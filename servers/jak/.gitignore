@@ -1,0 +1,25 @@
+# OSX
+.DS_Store
+
+# Java class and dump files
+*.class
+hs_err_pid*
+
+# Gradle files
+local.properties
+.gradle/
+build
+
+# Log Files
+*.log
+
+# Intellij
+*.iml
+.idea
+
+# Keystore files
+*.jks
+
+# CBL Temporary files
+CouchbaseLiteTemp
+
