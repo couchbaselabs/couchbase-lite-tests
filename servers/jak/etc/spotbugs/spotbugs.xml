@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ Created by G. Blake Meike on 3/11/19.
+-->
+
+<!--suppress XmlUnboundNsPrefix -->
+<FindBugsFilter>
+    <!-- ignore all issues in resource generation -->
+    <Match>
+        <Class name="~.*\.R\$.*"/>
+    </Match>
+
+    <!-- ignore all issues in manifest generation -->
+    <Match>
+        <Class name="~.*\.Manifest\$.*"/>
+    </Match>
+
+    <!-- These two are real problems, but our API embeds them -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP" />
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
+
+    <!-- I don't believe this... -->
+    <Match>
+        <Bug pattern="SF_SWITCH_NO_DEFAULT" />
+    </Match>
+
+</FindBugsFilter>

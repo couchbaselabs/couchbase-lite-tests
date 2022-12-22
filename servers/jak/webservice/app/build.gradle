@@ -1,0 +1,219 @@
+
+
+
+import com.github.spotbugs.snom.SpotBugsTask
+
+plugins {
+    id 'java'
+    id 'kotlin'
+    id 'war'
+    id 'com.bmuschko.tomcat'
+    id 'checkstyle'
+    id 'pmd'
+    id 'com.github.spotbugs'
+}
+
+
+ext {
+    COUCHBASE_LITE_VERSION = System.getProperty('version', "3.1.0-SNAPSHOT")
+    SPOTBUGS_VERSION = '4.4.2'
+    TOMCAT_VERSION = '9.0.1'
+
+    SHARED_DIR = "${ROOT_DIR}/shared"
+    ETC_DIR = "${ROOT_DIR}/etc"
+
+    REPORTS_DIR = "${buildDir}/reports"
+}
+
+// Set -Pverbose to get full console logs for tests
+def VERBOSE = project.hasProperty("verbose")
+
+// Set true to use mavenLocal instead of Proget
+def USE_LOCAL_MAVEN = project.hasProperty("useLocalMaven")
+
+java {
+    sourceSets {
+        main {
+            java.srcDirs = [
+                "src/main/java/",
+                "${SHARED_DIR}/common/main/java",
+                "${SHARED_DIR}/jvm/main/java"
+            ]
+            resources.srcDirs = ["${SHARED_DIR}/assets"]
+        }
+        test {
+            java.srcDirs = [
+                "${SHARED_DIR}/common/test/java",
+                "${projectDir}/src/test/java/"
+            ]
+        }
+    }
+}
+
+repositories {
+    if (USE_LOCAL_MAVEN) { mavenLocal() }
+    else {
+        maven {
+            url "http://proget.build.couchbase.com/maven2/cimaven"
+            // for build version < 3.0.0-160, use below maven url
+            // url "http://proget.build.couchbase.com/maven2/internalmaven"
+            allowInsecureProtocol = true
+        }
+    }
+
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly 'androidx.annotation:annotation:1.5.0'
+
+    providedCompile "javax.servlet:javax.servlet-api:4.0.1"
+    providedCompile "com.couchbase.lite:couchbase-lite-java-ee-macos:${COUCHBASE_LITE_VERSION}"
+
+    implementation 'com.squareup.moshi:moshi:1.14.0'
+
+    testImplementation 'junit:junit:4.13.2'
+
+    tomcat "org.apache.tomcat.embed:tomcat-embed-core:${TOMCAT_VERSION}",
+            "org.apache.tomcat.embed:tomcat-embed-logging-juli:9.0.0.M6",
+            "org.apache.tomcat.embed:tomcat-embed-jasper:${TOMCAT_VERSION}",
+            "com.couchbase.lite:couchbase-lite-java-ee-macos:${COUCHBASE_LITE_VERSION}"
+}
+
+war {
+    archiveBaseName = "CBLTestServer-Java"
+    archiveAppendix = "WS"
+    archiveVersion = COUCHBASE_LITE_VERSION
+}
+
+tomcat {
+    contextPath = '/'
+    httpProtocol = 'org.apache.coyote.http11.Http11Nio2Protocol'
+    ajpProtocol  = 'org.apache.coyote.ajp.AjpNio2Protocol'
+}
+
+def FILE_FILTER = ['**/gen/**', "okhttp3/**", "org/json/**"]
+
+/////// Checkstyle
+checkstyle {
+    toolVersion = "8.42"
+    dependencies {
+        checkstyle "com.puppycrawl.tools:checkstyle:${toolVersion}"
+        checkstyle "com.github.sevntu-checkstyle:sevntu-checks:1.39.0"
+        checkstyle fileTree(dir: "${ETC_DIR}/checkstyle", include: ['kotlin-checks-0.9.jar'])
+    }
+
+    configFile = file("${ETC_DIR}/checkstyle/checkstyle.xml")
+    configProperties = ['configDir': file("${ETC_DIR}/checkstyle")]
+
+    showViolations true
+}
+task checkstyle(type: Checkstyle) {
+    description 'Checkstyle'
+    group 'verification'
+
+    source sourceSets.main.java.srcDirs
+    include '**/*.java'
+    exclude FILE_FILTER
+
+    classpath = files()
+
+    reports {
+        xml {
+            enabled = true
+            setDestination(file("${REPORTS_DIR}/checkstyle.xml"))
+        }
+        html {
+            enabled = true
+            setDestination(file("${REPORTS_DIR}/checkstyle.html"))
+        }
+    }
+}
+
+/////// PMD
+pmd {
+    toolVersion '6.26.0'
+    ruleSets = []
+}
+task pmd(type: Pmd) {
+    description 'PMD'
+    group 'verification'
+
+    ruleSetFiles = files("${ETC_DIR}/pmd/pmd.xml")
+
+    source = sourceSets.main.java.srcDirs
+    include '**/*.java'
+    exclude FILE_FILTER
+
+    reports {
+        xml {
+            enabled = true
+            setDestination(file("${REPORTS_DIR}/pmd.xml"))
+        }
+        html {
+            enabled = true
+            setDestination(file("${REPORTS_DIR}/pmd.html"))
+        }
+    }
+}
+
+/////// SpotBugs
+// If SpotBug is run on code generated with Java 11
+// it will generate quite a few extraneous NULLCHECK warnings.
+// Sadly the problem is Java 11 code generation: the only solution
+// is to disable the check.
+spotbugs { toolVersion = SPOTBUGS_VERSION }
+['Html', 'Xml'].each { reportType ->
+    task("spotbugs${reportType}", type: SpotBugsTask) {
+        description "Spotbugs with ${reportType} report"
+        group 'verification'
+
+        dependsOn compileJava, processResources
+
+        effort = "max"
+        reportLevel = "medium"
+        ignoreFailures = false
+
+        sourceDirs = project.files(sourceSets.main.java.srcDirs)
+
+        classDirs = fileTree(dir: "${buildDir}/classes/java/main")
+
+        def classpaths = []
+        tasks.withType(JavaCompile).each { task -> classpaths = task.classpath }
+        classpaths.each { dir -> auxClassPaths += project.files(dir) }
+
+        excludeFilter = file("${ETC_DIR}/spotbugs/spotbugs.xml")
+        onlyAnalyze = ['com.couchbase.lite.-']
+
+        reports {
+            xml {
+                enabled = (reportType == "Xml")
+                setDestination(file("${REPORTS_DIR}/spotbugs.xml"))
+            }
+            html {
+                enabled = (reportType == "Html")
+                setDestination(file("${REPORTS_DIR}/spotbugs.html"))
+            }
+        }
+    }
+}
+
+test {
+    testLogging {
+        outputs.upToDateWhen { false }
+
+        events = ["failed", "skipped"]
+
+        showStandardStreams = VERBOSE
+
+        showCauses = true
+        showExceptions = true
+        showStackTraces = true
+        exceptionFormat = 'full'
+    }
+}
+
+task smokeTest(dependsOn: ['clean', 'compileJava', 'checkstyle', 'pmd', 'spotbugsHtml', 'testClasses'])
+
+
