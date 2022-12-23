@@ -3,8 +3,9 @@ package com.couchbase.lite.javaws.mobiletest;
 import androidx.annotation.NonNull;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.Reader;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
@@ -15,6 +16,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.couchbase.lite.internal.utils.StringUtils;
+import com.couchbase.lite.mobiletest.Args;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.Reply;
 import com.couchbase.lite.mobiletest.TestApp;
@@ -33,28 +35,37 @@ public class TestServerApp extends HttpServlet {
 
     @Override
     public void init() {
-        TestApp.init(new JavaWSTestKitApp(getServletContext().getServerInfo().replaceAll("\\s+", "_")));
+        TestApp.init(new JavaWSTestApp(getServletContext().getServerInfo().replaceAll("\\s+", "_")));
         MEMORY.compareAndSet(null, Memory.create(TestApp.getApp().getAppId()));
     }
 
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            final Reply reply = dispatchRequest(request.getRequestURI(), getPostData(request.getReader()));
+            final Reply reply = dispatchRequest(request.getRequestURI(), request.getInputStream());
+            final InputStream data = reply.getData();
+
             response.setStatus(HttpServletResponse.SC_OK);
             response.setHeader("Content-Type", reply.getContentType());
-            response.getOutputStream().write(reply.getData());
-            response.getOutputStream().flush();
-            response.getOutputStream().close();
+            response.setHeader("Content-Length", String.valueOf(reply.size()));
+
+            final OutputStream out = response.getOutputStream();
+            final byte[] buf = new byte[1024];
+            while (true) {
+                final int n = data.readNBytes(buf, 0, buf.length);
+                if (n <= 0) { break; }
+                out.write(buf, 0, n);
+            }
+            out.flush();
+            out.close();
         }
         catch (Exception e) {
             Log.w(TAG, "Request failed", e);
 
-            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.setHeader("Content-Type", "text/plain");
 
             final StringWriter sw = new StringWriter();
-            final PrintWriter pw = new PrintWriter(sw);
-            e.printStackTrace(pw);
+            e.printStackTrace(new PrintWriter(sw));
 
             response.getWriter().println(sw);
         }
@@ -73,7 +84,7 @@ public class TestServerApp extends HttpServlet {
 
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     @NonNull
-    private Reply dispatchRequest(@NonNull String req, @NonNull String body) throws Exception {
+    private Reply dispatchRequest(@NonNull String req, @NonNull InputStream body) throws Exception {
         Log.i(TAG, "Request: " + req);
 
         final String[] path = req.split("/");
@@ -83,15 +94,6 @@ public class TestServerApp extends HttpServlet {
         if (StringUtils.isEmpty(method)) { throw new IllegalArgumentException("Empty request"); }
 
         // Find and invoke the method on the RequestHandler.
-        return TestApp.getApp().getDispatcher().run(req, body, MEMORY.get());
-    }
-
-    @NonNull
-    private String getPostData(@NonNull Reader in) throws IOException {
-        final StringWriter out = new StringWriter();
-        final char[] buffer = new char[1024];
-        int read;
-        while ((read = in.read(buffer)) != -1) { out.write(buffer, 0, read); }
-        return out.toString();
+        return TestApp.getApp().getDispatcher().run(req, Args.parse(body), MEMORY.get());
     }
 }

@@ -9,6 +9,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 public final class Memory extends ObjectStore {
+    public static class Ref {
+        public final String key;
+
+        public Ref(@NonNull String key) { this.key = key; }
+
+        @Nullable
+        public <T> T lookup(@NonNull Memory mem, @NonNull Class<T> type) { return mem.get(key, type); }
+    }
+
     private final String id;
     private final String platform;
 
@@ -27,10 +36,14 @@ public final class Memory extends ObjectStore {
     }
 
     @NonNull
-    public String add(@NonNull Object value) {
+    public Ref add(@NonNull Object value) {
         final String address = "@" + nextAddress.getAndIncrement() + "_" + id + "_" + platform;
         synchronized (symTab) { symTab.put(address, value); }
-        return address;
+        return new Ref(address);
+    }
+
+    public void remove(@NonNull Ref ref) {
+        synchronized (symTab) { symTab.remove(ref.key); }
     }
 
     public void remove(@NonNull String address) {
@@ -44,7 +57,7 @@ public final class Memory extends ObjectStore {
 
     @Nullable
     @Override
-    public <T> T get(@NonNull String name, @NonNull Class<T> expectedType) {
+    protected <T> T get(@NonNull String name, @NonNull Class<T> expectedType) {
         synchronized (symTab) { return super.get(name, expectedType); }
     }
 }
