@@ -16,10 +16,11 @@
 package com.couchbase.lite.mobiletest;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import org.jetbrains.annotations.NotNull;
 
 
 public final class Dispatcher {
@@ -32,16 +33,14 @@ public final class Dispatcher {
 
     private final Map<String, Action> dispatchTable = new HashMap<>();
 
-    public void init() {
-        dispatchTable.put("version", (args, mem) -> Reply.create(TestApp.getApp().getAppVersion()));
-    }
+    public void init() { dispatchTable.put("version", (args, mem) -> Reply.from(TestApp.getApp().getAppVersion())); }
 
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     @NonNull
-    public Reply run(@NonNull String method, @Nullable String body, @NonNull Memory mem) throws Exception {
+    public Reply run(@NonNull String method, @NotNull Args args, @NonNull Memory mem) throws Exception {
         final Action action = dispatchTable.get(method);
         if (action == null) { throw new IllegalArgumentException("No such method: " + method); }
-        return action.run(Args.parse(body, mem), mem);
+        return action.run(args, mem);
     }
 }
 

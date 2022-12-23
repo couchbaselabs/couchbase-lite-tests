@@ -19,6 +19,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,7 +28,9 @@ public class ObjectStore {
     @NonNull
     private final Map<String, Object> args;
 
-    public ObjectStore(@NonNull Map<String, Object> args) { this.args = Collections.unmodifiableMap(args); }
+    public ObjectStore(@Nullable Map<String, Object> args) {
+        this.args = Collections.unmodifiableMap((args != null) ? args : new HashMap<>());
+    }
 
     public boolean contains(@NonNull String name) { return args.containsKey(name); }
 
@@ -64,7 +67,7 @@ public class ObjectStore {
     public Map getMap(@NonNull String name) { return get(name, Map.class); }
 
     @Nullable
-    public <T> T get(@NonNull String name, @NonNull Class<T> expectedType) {
+    protected <T> T get(@NonNull String name, @NonNull Class<T> expectedType) {
         final Object val = args.get(name);
         if (val == null) { return null; }
         final Class<?> actualType = val.getClass();

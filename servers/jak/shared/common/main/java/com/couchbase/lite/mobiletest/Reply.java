@@ -18,78 +18,50 @@ package com.couchbase.lite.mobiletest;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
-import com.squareup.moshi.Moshi;
+import okio.Buffer;
+
+import com.couchbase.lite.mobiletest.util.Json;
 
 
 public final class Reply {
-    public static final Reply EMPTY = create("I-1");
-
-    private static final Moshi SERIALIZER = new Moshi.Builder().build();
+    public static final Reply EMPTY = from("I-1");
 
     @NonNull
-    public static Reply create(@NonNull String type, @NonNull byte[] data) { return new Reply(type, data); }
-
-    @NonNull
-    public static Reply create(@NonNull String str) { return new Reply("text/plain", '"' + str + '"'); }
-
-    @NonNull
-    public static Reply create(@NonNull Object data, @NonNull Memory mem) {
-        return new Reply("text/plain", serialize(data, mem));
+    public static Reply from(@NonNull String str) {
+        final String data = '"' + str + '"';
+        return Reply.from("text/plain", data.getBytes(StandardCharsets.UTF_8));
     }
 
-    @SuppressWarnings("PMD.NPathComplexity")
     @NonNull
-    private static String serialize(@Nullable Object value, @NonNull Memory memory) {
-        if (value == null) { return "null"; }
-        if (value instanceof Boolean) { return ((Boolean) value) ? "true" : "false"; }
-        if (value instanceof Integer) { return "I" + value; }
-        if (value instanceof Long) { return "L" + value; }
-        if (value instanceof Float) { return "F" + value; }
-        if (value instanceof Double) { return "D" + value; }
-        if (value instanceof String) { return "\"" + value + "\""; }
-        if (value instanceof List) {
-            final List<String> list = new ArrayList<>();
-            for (Object object: (List<?>) value) { list.add(serialize(object, memory)); }
-            return SERIALIZER.adapter(List.class).serializeNulls().toJson(list);
-        }
-        if (value instanceof Map) {
-            final Map<String, String> map = new HashMap<>();
-            for (Map.Entry<?, ?> entry: ((Map<?, ?>) value).entrySet()) {
-                final Object key = entry.getKey();
-                if (!(key instanceof String)) {
-                    throw new IllegalArgumentException("Key is not a string in serialize: " + key);
-                }
-                map.put((String) key, serialize(entry.getValue(), memory));
-            }
-            return SERIALIZER.adapter(Map.class).serializeNulls().toJson(map);
-        }
-
-        return memory.add(value);
+    public static Reply from(@NonNull String contentType, @NonNull byte[] data) {
+        return new Reply(contentType, new ByteArrayInputStream(data), data.length);
     }
 
+    @NonNull
+    public static Reply from(@Nullable Object data) throws IOException {
+        final Buffer buf = new Json().serialize(data);
+        return new Reply("application/json", buf.inputStream(), buf.size());
+    }
 
     private final String contentType;
-    private final byte[] data;
+    private final InputStream data;
+    private final long size;
 
-    private Reply(@NonNull String contentType, @NonNull String data) {
-        this(contentType, data.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private Reply(@NonNull String contentType, @NonNull byte[] data) {
+    public Reply(@NonNull String contentType, @NonNull InputStream data, long size) {
         this.contentType = contentType;
-        this.data = Arrays.copyOf(data, data.length);
+        this.data = data;
+        this.size = size;
     }
 
     @NonNull
     public String getContentType() { return contentType; }
 
-    @NonNull
-    public byte[] getData() { return Arrays.copyOf(this.data, this.data.length); }
+    public InputStream getData() { return data; }
+
+    public long size() { return size; }
 }

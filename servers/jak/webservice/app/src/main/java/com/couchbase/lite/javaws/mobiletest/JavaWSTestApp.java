@@ -5,10 +5,10 @@ import androidx.annotation.NonNull;
 import com.couchbase.lite.mobiletest.BaseTestApp;
 
 
-public class JavaWSTestKitApp extends BaseTestApp {
+public class JavaWSTestApp extends BaseTestApp {
     private final String containerName;
 
-    public JavaWSTestKitApp(@NonNull String containerName) { this.containerName = containerName; }
+    public JavaWSTestApp(@NonNull String containerName) { this.containerName = containerName; }
 
     @NonNull
     @Override
