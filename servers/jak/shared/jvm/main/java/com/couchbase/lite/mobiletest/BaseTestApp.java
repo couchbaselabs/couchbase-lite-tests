@@ -19,6 +19,9 @@ import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.TLSIdentity;
 
 
+/**
+ * Code common to JVM test apps.
+ */
 public abstract class BaseTestApp extends TestApp {
     private final File directory;
 

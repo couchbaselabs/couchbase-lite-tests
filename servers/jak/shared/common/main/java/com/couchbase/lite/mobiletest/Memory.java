@@ -9,6 +9,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 public final class Memory extends ObjectStore {
+    public static final String PREFIX_REF = "@";
+
     public static class Ref {
         public final String key;
 
@@ -18,26 +20,23 @@ public final class Memory extends ObjectStore {
         public <T> T lookup(@NonNull Memory mem, @NonNull Class<T> type) { return mem.get(key, type); }
     }
 
-    private final String id;
-    private final String platform;
+    private final String identifierSuffix;
 
     private final Map<String, Object> symTab;
     private final AtomicInteger nextAddress = new AtomicInteger(0);
 
     @NonNull
-    public static Memory create(@NonNull String id) { return new Memory(id, new HashMap<>()); }
+    public static Memory create(@NonNull TestApp app) { return new Memory(app, new HashMap<>()); }
 
-
-    private Memory(@NonNull String id, @NonNull Map<String, Object> symTab) {
+    private Memory(@NonNull TestApp app, @NonNull Map<String, Object> symTab) {
         super(symTab);
-        this.id = id;
         this.symTab = symTab;
-        platform = TestApp.getApp().getPlatform();
+        identifierSuffix = "_" + app.getPlatform() + "_" + app.getAppId();
     }
 
     @NonNull
     public Ref add(@NonNull Object value) {
-        final String address = "@" + nextAddress.getAndIncrement() + "_" + id + "_" + platform;
+        final String address = "@" + nextAddress.getAndIncrement() + identifierSuffix;
         synchronized (symTab) { symTab.put(address, value); }
         return new Ref(address);
     }

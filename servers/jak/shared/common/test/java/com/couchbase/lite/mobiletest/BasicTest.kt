@@ -17,15 +17,23 @@ package com.couchbase.lite.mobiletest
 
 import org.junit.Assert
 import org.junit.Test
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.nio.charset.StandardCharsets
 
 class BasicTest : BaseTest() {
     @Test
     fun testGetVersion() {
-        val r = TestApp.getApp().dispatcher.run("version", Args(null), Memory.create("test"))
+
+        val r = TestApp.getApp().dispatcher.run(
+            2,
+            "testing",
+            Dispatcher.Method.GET,
+            "version",
+            ByteArrayInputStream("{}".toByteArray()))
+
         Assert.assertNotNull(r)
-        Assert.assertEquals("text/plain", r.contentType)
+        Assert.assertEquals("application/json", r.contentType)
+
         val out = ByteArrayOutputStream()
         val buffer = ByteArray(1024)
         while (true) {
@@ -33,9 +41,8 @@ class BasicTest : BaseTest() {
             if (n <= 0) { break; }
             out.write(buffer, 0, n)
         }
-        val s = out.toString("UTF-8")
 
-        Assert.assertEquals("\"Test Server (", s.substring(0, 14))
+        Assert.assertEquals("{\"version\":\"Test Server (", out.toString("UTF-8").substring(0, 25))
     }
 }
 

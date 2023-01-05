@@ -1,7 +1,5 @@
 package com.couchbase.lite.javaws.mobiletest;
 
-import androidx.annotation.NonNull;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -10,13 +8,14 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.couchbase.lite.internal.utils.StringUtils;
-import com.couchbase.lite.mobiletest.Args;
+import com.couchbase.lite.mobiletest.Dispatcher;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.Reply;
 import com.couchbase.lite.mobiletest.TestApp;
@@ -34,19 +33,56 @@ public class TestServerApp extends HttpServlet {
     private static final AtomicReference<Memory> MEMORY = new AtomicReference<>();
 
     @Override
-    public void init() {
-        TestApp.init(new JavaWSTestApp(getServletContext().getServerInfo().replaceAll("\\s+", "_")));
-        MEMORY.compareAndSet(null, Memory.create(TestApp.getApp().getAppId()));
+    public void init() { TestApp.init(new JavaWSTestApp()); }
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        dispatchRequest(Dispatcher.Method.GET, req, resp);
     }
 
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    @Override
+    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        dispatchRequest(Dispatcher.Method.PUT, req, resp);
+    }
+
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        dispatchRequest(Dispatcher.Method.POST, req, resp);
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        dispatchRequest(Dispatcher.Method.DELETE, req, resp);
+    }
+
+    private void dispatchRequest(Dispatcher.Method method, HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+        final TestApp app = TestApp.getApp();
+        int version = 1;
         try {
-            final Reply reply = dispatchRequest(request.getRequestURI(), request.getInputStream());
+            try { version = Integer.parseInt(request.getHeader(TestApp.HEADER_PROTOCOL_VERSION)); }
+            catch (NumberFormatException ignore) { }
+
+            String client = request.getHeader(TestApp.HEADER_SENDER);
+            if (client == null) { client = TestApp.DEFAULT_CLIENT; }
+
+            final String reqUri = request.getRequestURI();
+            final String[] path = reqUri.split("/");
+            final int pathLen = path.length;
+            final String req = (pathLen <= 0) ? null : path[pathLen - 1];
+            if (StringUtils.isEmpty(req)) { throw new IllegalArgumentException("Empty request"); }
+
+            Log.i(TAG, "Request(" + version + ")@" + client + " " + method + ":" + req);
+
+            final Reply reply = app.getDispatcher().run(version, client, method, req, request.getInputStream());
+
             final InputStream data = reply.getData();
 
             response.setStatus(HttpServletResponse.SC_OK);
+
             response.setHeader("Content-Type", reply.getContentType());
             response.setHeader("Content-Length", String.valueOf(reply.size()));
+
+            response.setHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));
+            response.setHeader(TestApp.HEADER_SENDER, app.getAppId());
 
             final OutputStream out = response.getOutputStream();
             final byte[] buf = new byte[1024];
@@ -64,36 +100,13 @@ public class TestServerApp extends HttpServlet {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.setHeader("Content-Type", "text/plain");
 
+            response.setHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));
+            response.setHeader(TestApp.HEADER_SENDER, app.getAppId());
+
             final StringWriter sw = new StringWriter();
             e.printStackTrace(new PrintWriter(sw));
 
             response.getWriter().println(sw);
         }
-    }
-
-    /**
-     * GET method, for testing
-     */
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        response.setStatus(HttpServletResponse.SC_OK);
-        response.setHeader("Content-Type", "text/plain");
-        response.getOutputStream().write(CBL_OK);
-        response.getOutputStream().flush();
-        response.getOutputStream().close();
-    }
-
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
-    @NonNull
-    private Reply dispatchRequest(@NonNull String req, @NonNull InputStream body) throws Exception {
-        Log.i(TAG, "Request: " + req);
-
-        final String[] path = req.split("/");
-        final int pathLen = path.length;
-
-        final String method = (pathLen <= 0) ? null : path[pathLen - 1];
-        if (StringUtils.isEmpty(method)) { throw new IllegalArgumentException("Empty request"); }
-
-        // Find and invoke the method on the RequestHandler.
-        return TestApp.getApp().getDispatcher().run(req, Args.parse(body), MEMORY.get());
     }
 }

@@ -22,11 +22,7 @@ import com.couchbase.lite.CouchbaseLiteException
 import com.couchbase.lite.KeyStoreUtils
 import com.couchbase.lite.TLSIdentity
 import com.couchbase.lite.mobiletest.TestApp
-import com.couchbase.lite.mobiletest.util.Log
 import java.io.IOException
-import java.net.Inet4Address
-import java.net.NetworkInterface
-import java.net.SocketException
 import java.security.KeyStoreException
 import java.security.NoSuchAlgorithmException
 import java.security.UnrecoverableEntryException
@@ -36,39 +32,17 @@ import java.util.*
 
 class AndroidTestApp(private val context: Context) : TestApp() {
 
-    override fun initCBL() {
-        CouchbaseLite.init(context, true)
-    }
+    override fun initCBL() = CouchbaseLite.init(context, true)
 
     override fun getPlatform() = "android"
 
     override fun getFilesDir() = context.filesDir
 
-    override fun getAsset(name: String) = context.getAssets().open(name)
+    override fun getAsset(name: String) = context.assets.open(name)
 
     override fun encodeBase64(hashBytes: ByteArray) = Base64.encodeToString(hashBytes, Base64.NO_WRAP)
 
     override fun decodeBase64(encodedBytes: String) = Base64.decode(encodedBytes, Base64.NO_WRAP)
-
-    override fun getAppId(): String {
-        try {
-            for (intf in Collections.list(NetworkInterface.getNetworkInterfaces())) {
-                val iFaceName = intf.name
-                Log.d(TAG, "intf_name: $iFaceName")
-                for (inetAddress in Collections.list(intf.inetAddresses)) {
-                    if (!inetAddress.isLoopbackAddress
-                        && inetAddress is Inet4Address
-                        && (iFaceName == "eth1" || iFaceName == "wlan0") // ???
-                    ) {
-                        inetAddress.getHostAddress()?.let { return it }
-                    }
-                }
-            }
-        } catch (e: SocketException) {
-            Log.w(TAG, "Failed getting device IP address", e)
-        }
-        return "unknown"
-    }
 
     @Throws(CouchbaseLiteException::class)
     override fun getCreateIdentity(): TLSIdentity {

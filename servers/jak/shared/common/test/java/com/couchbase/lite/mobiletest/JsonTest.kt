@@ -15,18 +15,50 @@
 //
 package com.couchbase.lite.mobiletest
 
-import com.couchbase.lite.mobiletest.util.Json
+import com.couchbase.lite.mobiletest.json.JsonV1
+import com.couchbase.lite.mobiletest.json.JsonV2
 import org.junit.Assert
 import org.junit.Test
 import java.io.ByteArrayInputStream
 
 class JsonTest : BaseTest() {
     @Test
-    fun testArgs() {
-        val stream = ByteArrayInputStream("{\"this\": { \"foo\": \"L55\"}}".toByteArray(Charsets.UTF_8))
+    fun testJson1Args() {
+        val data: MutableMap<String, Any?> = mutableMapOf("red" to null)
+        data["green"] = listOf(true, "string", 43, 44L, 2.71828F, 2.71828, Memory.Ref("x1"))
 
-        val parsed = Json().parse(stream, Map::class.java)
+        val json = JsonV1().serializeReply(data)
+        val parsed = JsonV1().parseTask(json.inputStream())
 
-        Assert.assertEquals(55L, (parsed["this"] as Map<*, *>?)?.get("foo"))
+        Assert.assertNull(parsed["red"])
+
+        val list = parsed["green"] as List<Any?>
+        Assert.assertTrue(list[0] as Boolean)
+        Assert.assertEquals("string", list[1])
+        Assert.assertEquals(43, list[2])
+        Assert.assertEquals(44L, list[3])
+        Assert.assertEquals(2.71828F, list[4])
+        Assert.assertEquals(2.71828, list[5])
+        Assert.assertEquals("x1", (list[6] as Memory.Ref).key)
+    }
+
+    @Test
+    fun testJson2Args() {
+        val data: MutableMap<String, Any?> = mutableMapOf("red" to null)
+        data["green"] = listOf(true, "string", 43, 44L, 2.71828F, 2.71828, Memory.Ref("x1"))
+
+        val json = JsonV2().serializeReply(data)
+        val parsed = JsonV2().parseTask(json.inputStream())
+
+        Assert.assertNull(parsed["red"])
+
+        val list = parsed["green"] as List<Any?>
+        Assert.assertTrue(list[0] as Boolean)
+        Assert.assertEquals("string", list[1])
+        Assert.assertEquals(43L, list[2])
+        Assert.assertEquals(44L, list[3])
+        Assert.assertEquals(2.71828, list[4])
+        Assert.assertEquals(2.71828, list[5])
+        Assert.assertEquals("x1", (list[6] as Memory.Ref).key)
     }
 }
