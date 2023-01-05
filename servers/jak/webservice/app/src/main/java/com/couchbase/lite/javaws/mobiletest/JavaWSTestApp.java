@@ -6,15 +6,7 @@ import com.couchbase.lite.mobiletest.BaseTestApp;
 
 
 public class JavaWSTestApp extends BaseTestApp {
-    private final String containerName;
-
-    public JavaWSTestApp(@NonNull String containerName) { this.containerName = containerName; }
-
     @NonNull
     @Override
     public String getPlatform() { return "java-webservice"; }
-
-    @NonNull
-    @Override
-    public String getAppId() { return containerName; }
 }

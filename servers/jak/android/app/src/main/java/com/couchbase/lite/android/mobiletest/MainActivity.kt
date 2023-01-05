@@ -18,9 +18,8 @@ package com.couchbase.lite.android.mobiletest
 import android.os.Bundle
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import com.couchbase.lite.mobiletest.util.Log
 import com.couchbase.lite.mobiletest.Server
-import com.couchbase.lite.mobiletest.TestApp
+import com.couchbase.lite.mobiletest.util.Log
 import java.io.IOException
 
 
@@ -38,16 +37,17 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        val id = TestApp.getApp().appId
-        val server = Server(id)
+        val server = Server()
 
-
-        val port = server.myPort
-        Log.i(TAG, "Server launched at $id:$port")
-        status?.text = getString(R.string.running, id, port)
         try {
             server.start()
             this.server = server
+
+            val port = server.myPort
+            val address = server.myServerSocket.inetAddress.hostAddress
+
+            Log.i(TAG, "Server launched at $address:$port")
+            status?.text = getString(R.string.running, address, port)
         } catch (e: IOException) {
             Log.e(TAG, "Failed starting server", e)
             status?.text = getString(R.string.fail)
@@ -60,4 +60,5 @@ class MainActivity : AppCompatActivity() {
         server?.stop()
         status?.setText(R.string.stopped)
     }
+
 }

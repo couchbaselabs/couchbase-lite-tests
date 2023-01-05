@@ -101,6 +101,7 @@ repositories {
     mavenCentral()
 }
 
+configurations.all { resolutionStrategy.cacheChangingModulesFor 1, 'seconds' }
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.5.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
@@ -114,12 +115,13 @@ dependencies {
     // for build version > 3.0.0-160 but < 3.0.0-177, use package name:
     // implementation "com.couchbase.lite:couchbase-lite-kt-android-ee:${COUCHBASE_LITE_VERSION}"
     // for build version > 3.0.0-177, use package name:
-    implementation "com.couchbase.lite:couchbase-lite-android-ee-ktx:${COUCHBASE_LITE_VERSION}"
+    implementation ("com.couchbase.lite:couchbase-lite-android-ee-ktx:${COUCHBASE_LITE_VERSION}") { changing = true }
+
 
     testImplementation 'junit:junit:4.13.2'
 
-    androidTestImplementation 'androidx.test.ext:junit:1.1.4'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
 
 

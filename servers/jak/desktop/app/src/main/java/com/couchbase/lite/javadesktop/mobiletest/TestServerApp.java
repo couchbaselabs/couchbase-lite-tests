@@ -87,7 +87,7 @@ public class TestServerApp implements Daemon {
     public void start() {
         final String id = TestApp.getApp().getAppId();
 
-        final Server server = new Server(id);
+        final Server server = new Server();
         if (!SERVER.compareAndSet(null, server)) { throw new IllegalStateException("Attempt to restart server"); }
 
         Log.i(TAG, "Server launched at " + id + ":" + server.myPort);

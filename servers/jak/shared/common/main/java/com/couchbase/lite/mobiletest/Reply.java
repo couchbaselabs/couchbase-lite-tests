@@ -22,10 +22,11 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 import okio.Buffer;
 
-import com.couchbase.lite.mobiletest.util.Json;
+import com.couchbase.lite.mobiletest.json.Json;
 
 
 public final class Reply {
@@ -43,8 +44,8 @@ public final class Reply {
     }
 
     @NonNull
-    public static Reply from(@Nullable Object data) throws IOException {
-        final Buffer buf = new Json().serialize(data);
+    public static Reply from(@Nullable Map<String, Object> data) throws IOException {
+        final Buffer buf = Json.getSerializer().serializeReply(data);
         return new Reply("application/json", buf.inputStream(), buf.size());
     }
 

@@ -37,12 +37,18 @@ import com.couchbase.lite.LogDomain;
 import com.couchbase.lite.LogLevel;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
+import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 public abstract class TestApp {
     protected static final String TAG = "APP";
 
+    public static final String HEADER_PROTOCOL_VERSION = "CBLTest-Protocol-Version";
+    public static final String HEADER_SENDER = "CBLTest-Sender";
+    public static final String DEFAULT_CLIENT = "xyxyzy";
+
     private static final AtomicReference<TestApp> APP = new AtomicReference<>();
+    private static final AtomicReference<String> APP_ID = new AtomicReference<>();
 
     public static void init(@NonNull TestApp app) {
         if (!APP.compareAndSet(null, app)) { throw new IllegalStateException("Attempt to re-initialize the Test App"); }
@@ -56,12 +62,10 @@ public abstract class TestApp {
         return app;
     }
 
-    private final Dispatcher dispatcher = new Dispatcher();
+
+    private Dispatcher dispatcher;
 
     protected abstract void initCBL();
-
-    @NonNull
-    public abstract String getAppId();
 
     @NonNull
     public abstract String getPlatform();
@@ -91,13 +95,20 @@ public abstract class TestApp {
     public abstract TLSIdentity getClientCertsIdentity() throws Exception;
 
     @NonNull
-    public Dispatcher getDispatcher() { return dispatcher; }
+    public final String getAppId() { return APP_ID.get(); }
 
     @NonNull
-    public String getAppVersion() { return "Test Server (" + getPlatform() + ") :: " + CBLVersion.getVersionInfo(); }
+    public final String getAppVersion() {
+        return "Test Server (" + getPlatform() + ") :: " + CBLVersion.getVersionInfo();
+    }
+
+    // The dispatcher is down here because it probably takes it a while to initialize.
+    // Do it early, before showing the UI...
+    @NonNull
+    public final Dispatcher getDispatcher() { return dispatcher; }
 
     @NonNull
-    public List<Certificate> getAuthenticatorCertsList() throws CertificateException, IOException {
+    public final List<Certificate> getAuthenticatorCertsList() throws CertificateException, IOException {
         final CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
 
         final List<Certificate> certsList = new ArrayList<>();
@@ -126,6 +137,8 @@ public abstract class TestApp {
     }
 
     private void init() {
+        APP_ID.set(StringUtils.randomString(26));
+
         initCBL();
 
         Database.log.getConsole().setLevel(LogLevel.DEBUG);
@@ -133,6 +146,7 @@ public abstract class TestApp {
 
         // The dispatcher is down here because it probably takes it a while to initialize.
         // Do it early, before showing the UI...
+        dispatcher = new Dispatcher(this);
         dispatcher.init();
     }
 }

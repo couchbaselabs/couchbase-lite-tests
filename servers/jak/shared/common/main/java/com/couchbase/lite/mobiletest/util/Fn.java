@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2022 Couchbase, Inc All rights reserved.
+// Copyright (c) 2023 Couchbase, Inc All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,16 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest;
+package com.couchbase.lite.mobiletest.util;
 
-import org.junit.BeforeClass;
-
-import com.couchbase.lite.javaws.mobiletest.JavaWSTestApp;
-
-
-public class BaseTest {
-    @BeforeClass
-    public static void setupTests() {
-        TestApp.init(new JavaWSTestApp());
+public class Fn {
+    @FunctionalInterface
+    public interface Supplier<T> {
+        T get();
     }
 }
