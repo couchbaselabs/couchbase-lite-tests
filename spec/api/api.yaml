@@ -1,0 +1,359 @@
+openapi: 3.0.3
+info:
+  title: Couchbase Lite Test Server API
+  description: |-
+    This is a REST API specification for Couchbase Lite Test Server.
+
+    The APIs except GET '/' requires the following request headers:
+    * CBLTest-API-Version (integer)
+    * CBLTest-Client-ID (UUID)
+
+    The response headers of all APIs will contains the following response headers:
+    * CBLTest-API-Version (integer)
+    * CBLTest-Server-ID (UUID)
+  version: 1.0.0
+tags:
+  - name: API
+paths:
+  /:
+    get:
+      tags:
+        - API
+      summary: Get Test Server information
+      description: |- 
+        Get Test Server information containing the following information (tentative):
+
+        * version : Test Server version number. This is probably the same as CBL release number?
+        * apiVersion: API version number. This probably increases when we have breaking changes?
+        * cbl: The name of the CBL library used.
+        * device : Device or platform information that the test server is running on.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerInfo'
+  /reset:
+    post:
+      tags:
+        - API
+      summary: Reset the test server
+      description: |- 
+        Reset the test server by deleting all of the databases and re-creating new databases with prebuilt datasets if specified. 
+      operationId: reset
+      requestBody:
+        description: |- 
+          The request object describes how the databases will be setup after being reset. The properties include:
+
+          * **datasets** (Optional) : the datasets which are prebuilt databases to be copied as the specified database names.
+            The data structure is a JSON dictionary where the keys are the dataset names and the values are an array of the
+            database names. Without specified, no databases will be created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetConfiguration'
+        required: true
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Error'
+        '405':
+          description: Operation Not Allowed
+  /getAllDocumentIDs:
+    post:
+      tags:
+        - API
+      summary: Get all document IDs
+      description: Get all document IDs from the specified collections
+      operationId: getAllDocumentIDs
+      requestBody:
+        description: |- 
+          The request object provides a list of the collections in the specified database. The properties include: 
+
+          * **database** : The database name
+          * **collections** : An array of the collection names. The collection name is in the <scope-name>.<collection-name> format.
+
+          If the specified database is not found, the 400 error will be returned.
+
+          If the specified collections are not found, the response will not included the collections in its body.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Collections'
+        required: true
+      responses:
+        '200':
+          description: |- 
+            Success
+
+            The response body is a dictionary where keys are the collection name and values are an array of document IDs.
+            
+            If the specified collections in the request, the dictionary will not contain those collections.
+          content:
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/DocumentIDs'
+        '400':
+          $ref: '#/components/responses/Error'
+        '405':
+          description: Operation Not Allowed
+  /startReplicator:
+    post:
+      tags:
+        - API
+      summary: Create and start a replicator
+      description: |- 
+        Create and start a replicator. If success, the created replicator identifier will be returned.
+      operationId: startReplicator
+      requestBody:
+        description: |- 
+          The request object containing the replicator configuration and the reset checkpoint flag 
+          used when starting the replicator.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['config']
+              properties:
+                config:
+                  $ref: '#/components/schemas/ReplicatorConfiguration'
+                reset:
+                  type: boolean
+                  example: false
+        required: true
+      responses:
+        '200':
+          description: |- 
+            Success
+
+            The response body is an object containing the replicator object identifier.
+          content:
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/Replicator'
+        '400':
+          $ref: '#/components/responses/Error'
+        '405':
+          description: Operation Not Allowed
+  /getReplicatorStatus:
+    post:
+      tags:
+        - API
+      summary: Get the current status of the replicator
+      description: Get the current status of the replicator.
+      operationId: getReplicatorStatus
+      requestBody:
+        description: |- 
+          The request object containing the replicator identifier.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Replicator'
+        required: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReplicatorStatus'
+        '400':
+          $ref: '#/components/responses/Error'
+        '405':
+          description: Operation Not Allowed
+components:
+  schemas:
+    Collections:
+      type: object
+      properties:
+        database:
+          type: string
+          example: 'db1'
+        collections:
+          type: array
+          items:
+            type: string
+          example: ['catalog.cloths', 'catalog.shoes']
+    DocumentIDs:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string
+      example: { 'catalog.cloths': ['c001', 'c002'], 
+                 'catalog.shoes': ['s001', 's002', 's003']}
+    Error:
+      type: object
+      required: ['domain', 'code']
+      properties:
+        domain:
+          type: integer
+          format: int32
+          example: 1
+        code: 
+          type: integer
+          format: int32
+          example: 1
+        message: 
+          type: string
+          example: 'This is an error'
+    Replicator:
+      type: object
+      required: ['id']
+      properties:
+        id: 
+          type: string
+          format: uuid
+          example: '123e4567-e89b-12d3-a456-426614174000'
+    ReplicatorBasicAuthenticator:
+      type: object
+      required: ['type', 'username', 'password']
+      properties:
+        'type':
+          type: string
+          enum: ['BASIC']
+        username:
+          type: string
+          example: 'user1'
+        password:
+          type: string
+          example: 'p@ssw0rd'
+    ReplicatorSessionAuthenticator:
+      type: object
+      required: ['type', 'sessionID']
+      properties:
+        'type':
+          type: string
+          enum: ['SESSION']
+        sessionID:
+          type: string
+          example: 'SG12345'
+        cookieName:
+          type: string
+          example: 'sessionID'
+    ReplicatorConfiguration:
+      type: object
+      required: ['database', 'collections', 'endpoint']
+      properties:
+        database:
+          type: string
+          example: 'db1'
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicationCollection'
+        endpoint:
+          type: string
+          example: "wss://localhost:4985/db"
+        replicatorType:
+          type: string
+          enum:
+            - pushAndPull
+            - push
+            - pull
+          example: pushAndPull
+        continuous:
+          type: boolean
+          example: true
+        authenticator:
+          oneOf:
+            - $ref: '#/components/schemas/ReplicatorBasicAuthenticator'
+            - $ref: '#/components/schemas/ReplicatorSessionAuthenticator'
+    ReplicationCollection:
+      type: object
+      required: ['collection']
+      properties:
+        collection: 
+          type: string
+          example: 'store.cloths'
+        channels:
+          type: array
+          items:
+            type: string
+          example: ['A', 'B']
+        documentIDs:
+          type: array
+          items:
+            type: string
+          example: ['doc1', 'doc2']
+    ReplicatorStatus:
+      type: object
+      required: ['activity', 'progress']
+      properties:
+        activity: 
+          type: string
+          enum: ['STOPPED', 'OFFLINE', 'CONNECTING', 'IDLE', 'BUSY']
+        progress:
+          type: object
+          properties:
+            complete:
+              type: number
+              format: document
+        error:
+          $ref: '#/components/schemas/Error'
+    ResetConfiguration:
+      type: object
+      properties:
+        datasets:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example: { 'catalog': ['db1', 'db2'] }
+    ServerInfo:
+      type: object
+      required: ['version']
+      properties:
+        version:
+          type: string
+          example: "3.1.0"
+        apiVersion:
+          type: integer
+          example: 1
+        cbl:
+          type: string
+          example: "couchbase-lite-android"
+        device:
+          type: object
+          properties:
+            model:
+              description: 'Device Model Name'
+              type: string
+              example: 'Android Nexus X'
+            systemName:
+              description: 'Operating System Name'
+              type: string
+              example: 'Android OS Name'
+            systemVersion:  
+              description: 'Operating System Version'
+              type: string
+              example: '6.0.0'
+            systemApiVersion:  
+              description: 'Operating System API Version'
+              type: string
+              example: '19'
+  responses:
+    Error:
+      description: |- 
+        An error response object containing the following error including domain, error code, and message.
+        
+        Domains:
+          * 0: TESTSERVER
+          * 1: CBL
+          * 2: POSIX
+          * 3: SQLITE
+          * 4: FLEECE
+          * 5: NETWORK
+          * 6: WEBSOCKET
+
+        The domains besides TESTSERVER are from CouchbaseLiteException.
+
+        The TESTSERVER error codes:
+          * 1: NotFound | Resource such as the database or replicator is not found        
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
