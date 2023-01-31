@@ -14,13 +14,13 @@
 
 ### SG Dataset
 
-| Collections         | #Docs       | #Size (bytes) |
-| :------------------ | ----------- | ------------- |
-| inventory.airline   | 0           | 0             |
-| inventory.route     | 0           | 0             |
-| inventory.airport   | 1960        | 455K          |
-| inventory.landmark  | 4490        | 2.86M         |
-| inventory.hotel     | 459         | TBD           |
+| Collections         | #Docs       | #Size (bytes) | Channels |
+| :------------------ | ----------- | ------------- |----------
+| inventory.airline   | 0           | 0             | country ("United States", "United Kingdom", "France") |
+| inventory.route     | 0           | 0             | 
+| inventory.airport   | 1960        | 455K          | country ("United States", "United Kingdom", "France") |
+| inventory.landmark  | 4490        | 2.86M         | country ("United States", "United Kingdom", "France") |
+| inventory.hotel     | 459         | TBD           | country ("United States", "United Kingdom", "France") |
 
 Note: the documents in the `inventory.hotel` collections of CBL and SG will have different document IDs.
 
