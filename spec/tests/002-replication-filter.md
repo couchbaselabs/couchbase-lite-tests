@@ -43,7 +43,7 @@ Test that the replicator will push only the docs specified in the document ids f
          * documentIDs : `route_10000`, `route_10001`
     * endpoint: `/travel-sample-inventory`
     * type: push
-    * continuos: false
+    * continuous: false
 3. Wait until the replicator is stopped.
 4. Check that only docs specified in the documentIDs filters are replicated except `inventory.airline`.`airline_1x`
 5. Update docs in the local database (NEED_API)
@@ -70,7 +70,7 @@ Test that the replicator will pull only the docs specified in the document ids f
          * documentIDs : `landmark_10019`, `landmark_10156`
     * endpoint: `/travel-sample-inventory`
     * type: pull
-    * continuos: false
+    * continuous: false
 3. Wait until the replicator is stopped.
 4. Check that only docs specified in the documentIDs filters are replicated except `inventory.airport`.`airport_1x`.
 5. Update docs on SG
@@ -97,7 +97,7 @@ Test that the replicator will pull only the docs specified in the channels filte
          * channels : `France`
     * endpoint: `/travel-sample-inventory`
     * type: pull
-    * continuos: false
+    * continuous: false
 3. Wait until the replicator is stopped.
 4. Check that only docs in the specified channels are pulled.
 5. Update docs on SG
@@ -121,14 +121,14 @@ Test that the replicator will push only the docs that are passed from the push f
       * `inventory.airline`
          * pushFilter:
             * name: `documentIDs`
-            * params: `{ "documentIDs": { "inventory.airline": "airline_10", "airline_22", "airline_1x"} }`
+            * params: `{ "documentIDs": ["airline_10", "airline_22", "airline_1x"] }`
       * `inventory.route`
          * pushFilter:  
             * name: `deletedDocumentsOnly`
             * params: `{}`
     * endpoint: `/travel-sample-inventory`
     * type: push
-    * continuos: false
+    * continuous: false
 3. Wait until the replicator is stopped.
 4. Check that only docs passed the push filters are replicated.
 5. Update docs in the local database (NEED_API)
@@ -152,14 +152,14 @@ Test that the replicator will pull only the docs that are passed from the pull f
       * `inventory.airport`
          * pullFilter:
             * name: `documentIDs`  
-            * params : `{ "documentIDs": {"inventory.airport": "airport_1254", "airport_1260", "airport_1x"} }`
+            * params : `{ "documentIDs": ["airport_1254", "airport_1260", "airport_1x"] }`
       * `inventory.landmark`
          * pullFilter:  
             * name: `deletedDocumentsOnly`
             * params: `{}`
     * endpoint: `/travel-sample-inventory`
     * type: pull
-    * continuos: false
+    * continuous: false
 3. Wait until the replicator is stopped.
 4. Check that only docs passed the pull filters are replicated.
 5. Update docs on SG
