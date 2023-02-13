@@ -105,7 +105,8 @@ paths:
         - API
       summary: Update documents in the database.
       description: |-
-        Perform document updates in batch, including save (create or update), delete and purge documents in the database.
+        Perform document updates in batch. The request body contains an array of DatabaseUpdateItem object which describes how documents are updated, deleted or purged.
+        For updating a document, the changes to the document are specified as delta in updatedProperties and removedProperties key of the DatabaseUpdateItem.
       operationId: updateDatabase
       requestBody:
         description: |-
@@ -216,6 +217,24 @@ components:
           type: string
       example: { 'catalog.cloths': ['c001', 'c002'], 
                  'catalog.shoes': ['s001', 's002', 's003']}
+    DocumentReplication:
+      type: object
+      properties:
+        collection:
+          type: string
+          example: 'store.cloths'
+        documentID:
+          type: string
+          example: 'doc1'
+        isPush: 
+          type: boolean
+          example: true
+        flags: 
+          type: integer
+          format: int32
+          example: 2
+        error:
+          $ref: '#/components/schemas/Error'
     DatabaseUpdateItem:
       type: object
       required: ['type', 'collection', 'documentID']
@@ -230,10 +249,14 @@ components:
         documentID:
           type: string
           example: 'doc1'
-        properties:
+        updatedProperties:
           type: object
           additionalProperties: { }
           example: {'name': 'Cool Sport Tech Fleece Shirt'}
+        removedProperties:
+          type: object
+          additionalProperties: { }
+          example: {'vendor': {'info': null}}
     Error:
       type: object
       required: ['domain', 'code']
@@ -358,6 +381,10 @@ components:
             documentCount:
               type: number
               format: int64
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentReplication'
         error:
           $ref: '#/components/schemas/Error'
     ResetConfiguration:
