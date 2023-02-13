@@ -99,6 +99,39 @@ paths:
           $ref: '#/components/responses/Error'
         '405':
           description: Operation Not Allowed
+  /updateDatabase:
+    post:
+      tags:
+        - API
+      summary: Update documents in the database.
+      description: |-
+        Perform document updates in batch. The request body contains an array of DatabaseUpdateItem object which describes how documents are updated, deleted or purged.
+        For updating a document, the changes to the document are specified as delta in updatedProperties and removedProperties key of the DatabaseUpdateItem.
+      operationId: updateDatabase
+      requestBody:
+        description: |-
+          The request object containing document update items that will be performed in batch.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['database', 'updates']
+              properties:
+                database:
+                  type: string
+                  example: 'db1'
+                updates:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/DatabaseUpdateItem'
+        required: true
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/components/responses/Error'
+        '405':
+          description: Operation Not Allowed
   /startReplicator:
     post:
       tags:
@@ -184,6 +217,46 @@ components:
           type: string
       example: { 'catalog.cloths': ['c001', 'c002'], 
                  'catalog.shoes': ['s001', 's002', 's003']}
+    DocumentReplication:
+      type: object
+      properties:
+        collection:
+          type: string
+          example: 'store.cloths'
+        documentID:
+          type: string
+          example: 'doc1'
+        isPush: 
+          type: boolean
+          example: true
+        flags: 
+          type: integer
+          format: int32
+          example: 2
+        error:
+          $ref: '#/components/schemas/Error'
+    DatabaseUpdateItem:
+      type: object
+      required: ['type', 'collection', 'documentID']
+      properties:
+        type: 
+          type: string
+          enum: ['UPDATE', 'DELETE', 'PURGE']
+          example: 'UPDATE'
+        collection:
+          type: string
+          example: 'store.cloths'
+        documentID:
+          type: string
+          example: 'doc1'
+        updatedProperties:
+          type: object
+          additionalProperties: { }
+          example: {'name': 'Cool Sport Tech Fleece Shirt'}
+        removedProperties:
+          type: object
+          additionalProperties: { }
+          example: {'vendor': {'info': null}}
     Error:
       type: object
       required: ['domain', 'code']
@@ -278,6 +351,19 @@ components:
           items:
             type: string
           example: ['doc1', 'doc2']
+        pushFilter:
+          $ref: '#/components/schemas/ReplicationFilter'
+    ReplicationFilter:
+      type: object
+      required: ['name']
+      properties:
+        name:
+          type: string
+          example: 'documentIDs'
+        params:
+          type: object
+          additionalProperties: { }
+          example: { 'documentIDs': ['doc1', 'doc2'] }
     ReplicatorStatus:
       type: object
       required: ['activity', 'progress']
@@ -287,10 +373,18 @@ components:
           enum: ['STOPPED', 'OFFLINE', 'CONNECTING', 'IDLE', 'BUSY']
         progress:
           type: object
+          required: ['complete', 'documentCount']
           properties:
             complete:
               type: number
-              format: document
+              format: double
+            documentCount:
+              type: number
+              format: int64
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentReplication'
         error:
           $ref: '#/components/schemas/Error'
     ResetConfiguration:
