@@ -196,10 +196,93 @@ paths:
           $ref: '#/components/responses/Error'
         '405':
           description: Operation Not Allowed
+  /snapshotDocuments:
+    post:
+      tags:
+        - API
+      summary: Snapshot documents for verifying changes
+      description: |- 
+        Given a list of document IDs, snapshot the documents by getting and saving the documents in the memory. For the non-existing or deleted documents, the documents will be recorded as null.
+        
+        The API will return a UUID of the snapshot, which can be used when calling POST /verifyDocuments requests to verify changes in the local database after finishing replication. 
+      operationId: snapshotDocuments
+      requestBody:
+        description: |-
+          The request object containing the IDs of the documents to be snapshotted.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/DocumentID'
+        required: true
+      responses:
+        '200':
+          description: |- 
+            Success
+
+            The response body is an object containing the snapshot identifier.
+          content:
+            application/json:
+              schema: 
+                type: object
+                required: ['id']
+                properties:
+                  id: 
+                    type: string
+                    format: uuid
+                    example: '123e0000-e89b-12d3-a456-426614174000'
+        '400':
+          $ref: '#/components/responses/Error'
+        '405':
+          description: Operation Not Allowed
+  /verifyDocuments:
+    post:
+      tags:
+        - API
+      summary: Verify document changes from a document snapshot.
+      description: |- 
+        Verify document changes from a document snapshot. The request body contains an array of changes to be verified.
+      operationId: verifyDocuments
+      requestBody:
+        description: Verify document changes from the given document snapshot recorded by using POST /snapshotDocuments.
+        content:
+          application/json:
+            schema: 
+              type: object
+              properties:
+                database:
+                  type: string
+                  example: 'db1'
+                snapshot:
+                  type: string
+                  format: uuid
+                  example: '123e0000-e89b-12d3-a456-426614174000'
+                changes:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/DatabaseUpdateItem'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: 
+                type: object
+                required: ['result']
+                properties:
+                  result: 
+                    type: boolean
+                    example: true
+        '400':
+          $ref: '#/components/responses/Error'
+        '405':
+          description: Operation Not Allowed
 components:
   schemas:
     Collections:
       type: object
+      required: ['database', 'collections']
       properties:
         database:
           type: string
@@ -209,6 +292,16 @@ components:
           items:
             type: string
           example: ['catalog.cloths', 'catalog.shoes']
+    DocumentID:
+      type: object
+      required: ['collection', 'id']
+      properties:
+        collection:
+          type: string
+          example: 'store.cloths'
+        id:
+          type: string
+          example: 'doc1'
     DocumentIDs:
       type: object
       additionalProperties:
@@ -219,6 +312,7 @@ components:
                  'catalog.shoes': ['s001', 's002', 's003']}
     DocumentReplication:
       type: object
+      required: ['collection', 'documentID', 'isPush']
       properties:
         collection:
           type: string
