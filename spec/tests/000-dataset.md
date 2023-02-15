@@ -214,12 +214,32 @@ Note: The documents populated to CBL and SG will have different document IDs.
 }
 ```
 
-## 3. default_empty (SG only)
+## 3. posts
 
-The SG only dataset that contains only an empty default collection.
+### CBL Dataset
+
+| Collections         | #Docs       | #Size (bytes) |
+| :------------------ | ----------- | ------------- |
+| _default.posts      | 0           | 0             |
 
 ### SG Dataset
 
 | Collections         | #Docs       | #Size (bytes) |
 | :------------------ | ----------- | ------------- |
-| _default._default   | 0           | 0             |
+| _default.posts      | 5           | TBD           |
+
+**Note:**
+* post_1, post_2, and post_3 will have `channels` as ["user1", "public"].
+* post_4, post_5 will have `channels` as ["public"].
+
+### Sample Docs
+
+```JSON
+{
+    "_id" : "post_1",
+    "channels": ["user1", "public"],
+    "title": "This is my post",
+    "content": "This is my post content",
+    "owner": "user1"
+}
+```
