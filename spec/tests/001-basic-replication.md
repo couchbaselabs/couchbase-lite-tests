@@ -186,7 +186,7 @@ Test push replication with the default collection.
 1. Load `name-100` dataset.
 2. Start a replicator:
     * collections : `_default._default`
-    * endpoint: `/default_empty`
+    * endpoint: `/name-100`
     * type: push
     * continuos: false
 3. Wait until the replicator is stopped.
