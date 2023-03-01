@@ -15,4 +15,9 @@
 //
 package com.couchbase.lite.mobiletest
 
-open class BaseTest {}
+
+const val TAG = "TEST"
+
+open class BaseTest {
+
+}
