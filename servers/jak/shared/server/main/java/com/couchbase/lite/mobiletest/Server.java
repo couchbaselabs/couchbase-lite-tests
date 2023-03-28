@@ -2,8 +2,7 @@ package com.couchbase.lite.mobiletest;
 
 import androidx.annotation.NonNull;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.io.OutputStream;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -11,6 +10,7 @@ import java.util.Map;
 import org.nanohttpd.protocols.http.IHTTPSession;
 import org.nanohttpd.protocols.http.NanoHTTPD;
 import org.nanohttpd.protocols.http.request.Method;
+import org.nanohttpd.protocols.http.response.IStatus;
 import org.nanohttpd.protocols.http.response.Response;
 import org.nanohttpd.protocols.http.response.Status;
 
@@ -22,7 +22,34 @@ public class Server extends NanoHTTPD {
     private static final String TAG = "SERVER";
 
     private static final int PORT = 8080;
-    private static final String KEY_POST_DATA = "postData";
+
+    private static class SafeResponse extends Response {
+        private static final Map<Reply.Status, IStatus> STATUS;
+        static {
+            final Map<Reply.Status, IStatus> m = new HashMap<>();
+            m.put(Reply.Status.OK, Status.OK);
+            m.put(Reply.Status.BAD_REQUEST, Status.BAD_REQUEST);
+            m.put(Reply.Status.METHOD_NOT_ALLOWED, Status.METHOD_NOT_ALLOWED);
+            STATUS = Collections.unmodifiableMap(m);
+        }
+
+        private final Reply reply;
+
+        SafeResponse(@NonNull Reply reply) {
+            super(
+                STATUS.get(reply.getStatus()),
+                reply.getContentType(),
+                reply.getContent(),
+                reply.getSize());
+            this.reply = reply;
+        }
+
+        @Override
+        public void send(OutputStream outputStream) {
+            super.send(outputStream);
+            reply.close();
+        }
+    }
 
     private static final Map<Method, Dispatcher.Method> METHODS;
     static {
@@ -34,6 +61,7 @@ public class Server extends NanoHTTPD {
         METHODS = Collections.unmodifiableMap(m);
     }
 
+
     private final String appId;
     private final Dispatcher dispatcher;
 
@@ -44,45 +72,44 @@ public class Server extends NanoHTTPD {
         dispatcher = app.getDispatcher();
     }
 
+    @SuppressWarnings("PMD.PreserveStackTrace")
     @NonNull
     @Override
     public Response handle(@NonNull IHTTPSession session) {
-        int version = 1;
+        int version = 0;
         Response resp;
+        Reply reply = null;
         try {
             final Map<String, String> headers = session.getHeaders();
 
-            try { version = Integer.parseInt(headers.get(TestApp.HEADER_PROTOCOL_VERSION)); }
-            catch (NumberFormatException ignore) { }
+            final String versionStr = headers.get(TestApp.HEADER_PROTOCOL_VERSION);
+            if (versionStr == null) { throw new IllegalArgumentException("Missing protocol version"); }
+            try { version = Integer.parseInt(versionStr); }
+            catch (NumberFormatException ignore) {
+                throw new IllegalArgumentException("Unrecognized protocol version");
+            }
 
             String client = headers.get(TestApp.HEADER_SENDER);
             if (client == null) { client = TestApp.DEFAULT_CLIENT; }
 
-            String req = session.getUri();
-            if (StringUtils.isEmpty(req)) { throw new IllegalArgumentException("Empty request"); }
-
-            if (!req.startsWith("/")) { req = req.substring(1); }
-
             final Dispatcher.Method method = METHODS.get(session.getMethod());
             if (method == null) { throw new IllegalArgumentException("Unimplemented method: " + session.getMethod()); }
 
-            Log.i(TAG, "Request(" + version + ")@" + client + " " + method + ":" + req);
+            final String endpoint = session.getUri();
+            if (StringUtils.isEmpty(endpoint)) { throw new IllegalArgumentException("Empty request"); }
 
-            // Find and invoke the method on the RequestHandler.
-            final Reply reply = dispatcher.run(version, client, method, req, session.getInputStream());
+            Log.i(TAG, "Request(" + version + ")@" + client + " " + method + ":" + endpoint);
 
-            resp = Response.newFixedLengthResponse(
-                Status.OK,
-                reply.getContentType(),
-                reply.getData(),
-                reply.size());
+            reply = dispatcher.handleRequest(client, version, method, endpoint, session.getInputStream());
+            resp = new SafeResponse(reply);
         }
-        catch (Exception e) {
-            Log.w(TAG, "Request failed", e);
-            final StringWriter sw = new StringWriter();
-            final PrintWriter pw = new PrintWriter(sw);
-            e.printStackTrace(pw);
-            resp = Response.newFixedLengthResponse(Status.BAD_REQUEST, "text/plain", sw.toString());
+        catch (Exception err) {
+            Log.w(TAG, "Server error", err);
+            if (reply != null) { reply.close(); }
+            resp = Response.newFixedLengthResponse(
+                Status.INTERNAL_ERROR,
+                "text/plain",
+                TestException.printError(err));
         }
 
         resp.addHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));

@@ -33,8 +33,9 @@ import com.couchbase.lite.mobiletest.Memory;
 
 
 public final class JsonV1 extends Json {
+    @SuppressWarnings("PMD.PrematureDeclaration")
     @NonNull
-    public Map<String, Object> parseTask(@NonNull InputStream json) throws IOException {
+    public Map<String, Object> parseRequest(@NonNull InputStream json) throws IOException {
         final JsonReader reader = JsonReader.of(Okio.buffer(Okio.source(json)));
         final Map<String, Object> val = parseMap(reader);
         if (reader.hasNext()) { throw new IOException("Unexpected content after document end"); }
@@ -43,14 +44,15 @@ public final class JsonV1 extends Json {
 
     @NonNull
     public Buffer serializeReply(@Nullable Map<String, Object> data) throws IOException {
-        Buffer buf = new Buffer();
-        JsonWriter writer = JsonWriter.of(buf);
+        final Buffer buf = new Buffer();
+        final JsonWriter writer = JsonWriter.of(buf);
         writer.setLenient(true);
         writer.setSerializeNulls(true);
         serializeMap((data != null) ? data : new HashMap<String, Object>(), writer);
         return buf;
     }
 
+    @Nullable
     protected Object parseString(@NonNull String s) {
         switch (s) {
             case "null":
@@ -59,25 +61,30 @@ public final class JsonV1 extends Json {
                 return true;
             case "false":
                 return false;
-            default: {
-                final String suffix = s.substring(1);
-                switch (s.substring(0, 1)) {
-                    case "I":
-                        return Integer.valueOf(suffix);
-                    case "L":
-                        return Long.valueOf(suffix);
-                    case "F":
-                        return Float.valueOf(suffix);
-                    case "D":
-                        return Double.valueOf(suffix);
-                    case "\"":
-                        return !suffix.endsWith("\"") ? s : suffix.substring(0, suffix.length() - 1);
-                    case "@":
-                        return new Memory.Ref(suffix);
-                    default:
-                        return s;
-                }
-            }
+            default:
+                return getRef(s);
+        }
+    }
+
+    @SuppressWarnings("PMD.PrematureDeclaration")
+    @NonNull
+    private Object getRef(@NonNull String s) {
+        final String suffix = s.substring(1);
+        switch (s.substring(0, 1)) {
+            case "I":
+                return Integer.valueOf(suffix);
+            case "L":
+                return Long.valueOf(suffix);
+            case "F":
+                return Float.valueOf(suffix);
+            case "D":
+                return Double.valueOf(suffix);
+            case "\"":
+                return !suffix.endsWith("\"") ? s : suffix.substring(0, suffix.length() - 1);
+            case "@":
+                return new Memory.Ref(suffix);
+            default:
+                return s;
         }
     }
 

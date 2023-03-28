@@ -12,11 +12,14 @@ import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableEntryException;
 import java.security.cert.CertificateException;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import com.couchbase.lite.CouchbaseLite;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.TLSIdentity;
+import com.couchbase.lite.internal.core.CBLVersion;
 
 
 /**
@@ -34,6 +37,24 @@ public abstract class BaseTestApp extends TestApp {
 
     @Override
     protected void initCBL() { CouchbaseLite.init(true); }
+
+    @NonNull
+    @Override
+    public Map<String, Object> getSystemInfo() {
+        final Map<String, Object> device = new HashMap<>();
+        device.put("model", System.getProperty("os.arch"));
+        device.put("systemName", System.getProperty("os.name"));
+        device.put("systemVersion", System.getProperty("os.version"));
+        device.put("systemApiVersion", System.getProperty("java.version"));
+
+        final Map<String, Object> content = new HashMap<>();
+        content.put("version", CBLVersion.getVersionInfo());
+        content.put("apiVersion", "1.0");   // ???? WHat goes here?
+        content.put("cbl", "couchbase-lite-java-ee");
+        content.put("device", device);
+
+        return content;
+    }
 
     @NonNull
     @Override

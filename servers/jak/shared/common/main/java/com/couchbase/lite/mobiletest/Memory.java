@@ -3,11 +3,14 @@ package com.couchbase.lite.mobiletest;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
+// Not thread safe...
 public final class Memory extends ObjectStore {
     public static final String PREFIX_REF = "@";
 
@@ -20,43 +23,57 @@ public final class Memory extends ObjectStore {
         public <T> T lookup(@NonNull Memory mem, @NonNull Class<T> type) { return mem.get(key, type); }
     }
 
-    private final String identifierSuffix;
-
-    private final Map<String, Object> symTab;
-    private final AtomicInteger nextAddress = new AtomicInteger(0);
+    private static final Map<String, Map<String, Object>> SYM_TABS = new HashMap<>();
 
     @NonNull
-    public static Memory create(@NonNull TestApp app) { return new Memory(app, new HashMap<>()); }
+    public static Memory get(@NonNull String client) {
+        Map<String, Object> symTab = SYM_TABS.get(client);
+        if (symTab == null) {
+            symTab = new HashMap<>();
+            SYM_TABS.put(client, symTab);
+        }
 
-    private Memory(@NonNull TestApp app, @NonNull Map<String, Object> symTab) {
+        final TestApp app = TestApp.getApp();
+
+        return new Memory(symTab, client, "_" + app.getPlatform() + "_" + app.getAppId());
+    }
+
+    public static void reset(@NonNull Memory mem) { SYM_TABS.remove(mem.client); }
+
+
+    private final Map<String, Object> symTab;
+
+    private final String client;
+    private final String identifierSuffix;
+
+    private final AtomicInteger nextAddress = new AtomicInteger(0);
+
+    private Memory(@NonNull Map<String, Object> symTab, @NonNull String client, @NonNull String suffix) {
         super(symTab);
         this.symTab = symTab;
-        identifierSuffix = "_" + app.getPlatform() + "_" + app.getAppId();
+        this.client = client;
+        identifierSuffix = suffix;
+    }
+
+    public void put(@NonNull String key, @NonNull Object value) { symTab.put(key, value); }
+
+    public void addToList(@NonNull String key, @NonNull Object value) {
+        List<Object> list = getList(key);
+        if (list == null) { list = new ArrayList<>(); }
+        list.add(value);
+        put(key, list);
     }
 
     @NonNull
-    public Ref add(@NonNull Object value) {
+    public Ref addRef(@NonNull Object value) {
         final String address = "@" + nextAddress.getAndIncrement() + identifierSuffix;
-        synchronized (symTab) { symTab.put(address, value); }
+        symTab.put(address, value);
         return new Ref(address);
     }
 
-    public void remove(@NonNull Ref ref) {
-        synchronized (symTab) { symTab.remove(ref.key); }
-    }
-
-    public void remove(@NonNull String address) {
-        synchronized (symTab) { symTab.remove(address); }
-    }
-
-    public void flush() {
-        synchronized (symTab) { symTab.clear(); }
-        nextAddress.set(0);
-    }
+    public void removeRef(@NonNull Ref ref) { symTab.remove(ref.key); }
 
     @Nullable
     @Override
-    protected <T> T get(@NonNull String name, @NonNull Class<T> expectedType) {
-        synchronized (symTab) { return super.get(name, expectedType); }
-    }
+    protected <T> T get(@NonNull String name, @NonNull Class<T> expectedType) { return super.get(name, expectedType); }
 }

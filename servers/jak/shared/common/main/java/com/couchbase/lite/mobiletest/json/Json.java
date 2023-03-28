@@ -42,15 +42,14 @@ public abstract class Json {
 
     private static final List<Fn.Supplier<Json>> PROTOCOLS;
     static {
-        List<Fn.Supplier<Json>> l = new ArrayList<>();
+        final List<Fn.Supplier<Json>> l = new ArrayList<>();
         l.add(JsonV1::new);
         l.add(JsonV2::new);
         PROTOCOLS = Collections.unmodifiableList(l);
     }
-    public static Json getParser(int version) {
-        final int previousVersion = PROTOCOL_VERSION.getAndSet(version);
-        if (version != previousVersion) { Log.i(TAG, "New request protocol: " + version); }
-
+    @NonNull
+    public static Json getParser(int v) {
+        final int version = checkProtocolVersion(v);
         final Fn.Supplier<Json> supplier = ((version < 1) || version > PROTOCOLS.size())
             ? null
             : PROTOCOLS.get(version - 1);
@@ -62,19 +61,29 @@ public abstract class Json {
         return supplier.get();
     }
 
-    public static Json getSerializer() {
-        final int version = PROTOCOL_VERSION.get();
+    @NonNull
+    public static Json getSerializer(int v) {
+        final int version = checkProtocolVersion(v);
         if (version < 1) { throw new IllegalStateException("reply before request!"); }
         return PROTOCOLS.get(version - 1).get();
     }
 
+    private static int checkProtocolVersion(int version) {
+        final int previousVersion = PROTOCOL_VERSION.getAndSet(version);
+        if ((previousVersion != 0) && (version != previousVersion)) {
+            Log.i(TAG, "Request protocol changed: " + previousVersion + " => " + version);
+        }
+        return version;
+    }
+
 
     @NonNull
-    public abstract Map<String, Object> parseTask(@NonNull InputStream json) throws IOException;
+    public abstract Map<String, Object> parseRequest(@NonNull InputStream json) throws IOException;
 
     @NonNull
     public abstract Buffer serializeReply(@Nullable Map<String, Object> reply) throws IOException;
 
+    @Nullable
     protected abstract Object parseString(@NonNull String s);
 
     protected abstract void serializeValue(@Nullable Object value, @NonNull JsonWriter writer) throws IOException;
@@ -119,8 +128,9 @@ public abstract class Json {
         writer.endArray();
     }
 
+    @Nullable
     protected final Object parseValue(@NonNull JsonReader json) throws IOException {
-        JsonReader.Token token = json.peek();
+        final JsonReader.Token token = json.peek();
         switch (token) {
             case NULL:
                 return json.nextNull();

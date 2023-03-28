@@ -15,34 +15,66 @@
 //
 package com.couchbase.lite.mobiletest
 
+import com.squareup.moshi.Moshi
+import okio.buffer
+import okio.source
 import org.junit.Assert
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 
 class BasicTest : BaseTest() {
+    @Suppress("UNCHECKED_CAST")
     @Test
     fun testGetVersion() {
+        var resp: Map<String, Any>?
 
-        val r = TestApp.getApp().dispatcher.run(
-            2,
+        TestApp.getApp().dispatcher.handleRequest(
             "testing",
+            2,
             Dispatcher.Method.GET,
-            "version",
-            ByteArrayInputStream("{}".toByteArray()))
+            "/",
+            ByteArrayInputStream("{}".toByteArray())
+        ).use { r ->
+            Assert.assertNotNull(r)
+            Assert.assertEquals(Reply.Status.OK, r.status)
+            Assert.assertEquals("application/json", r.contentType)
 
-        Assert.assertNotNull(r)
-        Assert.assertEquals("application/json", r.contentType)
-
-        val out = ByteArrayOutputStream()
-        val buffer = ByteArray(1024)
-        while (true) {
-            val n = r.data.read(buffer, 0, buffer.size)
-            if (n <= 0) { break; }
-            out.write(buffer, 0, n)
+            resp = Moshi.Builder().build().adapter(Any::class.java)
+                .fromJson(r.content.source().buffer()) as? Map<String, Any>
         }
 
-        Assert.assertEquals("{\"version\":\"Test Server (", out.toString("UTF-8").substring(0, 25))
+        Assert.assertEquals("CouchbaseLite ", (resp?.get("version") as? String)?.substring(0, 14))
+    }
+
+    @Test
+    fun testBadRequest() {
+        var resp: String
+
+        TestApp.getApp().dispatcher.handleRequest(
+            "testing",
+            2,
+            Dispatcher.Method.GET,
+            "foo",
+            ByteArrayInputStream("{}".toByteArray())
+        ).use { r ->
+            Assert.assertNotNull(r)
+            Assert.assertEquals(Reply.Status.METHOD_NOT_ALLOWED, r.status)
+            Assert.assertEquals("text/plain", r.contentType)
+
+            ByteArrayOutputStream().use { out ->
+                val buffer = ByteArray(1024)
+                r.content.use {
+                    while (true) {
+                        val n = it.read(buffer, 0, buffer.size)
+                        if (n <= 0) break
+                        out.write(buffer, 0, n)
+                    }
+                }
+                resp = out.toString("UTF-8")
+            }
+        }
+
+        Assert.assertEquals("Unrecognized request: ", resp.substring(0, 22))
     }
 }
-

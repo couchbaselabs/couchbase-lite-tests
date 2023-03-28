@@ -7,8 +7,11 @@ plugins {
 }
 
 ext {
-    COUCHBASE_LITE_VERSION = System.getProperty('version', "3.1.0-SNAPSHOT")
-    SPOTBUGS_VERSION = '4.4.2'
+    COUCHBASE_LITE_VERSION = System.getProperty('version', "3.2.0-SNAPSHOT")
+
+    TEST_SERVER_VERSION = "TestServer_" + COUCHBASE_LITE_VERSION
+
+    SPOTBUGS_VERSION = '4.7.3'
 
     SHARED_DIR = "${ROOT_DIR}/shared"
     ETC_DIR = "${ROOT_DIR}/etc"
@@ -25,20 +28,22 @@ android {
     compileSdkVersion COMPILE_SDK_VERSION
     buildToolsVersion BUILD_TOOLS_VERSION
 
-    kotlinOptions { jvmTarget = '1.8' }
-
     compileOptions {
         targetCompatibility 1.8
         sourceCompatibility 1.8
     }
 
+    kotlinOptions { jvmTarget = '1.8' }
+
     defaultConfig {
         minSdkVersion ANDROID_MIN_SDK
         targetSdkVersion ANDROID_TARGET_SDK
-        versionCode 1
-        versionName "testserver_" + COUCHBASE_LITE_VERSION
+        versionCode 30200
+        versionName TEST_SERVER_VERSION
 
         multiDexEnabled true
+
+        buildConfigField "String", "TEST_SERVER_VERSION", "\"${TEST_SERVER_VERSION}\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -54,6 +59,9 @@ android {
 
     buildTypes {
         release {
+            ndk.debugSymbolLevel 'FULL'
+
+            debuggable true
             minifyEnabled false
             signingConfig signingConfigs.config
         }
@@ -103,13 +111,14 @@ repositories {
 
 configurations.all { resolutionStrategy.cacheChangingModulesFor 1, 'seconds' }
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.5.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 
     implementation 'com.squareup.moshi:moshi:1.14.0'
 
     implementation 'org.nanohttpd:nanohttpd:2.3.2-SNAPSHOT'
 
+    // !! If you change this, be sure also to change the SystemInfo entry
     // for build version < 3.0.0-160, use package name:
     // implementation "com.couchbase.lite:couchbase-lite-android-ee:${COUCHBASE_LITE_VERSION}"
     // for build version > 3.0.0-160 but < 3.0.0-177, use package name:

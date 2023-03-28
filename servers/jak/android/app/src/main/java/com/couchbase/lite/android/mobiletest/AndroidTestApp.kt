@@ -16,11 +16,13 @@
 package com.couchbase.lite.android.mobiletest
 
 import android.content.Context
+import android.os.Build
 import android.util.Base64
 import com.couchbase.lite.CouchbaseLite
 import com.couchbase.lite.CouchbaseLiteException
 import com.couchbase.lite.KeyStoreUtils
 import com.couchbase.lite.TLSIdentity
+import com.couchbase.lite.internal.core.CBLVersion
 import com.couchbase.lite.mobiletest.TestApp
 import java.io.IOException
 import java.security.KeyStoreException
@@ -36,13 +38,27 @@ class AndroidTestApp(private val context: Context) : TestApp() {
 
     override fun getPlatform() = "android"
 
-    override fun getFilesDir() = context.filesDir
+    override fun getSystemInfo(): Map<String, Any> {
+        return mapOf(
+            "version" to CBLVersion.getVersionInfo(),
+            "apiVersion" to BuildConfig.VERSION_NAME,
+            "cbl" to "couchbase-lite-android-ee-ktx",
+            "device" to mapOf(
+                "model" to Build.PRODUCT,
+                "systemName" to "android",
+                "systemVersion" to Build.VERSION.RELEASE,
+                "systemApiVersion" to Build.VERSION.SDK_INT
+            )
+        )
+    }
+
+    override fun getFilesDir() = context.filesDir!!
 
     override fun getAsset(name: String) = context.assets.open(name)
 
-    override fun encodeBase64(hashBytes: ByteArray) = Base64.encodeToString(hashBytes, Base64.NO_WRAP)
+    override fun encodeBase64(hashBytes: ByteArray) = Base64.encodeToString(hashBytes, Base64.NO_WRAP)!!
 
-    override fun decodeBase64(encodedBytes: String) = Base64.decode(encodedBytes, Base64.NO_WRAP)
+    override fun decodeBase64(encodedBytes: String) = Base64.decode(encodedBytes, Base64.NO_WRAP)!!
 
     @Throws(CouchbaseLiteException::class)
     override fun getCreateIdentity(): TLSIdentity {

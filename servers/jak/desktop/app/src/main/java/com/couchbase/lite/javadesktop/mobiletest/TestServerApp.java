@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.daemon.Daemon;
 import org.apache.commons.daemon.DaemonContext;
 
@@ -40,6 +41,7 @@ public class TestServerApp implements Daemon {
      *
      * @param args Arguments from prunsrv command line
      **/
+    @SuppressFBWarnings("UW_UNCOND_WAIT")
     @SuppressWarnings("PMD.MissingBreakInSwitch")
     public static void windowsService(String[] args) {
         switch (args[0].trim().toLowerCase(Locale.getDefault())) {
@@ -69,8 +71,9 @@ public class TestServerApp implements Daemon {
         app.start();
     }
 
+    @SuppressFBWarnings("NN_NAKED_NOTIFY")
     private static void stopApp() {
-        Log.i(TAG, "Stopping TestServer service.");
+        Log.i(TAG, "Stopping Java Desktop Test Server.");
         final Server server = SERVER.getAndSet(null);
         if (server != null) {
             server.stop();
@@ -85,12 +88,11 @@ public class TestServerApp implements Daemon {
 
     @Override
     public void start() {
-        final String id = TestApp.getApp().getAppId();
-
         final Server server = new Server();
         if (!SERVER.compareAndSet(null, server)) { throw new IllegalStateException("Attempt to restart server"); }
 
-        Log.i(TAG, "Server launched at " + id + ":" + server.myPort);
+        final String id = TestApp.getApp().getAppId();
+        Log.i(TAG, "Java Desktop Test Server launched at " + id + ":" + server.myPort);
     }
 
     @Override
@@ -101,6 +103,6 @@ public class TestServerApp implements Daemon {
 
     private void initApp() {
         TestApp.init(new JavaDesktopTestApp());
-        Log.i(TAG, "TestKit App initialized.");
+        Log.i(TAG, "Java Desktop Test Server initialized.");
     }
 }

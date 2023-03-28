@@ -45,13 +45,15 @@ public abstract class TestApp {
 
     public static final String HEADER_PROTOCOL_VERSION = "CBLTest-Protocol-Version";
     public static final String HEADER_SENDER = "CBLTest-Sender";
-    public static final String DEFAULT_CLIENT = "xyxyzy";
+    public static final String DEFAULT_CLIENT = "xyzzy";
 
     private static final AtomicReference<TestApp> APP = new AtomicReference<>();
     private static final AtomicReference<String> APP_ID = new AtomicReference<>();
 
     public static void init(@NonNull TestApp app) {
-        if (!APP.compareAndSet(null, app)) { throw new IllegalStateException("Attempt to re-initialize the Test App"); }
+        if (!APP.compareAndSet(null, app)) {
+            throw new IllegalStateException("Attempt to re-initialize the Test App");
+        }
         app.init();
     }
 
@@ -69,6 +71,9 @@ public abstract class TestApp {
 
     @NonNull
     public abstract String getPlatform();
+
+    @NonNull
+    public abstract Map<String, Object> getSystemInfo();
 
     @NonNull
     public abstract String encodeBase64(@NonNull byte[] hashBytes);
