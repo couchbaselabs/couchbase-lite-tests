@@ -16,53 +16,53 @@
 package com.couchbase.lite.mobiletest;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
 
 import okio.Buffer;
 
-import com.couchbase.lite.mobiletest.json.Json;
 
+public class Reply implements AutoCloseable {
+    public enum Status {
+        OK(200), BAD_REQUEST(400), METHOD_NOT_ALLOWED(405);
 
-public final class Reply {
-    public static final Reply EMPTY = from("I-1");
+        private final int code;
 
-    @NonNull
-    public static Reply from(@NonNull String str) {
-        final String data = '"' + str + '"';
-        return Reply.from("text/plain", data.getBytes(StandardCharsets.UTF_8));
+        Status(int code) { this.code = code; }
+
+        public int getCode() { return code; }
     }
 
     @NonNull
-    public static Reply from(@NonNull String contentType, @NonNull byte[] data) {
-        return new Reply(contentType, new ByteArrayInputStream(data), data.length);
-    }
-
+    private final Status status;
     @NonNull
-    public static Reply from(@Nullable Map<String, Object> data) throws IOException {
-        final Buffer buf = Json.getSerializer().serializeReply(data);
-        return new Reply("application/json", buf.inputStream(), buf.size());
-    }
-
     private final String contentType;
-    private final InputStream data;
-    private final long size;
+    @NonNull
+    private final Buffer content;
 
-    public Reply(@NonNull String contentType, @NonNull InputStream data, long size) {
+    public Reply(@NonNull Status code, @NonNull String contentType, @NonNull Buffer content) {
+        this.status = code;
         this.contentType = contentType;
-        this.data = data;
-        this.size = size;
+        this.content = content;
     }
 
     @NonNull
     public String getContentType() { return contentType; }
 
-    public InputStream getData() { return data; }
+    @NonNull
+    public Status getStatus() { return status; }
 
-    public long size() { return size; }
+    @NonNull
+    public InputStream getContent() {
+        if (!content.isOpen()) { throw new IllegalStateException("Attempt to get reply content after close"); }
+        return content.inputStream();
+    }
+
+    public long getSize() {
+        if (!content.isOpen()) { throw new IllegalStateException("Attempt to get reply size after close"); }
+        return content.size();
+    }
+
+    @Override
+    public void close() { content.close(); }
 }

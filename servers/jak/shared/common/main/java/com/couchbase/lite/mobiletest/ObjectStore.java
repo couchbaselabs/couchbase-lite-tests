@@ -23,7 +23,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
 // Read only, relatively type safe object store
+// Not thread safe...
 public class ObjectStore {
     @NonNull
     private final Map<String, Object> args;
@@ -58,13 +60,13 @@ public class ObjectStore {
     @Nullable
     public byte[] getData(@NonNull String name) { return get(name, byte[].class); }
 
-    @SuppressWarnings("rawtypes")
+    @SuppressWarnings("unchecked")
     @Nullable
-    public List getList(@NonNull String name) { return get(name, List.class); }
+    public List<Object> getList(@NonNull String name) { return get(name, List.class); }
 
-    @SuppressWarnings("rawtypes")
+    @SuppressWarnings("unchecked")
     @Nullable
-    public Map getMap(@NonNull String name) { return get(name, Map.class); }
+    public Map<String, Object> getMap(@NonNull String name) { return get(name, Map.class); }
 
     @Nullable
     protected <T> T get(@NonNull String name, @NonNull Class<T> expectedType) {
@@ -72,6 +74,6 @@ public class ObjectStore {
         if (val == null) { return null; }
         final Class<?> actualType = val.getClass();
         if (expectedType.isAssignableFrom(actualType)) { return expectedType.cast(val); }
-        throw new IllegalArgumentException("Cannot convert " + actualType + " to " + expectedType);
+        throw new TestException(TestException.TESTSERVER, 0, "Cannot convert " + actualType + " to " + expectedType);
     }
 }

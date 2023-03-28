@@ -33,9 +33,11 @@ import com.couchbase.lite.mobiletest.Memory;
 
 
 public class JsonV2 extends Json {
+    @SuppressWarnings("PMD.PrematureDeclaration")
     @NonNull
-    public Map<String, Object> parseTask(@NonNull InputStream json) throws IOException {
+    public Map<String, Object> parseRequest(@NonNull InputStream json) throws IOException {
         final JsonReader reader = JsonReader.of(Okio.buffer(Okio.source(json)));
+        reader.setLenient(true);
         final Map<String, Object> val = parseMap(reader);
         if (reader.hasNext()) { throw new IOException("Unexpected content after document end"); }
         return val;
@@ -43,14 +45,15 @@ public class JsonV2 extends Json {
 
     @NonNull
     public Buffer serializeReply(@Nullable Map<String, Object> data) throws IOException {
-        Buffer buf = new Buffer();
-        JsonWriter writer = JsonWriter.of(buf);
+        final Buffer buf = new Buffer();
+        final JsonWriter writer = JsonWriter.of(buf);
         writer.setLenient(true);
         writer.setSerializeNulls(true);
         serializeMap((data != null) ? data : new HashMap<String, Object>(), writer);
         return buf;
     }
 
+    @NonNull
     @Override
     protected Object parseString(@NonNull String s) {
         return (!s.startsWith(Memory.PREFIX_REF)) ? s : new Memory.Ref(s.substring(1));

@@ -13,15 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.util;
+package com.couchbase.lite.mobiletest;
 
 import androidx.annotation.NonNull;
 
+import java.util.Map;
 
-public class Fn {
-    @FunctionalInterface
-    public interface Supplier<T> {
-        @NonNull
-        T get();
-    }
+
+@SuppressWarnings("PMD.SignatureDeclareThrowsException")
+@FunctionalInterface
+interface Test {
+    @NonNull
+    Map<String, Object> run(@NonNull Map<String, Object> req, @NonNull Memory mem)
+        throws TestException;
 }

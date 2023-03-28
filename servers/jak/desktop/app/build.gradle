@@ -1,5 +1,3 @@
-
-
 import com.github.spotbugs.snom.SpotBugsTask
 
 plugins {
@@ -11,8 +9,8 @@ plugins {
 }
 
 ext {
-    COUCHBASE_LITE_VERSION = System.getProperty('version', "3.1.0-SNAPSHOT")
-    SPOTBUGS_VERSION = '4.4.2'
+    COUCHBASE_LITE_VERSION = System.getProperty('version', "3.2.0-SNAPSHOT")
+    SPOTBUGS_VERSION = '4.7.3'
 
     SHARED_DIR = "${ROOT_DIR}/shared"
     ETC_DIR = "${ROOT_DIR}/etc"
@@ -29,6 +27,9 @@ def USE_LOCAL_MAVEN = project.hasProperty("useLocalMaven")
 group 'com.couchbase.lite.mobiletest'
 
 java {
+    sourceCompatibility = "1.8"
+    targetCompatibility = "1.8"
+
     sourceSets {
         main {
             java.srcDirs = [
@@ -81,6 +82,7 @@ repositories {
 
 dependencies {
     compileOnly 'androidx.annotation:annotation:1.5.0'
+    compileOnly "com.github.spotbugs:spotbugs-annotations:${SPOTBUGS_VERSION}"
 
     implementation 'commons-daemon:commons-daemon:1.2.2'
 
@@ -88,11 +90,11 @@ dependencies {
 
     implementation 'org.nanohttpd:nanohttpd:2.3.2-SNAPSHOT'
 
+    // !! If you change this, be sure to change the entry in ServerInfo
     implementation "com.couchbase.lite:couchbase-lite-java-ee-macos:${COUCHBASE_LITE_VERSION}"
 
     testImplementation 'junit:junit:4.13.2'
 }
-
 
 def FILE_FILTER = ['**/gen/**', "okhttp3/**", "org/json/**"]
 

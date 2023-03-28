@@ -3,12 +3,8 @@ package com.couchbase.lite.javaws.mobiletest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
 
-import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -16,97 +12,96 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.couchbase.lite.internal.utils.StringUtils;
 import com.couchbase.lite.mobiletest.Dispatcher;
-import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.Reply;
 import com.couchbase.lite.mobiletest.TestApp;
+import com.couchbase.lite.mobiletest.TestException;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
 @WebServlet(name = "TestServerApp", urlPatterns = {"/"}, loadOnStartup = 1)
 public class TestServerApp extends HttpServlet {
     private static final String TAG = "MAIN";
-    private static final byte[] CBL_OK = "CouchbaseLite Java WebService - OK".getBytes(StandardCharsets.UTF_8);
+
+    private static final AtomicReference<String> CLIENT = new AtomicReference<>();
 
     // Servlets are serializable...
     private static final long serialVersionUID = 42L;
 
-    private static final AtomicReference<Memory> MEMORY = new AtomicReference<>();
-
     @Override
     public void init() { TestApp.init(new JavaWSTestApp()); }
 
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
         dispatchRequest(Dispatcher.Method.GET, req, resp);
     }
 
     @Override
-    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected void doPut(HttpServletRequest req, HttpServletResponse resp) {
         dispatchRequest(Dispatcher.Method.PUT, req, resp);
     }
 
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) {
         dispatchRequest(Dispatcher.Method.POST, req, resp);
     }
 
     @Override
-    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) {
         dispatchRequest(Dispatcher.Method.DELETE, req, resp);
     }
 
-    private void dispatchRequest(Dispatcher.Method method, HttpServletRequest request, HttpServletResponse response)
-        throws IOException {
+    @SuppressWarnings("PMD.PreserveStackTrace")
+    private void dispatchRequest(Dispatcher.Method method, HttpServletRequest request, HttpServletResponse response) {
         final TestApp app = TestApp.getApp();
-        int version = 1;
+        int version = 0;
         try {
-            try { version = Integer.parseInt(request.getHeader(TestApp.HEADER_PROTOCOL_VERSION)); }
-            catch (NumberFormatException ignore) { }
+            final String versionStr = request.getHeader(TestApp.HEADER_PROTOCOL_VERSION);
+            if (versionStr == null) { throw new IllegalArgumentException("Missing protocol version"); }
+            try { version = Integer.parseInt(versionStr); }
+            catch (NumberFormatException ignore) {
+                throw new IllegalArgumentException("Unrecognized protocol version");
+            }
 
             String client = request.getHeader(TestApp.HEADER_SENDER);
             if (client == null) { client = TestApp.DEFAULT_CLIENT; }
 
-            final String reqUri = request.getRequestURI();
-            final String[] path = reqUri.split("/");
-            final int pathLen = path.length;
-            final String req = (pathLen <= 0) ? null : path[pathLen - 1];
-            if (StringUtils.isEmpty(req)) { throw new IllegalArgumentException("Empty request"); }
+            final String previousClient = TestServerApp.CLIENT.getAndSet(client);
+            if (!client.equals(previousClient)) { Log.w(TAG, "New client: " + previousClient + " => " + client); }
 
-            Log.i(TAG, "Request(" + version + ")@" + client + " " + method + ":" + req);
+            final String endpoint = request.getRequestURI();
+            if (StringUtils.isEmpty(endpoint)) { throw new IllegalArgumentException("Empty request"); }
 
-            final Reply reply = app.getDispatcher().run(version, client, method, req, request.getInputStream());
+            Log.i(TAG, "Request(" + version + ")@" + client + " " + method + ":" + endpoint);
 
-            final InputStream data = reply.getData();
+            try (Reply reply
+                     = app.getDispatcher().handleRequest(client, version, method, endpoint, request.getInputStream())) {
+                response.setStatus(reply.getStatus().getCode());
 
-            response.setStatus(HttpServletResponse.SC_OK);
+                response.setHeader("Content-Type", reply.getContentType());
+                response.setHeader("Content-Length", String.valueOf(reply.getSize()));
 
-            response.setHeader("Content-Type", reply.getContentType());
-            response.setHeader("Content-Length", String.valueOf(reply.size()));
+                response.setHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));
+                response.setHeader(TestApp.HEADER_SENDER, app.getAppId());
 
-            response.setHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));
-            response.setHeader(TestApp.HEADER_SENDER, app.getAppId());
-
-            final OutputStream out = response.getOutputStream();
-            final byte[] buf = new byte[1024];
-            while (true) {
-                final int n = data.readNBytes(buf, 0, buf.length);
-                if (n <= 0) { break; }
-                out.write(buf, 0, n);
+                try (InputStream in = reply.getContent(); OutputStream out = response.getOutputStream()) {
+                    final byte[] buf = new byte[1024];
+                    while (true) {
+                        final int n = in.readNBytes(buf, 0, buf.length);
+                        if (n <= 0) { break; }
+                        out.write(buf, 0, n);
+                    }
+                    out.flush();
+                }
             }
-            out.flush();
-            out.close();
         }
-        catch (Exception e) {
-            Log.w(TAG, "Request failed", e);
+        catch (IOException | RuntimeException err) {
+            Log.w(TAG, "Server error", err);
 
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.setHeader("Content-Type", "text/plain");
+            try { response.getWriter().println(TestException.printError(err)); }
+            catch (IOException e) { Log.e(TAG, "Failed writing error to response", e); }
 
             response.setHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));
             response.setHeader(TestApp.HEADER_SENDER, app.getAppId());
-
-            final StringWriter sw = new StringWriter();
-            e.printStackTrace(new PrintWriter(sw));
-
-            response.getWriter().println(sw);
         }
     }
 }

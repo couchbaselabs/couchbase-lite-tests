@@ -16,15 +16,17 @@
 package com.couchbase.lite.mobiletest;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
-import org.jetbrains.annotations.NotNull;
+import okio.Buffer;
 
+import com.couchbase.lite.mobiletest.json.Json;
+import com.couchbase.lite.mobiletest.tests.DatabaseManager;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
@@ -33,45 +35,86 @@ public final class Dispatcher {
 
     public enum Method {GET, PUT, POST, DELETE}
 
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
-    @FunctionalInterface
-    private interface Action {
-        void run(@NonNull Task task, @NonNull HashMap<String, Object> reply, @NonNull Memory mem) throws Exception;
-    }
+    private final Map<Integer, Map<String, Map<Method, Test>>> dispatchTable = new HashMap<>();
+    private final TestApp app;
 
-
-    private final Memory memory;
-
-    private final Map<String, Action> dispatchTable = new HashMap<>();
-
-    private final AtomicReference<String> client = new AtomicReference<>();
-
-    public Dispatcher(TestApp app) { memory = Memory.create(app); }
+    public Dispatcher(@NonNull TestApp app) { this.app = app; }
 
     // build the dispatch table
     public void init() {
-        dispatchTable.put("get@version", (task, reply, mem) -> reply.put("version", TestApp.getApp().getAppVersion()));
+        addTest(2, "/", Method.GET, (r, m) -> app.getSystemInfo());
+        addTest(2, "/reset", Method.POST, (r, m) -> {
+            DatabaseManager.reset(m);
+            Memory.reset(m);
+            return new HashMap<>();
+        });
+        addTest(2, "/getAllDocumentIDs", Method.POST, (r, m) -> null);
+        addTest(2, "/startReplicator", Method.POST, (r, m) -> null);
+        addTest(2, "/getReplicatorStatus", Method.POST, (r, m) -> null);
     }
 
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    // This method returns a Reply.  Be sure to close it!
+    @SuppressWarnings("resource")
     @NonNull
-    public Reply run(
-        int version,
+    public Reply handleRequest(
         @NonNull String client,
-        @NonNull Method method,
-        @NonNull String request,
-        @NotNull InputStream data) throws Exception {
-        final String previousClient = this.client.getAndSet(client);
-        if (!client.equals(previousClient)) { Log.w(TAG, "New client: " + previousClient + " >>> " + client); }
+        int version,
+        @NonNull Dispatcher.Method method,
+        @NonNull String path,
+        @NonNull InputStream req
+    ) throws IOException {
+        final Json serializer = Json.getSerializer(version);
+        try {
+            final Test test = getTest(version, path, method);
+            if (test == null) {
+                final String msg = "Unrecognized request: " + method + " " + path + " @" + version;
+                Log.w(TAG, msg);
+                return new Reply(
+                    Reply.Status.METHOD_NOT_ALLOWED,
+                    "text/plain",
+                    new Buffer().writeUtf8(msg));
+            }
 
-        final String act = (method + "@" + request).toLowerCase(Locale.getDefault());
-        final Action action = dispatchTable.get(act);
-        if (action == null) { throw new IllegalArgumentException("Unrecognized request: " + act); }
+            return new Reply(
+                Reply.Status.OK,
+                "application/json",
+                serializer.serializeReply(
+                    test.run(Json.getParser(version).parseRequest(req), Memory.get(client))));
+        }
+        catch (TestException err) {
+            Log.w(TAG, "Test failed", err);
+            return new Reply(
+                Reply.Status.BAD_REQUEST,
+                "application/json",
+                serializer.serializeReply(err.getError()));
+        }
+    }
 
-        final HashMap<String, Object> reply = new HashMap<>();
-        action.run(Task.from(version, data), reply, memory);
+    @Nullable
+    private Test getTest(int version, @NonNull String path, @NonNull Method method) {
+        final Map<String, Map<Method, Test>> vMap = dispatchTable.get(version);
+        if (vMap != null) {
+            final Map<Method, Test> veMap = vMap.get(path);
+            if (veMap != null) { return veMap.get(method); }
+        }
+        return null;
+    }
 
-        return Reply.from(reply);
+    private void addTest(int version, @NonNull String path, @NonNull Method method, @NonNull Test action) {
+        Map<String, Map<Method, Test>> vMap = dispatchTable.get(version);
+        if (vMap == null) {
+            vMap = new HashMap<>();
+            dispatchTable.put(version, vMap);
+        }
+        Map<Method, Test> veMap = vMap.get(path);
+        if (veMap == null) {
+            veMap = new HashMap<>();
+            vMap.put(path, veMap);
+        }
+        if (veMap.get(method) != null) {
+            Log.w(TAG, "Replacing method: " + path + "@" + method + " v" + version);
+        }
+        veMap.put(method, action);
     }
 }
 
