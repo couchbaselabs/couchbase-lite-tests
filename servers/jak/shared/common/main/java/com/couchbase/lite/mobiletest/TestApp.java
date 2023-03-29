@@ -37,6 +37,7 @@ import com.couchbase.lite.LogDomain;
 import com.couchbase.lite.LogLevel;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
+import com.couchbase.lite.mobiletest.tests.DatabaseManager;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
@@ -64,6 +65,10 @@ public abstract class TestApp {
         return app;
     }
 
+
+    private final Map<String, Map<String, Object>> symTabs = new HashMap<>();
+
+    private final AtomicReference<DatabaseManager> dbMgr = new AtomicReference<>();
 
     private Dispatcher dispatcher;
 
@@ -122,6 +127,29 @@ public abstract class TestApp {
         }
 
         return certsList;
+    }
+
+    @NonNull
+    public final Memory getMemory(@NonNull String client) {
+        Map<String, Object> symTab = symTabs.get(client);
+        if (symTab == null) {
+            symTab = new HashMap<>();
+            symTabs.put(client, symTab);
+        }
+
+        return new Memory(symTab, "_" + getPlatform() + "_" + getAppId());
+    }
+
+    @NonNull
+    public final DatabaseManager getDbMgr(@NonNull Memory memory) {
+        final DatabaseManager mgr = dbMgr.get();
+        if (mgr == null) { dbMgr.compareAndSet(null, new DatabaseManager()); }
+        return dbMgr.get();
+    }
+
+    @Nullable
+    public final DatabaseManager resetDbMgr(@NonNull DatabaseManager currManager) {
+        return (!dbMgr.compareAndSet(currManager, new DatabaseManager())) ? null : dbMgr.get();
     }
 
     @NonNull

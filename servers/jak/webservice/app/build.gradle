@@ -32,6 +32,9 @@ def VERBOSE = project.hasProperty("verbose")
 def USE_LOCAL_MAVEN = project.hasProperty("useLocalMaven")
 
 java {
+    sourceCompatibility = "1.8"
+    targetCompatibility = "1.8"
+
     sourceSets {
         main {
             java.srcDirs = [
