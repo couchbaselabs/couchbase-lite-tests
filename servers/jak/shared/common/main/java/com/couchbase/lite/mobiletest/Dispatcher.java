@@ -26,7 +26,6 @@ import java.util.Map;
 import okio.Buffer;
 
 import com.couchbase.lite.mobiletest.json.Json;
-import com.couchbase.lite.mobiletest.tests.DatabaseManager;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
@@ -44,8 +43,8 @@ public final class Dispatcher {
     public void init() {
         addTest(2, "/", Method.GET, (r, m) -> app.getSystemInfo());
         addTest(2, "/reset", Method.POST, (r, m) -> {
-            DatabaseManager.reset(m);
-            Memory.reset(m);
+            app.getDbMgr(m).reset(m);
+            m.reset();
             return new HashMap<>();
         });
         addTest(2, "/getAllDocumentIDs", Method.POST, (r, m) -> null);
@@ -79,7 +78,7 @@ public final class Dispatcher {
                 Reply.Status.OK,
                 "application/json",
                 serializer.serializeReply(
-                    test.run(Json.getParser(version).parseRequest(req), Memory.get(client))));
+                    test.run(Json.getParser(version).parseRequest(req), TestApp.getApp().getMemory(client))));
         }
         catch (TestException err) {
             Log.w(TAG, "Test failed", err);

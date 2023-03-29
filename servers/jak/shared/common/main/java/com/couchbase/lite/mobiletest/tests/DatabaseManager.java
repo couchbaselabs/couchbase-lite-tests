@@ -27,13 +27,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.DatabaseConfiguration;
 import com.couchbase.lite.internal.core.C4Database;
 import com.couchbase.lite.mobiletest.Memory;
+import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestException;
 import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
@@ -46,29 +46,19 @@ public final class DatabaseManager {
 
     private static final String DB_EXTENSION = C4Database.DB_EXTENSION;
 
-    private static final AtomicReference<DatabaseManager> DB_MGR = new AtomicReference<>();
-
-    @NonNull
-    public static DatabaseManager get(@NonNull Memory memory) {
-        final DatabaseManager mgr = DB_MGR.get();
-        if (mgr == null) { DB_MGR.compareAndSet(null, new DatabaseManager()); }
-        return DB_MGR.get();
-    }
-
-    public static void reset(@NonNull Memory memory) {
-        final DatabaseManager mgr = DB_MGR.getAndSet(null);
-        if (mgr != null) { mgr.finish(memory); }
-        DB_MGR.compareAndSet(null, new DatabaseManager());
-    }
-
 
     private final File dbRoot;
 
-    private DatabaseManager() {
+    public DatabaseManager() {
         dbRoot = new File("tests_" + new SimpleDateFormat("MM_dd_HH_mm_ss", Locale.getDefault()).format(new Date()));
         if (!dbRoot.mkdirs() || !dbRoot.canWrite()) {
             throw new IllegalStateException("Could not create directory: " + dbRoot);
         }
+    }
+
+    public void reset(@NonNull Memory memory) {
+        final DatabaseManager mgr = TestApp.getApp().resetDbMgr(this);
+        if (mgr != null) { mgr.finish(memory); }
     }
 
     @NonNull
