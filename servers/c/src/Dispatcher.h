@@ -1,35 +1,31 @@
 #pragma once
-
-#include <nlohmann/json.hpp>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 struct mg_connection;
+class Request;
 
 class Dispatcher {
 public:
     Dispatcher();
 
-    int handle(mg_connection* conn);
+    int handle(mg_connection* conn) const;
 
 private:
-    using Handler = std::function<void(nlohmann::json&, mg_connection*)>;
-
+    using Handler = std::function<int(const Request& request)>;
     struct Rule {
         int version;
         std::string method;
         std::string path;
         Handler handler;
     };
+    void addRule(const Rule& rule);
 
-    void addHandler(int version, std::string method, std::string path, const Handler& handler);
-    Handler findHandler(int version, std::string method, const std::string& path);
+    [[nodiscard]] Handler findHandler(const Request& request) const;
 
-    int sendErrorCode(mg_connection* conn, int code, const std::string& message = "");
-    void sendJSONResponse(mg_connection* conn, const nlohmann::json& object);
+    // Handler Functions:
+    int handleGETRoot(const Request& request);
 
-    void handleGetRoot(nlohmann::json&, mg_connection*);
-
+    // Member Variables:
     std::vector<Rule> _rules;
 };
