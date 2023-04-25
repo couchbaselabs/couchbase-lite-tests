@@ -11,13 +11,15 @@ add_subdirectory(vendor)
 get_directory_property(civetweb_SOURCE_DIR DIRECTORY vendor DEFINITION civetweb_SOURCE_DIR)
 
 message(STATUS ${CMAKE_LIBRARY_ARCHITECTURE})
-find_package(CouchbaseLite 3.1.0 REQUIRED)
+
+find_package(CouchbaseLite 3.1.0 REQUIRED PATHS lib/libcblite)
 
 set(
         SOURCE_FILES
         src/main.cpp
         src/TestServer.cpp src/TestServer.h
-        src/Dispatcher.cpp src/Dispatcher.h)
+        src/Dispatcher.cpp src/Dispatcher.h
+        src/Request.cpp src/Request.h)
 
 add_executable(testserver ${SOURCE_FILES})
 

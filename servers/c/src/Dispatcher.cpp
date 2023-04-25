@@ -1,77 +1,49 @@
 #include "Dispatcher.h"
-#include <civetweb.h>
-#include <sstream>
+#include "Request.h"
 
 using namespace std;
-using namespace placeholders;
 using namespace nlohmann;
 
+#define HANDLER(h) [this](const Request& request) -> int { return h(request); }
+
 Dispatcher::Dispatcher() {
-    addHandler (1, "GET", "/", bind(&Dispatcher::handleGetRoot, this, _1, _2));
+    addRule({1, "GET", "/", HANDLER(handleGETRoot)});
 }
 
-int Dispatcher::handle(mg_connection *conn) {
-    const mg_request_info* request_info = mg_get_request_info(conn);
-    string method = request_info->request_method;
-    string path = request_info->request_uri;
-
-    auto handler = findHandler(1, method, path);
+int Dispatcher::handle(mg_connection *conn) const {
+    Request request = Request(conn);
+    auto handler = findHandler(request);
     if (!handler) {
-        return sendErrorCode(conn, 405);
+        return request.respondWithError(405);
     }
 
     try {
-        stringstream s;
-        char buf[8192];
-        int r = mg_read(conn, buf, 8192);
-        while(r > 0) {
-            s.write(buf, r);
-            r = mg_read(conn, buf, 8192);
-        }
-
-        json body;
-        if(s.tellp() >= 2) {
-            s >> body;
-        }
-        handler(body, conn);
+        return handler(request);
     } catch(const exception& e) {
         string msg = "Exception caught during router handling: " + string(e.what());
-        return sendErrorCode(conn, 400, msg);
+        return request.respondWithError(405, msg.c_str());
     }
-    return 200;
 }
 
-void Dispatcher::addHandler(int version, string method, string path, const Dispatcher::Handler& handler) {
-    _rules.push_back({version, method, path, handler});
+void Dispatcher::addRule(const Rule& rule) {
+    _rules.push_back(rule);
 }
 
-Dispatcher::Handler Dispatcher::findHandler(int version, string method, const string& path) {
+Dispatcher::Handler Dispatcher::findHandler(const Request& request) const {
     for (auto &rule : _rules) {
-        if (rule.version <= version && rule.method == method && rule.path == path) {
+        if (rule.version <= request.version() &&
+            rule.method == request.method() &&
+            rule.path == request.path()) {
             return rule.handler;
         }
     }
     return nullptr;
 }
 
-int Dispatcher::sendErrorCode(mg_connection* conn, int code, const std::string& message) {
-    auto msg = message.empty() ? mg_get_response_code_text(conn, code) : message.c_str();
-    mg_send_http_error(conn, code, "%s", msg);
-}
-
-void Dispatcher::sendJSONResponse(mg_connection* conn, const nlohmann::json& json) {
-    string encoded = json.dump();
-    mg_send_http_ok(conn, "application/json", encoded.size());
-    mg_write(conn, encoded.c_str(), encoded.size());
-}
-
-void Dispatcher::handleGetRoot(json& body, mg_connection *conn) {
+int Dispatcher::handleGETRoot(const Request& request) {
     json result;
     result["version"] = "3.1.0";
     result["apiVersion"] = 1;
     result["cbl"] = "couchbase-lite-c";
-    sendJSONResponse(conn, result);
+    return request.respondWithJSON(result);
 }
-
-
-

@@ -1,0 +1,9 @@
+#lib
+lib/libcblite
+
+#Build
+build
+cmake-build-debug
+
+# Clion
+.idea
