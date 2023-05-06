@@ -1,31 +1,45 @@
 #pragma once
-#include <string>
-#include <vector>
+
+#include "CBLManager.h"
 
 struct mg_connection;
+
 class Request;
+
+class TestServer;
 
 class Dispatcher {
 public:
-    Dispatcher();
+    explicit Dispatcher(const TestServer *testServer);
 
-    int handle(mg_connection* conn) const;
+    int handle(mg_connection *conn) const;
 
 private:
-    using Handler = std::function<int(const Request& request)>;
+    using Handler = std::function<int(Request &request)>;
     struct Rule {
         int version;
         std::string method;
         std::string path;
         Handler handler;
     };
-    void addRule(const Rule& rule);
 
-    [[nodiscard]] Handler findHandler(const Request& request) const;
+    void addRule(const Rule &rule);
+
+    [[nodiscard]] Handler findHandler(const Request &request) const;
 
     // Handler Functions:
-    int handleGETRoot(const Request& request);
+    int handleGETRoot(Request &request);
+
+    int handlePOSTReset(Request &request);
+
+    int handlePOSTGetAllDocumentIDs(Request &request);
+
+    int handlePOSTStartReplicator(Request &request);
+
+    int handlePOSTGetReplicatorStatus(Request &request);
 
     // Member Variables:
+    const TestServer *_testServer{nullptr};
     std::vector<Rule> _rules;
+    std::unique_ptr<CBLManager> _dbManager;
 };

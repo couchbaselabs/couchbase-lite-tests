@@ -6,7 +6,7 @@ using namespace nlohmann;
 using namespace std;
 
 Request::Request(mg_connection *conn) {
-    const mg_request_info* info = mg_get_request_info(conn);
+    const mg_request_info *info = mg_get_request_info(conn);
     _method = info->request_method;
     _path = info->request_uri;
     _conn = conn;
@@ -21,15 +21,27 @@ const nlohmann::json &Request::jsonBody() {
         stringstream s;
         char buf[8192];
         int r = mg_read(_conn, buf, 8192);
-        while(r > 0) {
+        while (r > 0) {
             s.write(buf, r);
             r = mg_read(_conn, buf, 8192);
         }
-        if(s.tellp() >= 2) {
+        if (s.tellp() >= 2) {
             s >> _jsonBody;
         }
     }
     return _jsonBody;
+}
+
+int Request::respondWithOK() const {
+    mg_send_http_ok(_conn, nullptr, 0);
+    return 200;
+}
+
+int Request::respondWithJSON(const json &json) const {
+    string jsonStr = json.dump();
+    mg_send_http_ok(_conn, "application/json", (long long) jsonStr.size());
+    mg_write(_conn, jsonStr.c_str(), jsonStr.size());
+    return 200;
 }
 
 int Request::respondWithError(int code, const char *message) const {
@@ -39,9 +51,3 @@ int Request::respondWithError(int code, const char *message) const {
     return code;
 }
 
-int Request::respondWithJSON(const json &json) const {
-    string jsonStr = json.dump();
-    mg_send_http_ok(_conn, "application/json", (long long)jsonStr.size());
-    mg_write(_conn, jsonStr.c_str(), jsonStr.size());
-    return 200;
-}
