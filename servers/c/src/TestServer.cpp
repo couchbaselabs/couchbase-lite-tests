@@ -1,37 +1,36 @@
 #include "TestServer.h"
-#include "Dispatcher.h"
 #include <civetweb.h>
 #include <string>
 
 using namespace std;
 
-TestServer::TestServer() {
-    _context = nullptr;
-    _dispatcher = Dispatcher();
+const TestServer::Context *TestServer::context() const {
+    return &_context;
 }
 
 void TestServer::start() {
-    if (_context) {
+    if (_server) {
         throw std::runtime_error("Already Started");
     }
 
     string port_str = to_string(PORT);
-    const char* options[3] = {"listening_ports", port_str.c_str(), nullptr};
+    const char *options[3] = {"listening_ports", port_str.c_str(), nullptr};
 
-    _context = mg_start(nullptr, nullptr, options);
+    _server = mg_start(nullptr, nullptr, options);
 
-    mg_set_request_handler(_context, "/*", [](mg_connection *conn, void *context) -> int {
+    mg_set_request_handler(_server, "/*", [](mg_connection *conn, void *context) -> int {
         auto server = static_cast<TestServer *>(context);
         return server->handleRequest(conn);
     }, this);
 }
 
 void TestServer::stop() {
-    if (_context) {
-        mg_stop(_context);
+    if (_server) {
+        mg_stop(_server);
     }
 }
 
 int TestServer::handleRequest(mg_connection *conn) {
     return _dispatcher.handle(conn);
 }
+

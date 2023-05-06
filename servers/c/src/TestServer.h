@@ -1,4 +1,5 @@
 #pragma once
+
 #include "Dispatcher.h"
 
 struct mg_context;
@@ -8,14 +9,23 @@ class TestServer {
 public:
     static constexpr unsigned short PORT = 8080;
 
-    TestServer();
+    struct Context {
+        std::string databaseDir;
+        std::string assetDir;
+    };
+
+    TestServer(Context context) : _context(context), _dispatcher(this) {}
+
+    const Context *context() const;
 
     void start();
+
     void stop();
 
 private:
     int handleRequest(mg_connection *conn);
 
-    mg_context* _context;
+    Context _context;
+    mg_context *_server{nullptr};
     Dispatcher _dispatcher;
 };

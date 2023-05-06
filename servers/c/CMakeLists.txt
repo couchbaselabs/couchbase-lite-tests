@@ -17,11 +17,31 @@ find_package(CouchbaseLite 3.1.0 REQUIRED PATHS lib/libcblite)
 set(
         SOURCE_FILES
         src/main.cpp
+
+        src/Common.h src/CollectionSpec.h
+        src/CBLManager.cpp src/CBLManager.h
+        src/Dispatcher.cpp src/Dispatcher+Handlers.cpp src/Dispatcher.h
+        src/Request.cpp src/Request.h
         src/TestServer.cpp src/TestServer.h
-        src/Dispatcher.cpp src/Dispatcher.h
-        src/Request.cpp src/Request.h)
+
+        src/support/Defer.h
+        src/support/Exception.h
+        src/support/FileSupport.h
+)
 
 add_executable(testserver ${SOURCE_FILES})
+
+if(APPLE)
+    target_sources(
+            testserver PRIVATE
+            src/support/FileSupport+Apple.mm
+    )
+else()
+    target_sources(
+            testserver PRIVATE
+            src/support/FileSupport.mm
+    )
+endif()
 
 target_link_libraries(
         testserver PRIVATE
@@ -41,3 +61,5 @@ target_compile_definitions(
         -DJSON_USE_IMPLICIT_CONVERSIONS=0
         -DHAS_UNCAUGHT_EXCEPTIONS=1
 )
+
+file(COPY assets DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
