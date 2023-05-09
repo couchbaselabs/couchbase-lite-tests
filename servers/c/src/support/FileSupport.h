@@ -3,7 +3,7 @@
 #include <string>
 
 namespace file_support {
-    std::string tempDir(std::string dir, bool create);
+    std::string tempDir(const std::string &dir, bool create);
 
     std::string assetDir();
 }

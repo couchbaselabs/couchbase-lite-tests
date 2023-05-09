@@ -10,7 +10,7 @@
 
 using namespace std;
 
-string file_support::tempDir(string subdir, bool create) {
+string file_support::tempDir(const string &subdir, bool create) {
 #ifdef __ANDROID__
     // TODO:
     return ""

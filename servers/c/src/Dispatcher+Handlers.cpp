@@ -11,7 +11,7 @@ using ReplicatorParams = CBLManager::ReplicatorParams;
 using ReplicationAuthenticator = CBLManager::ReplicationAuthenticator;
 using ReplicationCollection = CBLManager::ReplicationCollection;
 
-int Dispatcher::handleGETRoot(Request &request) {
+int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-member-functions-to-static)
     json result;
     result["version"] = "3.1.0";
     result["apiVersion"] = 1;
@@ -296,8 +296,7 @@ int Dispatcher::handlePOSTGetDocument(Request &request) {
 
         auto json = nlohmann::json::parse(STR(jsonSlice));
         return request.respondWithJSON(json);
-
     } else {
-        request.respondWithError(404, "Document Not Found");
+        return request.respondWithError(404, "Document Not Found");
     }
 }
