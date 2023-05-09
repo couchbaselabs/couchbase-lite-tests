@@ -21,11 +21,11 @@ public:
     const nlohmann::json &jsonBody();
 
     // Response:
-    int respondWithOK() const;
+    [[nodiscard]] int respondWithOK() const;
 
-    int respondWithJSON(const nlohmann::json &json) const;
+    [[nodiscard]] int respondWithJSON(const nlohmann::json &json) const;
 
-    int respondWithError(int code, const char *message = nullptr) const;
+    [[nodiscard]] int respondWithError(int code, const char *message = nullptr) const;
 
 private:
     mg_connection *_conn;

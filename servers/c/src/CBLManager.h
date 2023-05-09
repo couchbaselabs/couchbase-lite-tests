@@ -23,7 +23,7 @@ public:
      */
     CBLDatabase *database(const std::string &name);
 
-    CBLCollection *collection(const CBLDatabase *db, const std::string &name, bool mustExist = true);
+    static CBLCollection *collection(const CBLDatabase *db, const std::string &name, bool mustExist = true);
 
     struct ReplicationCollection {
         std::string collection;

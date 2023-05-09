@@ -19,17 +19,16 @@ public:
         ss << "Couchbase Lite Error : " << (int) error.domain << "/" << error.code << ", " << message;
         _what = ss.str();
     }
-
-    [[nodiscard]]
-    const char *what() const noexcept override {
+    
+    [[nodiscard]] const char *what() const noexcept override {
         return _what.c_str();
     }
 
-    const CBLError &error() const {
+    [[nodiscard]] const CBLError &error() const {
         return _error;
     }
 
 private:
     string _what;
-    CBLError _error;
+    CBLError _error{};
 };

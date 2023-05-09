@@ -14,9 +14,9 @@ public:
         std::string assetDir;
     };
 
-    TestServer(Context context) : _context(context), _dispatcher(this) {}
+    explicit TestServer(Context context) : _context(std::move(context)), _dispatcher(this) {}
 
-    const Context *context() const;
+    [[nodiscard]] const Context *context() const;
 
     void start();
 
