@@ -7,13 +7,17 @@
 
 Dispatcher::Dispatcher(const TestServer *testServer) {
     _testServer = testServer;
-    _dbManager = make_unique<CBLManager>(_testServer->context()->databaseDir, _testServer->context()->assetDir);
+    _cblManager = make_unique<CBLManager>(_testServer->context()->databaseDir, _testServer->context()->assetDir);
 
     addRule({1, "GET", "/", HANDLER(handleGETRoot)});
     addRule({1, "POST", "/reset", HANDLER(handlePOSTReset)});
     addRule({1, "POST", "/getAllDocumentIDs", HANDLER(handlePOSTGetAllDocumentIDs)});
+    addRule({1, "POST", "/updateDatabase", HANDLER(handlePOSTUpdateDatabase)});
     addRule({1, "POST", "/startReplicator", HANDLER(handlePOSTStartReplicator)});
     addRule({1, "POST", "/getReplicatorStatus", HANDLER(handlePOSTGetReplicatorStatus)});
+    
+    // For testing:
+    addRule({1, "POST", "/test/getDocument", HANDLER(handlePOSTGetDocument)});
 }
 
 int Dispatcher::handle(mg_connection *conn) const {

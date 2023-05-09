@@ -34,12 +34,17 @@ private:
 
     int handlePOSTGetAllDocumentIDs(Request &request);
 
+    int handlePOSTUpdateDatabase(Request &request);
+
     int handlePOSTStartReplicator(Request &request);
 
     int handlePOSTGetReplicatorStatus(Request &request);
 
+    // Handler Functions for Testing:
+    int handlePOSTGetDocument(Request &request);
+
     // Member Variables:
     const TestServer *_testServer{nullptr};
     std::vector<Rule> _rules;
-    std::unique_ptr<CBLManager> _dbManager;
+    std::unique_ptr<CBLManager> _cblManager;
 };
