@@ -2,6 +2,7 @@
 #include "CollectionSpec.h"
 #include "Common.h"
 #include "Request.h"
+#include "support/FleeceSupport.h"
 
 using namespace std;
 using namespace nlohmann;
@@ -19,14 +20,14 @@ int Dispatcher::handleGETRoot(Request &request) {
 }
 
 int Dispatcher::handlePOSTReset(Request &request) {
-    _dbManager->reset();
+    _cblManager->reset();
     json body = request.jsonBody();
     if (body.contains("datasets")) {
         json dataset = body["datasets"];
         for (auto &[key, val]: dataset.items()) {
             auto dbNames = val.get<vector<string>>();
             for (auto &name: dbNames) {
-                _dbManager->loadDataset(key, name);
+                _cblManager->loadDataset(key, name);
             }
         }
     }
@@ -38,34 +39,23 @@ int Dispatcher::handlePOSTGetAllDocumentIDs(Request &request) {
     auto dbName = body["database"].get<string>();
     auto colNames = body["collections"].get<vector<string>>();
 
-    auto db = _dbManager->database(dbName);
-    if (!db) {
-        throw std::runtime_error("database not found");
-    }
+    auto db = _cblManager->database(dbName);
 
     json result = json::object();
     for (auto &colName: colNames) {
-        CBLError error{};
-        auto spec = CollectionSpec(colName);
-        auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
-        checkError(error);
+        auto col = _cblManager->collection(db, colName, false);
+        AUTO_RELEASE(col);
 
         if (col) {
-            CBLQuery *query = nullptr;
-            CBLResultSet *rs = nullptr;
-
-            DEFER {
-                      CBLResultSet_Release(rs);
-                      CBLQuery_Release(query);
-                      CBLCollection_Release(col);
-                  };
-
+            CBLError error{};
             string str = "SELECT meta().id FROM " + colName;
-            query = CBLDatabase_CreateQuery(db, kCBLN1QLLanguage, FLS(str), nullptr, &error);
+            CBLQuery *query = CBLDatabase_CreateQuery(db, kCBLN1QLLanguage, FLS(str), nullptr, &error);
             checkError(error);
+            AUTO_RELEASE(query);
 
-            rs = CBLQuery_Execute(query, &error);
+            CBLResultSet *rs = CBLQuery_Execute(query, &error);
             checkError(error);
+            AUTO_RELEASE(rs);
 
             vector<string> ids;
             while (CBLResultSet_Next(rs)) {
@@ -77,6 +67,116 @@ int Dispatcher::handlePOSTGetAllDocumentIDs(Request &request) {
         }
     }
     return request.respondWithJSON(result);
+}
+
+static void updateProperties(json &delta, FLMutableDict properties) { // NOLINT(misc-no-recursion)
+    if (delta.type() != json::value_t::object) {
+        throw domain_error("Applied delta is not dictionary");
+    }
+
+    for (const auto &[deltaKey, deltaValue]: delta.items()) {
+        auto key = FLS(deltaKey);
+        if (deltaValue.type() == json::value_t::object) {
+            auto dict = FLMutableDict_GetMutableDict(properties, key);
+            if (!dict) {
+                dict = FLMutableDict_New();
+                FLMutableDict_SetDict(properties, key, dict);
+                FLMutableDict_Release(dict);
+            }
+            updateProperties(deltaValue, dict);
+        } else {
+            auto slot = FLMutableDict_Set(properties, key);
+            fleece_support::setSlotValue(slot, deltaValue);
+        }
+    }
+}
+
+static void removeProperties(json &removedProps, FLMutableDict properties) { // NOLINT(misc-no-recursion)
+    if (removedProps.type() != json::value_t::object) {
+        throw domain_error("Removed properties is not dictionary");
+    }
+
+    for (const auto &[deletedKey, deletedValue]: removedProps.items()) {
+        auto key = FLS(deletedKey);
+        if (deletedValue.type() == json::value_t::object) {
+            auto dict = FLMutableDict_GetMutableDict(properties, key);
+            if (!dict) {
+                dict = FLMutableDict_New();
+                FLMutableDict_SetDict(properties, key, dict);
+                FLMutableDict_Release(dict);
+            }
+            removeProperties(deletedValue, dict);
+        } else if (deletedValue.type() == json::value_t::null) {
+            FLMutableDict_Remove(properties, key);
+        } else {
+            throw domain_error("Invalid removed property value");
+        }
+    }
+}
+
+int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
+    static constexpr const char *kUpdateDatabaseTypeUpdate = "UPDATE";
+    static constexpr const char *kUpdateDatabaseTypeDelete = "DELETE";
+    static constexpr const char *kUpdateDatabaseTypePurge = "PURGE";
+
+    json body = request.jsonBody();
+    auto dbName = body["database"].get<string>();
+    auto db = _cblManager->database(dbName);
+
+    {
+        CBLError error{};
+
+        bool commit = false;
+        CBLDatabase_BeginTransaction(db, &error);
+        checkError(error);
+        DEFER { CBLDatabase_EndTransaction(db, commit, &error); };
+
+        for (auto &update: body["updates"]) {
+            auto colName = update["collection"].get<string>();
+            auto spec = CollectionSpec(colName);
+            auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
+            checkError(error);
+            AUTO_RELEASE(col);
+
+            auto docID = update["documentID"].get<string>();
+            CBLDocument *doc = CBLCollection_GetMutableDocument(col, FLS(docID), &error);
+            checkError(error);
+            AUTO_RELEASE(doc);
+
+            auto type = update["type"].get<string>();
+            if (type == kUpdateDatabaseTypeUpdate) {
+                if (!doc) {
+                    doc = CBLDocument_CreateWithID(FLS(docID));
+                }
+                auto props = FLDict_AsMutable(CBLDocument_Properties(doc));
+
+                if (update.contains("updatedProperties")) {
+                    json updatedProps = update["updatedProperties"];
+                    updateProperties(updatedProps, props);
+                }
+
+                if (update.contains("removedProperties")) {
+                    json removedProps = update["removedProperties"];
+                    removeProperties(removedProps, props);
+                }
+
+                CBLCollection_SaveDocument(col, doc, &error);
+                checkError(error);
+            } else if (type == kUpdateDatabaseTypeDelete) {
+                if (doc) {
+                    CBLCollection_DeleteDocument(col, doc, &error);
+                    checkError(error);
+                }
+            } else if (type == kUpdateDatabaseTypePurge) {
+                if (doc) {
+                    CBLCollection_PurgeDocument(col, doc, &error);
+                    checkError(error);
+                }
+            }
+        }
+        commit = true;
+    }
+    return request.respondWithOK();
 }
 
 int Dispatcher::handlePOSTStartReplicator(Request &request) {
@@ -131,7 +231,7 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
         reset = body["reset"].get<bool>();
     }
 
-    string id = _dbManager->startReplicator(params, reset);
+    string id = _cblManager->startReplicator(params, reset);
 
     json result;
     result["id"] = id;
@@ -144,7 +244,7 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
     json body = request.jsonBody();
 
     auto id = body["id"].get<string>();
-    auto repl = _dbManager->replicator(id);
+    auto repl = _cblManager->replicator(id);
     if (!repl) {
         throw std::runtime_error("replicator not found");
     }
@@ -171,4 +271,33 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
     }
 
     return request.respondWithJSON(result);
+}
+
+// Handler Functions For Testing
+
+int Dispatcher::handlePOSTGetDocument(Request &request) {
+    json body = request.jsonBody();
+    auto dbName = body["database"].get<string>();
+    auto colName = body["collection"].get<string>();
+    auto docID = body["documentID"].get<string>();
+
+    auto db = _cblManager->database(dbName);
+    auto col = _cblManager->collection(db, colName);
+
+    CBLError error{};
+    auto doc = CBLCollection_GetDocument(col, FLS(docID), &error);
+    checkError(error);
+    AUTO_RELEASE(doc);
+
+    if (doc) {
+        auto props = CBLDocument_Properties(doc);
+        auto jsonSlice = FLValue_ToJSON((FLValue) props);
+        DEFER { FLSliceResult_Release(jsonSlice); };
+
+        auto json = nlohmann::json::parse(STR(jsonSlice));
+        return request.respondWithJSON(json);
+
+    } else {
+        request.respondWithError(404, "Document Not Found");
+    }
 }
