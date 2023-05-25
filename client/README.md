@@ -1,0 +1,3 @@
+# Couchbase Lite Functional Testing Client
+
+To be written...
