@@ -39,6 +39,7 @@ option(CIVETWEB_ENABLE_SSL "Enables the secure socket layer" OFF)
 option(CIVETWEB_ENABLE_ASAN "Enable ASAN in debug mode" OFF)
 option(CIVETWEB_BUILD_TESTING "Enable automated testing of civetweb" OFF)
 option(CIVETWEB_ENABLE_SERVER_EXECUTABLE "Enable building of the server executable" OFF)
+option(CIVETWEB_ENABLE_DEBUG_TOOLS "For Debug builds enable verbose logging and assertions" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 set(BUILD_SHARED_LIBS OFF) # Ugh how many times do I have to tell you?!
 
