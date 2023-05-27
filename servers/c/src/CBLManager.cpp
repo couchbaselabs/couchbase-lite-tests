@@ -73,7 +73,7 @@ void CBLManager::loadDataset(const string &name, const string &targetDatabaseNam
     if (!db) {
         throw CBLException(error);
     }
-    _databases[name] = db;
+    _databases[targetDatabaseName] = db;
 }
 
 CBLDatabase *CBLManager::database(const string &name) {
