@@ -1,8 +1,7 @@
-from logging import warning
 from pathlib import Path
 from typing import Dict
 
-from .responses import GetRootResponse
+from .logging import LogLevel, cbl_setLogLevel
 from .extrapropsparser import _parse_extra_props
 from .configparser import ParsedConfig, _parse_config
 from .assertions import _assert_not_null
@@ -11,17 +10,16 @@ from enum import Enum
 from sys import version_info
 from json import dumps
 
-from requests import Response, get
+from requests import get
 
 if version_info < (3, 9):
     raise RuntimeError("Python must be at least v3.9!")
 
-class LogLevel(Enum):
-    ERROR = "error"
-    WARNING = "warning"
-    INFO = "info"
-    VERBOSE = "verbose"
-    DEBUG = "debug"
+def available_api_version(version: int) -> int:
+    if version < 2:
+        return version
+    
+    raise NotImplementedError(f"API version {version} does not exist!")
 
 class CBLPyTest:
     @property
@@ -40,20 +38,11 @@ class CBLPyTest:
     def output_path(self) -> Path:
         return self.__output_path
     
-    def remote_get_root(self, remote_url: str) -> GetRootResponse:
-        try:
-            resp = get(remote_url)
-            resp.headers.update
-        except:
-            warning(f"Failed to send GET / to test server!")
-            return None
-        
-        return GetRootResponse(resp.content)
-    
     def __init__(self, config_path: str, log_level: LogLevel = LogLevel.VERBOSE, extra_props_path: str = None, output_path: str = None):
         _assert_not_null(config_path, nameof(config_path))
         self.__config = _parse_config(config_path)
         self.__log_level = LogLevel(log_level)
+        cbl_setLogLevel(self.__log_level)
         self.__extra_props = None
         if extra_props_path is not None:
             self.__extra_props = _parse_extra_props(extra_props_path)
