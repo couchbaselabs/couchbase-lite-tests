@@ -45,7 +45,7 @@ class ErrorResponseBody:
         self.__code = code
         self.__message = message
 
-class TestServerResponse(ABC):
+class TestServerResponse:
     @property
     def version(self) -> int:
         return self.__version
@@ -57,23 +57,22 @@ class TestServerResponse(ABC):
     @property
     def error(self) -> ErrorResponseBody:
         return self.__error
-    
-    @abstractmethod
-    def _http_name(self) -> str:
-        return None
 
-    def __init__(self, request_id: int, status_code: int, version: int, body: dict):
+    def __init__(self, request_id: int, status_code: int, version: int, body: dict, 
+                 http_name: str, http_method: str = "post"):
         self.__id = request_id
         self.__version = available_api_version(version)
         self.__status_code = status_code
         self.__error = ErrorResponseBody.create(body)
         self.__payload = body
+        self.__http_name = http_name
+        self.__http_method = http_method
 
     def serialize_payload(self) -> str:
         return dumps(self.__payload)
 
     def __str__(self) -> str:
-        return f"<- {self._http_name()} #{self.__id} {self.__status_code}"
+        return f"<- v{self.__version} {self.__http_method.upper()} /{self.__http_name} #{self.__id} {self.__status_code}"
 
 class GetRootResponse(TestServerResponse):
     __version_key: Final[str] = "version"
@@ -102,7 +101,4 @@ class GetRootResponse(TestServerResponse):
         self.__api_version = cast(int, json.get(self.__api_version_key))
         self.__cbl = cast(str, json.get(self.__cbl_key))
         self.__device = cast(Dict[str, any], json.get(self.__device_key))
-        super().__init__(request_id, status_code, self.__api_version, json)
-
-    def _http_name(self) -> str:
-        return "GET /"
+        super().__init__(request_id, status_code, self.__api_version, json, "", "get")

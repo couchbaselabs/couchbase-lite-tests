@@ -10,8 +10,6 @@ from enum import Enum
 from sys import version_info
 from json import dumps
 
-from requests import get
-
 if version_info < (3, 9):
     raise RuntimeError("Python must be at least v3.9!")
 

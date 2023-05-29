@@ -4,6 +4,7 @@ from json import loads
 from pathlib import Path
 from shutil import rmtree
 from typing import cast
+from urllib.parse import urljoin
 from uuid import UUID, uuid4
 from requests import Request, Response, Session, get
 from importlib import import_module
@@ -24,7 +25,7 @@ class TestServerRequestBody(ABC):
     def serialize(self) -> str:
         pass
 
-class TestServerRequest(ABC):
+class TestServerRequest:
     __next_id: int = 1
 
     @property
@@ -34,17 +35,26 @@ class TestServerRequest(ABC):
     @property
     def payload(self) -> TestServerRequestBody:
         return self.__payload
+    
+    def __init__(self, version: int, uuid: UUID, http_name: str, payload_type = None, 
+                 method: str = "post", payload: TestServerRequestBody = None):
+        if payload is not None and payload_type is not None:
+            assert(isinstance(payload, payload_type))
 
-    def __init__(self, version: int, uuid: UUID, payload: TestServerRequestBody = None):
         self.__version = available_api_version(version)
         self.__uuid = uuid
         self.__payload = payload
         self.__id = TestServerRequest.__next_id 
         TestServerRequest.__next_id += 1
+        self.__http_name = http_name
+        self.__method = method
 
-    @abstractmethod
     def _create_request(self, url: str) -> Request:
-        return None
+        full_url = urljoin(url, self.__http_name)
+        return Request(self.__method, full_url)
+    
+    def _http_name(self) -> str:
+        return f"v1 {self.__method.capitalize()} /{self.__http_name}"
     
     def _create_response(self, r: Response, version: int) -> TestServerResponse:
         module = import_module(f"cbltest.v{version}.responses")
@@ -58,11 +68,7 @@ class TestServerRequest(ABC):
             else:
                 content = loads(r.content)
 
-        return cast(TestServerResponse, response_class(self.__id, r.status_code, version, content))
-    
-    @abstractmethod
-    def _http_name(self) -> str:
-        return 
+        return cast(TestServerResponse, response_class(self.__id, r.status_code, content))
     
     def send(self, url: str, session: Session = None) -> TestServerResponse:
         cbl_trace(f"Sending {self}")
@@ -94,25 +100,19 @@ class TestServerRequest(ABC):
         ret_val = self._create_response(resp, resp_version)
         cbl_trace(f"Received {ret_val}")
         if not resp.ok:
-            cbl_warning(f"{self}\nwas not successful ({resp.status_code})")
+            cbl_warning(f"{self} was not successful ({resp.status_code})")
         return ret_val
     
     def __str__(self) -> str:
-        return f"-> {self._http_name()} #{self.__id}"
+        return f"-> v{self.__version} {self.__method.upper()} /{self.__http_name} #{self.__id}"
 
 # Only this request is not versioned
 class GetRootRequest(TestServerRequest):
     def __init__(self, uuid: UUID):
-        super().__init__(0, uuid)
-
-    def _create_request(self, url: str) -> Request:
-        return Request("get", url)
+        super().__init__(0, uuid, "", method="get")
     
     def _create_response(self, r: Response, version: int) -> TestServerResponse:
         return GetRootResponse(self.number, r.status_code, loads(r.content))
-    
-    def _http_name(self) -> str:
-        return "GET /"
 
 
 class RequestFactory:
@@ -167,6 +167,12 @@ class RequestFactory:
             raise ValueError("No payload provided!")
         
         return self._create_request("PostSnapshotDocumentsRequest", payload)
+    
+    def create_post_update_database(self, payload: TestServerRequestBody) -> TestServerRequest:
+        if payload is None:
+            raise ValueError("No payload provided!")
+        
+        return self._create_request("PostUpdateDatabaseRequest", payload)
     
     def send_request(self, r: TestServerRequest) -> TestServerResponse:
         send_log_path = self.__record_path / f"{r.number:05d}_begin"

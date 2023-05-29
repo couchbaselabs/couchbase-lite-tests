@@ -2,7 +2,7 @@ from cbltest import CBLPyTest
 from argparse import ArgumentParser
 
 from cbltest.requests import RequestFactory
-from cbltest.v1.requests import PostGetAllDocumentIDsRequestBody, PostResetRequestBody, PostSnapshotDocumentsRequestBody, SnapshotDocumentEntry
+from cbltest.v1.requests import *
 
 def cli_main():
     ap = ArgumentParser(prog="cli.py", description="Drives CBLPyTest from the command line for experimentation",
@@ -22,14 +22,15 @@ def cli_main():
     payload.add_dataset("travel-sample", ["db1"])
     request = rf.create_post_reset(payload)
     resp = rf.send_request(request)
-
-    # payload = PostGetAllDocumentIDsRequestBody("db1")
-    # payload.collections.extend(["inventory.airlines", "inventory.routes"])
-    # request = rf.create_post_get_all_document_ids(payload)
-    # resp = rf.send_request(request)
     
-    payload = PostSnapshotDocumentsRequestBody([SnapshotDocumentEntry("inventory.airlines", "airline_85")])
-    request = rf.create_post_snapshot_documents(payload)
+    db_update = DatabaseUpdateEntry(DatabaseUpdateType.DELETE, "inventory.airlines", "airline_85")
+    payload = PostUpdateDatabaseRequestBody("db1", [db_update])
+    request = rf.create_post_update_database(payload)
+    resp = rf.send_request(request)
+
+    payload = PostGetAllDocumentIDsRequestBody("db1")
+    payload.collections.extend(["inventory.airlines"])
+    request = rf.create_post_get_all_document_ids(payload)
     resp = rf.send_request(request)
 
 if __name__ == "__main__":
