@@ -27,7 +27,7 @@ set(
         src/support/Defer.h
         src/support/Define.h
         src/support/Exception.h
-        src/support/FileSupport.h src/support/FileSupport.cpp
+        src/support/FileSupport.h
         src/support/FleeceSupport.cpp src/support/FleeceSupport.h)
 
 add_executable(testserver ${SOURCE_FILES})
