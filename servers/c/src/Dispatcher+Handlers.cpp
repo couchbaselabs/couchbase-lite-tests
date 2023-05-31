@@ -3,6 +3,7 @@
 #include "Common.h"
 #include "Request.h"
 #include "support/FleeceSupport.h"
+#include "TestServer.h"
 
 using namespace std;
 using namespace nlohmann;
@@ -13,9 +14,9 @@ using ReplicationCollection = CBLManager::ReplicationCollection;
 
 int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-member-functions-to-static)
     json result;
-    result["version"] = "3.1.0";
-    result["apiVersion"] = 1;
-    result["cbl"] = "couchbase-lite-c";
+    result["version"] = TestServer::VERSION;
+    result["apiVersion"] = TestServer::API_VERSION;
+    result["cbl"] = TestServer::CBL_PLATFORM_NAME;
     return request.respondWithJSON(result);
 }
 

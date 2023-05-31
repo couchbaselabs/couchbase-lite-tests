@@ -28,7 +28,8 @@ set(
         src/support/Define.h
         src/support/Exception.h
         src/support/FileSupport.h
-        src/support/FleeceSupport.cpp src/support/FleeceSupport.h)
+        src/support/FleeceSupport.cpp src/support/FleeceSupport.h
+        src/support/UUID.cpp src/support/UUID.h)
 
 add_executable(testserver ${SOURCE_FILES})
 

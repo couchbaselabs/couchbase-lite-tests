@@ -9,25 +9,29 @@ Dispatcher::Dispatcher(const TestServer *testServer) {
     _testServer = testServer;
     _cblManager = make_unique<CBLManager>(_testServer->context()->databaseDir, _testServer->context()->assetDir);
 
-    addRule({1, "GET", "/", HANDLER(handleGETRoot)});
-    addRule({1, "POST", "/reset", HANDLER(handlePOSTReset)});
-    addRule({1, "POST", "/getAllDocumentIDs", HANDLER(handlePOSTGetAllDocumentIDs)});
-    addRule({1, "POST", "/updateDatabase", HANDLER(handlePOSTUpdateDatabase)});
-    addRule({1, "POST", "/startReplicator", HANDLER(handlePOSTStartReplicator)});
-    addRule({1, "POST", "/getReplicatorStatus", HANDLER(handlePOSTGetReplicatorStatus)});
-    
+    addRule({"GET", "/", HANDLER(handleGETRoot)});
+    addRule({"POST", "/reset", HANDLER(handlePOSTReset)});
+    addRule({"POST", "/getAllDocumentIDs", HANDLER(handlePOSTGetAllDocumentIDs)});
+    addRule({"POST", "/updateDatabase", HANDLER(handlePOSTUpdateDatabase)});
+    addRule({"POST", "/startReplicator", HANDLER(handlePOSTStartReplicator)});
+    addRule({"POST", "/getReplicatorStatus", HANDLER(handlePOSTGetReplicatorStatus)});
+
     // For testing:
-    addRule({1, "POST", "/test/getDocument", HANDLER(handlePOSTGetDocument)});
+    addRule({"POST", "/test/getDocument", HANDLER(handlePOSTGetDocument)});
 }
 
 int Dispatcher::handle(mg_connection *conn) const {
-    Request request = Request(conn);
-    auto handler = findHandler(request);
-    if (!handler) {
-        return request.respondWithError(405);
-    }
-
+    Request request = Request(conn, _testServer);
     try {
+        if (request.version() != TestServer::API_VERSION) {
+            return request.respondWithError(403, "API Version Mismatched");
+        }
+
+        auto handler = findHandler(request);
+        if (!handler) {
+            return request.respondWithError(404, "API Not Found");
+        }
+
         return handler(request);
     } catch (const exception &e) {
         return request.respondWithError(400, e.what());
@@ -40,8 +44,7 @@ void Dispatcher::addRule(const Rule &rule) {
 
 Dispatcher::Handler Dispatcher::findHandler(const Request &request) const {
     for (auto &rule: _rules) {
-        if (rule.version <= request.version() &&
-            rule.method == request.method() &&
+        if (rule.method == request.method() &&
             rule.path == request.path()) {
             return rule.handler;
         }

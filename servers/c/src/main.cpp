@@ -8,12 +8,12 @@
 #include "TestServer.h"
 
 using namespace std;
-using namespace file_support;
+using namespace test_server_support;
 
 int main() {
     mg_init_library(0);
-    TestServer::Context context = {file_support::tempDir("CBL-C-TestServer", true),
-                                   file_support::assetDir()};
+    TestServer::Context context = {tempDir("CBL-C-TestServer", true),
+                                   assetDir()};
     TestServer server = TestServer(context);
     server.start();
     cout << "Using CBL C version " << CBLITE_VERSION << "-" << CBLITE_BUILD_NUMBER;
