@@ -14,22 +14,15 @@ message(STATUS ${CMAKE_LIBRARY_ARCHITECTURE})
 
 find_package(CouchbaseLite 3.1.0 REQUIRED PATHS lib/libcblite)
 
-set(
-        SOURCE_FILES
+set(SOURCE_FILES
         src/main.cpp
-
-        src/Common.h src/CollectionSpec.h
-        src/CBLManager.cpp src/CBLManager.h
-        src/Dispatcher.cpp src/Dispatcher+Handlers.cpp src/Dispatcher.h
-        src/Request.cpp src/Request.h
-        src/TestServer.cpp src/TestServer.h
-
-        src/support/Defer.h
-        src/support/Define.h
-        src/support/Exception.h
-        src/support/FileSupport.h
-        src/support/FleeceSupport.cpp src/support/FleeceSupport.h
-        src/support/UUID.cpp src/support/UUID.h)
+        src/CBLManager.cpp
+        src/Dispatcher.cpp
+        src/Dispatcher+Handlers.cpp
+        src/Request.cpp
+        src/TestServer.cpp
+        src/support/FleeceSupport.cpp
+        src/support/UUID.cpp)
 
 add_executable(testserver ${SOURCE_FILES})
 
@@ -41,9 +34,11 @@ if(APPLE)
 else()
     target_sources(
             testserver PRIVATE
-            src/support/FileSupport.mm
+            src/support/FileSupport.cpp
     )
 endif()
+
+target_include_directories(testserver PRIVATE src)
 
 target_link_libraries(
         testserver PRIVATE

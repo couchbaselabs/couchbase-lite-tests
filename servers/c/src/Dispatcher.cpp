@@ -23,13 +23,19 @@ Dispatcher::Dispatcher(const TestServer *testServer) {
 int Dispatcher::handle(mg_connection *conn) const {
     Request request = Request(conn, _testServer);
     try {
-        if (request.version() != TestServer::API_VERSION) {
-            return request.respondWithError(403, "API Version Mismatched");
-        }
+        if (request.path() != "/") {
+            if (request.version() != TestServer::API_VERSION) {
+                return request.respondWithError(403, "API Version Mismatched, Missing or Invalid Format");
+            }
 
+            if (request.clientUUID().empty()) {
+                return request.respondWithError(403, "Client UUID Missing");
+            }
+        }
+        
         auto handler = findHandler(request);
         if (!handler) {
-            return request.respondWithError(404, "API Not Found");
+            return request.respondWithError(404, "Request API Not Found");
         }
 
         return handler(request);
