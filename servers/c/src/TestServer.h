@@ -7,6 +7,9 @@ struct mg_connection;
 
 class TestServer {
 public:
+    static constexpr const char *CBL_PLATFORM_NAME = "couchbase-lite-c";
+    static constexpr const char *VERSION = "3.1.0";
+    static constexpr unsigned short API_VERSION = 1;
     static constexpr unsigned short PORT = 8080;
 
     struct Context {
@@ -16,7 +19,9 @@ public:
 
     explicit TestServer(Context context) : _context(std::move(context)), _dispatcher(this) {}
 
-    [[nodiscard]] const Context *context() const;
+    [[nodiscard]] const Context *context() const { return &_context; }
+
+    std::string serverUUID() const { return _uuid; }
 
     void start();
 
@@ -28,4 +33,5 @@ private:
     Context _context;
     mg_context *_server{nullptr};
     Dispatcher _dispatcher;
+    std::string _uuid;
 };

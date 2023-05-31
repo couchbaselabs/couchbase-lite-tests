@@ -1,17 +1,16 @@
 #include "TestServer.h"
 #include <civetweb.h>
 #include <string>
+#include "support/UUID.h"
 
 using namespace std;
-
-const TestServer::Context *TestServer::context() const {
-    return &_context;
-}
 
 void TestServer::start() {
     if (_server) {
         throw std::runtime_error("Already Started");
     }
+
+    _uuid = test_server_support::generateUUID();
 
     string port_str = to_string(PORT);
     const char *options[3] = {"listening_ports", port_str.c_str(), nullptr};
@@ -33,4 +32,3 @@ void TestServer::stop() {
 int TestServer::handleRequest(mg_connection *conn) {
     return _dispatcher.handle(conn);
 }
-

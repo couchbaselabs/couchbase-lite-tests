@@ -7,7 +7,7 @@
 
 using namespace std;
 
-string file_support::tempDir(const string &subdir, bool create) {
+string test_server_support::tempDir(const string &subdir, bool create) {
     NSString *tempDir = NSTemporaryDirectory();
     if (!subdir.empty()) {
         NSString *sub = [NSString stringWithCString:subdir.c_str() encoding:NSUTF8StringEncoding];
@@ -19,7 +19,7 @@ string file_support::tempDir(const string &subdir, bool create) {
     return tempDir.UTF8String;
 }
 
-string file_support::assetDir() {
+string test_server_support::assetDir() {
     auto bundle = CFBundleGetBundleWithIdentifier(CFSTR("com.couchbase.CouchbaseLiteTests"));
     if (bundle) {
         auto url = CFBundleCopyResourcesDirectoryURL(bundle);

@@ -17,7 +17,6 @@ public:
 private:
     using Handler = std::function<int(Request &request)>;
     struct Rule {
-        int version;
         std::string method;
         std::string path;
         Handler handler;
