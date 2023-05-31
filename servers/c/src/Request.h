@@ -20,6 +20,8 @@ public:
 
     [[nodiscard]] int version() const;
 
+    [[nodiscard]] std::string clientUUID() const;
+
     const nlohmann::json &jsonBody();
 
     // Response:

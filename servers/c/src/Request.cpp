@@ -16,10 +16,12 @@ Request::Request(mg_connection *conn, const TestServer *server) {
 
 int Request::version() const {
     auto version = mg_get_header(_conn, "CBLTest-API-Version");
-    if (!version) {
-        throw runtime_error("CBLTest-API-Version Request Header Not Found");
-    }
-    return stoi(version);
+    if (!version) { return -1; }
+    try { return stoi(version); } catch (...) { return -1; }
+}
+
+std::string Request::clientUUID() const {
+    return mg_get_header(_conn, "CBLTest-Client-ID");
 }
 
 const nlohmann::json &Request::jsonBody() {
