@@ -9,13 +9,13 @@ unsigned char randomChar() {
     return static_cast<unsigned char>(dis(gen));
 }
 
-std::string generateHex(const unsigned int len) {
+std::string generateHex(const unsigned int num) {
     std::stringstream ss;
-    for (auto i = 0; i < len; i++) {
+    for (auto i = 0; i < num; i++) {
         const auto rc = randomChar();
-        std::stringstream hexstream;
-        hexstream << std::hex << int(rc);
-        auto hex = hexstream.str();
+        std::stringstream hexSs;
+        hexSs << std::hex << int(rc);
+        auto hex = hexSs.str();
         ss << (hex.length() < 2 ? '0' + hex : hex);
     }
     return ss.str();
