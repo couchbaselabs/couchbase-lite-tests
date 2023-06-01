@@ -1,0 +1,3 @@
+requests
+varname
+opentelemetry-api

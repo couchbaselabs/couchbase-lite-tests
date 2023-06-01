@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cbltest"
+dynamic = ["version"]
+authors = [
+    { name = "Jim Borden", email = "jim.borden@couchbase.com" }
+]
+description = "A client for consuming the Couchbase Lite functional testing REST API"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "License :: OSI Approved :: Apache Software License",
+    "Framework :: Pytest",
+    "Topic :: Software Development :: Testing",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Environment :: Console"
+]
+dependencies = [
+    "requests",
+    "opentelemetry-api",
+    "varname"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/couchbaselabs/couchbase-lite-tests"
+"Bug Tracker" = "https://github.com/couchbaselabs/couchbase-lite-tests/issues"
+
+[tool.hatch.version]
+path = "src/cbltest/version.py"
