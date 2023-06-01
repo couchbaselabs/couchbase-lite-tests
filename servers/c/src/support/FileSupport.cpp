@@ -5,7 +5,7 @@
 
 using namespace std;
 
-string file_support::tempDir(const string &subdir, bool create) {
+string ts_support::files::tempDir(const string &subdir, bool create) {
 #ifdef __ANDROID__
     // TODO:
     return ""
@@ -23,7 +23,7 @@ string file_support::tempDir(const string &subdir, bool create) {
     return dir;
 }
 
-string file_support::assetDir() {
+string ts_support::files::assetDir() {
 #ifdef __ANDROID__
     // TODO:
     return ""

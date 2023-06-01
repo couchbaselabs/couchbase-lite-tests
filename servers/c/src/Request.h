@@ -1,5 +1,6 @@
 #pragma once
 
+#include "support/Exception.h"
 #include <nlohmann/json.hpp>
 #include <string>
 
@@ -29,12 +30,14 @@ public:
 
     [[nodiscard]] int respondWithJSON(const nlohmann::json &json) const;
 
-    [[nodiscard]] int respondWithError(int code, const char *message = nullptr) const;
+    [[nodiscard]] int respondWithServerError(const char *message = nullptr, int code = 400) const;
+
+    [[nodiscard]] int respondWithCBLError(const ts_support::exception::CBLException &exception) const;
 
 private:
     void addCommonResponseHeaders() const;
 
-    int respond(int status, std::function<void()>) const;
+    int respond(int status, const std::optional<std::string> &json = std::nullopt) const;
 
     mg_connection *_conn;
     const TestServer *_server;

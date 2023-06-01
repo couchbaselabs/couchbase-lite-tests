@@ -87,7 +87,7 @@ static void updateProperties(json &delta, FLMutableDict properties) { // NOLINT(
             updateProperties(deltaValue, dict);
         } else {
             auto slot = FLMutableDict_Set(properties, key);
-            fleece_support::setSlotValue(slot, deltaValue);
+            ts_support::fleece::setSlotValue(slot, deltaValue);
         }
     }
 }
@@ -123,7 +123,7 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
     json body = request.jsonBody();
     auto dbName = body["database"].get<string>();
     auto db = _cblManager->database(dbName);
-
+    
     {
         CBLError error{};
 
@@ -298,6 +298,6 @@ int Dispatcher::handlePOSTGetDocument(Request &request) {
         auto json = nlohmann::json::parse(STR(jsonSlice));
         return request.respondWithJSON(json);
     } else {
-        return request.respondWithError(404, "Document Not Found");
+        return request.respondWithServerError("Document Not Found");
     }
 }

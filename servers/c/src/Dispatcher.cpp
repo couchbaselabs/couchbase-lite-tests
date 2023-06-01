@@ -25,22 +25,23 @@ int Dispatcher::handle(mg_connection *conn) const {
     try {
         if (request.path() != "/") {
             if (request.version() != TestServer::API_VERSION) {
-                return request.respondWithError(403, "API Version Mismatched, Missing or Invalid Format");
+                return request.respondWithServerError("API Version Mismatched, Missing or Invalid Format");
             }
 
             if (request.clientUUID().empty()) {
-                return request.respondWithError(403, "Client UUID Missing");
+                return request.respondWithServerError("Client UUID Missing");
             }
         }
-        
+
         auto handler = findHandler(request);
         if (!handler) {
-            return request.respondWithError(404, "Request API Not Found");
+            return request.respondWithServerError("Request API Not Found");
         }
-
         return handler(request);
+    } catch (const CBLException &e) {
+        return request.respondWithCBLError(e);
     } catch (const exception &e) {
-        return request.respondWithError(400, e.what());
+        return request.respondWithServerError(e.what());
     }
 }
 

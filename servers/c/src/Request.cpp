@@ -5,6 +5,7 @@
 
 using namespace nlohmann;
 using namespace std;
+using namespace ts_support::exception;
 
 Request::Request(mg_connection *conn, const TestServer *server) {
     const mg_request_info *info = mg_get_request_info(conn);
@@ -41,36 +42,50 @@ const nlohmann::json &Request::jsonBody() {
 }
 
 int Request::respondWithOK() const {
-    return respond(200, [&]() {
-        mg_send_http_ok(_conn, nullptr, 0);
-    });
+    return respond(200);
 }
 
 int Request::respondWithJSON(const json &json) const {
-    return respond(200, [&]() {
-        string jsonStr = json.dump();
-        mg_send_http_ok(_conn, "application/json", (long long) jsonStr.size());
-        mg_write(_conn, jsonStr.c_str(), jsonStr.size());
-    });
+    auto jsonBody = json.dump();
+    return respond(200, jsonBody);
 }
 
-int Request::respondWithError(int code, const char *message) const {
+int Request::respondWithServerError(const char *message, int code) const {
     assert(code >= 400);
-    return respond(code, [&]() {
-        auto msg = message == nullptr ? mg_get_response_code_text(_conn, code) : message;
-        mg_send_http_error(_conn, code, "%s", msg);
-    });
+    nlohmann::json json = json::object();
+    json["domain"] = "TESTSERVER";
+    json["code"] = code;
+    json["message"] = message;
+    auto jsonBody = json.dump();
+    return respond(code, jsonBody);
+}
+
+int Request::respondWithCBLError(const ts_support::exception::CBLException &exception) const {
+    auto jsonBody = exception.json();
+    return respond(400, jsonBody);
 }
 
 void Request::addCommonResponseHeaders() const {
     mg_response_header_add(_conn, "CBLTest-API-Version", to_string(TestServer::API_VERSION).c_str(), -1);
     mg_response_header_add(_conn, "CBLTest-Server-ID", _server->serverUUID().c_str(), -1);
+    mg_response_header_add(_conn, "Cache-Control", "no-cache, no-store, must-revalidate, private, max-age=0", -1);
+    mg_response_header_add(_conn, "Expires", "0", -1);
+    mg_response_header_add(_conn, "Pragma", "no-cache", -1);
 }
 
-int Request::respond(int status, std::function<void()> respondFunction) const {
+int Request::respond(int status, const optional<string> &json) const {
     mg_response_header_start(_conn, status);
     addCommonResponseHeaders();
-    respondFunction();
+    if (json) {
+        mg_response_header_add(_conn, "Content-Type", "application/json", -1);
+        mg_response_header_add(_conn, "Content-Length", to_string(json->size()).c_str(), -1);
+    } else {
+        mg_response_header_add(_conn, "Content-Type", "text/html", -1);
+        mg_response_header_add(_conn, "Content-Length", "0", -1);
+    }
     mg_response_header_send(_conn);
+    if (json) {
+        mg_write(_conn, json->c_str(), json->size());
+    }
     return status;
 }

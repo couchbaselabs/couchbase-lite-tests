@@ -34,7 +34,7 @@ static int ts_open(const char *filename, int openFlag, [[maybe_unused]] int perm
 
 using namespace std;
 
-void zip_support::extractZip(const string &zipFile, const string &dir) {
+void ts_support::zip::extractZip(const string &zipFile, const string &dir) {
     int err;
     zip_t *zip = zip_open(zipFile.c_str(), ZIP_RDONLY, &err);
     if (!zip) {

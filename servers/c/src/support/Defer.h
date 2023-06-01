@@ -3,7 +3,7 @@
 #include <utility>
 
 // Copied from LiteCore's Defer.hh
-namespace test_server {
+namespace ts_support {
     template<class Fun>
     class ScopeGuard {
         Fun f_;
@@ -34,15 +34,15 @@ namespace test_server {
         };
 
         template<typename Fun>
-        test_server::ScopeGuard<Fun> operator+(ScopeGuardOnExit, Fun &&fn) {
-            return test_server::ScopeGuard<Fun>(std::forward<Fun>(fn));
+        ts_support::ScopeGuard<Fun> operator+(ScopeGuardOnExit, Fun &&fn) {
+            return ts_support::ScopeGuard<Fun>(std::forward<Fun>(fn));
         }
     }
 
 // I prefer the name DEFER to SCOPE_EXIT --jens
 #define DEFER \
     auto ANONYMOUS_VARIABLE(DEFERRED) \
-        = test_server::detail::ScopeGuardOnExit() + [&]()
+        = ts_support::detail::ScopeGuardOnExit() + [&]()
 
 #define CONCATENATE_IMPL(s1, s2) s1##s2
 #define CONCATENATE(s1, s2) CONCATENATE_IMPL(s1, s2)
