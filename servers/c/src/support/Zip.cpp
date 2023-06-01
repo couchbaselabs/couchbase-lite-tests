@@ -6,18 +6,18 @@
 
 #ifndef _MSC_VER
 
-#include <sys/stat.h>
 #include <unistd.h>
 
 #define ts_open open
 #define _close close
 #define _write write
+#define O_BINARY 0
 #else
 
 #include <io.h>
 #include <windows.h>
 
-static int ts_open(const char* filename, int openFlag, [[maybe_unused]] int permission) {
+static int ts_open(const char *filename, int openFlag, [[maybe_unused]] int permission) {
     int fd = -1;
     errno_t err = _sopen_s(&fd, filename, openFlag, _SH_DENYWR, _S_IWRITE);
     if (err != 0) {
@@ -34,13 +34,13 @@ static int ts_open(const char* filename, int openFlag, [[maybe_unused]] int perm
 
 using namespace std;
 
-void support::extractZip(const string &zipFile, const string &dir) {
+void zip_support::extractZip(const string &zipFile, const string &dir) {
     int err;
     zip_t *zip = zip_open(zipFile.c_str(), ZIP_RDONLY, &err);
     if (!zip) {
-        char errMesg[256];
-        zip_error_to_str(errMesg, sizeof(errMesg), err, errno);
-        throw std::runtime_error("Cannot open '" + zipFile + "' with error : " + string(errMesg));
+        char errMsg[256];
+        zip_error_to_str(errMsg, sizeof(errMsg), err, errno);
+        throw std::runtime_error("Cannot open '" + zipFile + "' with error : " + string(errMsg));
     }
     DEFER { zip_close(zip); };
 
@@ -64,14 +64,15 @@ void support::extractZip(const string &zipFile, const string &dir) {
             continue;
         }
 
-        zip_file_t *zipFile = zip_fopen_index(zip, index, 0);
-        if (!zipFile) {
+        // Open zipped file to read:
+        zip_file_t *zipFd = zip_fopen_index(zip, index, 0);
+        if (!zipFd) {
             string error = zip_strerror(zip);
             throw std::runtime_error("Cannot open zipped file '" + string(stat.name) + "' with error = " + error);
         }
-        DEFER { zip_fclose(zipFile); };
+        DEFER { zip_fclose(zipFd); };
 
-        /* try to open the file in the filesystem for writing */
+        // Open extracted file to write:
         int fd = ts_open(extFile.c_str(), O_CREAT | O_TRUNC | O_WRONLY | O_BINARY, 0644);
         if (fd < 0) {
             throw std::runtime_error("Cannot open file '" + extFile + "' with error no " + to_string(errno));
@@ -79,16 +80,16 @@ void support::extractZip(const string &zipFile, const string &dir) {
         DEFER { _close(fd); };
 
         char buf[4098];
-        zip_int64_t readBytes = 0;
+        zip_int64_t readBytes;
         do {
-            readBytes = zip_fread(zipFile, buf, sizeof(buf));
+            readBytes = zip_fread(zipFd, buf, sizeof(buf));
             if (readBytes < 0) {
                 string error = zip_strerror(zip);
                 throw std::runtime_error("Cannot read zipped file '" + string(stat.name) + "' with error = " + error);
             }
 
             if (readBytes > 0) {
-                auto writtenBytes = _write(fd, buf, (unsigned int)readBytes);
+                auto writtenBytes = _write(fd, buf, (unsigned int) readBytes);
                 if (writtenBytes < readBytes) {
                     throw std::runtime_error(
                             "Cannot write file '" + extFile + "' with error no " + to_string(errno));

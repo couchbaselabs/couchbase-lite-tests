@@ -10,7 +10,7 @@ void TestServer::start() {
         throw std::runtime_error("Already Started");
     }
 
-    _uuid = test_server_support::generateUUID();
+    _uuid = key_support::generateUUID();
 
     string port_str = to_string(PORT);
     const char *options[3] = {"listening_ports", port_str.c_str(), nullptr};

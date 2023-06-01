@@ -21,7 +21,7 @@ std::string generateHex(const unsigned int num) {
     return ss.str();
 }
 
-std::string test_server_support::generateUUID() {
+std::string key_support::generateUUID() {
     std::stringstream ss;
     ss << generateHex(4) << '-'
        << generateHex(2) << '-'

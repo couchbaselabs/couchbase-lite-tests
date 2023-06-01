@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace test_server_support {
+namespace file_support {
     std::string tempDir(const std::string &dir, bool create);
 
     std::string assetDir();

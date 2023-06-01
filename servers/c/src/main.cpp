@@ -8,7 +8,7 @@
 #include "TestServer.h"
 
 using namespace std;
-using namespace test_server_support;
+using namespace file_support;
 
 int main() {
     mg_init_library(0);

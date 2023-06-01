@@ -2,6 +2,6 @@
 
 #include <string>
 
-namespace test_server_support {
+namespace key_support {
     std::string generateUUID();
 }
