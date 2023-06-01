@@ -228,7 +228,7 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
 
         raw_entries = []
 
-        for e in self.entries:
+        for e in self.updates:
             raw_entry = e.to_dict()
             if raw_entry is None:
                 cbl_warning("Skipping invalid DatabaseUpdateEntry in body serialization!")
