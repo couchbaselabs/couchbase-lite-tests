@@ -1,11 +1,17 @@
 #include "CBLManager.h"
 #include "CollectionSpec.h"
 #include "Common.h"
+#include "support/Zip.h"
 
 #include <filesystem>
 #include <utility>
 
 using namespace std;
+
+#define DB_FILE_EXT ".cblite2"
+#define DB_FILE_ZIP_EXT ".cblite2.zip"
+#define DB_FILE_ZIP_EXTRACTED_DIR "extracted"
+#define ASSET_DATABASES_DIR "databases"
 
 CBLManager::CBLManager(string databaseDir, string assetDir) {
     _databaseDir = std::move(databaseDir);
@@ -55,10 +61,19 @@ void CBLManager::loadDataset(const string &name, const string &targetDatabaseNam
         return;
     }
 
-    CBLError error{};
-    string fromDbPath = filesystem::path(_assetDir).append("databases").append(name + ".cblite2").string();
-    CBLDatabaseConfiguration config = {FLS(_databaseDir)};
+    string fromDbPath;
+    auto dbAssetPath = filesystem::path(_assetDir).append(ASSET_DATABASES_DIR);
+    auto zipFilePath = dbAssetPath.append(name + DB_FILE_ZIP_EXT);
+    if (filesystem::exists(zipFilePath)) {
+        auto extDirPath = filesystem::path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
+        support::extractZip(zipFilePath.string(), extDirPath.string());
+        fromDbPath = extDirPath.append(name + DB_FILE_EXT).string();
+    } else {
+        fromDbPath = dbAssetPath.append(name + DB_FILE_EXT).string();
+    }
 
+    CBLError error{};
+    CBLDatabaseConfiguration config = {FLS(_databaseDir)};
     if (CBL_DatabaseExists(FLS(targetDatabaseName), config.directory)) {
         if (!CBL_DeleteDatabase(FLS(targetDatabaseName), config.directory, &error)) {
             throw CBLException(error);
