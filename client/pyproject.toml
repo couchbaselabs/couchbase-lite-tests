@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cbltest"
-version = "0.1.0"
+dynamic = ["version"]
 authors = [
     { name = "Jim Borden", email = "jim.borden@couchbase.com" }
 ]
@@ -29,3 +29,6 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/couchbaselabs/couchbase-lite-tests"
 "Bug Tracker" = "https://github.com/couchbaselabs/couchbase-lite-tests/issues"
+
+[tool.hatch.version]
+path = "src/cbltest/version.py"
