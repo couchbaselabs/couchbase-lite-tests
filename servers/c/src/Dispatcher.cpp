@@ -25,11 +25,11 @@ int Dispatcher::handle(mg_connection *conn) const {
     try {
         if (request.path() != "/") {
             if (request.version() != TestServer::API_VERSION) {
-                return request.respondWithServerError("API Version Mismatched, Missing or Invalid Format");
+                return request.respondWithServerError("API Version Mismatched or Missing", 403);
             }
 
             if (request.clientUUID().empty()) {
-                return request.respondWithServerError("Client UUID Missing");
+                return request.respondWithServerError("Client UUID Missing", 403);
             }
         }
 
