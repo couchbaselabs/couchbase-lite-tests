@@ -24,15 +24,14 @@ _cbl_log.addHandler(console)
 _cbl_log.info(f"-- Python test client v{VERSION} started --\n")
 
 def cbl_setLogLevel(level: LogLevel):
-    match level:
-        case LogLevel.ERROR:
-            console.setLevel(ERROR)
-        case LogLevel.WARNING:
-            console.setLevel(WARN)
-        case LogLevel.INFO:
-            console.setLevel(INFO)
-        case LogLevel.VERBOSE | LogLevel.DEBUG:
-            console.setLevel(DEBUG)
+    if level == LogLevel.ERROR:
+        console.setLevel(ERROR)
+    elif level == LogLevel.WARNING:
+        console.setLevel(WARN)
+    elif level == LogLevel.INFO:
+        console.setLevel(INFO)
+    elif level ==  LogLevel.VERBOSE or level == LogLevel.DEBUG:
+        console.setLevel(DEBUG)
 
 def cbl_error(msg: str):
     _cbl_log.error(msg, stack_info=True, stacklevel=3)
