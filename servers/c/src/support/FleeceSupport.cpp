@@ -4,7 +4,7 @@
 using namespace std;
 using namespace nlohmann;
 
-void fleece_support::setSlotValue(FLSlot slot, const json &json) { // NOLINT(misc-no-recursion)
+void ts_support::fleece::setSlotValue(FLSlot slot, const json &json) { // NOLINT(misc-no-recursion)
     switch (json.type()) {
         case json::value_t::string: {
             auto s = json.get<string>();

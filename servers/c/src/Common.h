@@ -5,6 +5,8 @@
 #include "support/Exception.h"
 #include "cbl/CouchbaseLite.h"
 
+using namespace ts_support::exception;
+
 inline void checkError(CBLError &error) {
     if (error.code > 0) { throw CBLException(error); }
 }

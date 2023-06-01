@@ -21,6 +21,7 @@ set(SOURCE_FILES
         src/Dispatcher+Handlers.cpp
         src/Request.cpp
         src/TestServer.cpp
+        src/support/Exception.cpp
         src/support/FleeceSupport.cpp
         src/support/UUID.cpp
         src/support/Zip.cpp)

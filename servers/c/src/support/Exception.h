@@ -1,34 +1,25 @@
 #pragma once
 
+#include "cbl/CBLBase.h"
 #include <exception>
 #include <string>
 #include <sstream>
-#include "cbl/CBLBase.h"
 
 using namespace std;
 
-class CBLException : public std::exception {
-public:
-    explicit CBLException(const CBLError &error) {
-        _error = error;
+namespace ts_support::exception {
+    class CBLException : public std::exception {
+    public:
+        explicit CBLException(const CBLError &error);
 
-        FLSliceResult messageVal = CBLError_Message(&error);
-        auto message = string(static_cast<const char *>(messageVal.buf), messageVal.size);
+        [[nodiscard]] const char *what() const noexcept override { return _what.c_str(); }
 
-        stringstream ss;
-        ss << "Couchbase Lite Error : " << (int) error.domain << "/" << error.code << ", " << message;
-        _what = ss.str();
-    }
-    
-    [[nodiscard]] const char *what() const noexcept override {
-        return _what.c_str();
-    }
+        [[nodiscard]] const CBLError &error() const { return _error; }
 
-    [[nodiscard]] const CBLError &error() const {
-        return _error;
-    }
+        [[nodiscard]] std::string json() const;
 
-private:
-    string _what;
-    CBLError _error{};
-};
+    private:
+        string _what;
+        CBLError _error;
+    };
+}

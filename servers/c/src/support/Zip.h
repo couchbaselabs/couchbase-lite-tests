@@ -2,6 +2,6 @@
 
 #include <string>
 
-namespace zip_support {
+namespace ts_support::zip {
     void extractZip(const std::string &zipFile, const std::string &dir);
 }

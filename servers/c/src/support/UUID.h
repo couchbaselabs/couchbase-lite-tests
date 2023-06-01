@@ -2,6 +2,6 @@
 
 #include <string>
 
-namespace key_support {
+namespace ts_support::key {
     std::string generateUUID();
 }

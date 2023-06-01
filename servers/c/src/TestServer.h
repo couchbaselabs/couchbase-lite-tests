@@ -21,7 +21,7 @@ public:
 
     [[nodiscard]] const Context *context() const { return &_context; }
 
-    std::string serverUUID() const { return _uuid; }
+    [[nodiscard]] std::string serverUUID() const { return _uuid; }
 
     void start();
 
