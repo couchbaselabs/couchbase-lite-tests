@@ -22,7 +22,8 @@ set(SOURCE_FILES
         src/Request.cpp
         src/TestServer.cpp
         src/support/FleeceSupport.cpp
-        src/support/UUID.cpp)
+        src/support/UUID.cpp
+        src/support/Zip.cpp)
 
 add_executable(testserver ${SOURCE_FILES})
 
