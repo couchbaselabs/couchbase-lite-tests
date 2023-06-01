@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CBLManager.h"
+#include <functional>
 
 struct mg_connection;
 

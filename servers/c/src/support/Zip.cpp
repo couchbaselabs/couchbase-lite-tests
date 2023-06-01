@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define _open open
+#define ts_open open
 #define _close close
 #define _write write
 #else
@@ -17,22 +17,22 @@
 #include <io.h>
 #include <windows.h>
 
+static int ts_open(const char* filename, int openFlag, [[maybe_unused]] int permission) {
+    int fd = -1;
+    errno_t err = _sopen_s(&fd, filename, openFlag, _SH_DENYWR, _S_IWRITE);
+    if (err != 0) {
+        errno = err;
+        return -1;
+    }
+
+    return fd;
+}
+
 #endif
 
 #include <zip.h>
 
 using namespace std;
-
-void createDirectory(const string &dir) {
-#ifdef WIN32
-    bool success = _mkdir(dir.c_str()) == 0 || errno == EEXIST;
-#else
-    bool success = mkdir(dir.c_str(), 0744) == 0 || errno == EEXIST;
-#endif
-    if (!success) {
-        throw std::runtime_error("Cannot create directory '" + dir + "', with error no " + to_string(errno));
-    }
-}
 
 void support::extractZip(const string &zipFile, const string &dir) {
     int err;
@@ -44,7 +44,7 @@ void support::extractZip(const string &zipFile, const string &dir) {
     }
     DEFER { zip_close(zip); };
 
-    createDirectory(dir);
+    filesystem::create_directory(dir);
 
     zip_int64_t numEntries = zip_get_num_entries(zip, 0);
     for (zip_int64_t index = 0; index < numEntries; index++) {
@@ -60,7 +60,7 @@ void support::extractZip(const string &zipFile, const string &dir) {
         string extFile = filesystem::path(dir).append(stat.name).string();
         bool isDir = stat.name[strlen(stat.name) - 1] == '/';
         if (isDir) {
-            createDirectory(extFile);
+            filesystem::create_directory(extFile);
             continue;
         }
 
@@ -72,7 +72,7 @@ void support::extractZip(const string &zipFile, const string &dir) {
         DEFER { zip_fclose(zipFile); };
 
         /* try to open the file in the filesystem for writing */
-        int fd = _open(extFile.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0644);
+        int fd = ts_open(extFile.c_str(), O_CREAT | O_TRUNC | O_WRONLY | O_BINARY, 0644);
         if (fd < 0) {
             throw std::runtime_error("Cannot open file '" + extFile + "' with error no " + to_string(errno));
         }
@@ -88,7 +88,7 @@ void support::extractZip(const string &zipFile, const string &dir) {
             }
 
             if (readBytes > 0) {
-                auto writtenBytes = _write(fd, buf, readBytes);
+                auto writtenBytes = _write(fd, buf, (unsigned int)readBytes);
                 if (writtenBytes < readBytes) {
                     throw std::runtime_error(
                             "Cannot write file '" + extFile + "' with error no " + to_string(errno));

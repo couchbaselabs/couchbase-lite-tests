@@ -15,7 +15,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if(MSVC)
-    add_definitions(-DWIN32_LEAN_AND_MEAN -D_WIN32_WINNT=0x0A00)
+    add_definitions(-D_WIN32_WINNT=0x0A00)
 endif()
 
 project(TestServerVendor)
