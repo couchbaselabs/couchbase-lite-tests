@@ -7,6 +7,7 @@
 #include <utility>
 
 using namespace std;
+using namespace filesystem;
 
 #define DB_FILE_EXT ".cblite2"
 #define DB_FILE_ZIP_EXT ".cblite2.zip"
@@ -62,10 +63,10 @@ void CBLManager::loadDataset(const string &name, const string &targetDatabaseNam
     }
 
     string fromDbPath;
-    auto dbAssetPath = filesystem::path(_assetDir).append(ASSET_DATABASES_DIR);
-    auto zipFilePath = dbAssetPath.append(name + DB_FILE_ZIP_EXT);
+    auto dbAssetPath = path(_assetDir).append(ASSET_DATABASES_DIR);
+    auto zipFilePath = path(dbAssetPath).append(name + DB_FILE_ZIP_EXT);
     if (filesystem::exists(zipFilePath)) {
-        auto extDirPath = filesystem::path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
+        auto extDirPath = path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
         support::extractZip(zipFilePath.string(), extDirPath.string());
         fromDbPath = extDirPath.append(name + DB_FILE_EXT).string();
     } else {
