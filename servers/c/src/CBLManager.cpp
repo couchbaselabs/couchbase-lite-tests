@@ -67,7 +67,7 @@ void CBLManager::loadDataset(const string &name, const string &targetDatabaseNam
     auto zipFilePath = path(dbAssetPath).append(name + DB_FILE_ZIP_EXT);
     if (filesystem::exists(zipFilePath)) {
         auto extDirPath = path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
-        support::extractZip(zipFilePath.string(), extDirPath.string());
+        zip_support::extractZip(zipFilePath.string(), extDirPath.string());
         fromDbPath = extDirPath.append(name + DB_FILE_EXT).string();
     } else {
         fromDbPath = dbAssetPath.append(name + DB_FILE_EXT).string();

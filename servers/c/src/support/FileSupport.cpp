@@ -2,15 +2,10 @@
 
 #include <string>
 #include <filesystem>
-#include <iostream>
-
-#ifndef _MSC_VER
-#include <sys/stat.h>
-#endif
 
 using namespace std;
 
-string test_server_support::tempDir(const string &subdir, bool create) {
+string file_support::tempDir(const string &subdir, bool create) {
 #ifdef __ANDROID__
     // TODO:
     return ""
@@ -28,11 +23,11 @@ string test_server_support::tempDir(const string &subdir, bool create) {
     return dir;
 }
 
-string test_server_support::assetDir() {
+string file_support::assetDir() {
 #ifdef __ANDROID__
     // TODO:
     return ""
 #endif
-        auto current = filesystem::current_path() / "assets";
-        return current.generic_string();
+    auto current = filesystem::current_path() / "assets";
+    return current.generic_string();
 }
