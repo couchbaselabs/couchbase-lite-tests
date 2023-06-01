@@ -4,10 +4,12 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <optional>
+#include <mutex>
 
 #include "cbl/CouchbaseLite.h"
 
-class CBLDatabase;
+struct CBLDatabase;
 
 class CBLManager {
 public:
