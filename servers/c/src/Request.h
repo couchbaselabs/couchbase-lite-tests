@@ -21,7 +21,7 @@ public:
 
     [[nodiscard]] int version() const;
 
-    [[nodiscard]] std::string clientUUID() const;
+    [[nodiscard]] std::string clientID() const;
 
     const nlohmann::json &jsonBody();
 

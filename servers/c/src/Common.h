@@ -7,10 +7,10 @@
 
 using namespace ts_support::exception;
 
-inline void checkError(CBLError &error) {
+static inline void CheckError(CBLError &error) {
     if (error.code > 0) { throw CBLException(error); }
 }
 
-inline void checkNotNull(void *obj, const char *message) {
+static inline void CheckNotNull(void *obj, const string &message) {
     if (!obj) { throw runtime_error(message); }
 }

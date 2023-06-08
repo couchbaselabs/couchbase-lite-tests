@@ -28,8 +28,8 @@ int Dispatcher::handle(mg_connection *conn) const {
                 return request.respondWithServerError("API Version Mismatched or Missing", 403);
             }
 
-            if (request.clientUUID().empty()) {
-                return request.respondWithServerError("Client UUID Missing", 403);
+            if (request.clientID().empty()) {
+                return request.respondWithServerError("Client ID Missing", 403);
             }
         }
 
