@@ -31,11 +31,13 @@ add_executable(testserver ${SOURCE_FILES})
 if(APPLE)
     target_sources(
             testserver PRIVATE
+            src/support/Device+Apple.mm
             src/support/FileSupport+Apple.mm
     )
 else()
     target_sources(
             testserver PRIVATE
+            src/support/Device.cpp
             src/support/FileSupport.cpp
     )
 endif()
