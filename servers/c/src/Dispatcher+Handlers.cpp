@@ -12,6 +12,32 @@ using ReplicatorParams = CBLManager::ReplicatorParams;
 using ReplicationAuthenticator = CBLManager::ReplicationAuthenticator;
 using ReplicationCollection = CBLManager::ReplicationCollection;
 
+template<typename T>
+static inline T GetValue(const json &dict, const string &key, const string &pathInfo = "") {
+    if (!dict.contains(key)) {
+        throw domain_error("'" + key + "' is required");
+    }
+    try {
+        return dict[key].get<T>();
+    } catch (const exception &e) {
+        string pathName = pathInfo.empty() ? key : pathInfo;
+        throw domain_error("'" + pathName + "' has invalid value type : " + e.what());
+    }
+}
+
+static inline void CheckIsObject(const json &obj, const string &key, const string &pathInfo = "") {
+    if (!obj.is_object()) {
+        string pathName = pathInfo.empty() ? key : pathInfo;
+        throw domain_error("'" + pathName + "' is not a JSON object");
+    }
+}
+
+static inline void CheckBody(const json &body) {
+    if (!body.is_object()) {
+        throw domain_error("Request body is not json object");
+    }
+}
+
 int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-member-functions-to-static)
     json result;
     result["version"] = TestServer::VERSION;
@@ -22,13 +48,19 @@ int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-
 
 int Dispatcher::handlePOSTReset(Request &request) {
     _cblManager->reset();
+
     json body = request.jsonBody();
+    CheckBody(body);
     if (body.contains("datasets")) {
-        json dataset = body["datasets"];
-        for (auto &[key, val]: dataset.items()) {
-            auto dbNames = val.get<vector<string>>();
-            for (auto &name: dbNames) {
-                _cblManager->loadDataset(key, name);
+        auto datasets = GetValue<unordered_map<string, vector<string>>>(body, "datasets");
+        for (auto &dataset: datasets) {
+            auto datasetName = dataset.first;
+            auto dbNames = dataset.second;
+            if (dbNames.empty()) {
+                throw domain_error("dataset '" + datasetName + "' has no database names");
+            }
+            for (auto &dbName: dbNames) {
+                _cblManager->loadDataset(datasetName, dbName);
             }
         }
     }
@@ -37,11 +69,12 @@ int Dispatcher::handlePOSTReset(Request &request) {
 
 int Dispatcher::handlePOSTGetAllDocumentIDs(Request &request) {
     json body = request.jsonBody();
-    auto dbName = body["database"].get<string>();
-    auto colNames = body["collections"].get<vector<string>>();
+    CheckBody(body);
+
+    auto dbName = GetValue<string>(body, "database");
+    auto colNames = GetValue<vector<string>>(body, "collections");
 
     auto db = _cblManager->database(dbName);
-
     json result = json::object();
     for (auto &colName: colNames) {
         auto col = _cblManager->collection(db, colName, false);
@@ -51,11 +84,11 @@ int Dispatcher::handlePOSTGetAllDocumentIDs(Request &request) {
             CBLError error{};
             string str = "SELECT meta().id FROM " + colName;
             CBLQuery *query = CBLDatabase_CreateQuery(db, kCBLN1QLLanguage, FLS(str), nullptr, &error);
-            checkError(error);
+            CheckError(error);
             AUTO_RELEASE(query);
 
             CBLResultSet *rs = CBLQuery_Execute(query, &error);
-            checkError(error);
+            CheckError(error);
             AUTO_RELEASE(rs);
 
             vector<string> ids;
@@ -121,34 +154,36 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
     static constexpr const char *kUpdateDatabaseTypePurge = "PURGE";
 
     json body = request.jsonBody();
-    auto dbName = body["database"].get<string>();
+    CheckBody(body);
+
+    auto dbName = GetValue<string>(body, "database");
     auto db = _cblManager->database(dbName);
-    
     {
         CBLError error{};
-
         bool commit = false;
         CBLDatabase_BeginTransaction(db, &error);
-        checkError(error);
+        CheckError(error);
         DEFER { CBLDatabase_EndTransaction(db, commit, &error); };
 
-        for (auto &update: body["updates"]) {
-            auto colName = update["collection"].get<string>();
+        auto updates = GetValue<vector<json>>(body, "updates");
+        for (auto &update: updates) {
+            auto colName = GetValue<string>(update, "collection");
             auto spec = CollectionSpec(colName);
             auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
-            checkError(error);
+            CheckError(error);
             AUTO_RELEASE(col);
 
-            auto docID = update["documentID"].get<string>();
+            auto docID = GetValue<string>(update, "documentID");
             CBLDocument *doc = CBLCollection_GetMutableDocument(col, FLS(docID), &error);
-            checkError(error);
+            CheckError(error);
             AUTO_RELEASE(doc);
 
-            auto type = update["type"].get<string>();
+            auto type = GetValue<string>(update, "type");
             if (type == kUpdateDatabaseTypeUpdate) {
                 if (!doc) {
                     doc = CBLDocument_CreateWithID(FLS(docID));
                 }
+
                 auto props = FLDict_AsMutable(CBLDocument_Properties(doc));
 
                 if (update.contains("updatedProperties")) {
@@ -162,16 +197,16 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
                 }
 
                 CBLCollection_SaveDocument(col, doc, &error);
-                checkError(error);
+                CheckError(error);
             } else if (type == kUpdateDatabaseTypeDelete) {
                 if (doc) {
                     CBLCollection_DeleteDocument(col, doc, &error);
-                    checkError(error);
+                    CheckError(error);
                 }
             } else if (type == kUpdateDatabaseTypePurge) {
                 if (doc) {
                     CBLCollection_PurgeDocument(col, doc, &error);
-                    checkError(error);
+                    CheckError(error);
                 }
             }
         }
@@ -181,47 +216,58 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
 }
 
 int Dispatcher::handlePOSTStartReplicator(Request &request) {
+    static constexpr const char *kReplicatorTypePush = "push";
+    static constexpr const char *kReplicatorTypePull = "pull";
+    static constexpr const char *kReplicatorTypePushAndPull = "pushAndPull";
+    static constexpr const char *kAuthTypeBasic = "BASIC";
+
     json body = request.jsonBody();
+    CheckBody(body);
 
     ReplicatorParams params;
-    json config = body["config"];
-    params.endpoint = config["endpoint"].get<string>();
-    params.database = config["database"].get<string>();
+    json config = GetValue<json>(body, "config");
+    CheckIsObject(config, "config");
+
+    params.endpoint = GetValue<string>(config, "endpoint");
+    params.database = GetValue<string>(config, "database");
 
     if (config.contains("replicatorType")) {
-        auto replicatorType = config["replicatorType"].get<string>();
-        if (replicatorType == "push") {
+        auto replicatorType = GetValue<string>(config, "replicatorType");
+        if (replicatorType == kReplicatorTypePush) {
             params.replicatorType = kCBLReplicatorTypePush;
-        } else if (replicatorType == "pull") {
+        } else if (replicatorType == kReplicatorTypePull) {
             params.replicatorType = kCBLReplicatorTypePull;
-        } else {
+        } else if (replicatorType == kReplicatorTypePushAndPull) {
             params.replicatorType = kCBLReplicatorTypePushAndPull;
+        } else {
+            throw domain_error("Invalid replicator type");
         }
     }
 
     if (config.contains("continuous")) {
-        params.continuous = config["continuous"].get<bool>();
+        params.continuous = GetValue<bool>(config, "continuous");
     }
 
     if (config.contains("authenticator")) {
-        json authVal = config["authenticator"];
-        if (authVal["type"].get<string>() == "BASIC") {
+        json authObject = config["authenticator"];
+        CheckIsObject(authObject, "authenticator");
+        if (GetValue<string>(authObject, "type") == kAuthTypeBasic) {
             ReplicationAuthenticator auth;
-            auth.username = authVal["username"].get<string>();
-            auth.password = authVal["password"].get<string>();
+            auth.username = GetValue<string>(authObject, "username");
+            auth.password = GetValue<string>(authObject, "password");
             params.authenticator = auth;
         }
     }
 
     vector<ReplicationCollection> collections;
-    for (auto &colVal: config["collections"]) {
+    for (auto &colObject: GetValue<vector<json>>(config, "collections")) {
         ReplicationCollection col;
-        col.collection = colVal["collection"].get<string>();
-        if (colVal.contains("channels")) {
-            col.channels = colVal["channels"].get<vector<string>>();
+        col.collection = GetValue<string>(colObject, "collection");
+        if (colObject.contains("channels")) {
+            col.channels = GetValue<vector<string>>(colObject, "channels");
         }
-        if (colVal.contains("documentIDs")) {
-            col.documentIDs = colVal["documentIDs"].get<vector<string>>();
+        if (colObject.contains("documentIDs")) {
+            col.documentIDs = GetValue<vector<string>>(colObject, "documentIDs");
         }
         collections.push_back(col);
     }
@@ -229,7 +275,7 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
 
     bool reset = false;
     if (body.contains("reset")) {
-        reset = body["reset"].get<bool>();
+        reset = GetValue<bool>(body, "reset");
     }
 
     string id = _cblManager->startReplicator(params, reset);
@@ -243,11 +289,12 @@ static const string kStatuses[5] = {"STOPPED", "OFFLINE", "CONNECTING", "IDLE", 
 
 int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
     json body = request.jsonBody();
+    CheckBody(body);
 
-    auto id = body["id"].get<string>();
+    auto id = GetValue<string>(body, "id");
     auto repl = _cblManager->replicator(id);
     if (!repl) {
-        throw std::runtime_error("replicator not found");
+        throw std::domain_error("Replicator '" + id + "' not found");
     }
 
     json result;
@@ -258,7 +305,7 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
     progress["complete"] = status.progress.complete;
     progress["documentCount"] = status.progress.documentCount;
     result["progress"] = progress;
-
+    
     if (status.error.code > 0) {
         json error;
         error["domain"] = (int) status.error.domain;
@@ -278,16 +325,18 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
 
 int Dispatcher::handlePOSTGetDocument(Request &request) {
     json body = request.jsonBody();
-    auto dbName = body["database"].get<string>();
-    auto colName = body["collection"].get<string>();
-    auto docID = body["documentID"].get<string>();
+    CheckBody(body);
+
+    auto dbName = GetValue<string>(body, "database");
+    auto colName = GetValue<string>(body, "collection");
+    auto docID = GetValue<string>(body, "documentID");
 
     auto db = _cblManager->database(dbName);
     auto col = _cblManager->collection(db, colName);
 
     CBLError error{};
     auto doc = CBLCollection_GetDocument(col, FLS(docID), &error);
-    checkError(error);
+    CheckError(error);
     AUTO_RELEASE(doc);
 
     if (doc) {

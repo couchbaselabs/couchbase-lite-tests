@@ -102,7 +102,7 @@ CBLDatabase *CBLManager::databaseUnlocked(const string &name) {
     if (auto i = _databases.find(name); i != _databases.end()) {
         db = i->second;
     }
-    checkNotNull(db, "Database Not Found");
+    CheckNotNull(db, "Database '" + name + "' Not Found");
     return db;
 }
 
@@ -110,9 +110,9 @@ CBLCollection *CBLManager::collection(const CBLDatabase *db, const std::string &
     CBLError error{};
     auto spec = CollectionSpec(name);
     auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
-    checkError(error);
+    CheckError(error);
     if (mustExist) {
-        checkNotNull(col, "Collection Not Found");
+        CheckNotNull(col, "Collection Not Found");
     }
     return col;
 }
@@ -170,7 +170,7 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
           };
 
     endpoint = CBLEndpoint_CreateWithURL(FLS(params.endpoint), &error);
-    checkError(error);
+    CheckError(error);
 
     if (params.authenticator) {
         auth = CBLAuth_CreatePassword(FLS(params.authenticator->username),
@@ -186,7 +186,7 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
     config.authenticator = auth;
 
     CBLReplicator *repl = CBLReplicator_Create(&config, &error);
-    checkError(error);
+    CheckError(error);
     CBLReplicator_Start(repl, reset);
 
     string id = "@replicator::" + to_string(++replicatorID);

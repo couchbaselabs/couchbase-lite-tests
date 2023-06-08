@@ -21,21 +21,26 @@ int Request::version() const {
     try { return stoi(version); } catch (...) { return -1; }
 }
 
-std::string Request::clientUUID() const {
+std::string Request::clientID() const {
     return mg_get_header(_conn, "CBLTest-Client-ID");
 }
 
 const nlohmann::json &Request::jsonBody() {
     if (_jsonBody.empty()) {
-        stringstream s;
-        char buf[8192];
-        int r = mg_read(_conn, buf, 8192);
-        while (r > 0) {
-            s.write(buf, r);
-            r = mg_read(_conn, buf, 8192);
-        }
-        if (s.tellp() >= 2) {
-            s >> _jsonBody;
+        try {
+            stringstream s;
+            char buf[8192];
+            int r = mg_read(_conn, buf, 8192);
+            while (r > 0) {
+                s.write(buf, r);
+                r = mg_read(_conn, buf, 8192);
+            }
+            if (s.tellp() >= 2) {
+                s >> _jsonBody;
+            }
+        } catch (const exception &e) {
+            string message = string("Invalid JSON Body : ") + e.what();
+            throw domain_error(message);
         }
     }
     return _jsonBody;
