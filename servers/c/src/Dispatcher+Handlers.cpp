@@ -2,6 +2,7 @@
 #include "CollectionSpec.h"
 #include "Common.h"
 #include "Request.h"
+#include "support/Device.h"
 #include "support/FleeceSupport.h"
 #include "TestServer.h"
 
@@ -43,6 +44,26 @@ int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-
     result["version"] = TestServer::VERSION;
     result["apiVersion"] = TestServer::API_VERSION;
     result["cbl"] = TestServer::CBL_PLATFORM_NAME;
+
+    json device;
+    string model = ts_support::device::deviceModel();
+    if (!model.empty()) {
+        device["model"] = model;
+    }
+    string osName = ts_support::device::osName();
+    if (!osName.empty()) {
+        device["systemName"] = osName;
+    }
+    string osVersion = ts_support::device::osVersion();
+    if (!osVersion.empty()) {
+        device["systemVersion"] = osVersion;
+    }
+    string apiVersion = ts_support::device::apiVersion();
+    if (!apiVersion.empty()) {
+        device["systemApiVersion"] = apiVersion;
+    }
+    result["device"] = device;
+    
     return request.respondWithJSON(result);
 }
 
@@ -305,7 +326,7 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
     progress["complete"] = status.progress.complete;
     progress["documentCount"] = status.progress.documentCount;
     result["progress"] = progress;
-    
+
     if (status.error.code > 0) {
         json error;
         error["domain"] = (int) status.error.domain;
