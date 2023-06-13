@@ -16,7 +16,9 @@ find_package(CouchbaseLite 3.1.0 REQUIRED PATHS lib/libcblite)
 
 set(SOURCE_FILES
         src/main.cpp
+        src/CollectionSpec.cpp
         src/CBLManager.cpp
+        src/CBLReplicationFilter.cpp
         src/Dispatcher.cpp
         src/Dispatcher+Handlers.cpp
         src/Request.cpp
@@ -41,8 +43,6 @@ else()
             src/support/FileSupport.cpp
     )
 endif()
-
-target_include_directories(testserver PRIVATE src)
 
 target_link_libraries(
         testserver PRIVATE

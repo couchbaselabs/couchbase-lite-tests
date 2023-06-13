@@ -1,11 +1,14 @@
 #pragma once
 
+#include <mutex>
+#include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include <optional>
-#include <mutex>
+
+#include "CBLReplicationFilter.h"
 
 #include "cbl/CouchbaseLite.h"
 
@@ -31,6 +34,8 @@ public:
         std::string collection;
         std::vector<std::string> channels;
         std::vector<std::string> documentIDs;
+        std::optional<ReplicationFilterSpec> pushFilter;
+        std::optional<ReplicationFilterSpec> pullFilter;
     };
 
     struct ReplicationAuthenticator {
@@ -59,8 +64,21 @@ private:
     std::string _databaseDir;
     std::string _assetDir;
 
+    /** Map of database id and database */
     std::unordered_map<std::string, CBLDatabase *> _databases;
 
+    /* Replicator id number */
     int64_t replicatorID = 0;
+
+    /** Map of replicator id and database object */
     std::unordered_map<std::string, CBLReplicator *> _replicators;
+
+    /** Replicator context for keeping per replicator objects used by callbacks */
+    struct ReplicatorContext {
+        /** Map of collection name and replication filter object */
+        std::unordered_map<std::string, std::unique_ptr<ReplicationFilter>> filters;
+    };
+
+    /** Vector for keeping replicator contexts. */
+    std::vector<std::unique_ptr<ReplicatorContext>> _contexts;
 };

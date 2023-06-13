@@ -1,9 +1,11 @@
 #include "Dispatcher.h"
 #include "CollectionSpec.h"
-#include "Common.h"
 #include "Request.h"
+#include "support/Defer.h"
+#include "support/Define.h"
 #include "support/Device.h"
 #include "support/FleeceSupport.h"
+#include "support/JSONSupport.h"
 #include "TestServer.h"
 
 using namespace std;
@@ -12,26 +14,6 @@ using namespace nlohmann;
 using ReplicatorParams = CBLManager::ReplicatorParams;
 using ReplicationAuthenticator = CBLManager::ReplicationAuthenticator;
 using ReplicationCollection = CBLManager::ReplicationCollection;
-
-template<typename T>
-static inline T GetValue(const json &dict, const string &key, const string &pathInfo = "") {
-    if (!dict.contains(key)) {
-        throw domain_error("'" + key + "' is required");
-    }
-    try {
-        return dict[key].get<T>();
-    } catch (const exception &e) {
-        string pathName = pathInfo.empty() ? key : pathInfo;
-        throw domain_error("'" + pathName + "' has invalid value type : " + e.what());
-    }
-}
-
-static inline void CheckIsObject(const json &obj, const string &key, const string &pathInfo = "") {
-    if (!obj.is_object()) {
-        string pathName = pathInfo.empty() ? key : pathInfo;
-        throw domain_error("'" + pathName + "' is not a JSON object");
-    }
-}
 
 static inline void CheckBody(const json &body) {
     if (!body.is_object()) {
@@ -63,7 +45,7 @@ int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-
         device["systemApiVersion"] = apiVersion;
     }
     result["device"] = device;
-    
+
     return request.respondWithJSON(result);
 }
 
@@ -289,6 +271,22 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
         }
         if (colObject.contains("documentIDs")) {
             col.documentIDs = GetValue<vector<string>>(colObject, "documentIDs");
+        }
+        if (colObject.contains("pushFilter")) {
+            auto filterObject = GetValue<json>(colObject, "pushFilter");
+            ReplicationFilterSpec filterSpec = {};
+            filterSpec.name = GetValue<string>(filterObject, "name");
+            filterSpec.params = filterObject.contains("params") ?
+                                GetValue<json>(filterObject, "params") : json::object();
+            col.pushFilter = filterSpec;
+        }
+        if (colObject.contains("pullFilter")) {
+            auto filterObject = GetValue<json>(colObject, "pullFilter");
+            ReplicationFilterSpec filterSpec = {};
+            filterSpec.name = GetValue<string>(filterObject, "name");
+            filterSpec.params = filterObject.contains("params") ?
+                                GetValue<json>(filterObject, "params") : json::object();
+            col.pullFilter = filterSpec;
         }
         collections.push_back(col);
     }

@@ -1,13 +1,16 @@
 #include "CBLManager.h"
 #include "CollectionSpec.h"
-#include "Common.h"
+#include "support/Defer.h"
+#include "support/Define.h"
+#include "support/Exception.h"
 #include "support/Zip.h"
 
 #include <filesystem>
 #include <utility>
 
-using namespace std;
 using namespace filesystem;
+using namespace std;
+using namespace ts_support::exception;
 
 #define DB_FILE_EXT ".cblite2"
 #define DB_FILE_ZIP_EXT ".cblite2.zip"
@@ -53,6 +56,7 @@ void CBLManager::reset() {
             it++;
         }
         _replicators.clear();
+        _contexts.clear();
     }
 }
 
@@ -132,6 +136,8 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
               }
           };
 
+    auto context = make_unique<ReplicatorContext>();
+
     for (auto &replColSpec: params.collections) {
         auto spec = CollectionSpec(replColSpec.collection);
         auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
@@ -159,6 +165,34 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
             }
             replCol.documentIDs = docIDs;
         }
+
+        // Push Filter:
+        auto pushFilter = replColSpec.pushFilter;
+        if (pushFilter) {
+            auto filter = ReplicationFilter::make_filter(pushFilter.value());
+            if (!filter) {
+                throw domain_error("Cannot find push filter named " + pushFilter->name);
+            }
+            context->filters[replColSpec.collection] = unique_ptr<ReplicationFilter>(filter);
+            replCol.pushFilter = [](void *ctx, CBLDocument *doc, CBLDocumentFlags flags) -> bool {
+                auto collectionName = CollectionSpec(CBLDocument_Collection(doc)).fullName();
+                return ((ReplicatorContext *) ctx)->filters[collectionName].get()->run(doc, flags);
+            };
+        }
+
+        // Pull Filter:
+        auto pullFilter = replColSpec.pullFilter;
+        if (pullFilter) {
+            auto filter = ReplicationFilter::make_filter(pullFilter.value());
+            if (!filter) {
+                throw domain_error("Cannot find pull filter named " + pullFilter->name);
+            }
+            context->filters[replColSpec.collection] = unique_ptr<ReplicationFilter>(filter);
+            replCol.pullFilter = [](void *ctx, CBLDocument *doc, CBLDocumentFlags flags) -> bool {
+                auto collectionName = CollectionSpec(CBLDocument_Collection(doc)).fullName();
+                return ((ReplicatorContext *) ctx)->filters[collectionName].get()->run(doc, flags);
+            };
+        }
         replCols.push_back(replCol);
     }
 
@@ -184,10 +218,13 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
     config.replicatorType = params.replicatorType;
     config.continuous = params.continuous;
     config.authenticator = auth;
+    config.context = context.get();
 
     CBLReplicator *repl = CBLReplicator_Create(&config, &error);
     CheckError(error);
     CBLReplicator_Start(repl, reset);
+
+    _contexts.push_back(std::move(context));
 
     string id = "@replicator::" + to_string(++replicatorID);
     _replicators[id] = repl;

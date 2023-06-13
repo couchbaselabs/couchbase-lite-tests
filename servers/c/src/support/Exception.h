@@ -23,3 +23,11 @@ namespace ts_support::exception {
         CBLError _error;
     };
 }
+
+static inline void CheckError(CBLError &error) {
+    if (error.code > 0) { throw ts_support::exception::CBLException(error); }
+}
+
+static inline void CheckNotNull(void *obj, const string &message) {
+    if (!obj) { throw runtime_error(message); }
+}
