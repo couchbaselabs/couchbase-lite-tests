@@ -1,6 +1,6 @@
 #include "CBLReplicationFilter.h"
 #include "support/Define.h"
-#include "support/JSONSupport.h"
+#include "support/JSON.h"
 
 #include "cbl/CouchbaseLite.h"
 

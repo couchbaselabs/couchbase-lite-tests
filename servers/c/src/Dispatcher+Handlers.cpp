@@ -4,8 +4,8 @@
 #include "support/Defer.h"
 #include "support/Define.h"
 #include "support/Device.h"
-#include "support/FleeceSupport.h"
-#include "support/JSONSupport.h"
+#include "support/Fleece.h"
+#include "support/JSON.h"
 #include "TestServer.h"
 
 using namespace std;
