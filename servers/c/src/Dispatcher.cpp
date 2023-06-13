@@ -1,7 +1,9 @@
 #include "Dispatcher.h"
-#include "Common.h"
 #include "Request.h"
 #include "TestServer.h"
+#include "support/Exception.h"
+
+using namespace ts_support::exception;
 
 #define HANDLER(h) [this](Request& request) -> int { return h(request); }
 
