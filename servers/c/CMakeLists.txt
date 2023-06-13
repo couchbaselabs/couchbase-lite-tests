@@ -24,7 +24,7 @@ set(SOURCE_FILES
         src/Request.cpp
         src/TestServer.cpp
         src/support/Exception.cpp
-        src/support/FleeceSupport.cpp
+        src/support/Fleece.cpp
         src/support/UUID.cpp
         src/support/Zip.cpp)
 
@@ -34,13 +34,13 @@ if(APPLE)
     target_sources(
             testserver PRIVATE
             src/support/Device+Apple.mm
-            src/support/FileSupport+Apple.mm
+            src/support/Files+Apple.mm
     )
 else()
     target_sources(
             testserver PRIVATE
             src/support/Device.cpp
-            src/support/FileSupport.cpp
+            src/support/Files.cpp
     )
 endif()
 

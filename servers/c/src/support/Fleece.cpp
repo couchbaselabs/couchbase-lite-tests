@@ -1,4 +1,4 @@
-#include "FleeceSupport.h"
+#include "Fleece.h"
 #include "Define.h"
 
 using namespace std;

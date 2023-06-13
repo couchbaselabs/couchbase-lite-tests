@@ -4,7 +4,7 @@
 #include <civetweb.h>
 #include "cbl/CouchbaseLite.h"
 
-#include "support/FileSupport.h"
+#include "support/Files.h"
 #include "TestServer.h"
 
 using namespace std;
