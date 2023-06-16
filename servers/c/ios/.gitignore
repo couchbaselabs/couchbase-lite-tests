@@ -1,0 +1,8 @@
+# XCode
+xcuserdata/
+
+# CBL-C Framework
+CouchbaseLite.xcframework/
+
+# Fetched Dependencies
+/vendor/cmake/

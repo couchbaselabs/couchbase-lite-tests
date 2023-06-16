@@ -1,6 +1,8 @@
 #include "CollectionSpec.h"
 
-#include "cbl/CouchbaseLite.h"
+#include "CBLHeader.h"
+#include CBL_HEADER(CouchbaseLite.h)
+
 #include "support/Define.h"
 
 CollectionSpec::CollectionSpec(const CBLCollection *collection) {

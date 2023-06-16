@@ -7,7 +7,7 @@ using namespace std;
 
 void TestServer::start() {
     if (_server) {
-        throw std::runtime_error("Already Started");
+        return;
     }
     
     _uuid = ts_support::key::generateUUID();

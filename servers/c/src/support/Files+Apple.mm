@@ -20,7 +20,8 @@ string ts_support::files::tempDir(const string &subdir, bool create) {
 }
 
 string ts_support::files::assetDir() {
-    auto bundle = CFBundleGetBundleWithIdentifier(CFSTR("com.couchbase.CouchbaseLiteTests"));
+    // TODO: The identifier should be passed into the function instead of hard coding the value here.
+    auto bundle = CFBundleGetBundleWithIdentifier(CFSTR("com.couchbase.CBLTestServer"));
     if (bundle) {
         auto url = CFBundleCopyResourcesDirectoryURL(bundle);
         CFAutorelease(url);

@@ -2,7 +2,8 @@
 #include "support/Define.h"
 #include "support/JSON.h"
 
-#include "cbl/CouchbaseLite.h"
+#include "CBLHeader.h"
+#include CBL_HEADER(CouchbaseLite.h)
 
 #include <unordered_set>
 

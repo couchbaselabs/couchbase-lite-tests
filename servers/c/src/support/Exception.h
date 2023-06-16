@@ -1,6 +1,8 @@
 #pragma once
 
-#include "cbl/CBLBase.h"
+#include "../CBLHeader.h"
+#include CBL_HEADER(CBLBase.h)
+
 #include <exception>
 #include <string>
 #include <sstream>
