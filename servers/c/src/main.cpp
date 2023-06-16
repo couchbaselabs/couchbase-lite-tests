@@ -12,8 +12,7 @@ using namespace ts_support::files;
 
 int main() {
     mg_init_library(0);
-    TestServer::Context context = {tempDir("CBL-C-TestServer", true),
-                                   assetDir()};
+    TestServer::Context context = {tempDir("CBL-C-TestServer", true), assetDir()};
     TestServer server = TestServer(context);
     server.start();
     cout << "Using CBL C version " << CBLITE_VERSION << "-" << CBLITE_BUILD_NUMBER;

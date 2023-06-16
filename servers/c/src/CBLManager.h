@@ -1,5 +1,10 @@
 #pragma once
 
+#include "CBLReplicationFilter.h"
+
+#include "CBLHeader.h"
+#include CBL_HEADER(CouchbaseLite.h)
+
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <optional>
@@ -7,10 +12,6 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-
-#include "CBLReplicationFilter.h"
-
-#include "cbl/CouchbaseLite.h"
 
 struct CBLDatabase;
 
