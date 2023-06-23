@@ -63,11 +63,11 @@ target_compile_definitions(
         -DHAS_UNCAUGHT_EXCEPTIONS=1
 )
 
-if(MSVC)
-    target_link_libraries(
-            testserver PRIVATE
-            zlibstatic
-    )
-endif()
+#if(MSVC)
+#    target_link_libraries(
+#            testserver PRIVATE
+#            zlibstatic
+#    )
+#endif()
 
 file(COPY assets DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
