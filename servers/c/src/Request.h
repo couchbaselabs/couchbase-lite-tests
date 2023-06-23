@@ -2,6 +2,7 @@
 
 #include "support/Exception.h"
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
 
 struct mg_connection;

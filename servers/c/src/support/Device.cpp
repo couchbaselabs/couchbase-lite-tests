@@ -1,7 +1,5 @@
 #include "Device.h"
 
-using namespace std;
-
 #ifdef _MSC_VER
 #define NOMINMAX
 #include <sstream>
@@ -12,6 +10,11 @@ using namespace std;
 extern "C" NTSYSAPI NTSTATUS NTAPI RtlGetVersion(
     _Out_ PRTL_OSVERSIONINFOW lpVersionInformation
 );
+#endif
+
+#ifdef __ANDROID__
+#include <sstream>
+#include <sys/system_properties.h>
 #endif
 
 #if defined(__linux__) && !defined(__ANDROID__)
@@ -70,12 +73,7 @@ static string getDistroInfo() {
 }
 #endif
 
-#ifdef __ANDROID__
-#include <sstream>
-#include <sys/system_properties.h>
-#endif
-
-string ts_support::device::deviceModel() {
+std::string ts_support::device::deviceModel() {
 #if __ANDROID__
     char product_model_str[PROP_VALUE_MAX];
     __system_property_get("ro.product.model", product_model_str);
@@ -85,7 +83,7 @@ string ts_support::device::deviceModel() {
 #endif
 }
 
-string ts_support::device::osName() {
+std::string ts_support::device::osName() {
 #if __ANDROID__
     return "Android";
 #elif _MSC_VER
@@ -97,7 +95,7 @@ string ts_support::device::osName() {
 #endif
 }
 
-string ts_support::device::osVersion() {
+std::string ts_support::device::osVersion() {
 #if __ANDROID__
     char sdk_ver_str[PROP_VALUE_MAX];
     __system_property_get("ro.build.version.sdk", sdk_ver_str);
@@ -106,7 +104,7 @@ string ts_support::device::osVersion() {
     RTL_OSVERSIONINFOW version{};
     version.dwOSVersionInfoSize = sizeof(RTL_OSVERSIONINFOW);
     auto result = RtlGetVersion(&version);
-    stringstream ss;
+    std::stringstream ss;
     if (result < 0) {
         ss << "Unknown Version";
     } else {
@@ -122,7 +120,7 @@ string ts_support::device::osVersion() {
 #endif
 }
 
-string ts_support::device::apiVersion() {
+std::string ts_support::device::apiVersion() {
 #if __ANDROID__
     char rel_ver_str[PROP_VALUE_MAX];
     __system_property_get("ro.build.version.release", rel_ver_str);

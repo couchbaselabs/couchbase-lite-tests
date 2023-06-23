@@ -1,0 +1,54 @@
+name: C TestServer Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "**"
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Debug
+  CBL_EDITION: enterprise
+  CBL_VERSION: 3.1.0
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
+#### BUILD
+
+    - name: Create Build Environment
+      # Create a build directory, as our working directory for all subsequent commands
+      working-directory: ${{github.workspace}}/servers/c
+      run: cmake -E make_directory build
+
+    - name: Download CBL-C (Windows)
+      if: runner.os == 'Windows'
+      working-directory: ${{github.workspace}}/servers/c
+      shell: bash
+      run: |
+        curl -L https://packages.couchbase.com/releases/couchbase-lite-c/${CBL_VERSION}/couchbase-lite-c-${CBL_EDITION}-${CBL_VERSION}-windows-x86_64.zip --output cbl.zip
+        unzip cbl.zip
+
+    - name: Configure CMake (Windows)
+      if: runner.os == 'Windows'
+      working-directory: ${{github.workspace}}/servers/c/build
+      run: cmake -A x64 -DCMAKE_PREFIX_PATH=${{github.workspace}}/servers/c/libcblite-${{env.CBL_VERSION}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ..
+
+    - name: Build
+      # Use cmake to build -- this will invoke `make` on Linux/Mac, Visual Studio on Windows.
+      working-directory: ${{github.workspace}}/servers/c/build
+      run: cmake --build . --config ${{env.BUILD_TYPE}}
+      
