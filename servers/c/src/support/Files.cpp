@@ -8,7 +8,7 @@ using namespace std;
 string ts_support::files::tempDir(const string &subdir, bool create) {
 #ifdef __ANDROID__
     // TODO:
-    return ""
+    return "";
 #endif
 
 #ifdef WIN32
@@ -26,7 +26,7 @@ string ts_support::files::tempDir(const string &subdir, bool create) {
 string ts_support::files::assetDir() {
 #ifdef __ANDROID__
     // TODO:
-    return ""
+    return "";
 #endif
     auto current = filesystem::current_path() / "assets";
     return current.generic_string();
