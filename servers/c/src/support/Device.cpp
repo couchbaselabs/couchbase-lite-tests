@@ -124,7 +124,7 @@ std::string ts_support::device::apiVersion() {
 #if __ANDROID__
     char rel_ver_str[PROP_VALUE_MAX];
     __system_property_get("ro.build.version.release", rel_ver_str);
-    return sdk_ver_str;
+    return rel_ver_str;
 #else
     return "";
 #endif
