@@ -335,6 +335,7 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
             error["message"] = STR(message);
         }
         FLSliceResult_Release(message);
+        result["error"] = error;
     }
 
     return request.respondWithJSON(result);

@@ -128,8 +128,9 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
     CBLError error{};
     vector<CBLReplicationCollection> replCols;
 
+    bool success = false;
     DEFER {
-              if (error.code > 0) {
+              if (!success) {
                   for (auto &replCol: replCols) {
                       CBLCollection_Release(replCol.collection);
                   }
@@ -141,9 +142,8 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
     for (auto &replColSpec: params.collections) {
         auto spec = CollectionSpec(replColSpec.collection);
         auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
-        if (error.code > 0) {
-            break;
-        }
+        CheckError(error);
+        CheckNotNull(col, "Collection " + spec.fullName() + " Not Found");
 
         CBLReplicationCollection replCol{};
         replCol.collection = col;
@@ -228,6 +228,7 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
 
     string id = "@replicator::" + to_string(++replicatorID);
     _replicators[id] = repl;
+    success = true;
     return id;
 }
 
