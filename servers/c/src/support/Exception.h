@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../CBLHeader.h"
+#include "CBLHeader.h"
 #include CBL_HEADER(CBLBase.h)
 
 #include <exception>
@@ -30,6 +30,6 @@ static inline void CheckError(CBLError &error) {
     if (error.code > 0) { throw ts_support::exception::CBLException(error); }
 }
 
-static inline void CheckNotNull(void *obj, const string &message) {
+static inline void CheckNotNull(const void *obj, const string &message) {
     if (!obj) { throw runtime_error(message); }
 }

@@ -1,15 +1,7 @@
 #pragma once
 
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#if !TARGET_OS_OSX
-#include "CouchbaseLite/Fleece.h"
-#else
-#include "fleece/Fleece.h"
-#endif
-#else
-#include "fleece/Fleece.h"
-#endif
+#include "CBLHeader.h"
+#include FLEECE_HEADER(Fleece.h)
 
 #include <nlohmann/json.hpp>
 
