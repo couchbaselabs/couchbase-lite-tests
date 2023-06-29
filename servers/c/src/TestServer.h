@@ -14,12 +14,18 @@ public:
 
     struct Context {
         std::string databaseDir;
-        std::string assetDir;
+        std::string assetsDir;
     };
 
-    explicit TestServer(Context context) : _context(std::move(context)), _dispatcher(this) {}
+    explicit TestServer();
 
-    [[nodiscard]] const Context *context() const { return &_context; }
+    ~TestServer();
+
+    TestServer(const TestServer &server) = delete;
+
+    TestServer &operator=(const TestServer &server) = delete;
+
+    [[nodiscard]] const Context &context() const { return _context; }
 
     [[nodiscard]] std::string serverUUID() const { return _uuid; }
 
@@ -31,7 +37,7 @@ private:
     int handleRequest(mg_connection *conn);
 
     Context _context;
+    Dispatcher *_dispatcher{nullptr};
     mg_context *_server{nullptr};
-    Dispatcher _dispatcher;
     std::string _uuid;
 };

@@ -2,7 +2,7 @@
 
 #include "CBLReplicationFilter.h"
 
-#include "CBLHeader.h"
+#include "support/CBLHeader.h"
 #include CBL_HEADER(CouchbaseLite.h)
 
 #include <mutex>
