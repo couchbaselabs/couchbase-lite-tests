@@ -7,7 +7,7 @@
 
 using namespace std;
 
-string ts_support::files::tempDir(const string &subdir, bool create) {
+string ts_support::files::filesDir(const std::string &subdir, bool create) {
     NSString *tempDir = NSTemporaryDirectory();
     if (!subdir.empty()) {
         NSString *sub = [NSString stringWithCString:subdir.c_str() encoding:NSUTF8StringEncoding];
@@ -19,7 +19,7 @@ string ts_support::files::tempDir(const string &subdir, bool create) {
     return tempDir.UTF8String;
 }
 
-string ts_support::files::assetDir() {
+string ts_support::files::assetsDir() {
     // TODO: The identifier should be passed into the function instead of hard coding the value here.
     auto bundle = CFBundleGetBundleWithIdentifier(CFSTR("com.couchbase.CBLTestServer"));
     if (bundle) {

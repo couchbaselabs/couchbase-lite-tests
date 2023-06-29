@@ -9,7 +9,7 @@ using namespace ts_support::exception;
 
 Dispatcher::Dispatcher(const TestServer *testServer) {
     _testServer = testServer;
-    _cblManager = make_unique<CBLManager>(_testServer->context()->databaseDir, _testServer->context()->assetDir);
+    _cblManager = make_unique<CBLManager>(_testServer->context().databaseDir, _testServer->context().assetsDir);
 
     addRule({"GET", "/", HANDLER(handleGETRoot)});
     addRule({"POST", "/reset", HANDLER(handlePOSTReset)});
