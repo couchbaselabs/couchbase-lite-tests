@@ -1,0 +1,15 @@
+{
+    "num_index_replicas": 0,
+    "bucket": "names",
+    "scopes": {
+       "_default": {
+          "collections": {
+             "_default": { "sync": "function (doc, oldDoc, meta) { channel(doc.channels); }" }
+          }
+       }
+    },
+    "delta_sync": {
+        "enabled": true
+    }
+ }
+ 
