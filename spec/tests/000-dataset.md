@@ -2,30 +2,53 @@
 
 ## 1. travel
 
-### CBL Dataset
+### CBL
 
-| Collections         | #Docs       | Doc ID                    |
-| :------------------ | ----------- |---------------------------|
-| travel.airlines     | 150         | airline_1 ... airline_150 |
-| travel.routes       | 3000        | route_1 ... route_3000    |
-| travel.airports     | 0           |                           |
-| travel.landmarks    | 0           |                           |
-| travel.hotels       | 350         | hotel_1 ... hotel_350     |
+| Collections         | #Docs       | Doc ID              |
+| :------------------ | ----------- |---------------------|
+| travel.airlines     | 150         | airline_1 ... 150   |
+| travel.routes       | 3000        | route_1 ... 3000    |
+| travel.airports     | 0           |                     |
+| travel.landmarks    | 0           |                     |
+| travel.hotels       | 350         | hotel_1 ... 350     |
 
-### SG Dataset
+### SG
 
-| Collections         | #Docs       | Doc ID                       |
-| :------------------ | ----------- |------------------------------|
-| travel.airlines     | 0           |                              | 
-| travel.routes       | 0           |                              |
-| travel.airports     | 300         | airport_1 ... airport_300    |
-| travel.landmarks    | 2300        | landmark_1 ... landmark_2300 |
-| travel.hotels       | 350         | hotel_351 ... hotel_700      |
+| Collections         | #Docs       | Doc ID              |
+| :------------------ | ----------- |---------------------|
+| travel.airlines     | 0           |                     | 
+| travel.routes       | 0           |                     |
+| travel.airports     | 300         | airport_1 ... 300   |
+| travel.landmarks    | 2300        | landmark_1 ... 2300 |
+| travel.hotels       | 350         | hotel_351 ... 700   |
 
 Note: 
 * Each document has `scope` and `collection` key.
 * Each document in CBL's `travel.hotels` has "image" key which contains a blob.
 * Each doucment in this dataset has "channels" property which contain a country value ("United States", "United Kingdom" or "France")
+
+### SG Config
+
+ | Config      | Value       |
+ | ----------- | ----------- |
+ | Database    | travel      |
+ | Port        | 4984 / 4985 |
+ | Collections | travel.airlines, travel.routes, travel.airports, travel.landmarks, travel.hotels |
+
+#### Sync Function
+
+```js
+function (doc, oldDoc, meta) {
+   channel(doc.channels);
+}
+```
+Note: Same sync function for all collections
+
+#### Users
+
+| Username | Password  | admin_channels          |
+| :------- | --------- |-------------------------|
+| user1    | pass      | ["*"] (All collections) |
 
 ### Sample Docs
 
@@ -218,18 +241,39 @@ Note:
 
 The 100 name documents in the default collection.
 
-### CBL Dataset
+### CBL
 
 | Collections         | #Docs       | Doc ID              |
 | :------------------ | ----------- | --------------------|
-| _default._default   | 100         | name_1 ... name_100 | 
+| _default._default   | 100         | name_1 ... 100      | 
 
-### SG Dataset
+### SG
 
 | Collections         | #Docs       | Doc ID              |
 | :------------------ | ----------- | --------------------|
-| _default._default   | 100         | name_1 ... name_100 |
+| _default._default   | 100         | name_101 --- 200    |
 
+### SG Config
+
+ | Config      | Value             |
+ | ----------- | ------------------|
+ | Database    | names             |
+ | Port        | 4984 / 4985       |
+ | Collections | _default._default |
+
+#### Sync Function
+
+```js
+function (doc, oldDoc, meta) {
+   channel(doc.channels);
+}
+```
+
+#### Users
+
+| Username | Password  | admin_channels |
+| :------- | --------- |----------------|
+| user1    | pass      | ["*"]          |
 
 ### Sample Docs
 
@@ -276,13 +320,35 @@ The 100 name documents in the default collection.
 
 ### SG Dataset
 
-| Collections         | #Docs       | Doc ID            |
-| :------------------ | ----------- | ----------------- |
-| _default.posts      | 5           | post_1 ... post_5 |
+| Collections         | #Docs       | Doc ID           |
+| :------------------ | ----------- | -----------------|
+| _default.posts      | 5           | post_1 ... 5     |
 
 **Note:**
 * post_1, post_2, and post_3 will have `channels` as ["user1", "public"].
 * post_4, post_5 will have `channels` as ["public"].
+
+### SG Config
+
+ | Config      | Value             |
+ | ----------- | ------------------|
+ | Database    | posts             |
+ | Port        | 4984 / 4985       |
+ | Collections | _default.posts |
+
+#### Sync Function
+
+```js
+function (doc, oldDoc, meta) {
+   channel(doc.channels);
+}
+```
+
+#### Users
+
+| Username | Password  | admin_channels     |
+| :------- | --------- |--------------------|
+| user1    | pass      | ["user1", "public"]|
 
 ### Sample Docs
 
