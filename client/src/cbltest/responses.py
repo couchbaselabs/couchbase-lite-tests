@@ -4,6 +4,7 @@ from json import dumps
 from typing import Dict, Final, cast
 
 from .version import available_api_version
+from .api.jsonserializable import JSONSerializable
     
 class ErrorDomain(Enum):
     """An enum representing the domain of an error returned by the server"""
@@ -59,7 +60,7 @@ class ErrorResponseBody:
         
         :param body: A dict potentially containing error keys
         """
-        if c.__error_domain_key in body and c.__error_code_key in body \
+        if body is not None and c.__error_domain_key in body and c.__error_code_key in body \
             and c.__error_msg_key in body:
             return ErrorResponseBody(body[c.__error_domain_key], body[c.__error_code_key], body[c.__error_msg_key])
         
@@ -70,16 +71,11 @@ class ErrorResponseBody:
         self.__code = code
         self.__message = message
 
-class TestServerResponse:
+class TestServerResponse(JSONSerializable):
     @property
     def version(self) -> int:
         """Gets the API version of the response, as specified by the remote server"""
         return self.__version
-    
-    @property
-    def number(self) -> int:
-        """Gets the number of the message (paired with a request)"""
-        return self.__id
     
     @property
     def uuid(self) -> str:
@@ -91,9 +87,8 @@ class TestServerResponse:
         """Gets the error sent by the remote server, if any"""
         return self.__error
 
-    def __init__(self, request_id: int, status_code: int, uuid: str, version: int, body: dict, 
+    def __init__(self, status_code: int, uuid: str, version: int, body: dict, 
                  http_name: str, http_method: str = "post"):
-        self.__id = request_id
         self.__version = available_api_version(version)
         self.__status_code = status_code
         self.__uuid = uuid
@@ -102,12 +97,12 @@ class TestServerResponse:
         self.__http_name = http_name
         self.__http_method = http_method
 
-    def serialize_payload(self) -> str:
+    def to_json(self) -> any:
         """Serializes the body of the response to a JSON string"""
-        return dumps(self.__payload)
+        return self.__payload
 
     def __str__(self) -> str:
-        return f"<- {self.__uuid} v{self.__version} {self.__http_method.upper()} /{self.__http_name} #{self.__id} {self.__status_code}"
+        return f"<- {self.__uuid} v{self.__version} {self.__http_method.upper()} /{self.__http_name} {self.__status_code}"
 
 class GetRootResponse(TestServerResponse):
     """

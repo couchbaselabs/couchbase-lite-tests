@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Final, List, cast
-from cbltest.responses import ErrorResponseBody, TestServerResponse
+from ..responses import ErrorResponseBody, TestServerResponse
+from ..api.replicator_types import ReplicatorActivityLevel, ReplicatorDocumentEntry, ReplicatorProgress
 
 # Like the requests file, this file also follows the convention that all of the 
 # received responses are classes that end in 'Response'.  However, unlike the
@@ -16,8 +17,8 @@ class PostResetResponse(TestServerResponse):
     A POST /reset response as specified in version 1 of the 
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
-    def __init__(self, request_id: int, status_code: int, uuid:str, body: dict):
-        super().__init__(request_id, status_code, uuid, 1, body, "reset")
+    def __init__(self, status_code: int, uuid:str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "reset")
     
 class PostGetAllDocumentIDsResponse(TestServerResponse):
     """
@@ -52,8 +53,8 @@ class PostGetAllDocumentIDsResponse(TestServerResponse):
         """
         return self.__payload.get(collection)
     
-    def __init__(self, request_id: int, status_code: int, uuid: str, body: dict):
-        super().__init__(request_id, status_code, uuid, 1, body, "getAllDocumentIDs")
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "getAllDocumentIDs")
         self.__payload = body
 
 class PostUpdateDatabaseResponse(TestServerResponse):
@@ -61,8 +62,8 @@ class PostUpdateDatabaseResponse(TestServerResponse):
     A POST /updateDatabase response as specified in version 1 of the 
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
-    def __init__(self, request_id: int, status_code: int, uuid: str, body: dict):
-        super().__init__(request_id, status_code, uuid, 1, body, "updateDatabase")
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "updateDatabase")
     
 class PostSnapshotDocumentsResponse(TestServerResponse):
     """
@@ -83,8 +84,8 @@ class PostSnapshotDocumentsResponse(TestServerResponse):
         """Gets the ID of the snapshot that was created"""
         return self.__snapshot_id
 
-    def __init__(self, request_id: int, status_code: int, uuid: str, body: dict):
-        super().__init__(request_id, status_code, uuid, 1, body, "snapshotDocuments")
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "snapshotDocuments")
         self.__snapshot_id = cast(str, body.get(self.__id_key))
     
 class PostVerifyDocumentsResponse(TestServerResponse):
@@ -105,8 +106,8 @@ class PostVerifyDocumentsResponse(TestServerResponse):
         "Gets the result of the verification"
         return self.__result
     
-    def __init__(self, request_id: int, status_code: int, uuid: str, body: dict):
-        super().__init__(request_id, status_code, uuid, 1, body, "verifyDocuments")
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "verifyDocuments")
         self.__result = cast(bool, body.get(self.__result_key))
     
 class PostStartReplicatorResponse(TestServerResponse):
@@ -128,99 +129,9 @@ class PostStartReplicatorResponse(TestServerResponse):
         """Gets the ID of the replicator that was started"""
         return self.__replicator_id
 
-    def __init__(self, request_id: int, status_code: int, uuid: str, body: dict):
-        super().__init__(request_id, status_code, uuid, 1, body, "startReplicator")
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "startReplicator")
         self.__replicator_id = cast(str, body.get(self.__id_key))
-
-class ReplicatorActivityLevel(Enum):
-    """An enum representing the activity level of a replicator"""
-
-    STOPPED = "STOPPED"
-    """The replicator is stopped and will no longer perform any action"""
-
-    OFFLINE = "OFFLINE"
-    """The replicator is unable to connect to the remote endpoint and will try
-    again later"""
-
-    CONNECTING = "CONNECTING"
-    """The replicator is establishing a connection to the remote endpoint"""
-
-    IDLE = "IDLE"
-    """The replicator is idle and waiting for more information"""
-
-    BUSY = "BUSY"
-    """The replicator is actively processing information"""
-
-    def __str__(self) -> str:
-        return self.value
-
-class ReplicatorProgress:
-    """A class representing the progress of a replicator in terms of units and documents complete"""
-
-    __complete_key: Final[str] = "complete"
-    __document_count_key: Final[str] = "documentCount"
-
-    @property
-    def complete(self) -> int:
-        """Gets the number of units completed so far"""
-        return self.__complete
-    
-    @property
-    def document_count(self) -> int:
-        """Gets the number of documents processed so far"""
-        return self.__document_count
-    
-    def __init__(self, body: dict) -> None:
-        assert(isinstance(body, dict))
-        self.__complete = cast(int, body.get(self.__complete_key))
-        self.__document_count = cast(int, body.get(self.__document_count_key))
-        assert(isinstance(self.__complete, int))
-        assert(isinstance(self.__document_count, int))
-
-class ReplicatorDocumentEntry:
-    """A class representing the status of a replicated document"""
-
-    __collection_key: Final[str] = "collection"
-    __document_id_key: Final[str] = "documentID"
-    __is_push_key: Final[str] = "isPush"
-    __flags_key: Final[str] = "flags"
-    __error_key: Final[str] = "error"
-
-    @property
-    def collection(self) -> str:
-        """Gets the collection that the document belongs to"""
-        return self.__collection
-    
-    @property
-    def document_id(self) -> str:
-        """Gets the ID of the document"""
-        return self.__document_id
-    
-    @property
-    def is_push(self) -> bool:
-        """Gets whether the document was pushed or pulled"""
-        return self.__is_push
-    
-    @property
-    def flags(self) -> int:
-        """Gets the flags that were set on the document when it was replicated"""
-        return self.__flags
-    
-    @property
-    def error(self) -> ErrorResponseBody:
-        """Gets the error that prevented the document from being replicated, if any"""
-        return self.__error
-
-    def __init__(self, body: dict) -> None:
-        assert(isinstance(body, dict))
-        self.__collection = cast(str, body.get(self.__collection_key))
-        assert(self.__collection is not None)
-        self.__document_id = cast(str, body.get(self.__document_id_key))
-        assert(self.__document_id is not None)
-        self.__is_push = cast(bool, body.get(self.__is_push_key))
-        self.__flags = cast(int, body.get(self.__flags_key))
-        self.__error = ErrorResponseBody.create(body.get(self.__error_key))
-
 
 class PostGetReplicatorStatusResponse(TestServerResponse):
     """
@@ -282,9 +193,10 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
         that once viewed it will be cleared"""
         return self.__documents
 
-    def __init__(self, request_id: int, status_code: int, uuid: str, body: dict):
-        super().__init__(request_id, status_code, uuid, 1, body, "getReplicatorStatus")
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "getReplicatorStatus")
         self.__activity = ReplicatorActivityLevel[cast(str, body.get(self.__activity_key)).upper()]
         self.__progress = ReplicatorProgress(cast(dict, body.get(self.__progress_key)))
         self.__replicator_error = ErrorResponseBody.create(body.get(self.__replicator_error_key))
-        self.__documents = [ReplicatorDocumentEntry(d) for d in body.get(self.__documents_key)]
+        if self.__documents_key in body:
+            self.__documents = [ReplicatorDocumentEntry(d) for d in body.get(self.__documents_key)]

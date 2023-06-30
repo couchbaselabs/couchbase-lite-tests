@@ -1,13 +1,14 @@
-from abc import ABC, abstractmethod
 from enum import Enum
 from json import dumps
 from typing import Dict, List, cast
 from uuid import UUID
 from varname import nameof
 
-from cbltest.logging import cbl_warning
-from cbltest.requests import TestServerRequest, TestServerRequestBody
-from cbltest.assertions import _assert_not_null
+from ..logging import cbl_warning
+from ..requests import TestServerRequest, TestServerRequestBody
+from ..assertions import _assert_not_null
+from ..api.replicator_types import ReplicatorAuthenticator, ReplicatorCollectionEntry, ReplicatorType
+from ..api.jsonserializable import JSONSerializable
 
 # Some conventions that are followed in this file are that all request classes that
 # will be sent to the test server are classes that end in 'Request'.  Their bodies
@@ -54,11 +55,8 @@ class PostResetRequestBody(TestServerRequestBody):
         """
         self.__datasets[name] = result_db_names
 
-    def serialize(self) -> str:
-        """
-        Serializes the :class:`PostResetRequestBody` to a JSON string
-        """
-        return f'{{"datasets": {dumps(self.__datasets)}}}'
+    def to_json(self) -> any:
+        return {"datasets": self.__datasets}
     
 class PostGetAllDocumentIDsRequestBody(TestServerRequestBody):
     """
@@ -83,19 +81,16 @@ class PostGetAllDocumentIDsRequestBody(TestServerRequestBody):
         """
         return self.__collections
     
-    def __init__(self, database: str = None, collections: List[str] = None):
+    def __init__(self, database: str, *collections: str):
         super().__init__(1)
+        _assert_not_null(database, nameof(database))
         self.database = database
         """The database to get document IDs from"""
 
-        self.__collections = collections if collections is not None else []
+        self.__collections = list(collections) if collections is not None else []
 
-    def serialize(self) -> str:
-        """
-        Serializes the :class:`PostGetAllDocumentIDsRequestBody` to a JSON string
-        """
-        raw = {"database": self.database, "collections": self.__collections}
-        return dumps(raw)
+    def to_json(self) -> any:
+        return {"database": self.database, "collections": self.__collections}
     
 class DatabaseUpdateType(Enum):
     """
@@ -114,7 +109,7 @@ class DatabaseUpdateType(Enum):
     def __str__(self) -> str:
         return self.value
     
-class DatabaseUpdateEntry:
+class DatabaseUpdateEntry(JSONSerializable):
     """
     A class representing a single update to perform on a database.  These entries
     can be passed via :class:`PostUpdateDatabaseRequestBody` to perform batch operations
@@ -157,10 +152,7 @@ class DatabaseUpdateEntry:
         
         return len(self.__updated_properties) > 0 or len(self.__removed_properties) > 0
     
-    def to_dict(self) -> Dict[str, any]:
-        """
-        Transforms the :class:`DatabaseUpdateEntry` into a serialized dictionary object
-        """
+    def to_json(self) -> any:
         if not self.is_valid():
             return None
         
@@ -219,9 +211,7 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
         This list can be directly added to or removed from.
         """
 
-    def serialize(self) -> str:
-        """Serializes the :class:`PostUpdateDatabaseRequestBody` to a JSON string"""
-
+    def to_json(self) -> any:
         raw = {
             "database": self.database
         }
@@ -229,7 +219,7 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
         raw_entries = []
 
         for e in self.updates:
-            raw_entry = e.to_dict()
+            raw_entry = e.to_json()
             if raw_entry is None:
                 cbl_warning("Skipping invalid DatabaseUpdateEntry in body serialization!")
                 continue
@@ -237,9 +227,9 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
             raw_entries.append(raw_entry)
 
         raw["updates"] = raw_entries
-        return dumps(raw)
+        return raw
     
-class SnapshotDocumentEntry:
+class SnapshotDocumentEntry(JSONSerializable):
     """
     A class for recording the fully qualified name of a document to be saved in a snapshot.
     This class is used in conjunction with :class:`PostSnapshotDocumentsRequestBody`
@@ -251,10 +241,7 @@ class SnapshotDocumentEntry:
         self.id: str = id
         """The ID of the snapshotted document"""
 
-    def to_dict(self) -> Dict[str, any]:
-        """
-        Transforms the :class:`SnapshotDocumentEntry` into a serialized dictionary object
-        """
+    def to_json(self) -> any:
         return {"collection": self.collection, "id": self.id}
     
 class PostSnapshotDocumentsRequestBody(TestServerRequestBody):
@@ -283,10 +270,8 @@ class PostSnapshotDocumentsRequestBody(TestServerRequestBody):
         super().__init__(1)
         self.__entries = entries if entries is not None else []
 
-    def serialize(self) -> str:
-        """Serializes the :class:`PostSnapshotDocumentsRequestBody` to a JSON string"""
-        raw = [e.to_dict() for e in self.entries] if self.entries is not None else []
-        return dumps(raw)
+    def to_json(self) -> any:
+        return [e.to_json() for e in self.__entries] if self.__entries is not None else []
 
 class PostVerifyDocumentsRequestBody(TestServerRequestBody):
     """
@@ -333,160 +318,12 @@ class PostVerifyDocumentsRequestBody(TestServerRequestBody):
         self.changes = changes
         """A list of changes to verify in the database (as compared to the `snapshot`)"""
 
-    def serialize(self) -> str:
-        """Serializes the :class:`PostVerifyDocumentsRequestBody` to a JSON string"""
-        raw = {
+    def to_json(self) -> any:
+        return {
             "snapshot": self.__snapshot,
             "database": self.__database,
-            "changes": [c.to_dict() for c in self.changes] if self.changes is not None else []
+            "changes": [c.to_json() for c in self.changes] if self.changes is not None else []
         }
-
-        return dumps(raw)
-    
-class ReplicatorType(Enum):
-    """An enum representing the direction of a replication"""
-
-    PUSH = "push"
-    """Local to remote only"""
-
-    PULL = "pull"
-    """Remote to local only"""
-
-    PUSH_AND_PULL = "pushAndPull"
-    """Bidirectional"""
-
-    def __str__(self) -> str:
-        return self.value
-    
-class ReplicatorAuthenticator(ABC):
-    """
-    The base class for replicator authenticators
-    """
-
-    @property
-    def type(self) -> str:
-        """Gets the type of authenticator (required for all authenticators)"""
-        return self.__type
-
-    def __init__(self, type: str) -> None:
-        self.__type = type
-
-    @abstractmethod
-    def to_dict(self) -> Dict[str, any]:
-        return None
-    
-class ReplicatorBasicAuthenticator(ReplicatorAuthenticator):
-    """A class holding information to perform HTTP Basic authentication"""
-
-    @property
-    def username(self) -> str:
-        """Gets the username that will be used for auth"""
-        return self.__username
-    
-    def password(self) -> str:
-        """Gets the password that will be used for auth"""
-        return self.__password
-    
-    def __init__(self, username: str, password: str) -> None:
-        super().__init__("basic")
-        self.__username = username
-        self.__password = password
-
-    def to_dict(self) -> Dict[str, any]:
-        """Transforms the :class:`ReplicatorBasicAuthenticator` into a JSON dictionary"""
-        return {
-            "type": "basic",
-            "username": self.__username,
-            "password": self.__password
-        }
-    
-class ReplicatorSessionAuthenticator(ReplicatorAuthenticator):
-    """A class holding information to authenticate via session cookie"""
-
-    @property 
-    def session_id(self) -> str:
-        """Gets the session ID that will be used for auth"""
-        return self.__session_id
-    
-    @property
-    def cookie_name(self) -> str:
-        """Gets the cookie name that will be used for auth"""
-        return self.__cookie_name
-    
-    def __init__(self, session_id: str, cookie_name: str = "SyncGatewaySession") -> None:
-        super().__init__("session")
-        self.__session_id = session_id
-        self.__cookie_name = cookie_name
-
-    def to_dict(self) -> Dict[str, any]:
-        """Transforms the :class:`ReplicatorSessionAuthenticator` into a JSON dictionary"""
-        return {
-            "type": "session",
-            "sessionID": self.__session_id,
-            "cookieName": self.__cookie_name
-        }
-    
-class ReplicatorPushFilterParameters:
-    """
-    A class representing parameters to be passed to a push filter.
-    In theory this could be anything, but in practice it has always been
-    just documentIDs.
-    """
-
-    def __init__(self) -> None:
-        self.document_ids: List[str] = None
-        """The document IDs to filter, if any"""
-
-    def to_dict(self) -> Dict[str, any]:
-        """Transforms the :class:`ReplicatorPushFilterParameters` into a JSON dictionary"""
-        if self.document_ids is None:
-            return None
-        
-        return {
-            "documentIDs": self.document_ids
-        }
-    
-class ReplicatorPushFilter:
-    """
-    A class representing a push filter to use on a replication to limit
-    the documents that get sent from local to remote.
-    """
-
-    @property
-    def name(self) -> str:
-        """Gets the name of the push filter"""
-        return self.__name
-    
-    def __init__(self, name: str):
-        self.__name = name
-        self.parameters = cast(ReplicatorPushFilterParameters, None)
-        """The parameters to be applied to the push filter"""
-
-    def to_dict(self) -> Dict[str, any]:
-        """Transforms the :class:`ReplicatorPushFilter` into a JSON dictionary"""
-        ret_val = {"name": self.name}
-        if self.parameters is not None:
-            ret_val["params"] = self.parameters.to_dict()
-
-class ReplicatorCollectionEntry:
-    """
-    A class representing configuration for a collection in a given replication
-    """
-    @property
-    def collection(self) -> str:
-        """Gets the name of the collection the configuration applies to"""
-        return self.__collection
-    
-    def __init__(self, collection: str):
-        self.__collection = collection
-        self.channels: List[str] = []
-        """A list of channels to use when replicating"""
-
-        self.document_ids: List[str] = []
-        """A list of document IDs to replicate.  All other documents will be ignored."""
-
-        self.push_filter: ReplicatorPushFilter = None
-        """A filter to apply to the replication.  Failing documents will be rejected."""
     
 class PostStartReplicatorRequestBody(TestServerRequestBody):
     """
@@ -560,10 +397,10 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
         self.reset: bool = False
         """Whether or not to start the replication over from the beginning"""
 
-        self.collections: List[ReplicatorCollectionEntry] = None
+        self.collections: List[ReplicatorCollectionEntry] = []
         """The per-collection configuration to use inside the replication"""
 
-    def serialize(self) -> str:
+    def to_json(self) -> any:
         """Serializes the :class:`PostStartReplicatorRequestBody` to a JSON string"""
         raw = {
             "database": self.__database,
@@ -579,7 +416,11 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
         if self.authenticator is not None:
             raw["authenticator"] = self.authenticator.to_dict()
 
-        return dumps(raw)
+        ret_val = {
+            "config": raw
+        }
+        
+        return ret_val
     
 class PostGetReplicatorStatusRequestBody(TestServerRequestBody):
     """
@@ -602,7 +443,7 @@ class PostGetReplicatorStatusRequestBody(TestServerRequestBody):
         super().__init__(1)
         self.__id = id
 
-    def serialize(self) -> str:
+    def to_json(self) -> any:
         """Serializes the :class:`PostGetReplicatorStatusRequestBody` to a JSON string"""
         return {"id": self.__id}
     

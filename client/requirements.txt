@@ -1,3 +1,4 @@
-requests
+aiohttp
 varname
 opentelemetry-api
+couchbase

@@ -1,20 +1,36 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from json import loads
+from enum import Enum
 from pathlib import Path
 from shutil import rmtree
-from typing import cast
+from typing import Type, cast
 from urllib.parse import urljoin
 from uuid import UUID, uuid4
-from requests import Request, Response, Session
+from aiohttp import ClientSession, ClientRequest, ClientResponse
 from importlib import import_module
 
 from .configparser import ParsedConfig
 from .logging import cbl_error, cbl_info, cbl_trace, cbl_warning
 from .responses import GetRootResponse, TestServerResponse
 from .version import available_api_version
+from .httplog import get_next_writer
+from .api.jsonserializable import JSONSerializable
 
-class TestServerRequestBody(ABC):
+class TestServerRequestType(Enum):
+    ROOT = "GetRootRequest"
+    RESET = "PostResetRequest"
+    ALL_DOC_IDS = "PostGetAllDocumentIDsRequest"
+    UPDATE_DB = "PostUpdateDatabaseRequest"
+    START_REPLICATOR = "PostStartReplicatorRequest"
+    REPLICATOR_STATUS = "PostGetReplicatorStatusRequest"
+    SNAPSHOT_DOCS = "PostSnapshotDocumentRequest"
+    VERIFY_DOCS = "PostVerifyDocumentsRequest"
+
+    def __str__(self) -> str:
+        return self.value
+    
+
+class TestServerRequestBody(JSONSerializable):
     """The base class from which all request bodies derive"""
 
     @property
@@ -26,18 +42,11 @@ class TestServerRequestBody(ABC):
         self.__version = available_api_version(version)
 
     @abstractmethod
-    def serialize(self) -> str:
+    def to_json(self) -> any:
         pass
 
 class TestServerRequest:
-    """The base class from which all requests derive, and in which all work is done"""
-    __next_id: int = 1
-
-    @property
-    def number(self) -> int:
-        """Gets the number of this request (to match it with a response in the http log)"""
-        return self.__id
-    
+    """The base class from which all requests derive, and in which all work is done"""    
     @property
     def payload(self) -> TestServerRequestBody:
         """Gets the body of the request.  The actual type is simply the request typename with 'Body' appended.
@@ -55,33 +64,27 @@ class TestServerRequest:
         self.__version = available_api_version(version)
         self.__uuid = uuid
         self.__payload = payload
-        self.__id = TestServerRequest.__next_id 
-        TestServerRequest.__next_id += 1
         self.__http_name = http_name
         self.__method = method
-
-    def _create_request(self, url: str) -> Request:
-        full_url = urljoin(url, self.__http_name)
-        return Request(self.__method, full_url)
     
     def _http_name(self) -> str:
         return f"v1 {self.__method.capitalize()} /{self.__http_name}"
     
-    def _create_response(self, r: Response, version: int, uuid: str) -> TestServerResponse:
+    async def _create_response(self, r: ClientResponse, version: int, uuid: str) -> TestServerResponse:
         module = import_module(f"cbltest.v{version}.responses")
         class_name = type(self).__name__.replace("Request", "Response")
         response_class = getattr(module, class_name)
         content: dict = {}
-        if len(r.content) != 0:
+        if r.content_length != 0:
             content_type = r.headers["Content-Type"]
             if "application/json" not in content_type:
                 cbl_warning(f"Non-JSON response body received from server ({content_type}), ignoring...")
             else:
-                content = loads(r.content)
+                content = await r.json()
 
-        return cast(TestServerResponse, response_class(self.__id, r.status_code, uuid, content))
+        return cast(TestServerResponse, response_class(r.status, uuid, content))
     
-    def send(self, url: str, session: Session = None) -> TestServerResponse:
+    async def send(self, url: str, session: ClientSession = None) -> TestServerResponse:
         """
         Send the request to the specified URL, though `RequestFactory.send_request` is preferred.
         
@@ -89,21 +92,21 @@ class TestServerRequest:
         :param session: The requests library session to use when transmitting the HTTP message
         """
         cbl_trace(f"Sending {self} to {url}")
-        r = self._create_request(url)
-        r.headers["Accept"] = "application/json"
+        headers = {}
+        headers["Accept"] = "application/json"
         if self.__version > 0:
-            r.headers["CBLTest-API-Version"] = str(self.__version)
-            r.headers["CBLTest-Client-ID"] = str(self.__uuid)
+            headers["CBLTest-API-Version"] = str(self.__version)
+            headers["CBLTest-Client-ID"] = str(self.__uuid)
         
+        data: str = None
         if self.__payload is not None:
-            r.data = self.__payload.serialize()
+            data = self.__payload.serialize() 
 
-        r.prepare()
         if session is not None:
-            resp = session.send(session.prepare_request(r))
+            resp = await session.request(self.__method, urljoin(url, self.__http_name), headers=headers, data=data)
         else:
-            with Session() as s:
-                resp = s.send(s.prepare_request(r))
+            async with ClientSession() as s:
+                resp = await s.request(self.__method, urljoin(url, self.__http_name), headers=headers, data=data)
 
         resp_version_header = resp.headers.get("CBLTest-API-Version")
         uuid = resp.headers.get("CBLTest-Server-ID")
@@ -115,14 +118,15 @@ class TestServerRequest:
             elif self.__version != 0:
                 cbl_warning(f"Response version for {resp_version} does not match request version {self.__version}!")
 
-        ret_val = self._create_response(resp, resp_version, uuid)
+        ret_val = await self._create_response(resp, resp_version, uuid)
         cbl_trace(f"Received {ret_val} from {url}")
         if not resp.ok:
-            cbl_warning(f"{self} was not successful ({resp.status_code})")
+            cbl_warning(f"{self} was not successful ({resp.status})")
+
         return ret_val
     
     def __str__(self) -> str:
-        return f"-> {self.__uuid} v{self.__version} {self.__method.upper()} /{self.__http_name} #{self.__id}"
+        return f"-> {self.__uuid} v{self.__version} {self.__method.upper()} /{self.__http_name}"
 
 # Only this request is not versioned
 class GetRootRequest(TestServerRequest):
@@ -133,8 +137,8 @@ class GetRootRequest(TestServerRequest):
     def __init__(self, uuid: UUID):
         super().__init__(0, uuid, "", method="get")
     
-    def _create_response(self, r: Response, version: int, uuid: str) -> TestServerResponse:
-        return GetRootResponse(self.number, r.status_code, uuid, loads(r.content))
+    async def _create_response(self, r: ClientResponse, version: int, uuid: str) -> TestServerResponse:
+        return GetRootResponse(self.number, r.status, uuid, await r.json())
 
 
 class RequestFactory:
@@ -158,7 +162,7 @@ class RequestFactory:
         self.__record_path.mkdir()
 
         self.__uuid = uuid4()
-        self.__session = Session()
+        self.__session = ClientSession()
         self.__version = available_api_version(config.api_version)
         self.__server_urls = config.test_servers
         cbl_info(f"RequestFactory created with API version {self.__version} ({self.__uuid})")
@@ -174,65 +178,35 @@ class RequestFactory:
             return cast(TestServerRequest, request_class(self.__uuid))
         
         return cast(TestServerRequest, request_class(self.__uuid, payload))
+    
+    def create_request(self, type: TestServerRequestType, payload: TestServerRequestBody = None) -> TestServerRequest:
+        """
+        Creates a request to send.
 
-    def create_get_root(self) -> TestServerRequest:
-        """Creates a GET / request"""
-        return GetRootRequest(self.__uuid)
-    
-    def create_post_reset(self, payload: TestServerRequestBody) -> TestServerRequest:
-        """Creates a POST /reset request"""
-        if payload is None:
+        :param type: The type of request to create
+        :param payload: The payload to send with the request
+        """
+        if type != TestServerRequestType.ROOT and payload is None:
             raise ValueError("No payload provided!")
         
-        return self._create_request("PostResetRequest", payload)
+        return self._create_request(str(type), payload)
     
-    def create_post_get_all_document_ids(self, payload: TestServerRequestBody) -> TestServerRequest:
-        """Creates a POST /getAllDocumentIDs request"""
-        if payload is None:
-            raise ValueError("No payload provided!")
-        
-        return self._create_request("PostGetAllDocumentIDsRequest", payload)
-    
-    def create_post_snapshot_documents(self, payload: TestServerRequestBody) -> TestServerRequest:
-        """Creates a POST /snapshotDocuments request"""
-        if payload is None:
-            raise ValueError("No payload provided!")
-        
-        return self._create_request("PostSnapshotDocumentsRequest", payload)
-    
-    def create_post_update_database(self, payload: TestServerRequestBody) -> TestServerRequest:
-        """Creats a POST /updateDatabase request"""
-        if payload is None:
-            raise ValueError("No payload provided!")
-        
-        return self._create_request("PostUpdateDatabaseRequest", payload)
-    
-    def send_request(self, index: int, r: TestServerRequest) -> TestServerResponse:
+    async def send_request(self, index: int, r: TestServerRequest) -> TestServerResponse:
         """Sends a request to the URL at the provided index (as indexes by test_servers in
         the JSON configuration file)"""
+        writer = get_next_writer()
         url = self.__server_urls[index]
-        send_log_path = self.__record_path / f"{r.number:05d}_begin.txt"
-        with open(send_log_path, "x") as fout:
-            fout.write(str(r))
-            fout.write("\n\n")
-            fout.write(r.payload.serialize() if r.payload is not None else "")
+        writer.write_begin(str(r), r.payload.serialize() if r.payload is not None else "")
         
         try:
-            ret_val = r.send(url, self.__session)
+            ret_val = await r.send(url, self.__session)
         except Exception as e:
             cbl_error(f"Failed to send {r}")
-            recv_log_path = self.__record_path / f"{r.number:05d}_error.txt"
-            with open(recv_log_path, "x") as fout:
-                fout.write(str(e))
+            writer.write_error(str(e))
 
             return None
         
-        recv_log_path = self.__record_path / f"{r.number:05d}_end.txt"
-        with open(recv_log_path, "x") as fout:
-            fout.write(str(ret_val))
-            fout.write("\n\n")
-            fout.write(ret_val.serialize_payload())
-
+        writer.write_end(str(ret_val), ret_val.serialize())
         return ret_val
     
     
