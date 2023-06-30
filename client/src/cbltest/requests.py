@@ -1,12 +1,12 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from enum import Enum
 from pathlib import Path
 from shutil import rmtree
-from typing import Type, cast
+from typing import cast
 from urllib.parse import urljoin
 from uuid import UUID, uuid4
-from aiohttp import ClientSession, ClientRequest, ClientResponse
+from aiohttp import ClientSession, ClientResponse
 from importlib import import_module
 
 from .configparser import ParsedConfig

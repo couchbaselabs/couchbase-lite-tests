@@ -1,7 +1,6 @@
-from enum import Enum
 from typing import Final, List, cast
-from ..responses import ErrorResponseBody, TestServerResponse
-from ..api.replicator_types import ReplicatorActivityLevel, ReplicatorDocumentEntry, ReplicatorProgress
+from cbltest.responses import ErrorResponseBody, TestServerResponse
+from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorDocumentEntry, ReplicatorProgress
 
 # Like the requests file, this file also follows the convention that all of the 
 # received responses are classes that end in 'Response'.  However, unlike the

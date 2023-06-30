@@ -3,8 +3,8 @@ from enum import Enum
 from json import dumps
 from typing import Dict, Final, cast
 
-from .version import available_api_version
-from .api.jsonserializable import JSONSerializable
+from cbltest.version import available_api_version
+from cbltest.api.jsonserializable import JSONSerializable
     
 class ErrorDomain(Enum):
     """An enum representing the domain of an error returned by the server"""

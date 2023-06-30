@@ -3,7 +3,7 @@ from pathlib import Path
 
 _http_num = count(1)
 
-class HttpLogWriter:
+class _HttpLogWriter:
     __record_path: Path = Path("http_log")
 
     def __init__(self, num: int):
@@ -29,5 +29,5 @@ class HttpLogWriter:
             fout.write(payload)
 
 
-def get_next_writer():
-    return HttpLogWriter(next(_http_num))        
+def get_next_writer() -> _HttpLogWriter:
+    return _HttpLogWriter(next(_http_num))        

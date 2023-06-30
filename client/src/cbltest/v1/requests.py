@@ -4,11 +4,11 @@ from typing import Dict, List, cast
 from uuid import UUID
 from varname import nameof
 
-from ..logging import cbl_warning
-from ..requests import TestServerRequest, TestServerRequestBody
-from ..assertions import _assert_not_null
-from ..api.replicator_types import ReplicatorAuthenticator, ReplicatorCollectionEntry, ReplicatorType
-from ..api.jsonserializable import JSONSerializable
+from cbltest.logging import cbl_warning
+from cbltest.requests import TestServerRequest, TestServerRequestBody
+from cbltest.assertions import _assert_not_null
+from cbltest.api.replicator_types import ReplicatorAuthenticator, ReplicatorCollectionEntry, ReplicatorType
+from cbltest.api.jsonserializable import JSONSerializable
 
 # Some conventions that are followed in this file are that all request classes that
 # will be sent to the test server are classes that end in 'Request'.  Their bodies

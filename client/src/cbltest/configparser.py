@@ -5,20 +5,25 @@ from typing import Final, List, cast
 from .jsonhelper import _assert_contains_string_list, _get_int_or_default, _get_string_list, _assert_string_entry
 
 class SyncGatewayInfo:
+    """The parsed Sync Gateway information from the config file"""
+
     __hostname_key: Final[str] = "hostname"
     __port_key: Final[str] = "port"
     __admin_port_key: Final[str] = "admin_port"
 
     @property
     def hostname(self) -> str:
+        """Gets the hostname of the Sync Gateway instance"""
         return self.__hostname
     
     @property
     def port(self) -> int:
+        """Gets the port to use for normal connection"""
         return self.__port
     
     @property
     def admin_port(self) -> int:
+        """Gets the port to use for admin connection"""
         return self.__admin_port
     
     def __init__(self, data: dict):
