@@ -1,185 +1,235 @@
 # Dataset
 
-## 1. travel-sample
+## 1. travel
 
 ### CBL Dataset
 
-| Collections         | #Docs       | #Size (bytes) |
-| :------------------ | ----------- | ------------- |
-| inventory.airline   | 187         | 34.8K         |
-| inventory.route     | 24000       | 12.7M         |
-| inventory.airport   | 0           | 0             |
-| inventory.landmark  | 0           | 0             |
-| inventory.hotel     | 458         | TBD           |
+| Collections         | #Docs       | Doc ID                    |
+| :------------------ | ----------- |---------------------------|
+| travel.airlines     | 150         | airline_1 ... airline_150 |
+| travel.routes       | 3000        | route_1 ... route_3000    |
+| travel.airports     | 0           |                           |
+| travel.landmarks    | 0           |                           |
+| travel.hotels       | 350         | hotel_1 ... hotel_350     |
 
 ### SG Dataset
 
-| Collections         | #Docs       | #Size (bytes) | Channels |
-| :------------------ | ----------- | ------------- |----------
-| inventory.airline   | 0           | 0             | country ("United States", "United Kingdom", "France") |
-| inventory.route     | 0           | 0             | 
-| inventory.airport   | 1960        | 455K          | country ("United States", "United Kingdom", "France") |
-| inventory.landmark  | 4490        | 2.86M         | country ("United States", "United Kingdom", "France") |
-| inventory.hotel     | 459         | TBD           | country ("United States", "United Kingdom", "France") |
+| Collections         | #Docs       | Doc ID                       |
+| :------------------ | ----------- |------------------------------|
+| travel.airlines     | 0           |                              | 
+| travel.routes       | 0           |                              |
+| travel.airports     | 300         | airport_1 ... airport_300    |
+| travel.landmarks    | 2300        | landmark_1 ... landmark_2300 |
+| travel.hotels       | 350         | hotel_351 ... hotel_700      |
 
-Note: the documents in the `inventory.hotel` collections of CBL and SG will have different document IDs.
+Note: 
+* Each document has `scope` and `collection` key.
+* Each document in CBL's `travel.hotels` has "image" key which contains a blob.
+* Each doucment in this dataset has "channels" property which contain a country value ("United States", "United Kingdom" or "France")
 
 ### Sample Docs
 
-#### inventory.airline
+#### travel.airlines
 
 ```JSON
 {
-    "_id": "airline_10",
-    "id": 10,
-    "type": "airline",
-    "name": "40-Mile Air",
-    "iata": "Q5",
-    "icao": "MLA",
-    "callsign": "MILE-AIR",
-    "country": "United States"
+  "_id": "airline_1",
+  "callsign": "MILE-AIR",
+  "collection": "airlines",
+  "country": "United States",
+  "channels": ["United States"],
+  "iata": "Q5",
+  "icao": "MLA",
+  "id": 1,
+  "name": "40-Mile Air",
+  "oid": 10,
+  "scope": "travel",
+  "type": "airline"
 }
 ```
 
-#### inventory.route
+#### travel.routes
 
 ```JSON
-{
-    "_id": "route_10009",
-    "id": 10009,
-    "type": "route",
-    "airline": "AF",
-    "airlineid": "airline_137",
-    "sourceairport": "TUN",
-    "destinationairport": "CDG",
-    "stops": 0,
-    "equipment": "321 319 320",
-    "schedule": [{
-        "day": 0,
-        "utc": "13:22:00",
-        "flight": "AF665"
-    }, {
-        "day": 1,
-        "utc": "16:10:00",
-        "flight": "AF232"
-    }, {
-        "day": 2,
-        "utc": "07:49:00",
-        "flight": "AF335"
-        }],
-    "distance": 1487.9098005221067
-}
-```
-
-#### inventory.airport
-
-```JSON
-{
-    "_id": "airport_1254",
-    "id": 1254,
-    "type": "airport",
-    "airportname": "Calais Dunkerque",
-    "city": "Calais",
-    "country": "France",
-    "faa": "CQF",
-    "icao": "LFAC",
-    "tz": "Europe/Paris",
-    "geo": {
-        "lat": 50.962097,
-        "lon": 1.954764,
-        "alt": 12
+"_id": "route_1",
+  "airline": "Q5",
+  "airlineid": "airline_1",
+  "channels": ["United States"],
+  "collection": "routes",
+  "country": "United States",
+  "destinationairport": "HKB",
+  "distance": 118.20183585107631,
+  "equipment": "CNA",
+  "id": 1,
+  "schedule": [
+    {
+      "day": 0,
+      "flight": "Q5188",
+      "utc": "12:40:00"
+    },
+    {
+      "day": 0,
+      "flight": "Q5630",
+      "utc": "21:53:00"
     }
+  ],
+  "scope": "travel",
+  "sourceairport": "FAI",
+  "stops": 0,
+  "type": "route"
+```
+
+#### travel.airports
+
+```JSON
+{
+  "_id": "airport_1",
+  "icao": "EGAC",
+  "geo": {
+    "alt": 15,
+    "lon": -5.8725,
+    "lat": 54.618056
+  },
+  "faa": "BHD",
+  "type": "airport",
+  "scope": "travel",
+  "id": 1,
+  "city": "Belfast",
+  "tz": "Europe/London",
+  "country": "United Kingdom",
+  "channels": ["United Kingdom"],
+  "collection": "airports",
+  "airportname": "Belfast City"
 }
 ```
 
-#### inventory.landmark
+#### travel.landmarks
 
 ``` JSON
 {
-    "_id": "landmark_10020",
-    "id": 10020,
-    "type": "landmark",
-    "title": "Gillingham (Kent)",
-    "name": "Hollywood Bowl",
-    "alt": null,
-    "address": "4 High Street, ME7 1BB",
-    "directions": null,
-    "phone": null,
-    "tollfree": null,
-    "email": null,
-    "url": "http://www.thehollywoodbowl.co.uk",
-    "hours": null,
-    "image": null,
-    "price": null,
-    "content": "A newly extended lively restaurant",
-    "geo": {
-        "lat": 51.38937,
-        "lon": 0.5427,
-        "accuracy": "RANGE_INTERPOLATED"
-        },
-    "activity": "eat",
-    "country": "United Kingdom",
-    "city": "Gillingham",
-    "state": null
+  "_id": "landmark_1",
+  "directions": null,
+  "phone": "+46 980 402 00",
+  "state": "California",
+  "country": "United States",
+  "channels": ["United States"],
+  "image": null,
+  "tollfree": null,
+  "activity": "see",
+  "address": "STF Abisko Mountain Station, Sweden",
+  "title": "Abisko",
+  "scope": "travel",
+  "name": "Aurora Sky Station",
+  "geo": {
+    "lat": 37.8013,
+    "lon": -122.3988,
+    "accuracy": "RANGE_INTERPOLATED"
+  },
+  "price": "Sep, Nov 625 SEK, STF member: 525 SEK; Dec-Mar 695 SEK, STF member: 595 SEK",
+  "url": "http://www.auroraskystation.com",
+  "collection": "landmarks",
+  "email": "lapplandsbokning@stfturist.se",
+  "content": "The night visit to the station includes return ticket by chair-lift, guided tour and an aurora watchers overall.",
+  "id": 1,
+  "hours": "In 2013/2014 winter season: Sep 5 - Sep 28 and Nov 1 - Nov 30: Thu-Sat 21:00-1:00;",
+  "city": "San Francisco",
+  "type": "landmark",
+  "alt": null
 }
 ```
 
-#### inventory.hotel
+#### travel.hotels
 
 ```JSON
 {
-    "_id": "hotel_10026"
-    "id": 10026,
-    "type": "hotel",
-    "title": "Gillingham (Kent)",
-    "name": "The Balmoral Guesthouse",
-    "address": "57-59 Balmoral Road, ME7 4NT",
-    "directions": null,
-    "phone": "+44 1634 853 68",
-    "tollfree": null,
-    "email": null,
-    "fax": null,
-    "url": "http://www.thebalmoral-guesthouse.co.uk",
-    "checkin": null,
-    "checkout": null,
-    "price": "Single room £32 per night",
-    "geo": {
-        "lat": 51.38624,
-        "lon": 0.55078,
-        "accuracy": "RANGE_INTERPOLATED"
+  "_id": "hotel_1",
+  "address": "1702 18th Street",
+  "alias": null,
+  "checkin": "1PM",
+  "checkout": "11AM",
+  "city": "Bakersfield",
+  "collection": "hotels",
+  "country": "United States",
+  "channels": ["United States"],
+  "description": "This boutique hotel offers five unique food and beverage venues.",
+  "directions": null,
+  "email": null,
+  "fax": null,
+  "free_breakfast": true,
+  "free_internet": false,
+  "free_parking": false,
+  "geo": {
+    "accuracy": "RANGE_INTERPOLATED",
+    "lat": 35.375572,
+    "lon": -119.02151
+  },
+  "id": 1,
+  "image": {
+    "@type": "blob",
+    "content_type": "image/png",
+    "digest": "sha1-nNc+mije7Cd01tWxb9cxKWXiIP0=",
+    "length": 156632
+  },
+  "name": "The Padre Hotel",
+  "pets_ok": true,
+  "phone": null,
+  "price": null,
+  "public_likes": [
+    "Mittie Pollich",
+    "Elizabeth Reilly"
+  ],
+  "reviews": [
+    {
+      "author": "Tania Gerlach III",
+      "content": "Very nice hotel.",
+      "ratings": {
+        "Cleanliness": 5,
+        "Location": 3,
+        "Overall": 4,
+        "Rooms": 5,
+        "Service": 5,
+        "Sleep Quality": 5,
+        "Value": 5
+      }
     },
-    "country": "United Kingdom",
-    "city": "Gillingham",
-    "state": null,
-    "reviews": [],
-    "public_likes": [],
-    "vacancy": false,
-    "description": "A recently modernised guesthouse.",
-    "alias": null,
-    "pets_ok": true,
-    "free_breakfast": true,
-    "free_internet": true,
-    "free_parking": false
+    {
+      "author": "Angelica Block",
+      "content": "Very good hotel.",
+      "ratings": {
+        "Location": 4,
+        "Overall": 3,
+        "Rooms": 3,
+        "Service": 3,
+        "Value": 2
+      }
+    }
+  ],
+  "scope": "travel",
+  "state": "California",
+  "title": "Bakersfield",
+  "tollfree": null,
+  "type": "hotel",
+  "url": "http://www.thepadrehotel.com",
+  "vacancy": false
 }
 ```
 
-## 2. names-100
+## 2. names
 
 The 100 name documents in the default collection.
 
 ### CBL Dataset
 
-| Collections         | #Docs       | #Size (bytes) |
-| :------------------ | ----------- | ------------- |
-| _default._default   | 100         | TBD           |
+| Collections         | #Docs       | Doc ID              |
+| :------------------ | ----------- | --------------------|
+| _default._default   | 100         | name_1 ... name_100 | 
 
 ### SG Dataset
 
-| Collections         | #Docs       | #Size (bytes) |
-| :------------------ | ----------- | ------------- |
-| _default._default   | 100         | TBD           |
+| Collections         | #Docs       | Doc ID              |
+| :------------------ | ----------- | --------------------|
+| _default._default   | 100         | name_1 ... name_100 |
 
-Note: The documents populated to CBL and SG will have different document IDs.
 
 ### Sample Docs
 
@@ -210,7 +260,9 @@ Note: The documents populated to CBL and SG will have different document IDs.
         ]
     },
     "likes": ["chatting"],
-    "memberSince": "2011-05-05"
+    "memberSince": "2011-05-05",
+    "scope": "_default",
+    "collection": "_default"
 }
 ```
 
@@ -218,15 +270,15 @@ Note: The documents populated to CBL and SG will have different document IDs.
 
 ### CBL Dataset
 
-| Collections         | #Docs       | #Size (bytes) |
-| :------------------ | ----------- | ------------- |
-| _default.posts      | 0           | 0             |
+| Collections         | #Docs       |
+| :------------------ | ----------- |
+| _default.posts      | 0           |
 
 ### SG Dataset
 
-| Collections         | #Docs       | #Size (bytes) |
-| :------------------ | ----------- | ------------- |
-| _default.posts      | 5           | TBD           |
+| Collections         | #Docs       | Doc ID            |
+| :------------------ | ----------- | ----------------- |
+| _default.posts      | 5           | post_1 ... post_5 |
 
 **Note:**
 * post_1, post_2, and post_3 will have `channels` as ["user1", "public"].
@@ -236,10 +288,12 @@ Note: The documents populated to CBL and SG will have different document IDs.
 
 ```JSON
 {
-    "_id" : "post_1",
-    "channels": ["user1", "public"],
-    "title": "This is my post",
-    "content": "This is my post content",
-    "owner": "user1"
+  "_id": "post_1",
+  "scope": "_default",
+  "collection": "posts",
+  "channels": ["user1", "public"],
+  "title": "Post 1",
+  "content": "This is content of my post 1",
+  "owner": "user1"
 }
 ```
