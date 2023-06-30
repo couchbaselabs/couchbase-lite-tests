@@ -21,9 +21,10 @@ classifiers = [
     "Environment :: Console"
 ]
 dependencies = [
-    "requests",
+    "aiohttp",
     "opentelemetry-api",
-    "varname"
+    "varname",
+    "couchbase"
 ]
 
 [project.urls]

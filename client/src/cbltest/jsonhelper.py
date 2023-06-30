@@ -19,7 +19,17 @@ def _get_string_list(d: dict, key: str) -> List[str]:
 def _assert_contains_string_list(d: dict, key: str) -> List[str]:
     ret_val = _get_string_list(d, key)
     if ret_val is None:
-        raise ValueError(f"Missing required key {key} in config file!")
+        raise ValueError(f"Missing required key {key} in dictionary!")
+    
+    return ret_val
+
+def _assert_string_entry(d: dict, key: str) -> str:
+    if key not in d:
+        raise ValueError(f"Missing requied key {key} in dictionary!")
+    
+    ret_val = d[key]
+    if not isinstance(ret_val, str):
+        raise ValueError(f"Expecting string for key {key} but found {ret_val}")
     
     return ret_val
 

@@ -1,11 +1,14 @@
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 from .requests import RequestFactory
 from .logging import LogLevel, cbl_setLogLevel
 from .extrapropsparser import _parse_extra_props
-from .configparser import ParsedConfig, _parse_config
+from .configparser import ParsedConfig, SyncGatewayInfo, _parse_config
 from .assertions import _assert_not_null
+from .api.testserver import TestServer
+from .api.syncgateway import SyncGateway
+from .api.couchbaseserver import CouchbaseServer
 from varname import nameof
 from sys import version_info
 from json import dumps
@@ -44,6 +47,18 @@ class CBLPyTest:
         """Gets the request factory for creating and sending requests to the test server"""
         return self.__request_factory
     
+    @property
+    def test_servers(self) -> List[TestServer]:
+        return self.__test_servers
+    
+    @property
+    def sync_gateways(self) -> List[SyncGateway]:
+        return self.__sync_gateways
+    
+    @property
+    def couchbase_servers(self) -> List[CouchbaseServer]:
+        return self.__couchbase_servers
+    
     def __init__(self, config_path: str, log_level: LogLevel = LogLevel.VERBOSE, extra_props_path: str = None, output_path: str = None):
         _assert_not_null(config_path, nameof(config_path))
         self.__config = _parse_config(config_path)
@@ -58,6 +73,25 @@ class CBLPyTest:
             self.__output_path = Path(output_path)
 
         self.__request_factory = RequestFactory(self.__config)
+        self.__test_servers: List[TestServer] = []
+        index = 0
+        for url in self.__config.test_servers:
+            self.__test_servers.append(TestServer(self.__request_factory, index, url))
+            index += 1
+
+        self.__sync_gateways: List[SyncGateway] = []
+        index = 0
+        cert_count = 0 if self.__config.sync_gateway_certs is None else len(self.__config.sync_gateway_certs)
+        for sg in self.__config.sync_gateways:
+            secure = index < cert_count and self.__config.sync_gateway_certs[index] is not None
+            info = SyncGatewayInfo(sg)
+            self.__sync_gateways.append(SyncGateway(info.hostname, "admin", "password", info.port, info.admin_port, secure))
+            index += 1
+
+        self.__couchbase_servers: List[CouchbaseServer] = []
+        for url in self.__config.couchbase_servers:
+            self.__couchbase_servers.append(CouchbaseServer(url, "Administrator", "password"))
+
 
     def __str__(self) -> str:
         ret_val = "Configuration:" + "\n" + str(self.__config) + "\n\n" + \

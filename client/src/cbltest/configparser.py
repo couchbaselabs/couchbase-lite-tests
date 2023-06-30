@@ -2,7 +2,29 @@ from pathlib import Path
 from json import load, dumps
 from typing import Final, List, cast
 
-from .jsonhelper import _assert_contains_string_list, _get_int_or_default, _get_string_list
+from .jsonhelper import _assert_contains_string_list, _get_int_or_default, _get_string_list, _assert_string_entry
+
+class SyncGatewayInfo:
+    __hostname_key: Final[str] = "hostname"
+    __port_key: Final[str] = "port"
+    __admin_port_key: Final[str] = "admin_port"
+
+    @property
+    def hostname(self) -> str:
+        return self.__hostname
+    
+    @property
+    def port(self) -> int:
+        return self.__port
+    
+    @property
+    def admin_port(self) -> int:
+        return self.__admin_port
+    
+    def __init__(self, data: dict):
+        self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
+        self.__port: int = _get_int_or_default(data, self.__port_key, 4984)
+        self.__admin_port: int = _get_int_or_default(data, self.__admin_port_key, 4985)
     
 class ParsedConfig:
     """The parsed result of the JSON config file provided to the SDK"""
@@ -20,7 +42,7 @@ class ParsedConfig:
         return self.__test_servers
     
     @property
-    def sync_gateways(self) -> List[str]:
+    def sync_gateways(self) -> List[dict]:
         """The list of sync gateways that can be interacted with"""
         return self.__sync_gateways
     
@@ -43,7 +65,10 @@ class ParsedConfig:
 
     def __init__(self, json: dict):
         self.__test_servers = _assert_contains_string_list(json, self.__test_server_key)
-        self.__sync_gateways = _assert_contains_string_list(json, self.__sgw_key)
+        if self.__sgw_key not in json:
+            raise ValueError(f"Missing key in configuration '{self.__sgw_key}'")
+        
+        self.__sync_gateways = json[self.__sgw_key]
         self.__couchbase_servers = _assert_contains_string_list(json, self.__cbs_key)
         self.__sync_gateway_certs = _get_string_list(json, self.__sgw_certs_key)
         self.__greenboard = cast(str, json.get(self.__greenboard_key))
