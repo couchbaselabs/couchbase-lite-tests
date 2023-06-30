@@ -8,11 +8,11 @@ Test that the replicator will stop with the `WebSocket 404 NotFound` error when 
 
 ### Steps
 
-1. Reset SG and load `travel` dataset.
+1. Reset SG and load `names` dataset.
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator: 
-    * collections : `travel.airlines`, `travel.cars`, `travel.hotels`
-    * endpoint: `/travel`
+    * collections : `travel.airlines`
+    * endpoint: `/names`
     * type: push
     * continuos: false
     * credentials: user1/pass
