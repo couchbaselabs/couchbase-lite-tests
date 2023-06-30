@@ -472,9 +472,6 @@ components:
             complete:
               type: number
               format: double
-            documentCount:
-              type: number
-              format: int64
         documents:
           type: array
           items:
