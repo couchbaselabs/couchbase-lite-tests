@@ -1,14 +1,18 @@
 from typing import List
 
-from ..logging import cbl_error, cbl_trace
-from ..requests import RequestFactory, TestServerRequestType
-from ..v1.requests import PostResetRequestBody
-from .error import CblTestError
-from .database import Database
+from cbltest.logging import cbl_error, cbl_trace
+from cbltest.requests import RequestFactory, TestServerRequestType
+from cbltest.v1.requests import PostResetRequestBody
+from cbltest.api.error import CblTestError
+from cbltest.api.database import Database
 
 class TestServer:
+    """
+    A class for interacting with a Couchbase Lite test server
+    """
     @property
     def url(self) -> str:
+        """Gets the URL of the test server being communicated with"""
         return self.__url
     
     def __init__(self, request_factory: RequestFactory, index: int, url: str):
@@ -19,6 +23,12 @@ class TestServer:
 
 
     async def create_and_reset_db(self, dataset: str, db_names: List[str]) -> List[Database]:
+        """
+        Creates and returns a set of Databases based on the given dataset
+
+        :param dataset: The name of the dataset to use for creating the databases
+        :param db_names: A list of database names, each of which will become a database with the dataset data
+        """
         payload = PostResetRequestBody()
         payload.add_dataset(dataset, db_names)
         request = self.__request_factory.create_request(TestServerRequestType.RESET, payload)

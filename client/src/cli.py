@@ -9,6 +9,7 @@ from cbltest.requests import TestServerRequestType
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import ReplicatorActivityLevel
 from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.api.cloud import CouchbaseCloud
 
 # This is an example of how to use the SDK.  It will be updated as the SDK evolves.
 # Currently the low level interface is being used.  This will be replaced by a higher
@@ -70,16 +71,12 @@ async def api():
 
     # Create the top level object which is the entry point for a python consumer
     tester = CBLPyTest(args.config, args.log_level, args.test_props, args.output)
-    #await tester.sync_gateways[0].delete_database("db")
-    #tester.couchbase_servers[0].drop_bucket("db")
 
-    tester.couchbase_servers[0].create_bucket("db")
-
+    cloud = CouchbaseCloud(tester.sync_gateways[0], tester.couchbase_servers[0])
     sg_payload = PutDatabasePayload("db")
     sg_payload.add_collection()
     sg_payload.enable_guest()
-    await tester.sync_gateways[0].put_database("db", sg_payload)
-
+    await cloud.put_empty_database("db", sg_payload, "db")
 
     dbs = await tester.test_servers[0].create_and_reset_db("travel-sample", ["db1"])
     db = dbs[0]
@@ -95,8 +92,7 @@ async def api():
     ])
 
     await replicator.start()
-    await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-    status = await replicator.get_status()
+    status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
     print(f"{status.progress.document_count} documents completed")
     if status.error is not None:
         print(status.error.message)

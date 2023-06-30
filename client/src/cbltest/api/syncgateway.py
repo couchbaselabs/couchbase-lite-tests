@@ -4,12 +4,12 @@ from urllib.parse import urljoin
 from aiohttp import ClientSession, BasicAuth
 from varname import nameof
 
-from ..httplog import get_next_writer
-from ..assertions import _assert_not_null
-from .error import CblSyncGatewayBadResponseError
-from .jsonserializable import JSONSerializable
+from cbltest.httplog import get_next_writer
+from cbltest.assertions import _assert_not_null
+from cbltest.api.error import CblSyncGatewayBadResponseError
+from cbltest.api.jsonserializable import JSONSerializable
     
-class CollectionMap(JSONSerializable):
+class _CollectionMap(JSONSerializable):
     @property
     def scope_name(self) -> str:
         return self.__scope_name
@@ -28,7 +28,7 @@ class CollectionMap(JSONSerializable):
     def to_json(self) -> any:
         return {"collections": self.__collections}
     
-class GuestEntry(JSONSerializable):
+class _GuestEntry(JSONSerializable):
     def __init__(self, admin_channels: List[str] = ["*"]):
         self.__admin_channels = admin_channels
 
@@ -36,21 +36,40 @@ class GuestEntry(JSONSerializable):
         return {"disabled": False, "admin_channels": self.__admin_channels}
 
 class PutDatabasePayload(JSONSerializable):
+    """
+    A class containing configuration options for a Sync Gateway database endpoint
+    """
     def __init__(self, bucket: str):
         _assert_not_null(bucket, nameof(bucket))
         self.num_index_replicas: int = 0
+        """The number of index replicas to use"""
         self.bucket = bucket
-        self.__scopes: Dict[str, CollectionMap] = {}
-        self.__guest: GuestEntry = None
+        """The bucket name in the backing Couchbase Server"""
+
+        self.__scopes: Dict[str, _CollectionMap] = {}
+        self.__guest: _GuestEntry = None
 
     def add_collection(self, scope_name: str = "_default", collection_name: str = "_default") -> None:
+        """
+        Adds a collection to the configuration of the database (must exist on Couchbase Server).
+        The scope name and collection name both default to "_default".
+
+        :param scope_name: The name of the scope in which the collection resides
+        :param collection_name: The name of the collection to retrieve data from
+        """
         _assert_not_null(scope_name, nameof(scope_name))
-        col_map = self.__scopes.get(scope_name, CollectionMap(collection_name))
+        col_map = self.__scopes.get(scope_name, _CollectionMap(collection_name))
         self.__scopes[scope_name] = col_map
         col_map.add_collection(collection_name)
 
     def enable_guest(self, admin_channels: List[str] = ["*"]) -> None:
-        self.__guest = GuestEntry(admin_channels)
+        """
+        Turns on GUEST user access for this database configuration
+
+        :param admin_channels: The channels that the guest user will have access to by default
+        (if not specified, all channels are granted)
+        """
+        self.__guest = _GuestEntry(admin_channels)
 
     def to_json(self) -> any:
         ret_val = {
@@ -68,7 +87,9 @@ class PutDatabasePayload(JSONSerializable):
         return ret_val
 
 class SyncGateway:
-    
+    """
+    A class for interacting with a given Sync Gateway instance
+    """
     def __init__(self, url: str, username: str, password: str, port: int = 4984, admin_port: int = 4985, 
                  secure: bool = False):
         scheme = "https://" if secure else "http://"
@@ -92,18 +113,28 @@ class SyncGateway:
             raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}")
         
     def replication_url(self, db_name: str):
+        """
+        Gets the replicator URL (ws://xxx) for a given db
+        
+        :param db_name: The DB to replicate with
+        """
         _assert_not_null(db_name, nameof(db_name))
         return urljoin(self.__replication_url, db_name)
 
-    async def put_database(self, db_name: str, payload: PutDatabasePayload, delete_if_present: bool = False) -> None:
-        try:
-            await self._send_request("put", f"/{db_name}", payload)
-        except CblSyncGatewayBadResponseError as e:
-            if e.code != 412:
-                raise
+    async def put_database(self, db_name: str, payload: PutDatabasePayload) -> None:
+        """
+        Attempts to create a database on the Sync Gateway instance
 
-            await self.delete_database(db_name)
-            await self._send_request("put", f"/{db_name}", payload)
+        :param db_name: The name of the DB to create
+        :param payload: The options for the DB to create
+        """
+        await self._send_request("put", f"/{db_name}", payload)
 
-    async def delete_database(self, db_name: str):
+    async def delete_database(self, db_name: str) -> None:
+        """
+        Deletes a database from Sync Gateway's configuration.  Note that this does NOT
+        delete the data from the backing bucket
+
+        :param db_name: The name of the Database to delete
+        """
         await self._send_request("delete", f"/{db_name}")

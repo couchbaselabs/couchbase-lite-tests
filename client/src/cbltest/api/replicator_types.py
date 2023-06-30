@@ -1,13 +1,13 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from enum import Enum
 from typing import Dict, Final, List, cast
 from varname import nameof
 
-from ..assertions import _assert_not_null
-from ..responses import ErrorResponseBody
+from cbltest.assertions import _assert_not_null
+from cbltest.responses import ErrorResponseBody
+from cbltest.api.jsonserializable import JSONSerializable
 
-
-class ReplicatorPushFilterParameters:
+class ReplicatorPushFilterParameters(JSONSerializable):
     """
     A class representing parameters to be passed to a push filter.
     In theory this could be anything, but in practice it has always been
@@ -18,8 +18,7 @@ class ReplicatorPushFilterParameters:
         self.document_ids: List[str] = None
         """The document IDs to filter, if any"""
 
-    def to_dict(self) -> Dict[str, any]:
-        """Transforms the :class:`ReplicatorPushFilterParameters` into a JSON dictionary"""
+    def to_json(self) -> any:
         if self.document_ids is None:
             return None
         
@@ -27,7 +26,7 @@ class ReplicatorPushFilterParameters:
             "documentIDs": self.document_ids
         }
 
-class ReplicatorPushFilter:
+class ReplicatorPushFilter(JSONSerializable):
     """
     A class representing a push filter to use on a replication to limit
     the documents that get sent from local to remote.
@@ -43,15 +42,15 @@ class ReplicatorPushFilter:
         self.parameters = cast(ReplicatorPushFilterParameters, None)
         """The parameters to be applied to the push filter"""
 
-    def to_dict(self) -> Dict[str, any]:
-        """Transforms the :class:`ReplicatorPushFilter` into a JSON dictionary"""
+    def to_json(self) -> any:
         ret_val = {"name": self.name}
         if self.parameters is not None:
-            ret_val["params"] = self.parameters.to_dict()
+            ret_val["params"] = self.parameters.to_json()
 
-class ReplicatorCollectionEntry:
+class ReplicatorCollectionEntry(JSONSerializable):
     @property
     def name(self) -> str:
+        """Gets the name of the collection that the options will be applied to"""
         return self.__name
     
     def __init__(self, name: str = "_default", channels: List[str] = None, document_ids: List[str] = None,
@@ -59,10 +58,15 @@ class ReplicatorCollectionEntry:
         _assert_not_null(name, nameof(name))
         self.__name = name
         self.channels = channels
-        self.document_ids = document_ids
-        self.push_filter = push_filter
+        """A list of channels to use when replicating with this collection"""
 
-    def to_dict(self) -> Dict[str, any]:
+        self.document_ids = document_ids
+        """A list of document IDs to consider with this collection, other docs will be ignored"""
+
+        self.push_filter = push_filter
+        """The push filter to use for this collection, if any"""
+
+    def to_json(self) -> any:
         ret_val = {
             "collection": self.__name
         }
@@ -74,7 +78,7 @@ class ReplicatorCollectionEntry:
             ret_val["documentIDs"] = self.document_ids
 
         if self.push_filter is not None:
-            ret_val["pushFilter"] = self.push_filter.to_dict()
+            ret_val["pushFilter"] = self.push_filter.to_json()
 
         return ret_val
 
@@ -93,7 +97,7 @@ class ReplicatorType(Enum):
     def __str__(self) -> str:
         return self.value
     
-class ReplicatorAuthenticator(ABC):
+class ReplicatorAuthenticator(JSONSerializable):
     """
     The base class for replicator authenticators
     """
@@ -107,8 +111,8 @@ class ReplicatorAuthenticator(ABC):
         self.__type = type
 
     @abstractmethod
-    def to_dict(self) -> Dict[str, any]:
-        return None
+    def to_json(self) -> any:
+        pass
     
 class ReplicatorBasicAuthenticator(ReplicatorAuthenticator):
     """A class holding information to perform HTTP Basic authentication"""
@@ -127,7 +131,7 @@ class ReplicatorBasicAuthenticator(ReplicatorAuthenticator):
         self.__username = username
         self.__password = password
 
-    def to_dict(self) -> Dict[str, any]:
+    def to_json(self) -> any:
         """Transforms the :class:`ReplicatorBasicAuthenticator` into a JSON dictionary"""
         return {
             "type": "basic",
@@ -153,8 +157,7 @@ class ReplicatorSessionAuthenticator(ReplicatorAuthenticator):
         self.__session_id = session_id
         self.__cookie_name = cookie_name
 
-    def to_dict(self) -> Dict[str, any]:
-        """Transforms the :class:`ReplicatorSessionAuthenticator` into a JSON dictionary"""
+    def to_json(self) -> any:
         return {
             "type": "session",
             "sessionID": self.__session_id,
@@ -251,16 +254,22 @@ class ReplicatorDocumentEntry:
         self.__error = ErrorResponseBody.create(body.get(self.__error_key))
     
 class ReplicatorStatus:
+    """
+    A class representing the current status (activity, progress, error, etc) of a Replicator
+    """
     @property
     def progress(self) -> ReplicatorProgress:
+        """Gets the progress numbers for the Replicator"""
         return self.__progress
     
     @property
     def activity(self) -> ReplicatorActivityLevel:
+        """Gets the activity level for the Replicator"""
         return self.__activity
     
     @property
     def error(self) -> ErrorResponseBody:
+        """Gets the error for the Replicator, if any"""
         return self.__error
     
     def __init__(self, progress: ReplicatorProgress, activity: ReplicatorActivityLevel, error: ErrorResponseBody):
