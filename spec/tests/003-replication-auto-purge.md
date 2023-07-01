@@ -22,8 +22,8 @@ Test that the replicator will purged the docs that the user lost the access to b
 5. Check that the docs that the user has access to are all pulled.
 6. Update docs on SG:
    * Update `post_1` with channels = [] (ACCESS-REMOVED)
-   * Update `post_2` with channels = ["user1"]
-   * Update `post_3` with channels = ["public"]
+   * Update `post_2` with channels = ["group1"]
+   * Update `post_3` with channels = ["group2"]
    * Delete `post_4`
 7. Start the replicator with the same config as the step 3.
 8. Wait until the replicator is stopped.
@@ -55,7 +55,7 @@ Test that the replicator will purged the docs that the user lost the access to b
 4. Wait until the replicator is stopped.
 5. Check that the docs that the user has access to are all pulled.
 6. Update user access to channels on SG:
-    * Remove access to `public` channel.
+    * Remove access to `group2` channel.
 7. Start the replicator with the same config as the step 3.
 8. Wait until the replicator is stopped.
 9. Check local documents:
@@ -63,14 +63,14 @@ Test that the replicator will purged the docs that the user lost the access to b
 10. Check document replications (NEED REST API):
    * `post_4` and `post_5` have access-removed flag set.
 11. Update user access to channels on SG:
-    * Remove access to the user's `user1` channel.
+    * Remove access to the user's `group1` channel.
 12. Start the replicator with the same config as the step 3.
 13. Check local documents:
     * `post_1`, `post_2` and `post_3` were purged.
 14. Check document replications:
     * `post_1`, `post_2`, and `post_3` have access-removed flag set.
 15. Update user access to channels on SG (NEED REST API):
-    * Add user access to `public` channel back again.
+    * Add user access to `group2` channel back again.
 16. Start the replicator with the same config as the step 3.
 17. Wait until the replicator is stopped.
 18. Check local documents:
@@ -105,8 +105,8 @@ Test that when auto-purge is disabled, the replicator will not purge the docs th
 5. Check that the docs that the user has access to are all pulled.
 6. Update docs on SG:
    * Update `post_1` with channels = [] (ACCESS-REMOVED)
-   * Update `post_2` with channels = ["user1"]
-   * Update `post_3` with channels = ["public"]
+   * Update `post_2` with channels = ["group1"]
+   * Update `post_3` with channels = ["group2"]
 7. Start the replicator with the same config as the step 3.
 8. Wait until the replicator is stopped.
 9. Check local documents:
@@ -138,7 +138,7 @@ Test that when auto-purge is disabled, the replicator will not purge the docs th
 3. Wait until the replicator is stopped.
 4. Check that the docs that the user has access to are all pulled.
 5. Update user access to channels on SG:
-   * Remove access to `public` channel.
+   * Remove access to `group2` channel.
 6. Start the replicator with the same config as the step 3.
 7. Start a replicator: 
    * collections : 

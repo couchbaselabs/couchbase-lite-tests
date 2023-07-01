@@ -1,5 +1,5 @@
-{"_id" : "post_1", "scope": "_default", "collection": "posts", "channels": ["user1", "public"], "title": "Post 1", "content": "This is content of my post 1", "owner": "user1"}
-{"_id" : "post_2", "scope": "_default", "collection": "posts", "channels": ["user1", "public"], "title": "Post 2", "content": "This is content of my post 2", "owner": "user1"}
-{"_id" : "post_3", "scope": "_default", "collection": "posts", "channels": ["user1", "public"], "title": "Post 3", "content": "This is content of my post 3", "owner": "user1"}
-{"_id" : "post_4", "scope": "_default", "collection": "posts", "channels": ["public"], "title": "Post 4", "content": "This is content of my post 4", "owner": "user1"}
-{"_id" : "post_5", "scope": "_default", "collection": "posts", "channels": ["public"], "title": "Post 5", "content": "This is content of my post 5", "owner": "user1"}
+{"_id" : "post_1", "scope": "_default", "collection": "posts", "channels": ["group1", "group2"], "title": "Post 1", "content": "This is content of my post 1", "owner": "user1"}
+{"_id" : "post_2", "scope": "_default", "collection": "posts", "channels": ["group1", "group2"], "title": "Post 2", "content": "This is content of my post 2", "owner": "user1"}
+{"_id" : "post_3", "scope": "_default", "collection": "posts", "channels": ["group1", "group2"], "title": "Post 3", "content": "This is content of my post 3", "owner": "user1"}
+{"_id" : "post_4", "scope": "_default", "collection": "posts", "channels": ["group2"], "title": "Post 4", "content": "This is content of my post 4", "owner": "user1"}
+{"_id" : "post_5", "scope": "_default", "collection": "posts", "channels": ["group2"], "title": "Post 5", "content": "This is content of my post 5", "owner": "user1"}
