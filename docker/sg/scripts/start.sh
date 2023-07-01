@@ -1,7 +1,7 @@
 #!/bin/sh
 
-if [ "$#" -lt 2 ]; then
-  echo "Usage: start.sh <SSL: true | false> <LEGACY_MODE: true | false>" >&2
+if [ "$#" -lt 1 ]; then
+  echo "Usage: start.sh <SSL: true | false>" >&2
   exit 1
 fi
 

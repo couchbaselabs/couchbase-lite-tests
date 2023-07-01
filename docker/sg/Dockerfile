@@ -3,7 +3,6 @@ FROM ubuntu:22.04
 ARG SG_DEB_ARM64
 ARG SG_DEB_AMD64
 ARG SSL=true
-ARG LEGACY_MODE=false
 
 RUN [ -z "$SG_DEB_ARM64" ] && echo "SG_DEB_ARM64 is required" && exit 1 || true
 RUN [ -z "$SG_DEB_AMD64" ] && echo "SG_DEB_AMD64 is required" && exit 1 || true
@@ -33,10 +32,7 @@ RUN dpkg -i ./couchbase-sync-gateway.deb
 
 EXPOSE 4984
 EXPOSE 4985
-EXPOSE 4884
-EXPOSE 4885
 
 ENV SSL=${SSL}
-ENV LEGACY_MODE=${LEGACY_MODE}
 
-CMD ./scripts/start.sh ${SSL} ${LEGACY_MODE}
+CMD ./scripts/start.sh ${SSL}
