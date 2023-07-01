@@ -348,7 +348,7 @@ function (doc, oldDoc, meta) {
 
 | Username | Password  | admin_channels     |
 | :------- | --------- |--------------------|
-| user1    | pass      | ["user1", "public"]|
+| user1    | pass      | ["group1", "group2"]|
 
 ### Sample Docs
 
@@ -357,7 +357,7 @@ function (doc, oldDoc, meta) {
   "_id": "post_1",
   "scope": "_default",
   "collection": "posts",
-  "channels": ["user1", "public"],
+  "channels": ["group1", "group2"],
   "title": "Post 1",
   "content": "This is content of my post 1",
   "owner": "user1"

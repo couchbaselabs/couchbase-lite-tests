@@ -117,7 +117,7 @@ curl -k --silent --location --request POST ${SG_URL_SCHEME}://localhost:4985/pos
       \"password\": \"pass\",
       \"collection_access\": {
           \"_default\": {
-              \"posts\": {\"admin_channels\": [\"user1\", \"public\"]}
+              \"posts\": {\"admin_channels\": [\"group1\", \"group2\"]}
           }
       }
   }"
