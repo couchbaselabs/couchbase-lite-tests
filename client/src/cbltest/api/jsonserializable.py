@@ -11,3 +11,11 @@ class JSONSerializable(ABC):
     def to_json(self) -> any:
         """Converts the object into a JSON compatible one"""
         pass
+
+class JSONDictionary(JSONSerializable):
+    """A helper class to wrap a literal dictionary into JSONSerializable"""
+    def __init__(self, d: dict): 
+        self.__dict = d
+        
+    def to_json(self) -> any:
+        return self.__dict

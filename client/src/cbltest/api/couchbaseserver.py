@@ -4,7 +4,7 @@ from couchbase.options import ClusterOptions
 from couchbase.auth import PasswordAuthenticator
 from couchbase.management.users import Role
 from couchbase.management.buckets import CreateBucketSettings
-from couchbase.exceptions import BucketAlreadyExistsException
+from couchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException
 
 class CouchbaseServer:
     """
@@ -41,5 +41,8 @@ class CouchbaseServer:
 
         :param name: The name of the bucket to drop
         """
-        mgr = self.__cluster.buckets()
-        mgr.drop_bucket(name)
+        try:
+            mgr = self.__cluster.buckets()
+            mgr.drop_bucket(name)
+        except BucketDoesNotExistException:
+            pass

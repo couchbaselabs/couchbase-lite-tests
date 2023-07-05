@@ -1,5 +1,6 @@
-from json import dumps
-from typing import Dict, List
+from json import dumps, loads
+from pathlib import Path
+from typing import Dict, List, cast
 from urllib.parse import urljoin
 from aiohttp import ClientSession, BasicAuth
 from varname import nameof
@@ -7,7 +8,7 @@ from varname import nameof
 from cbltest.httplog import get_next_writer
 from cbltest.assertions import _assert_not_null
 from cbltest.api.error import CblSyncGatewayBadResponseError
-from cbltest.api.jsonserializable import JSONSerializable
+from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
     
 class _CollectionMap(JSONSerializable):
     @property
@@ -27,13 +28,6 @@ class _CollectionMap(JSONSerializable):
 
     def to_json(self) -> any:
         return {"collections": self.__collections}
-    
-class _GuestEntry(JSONSerializable):
-    def __init__(self, admin_channels: List[str] = ["*"]):
-        self.__admin_channels = admin_channels
-
-    def to_json(self) -> any:
-        return {"disabled": False, "admin_channels": self.__admin_channels}
 
 class PutDatabasePayload(JSONSerializable):
     """
@@ -47,7 +41,6 @@ class PutDatabasePayload(JSONSerializable):
         """The bucket name in the backing Couchbase Server"""
 
         self.__scopes: Dict[str, _CollectionMap] = {}
-        self.__guest: _GuestEntry = None
 
     def add_collection(self, scope_name: str = "_default", collection_name: str = "_default") -> None:
         """
@@ -62,15 +55,6 @@ class PutDatabasePayload(JSONSerializable):
         self.__scopes[scope_name] = col_map
         col_map.add_collection(collection_name)
 
-    def enable_guest(self, admin_channels: List[str] = ["*"]) -> None:
-        """
-        Turns on GUEST user access for this database configuration
-
-        :param admin_channels: The channels that the guest user will have access to by default
-        (if not specified, all channels are granted)
-        """
-        self.__guest = _GuestEntry(admin_channels)
-
     def to_json(self) -> any:
         ret_val = {
             "scopes": {},
@@ -80,9 +64,6 @@ class PutDatabasePayload(JSONSerializable):
 
         for s in self.__scopes:
             ret_val["scopes"][s] = self.__scopes[s].to_json()
-
-        if self.__guest is not None:
-            ret_val["guest"] = self.__guest.to_json()
 
         return ret_val
 
@@ -98,19 +79,23 @@ class SyncGateway:
         self.__admin_url = f"{scheme}{url}:{admin_port}"
         self.__replication_url = f"{ws_scheme}{url}:{port}"
 
-    async def _send_request(self, method: str, path: str, payload: JSONSerializable = None) -> None:
+    async def _send_request(self, method: str, path: str, payload: JSONSerializable = None) -> any:
         headers = {"Content-Type": "application/json"} if payload is not None else None
         data = None if payload is None else payload.serialize()
         writer = get_next_writer()
         writer.write_begin(f"Sync Gateway [{self.__admin_url}] -> {method.upper()} {path}", data if data is not None else "")
         resp = await self.__admin_session.request(method, path, data=data, headers=headers)
         if resp.content_type.startswith("application/json"):
-            data = dumps(await resp.json(), indent=2)
+            ret_val = await resp.json()
+            data = dumps(ret_val, indent=2)
         else:
             data = await resp.text()
+            ret_val = data
         writer.write_end(f"Sync Gateway [{self.__admin_url}] <- {method.upper()} {path} {resp.status}", data)
         if not resp.ok:
             raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}")
+        
+        return ret_val
         
     def replication_url(self, db_name: str):
         """
@@ -132,9 +117,85 @@ class SyncGateway:
 
     async def delete_database(self, db_name: str) -> None:
         """
-        Deletes a database from Sync Gateway's configuration.  Note that this does NOT
-        delete the data from the backing bucket
+        Deletes a database from Sync Gateway's configuration.  
+
+        .. warning:: This will not delete the data from the Couchbase Server bucket.  
+            To delete the data see the 
+            :func:`drop_bucket()<cbltest.api.couchbaseserver.CouchbaseServer.drop_bucket>` function
 
         :param db_name: The name of the Database to delete
         """
         await self._send_request("delete", f"/{db_name}")
+
+    async def add_user(self, db_name: str, name: str, password: str, channel_access: Dict[str, List[str]]) -> None:
+        """
+        Adds the specified user to a Sync Gateway database with the specified channel access
+
+        :param db_name: The name of the Database to add the user to
+        :param name: The username to add
+        :param password: The password for the user that will be added
+        :param channel_access: The channels that the user will have access to, as a dictionary 
+            keyed by collection containing an array of channels
+        """
+        body = {
+            "name": name,
+            "password": password,
+            "collection_access": {}
+        }
+
+        collection_access = body["collection_access"]
+
+        if channel_access is not None:
+            for coll in channel_access:
+                split = coll.split(".")
+                scope = split[0] if len(split) > 1 else "_default"
+                collection = split[1] if len(split) > 1 else split[0]
+                if scope not in collection_access:
+                    collection_access[scope] = {}
+
+                collection_access[scope][collection] = {"admin_channels": channel_access[coll]}
+
+        await self._send_request("post", f"/{db_name}/_user/", JSONDictionary(body))
+
+    def _analyze_dataset_response(self, response: any) -> None:
+        assert(isinstance(response, list))
+        typed_response = cast(list, response)
+        for r in typed_response:
+            info = cast(dict, r)
+            if "error" in info:
+                raise CblSyncGatewayBadResponseError(info["status"], f"At least one bulk docs insert failed ({info['error']})")
+
+    async def load_dataset(self, db_name: str, path: Path) -> None:
+        """
+        Populates a given database name with the JSON contents at the specified path
+
+        .. note:: The expected format of the JSON file is one JSON object per line, which will
+            be interpreted as one document insert per line
+
+        :param db_name: The name of the database to populate
+        :param path: The path of the JSON file to use as input
+        """
+        last_scope: str = None
+        last_coll: str = None
+        collected = []
+        with open(path, "r") as fin:
+            json_line = fin.readline()
+            while json_line:
+                json = loads(json_line)
+                scope = json["scope"]
+                collection = json["collection"]
+                if last_scope != scope or last_coll != collection:
+                    if last_scope and last_coll:
+                        resp = await self._send_request("post", f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs", 
+                                                        JSONDictionary({"docs": collected}))
+                        self._analyze_dataset_response(resp)
+                        collected.clear()
+
+                last_scope = scope
+                last_coll = collection
+                collected.append(json)
+                json_line = fin.readline()
+
+        resp = await self._send_request("post", f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs", 
+                                        JSONDictionary({"docs": collected}))
+        self._analyze_dataset_response(resp)

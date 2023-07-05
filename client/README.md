@@ -20,5 +20,11 @@ You can install this SDK with the following command: `pip install cbltest --extr
 
 ## Configuration
 
-There is only one required file to configure the SDK, and some optional settings in addition.  The schema for the required JSON file is hosted at https://packages.couchbase.com/couchbase-lite/testserver.schema.json
+There is only one required file to configure the SDK, and some optional settings in addition.  The schema for the required JSON file is hosted at https://packages.couchbase.com/couchbase-lite/testserver.schema.json.  You can enable autocomplete and validation in IDEs that support it (such as Visual Studio Code) by including a `$schema` key in your JSON:
 
+```javascript
+{
+    "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
+    ...
+}
+```
