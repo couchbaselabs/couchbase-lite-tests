@@ -127,14 +127,14 @@ class ReplicatorBasicAuthenticator(ReplicatorAuthenticator):
         return self.__password
     
     def __init__(self, username: str, password: str) -> None:
-        super().__init__("basic")
+        super().__init__("BASIC")
         self.__username = username
         self.__password = password
 
     def to_json(self) -> any:
         """Transforms the :class:`ReplicatorBasicAuthenticator` into a JSON dictionary"""
         return {
-            "type": "basic",
+            "type": self.type,
             "username": self.__username,
             "password": self.__password
         }
@@ -153,13 +153,13 @@ class ReplicatorSessionAuthenticator(ReplicatorAuthenticator):
         return self.__cookie_name
     
     def __init__(self, session_id: str, cookie_name: str = "SyncGatewaySession") -> None:
-        super().__init__("session")
+        super().__init__("SESSION")
         self.__session_id = session_id
         self.__cookie_name = cookie_name
 
     def to_json(self) -> any:
         return {
-            "type": "session",
+            "type": self.type,
             "sessionID": self.__session_id,
             "cookieName": self.__cookie_name
         }

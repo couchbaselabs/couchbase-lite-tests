@@ -1,4 +1,6 @@
 import asyncio
+import os
+from pathlib import Path
 from cbltest import CBLPyTest
 from argparse import ArgumentParser
 
@@ -7,7 +9,7 @@ from argparse import ArgumentParser
 from cbltest.v1.requests import *
 from cbltest.requests import TestServerRequestType
 from cbltest.api.replicator import Replicator
-from cbltest.api.replicator_types import ReplicatorActivityLevel
+from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import PutDatabasePayload
 from cbltest.api.cloud import CouchbaseCloud
 
@@ -38,7 +40,7 @@ async def cli_main():
     payload = PostResetRequestBody()
 
     # Populate the body
-    payload.add_dataset("travel-sample", ["db1"])
+    payload.add_dataset("travel-samples", ["db1"])
 
     # Create the request
     request = rf.create_request(TestServerRequestType.RESET, payload)
@@ -57,6 +59,8 @@ async def cli_main():
     request = rf.create_request(TestServerRequestType.ALL_DOC_IDS, payload)
     resp = await rf.send_request(0, request)
 
+script_path = os.path.abspath(os.path.dirname(__file__))
+
 async def api():
     ap = ArgumentParser(prog="cli.py", description="Drives CBLPyTest from the command line for experimentation",
                           epilog="CBLPyTest is meant to be used inside of pytest tests, not from the CLI.")
@@ -73,27 +77,23 @@ async def api():
     tester = CBLPyTest(args.config, args.log_level, args.test_props, args.output)
 
     cloud = CouchbaseCloud(tester.sync_gateways[0], tester.couchbase_servers[0])
-    sg_payload = PutDatabasePayload("db")
+    sg_payload = PutDatabasePayload("names")
     sg_payload.add_collection()
-    sg_payload.enable_guest()
-    await cloud.put_empty_database("db", sg_payload, "db")
+    await cloud.put_empty_database("names", sg_payload, "names")
+    await tester.sync_gateways[0].load_dataset("names", Path(script_path, "..", "..", "dataset", "names-sg.json"))
+    await tester.sync_gateways[0].add_user("names", "user1", "pass", {
+        "_default._default": ["*"]
+    })
 
-    dbs = await tester.test_servers[0].create_and_reset_db("travel-sample", ["db1"])
+    dbs = await tester.test_servers[0].create_and_reset_db("travel", ["db1"])
     db = dbs[0]
 
-    async with db.batch_updater() as b:
-        b.delete_document("inventory.airlines", "airline_85")
-
-    # all_docs = await db.get_all_documents("inventory.airlines")
-    # print(f"{len(all_docs.collections[0].document_ids)} documents found")
-
-    replicator = Replicator(db, "ws://localhost:4984/db", replicator_type=ReplicatorType.PUSH, collections=[
-        ReplicatorCollectionEntry("inventory.airlines")
-    ])
+    replicator = Replicator(db, tester.sync_gateways[0].replication_url("names"), replicator_type=ReplicatorType.PUSH, collections=[
+        ReplicatorCollectionEntry("travel.airlines")
+    ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
 
     await replicator.start()
     status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-    print(f"{status.progress.document_count} documents completed")
     if status.error is not None:
         print(status.error.message)
 

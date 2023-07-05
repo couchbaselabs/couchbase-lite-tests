@@ -411,10 +411,10 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
         }
 
         if self.collections is not None:
-            raw["collections"] = [c.to_dict() for c in self.collections]
+            raw["collections"] = [c.to_json() for c in self.collections]
 
         if self.authenticator is not None:
-            raw["authenticator"] = self.authenticator.to_dict()
+            raw["authenticator"] = self.authenticator.to_json()
 
         ret_val = {
             "config": raw
