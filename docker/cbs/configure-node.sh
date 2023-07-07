@@ -132,6 +132,6 @@ couchbase_cli_check user-manage --set \
   -c 127.0.0.1 -u Administrator -p password
 echo
 
-echo "Configuration completed!" | tee /dev/fd/3
+echo "Couchbase Server configuration completed!" | tee /dev/fd/3
 
 config_done

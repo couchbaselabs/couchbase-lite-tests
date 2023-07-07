@@ -1,0 +1,10 @@
+{
+    "name": "user1",
+    "password": "pass",
+    "collection_access": {
+        "_default": {
+            "_default": {"admin_channels": ["*"]}
+        }
+    }
+}
+

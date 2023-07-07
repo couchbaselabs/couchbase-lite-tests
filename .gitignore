@@ -1,11 +1,6 @@
 # macOS:
 .DS_Store
+
+# python
 __pycache__
 venv
-client/dist
-client/docs/build
-servers/dotnet/bin
-servers/dotnet/.vs
-servers/dotnet/obj
-tests/http_log
-tests/testserver.log
