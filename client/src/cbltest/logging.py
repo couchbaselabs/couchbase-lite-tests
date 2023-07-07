@@ -37,7 +37,7 @@ def cbl_error(msg: str):
     _cbl_log.error(msg, stack_info=True, stacklevel=3)
 
 def cbl_warning(msg: str):
-    _cbl_log.warn(msg)
+    _cbl_log.warning(msg)
 
 def cbl_info(msg: str):
     _cbl_log.info(msg)

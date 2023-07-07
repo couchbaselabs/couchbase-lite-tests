@@ -6,8 +6,8 @@ project = 'Couchbase Lite Python Test Client'
 copyright = '2023, Couchbase'
 author = 'Couchbase'
 
-release = '0.1'
-version = '0.1.0'
+release = '0.1.3'
+version = '0.1'
 
 # -- General configuration
 

@@ -80,7 +80,7 @@ class ParsedConfig:
         self.__api_version = _get_int_or_default(json, self.__api_version_key, 1)
 
     def __str__(self) -> str:
-        ret_val = "API Version: " + self.__api_version + "\n" + \
+        ret_val = "API Version: " + str(self.__api_version) + "\n" + \
             "Test Servers: " + dumps(self.__test_servers) + "\n" + \
             "Sync Gateways: " + dumps(self.__sync_gateways)  + "\n" + \
             "Couchbase Servers: " + dumps(self.__couchbase_servers) + "\n" + \

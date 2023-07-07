@@ -2,10 +2,10 @@
 .DS_Store
 __pycache__
 venv
-client/src/http_log
-client/src/testserver.log
 client/dist
 client/docs/build
 servers/dotnet/bin
 servers/dotnet/.vs
 servers/dotnet/obj
+tests/http_log
+tests/testserver.log

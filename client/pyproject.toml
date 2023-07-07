@@ -11,6 +11,7 @@ authors = [
 description = "A client for consuming the Couchbase Lite functional testing REST API"
 readme = "README.md"
 requires-python = ">=3.9"
+license = {text ="Apache-2.0"}
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "License :: OSI Approved :: Apache Software License",
@@ -33,3 +34,13 @@ dependencies = [
 
 [tool.hatch.version]
 path = "src/cbltest/version.py"
+
+[tool.hatch.build]
+include = [
+    "src/cbltest"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "src/cbltest"
+]
