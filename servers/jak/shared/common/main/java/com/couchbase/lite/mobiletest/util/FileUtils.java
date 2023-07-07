@@ -155,7 +155,7 @@ public class FileUtils {
     }
 
     private void mkPath(@NonNull File path) throws IOException {
-        if (!path.mkdirs()) { throw new IOException("Failed to create directory: " + path); }
+        if (!(path.exists() || path.mkdirs())) { throw new IOException("Failed to create directory: " + path); }
     }
 }
 
