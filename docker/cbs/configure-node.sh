@@ -71,67 +71,27 @@ curl_check() {
   fi
 }
 
-wait_for_uri 200 http://127.0.0.1:8091/ui/index.html
+wait_for_uri 200 http://localhost:8091/ui/index.html
+echo "Couchbase Server up!" | tee /dev/fd/3
 
-echo "Setting up cluster:"
-couchbase_cli_check cluster-init -c 127.0.0.1 --cluster-name couchbase-lite-test --cluster-username Administrator \
+echo "Set up the cluster"
+couchbase_cli_check cluster-init -c localhost --cluster-name couchbase-lite-test --cluster-username Administrator \
   --cluster-password password --services data,index,query,fts --cluster-ramsize 2048 --cluster-index-ramsize 2048 \
   --cluster-fts-ramsize 256 --index-storage-setting default
 echo
 
-echo "Checking credentials with curl:"
-curl_check http://127.0.0.1:8091/settings/web -d port=8091 -d username=Administrator -d password=password -u Administrator:password
+echo "Verify credentials"
+curl_check http://localhost:8091/settings/web -d port=8091 -d username=Administrator -d password=password -u Administrator:password
 echo
 
-# travel Bucket
-
-echo "Creating travel bucket  :"
-couchbase_cli_check bucket-create -c 127.0.0.1 \
-  -u Administrator -p password --bucket travel \
-  --bucket-type couchbase --bucket-ramsize 512 \
-  --bucket-replica 0 --enable-flush 1
-
-couchbase_cli_check collection-manage -c 127.0.0.1 -u Administrator -p password --bucket travel --create-scope travel
-
-couchbase_cli_check collection-manage -c 127.0.0.1 -u Administrator -p password --bucket travel --create-collection travel.airlines
-
-couchbase_cli_check collection-manage -c 127.0.0.1 -u Administrator -p password --bucket travel --create-collection travel.routes
-
-couchbase_cli_check collection-manage -c 127.0.0.1 -u Administrator -p password --bucket travel --create-collection travel.airports
-
-couchbase_cli_check collection-manage -c 127.0.0.1 -u Administrator -p password --bucket travel --create-collection travel.landmarks
-
-couchbase_cli_check collection-manage -c 127.0.0.1 -u Administrator -p password --bucket travel --create-collection travel.hotels
-
-echo
-
-# names bucket
-
-echo "Creating names bucket  :"
-couchbase_cli_check bucket-create -c 127.0.0.1 \
-  -u Administrator -p password --bucket names \
-  --bucket-type couchbase --bucket-ramsize 512 \
-  --bucket-replica 0 --enable-flush 1
-echo
-
-# posts bucket
-
-echo "Creating posts bucket  :"
-couchbase_cli_check bucket-create -c 127.0.0.1 \
-  -u Administrator -p password --bucket posts \
-  --bucket-type couchbase --bucket-ramsize 512 \
-  --bucket-replica 0 --enable-flush 1
-
-couchbase_cli_check collection-manage -c 127.0.0.1 -u Administrator -p password --bucket posts --create-collection _default.posts
-echo
-
-echo "Creating RBAC 'admin' user"
+echo "Create RBAC 'admin' user"
 couchbase_cli_check user-manage --set \
+  -c localhost -u Administrator -p password \
   --rbac-username admin --rbac-password password \
-  --roles 'bucket_full_access[*],bucket_admin[*]' --auth-domain local \
-  -c 127.0.0.1 -u Administrator -p password
+  --auth-domain local \
+  --roles 'sync_gateway_dev_ops,sync_gateway_configurator[*],mobile_sync_gateway[*],bucket_full_access[*],bucket_admin[*]'
 echo
 
-echo "Couchbase Server configuration completed!" | tee /dev/fd/3
+echo "Couchbase Server configured" | tee /dev/fd/3
 
 config_done
