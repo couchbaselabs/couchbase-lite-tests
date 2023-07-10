@@ -23,7 +23,7 @@ RUN mkdir -p /opt/sg && \
 
 COPY cert /opt/sg/cert
 COPY config /opt/sg/config
-COPY scripts /opt/sg/scripts
+COPY start-sgw.sh /opt/sg
 
 WORKDIR /opt/sg
 
@@ -35,4 +35,4 @@ EXPOSE 4985
 
 ENV SSL=${SSL}
 
-CMD ./scripts/start.sh ${SSL}
+CMD ./start-sgw.sh ${SSL}
