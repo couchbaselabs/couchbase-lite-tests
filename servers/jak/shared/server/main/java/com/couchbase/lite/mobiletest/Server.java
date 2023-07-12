@@ -46,8 +46,8 @@ public class Server extends NanoHTTPD {
 
         @Override
         public void send(OutputStream outputStream) {
-            super.send(outputStream);
-            reply.close();
+            try { super.send(outputStream); }
+            finally { reply.close(); }
         }
     }
 

@@ -16,11 +16,33 @@
 package com.couchbase.lite.android.mobiletest
 
 import android.app.Application
+import com.couchbase.lite.mobiletest.Server
 import com.couchbase.lite.mobiletest.TestApp
+import org.koin.android.ext.koin.androidContext
+import org.koin.androidx.viewmodel.dsl.viewModel
+import org.koin.core.context.GlobalContext
+import org.koin.dsl.module
+
 
 class TestServerApp : Application() {
     override fun onCreate() {
         super.onCreate()
         TestApp.init(AndroidTestApp(this))
+
+
+        // Enable Koin dependency injection framework
+        GlobalContext.startKoin {
+            // inject Android context
+            androidContext(this@TestServerApp)
+
+            // dependency register modules
+            modules(
+                module {
+                    single { Server() as Server }
+
+                    viewModel { MainViewModel(get()) }
+                })
+        }
+
     }
 }

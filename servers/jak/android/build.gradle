@@ -14,30 +14,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-buildscript {
-    ext {
-        COMPILE_SDK_VERSION = 33
-        BUILD_TOOLS_VERSION = '33.0.2'
-        KOTLIN_VERSION = '1.8.10'
 
-        ANDROID_MIN_SDK = 22
-        ANDROID_TARGET_SDK = 30
-
-        ROOT_DIR = "${projectDir}/.."
-    }
-
-    repositories {
-        google()
-        maven { url "https://plugins.gradle.org/m2/" }
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${KOTLIN_VERSION}"
-        classpath 'com.android.tools.build:gradle:7.4.2'
-        classpath "com.github.spotbugs.snom:spotbugs-gradle-plugin:5.0.13"
-    }
+plugins {
+    id 'com.android.application' version '8.0.2' apply false
+    id 'org.jetbrains.kotlin.android' version '1.8.20' apply false
+    id 'com.github.spotbugs' version '5.0.14' apply false
 }
 
-task clean(type: Delete) { delete rootProject.buildDir }
+ext {
+    COMPILE_SDK_VERSION = 33
+    BUILD_TOOLS_VERSION = '33.0.2'
 
+    CBL_VERSION='3.2.0-SNAPSHOT'
+
+    ANDROID_MIN_SDK = 22
+    ANDROID_TARGET_SDK = 30
+
+    ROOT_DIR = "${projectDir}/.."
+}

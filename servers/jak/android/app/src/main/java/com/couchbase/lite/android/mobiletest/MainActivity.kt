@@ -16,49 +16,38 @@
 package com.couchbase.lite.android.mobiletest
 
 import android.os.Bundle
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import com.couchbase.lite.mobiletest.Server
-import com.couchbase.lite.mobiletest.util.Log
-import java.io.IOException
+import com.couchbase.lite.android.mobiletest.databinding.ActivityMainBinding
+import com.couchbase.lite.mobiletest.TestApp
+import org.koin.androidx.viewmodel.ext.android.viewModel
 
-
-private const val TAG = "MAIN"
 
 class MainActivity : AppCompatActivity() {
-    private var server: Server? = null
-    private var status: TextView? = null
+    private lateinit var viewBinding: ActivityMainBinding
+    private val model by viewModel<MainViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        status = findViewById(R.id.status)
+        viewBinding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(viewBinding.getRoot());
     }
 
     override fun onStart() {
         super.onStart()
-        val server = Server()
 
+        viewBinding.server.text = TestApp.getApp().getAppVersion()
         try {
-            server.start()
-            this.server = server
-
-            val port = server.myPort
-            val address = server.myServerSocket.inetAddress.hostAddress
-
-            Log.i(TAG, "Server launched at $address:$port")
-            status?.text = getString(R.string.running, address, port)
-        } catch (e: IOException) {
-            Log.e(TAG, "Failed starting server", e)
-            status?.text = getString(R.string.fail)
+            val uri = model.startServer()
+            viewBinding.status.text = getString(R.string.running, uri?.toString() ?: "unknown")
+        } catch (e: Exception) {
+            viewBinding.status.text = getString(R.string.fail)
             finish()
         }
     }
 
     override fun onStop() {
         super.onStop()
-        server?.stop()
-        status?.setText(R.string.stopped)
+        model.stopServer()
+        viewBinding.status.setText(R.string.stopped)
     }
-
 }

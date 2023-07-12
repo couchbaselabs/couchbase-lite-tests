@@ -22,6 +22,7 @@ public final class Memory extends ObjectStore {
         public <T> T lookup(@NonNull Memory mem, @NonNull Class<T> type) { return mem.get(key, type); }
     }
 
+    private final String client;
 
     private final Map<String, Object> symTab;
 
@@ -29,11 +30,14 @@ public final class Memory extends ObjectStore {
 
     private final AtomicInteger nextAddress = new AtomicInteger(0);
 
-    Memory(@NonNull Map<String, Object> symTab, @NonNull String suffix) {
+    Memory(@NonNull String client, @NonNull Map<String, Object> symTab, @NonNull String suffix) {
         super(symTab);
+        this.client = client;
         this.symTab = symTab;
         identifierSuffix = suffix;
     }
+
+    public String getClient() { return client; }
 
     public void put(@NonNull String key, @NonNull Object value) { symTab.put(key, value); }
 
@@ -52,11 +56,6 @@ public final class Memory extends ObjectStore {
     }
 
     public void removeRef(@NonNull Ref ref) { symTab.remove(ref.key); }
-
-    public void reset() {
-        symTab.clear();
-        nextAddress.set(0);
-    }
 
     @Nullable
     @Override

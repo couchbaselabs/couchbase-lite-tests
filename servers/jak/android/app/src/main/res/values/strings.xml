@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">CBLTestServer-Kotlin-Android</string>
     <string name="starting">Server starting…</string>
-    <string name="running">Server running at:\n %1$s:%2$d</string>
+    <string name="running">Server running at:\n %s</string>
     <string name="fail">Server failed to start.  Exiting.</string>
     <string name="stopped">Server stopped!</string>
 </resources>
