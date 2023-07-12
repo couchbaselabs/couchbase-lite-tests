@@ -1,10 +1,12 @@
 from datetime import timedelta
+from typing import List
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions
 from couchbase.auth import PasswordAuthenticator
-from couchbase.management.users import Role
 from couchbase.management.buckets import CreateBucketSettings
-from couchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException
+from couchbase.management.collections import CollectionSpec
+from couchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException, ScopeAlreadyExistsException
+from couchbase.exceptions import CollectionAlreadyExistsException
 
 class CouchbaseServer:
     """
@@ -16,6 +18,20 @@ class CouchbaseServer:
         self.__cluster = Cluster(url, opts)
         self.__cluster.wait_until_ready(timedelta(seconds=10))
 
+    def create_collections(self, bucket: str, scope: str, names: List[str]) -> None:
+        bucket_obj = self.__cluster.bucket(bucket)
+        c = bucket_obj.collections()
+        try:
+            c.create_scope(scope)
+        except ScopeAlreadyExistsException:
+            pass
+
+        for name in names:
+            try:
+                c.create_collection(CollectionSpec(name, scope))
+            except CollectionAlreadyExistsException:
+                pass
+
     def create_bucket(self, name: str):
         """
         Creates a bucket with a given name that Sync Gateway can use
@@ -23,15 +39,9 @@ class CouchbaseServer:
         :param name: The name of the bucket to create
         """
         mgr = self.__cluster.buckets()
-        user_mgr = self.__cluster.users()
         settings = CreateBucketSettings(name=name, flush_enabled=True, ram_quota_mb=512)
         try:
             mgr.create_bucket(settings)
-            existing_user = user_mgr.get_user("admin").user
-            roles = existing_user.roles
-            roles.add(Role("bucket_full_access", name))
-            roles.add(Role("bucket_admin", name))
-            user_mgr.upsert_user(existing_user)
         except BucketAlreadyExistsException:
             pass
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, cast
+from typing import Dict, List, cast
 
 from cbltest.requests import TestServerRequestType
 from cbltest.v1.responses import PostGetAllDocumentIDsResponse
@@ -50,6 +50,9 @@ class DatabaseUpdater:
         :param id: The ID of the document to purge
         """
         self.__updates.append(DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id))
+
+    def upsert_document(self, collection: str, id: str, new_properties: Dict[str, any] = None, removed_properties: List[str] = None):
+        self.__updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties))
 
 class AllDocumentsCollection:
     """
