@@ -84,8 +84,30 @@ class TestBasicReplication:
     async def test_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         sg_payload = PutDatabasePayload("travel")
-        sg_payload.add_collection("travel", "airlines")
+        sg_payload.add_collection("travel", "landmarks")
         sg_payload.add_collection("travel", "airports")
         sg_payload.add_collection("travel", "hotels")
-        sg_payload.add_collection("travel", "landmarks")
         await cloud.put_empty_database("travel", sg_payload, "travel")
+        await cblpytest.sync_gateways[0].add_user("travel", "user1", "pass", {
+            "travel.airports": ["*"]
+        })
+        await cblpytest.sync_gateways[0].load_dataset("travel", dataset_path / "travel-sg.json")
+
+        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        db = dbs[0]
+
+        replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), replicator_type=ReplicatorType.PULL, collections=[
+            ReplicatorCollectionEntry("travel.airports")
+        ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+
+        await replicator.start()
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None
+        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airports")
+        lite_all_docs = await db.get_all_documents("travel.airports")
+        assert len(lite_all_docs.collections[0].document_ids) > 0
+        assert len(sg_all_docs) == len(lite_all_docs.collections[0].document_ids)
+        sg_ids = set(lite_all_docs.collections[0].document_ids)
+        lite_ids = set(lite_all_docs.collections[0].document_ids)
+        for id in sg_ids:
+            assert id in lite_ids
