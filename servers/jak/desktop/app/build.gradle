@@ -49,6 +49,8 @@ java {
     }
 }
 
+kotlin { jvmToolchain(8) }
+
 jar {
     archiveBaseName = "CBLTestServer-Java"
     archiveAppendix = "Desktop"
@@ -65,12 +67,7 @@ jar {
 repositories {
     if (USE_LOCAL_MAVEN) { mavenLocal() }
     else {
-        maven {
-            url "http://proget.build.couchbase.com/maven2/cimaven"
-            // for build version < 3.0.0-160, use below maven url
-            // url "http://proget.build.couchbase.com/maven2/internalmaven"
-            allowInsecureProtocol = true
-        }
+        maven { url 'https://proget.sc.couchbase.com/maven2/cimaven/' }
     }
 
     // Home of NanoHTTP
@@ -79,6 +76,9 @@ repositories {
     google()
     mavenCentral()
 }
+
+def COUCHBASE_LITE_LIB = 'couchbase-lite-java-ee'
+if (USE_LOCAL_MAVEN) { COUCHBASE_LITE_LIB += "-macos" }
 
 dependencies {
     compileOnly 'androidx.annotation:annotation:1.5.0'
@@ -90,8 +90,7 @@ dependencies {
 
     implementation 'org.nanohttpd:nanohttpd:2.3.2-SNAPSHOT'
 
-    // !! If you change this, be sure to change the entry in ServerInfo
-    implementation "com.couchbase.lite:couchbase-lite-java-ee-macos:${COUCHBASE_LITE_VERSION}"
+    implementation "com.couchbase.lite:${COUCHBASE_LITE_LIB}:${COUCHBASE_LITE_VERSION}"
 
     testImplementation 'junit:junit:4.13.2'
 }
@@ -124,11 +123,11 @@ task checkstyle(type: Checkstyle) {
 
     reports {
         xml {
-            enabled = true
+            required = true
             setDestination(file("${REPORTS_DIR}/checkstyle.xml"))
         }
         html {
-            enabled = true
+            required = true
             setDestination(file("${REPORTS_DIR}/checkstyle.html"))
         }
     }
@@ -151,11 +150,11 @@ task pmd(type: Pmd) {
 
     reports {
         xml {
-            enabled = true
+            required = true
             setDestination(file("${REPORTS_DIR}/pmd.xml"))
         }
         html {
-            enabled = true
+            required = true
             setDestination(file("${REPORTS_DIR}/pmd.html"))
         }
     }
@@ -191,11 +190,11 @@ spotbugs { toolVersion = SPOTBUGS_VERSION }
 
         reports {
             xml {
-                enabled = (reportType == "Xml")
+                required = (reportType == "Xml")
                 setDestination(file("${REPORTS_DIR}/spotbugs.xml"))
             }
             html {
-                enabled = (reportType == "Html")
+                required = (reportType == "Html")
                 setDestination(file("${REPORTS_DIR}/spotbugs.html"))
             }
         }

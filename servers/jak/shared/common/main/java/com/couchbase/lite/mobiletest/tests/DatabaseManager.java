@@ -23,17 +23,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.DatabaseConfiguration;
 import com.couchbase.lite.internal.core.C4Database;
 import com.couchbase.lite.mobiletest.Memory;
-import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestException;
 import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
@@ -54,11 +51,6 @@ public final class DatabaseManager {
         if (!dbRoot.mkdirs() || !dbRoot.canWrite()) {
             throw new IllegalStateException("Could not create directory: " + dbRoot);
         }
-    }
-
-    public void reset(@NonNull Memory memory) {
-        final DatabaseManager mgr = TestApp.getApp().resetDbMgr(this);
-        if (mgr != null) { mgr.finish(memory); }
     }
 
     @NonNull
@@ -99,12 +91,9 @@ public final class DatabaseManager {
         return createDb(dbName, memory);
     }
 
-    @NonNull
-    public Map<String, Object> finish(@NonNull Memory memory) {
-        final Map<String, Object> installed = new HashMap<>();
-
+    public void reset(@NonNull Memory memory) {
         final List<Object> dbs = memory.getList(SYM_OPEN_DBS);
-        if (dbs == null) { return installed; }
+        if (dbs == null) { return; }
 
         for (Object obj: dbs) {
             if (!(obj instanceof Database)) {
@@ -113,11 +102,10 @@ public final class DatabaseManager {
             }
 
             final Database db = (Database) obj;
-            try { db.close(); }
+            try { db.delete(); }
             catch (CouchbaseLiteException e) {
                 Log.w(TAG, "Failed deleting database: " + db.getName());
             }
         }
-        return installed;
     }
 }

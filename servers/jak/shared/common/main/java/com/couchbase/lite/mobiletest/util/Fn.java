@@ -20,8 +20,8 @@ import androidx.annotation.NonNull;
 
 public class Fn {
     @FunctionalInterface
-    public interface Supplier<T> {
+    public interface Supplier<R> {
         @NonNull
-        T get();
+        R get();
     }
 }

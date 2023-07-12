@@ -38,12 +38,11 @@ import com.couchbase.lite.LogLevel;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
 import com.couchbase.lite.mobiletest.tests.DatabaseManager;
+import com.couchbase.lite.mobiletest.tests.ReplicatorManager;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 public abstract class TestApp {
-    protected static final String TAG = "APP";
-
     public static final String HEADER_PROTOCOL_VERSION = "CBLTest-Protocol-Version";
     public static final String HEADER_SENDER = "CBLTest-Sender";
     public static final String DEFAULT_CLIENT = "xyzzy";
@@ -69,6 +68,7 @@ public abstract class TestApp {
     private final Map<String, Map<String, Object>> symTabs = new HashMap<>();
 
     private final AtomicReference<DatabaseManager> dbMgr = new AtomicReference<>();
+    private final AtomicReference<ReplicatorManager> replMgr = new AtomicReference<>();
 
     private Dispatcher dispatcher;
 
@@ -137,19 +137,31 @@ public abstract class TestApp {
             symTabs.put(client, symTab);
         }
 
-        return new Memory(symTab, "_" + getPlatform() + "_" + getAppId());
+        return new Memory(client, symTab, "_" + getPlatform() + "_" + getAppId());
     }
 
     @NonNull
-    public final DatabaseManager getDbMgr(@NonNull Memory memory) {
+    public final DatabaseManager getDbMgr() {
         final DatabaseManager mgr = dbMgr.get();
         if (mgr == null) { dbMgr.compareAndSet(null, new DatabaseManager()); }
         return dbMgr.get();
     }
 
-    @Nullable
-    public final DatabaseManager resetDbMgr(@NonNull DatabaseManager currManager) {
-        return (!dbMgr.compareAndSet(currManager, new DatabaseManager())) ? null : dbMgr.get();
+    @NonNull
+    public final ReplicatorManager getReplMgr() {
+        final ReplicatorManager mgr = replMgr.get();
+        if (mgr == null) { replMgr.compareAndSet(null, new ReplicatorManager()); }
+        return replMgr.get();
+    }
+
+    public final void reset(Memory mem) {
+        final ReplicatorManager rMgr = replMgr.getAndSet(null);
+        rMgr.reset(mem);
+
+        final DatabaseManager mgr = dbMgr.getAndSet(null);
+        mgr.reset(mem);
+
+        symTabs.remove(mem.getClient());
     }
 
     @NonNull

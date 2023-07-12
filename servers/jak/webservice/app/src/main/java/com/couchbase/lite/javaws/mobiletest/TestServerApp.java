@@ -84,7 +84,7 @@ public class TestServerApp extends HttpServlet {
                 try (InputStream in = reply.getContent(); OutputStream out = response.getOutputStream()) {
                     final byte[] buf = new byte[1024];
                     while (true) {
-                        final int n = in.readNBytes(buf, 0, buf.length);
+                        final int n = in.read(buf, 0, buf.length);
                         if (n <= 0) { break; }
                         out.write(buf, 0, n);
                     }

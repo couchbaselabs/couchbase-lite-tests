@@ -20,12 +20,14 @@ import androidx.annotation.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 import okio.Buffer;
 
 import com.couchbase.lite.mobiletest.json.Json;
+import com.couchbase.lite.mobiletest.util.Fn;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
@@ -42,11 +44,7 @@ public final class Dispatcher {
     // build the dispatch table
     public void init() {
         addTest(2, "/", Method.GET, (r, m) -> app.getSystemInfo());
-        addTest(2, "/reset", Method.POST, (r, m) -> {
-            app.getDbMgr(m).reset(m);
-            m.reset();
-            return new HashMap<>();
-        });
+        addTest(2, "/reset", Method.POST, (r, m) -> { TestApp.getApp().reset(m); return Collections.emptyMap(); });
         addTest(2, "/getAllDocumentIDs", Method.POST, (r, m) -> null);
         addTest(2, "/startReplicator", Method.POST, (r, m) -> null);
         addTest(2, "/getReplicatorStatus", Method.POST, (r, m) -> null);

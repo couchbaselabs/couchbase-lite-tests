@@ -1,6 +1,8 @@
+
+
 plugins {
     id 'com.android.application'
-    id 'kotlin-android'
+    id 'org.jetbrains.kotlin.android'
     id 'checkstyle'
     id 'pmd'
     id 'com.github.spotbugs'
@@ -34,6 +36,11 @@ android {
     }
 
     kotlinOptions { jvmTarget = '1.8' }
+
+    buildFeatures {
+        buildConfig = true
+        viewBinding = true
+    }
 
     defaultConfig {
         minSdkVersion ANDROID_MIN_SDK
@@ -83,23 +90,17 @@ android {
             ]
         }
     }
-
-    lintOptions {
-        disable 'UseSparseArrays'
+    lint {
         abortOnError false
+        disable 'UseSparseArrays'
     }
-}
 
+}
 
 repositories {
     if (USE_LOCAL_MAVEN) { mavenLocal() }
     else {
-        maven {
-            url "http://proget.build.couchbase.com/maven2/cimaven"
-            // for build version < 3.0.0-160, use below maven url
-            // url "http://proget.build.couchbase.com/maven2/internalmaven"
-            allowInsecureProtocol = true
-        }
+        maven { url 'https://proget.sc.couchbase.com/maven2/cimaven/' }
     }
 
     // Home of NanoHTTP
@@ -111,8 +112,13 @@ repositories {
 
 configurations.all { resolutionStrategy.cacheChangingModulesFor 1, 'seconds' }
 dependencies {
+    // Dependency injection
+    implementation "io.insert-koin:koin-core:3.3.3"
+    implementation "io.insert-koin:koin-android:3.3.3"
+
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.databinding:databinding-runtime:8.0.2'
 
     implementation 'com.squareup.moshi:moshi:1.14.0'
 
@@ -125,7 +131,6 @@ dependencies {
     // implementation "com.couchbase.lite:couchbase-lite-kt-android-ee:${COUCHBASE_LITE_VERSION}"
     // for build version > 3.0.0-177, use package name:
     implementation ("com.couchbase.lite:couchbase-lite-android-ee-ktx:${COUCHBASE_LITE_VERSION}") { changing = true }
-
 
     testImplementation 'junit:junit:4.13.2'
 
@@ -162,11 +167,11 @@ task checkstyle(type: Checkstyle) {
 
     reports {
         xml {
-            enabled = true
+            required = true
             setDestination(file("${REPORTS_DIR}/checkstyle.xml"))
         }
         html {
-            enabled = true
+            required = true
             setDestination(file("${REPORTS_DIR}/checkstyle.html"))
         }
     }
@@ -189,11 +194,11 @@ task pmd(type: Pmd) {
 
     reports {
         xml {
-            enabled = true
+            required = true
             setDestination(file("${REPORTS_DIR}/pmd.xml"))
         }
         html {
-            enabled = true
+            required = true
             setDestination(file("${REPORTS_DIR}/pmd.html"))
         }
     }
@@ -232,11 +237,11 @@ spotbugs { toolVersion = SPOTBUGS_VERSION }
 
         reports {
             xml {
-                enabled = (reportType == "Xml")
+                required = (reportType == "Xml")
                 setDestination(file("${REPORTS_DIR}/spotbugs.xml"))
             }
             html {
-                enabled = (reportType == "Html")
+                required = (reportType == "Html")
                 setDestination(file("${REPORTS_DIR}/spotbugs.html"))
             }
         }
