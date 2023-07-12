@@ -15,6 +15,10 @@ class _CollectionMap(JSONSerializable):
     def scope_name(self) -> str:
         return self.__scope_name
     
+    @property
+    def collections(self) -> str:
+        return list(self.__collections.keys())
+    
     def __init__(self, scope_name: str) -> None:
         _assert_not_null(scope_name, nameof(scope_name))
         self.__scope_name = scope_name
@@ -42,6 +46,16 @@ class PutDatabasePayload(JSONSerializable):
 
         self.__scopes: Dict[str, _CollectionMap] = {}
 
+    def scopes(self) -> List[str]:
+        return list(self.__scopes.keys())
+    
+    def collections(self, scope: str) -> List[str]:
+        map = self.__scopes.get(scope)
+        if not map:
+            return None
+        
+        return map.collections
+
     def add_collection(self, scope_name: str = "_default", collection_name: str = "_default") -> None:
         """
         Adds a collection to the configuration of the database (must exist on Couchbase Server).
@@ -66,6 +80,38 @@ class PutDatabasePayload(JSONSerializable):
             ret_val["scopes"][s] = self.__scopes[s].to_json()
 
         return ret_val
+    
+class _AllDocumentsResponseRow:
+    @property
+    def key(self) -> str:
+        return self.__key
+    
+    @property
+    def id(self) -> str:
+        return self.__id
+    
+    @property
+    def revid(self) -> str:
+        return self.__revid
+    
+    def __init__(self, key: str, id: str, revid: str) -> None:
+        self.__key = key
+        self.__id = id
+        self.__revid = revid
+    
+class AllDocumentsResponse:
+    @property 
+    def rows(self) -> List[_AllDocumentsResponseRow]:
+        return self.__rows
+    
+    def __len__(self) -> int:
+        return self.__len
+    
+    def __init__(self, input: dict) -> None:
+        self.__len = input["total_rows"]
+        self.__rows: List[_AllDocumentsResponseRow] = []
+        for row in input["rows"]:
+            self.__rows.append(_AllDocumentsResponseRow(row["key"], row["id"], row["value"]["rev"]))
 
 class SyncGateway:
     """
@@ -178,13 +224,13 @@ class SyncGateway:
         last_scope: str = None
         last_coll: str = None
         collected = []
-        with open(path, "r") as fin:
+        with open(path, "r", encoding='utf8') as fin:
             json_line = fin.readline()
             while json_line:
                 json = loads(json_line)
                 scope = json["scope"]
                 collection = json["collection"]
-                if last_scope != scope or last_coll != collection:
+                if last_scope != scope or last_coll != collection or len(collected) > 500:
                     if last_scope and last_coll:
                         resp = await self._send_request("post", f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs", 
                                                         JSONDictionary({"docs": collected}))
@@ -199,3 +245,9 @@ class SyncGateway:
         resp = await self._send_request("post", f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs", 
                                         JSONDictionary({"docs": collected}))
         self._analyze_dataset_response(resp)
+
+    async def get_all_documents(self, db_name: str, scope: str = "_default", collection: str = "_default") -> AllDocumentsResponse:
+        resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_all_docs")
+        assert isinstance(resp, dict)
+        return AllDocumentsResponse(cast(dict, resp))
+

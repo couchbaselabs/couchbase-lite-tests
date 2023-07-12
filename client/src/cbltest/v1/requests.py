@@ -116,7 +116,7 @@ class DatabaseUpdateEntry(JSONSerializable):
     """
     
     def __init__(self, type: DatabaseUpdateType, collection: str, document_id: str,
-                 updated_properties: Dict[str, any] = None, removed_properties: Dict[str, any] = None) -> None:
+                 updated_properties: Dict[str, any] = None, removed_properties: List[str] = None) -> None:
         self.type: DatabaseUpdateEntry = cast(DatabaseUpdateEntry, _assert_not_null(type, nameof(type)))
         """The type of update to be performed"""
 
@@ -134,7 +134,7 @@ class DatabaseUpdateEntry(JSONSerializable):
         It has no meaning if `type` is not `UPDATE`
         """
 
-        self.removed_properties: Dict[str, any] = removed_properties
+        self.removed_properties: List[str] = removed_properties
         """
         The properties to be removed on a given document. 
         The values of the dictionary entries should simply be null.
@@ -150,7 +150,7 @@ class DatabaseUpdateEntry(JSONSerializable):
         if self.type != DatabaseUpdateType.UPDATE:
             return True
         
-        return len(self.__updated_properties) > 0 or len(self.__removed_properties) > 0
+        return len(self.updated_properties) > 0 or len(self.removed_properties) > 0
     
     def to_json(self) -> any:
         if not self.is_valid():
@@ -169,7 +169,9 @@ class DatabaseUpdateEntry(JSONSerializable):
             raw["updatedProperties"] = self.updated_properties
 
         if self.removed_properties is not None and len(self.removed_properties) > 0:
-            raw["removedProperties"] = self.removed_properties
+            raw["removedProperties"] = {}
+            for p in self.removed_properties:
+                raw["removedProperties"][p] = None
 
         return raw
     
