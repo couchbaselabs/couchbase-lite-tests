@@ -26,7 +26,7 @@ The system consists of 4 components:
 
 You will need more than one terminal window.
 
-In the first, from the `docker` folder, start the environment:
+In the first, from the `environment` folder, start the environment:
 
 'docker compose up'
 
@@ -44,6 +44,8 @@ python3 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
 ```
+If you've already don't this once (you've created the venv and installed the requirements in it)
+you don't need to do it again.  Just activate it with `. venv/bin/activate`.
 
 Tests run inside the test client framework.  You will have to install the client
 to run the tests.  The easiest way to do this is to install the test client
@@ -70,5 +72,4 @@ You should now be able to run all of the tests in one of the test files
 ```
 pytest --config config.example.json test_basic_replication.py
 ```
-
 

@@ -44,6 +44,7 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 
 public abstract class TestApp {
     public static final String HEADER_PROTOCOL_VERSION = "CBLTest-Protocol-Version";
+    public static final int DEFAULT_PROTOCOL_VERSION = 2;
     public static final String HEADER_SENDER = "CBLTest-Sender";
     public static final String DEFAULT_CLIENT = "xyzzy";
 
@@ -156,10 +157,10 @@ public abstract class TestApp {
 
     public final void reset(Memory mem) {
         final ReplicatorManager rMgr = replMgr.getAndSet(null);
-        rMgr.reset(mem);
+        if (rMgr != null) { rMgr.reset(mem); }
 
-        final DatabaseManager mgr = dbMgr.getAndSet(null);
-        mgr.reset(mem);
+        final DatabaseManager dMgr = dbMgr.getAndSet(null);
+        if (dMgr != null) { dMgr.reset(mem); }
 
         symTabs.remove(mem.getClient());
     }

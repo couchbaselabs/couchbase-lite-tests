@@ -76,21 +76,28 @@ public class Server extends NanoHTTPD {
     @NonNull
     @Override
     public Response handle(@NonNull IHTTPSession session) {
-        int version = 0;
+        int version = TestApp.DEFAULT_PROTOCOL_VERSION;
         Response resp;
         Reply reply = null;
         try {
             final Map<String, String> headers = session.getHeaders();
 
             final String versionStr = headers.get(TestApp.HEADER_PROTOCOL_VERSION);
-            if (versionStr == null) { throw new IllegalArgumentException("Missing protocol version"); }
-            try { version = Integer.parseInt(versionStr); }
-            catch (NumberFormatException ignore) {
-                throw new IllegalArgumentException("Unrecognized protocol version");
+            if (versionStr == null) {
+                Log.w(TAG, "Request does not specify a protocol version. Using version " + version);
+            }
+            else {
+                try { version = Integer.parseInt(versionStr); }
+                catch (NumberFormatException ignore) {
+                    Log.w(TAG, "Unrecognized protocol version: " + versionStr + ". Using version " + version);
+                }
             }
 
             String client = headers.get(TestApp.HEADER_SENDER);
-            if (client == null) { client = TestApp.DEFAULT_CLIENT; }
+            if (client == null) {
+                client = TestApp.DEFAULT_CLIENT;
+                Log.w(TAG, "Request does not specify a client Id. Using " + client);
+            }
 
             final Dispatcher.Method method = METHODS.get(session.getMethod());
             if (method == null) { throw new IllegalArgumentException("Unimplemented method: " + session.getMethod()); }
