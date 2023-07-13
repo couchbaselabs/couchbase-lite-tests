@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">CBLTestServer-Kotlin-Android</string>
+    <string name="app_name">CBLTestServer-Android-Kotlin</string>
     <string name="starting">Server starting…</string>
     <string name="running">Server running at:\n %s</string>
     <string name="fail">Server failed to start.  Exiting.</string>

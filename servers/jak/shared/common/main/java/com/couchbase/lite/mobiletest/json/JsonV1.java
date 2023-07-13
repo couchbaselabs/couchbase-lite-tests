@@ -38,7 +38,7 @@ public final class JsonV1 extends Json {
     public Map<String, Object> parseRequest(@NonNull InputStream json) throws IOException {
         final JsonReader reader = JsonReader.of(Okio.buffer(Okio.source(json)));
         final Map<String, Object> val = parseMap(reader);
-        if (reader.hasNext()) { throw new IOException("Unexpected content after document end"); }
+        // ??? check for extraneous stuff at the end of the document, wo hanging
         return val;
     }
 
