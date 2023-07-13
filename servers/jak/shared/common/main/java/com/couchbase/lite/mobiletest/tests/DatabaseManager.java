@@ -23,14 +23,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.DatabaseConfiguration;
 import com.couchbase.lite.internal.core.C4Database;
 import com.couchbase.lite.mobiletest.Memory;
+import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestException;
 import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
@@ -47,55 +49,73 @@ public final class DatabaseManager {
     private final File dbRoot;
 
     public DatabaseManager() {
-        dbRoot = new File("tests_" + new SimpleDateFormat("MM_dd_HH_mm_ss", Locale.getDefault()).format(new Date()));
+        final String testDir = "tests_"
+            + new SimpleDateFormat("MM_dd_HH_mm_ss", Locale.getDefault()).format(new Date());
+        dbRoot = new File(TestApp.getApp().getFilesDir(), testDir);
         if (!dbRoot.mkdirs() || !dbRoot.canWrite()) {
             throw new IllegalStateException("Could not create directory: " + dbRoot);
         }
     }
 
     @NonNull
-    public Database createDb(@NonNull String name, @NonNull Memory memory) throws TestException {
+    public Database openDb(@NonNull String name, @NonNull Memory memory) throws TestException {
+        Map<String, Object> openDbs = memory.getMap(SYM_OPEN_DBS);
+        if (openDbs == null) {
+            openDbs = new HashMap<>();
+            memory.put(SYM_OPEN_DBS, openDbs);
+        }
+        else {
+            final Object db = openDbs.get(name);
+            if (db instanceof Database) { return (Database) db; }
+        }
+
         final Database db;
         final DatabaseConfiguration dbConfig = new DatabaseConfiguration().setDirectory(dbRoot.getPath());
         try { db = new Database(name, dbConfig); }
         catch (CouchbaseLiteException e) {
-            throw new TestException(TestException.TESTSERVER, 0, "Failed opening database: " + name, e);
+            throw new IllegalStateException("Failed opening database: " + name, e);
         }
-        memory.addToList(SYM_OPEN_DBS, db);
+
+        openDbs.put(name, db);
+        Log.i(TAG, "Created database: " + name);
+
         return db;
     }
+
+    public void closeDb(@NonNull String name, @NonNull Memory memory) throws TestException {
+        if (closeDbInternal(name, memory)) { return; }
+        Log.w(TAG, "Attempt to close a database that is not open: " + name);
+    }
+
 
     // New stream constructors are supported only in API 26+
     @SuppressWarnings("IOStreamConstructor")
     @NonNull
     public Database installDb(@NonNull String datasetName, @NonNull String dbName, @NonNull Memory memory)
         throws TestException {
+        closeDbInternal(dbName, memory);
+
         final File tmpDir = new File("tmpDir");
 
         if (!new File(tmpDir, datasetName + DB_EXTENSION).exists()) {
             try (InputStream in = new FileInputStream(datasetName)) { new FileUtils().unzip(in, tmpDir); }
-            catch (IOException e) {
-                throw new IllegalStateException("?????", e);
-            }
+            catch (IOException e) { throw new IllegalStateException("Faild unzipping dataset: " + datasetName, e); }
         }
 
         try { Database.copy(new File(tmpDir, datasetName + DB_EXTENSION), dbName, new DatabaseConfiguration()); }
         catch (CouchbaseLiteException e) {
-            throw new TestException(
-                TestException.TESTSERVER,
-                0,
-                "Failed copying dataset: " + datasetName + " to " + dbName,
-                e);
+            throw new IllegalStateException("Failed copying dataset: " + datasetName + " to " + dbName, e);
         }
 
-        return createDb(dbName, memory);
+        return openDb(dbName, memory);
     }
 
-    public void reset(@NonNull Memory memory) {
-        final List<Object> dbs = memory.getList(SYM_OPEN_DBS);
-        if (dbs == null) { return; }
+    // !!! The req may contain a spec for datasets to be loaded
+    public void reset(@NonNull Map<String, Object> req, @NonNull Memory memory) {
+        final Map<String, Object> openDbs = memory.getMap(SYM_OPEN_DBS);
+        if ((openDbs == null) || openDbs.isEmpty()) { return; }
 
-        for (Object obj: dbs) {
+        for (Object obj: openDbs.values()) {
             if (!(obj instanceof Database)) {
                 Log.e(TAG, "Attempt to close non-database: " + obj);
                 continue;
@@ -103,9 +123,24 @@ public final class DatabaseManager {
 
             final Database db = (Database) obj;
             try { db.delete(); }
-            catch (CouchbaseLiteException e) {
-                Log.w(TAG, "Failed deleting database: " + db.getName());
+            catch (CouchbaseLiteException e) { Log.w(TAG, "Failed deleting database: " + db.getName()); }
+        }
+    }
+
+    private boolean closeDbInternal(@NonNull String name, @NonNull Memory memory) throws TestException {
+        final Map<String, Object> openDbs = memory.getMap(SYM_OPEN_DBS);
+        if (openDbs != null) {
+            final Object db = openDbs.remove(name);
+            if (db instanceof Database) {
+                try {
+                    ((Database) db).close();
+                    return true;
+                }
+                catch (CouchbaseLiteException e) {
+                    throw new IllegalStateException("Failed closing database: " + name, e);
+                }
             }
         }
+        return false;
     }
 }

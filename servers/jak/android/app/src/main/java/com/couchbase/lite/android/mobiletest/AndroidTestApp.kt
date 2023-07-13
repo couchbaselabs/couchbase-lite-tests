@@ -33,7 +33,6 @@ import java.util.*
 
 
 class AndroidTestApp(private val context: Context) : TestApp() {
-
     override fun initCBL() = CouchbaseLite.init(context, true)
 
     override fun getPlatform() = "android"
@@ -41,7 +40,7 @@ class AndroidTestApp(private val context: Context) : TestApp() {
     override fun getSystemInfo(): Map<String, Any> {
         return mapOf(
             "version" to CBLVersion.getVersionInfo(),
-            "apiVersion" to BuildConfig.VERSION_NAME,
+            "apiVersion" to BuildConfig.VERSION_CODE,
             "cbl" to "couchbase-lite-android-ee-ktx",
             "device" to mapOf(
                 "model" to Build.PRODUCT,

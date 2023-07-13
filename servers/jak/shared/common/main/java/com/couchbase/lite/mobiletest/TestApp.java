@@ -43,10 +43,10 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 public abstract class TestApp {
-    public static final String HEADER_PROTOCOL_VERSION = "CBLTest-Protocol-Version";
-    public static final int DEFAULT_PROTOCOL_VERSION = 2;
-    public static final String HEADER_SENDER = "CBLTest-Sender";
-    public static final String DEFAULT_CLIENT = "xyzzy";
+    public static final String HEADER_PROTOCOL_VERSION = "CBLTest-API-Version";
+    public static final int DEFAULT_PROTOCOL_VERSION = 1;
+    public static final String HEADER_SENDER = "CBLTest-Client-ID";
+    public static final String DEFAULT_CLIENT = "c0ffee00-c0c0-50da-c01a-de1ec7ab1e00";
 
     private static final AtomicReference<TestApp> APP = new AtomicReference<>();
     private static final AtomicReference<String> APP_ID = new AtomicReference<>();
@@ -155,12 +155,12 @@ public abstract class TestApp {
         return replMgr.get();
     }
 
-    public final void reset(Memory mem) {
+    public final void reset(@NonNull Map<String, Object> req, Memory mem) {
         final ReplicatorManager rMgr = replMgr.getAndSet(null);
         if (rMgr != null) { rMgr.reset(mem); }
 
         final DatabaseManager dMgr = dbMgr.getAndSet(null);
-        if (dMgr != null) { dMgr.reset(mem); }
+        if (dMgr != null) { dMgr.reset(req, mem); }
 
         symTabs.remove(mem.getClient());
     }
