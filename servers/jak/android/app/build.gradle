@@ -112,6 +112,8 @@ repositories {
 
 configurations.all { resolutionStrategy.cacheChangingModulesFor 1, 'seconds' }
 dependencies {
+    compileOnly "com.github.spotbugs:spotbugs-annotations:${SPOTBUGS_VERSION}"
+
     // Dependency injection
     implementation "io.insert-koin:koin-core:3.3.3"
     implementation "io.insert-koin:koin-android:3.3.3"

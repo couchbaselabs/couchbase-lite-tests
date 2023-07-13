@@ -20,8 +20,8 @@ import com.couchbase.lite.mobiletest.json.CompareJsonObject
 import com.couchbase.lite.mobiletest.json.UpdateJsonObject
 import com.couchbase.lite.mobiletest.json.PrintJson
 import com.couchbase.lite.mobiletest.json.JsonReduce
+import com.couchbase.lite.mobiletest.json.JsonV0
 import com.couchbase.lite.mobiletest.json.JsonV1
-import com.couchbase.lite.mobiletest.json.JsonV2
 
 import org.json.JSONObject
 import org.junit.Assert
@@ -33,8 +33,8 @@ class JsonTest : BaseTest() {
         val data: MutableMap<String, Any?> = mutableMapOf("red" to null)
         data["green"] = listOf(true, "string", 43, 44L, 2.71828F, 2.71828, Memory.Ref("x1"))
 
-        val json = JsonV1().serializeReply(data)
-        val parsed = JsonV1().parseRequest(json.inputStream())
+        val json = JsonV0().serializeReply(data)
+        val parsed = JsonV0().parseRequest(json.inputStream())
 
         Assert.assertNull(parsed["red"])
 
@@ -53,8 +53,8 @@ class JsonTest : BaseTest() {
         val data: MutableMap<String, Any?> = mutableMapOf("red" to null)
         data["green"] = listOf(true, "string", 43, 44L, 2.71828F, 2.71828, Memory.Ref("x1"))
 
-        val json = JsonV2().serializeReply(data)
-        val parsed = JsonV2().parseRequest(json.inputStream())
+        val json = JsonV1().serializeReply(data)
+        val parsed = JsonV1().parseRequest(json.inputStream())
 
         Assert.assertNull(parsed["red"])
 

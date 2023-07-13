@@ -17,10 +17,11 @@ package com.couchbase.lite.mobiletest.tests;
 
 import androidx.annotation.NonNull;
 
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 import com.couchbase.lite.Replicator;
-import com.couchbase.lite.ReplicatorConfiguration;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.TestException;
 import com.couchbase.lite.mobiletest.util.Log;
@@ -31,18 +32,37 @@ public class ReplicatorManager {
 
     private static final String SYM_OPEN_REPLS = "~OPEN_REPLS";
 
+    private static final String KEY_REPL_ID = "id";
+
+
     @NonNull
-    public Replicator createRepl(@NonNull ReplicatorConfiguration config, @NonNull Memory memory) throws TestException {
-        final Replicator repl = new Replicator(config);
-        memory.addToList(SYM_OPEN_REPLS, repl);
-        return repl;
+    public Map<String, Object> createRepl(@NonNull Map<String, Object> req, @NonNull Memory memory)
+        throws TestException {
+        Map<String, Object> liveRepls = memory.getMap(SYM_OPEN_REPLS);
+        if (liveRepls == null) {
+            liveRepls = new HashMap<>();
+            memory.put(SYM_OPEN_REPLS, liveRepls);
+        }
+
+        final String replId = UUID.randomUUID().toString();
+        final Replicator repl = new Replicator(new ReplicatorConfigBuilder(req, memory).build());
+        liveRepls.put(replId, repl);
+
+        repl.start();
+        Log.i(TAG, "Started replicator: " + replId);
+
+        final Map<String, Object> ret = new HashMap<>();
+        ret.put(KEY_REPL_ID, replId);
+        return ret;
     }
 
     public void reset(@NonNull Memory memory) {
-        final List<Object> repls = memory.getList(SYM_OPEN_REPLS);
-        if (repls == null) { return; }
+        final Map<String, Object> liveRepls = memory.getMap(SYM_OPEN_REPLS);
+        memory.put(SYM_OPEN_REPLS, null);
 
-        for (Object repl: repls) {
+        if ((liveRepls == null) || liveRepls.isEmpty()) { return; }
+
+        for (Object repl: liveRepls.values()) {
             if (!(repl instanceof Replicator)) {
                 Log.e(TAG, "Attempt to close non-replicator: " + repl);
                 continue;

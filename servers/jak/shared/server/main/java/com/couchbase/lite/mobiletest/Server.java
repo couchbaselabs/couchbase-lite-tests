@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.nanohttpd.protocols.http.IHTTPSession;
 import org.nanohttpd.protocols.http.NanoHTTPD;
 import org.nanohttpd.protocols.http.request.Method;
@@ -73,6 +74,7 @@ public class Server extends NanoHTTPD {
     }
 
     @SuppressWarnings("PMD.PreserveStackTrace")
+    @SuppressFBWarnings("REC_CATCH_EXCEPTION")
     @NonNull
     @Override
     public Response handle(@NonNull IHTTPSession session) {

@@ -38,21 +38,25 @@ import com.couchbase.lite.mobiletest.util.Log;
 public abstract class Json {
     private static final String TAG = "JSON";
 
-    private static final AtomicInteger PROTOCOL_VERSION = new AtomicInteger(0);
+    private static final AtomicInteger PROTOCOL_VERSION = new AtomicInteger(-1);
 
     private static final List<Fn.Supplier<Json>> PROTOCOLS;
     static {
         final List<Fn.Supplier<Json>> l = new ArrayList<>();
+        l.add(JsonV0::new);
         l.add(JsonV1::new);
-        l.add(JsonV2::new);
         PROTOCOLS = Collections.unmodifiableList(l);
     }
     @NonNull
-    public static Json getParser(int v) {
-        final int version = checkProtocolVersion(v);
-        final Fn.Supplier<Json> supplier = ((version < 1) || version > PROTOCOLS.size())
+    public static Json getParser(int version) {
+        final int previousVersion = PROTOCOL_VERSION.getAndSet(version);
+        if ((previousVersion >= 0) && (version != previousVersion)) {
+            Log.w(TAG, "Request protocol changed for parser: " + previousVersion + " => " + version);
+        }
+
+        final Fn.Supplier<Json> supplier = ((version < 0) || (version > (PROTOCOLS.size() - 1)))
             ? null
-            : PROTOCOLS.get(version - 1);
+            : PROTOCOLS.get(version);
 
         if (supplier == null) {
             throw new IllegalArgumentException("Unsupported protocol version: " + version);
@@ -62,18 +66,18 @@ public abstract class Json {
     }
 
     @NonNull
-    public static Json getSerializer(int v) {
-        final int version = checkProtocolVersion(v);
-        if (version < 1) { throw new IllegalStateException("reply before request!"); }
-        return PROTOCOLS.get(version - 1).get();
-    }
-
-    private static int checkProtocolVersion(int version) {
-        final int previousVersion = PROTOCOL_VERSION.getAndSet(version);
-        if ((previousVersion != 0) && (version != previousVersion)) {
-            Log.i(TAG, "Request protocol changed: " + previousVersion + " => " + version);
+    public static Json getSerializer(int version) {
+        final int previousVersion = PROTOCOL_VERSION.get();
+        if (previousVersion < 0) { Log.w(TAG, "Reply before request"); }
+        else if (version != previousVersion) {
+            Log.w(TAG, "Request protocol changed for serializer: " + previousVersion + " => " + version);
         }
-        return version;
+
+        if (version > (PROTOCOLS.size() - 1)) {
+            throw new IllegalArgumentException("Unsupported protocol version: " + version);
+        }
+
+        return PROTOCOLS.get(version).get();
     }
 
 

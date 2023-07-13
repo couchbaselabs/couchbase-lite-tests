@@ -15,6 +15,11 @@
         <Class name="~.*\.Manifest\$.*"/>
     </Match>
 
+    <!-- ignore all issues in the generated databinding classes -->
+    <Match>
+        <Class name="~com.couchbase.lite.android.mobiletest.databinding.*"/>
+    </Match>
+
     <!-- These two are real problems, but our API embeds them -->
     <Match>
         <Bug pattern="EI_EXPOSE_REP" />

@@ -27,7 +27,6 @@ import java.util.Map;
 import okio.Buffer;
 
 import com.couchbase.lite.mobiletest.json.Json;
-import com.couchbase.lite.mobiletest.util.Fn;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
@@ -43,11 +42,17 @@ public final class Dispatcher {
 
     // build the dispatch table
     public void init() {
-        addTest(2, "/", Method.GET, (r, m) -> app.getSystemInfo());
-        addTest(2, "/reset", Method.POST, (r, m) -> { TestApp.getApp().reset(m); return Collections.emptyMap(); });
-        addTest(2, "/getAllDocumentIDs", Method.POST, (r, m) -> null);
-        addTest(2, "/startReplicator", Method.POST, (r, m) -> null);
-        addTest(2, "/getReplicatorStatus", Method.POST, (r, m) -> null);
+        addTest(1, "/", Method.GET, (r, m) -> app.getSystemInfo());
+        addTest(1, "/reset", Method.POST, (r, m) -> {
+            app.reset(r, m);
+            return Collections.emptyMap();
+        });
+        addTest(1, "/getAllDocumentIDs", Method.POST, (r, m) -> Collections.emptyMap());
+        addTest(1, "/updateDatabase", Method.POST, (r, m) -> Collections.emptyMap());
+        addTest(1, "/startReplicator", Method.POST, (r, m) -> app.getReplMgr().createRepl(r, m));
+        addTest(1, "/getReplicatorStatus", Method.POST, (r, m) -> Collections.emptyMap());
+        addTest(1, "/snapshotDocuments", Method.POST, (r, m) -> Collections.emptyMap());
+        addTest(1, "/verifyDocuments", Method.POST, (r, m) -> Collections.emptyMap());
     }
 
     // This method returns a Reply.  Be sure to close it!
@@ -72,11 +77,12 @@ public final class Dispatcher {
                     new Buffer().writeUtf8(msg));
             }
 
-            return new Reply(
-                Reply.Status.OK,
-                "application/json",
-                serializer.serializeReply(
-                    test.run(Json.getParser(version).parseRequest(req), TestApp.getApp().getMemory(client))));
+            final Map<String, Object> result = test.run(
+                Json.getParser(version).parseRequest(req),
+                TestApp.getApp().getMemory(client));
+
+            Log.w(TAG, "Test succeeded");
+            return new Reply(Reply.Status.OK, "application/json", serializer.serializeReply(result));
         }
         catch (TestException err) {
             Log.w(TAG, "Test failed", err);

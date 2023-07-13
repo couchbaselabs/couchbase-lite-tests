@@ -3,14 +3,12 @@ package com.couchbase.lite.mobiletest;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
 // Not thread safe...
-public final class Memory extends ObjectStore {
+public final class Memory extends TypedMap {
     public static final String PREFIX_REF = "@";
 
     public static class Ref {
@@ -22,12 +20,16 @@ public final class Memory extends ObjectStore {
         public <T> T lookup(@NonNull Memory mem, @NonNull Class<T> type) { return mem.get(key, type); }
     }
 
+    @NonNull
     private final String client;
 
+    @NonNull
     private final Map<String, Object> symTab;
 
+    @NonNull
     private final String identifierSuffix;
 
+    @NonNull
     private final AtomicInteger nextAddress = new AtomicInteger(0);
 
     Memory(@NonNull String client, @NonNull Map<String, Object> symTab, @NonNull String suffix) {
@@ -37,16 +39,10 @@ public final class Memory extends ObjectStore {
         identifierSuffix = suffix;
     }
 
+    @NonNull
     public String getClient() { return client; }
 
     public void put(@NonNull String key, @NonNull Object value) { symTab.put(key, value); }
-
-    public void addToList(@NonNull String key, @NonNull Object value) {
-        List<Object> list = getList(key);
-        if (list == null) { list = new ArrayList<>(); }
-        list.add(value);
-        put(key, list);
-    }
 
     @NonNull
     public Ref addRef(@NonNull Object value) {

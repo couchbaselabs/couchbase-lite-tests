@@ -32,15 +32,13 @@ import okio.Okio;
 import com.couchbase.lite.mobiletest.Memory;
 
 
-public class JsonV2 extends Json {
+public final class JsonV0 extends Json {
     @SuppressWarnings("PMD.PrematureDeclaration")
     @NonNull
     public Map<String, Object> parseRequest(@NonNull InputStream json) throws IOException {
         final JsonReader reader = JsonReader.of(Okio.buffer(Okio.source(json)));
-        reader.setLenient(true);
-        final Map<String, Object> val = parseMap(reader);
         // ??? check for extraneous stuff at the end of the document, wo hanging
-        return val;
+        return parseMap(reader);
     }
 
     @NonNull
@@ -53,28 +51,70 @@ public class JsonV2 extends Json {
         return buf;
     }
 
-    @NonNull
-    @Override
+    @Nullable
     protected Object parseString(@NonNull String s) {
-        return (!s.startsWith(Memory.PREFIX_REF)) ? s : new Memory.Ref(s.substring(1));
+        switch (s) {
+            case "null":
+                return null;
+            case "true":
+                return true;
+            case "false":
+                return false;
+            default:
+                return getRef(s);
+        }
     }
 
-    @Override
+    @SuppressWarnings("PMD.PrematureDeclaration")
+    @NonNull
+    private Object getRef(@NonNull String s) {
+        final String suffix = s.substring(1);
+        switch (s.substring(0, 1)) {
+            case "I":
+                return Integer.valueOf(suffix);
+            case "L":
+                return Long.valueOf(suffix);
+            case "F":
+                return Float.valueOf(suffix);
+            case "D":
+                return Double.valueOf(suffix);
+            case "\"":
+                return !suffix.endsWith("\"") ? s : suffix.substring(0, suffix.length() - 1);
+            case "@":
+                return new Memory.Ref(suffix);
+            default:
+                return s;
+        }
+    }
+
+    @SuppressWarnings("PMD.NPathComplexity")
     protected void serializeValue(@Nullable Object value, @NonNull JsonWriter writer) throws IOException {
-        if (value == null) {
-            writer.nullValue();
+        if ((value == null) || ("null".equals(value))) {
+            writer.value("null");
             return;
         }
         if (value instanceof Boolean) {
-            writer.value((Boolean) value);
+            writer.value(((Boolean) value) ? "true" : "false");
             return;
         }
-        if (value instanceof Number) {
-            writer.value((Number) value);
+        if (value instanceof Integer) {
+            writer.value("I" + value);
+            return;
+        }
+        if (value instanceof Long) {
+            writer.value("L" + value);
+            return;
+        }
+        if (value instanceof Float) {
+            writer.value("F" + value);
+            return;
+        }
+        if (value instanceof Double) {
+            writer.value("D" + value);
             return;
         }
         if (value instanceof String) {
-            writer.value((String) value);
+            writer.value("\"" + value + "\"");
             return;
         }
         if (value instanceof Memory.Ref) {
