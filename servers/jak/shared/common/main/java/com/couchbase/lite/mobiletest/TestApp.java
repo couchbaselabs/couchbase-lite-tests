@@ -43,9 +43,9 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 public abstract class TestApp {
-    public static final String HEADER_PROTOCOL_VERSION = "CBLTest-API-Version";
+    public static final String HEADER_PROTOCOL_VERSION = "cbltest-api-version";
     public static final int DEFAULT_PROTOCOL_VERSION = 1;
-    public static final String HEADER_SENDER = "CBLTest-Client-ID";
+    public static final String HEADER_SENDER = "cbltest-client-id";
     public static final String DEFAULT_CLIENT = "c0ffee00-c0c0-50da-c01a-de1ec7ab1e00";
 
     private static final AtomicReference<TestApp> APP = new AtomicReference<>();

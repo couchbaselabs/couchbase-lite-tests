@@ -50,7 +50,7 @@ public final class Dispatcher {
         addTest(1, "/getAllDocumentIDs", Method.POST, (r, m) -> Collections.emptyMap());
         addTest(1, "/updateDatabase", Method.POST, (r, m) -> Collections.emptyMap());
         addTest(1, "/startReplicator", Method.POST, (r, m) -> app.getReplMgr().createRepl(r, m));
-        addTest(1, "/getReplicatorStatus", Method.POST, (r, m) -> Collections.emptyMap());
+        addTest(1, "/getReplicatorStatus", Method.POST, (r, m) -> app.getReplMgr().getReplStatus(r, m));
         addTest(1, "/snapshotDocuments", Method.POST, (r, m) -> Collections.emptyMap());
         addTest(1, "/verifyDocuments", Method.POST, (r, m) -> Collections.emptyMap());
     }
@@ -81,11 +81,11 @@ public final class Dispatcher {
                 Json.getParser(version).parseRequest(req),
                 TestApp.getApp().getMemory(client));
 
-            Log.w(TAG, "Test succeeded");
+            Log.w(TAG, "Request succeeded");
             return new Reply(Reply.Status.OK, "application/json", serializer.serializeReply(result));
         }
         catch (TestException err) {
-            Log.w(TAG, "Test failed", err);
+            Log.w(TAG, "Request failed", err);
             return new Reply(
                 Reply.Status.BAD_REQUEST,
                 "application/json",

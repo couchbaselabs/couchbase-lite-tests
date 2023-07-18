@@ -21,34 +21,43 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.couchbase.lite.Replicator;
+import com.couchbase.lite.ReplicatorStatus;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.TestException;
+import com.couchbase.lite.mobiletest.TypedMap;
+import com.couchbase.lite.mobiletest.deserializers.v1.ReplicatorConfigBuilder;
+import com.couchbase.lite.mobiletest.serializers.v1.ReplicatorStatusBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
 public class ReplicatorManager {
     private static final String TAG = "REPLMGR";
 
-    private static final String SYM_OPEN_REPLS = "~OPEN_REPLS";
-
     private static final String KEY_REPL_ID = "id";
 
+    private static final String SYM_OPEN_REPLS = "~OPEN_REPLS";
 
+    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @NonNull
-    public Map<String, Object> createRepl(@NonNull Map<String, Object> req, @NonNull Memory memory)
+    public Map<String, Object> createRepl(@NonNull Map<String, Object> req, @NonNull Memory mem)
         throws TestException {
-        Map<String, Object> liveRepls = memory.getMap(SYM_OPEN_REPLS);
+        TypedMap liveRepls = mem.getMap(SYM_OPEN_REPLS);
         if (liveRepls == null) {
-            liveRepls = new HashMap<>();
-            memory.put(SYM_OPEN_REPLS, liveRepls);
+            mem.put(SYM_OPEN_REPLS, new HashMap<>());
+            // liveRepls cannot be null
+            liveRepls = mem.getMap(SYM_OPEN_REPLS);
         }
 
         final String replId = UUID.randomUUID().toString();
-        final Replicator repl = new Replicator(new ReplicatorConfigBuilder(req, memory).build());
+        final ReplicatorConfigBuilder configBuilder = new ReplicatorConfigBuilder(req, mem);
+        final Replicator repl = new Replicator(configBuilder.build());
         liveRepls.put(replId, repl);
 
-        repl.start();
+        final Boolean shouldReset = configBuilder.shouldReset();
+        repl.start((shouldReset != null) && shouldReset);
         Log.i(TAG, "Started replicator: " + replId);
 
         final Map<String, Object> ret = new HashMap<>();
@@ -56,19 +65,32 @@ public class ReplicatorManager {
         return ret;
     }
 
+    @NonNull
+    public Map<String, Object> getReplStatus(@NonNull Map<String, Object> req, @NonNull Memory mem) {
+        final String id = new TypedMap(req, false).getString(KEY_REPL_ID);
+        if (id == null) { throw new IllegalStateException("Replicator id not specified"); }
+
+        final TypedMap liveRepls = mem.getMap(SYM_OPEN_REPLS);
+        if (liveRepls == null) { throw new IllegalStateException("No such replicator: " + id); }
+
+        final Replicator repl = liveRepls.get(id, Replicator.class);
+        if (repl == null) { throw new IllegalStateException("No such replicator: " + id); }
+
+        final ReplicatorStatus replStatus = repl.getStatus();
+        Log.i(TAG, "Replicator status: " + replStatus);
+
+        return new ReplicatorStatusBuilder(replStatus).build();
+    }
+
     public void reset(@NonNull Memory memory) {
-        final Map<String, Object> liveRepls = memory.getMap(SYM_OPEN_REPLS);
+        final TypedMap liveRepls = memory.getMap(SYM_OPEN_REPLS);
         memory.put(SYM_OPEN_REPLS, null);
 
         if ((liveRepls == null) || liveRepls.isEmpty()) { return; }
 
-        for (Object repl: liveRepls.values()) {
-            if (!(repl instanceof Replicator)) {
-                Log.e(TAG, "Attempt to close non-replicator: " + repl);
-                continue;
-            }
-
-            ((Replicator) repl).stop();
+        for (String key: liveRepls.getKeys()) {
+            final Replicator repl = liveRepls.get(key, Replicator.class);
+            if (repl != null) { repl.stop(); }
         }
     }
 }

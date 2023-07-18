@@ -18,10 +18,10 @@ package com.couchbase.lite.mobiletest;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 
 // Read only, relatively type safe object store
@@ -30,15 +30,22 @@ public class TypedMap extends TypedCollection {
     @NonNull
     private final Map<String, Object> args;
 
-    public TypedMap(@Nullable Map<?, ?> args) { this(args, true); }
+    public TypedMap() { this(new HashMap<>()); }
+
+    public TypedMap(@NonNull Map<?, ?> args) { this(args, true); }
 
     @SuppressWarnings("unchecked")
-    public TypedMap(@Nullable Map<?, ?> args, boolean strict) {
+    public TypedMap(@NonNull Map<?, ?> args, boolean strict) {
         super(strict);
-        this.args = Collections.unmodifiableMap((args != null) ? (Map<String, Object>) args : new HashMap<>());
+        this.args = (Map<String, Object>) args;
     }
 
+    public final boolean isEmpty() { return args.isEmpty(); }
+
     public boolean contains(@NonNull String key) { return args.containsKey(key); }
+
+    @NonNull
+    public Set<String> getKeys() { return args.keySet(); }
 
     @Nullable
     public Boolean getBoolean(@NonNull String key) { return get(key, Boolean.class); }
@@ -66,14 +73,27 @@ public class TypedMap extends TypedCollection {
 
     @SuppressWarnings("unchecked")
     @Nullable
-    public List<Object> getList(@NonNull String key) { return get(key, List.class); }
+    public TypedList getList(@NonNull String key) {
+        final List<Object> val = get(key, List.class);
+        return (val == null) ? null : new TypedList(val);
+    }
 
     @SuppressWarnings("unchecked")
     @Nullable
-    public Map<String, Object> getMap(@NonNull String key) { return get(key, Map.class); }
+    public TypedMap getMap(@NonNull String key) {
+        final Map<String, Object> val = get(key, Map.class);
+        return (val == null) ? null : new TypedMap(val);
+    }
 
     @Nullable
-    protected <T> T get(@NonNull String key, @NonNull Class<T> expectedType) {
-        return getT(expectedType, args.get(key));
+    public <T> T get(@NonNull String key, @NonNull Class<T> expectedType) {
+        return checkType(expectedType, args.get(key));
+    }
+
+    public void put(@NonNull String key, @Nullable Object val) { args.put(key, val); }
+
+    @Nullable
+    public <T> T remove(@NonNull String key, @NonNull Class<T> expectedType) {
+        return checkType(expectedType, args.remove(key));
     }
 }

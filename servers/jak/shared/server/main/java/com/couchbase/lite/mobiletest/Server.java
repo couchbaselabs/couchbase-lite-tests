@@ -107,7 +107,7 @@ public class Server extends NanoHTTPD {
             final String endpoint = session.getUri();
             if (StringUtils.isEmpty(endpoint)) { throw new IllegalArgumentException("Empty request"); }
 
-            Log.i(TAG, "Request(" + version + ")@" + client + " " + method + ":" + endpoint);
+            Log.i(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
 
             reply = dispatcher.handleRequest(client, version, method, endpoint, session.getInputStream());
             resp = new SafeResponse(reply);

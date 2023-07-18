@@ -27,6 +27,8 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.DatabaseConfiguration;
@@ -34,6 +36,7 @@ import com.couchbase.lite.internal.core.C4Database;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestException;
+import com.couchbase.lite.mobiletest.TypedMap;
 import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
 
@@ -57,16 +60,18 @@ public final class DatabaseManager {
         }
     }
 
+    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @NonNull
     public Database openDb(@NonNull String name, @NonNull Memory memory) throws TestException {
-        Map<String, Object> openDbs = memory.getMap(SYM_OPEN_DBS);
-        if (openDbs == null) {
-            openDbs = new HashMap<>();
-            memory.put(SYM_OPEN_DBS, openDbs);
+        TypedMap openDbs = memory.getMap(SYM_OPEN_DBS);
+        if (openDbs != null) {
+            final Database db = openDbs.get(name, Database.class);
+            if (db != null) { return db; }
         }
         else {
-            final Object db = openDbs.get(name);
-            if (db instanceof Database) { return (Database) db; }
+            memory.put(SYM_OPEN_DBS, new HashMap<>());
+            // openDbs cannot be null
+            openDbs = memory.getMap(SYM_OPEN_DBS);
         }
 
         final Database db;
@@ -112,28 +117,28 @@ public final class DatabaseManager {
 
     // !!! The req may contain a spec for datasets to be loaded
     public void reset(@NonNull Map<String, Object> req, @NonNull Memory memory) {
-        final Map<String, Object> openDbs = memory.getMap(SYM_OPEN_DBS);
+        final TypedMap openDbs = memory.getMap(SYM_OPEN_DBS);
         if ((openDbs == null) || openDbs.isEmpty()) { return; }
 
-        for (Object obj: openDbs.values()) {
-            if (!(obj instanceof Database)) {
-                Log.e(TAG, "Attempt to close non-database: " + obj);
+        for (String key: openDbs.getKeys()) {
+            final Database db = openDbs.get(key, Database.class);
+            if (db == null) {
+                Log.e(TAG, "Attempt to close non-existent database: " + key);
                 continue;
             }
 
-            final Database db = (Database) obj;
             try { db.delete(); }
             catch (CouchbaseLiteException e) { Log.w(TAG, "Failed deleting database: " + db.getName()); }
         }
     }
 
     private boolean closeDbInternal(@NonNull String name, @NonNull Memory memory) throws TestException {
-        final Map<String, Object> openDbs = memory.getMap(SYM_OPEN_DBS);
+        final TypedMap openDbs = memory.getMap(SYM_OPEN_DBS);
         if (openDbs != null) {
-            final Object db = openDbs.remove(name);
-            if (db instanceof Database) {
+            final Database db = openDbs.remove(name, Database.class);
+            if (db != null) {
                 try {
-                    ((Database) db).close();
+                    db.close();
                     return true;
                 }
                 catch (CouchbaseLiteException e) {
@@ -141,6 +146,7 @@ public final class DatabaseManager {
                 }
             }
         }
+
         return false;
     }
 }

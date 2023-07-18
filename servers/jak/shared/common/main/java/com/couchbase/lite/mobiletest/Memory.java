@@ -42,8 +42,6 @@ public final class Memory extends TypedMap {
     @NonNull
     public String getClient() { return client; }
 
-    public void put(@NonNull String key, @NonNull Object value) { symTab.put(key, value); }
-
     @NonNull
     public Ref addRef(@NonNull Object value) {
         final String address = "@" + nextAddress.getAndIncrement() + identifierSuffix;
@@ -52,8 +50,4 @@ public final class Memory extends TypedMap {
     }
 
     public void removeRef(@NonNull Ref ref) { symTab.remove(ref.key); }
-
-    @Nullable
-    @Override
-    protected <T> T get(@NonNull String name, @NonNull Class<T> expectedType) { return super.get(name, expectedType); }
 }
