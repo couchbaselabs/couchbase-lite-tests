@@ -25,11 +25,11 @@ abstract class TypedCollection {
     TypedCollection(boolean strict) { this.strict = strict; }
 
     @Nullable
-    protected final <T> T getT(@NonNull Class<T> expectedType, @Nullable Object val) {
+    protected final <T> T checkType(@NonNull Class<T> expectedType, @Nullable Object val) {
         if (val == null) { return null; }
         final Class<?> actualType = val.getClass();
         if (expectedType.isAssignableFrom(actualType)) { return expectedType.cast(val); }
         if (!strict) { return null; }
-        throw new TestException(TestException.TESTSERVER, 0, "Cannot convert " + actualType + " to " + expectedType);
+        throw new IllegalStateException("Cannot convert " + actualType + " to " + expectedType);
     }
 }

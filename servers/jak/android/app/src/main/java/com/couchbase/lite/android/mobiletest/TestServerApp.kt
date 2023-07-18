@@ -25,6 +25,8 @@ import org.koin.dsl.module
 
 
 class TestServerApp : Application() {
+
+    @Suppress("USELESS_CAST")
     override fun onCreate() {
         super.onCreate()
         TestApp.init(AndroidTestApp(this))
@@ -38,6 +40,7 @@ class TestServerApp : Application() {
             // dependency register modules
             modules(
                 module {
+                    // this cast *does* appear to be necessary
                     single { Server() as Server }
 
                     viewModel { MainViewModel(get()) }

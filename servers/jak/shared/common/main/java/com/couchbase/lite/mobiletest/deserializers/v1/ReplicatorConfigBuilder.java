@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.tests;
+package com.couchbase.lite.mobiletest.deserializers.v1;
 
 import androidx.annotation.NonNull;
 
@@ -40,7 +40,11 @@ import com.couchbase.lite.mobiletest.TypedList;
 import com.couchbase.lite.mobiletest.TypedMap;
 
 @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
-class ReplicatorConfigBuilder {
+public class ReplicatorConfigBuilder {
+    // !!! Temporary hack
+    @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
+    private static final String SGW_HOST = "192.168.89.163";
+
     private static final String KEY_CONFIG = "config";
     private static final String KEY_DB = "database";
     private static final String KEY_COLLECTIONS = "collections";
@@ -49,6 +53,7 @@ class ReplicatorConfigBuilder {
     private static final String TYPE_PUSH_AND_PULL = "pushandpull";
     private static final String TYPE_PUSH = "push";
     private static final String TYPE_PULL = "pull";
+    private static final String KEY_RESET = "reset";
     private static final String KEY_IS_CONTINUOUS = "continuous";
     private static final String KEY_AUTHENTICATOR = "authenticator";
     private static final String KEY_AUTH_TYPE = "type";
@@ -68,11 +73,16 @@ class ReplicatorConfigBuilder {
     @NonNull
     private final Memory memory;
 
-    ReplicatorConfigBuilder(@NonNull Map<String, Object> req, @NonNull Memory memory) {
+    private Boolean shouldReset;
+
+    public ReplicatorConfigBuilder(@NonNull Map<String, Object> req, @NonNull Memory memory) {
         this.req = req;
         this.memory = memory;
     }
 
+    public Boolean shouldReset() { return shouldReset; }
+
+    @SuppressWarnings("deprecation")
     @NonNull
     public ReplicatorConfiguration build() {
         final Object configSpec = req.get(KEY_CONFIG);
@@ -81,13 +91,22 @@ class ReplicatorConfigBuilder {
         }
         final TypedMap config = new TypedMap((Map<?, ?>) configSpec, false);
 
+        shouldReset = config.getBoolean(KEY_RESET);
+
         final String uri = config.getString(KEY_ENDPOINT);
         if (uri == null) {
             throw new IllegalStateException("Replicator configuration does not specify an endpoint");
         }
 
         final URLEndpoint endpoint;
-        try { endpoint = new URLEndpoint(new URI(uri)); }
+        try {
+            URI url = new URI(uri);
+
+            // !!! Temporary workaround!
+            url = new URI(url.getScheme(), null, SGW_HOST, url.getPort(), url.getPath(), null, null);
+
+            endpoint = new URLEndpoint(url);
+        }
         catch (URISyntaxException e) {
             throw new IllegalStateException("Replicator configuration contains an unparsable endpoint: " + uri, e);
         }
@@ -97,7 +116,7 @@ class ReplicatorConfigBuilder {
             throw new IllegalStateException("Replicator configuration does not specify a database");
         }
 
-        final List<Object> collections = config.getList(KEY_COLLECTIONS);
+        final TypedList collections = config.getList(KEY_COLLECTIONS);
         if (collections == null) {
             throw new IllegalStateException("Replicator configuration does not specify a list of collections");
         }
@@ -108,7 +127,7 @@ class ReplicatorConfigBuilder {
         if (collections.isEmpty()) { replConfig = new ReplicatorConfiguration(db, endpoint); }
         else {
             replConfig = new ReplicatorConfiguration(endpoint);
-            addCollections(db, new TypedList(collections), replConfig);
+            addCollections(db, collections, replConfig);
         }
 
         final String replType = config.getString(KEY_TYPE);
@@ -131,9 +150,8 @@ class ReplicatorConfigBuilder {
         final Boolean isContinuous = config.getBoolean(KEY_IS_CONTINUOUS);
         if (isContinuous != null) { replConfig.setContinuous(isContinuous); }
 
-        final Map<String, Object> auth = config.getMap(KEY_AUTHENTICATOR);
-        if (auth != null) {
-            final TypedMap authenticator = new TypedMap(auth);
+        final TypedMap authenticator = config.getMap(KEY_AUTHENTICATOR);
+        if (authenticator != null) {
             final String authType = authenticator.getString(KEY_AUTH_TYPE);
             if (authType == null) {
                 throw new IllegalStateException("Replicator authenticator does not specify a type");
@@ -158,11 +176,10 @@ class ReplicatorConfigBuilder {
         @NonNull TypedList spec,
         @NonNull ReplicatorConfiguration replConfig) {
         for (int i = 0; i < spec.size(); i++) {
-            final Map<String, Object> replColl = spec.getMap(i);
-            if (replColl == null) {
+            final TypedMap replCollection = spec.getMap(i);
+            if (replCollection == null) {
                 throw new IllegalStateException("Replication collection spec is null: " + i);
             }
-            final TypedMap replCollection = new TypedMap(replColl);
             final String collFqn = replCollection.getString(KEY_COLLECTION);
             if (collFqn == null) {
                 throw new IllegalStateException("Replication collection does not specify a collection: " + i);
@@ -186,9 +203,8 @@ class ReplicatorConfigBuilder {
     private CollectionConfiguration buildCollectionConfig(@NonNull TypedMap spec) {
         final CollectionConfiguration collectionConfig = new CollectionConfiguration();
 
-        final List<Object> chList = spec.getList(KEY_CHANNELS);
-        if (chList != null) {
-            final TypedList chSpec = new TypedList(chList);
+        final TypedList chSpec = spec.getList(KEY_CHANNELS);
+        if (chSpec != null) {
             final int n = chSpec.size();
             final List<String> channels = new ArrayList<>(n);
             for (int i = 0; i < n; i++) {
@@ -198,9 +214,8 @@ class ReplicatorConfigBuilder {
             collectionConfig.setChannels(channels);
         }
 
-        final List<Object> docIdList = spec.getList(KEY_DOCUMENT_IDS);
-        if (docIdList != null) {
-            final TypedList docIdSpec = new TypedList(chList);
+        final TypedList docIdSpec = spec.getList(KEY_DOCUMENT_IDS);
+        if (docIdSpec != null) {
             final int n = docIdSpec.size();
             final List<String> docIds = new ArrayList<>(n);
             for (int i = 0; i < n; i++) {
@@ -210,15 +225,10 @@ class ReplicatorConfigBuilder {
             collectionConfig.setDocumentIDs(docIds);
         }
 
-        final Map<String, Object> pushFilter = spec.getMap(KEY_PUSH_FILTER);
-        if (pushFilter != null) { collectionConfig.setPushFilter(buildReplicatorFilter(new TypedMap(pushFilter))); }
+        final TypedMap pushFilter = spec.getMap(KEY_PUSH_FILTER);
+        if (pushFilter != null) { collectionConfig.setPushFilter(buildReplicatorFilter(pushFilter)); }
 
         return collectionConfig;
-    }
-
-    @NonNull
-    private ReplicationFilter buildReplicatorFilter(@NonNull TypedMap map) {
-        throw new IllegalStateException("Filters not yet implemented");
     }
 
     @NonNull
@@ -231,6 +241,7 @@ class ReplicatorConfigBuilder {
         if ((pwd == null) || pwd.isEmpty()) {
             throw new IllegalStateException("Basic authenticator does not specify a password");
         }
+
         return new BasicAuthenticator(user, pwd.toCharArray());
     }
 
@@ -241,5 +252,11 @@ class ReplicatorConfigBuilder {
             throw new IllegalStateException("Session authenticator does not specify a session id");
         }
         return new SessionAuthenticator(session, spec.getString(KEY_SESSION_AUTH_COOKIE));
+    }
+
+
+    @NonNull
+    private ReplicationFilter buildReplicatorFilter(@NonNull TypedMap spec) {
+        throw new IllegalStateException("Filters not yet implemented");
     }
 }

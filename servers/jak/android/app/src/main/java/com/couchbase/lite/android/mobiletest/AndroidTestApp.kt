@@ -20,7 +20,10 @@ import android.os.Build
 import android.util.Base64
 import com.couchbase.lite.CouchbaseLite
 import com.couchbase.lite.CouchbaseLiteException
+import com.couchbase.lite.Database
 import com.couchbase.lite.KeyStoreUtils
+import com.couchbase.lite.LogDomain
+import com.couchbase.lite.LogLevel
 import com.couchbase.lite.TLSIdentity
 import com.couchbase.lite.internal.core.CBLVersion
 import com.couchbase.lite.mobiletest.TestApp
@@ -33,7 +36,12 @@ import java.util.*
 
 
 class AndroidTestApp(private val context: Context) : TestApp() {
-    override fun initCBL() = CouchbaseLite.init(context, true)
+    override fun initCBL()  {
+        CouchbaseLite.init(context, true)
+        val logger = Database.log.console
+        logger.domains = LogDomain.ALL_DOMAINS
+        logger.level = LogLevel.DEBUG
+    }
 
     override fun getPlatform() = "android"
 

@@ -49,10 +49,7 @@ public abstract class Json {
     }
     @NonNull
     public static Json getParser(int version) {
-        final int previousVersion = PROTOCOL_VERSION.getAndSet(version);
-        if ((previousVersion >= 0) && (version != previousVersion)) {
-            Log.w(TAG, "Request protocol changed for parser: " + previousVersion + " => " + version);
-        }
+        checkVersion(version);
 
         final Fn.Supplier<Json> supplier = ((version < 0) || (version > (PROTOCOLS.size() - 1)))
             ? null
@@ -67,11 +64,7 @@ public abstract class Json {
 
     @NonNull
     public static Json getSerializer(int version) {
-        final int previousVersion = PROTOCOL_VERSION.get();
-        if (previousVersion < 0) { Log.w(TAG, "Reply before request"); }
-        else if (version != previousVersion) {
-            Log.w(TAG, "Request protocol changed for serializer: " + previousVersion + " => " + version);
-        }
+        checkVersion(version);
 
         if (version > (PROTOCOLS.size() - 1)) {
             throw new IllegalArgumentException("Unsupported protocol version: " + version);
@@ -152,6 +145,13 @@ public abstract class Json {
                 return parseMap(json);
             default:
                 throw new IllegalArgumentException("Unexpected token: " + token);
+        }
+    }
+
+    private static void checkVersion(int version) {
+        final int previousVersion = PROTOCOL_VERSION.getAndSet(version);
+        if ((previousVersion >= 0) && (version != previousVersion)) {
+            Log.w(TAG, "Request protocol changed for parser: " + previousVersion + " => " + version);
         }
     }
 }

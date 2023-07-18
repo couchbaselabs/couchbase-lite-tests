@@ -16,6 +16,7 @@
 package com.couchbase.lite.android.mobiletest.util
 
 import com.couchbase.lite.mobiletest.Server
+import com.couchbase.lite.mobiletest.util.Log
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -81,7 +82,7 @@ fun Server.url(scheme: String = "http", path: String = ""): URI? {
             try {
                 URI("${scheme}://${addrStr}:${this.myPort}/${path}")
             } catch (err: URISyntaxException) {
-                android.util.Log.d(TAG, "Bad URL from: ${addrStr}", err)
+                Log.w(TAG, "Bad URL from: ${addrStr}", err)
                 null
             }
         }

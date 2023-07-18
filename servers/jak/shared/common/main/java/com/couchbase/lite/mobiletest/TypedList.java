@@ -19,7 +19,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -28,12 +27,16 @@ public class TypedList extends TypedCollection {
     @NonNull
     private final List<Object> args;
 
-    public TypedList(@Nullable List<Object> args) { this(args, true); }
+    public TypedList() { this(new ArrayList<>()); }
 
-    public TypedList(@Nullable List<Object> args, boolean strict) {
+    public TypedList(@NonNull List<Object> args) { this(args, true); }
+
+    public TypedList(@NonNull List<Object> args, boolean strict) {
         super(strict);
-        this.args = Collections.unmodifiableList((args != null) ? args : new ArrayList<>());
+        this.args = args;
     }
+
+    public final boolean isEmpty() { return args.isEmpty(); }
 
     public int size() { return args.size(); }
 
@@ -63,12 +66,20 @@ public class TypedList extends TypedCollection {
 
     @SuppressWarnings("unchecked")
     @Nullable
-    public List<Object> getList(int pos) { return get(pos, List.class); }
+    public TypedList getList(int pos) {
+        final List<Object> val = get(pos, List.class);
+        return (val == null) ? null : new TypedList(val);
+    }
 
     @SuppressWarnings("unchecked")
     @Nullable
-    public Map<String, Object> getMap(int pos) { return get(pos, Map.class); }
+    public TypedMap getMap(int pos) {
+        final Map<String, Object> val = get(pos, Map.class);
+        return (val == null) ? null : new TypedMap(val);
+    }
 
     @Nullable
-    protected <T> T get(int pos, @NonNull Class<T> expectedType) { return getT(expectedType,  args.get(pos)); }
+    public <T> T get(int pos, @NonNull Class<T> expectedType) { return checkType(expectedType, args.get(pos)); }
+
+    public void add(@Nullable Object val) { args.add(val); }
 }
