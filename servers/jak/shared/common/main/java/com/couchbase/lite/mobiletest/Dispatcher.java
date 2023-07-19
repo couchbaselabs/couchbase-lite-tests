@@ -24,9 +24,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import okio.Buffer;
-
-import com.couchbase.lite.mobiletest.json.Json;
+import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.factories.ReplyBuilder;
+import com.couchbase.lite.mobiletest.factories.RequestBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
@@ -49,8 +49,8 @@ public final class Dispatcher {
         });
         addTest(1, "/getAllDocumentIDs", Method.POST, (r, m) -> Collections.emptyMap());
         addTest(1, "/updateDatabase", Method.POST, (r, m) -> Collections.emptyMap());
-        addTest(1, "/startReplicator", Method.POST, (r, m) -> app.getReplMgr().createRepl(r, m));
-        addTest(1, "/getReplicatorStatus", Method.POST, (r, m) -> app.getReplMgr().getReplStatus(r, m));
+        addTest(1, "/startReplicator", Method.POST, (r, m) -> app.getReplSvc().createReplV1(r, m));
+        addTest(1, "/getReplicatorStatus", Method.POST, (r, m) -> app.getReplSvc().getReplStatusV1(r, m));
         addTest(1, "/snapshotDocuments", Method.POST, (r, m) -> Collections.emptyMap());
         addTest(1, "/verifyDocuments", Method.POST, (r, m) -> Collections.emptyMap());
     }
@@ -65,32 +65,20 @@ public final class Dispatcher {
         @NonNull String path,
         @NonNull InputStream req
     ) throws IOException {
-        final Json serializer = Json.getSerializer(version);
-        try {
-            final Test test = getTest(version, path, method);
-            if (test == null) {
-                final String msg = "Unrecognized request: " + method + " " + path + " @" + version;
-                Log.w(TAG, msg);
-                return new Reply(
-                    Reply.Status.METHOD_NOT_ALLOWED,
-                    "text/plain",
-                    new Buffer().writeUtf8(msg));
-            }
-
-            final Map<String, Object> result = test.run(
-                Json.getParser(version).parseRequest(req),
-                TestApp.getApp().getMemory(client));
-
-            Log.w(TAG, "Request succeeded");
-            return new Reply(Reply.Status.OK, "application/json", serializer.serializeReply(result));
+        final Test test = getTest(version, path, method);
+        if (test == null) {
+            final String msg = "Unrecognized request: " + method + " " + path + " @" + version;
+            Log.w(TAG, msg);
+            throw new ClientError(msg);
         }
-        catch (TestException err) {
-            Log.w(TAG, "Request failed", err);
-            return new Reply(
-                Reply.Status.BAD_REQUEST,
-                "application/json",
-                serializer.serializeReply(err.getError()));
-        }
+
+        final Map<String, Object> result = test.run(
+            new RequestBuilder().buildRequest(req),
+            TestApp.getApp().getMemory(client));
+
+        Log.w(TAG, "Request succeeded");
+
+        return new Reply(new ReplyBuilder().buildReply(result));
     }
 
     @Nullable

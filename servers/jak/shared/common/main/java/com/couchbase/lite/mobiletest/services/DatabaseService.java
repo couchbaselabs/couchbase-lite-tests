@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.tests;
+package com.couchbase.lite.mobiletest.services;
 
 import androidx.annotation.NonNull;
 
@@ -25,7 +25,6 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
@@ -35,14 +34,13 @@ import com.couchbase.lite.DatabaseConfiguration;
 import com.couchbase.lite.internal.core.C4Database;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.TestApp;
-import com.couchbase.lite.mobiletest.TestException;
-import com.couchbase.lite.mobiletest.TypedMap;
+import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
-public final class DatabaseManager {
-    private static final String TAG = "DBMGR";
+public final class DatabaseService {
+    private static final String TAG = "DB_SVC";
 
     private static final String SYM_OPEN_DBS = "~OPEN_DBS";
 
@@ -51,7 +49,7 @@ public final class DatabaseManager {
 
     private final File dbRoot;
 
-    public DatabaseManager() {
+    public DatabaseService() {
         final String testDir = "tests_"
             + new SimpleDateFormat("MM_dd_HH_mm_ss", Locale.getDefault()).format(new Date());
         dbRoot = new File(TestApp.getApp().getFilesDir(), testDir);
@@ -62,7 +60,7 @@ public final class DatabaseManager {
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @NonNull
-    public Database openDb(@NonNull String name, @NonNull Memory memory) throws TestException {
+    public Database openDb(@NonNull String name, @NonNull Memory memory) {
         TypedMap openDbs = memory.getMap(SYM_OPEN_DBS);
         if (openDbs != null) {
             final Database db = openDbs.get(name, Database.class);
@@ -87,7 +85,7 @@ public final class DatabaseManager {
         return db;
     }
 
-    public void closeDb(@NonNull String name, @NonNull Memory memory) throws TestException {
+    public void closeDb(@NonNull String name, @NonNull Memory memory) {
         if (closeDbInternal(name, memory)) { return; }
         Log.w(TAG, "Attempt to close a database that is not open: " + name);
     }
@@ -96,8 +94,7 @@ public final class DatabaseManager {
     // New stream constructors are supported only in API 26+
     @SuppressWarnings("IOStreamConstructor")
     @NonNull
-    public Database installDb(@NonNull String datasetName, @NonNull String dbName, @NonNull Memory memory)
-        throws TestException {
+    public Database installDb(@NonNull String datasetName, @NonNull String dbName, @NonNull Memory memory) {
         closeDbInternal(dbName, memory);
 
         final File tmpDir = new File("tmpDir");
@@ -115,8 +112,7 @@ public final class DatabaseManager {
         return openDb(dbName, memory);
     }
 
-    // !!! The req may contain a spec for datasets to be loaded
-    public void reset(@NonNull Map<String, Object> req, @NonNull Memory memory) {
+    public void reset(@NonNull TypedMap req, @NonNull Memory memory) {
         final TypedMap openDbs = memory.getMap(SYM_OPEN_DBS);
         if ((openDbs == null) || openDbs.isEmpty()) { return; }
 
@@ -132,7 +128,10 @@ public final class DatabaseManager {
         }
     }
 
-    private boolean closeDbInternal(@NonNull String name, @NonNull Memory memory) throws TestException {
+    public void init(TypedMap req, Memory mem) {
+    }
+
+    private boolean closeDbInternal(@NonNull String name, @NonNull Memory memory) {
         final TypedMap openDbs = memory.getMap(SYM_OPEN_DBS);
         if (openDbs != null) {
             final Database db = openDbs.remove(name, Database.class);

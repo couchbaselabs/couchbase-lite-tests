@@ -1,6 +1,8 @@
 package com.couchbase.lite.javadesktop.mobiletest;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -11,6 +13,7 @@ import org.apache.commons.daemon.DaemonContext;
 import com.couchbase.lite.mobiletest.Server;
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.util.Log;
+import com.couchbase.lite.mobiletest.util.NetUtils;
 
 
 public class TestServerApp implements Daemon {
@@ -92,7 +95,11 @@ public class TestServerApp implements Daemon {
         if (!SERVER.compareAndSet(null, server)) { throw new IllegalStateException("Attempt to restart server"); }
 
         final String id = TestApp.getApp().getAppId();
-        Log.i(TAG, "Java Desktop Test Server launched at " + id + ":" + server.myPort);
+        final List<InetAddress> addrs = NetUtils.getLocalAddresses();
+        Log.i(
+            TAG,
+            "Java Desktop Test Server " + id + " running at "
+                + NetUtils.makeUri("http", (addrs != null) ? addrs.get(0) : null, server.myPort, ""));
     }
 
     @Override

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2022 Couchbase, Inc All rights reserved.
+// Copyright (c) 2023 Couchbase, Inc All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,53 +13,51 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.json;
+package com.couchbase.lite.mobiletest.factories;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.squareup.moshi.JsonReader;
 import com.squareup.moshi.JsonWriter;
 import okio.Buffer;
-import okio.Okio;
-
-import com.couchbase.lite.mobiletest.Memory;
 
 
-public class JsonV1 extends Json {
-    @SuppressWarnings("PMD.PrematureDeclaration")
+public class ReplyBuilder {
     @NonNull
-    public Map<String, Object> parseRequest(@NonNull InputStream json) throws IOException {
-        final JsonReader reader = JsonReader.of(Okio.buffer(Okio.source(json)));
-        reader.setLenient(true);
-        // ??? check for extraneous stuff at the end of the document, wo hanging
-        return parseMap(reader);
-    }
-
-    @NonNull
-    public Buffer serializeReply(@Nullable Map<String, Object> data) throws IOException {
+    public Buffer buildReply(@Nullable Map<String, Object> reply) throws IOException {
         final Buffer buf = new Buffer();
         final JsonWriter writer = JsonWriter.of(buf);
         writer.setLenient(true);
         writer.setSerializeNulls(true);
-        serializeMap((data != null) ? data : new HashMap<String, Object>(), writer);
+        serializeMap((reply != null) ? reply : new HashMap<String, Object>(), writer);
         return buf;
     }
 
-    @NonNull
-    @Override
-    protected Object parseString(@NonNull String s) {
-        return (!s.startsWith(Memory.PREFIX_REF)) ? s : new Memory.Ref(s.substring(1));
+    private void serializeMap(Map<?, ?> value, @NonNull JsonWriter writer) throws IOException {
+        writer.beginObject();
+        for (Map.Entry<?, ?> entry: value.entrySet()) {
+            final Object key = entry.getKey();
+            if (!(key instanceof String)) {
+                throw new IllegalArgumentException("Key is not a string in serialize: " + key);
+            }
+            writer.name((String) key);
+            serializeValue(entry.getValue(), writer);
+        }
+        writer.endObject();
     }
 
-    @Override
-    protected void serializeValue(@Nullable Object value, @NonNull JsonWriter writer) throws IOException {
+    private void serializeList(List<?> value, @NonNull JsonWriter writer) throws IOException {
+        writer.beginArray();
+        for (Object item: value) { serializeValue(item, writer); }
+        writer.endArray();
+    }
+
+    private void serializeValue(@Nullable Object value, @NonNull JsonWriter writer) throws IOException {
         if (value == null) {
             writer.nullValue();
             return;
@@ -76,10 +74,6 @@ public class JsonV1 extends Json {
             writer.value((String) value);
             return;
         }
-        if (value instanceof Memory.Ref) {
-            writer.value(Memory.PREFIX_REF + ((Memory.Ref) value).key);
-            return;
-        }
         if (value instanceof List) {
             serializeList((List<?>) value, writer);
             return;
@@ -92,3 +86,5 @@ public class JsonV1 extends Json {
         throw new IllegalArgumentException("Value not a serializable type: " + value);
     }
 }
+
+

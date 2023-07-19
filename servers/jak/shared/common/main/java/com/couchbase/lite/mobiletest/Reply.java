@@ -23,34 +23,10 @@ import okio.Buffer;
 
 
 public class Reply implements AutoCloseable {
-    public enum Status {
-        OK(200), BAD_REQUEST(400), METHOD_NOT_ALLOWED(405);
-
-        private final int code;
-
-        Status(int code) { this.code = code; }
-
-        public int getCode() { return code; }
-    }
-
-    @NonNull
-    private final Status status;
-    @NonNull
-    private final String contentType;
     @NonNull
     private final Buffer content;
 
-    public Reply(@NonNull Status code, @NonNull String contentType, @NonNull Buffer content) {
-        this.status = code;
-        this.contentType = contentType;
-        this.content = content;
-    }
-
-    @NonNull
-    public String getContentType() { return contentType; }
-
-    @NonNull
-    public Status getStatus() { return status; }
+    public Reply(@NonNull Buffer content) { this.content = content; }
 
     @NonNull
     public InputStream getContent() {

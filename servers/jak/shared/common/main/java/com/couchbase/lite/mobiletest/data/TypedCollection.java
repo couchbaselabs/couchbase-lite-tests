@@ -13,35 +13,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.util;
+package com.couchbase.lite.mobiletest.data;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 
+abstract class TypedCollection {
+    private final boolean strict;
 
-public final class Fn {
-    private Fn() {}
+    TypedCollection(boolean strict) { this.strict = strict; }
 
-    @FunctionalInterface
-    public interface Supplier<R> {
-        @NonNull
-        R get();
-    }
-
-    @FunctionalInterface
-    interface Function<T, R> {
-        @Nullable
-        R apply(@NonNull T x);
-    }
-
-    @NonNull
-    public static <T, R> List<R> mapToList(@NonNull Collection<? extends T> l, @NonNull Function<T, R> fn) {
-        final List<R> r = new ArrayList<>(l.size());
-        for (T e: l) { r.add(fn.apply(e)); }
-        return r;
+    @Nullable
+    protected final <T> T checkType(@NonNull Class<T> expectedType, @Nullable Object val) {
+        if (val == null) { return null; }
+        final Class<?> actualType = val.getClass();
+        if (expectedType.isAssignableFrom(actualType)) { return expectedType.cast(val); }
+        if (!strict) { return null; }
+        throw new IllegalStateException("Cannot convert " + actualType + " to " + expectedType);
     }
 }

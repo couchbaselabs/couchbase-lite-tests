@@ -13,23 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest;
+package com.couchbase.lite.mobiletest.errors;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 
-abstract class TypedCollection {
-    private final boolean strict;
+public class ClientError extends TestError {
+    public ClientError(@NonNull String message) { super(message); }
 
-    TypedCollection(boolean strict) { this.strict = strict; }
-
-    @Nullable
-    protected final <T> T checkType(@NonNull Class<T> expectedType, @Nullable Object val) {
-        if (val == null) { return null; }
-        final Class<?> actualType = val.getClass();
-        if (expectedType.isAssignableFrom(actualType)) { return expectedType.cast(val); }
-        if (!strict) { return null; }
-        throw new IllegalStateException("Cannot convert " + actualType + " to " + expectedType);
-    }
+    public ClientError(@NonNull String message, @NonNull Throwable cause) { super(message, cause); }
 }

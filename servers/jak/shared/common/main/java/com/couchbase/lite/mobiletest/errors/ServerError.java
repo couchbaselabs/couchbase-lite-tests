@@ -13,18 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest;
+package com.couchbase.lite.mobiletest.errors;
 
 import androidx.annotation.NonNull;
 
-import java.util.Map;
 
-import com.couchbase.lite.mobiletest.data.TypedMap;
+public class ServerError extends TestError{
+    public ServerError(@NonNull String message) { super(message); }
 
-
-@SuppressWarnings("PMD.SignatureDeclareThrowsException")
-@FunctionalInterface
-interface Test {
-    @NonNull
-    Map<String, Object> run(@NonNull TypedMap req, @NonNull Memory mem);
+    public ServerError(@NonNull String message, @NonNull Throwable cause) { super(message, cause); }
 }

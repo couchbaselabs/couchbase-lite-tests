@@ -15,57 +15,37 @@
 //
 package com.couchbase.lite.mobiletest
 
+import com.couchbase.lite.mobiletest.factories.RequestBuilder
 import com.couchbase.lite.mobiletest.json.JsonEach
 import com.couchbase.lite.mobiletest.json.CompareJsonObject
 import com.couchbase.lite.mobiletest.json.UpdateJsonObject
 import com.couchbase.lite.mobiletest.json.PrintJson
 import com.couchbase.lite.mobiletest.json.JsonReduce
-import com.couchbase.lite.mobiletest.json.JsonV0
-import com.couchbase.lite.mobiletest.json.JsonV1
+import com.couchbase.lite.mobiletest.factories.ReplyBuilder
 
 import org.json.JSONObject
 import org.junit.Assert
 import org.junit.Test
 
 class JsonTest : BaseTest() {
-    @Test
-    fun testJson1Args() {
-        val data: MutableMap<String, Any?> = mutableMapOf("red" to null)
-        data["green"] = listOf(true, "string", 43, 44L, 2.71828F, 2.71828, Memory.Ref("x1"))
-
-        val json = JsonV0().serializeReply(data)
-        val parsed = JsonV0().parseRequest(json.inputStream())
-
-        Assert.assertNull(parsed["red"])
-
-        val list = parsed["green"] as List<Any?>
-        Assert.assertTrue(list[0] as Boolean)
-        Assert.assertEquals("string", list[1])
-        Assert.assertEquals(43, list[2])
-        Assert.assertEquals(44L, list[3])
-        Assert.assertEquals(2.71828F, list[4])
-        Assert.assertEquals(2.71828, list[5])
-        Assert.assertEquals("x1", (list[6] as Memory.Ref).key)
-    }
 
     @Test
     fun testJson2Args() {
         val data: MutableMap<String, Any?> = mutableMapOf("red" to null)
-        data["green"] = listOf(true, "string", 43, 44L, 2.71828F, 2.71828, Memory.Ref("x1"))
+        data["green"] = listOf(true, "string", 43, 44L, 2.71828F, 2.71828)
 
-        val json = JsonV1().serializeReply(data)
-        val parsed = JsonV1().parseRequest(json.inputStream())
+        val reply = ReplyBuilder().buildReply(data)
+        val request = RequestBuilder().buildRequest(reply.inputStream())
 
-        Assert.assertNull(parsed["red"])
+        Assert.assertNull(request.getString("red"))
 
-        val list = parsed["green"] as List<Any?>
-        Assert.assertTrue(list[0] as Boolean)
-        Assert.assertEquals("string", list[1])
-        Assert.assertEquals(43L, list[2])
-        Assert.assertEquals(44L, list[3])
-        Assert.assertEquals(2.71828, list[4])
-        Assert.assertEquals(2.71828, list[5])
-        Assert.assertEquals("x1", (list[6] as Memory.Ref).key)
+        val list = request.getList("green")!!
+        Assert.assertTrue(list.getBoolean(0)!!)
+        Assert.assertEquals("string", list.getString(1))
+        Assert.assertEquals(43L, list.getLong(2)) // the parser does this..
+        Assert.assertEquals(44L, list.getLong(3))
+        Assert.assertEquals(2.71828, list.getDouble(4)) // the parser does this..
+        Assert.assertEquals(2.71828, list.getDouble(5))
     }
 
     @Test

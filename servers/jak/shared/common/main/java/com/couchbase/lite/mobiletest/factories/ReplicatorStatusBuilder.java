@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.serializers.v1;
+package com.couchbase.lite.mobiletest.factories;
 
 import androidx.annotation.NonNull;
 
@@ -25,8 +25,8 @@ import com.couchbase.lite.ReplicatorStatus;
 
 
 public class ReplicatorStatusBuilder {
-    private static final String KEY_REPL_ACTIVITY = "'activity'";
-    private static final String KEY_REPL_PROGRESS = "'progress'";
+    private static final String KEY_REPL_ACTIVITY = "activity";
+    private static final String KEY_REPL_PROGRESS = "progress";
     private static final String KEY_REPL_DOCS_COMPLETE = "complete";
     private static final String KEY_REPL_DOC_COUNT = "documentCount";
 
