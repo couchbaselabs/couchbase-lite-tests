@@ -69,6 +69,7 @@ def COUCHBASE_LITE_LIB = 'couchbase-lite-java-ee'
 if (USE_LOCAL_MAVEN) { COUCHBASE_LITE_LIB += "-macos" }
 
 dependencies {
+    compileOnly "com.github.spotbugs:spotbugs-annotations:${SPOTBUGS_VERSION}"
     compileOnly 'androidx.annotation:annotation:1.5.0'
 
     providedCompile "javax.servlet:javax.servlet-api:4.0.1"

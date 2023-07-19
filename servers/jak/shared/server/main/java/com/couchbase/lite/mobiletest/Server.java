@@ -1,6 +1,7 @@
 package com.couchbase.lite.mobiletest;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.io.OutputStream;
 import java.util.Collections;
@@ -11,10 +12,12 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.nanohttpd.protocols.http.IHTTPSession;
 import org.nanohttpd.protocols.http.NanoHTTPD;
 import org.nanohttpd.protocols.http.request.Method;
-import org.nanohttpd.protocols.http.response.IStatus;
 import org.nanohttpd.protocols.http.response.Response;
 import org.nanohttpd.protocols.http.response.Status;
 
+import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.errors.ServerError;
+import com.couchbase.lite.mobiletest.errors.TestError;
 import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
@@ -25,23 +28,10 @@ public class Server extends NanoHTTPD {
     private static final int PORT = 8080;
 
     private static class SafeResponse extends Response {
-        private static final Map<Reply.Status, IStatus> STATUS;
-        static {
-            final Map<Reply.Status, IStatus> m = new HashMap<>();
-            m.put(Reply.Status.OK, Status.OK);
-            m.put(Reply.Status.BAD_REQUEST, Status.BAD_REQUEST);
-            m.put(Reply.Status.METHOD_NOT_ALLOWED, Status.METHOD_NOT_ALLOWED);
-            STATUS = Collections.unmodifiableMap(m);
-        }
-
         private final Reply reply;
 
         SafeResponse(@NonNull Reply reply) {
-            super(
-                STATUS.get(reply.getStatus()),
-                reply.getContentType(),
-                reply.getContent(),
-                reply.getSize());
+            super(Status.OK, "application/json", reply.getContent(), reply.getSize());
             this.reply = reply;
         }
 
@@ -89,13 +79,19 @@ public class Server extends NanoHTTPD {
                 Log.w(TAG, "Request does not specify a protocol version. Using version " + version);
             }
             else {
-                try { version = Integer.parseInt(versionStr); }
+                try {
+                    final int v = Integer.parseInt(versionStr);
+                    if (TestApp.KNOWN_VERSIONS.contains(v)) { version = v; }
+                    else {
+                        Log.w(TAG, "Unrecognized protocol version: " + versionStr + ". Using version " + version);
+                    }
+                }
                 catch (NumberFormatException ignore) {
                     Log.w(TAG, "Unrecognized protocol version: " + versionStr + ". Using version " + version);
                 }
             }
 
-            String client = headers.get(TestApp.HEADER_SENDER);
+            String client = headers.get(TestApp.HEADER_CLIENT);
             if (client == null) {
                 client = TestApp.DEFAULT_CLIENT;
                 Log.w(TAG, "Request does not specify a client Id. Using " + client);
@@ -112,18 +108,28 @@ public class Server extends NanoHTTPD {
             reply = dispatcher.handleRequest(client, version, method, endpoint, session.getInputStream());
             resp = new SafeResponse(reply);
         }
-        catch (Exception err) {
+        catch (ClientError err) {
+            Log.w(TAG, "Client error", err);
+            resp = handleError(reply, Status.BAD_REQUEST, err);
+        }
+        catch (ServerError err) {
             Log.w(TAG, "Server error", err);
-            if (reply != null) { reply.close(); }
-            resp = Response.newFixedLengthResponse(
-                Status.INTERNAL_ERROR,
-                "text/plain",
-                TestException.printError(err));
+            resp = handleError(reply, Status.INTERNAL_ERROR, err);
+        }
+        catch (Exception err) {
+            Log.w(TAG, "Internal Server error", err);
+            resp = handleError(reply, Status.INTERNAL_ERROR, new ServerError("Internal server error", err));
         }
 
         resp.addHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));
-        resp.addHeader(TestApp.HEADER_SENDER, appId);
+        resp.addHeader(TestApp.HEADER_SERVER, appId);
 
         return resp;
+    }
+
+    @NonNull
+    private Response handleError(@Nullable Reply reply, @NonNull Status status, @NonNull TestError err) {
+        if (reply != null) { reply.close(); }
+        return Response.newFixedLengthResponse(status, "text/plain", err.printError());
     }
 }

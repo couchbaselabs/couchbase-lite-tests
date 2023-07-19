@@ -13,35 +13,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.util;
+package com.couchbase.lite.mobiletest.errors;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 
 
-public final class Fn {
-    private Fn() {}
+public class TestError extends RuntimeException {
+    public TestError(@NonNull String message) { super(message); }
 
-    @FunctionalInterface
-    public interface Supplier<R> {
-        @NonNull
-        R get();
-    }
-
-    @FunctionalInterface
-    interface Function<T, R> {
-        @Nullable
-        R apply(@NonNull T x);
-    }
+    public TestError(@NonNull String message, @NonNull Throwable cause) { super(message, cause); }
 
     @NonNull
-    public static <T, R> List<R> mapToList(@NonNull Collection<? extends T> l, @NonNull Function<T, R> fn) {
-        final List<R> r = new ArrayList<>(l.size());
-        for (T e: l) { r.add(fn.apply(e)); }
-        return r;
+    public String printError() {
+        final StringWriter sw = new StringWriter();
+        sw.write(getLocalizedMessage());
+        sw.write("\n");
+        final PrintWriter pw = new PrintWriter(sw);
+        printStackTrace(pw);
+        return pw.toString();
     }
 }

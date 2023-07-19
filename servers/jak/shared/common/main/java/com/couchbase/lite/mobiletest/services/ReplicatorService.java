@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.tests;
+package com.couchbase.lite.mobiletest.services;
 
 import androidx.annotation.NonNull;
 
@@ -26,15 +26,14 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.ReplicatorStatus;
 import com.couchbase.lite.mobiletest.Memory;
-import com.couchbase.lite.mobiletest.TestException;
-import com.couchbase.lite.mobiletest.TypedMap;
-import com.couchbase.lite.mobiletest.deserializers.v1.ReplicatorConfigBuilder;
-import com.couchbase.lite.mobiletest.serializers.v1.ReplicatorStatusBuilder;
+import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.factories.ReplicatorConfigBuilder;
+import com.couchbase.lite.mobiletest.factories.ReplicatorStatusBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
-public class ReplicatorManager {
-    private static final String TAG = "REPLMGR";
+public class ReplicatorService {
+    private static final String TAG = "REPL_SVC";
 
     private static final String KEY_REPL_ID = "id";
 
@@ -42,8 +41,7 @@ public class ReplicatorManager {
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @NonNull
-    public Map<String, Object> createRepl(@NonNull Map<String, Object> req, @NonNull Memory mem)
-        throws TestException {
+    public Map<String, Object> createReplV1(@NonNull TypedMap req, @NonNull Memory mem) {
         TypedMap liveRepls = mem.getMap(SYM_OPEN_REPLS);
         if (liveRepls == null) {
             mem.put(SYM_OPEN_REPLS, new HashMap<>());
@@ -66,8 +64,8 @@ public class ReplicatorManager {
     }
 
     @NonNull
-    public Map<String, Object> getReplStatus(@NonNull Map<String, Object> req, @NonNull Memory mem) {
-        final String id = new TypedMap(req, false).getString(KEY_REPL_ID);
+    public Map<String, Object> getReplStatusV1(@NonNull TypedMap req, @NonNull Memory mem) {
+        final String id = req.getString(KEY_REPL_ID);
         if (id == null) { throw new IllegalStateException("Replicator id not specified"); }
 
         final TypedMap liveRepls = mem.getMap(SYM_OPEN_REPLS);
@@ -92,5 +90,8 @@ public class ReplicatorManager {
             final Replicator repl = liveRepls.get(key, Replicator.class);
             if (repl != null) { repl.stop(); }
         }
+    }
+
+    public void init(TypedMap req, Memory mem) {
     }
 }

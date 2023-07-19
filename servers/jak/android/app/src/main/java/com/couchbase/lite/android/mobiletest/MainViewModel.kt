@@ -16,9 +16,9 @@
 package com.couchbase.lite.android.mobiletest
 
 import androidx.lifecycle.ViewModel
-import com.couchbase.lite.android.mobiletest.util.url
 import com.couchbase.lite.mobiletest.Server
 import com.couchbase.lite.mobiletest.util.Log
+import com.couchbase.lite.mobiletest.util.NetUtils
 import java.io.IOException
 import java.net.URI
 
@@ -38,7 +38,8 @@ class MainViewModel(private val server: Server) : ViewModel() {
         }
     }
 
-    fun stopServer() {
-        server.stop()
-    }
+    fun stopServer() = server.stop()
+
+    private fun Server.url(scheme: String = "http", path: String = "") =
+        NetUtils.makeUri(scheme, NetUtils.getLocalAddresses()?.get(0), this.myPort, path)
 }

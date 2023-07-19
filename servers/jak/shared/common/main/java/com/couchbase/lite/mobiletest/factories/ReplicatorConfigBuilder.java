@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.deserializers.v1;
+package com.couchbase.lite.mobiletest.factories;
 
 import androidx.annotation.NonNull;
 
@@ -36,15 +36,12 @@ import com.couchbase.lite.SessionAuthenticator;
 import com.couchbase.lite.URLEndpoint;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.TestApp;
-import com.couchbase.lite.mobiletest.TypedList;
-import com.couchbase.lite.mobiletest.TypedMap;
+import com.couchbase.lite.mobiletest.data.TypedList;
+import com.couchbase.lite.mobiletest.data.TypedMap;
+
 
 @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
 public class ReplicatorConfigBuilder {
-    // !!! Temporary hack
-    @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
-    private static final String SGW_HOST = "192.168.89.163";
-
     private static final String KEY_CONFIG = "config";
     private static final String KEY_DB = "database";
     private static final String KEY_COLLECTIONS = "collections";
@@ -69,29 +66,31 @@ public class ReplicatorConfigBuilder {
     private static final String KEY_PUSH_FILTER = "pushFilter";
 
     @NonNull
-    private final Map<String, Object> req;
+    private final TypedMap req;
     @NonNull
     private final Memory memory;
 
-    private Boolean shouldReset;
+    // This is a stateful object!!
+    private boolean shouldReset;
 
-    public ReplicatorConfigBuilder(@NonNull Map<String, Object> req, @NonNull Memory memory) {
+    public ReplicatorConfigBuilder(@NonNull TypedMap req, @NonNull Memory memory) {
         this.req = req;
         this.memory = memory;
     }
 
-    public Boolean shouldReset() { return shouldReset; }
+    public boolean shouldReset() { return shouldReset; }
 
     @SuppressWarnings("deprecation")
     @NonNull
     public ReplicatorConfiguration build() {
-        final Object configSpec = req.get(KEY_CONFIG);
-        if (!(configSpec instanceof Map)) {
+        final Object configSpec = req.getMap(KEY_CONFIG);
+        if (configSpec == null) {
             throw new IllegalStateException("Replicator configuration  does not specify a config");
         }
         final TypedMap config = new TypedMap((Map<?, ?>) configSpec, false);
 
-        shouldReset = config.getBoolean(KEY_RESET);
+        final Boolean reset = config.getBoolean(KEY_RESET);
+        shouldReset = (reset != null) && reset;
 
         final String uri = config.getString(KEY_ENDPOINT);
         if (uri == null) {
@@ -99,14 +98,7 @@ public class ReplicatorConfigBuilder {
         }
 
         final URLEndpoint endpoint;
-        try {
-            URI url = new URI(uri);
-
-            // !!! Temporary workaround!
-            url = new URI(url.getScheme(), null, SGW_HOST, url.getPort(), url.getPath(), null, null);
-
-            endpoint = new URLEndpoint(url);
-        }
+        try { endpoint = new URLEndpoint(new URI(uri)); }
         catch (URISyntaxException e) {
             throw new IllegalStateException("Replicator configuration contains an unparsable endpoint: " + uri, e);
         }
@@ -121,7 +113,7 @@ public class ReplicatorConfigBuilder {
             throw new IllegalStateException("Replicator configuration does not specify a list of collections");
         }
 
-        final Database db = TestApp.getApp().getDbMgr().openDb(dbName, memory);
+        final Database db = TestApp.getApp().getDbSvc().openDb(dbName, memory);
 
         final ReplicatorConfiguration replConfig;
         if (collections.isEmpty()) { replConfig = new ReplicatorConfiguration(db, endpoint); }

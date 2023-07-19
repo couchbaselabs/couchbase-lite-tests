@@ -15,6 +15,7 @@
 //
 package com.couchbase.lite.mobiletest
 
+import com.couchbase.lite.mobiletest.errors.ClientError
 import com.squareup.moshi.Moshi
 import okio.buffer
 import okio.source
@@ -31,14 +32,12 @@ class BasicTest : BaseTest() {
 
         TestApp.getApp().dispatcher.handleRequest(
             "testing",
-            2,
+            1,
             Dispatcher.Method.GET,
             "/",
             ByteArrayInputStream("{}".toByteArray())
         ).use { r ->
             Assert.assertNotNull(r)
-            Assert.assertEquals(Reply.Status.OK, r.status)
-            Assert.assertEquals("application/json", r.contentType)
 
             resp = Moshi.Builder().build().adapter(Any::class.java)
                 .fromJson(r.content.source().buffer()) as? Map<String, Any>
@@ -48,33 +47,56 @@ class BasicTest : BaseTest() {
     }
 
     @Test
-    fun testBadRequest() {
-        var resp: String
-
-        TestApp.getApp().dispatcher.handleRequest(
-            "testing",
-            2,
-            Dispatcher.Method.GET,
-            "foo",
-            ByteArrayInputStream("{}".toByteArray())
-        ).use { r ->
-            Assert.assertNotNull(r)
-            Assert.assertEquals(Reply.Status.METHOD_NOT_ALLOWED, r.status)
-            Assert.assertEquals("text/plain", r.contentType)
-
-            ByteArrayOutputStream().use { out ->
-                val buffer = ByteArray(1024)
-                r.content.use {
-                    while (true) {
-                        val n = it.read(buffer, 0, buffer.size)
-                        if (n <= 0) break
-                        out.write(buffer, 0, n)
-                    }
-                }
-                resp = out.toString("UTF-8")
-            }
+    fun testBadRequestVersion() {
+        try {
+            TestApp.getApp().dispatcher.handleRequest(
+                "testing",
+                97,
+                Dispatcher.Method.GET,
+                "foo",
+                ByteArrayInputStream("{}".toByteArray())
+            )
         }
+        catch (err: ClientError) {
+            val msg = err.message
+            Assert.assertTrue(msg?.startsWith("Unrecognized request") ?: false)
+            Assert.assertTrue(msg?.contains("@97") ?: false)
+        }
+    }
 
-        Assert.assertEquals("Unrecognized request: ", resp.substring(0, 22))
+    @Test
+    fun testBadRequestMethod() {
+        try {
+            TestApp.getApp().dispatcher.handleRequest(
+                "testClient",
+                1,
+                Dispatcher.Method.PUT,
+                "/",
+                ByteArrayInputStream("{}".toByteArray())
+            )
+        }
+        catch (err: ClientError) {
+            val msg = err.message
+            Assert.assertTrue(msg?.startsWith("Unrecognized request") ?: false)
+            Assert.assertTrue(msg?.contains(" PUT ") ?: false)
+        }
+    }
+
+    @Test
+    fun testBadRequestEndpoint() {
+        try {
+            TestApp.getApp().dispatcher.handleRequest(
+                "testing",
+                1,
+                Dispatcher.Method.GET,
+                "/foo",
+                ByteArrayInputStream("{}".toByteArray())
+            )
+        }
+        catch (err: ClientError) {
+            val msg = err.message
+            Assert.assertTrue(msg?.startsWith("Unrecognized request") ?: false)
+            Assert.assertTrue(msg?.contains(" /foo ") ?: false)
+        }
     }
 }

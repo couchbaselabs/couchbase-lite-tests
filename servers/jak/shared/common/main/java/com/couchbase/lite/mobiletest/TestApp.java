@@ -25,10 +25,13 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -37,16 +40,21 @@ import com.couchbase.lite.LogDomain;
 import com.couchbase.lite.LogLevel;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
-import com.couchbase.lite.mobiletest.tests.DatabaseManager;
-import com.couchbase.lite.mobiletest.tests.ReplicatorManager;
+import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.services.DatabaseService;
+import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 public abstract class TestApp {
-    public static final String HEADER_PROTOCOL_VERSION = "cbltest-api-version";
+    public static final String HEADER_PROTOCOL_VERSION = "CBLTest-API-Version".toLowerCase(Locale.getDefault());
     public static final int DEFAULT_PROTOCOL_VERSION = 1;
-    public static final String HEADER_SENDER = "cbltest-client-id";
+    public static final List<Integer> KNOWN_VERSIONS
+        = Collections.unmodifiableList(Arrays.asList(DEFAULT_PROTOCOL_VERSION));
+
+    public static final String HEADER_CLIENT = "CBLTest-Client-ID".toLowerCase(Locale.getDefault());
     public static final String DEFAULT_CLIENT = "c0ffee00-c0c0-50da-c01a-de1ec7ab1e00";
+    public static final String HEADER_SERVER = "CBLTest-Server-ID";
 
     private static final AtomicReference<TestApp> APP = new AtomicReference<>();
     private static final AtomicReference<String> APP_ID = new AtomicReference<>();
@@ -66,10 +74,10 @@ public abstract class TestApp {
     }
 
 
-    private final Map<String, Map<String, Object>> symTabs = new HashMap<>();
+    private final Map<String, Memory> symTabs = new HashMap<>();
 
-    private final AtomicReference<DatabaseManager> dbMgr = new AtomicReference<>();
-    private final AtomicReference<ReplicatorManager> replMgr = new AtomicReference<>();
+    private final AtomicReference<DatabaseService> dbSvc = new AtomicReference<>();
+    private final AtomicReference<ReplicatorService> replSvc = new AtomicReference<>();
 
     private Dispatcher dispatcher;
 
@@ -132,37 +140,44 @@ public abstract class TestApp {
 
     @NonNull
     public final Memory getMemory(@NonNull String client) {
-        Map<String, Object> symTab = symTabs.get(client);
-        if (symTab == null) {
-            symTab = new HashMap<>();
-            symTabs.put(client, symTab);
-        }
+        Memory mem = symTabs.get(client);
+        if (mem != null) { return mem; }
 
-        return new Memory(client, symTab, "_" + getPlatform() + "_" + getAppId());
+        mem = new Memory(client);
+        symTabs.put(client, mem);
+
+        return mem;
     }
 
     @NonNull
-    public final DatabaseManager getDbMgr() {
-        final DatabaseManager mgr = dbMgr.get();
-        if (mgr == null) { dbMgr.compareAndSet(null, new DatabaseManager()); }
-        return dbMgr.get();
+    public final DatabaseService getDbSvc() {
+        final DatabaseService mgr = dbSvc.get();
+        if (mgr == null) { dbSvc.compareAndSet(null, new DatabaseService()); }
+        return dbSvc.get();
     }
 
     @NonNull
-    public final ReplicatorManager getReplMgr() {
-        final ReplicatorManager mgr = replMgr.get();
-        if (mgr == null) { replMgr.compareAndSet(null, new ReplicatorManager()); }
-        return replMgr.get();
+    public final ReplicatorService getReplSvc() {
+        final ReplicatorService mgr = replSvc.get();
+        if (mgr == null) { replSvc.compareAndSet(null, new ReplicatorService()); }
+        return replSvc.get();
     }
 
-    public final void reset(@NonNull Map<String, Object> req, Memory mem) {
-        final ReplicatorManager rMgr = replMgr.getAndSet(null);
+    public final void reset(@NonNull TypedMap req, @NonNull Memory mem) {
+        final ReplicatorService rMgr = replSvc.getAndSet(null);
         if (rMgr != null) { rMgr.reset(mem); }
 
-        final DatabaseManager dMgr = dbMgr.getAndSet(null);
+        final DatabaseService dMgr = dbSvc.getAndSet(null);
         if (dMgr != null) { dMgr.reset(req, mem); }
 
-        symTabs.remove(mem.getClient());
+        final String client = mem.getClient();
+        symTabs.remove(client);
+
+        final Memory newMem = getMemory(client);
+
+        getDbSvc().init(req, newMem);
+
+        getReplSvc().init(req, newMem);
     }
 
     @NonNull
