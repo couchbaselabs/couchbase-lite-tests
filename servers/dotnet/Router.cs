@@ -1,7 +1,11 @@
-﻿using System.Diagnostics;
+﻿using Couchbase.Lite;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using TestServer.Handlers;
 
 using HandlerAction = System.Action<System.Collections.Specialized.NameValueCollection,
@@ -23,22 +27,78 @@ namespace TestServer.Handlers
 
             return (split[0], split[1]);
         }
+
+        private static bool TryDeserialize<T>(this JsonElement element, HttpListenerResponse response, [NotNullWhen(true)]out T? result)
+        {
+            result = default;
+            try {
+                result = element.Deserialize<T>(new JsonSerializerOptions
+                {
+                    IncludeFields = true
+                })!;
+                return true;
+            } catch (JsonException ex) {
+                response.WriteBody(Router.CreateErrorResponse($"Invalid json received: {ex.Message}"), HttpStatusCode.BadRequest);
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<T> NotNull<T>(this IEnumerable<T?>? input) where T : class
+        {
+            if(input == null) {
+                return Enumerable.Empty<T>();
+            }
+
+            return input.Where(x => x != null).Select(x => x!);
+        }
     }
 }
 
 namespace TestServer
 {
+    public enum TestServerErrorDomain : int
+    {
+        TestServer,
+        CouchbaseLite,
+        POSIX,
+        SQLite,
+        Fleece,
+        Network,
+        Websocket
+    }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    internal sealed class HttpHandlerAttribute : Attribute
+    {
+        public string Path { get; }
+
+        public HttpHandlerAttribute(string path)
+        {
+            Path = path;
+        }
+    }
+
     public static class Router
     {
         #region Constants
 
         private static readonly IDictionary<string, HandlerAction> RouteMap =
-            new Dictionary<string, HandlerAction>
-            {
-                [""] = HandlerList.GetRootHandler,
-                ["reset"] = HandlerList.ResetDatabaseHandler,
-                ["getAllDocumentIDs"] = HandlerList.AllDocumentIDsHandler
-            };
+            new Dictionary<string, HandlerAction>();
+
+        #endregion
+
+        #region Constructors
+
+        static Router()
+        {
+            foreach(var method in typeof(HandlerList).GetMethods()
+                .Where(x => x.GetCustomAttribute(typeof(HttpHandlerAttribute)) != null)) {
+                var key = method.GetCustomAttribute<HttpHandlerAttribute>()!.Path;
+                var invocation = new HandlerAction((args, body, response) => method.Invoke(null, new object[] { args, body, response }));
+                RouteMap.Add(key, invocation);
+            }
+        }
 
         #endregion
 
@@ -59,20 +119,46 @@ namespace TestServer
             };
         }
 
+        public static (TestServerErrorDomain, int) MapError(CouchbaseException ex)
+        {
+            switch(ex.Domain) {
+                case CouchbaseLiteErrorType.POSIX:
+                    return (TestServerErrorDomain.POSIX, (int)ex.Error);
+                case CouchbaseLiteErrorType.SQLite:
+                    return (TestServerErrorDomain.SQLite, (int)ex.Error);
+                case CouchbaseLiteErrorType.Fleece:
+                    return (TestServerErrorDomain.Fleece, (int)ex.Error);
+                default: {
+                    var errCode = (int)ex.Error;
+                    var domain = TestServerErrorDomain.CouchbaseLite;
+                    if(ex.Error > (int)CouchbaseLiteError.HTTPBase) {
+                        errCode -= (int)CouchbaseLiteError.HTTPBase;
+                        domain = TestServerErrorDomain.Websocket;
+                    } else if(ex.Error > (int)CouchbaseLiteError.NetworkBase) {
+                        errCode -= (int)CouchbaseLiteError.NetworkBase;
+                        domain = TestServerErrorDomain.Network;
+                    }
+
+                    return (domain, errCode);
+                }
+            }
+        }
+
         #endregion
 
         #region Internal Methods
 
         internal static async Task Handle(Uri endpoint, Stream body, HttpListenerResponse response)
         {
-            if (!RouteMap.TryGetValue(endpoint.AbsolutePath!.TrimStart('/'), out HandlerAction? action)) {
+            var path = endpoint.AbsolutePath!.TrimStart('/');
+            if (!RouteMap.TryGetValue(path, out HandlerAction? action)) {
                 response.WriteEmptyBody(HttpStatusCode.NotFound);
                 return;
             }
 
             JsonDocument bodyObj;
             try {
-                if (action != HandlerList.GetRootHandler) {
+                if (path != "") {
                     bodyObj = await JsonDocument.ParseAsync(body);
                 } else {
                     bodyObj = JsonDocument.Parse("null");

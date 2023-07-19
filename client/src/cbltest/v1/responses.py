@@ -194,6 +194,9 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
 
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "getReplicatorStatus")
+        if not self.__activity_key in body:
+            return
+        
         self.__activity = ReplicatorActivityLevel[cast(str, body.get(self.__activity_key)).upper()]
         self.__progress = ReplicatorProgress(cast(dict, body.get(self.__progress_key)))
         self.__replicator_error = ErrorResponseBody.create(body.get(self.__replicator_error_key))
