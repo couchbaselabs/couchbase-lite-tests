@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Dynamic;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -11,6 +12,12 @@ namespace TestServer
 {
     internal static class HttpListenerResponseExtensions
     {
+        public static void AddHeaders(this HttpListenerResponse response)
+        {
+            response.AddHeader("CBLTest-API-Version", CBLTestServer.ApiVersion.ToString());
+            response.AddHeader("CBLTest-Server-ID", CBLTestServer.ServerID);
+        }
+
         public static void WriteBody<T>(this HttpListenerResponse response, T bodyObj, HttpStatusCode status = HttpStatusCode.OK)
         {
             if (response.OutputStream == null) {
@@ -23,6 +30,7 @@ namespace TestServer
                 response.ContentLength64 = body.LongLength;
                 response.ContentEncoding = Encoding.UTF8;
                 response.StatusCode = (int)status;
+                response.AddHeaders();
                 response.OutputStream.Write(body, 0, body.Length);
                 response.Close();
             } catch (ObjectDisposedException) {
@@ -42,6 +50,7 @@ namespace TestServer
                 response.ContentLength64 = body.LongLength;
                 response.ContentEncoding = Encoding.UTF8;
                 response.StatusCode = (int)status;
+                response.AddHeaders();
                 response.OutputStream.Write(body, 0, body.Length);
                 response.Close();
             } catch (ObjectDisposedException) {
@@ -53,9 +62,11 @@ namespace TestServer
         {
             try {
                 var body = Encoding.UTF8.GetBytes("{}");
+                response.ContentType = "application/json";
                 response.ContentLength64 = body.LongLength;
                 response.ContentEncoding = Encoding.UTF8;
                 response.StatusCode = (int)code;
+                response.AddHeaders();
                 response.OutputStream.Write(body, 0, body.Length);
                 response.Close();
             } catch (ObjectDisposedException) {

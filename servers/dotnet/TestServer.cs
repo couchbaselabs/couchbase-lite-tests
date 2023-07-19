@@ -7,6 +7,10 @@ namespace TestServer
     {
         #region Constants
 
+        public static readonly int ApiVersion = 1;
+
+        public static readonly string ServerID = Guid.NewGuid().ToString();
+
         private const ushort Port = 8080;
 
         private static readonly Stream NullStream = new MemoryStream(new byte[0]);

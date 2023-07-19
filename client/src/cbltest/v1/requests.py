@@ -150,7 +150,10 @@ class DatabaseUpdateEntry(JSONSerializable):
         if self.type != DatabaseUpdateType.UPDATE:
             return True
         
-        return len(self.updated_properties) > 0 or len(self.removed_properties) > 0
+        if self.updated_properties is not None:
+            return len(self.updated_properties) > 0
+        
+        return len(self.removed_properties) > 0 if self.removed_properties is not None else False
     
     def to_json(self) -> any:
         if not self.is_valid():

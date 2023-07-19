@@ -6,12 +6,12 @@ namespace TestServer
     public sealed class ObjectManager
     {
         private readonly Dictionary<string, Database> _activeDatabases = new();
-        private readonly HashSet<IDisposable> _activeDisposables = new();
+        private readonly Dictionary<string, IDisposable> _activeDisposables = new();
         private readonly AutoReaderWriterLock _lock = new AutoReaderWriterLock();
 
         public readonly string FilesDirectory;
 
-        public ObjectManager(string filesDirectory) 
+        public ObjectManager(string filesDirectory)
         {
             FilesDirectory = filesDirectory;
             Directory.CreateDirectory(FilesDirectory);
@@ -22,12 +22,12 @@ namespace TestServer
             using var l = _lock.GetWriteLock();
 
             foreach (var d in _activeDisposables) {
-                d.Dispose();
+                d.Value.Dispose();
             }
 
             _activeDisposables.Clear();
 
-            foreach(var db in _activeDatabases) {
+            foreach (var db in _activeDatabases) {
                 db.Value.Delete();
                 db.Value.Dispose();
             }
@@ -52,7 +52,7 @@ namespace TestServer
 
             var destinationZip = Path.Combine(FilesDirectory, $"{name}.cblite2.zip");
             using var wl = _lock.GetWriteLock();
-            if(File.Exists(destinationZip)) {
+            if (File.Exists(destinationZip)) {
                 File.Delete(destinationZip);
             }
 
@@ -61,15 +61,15 @@ namespace TestServer
                 asset.Dispose();
             }
 
-            if(Database.Exists(name, FilesDirectory)) {
+            if (Database.Exists(name, FilesDirectory)) {
                 Database.Delete(name, FilesDirectory);
             }
 
             ZipFile.ExtractToDirectory(destinationZip, FilesDirectory);
             File.Delete(destinationZip);
 
-            foreach(var targetDbName in targetDbNames) {
-                if(Database.Exists(targetDbName, FilesDirectory)) {
+            foreach (var targetDbName in targetDbNames) {
+                if (Database.Exists(targetDbName, FilesDirectory)) {
                     Database.Delete(targetDbName, FilesDirectory);
                 }
 
@@ -90,11 +90,25 @@ namespace TestServer
             return _activeDatabases.TryGetValue(name, out var db) ? db : null;
         }
 
-        public T RegisterObject<T>(Func<T> generator) where T : IDisposable
+        public (T, string) RegisterObject<T>(Func<T> generator) where T : class, IDisposable
         {
             var retVal = generator();
-            _activeDisposables.Add(retVal);
-            return retVal;
+            var key = Guid.NewGuid().ToString();
+            _activeDisposables.Add(key, retVal);
+            return (retVal, key);
+        }
+
+        public T? GetObject<T>(string name) where T : class, IDisposable
+        {
+            if(!_activeDisposables.TryGetValue(name, out var retVal)) {
+                return default;
+            }
+
+            if(retVal is not T castVal) {
+                return default;
+            }
+
+            return castVal;
         }
     }
 }

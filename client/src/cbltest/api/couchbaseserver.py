@@ -22,13 +22,15 @@ class CouchbaseServer:
         bucket_obj = self.__cluster.bucket(bucket)
         c = bucket_obj.collections()
         try:
-            c.create_scope(scope)
+            if scope != "_default":
+                c.create_scope(scope)
         except ScopeAlreadyExistsException:
             pass
 
         for name in names:
             try:
-                c.create_collection(CollectionSpec(name, scope))
+                if name != "_default":
+                    c.create_collection(CollectionSpec(name, scope))
             except CollectionAlreadyExistsException:
                 pass
 

@@ -8,6 +8,7 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    [HttpHandler("getAllDocumentIDs")]
     public static void AllDocumentIDsHandler(NameValueCollection args, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryGetProperty("database", out var database) || database.ValueKind != JsonValueKind.String) {

@@ -78,7 +78,8 @@ class TestBasicReplication:
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None
+        assert status.error is None, \
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
     @pytest.mark.asyncio
     async def test_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
@@ -102,7 +103,8 @@ class TestBasicReplication:
 
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None
+        assert status.error is None, \
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airports")
         lite_all_docs = await db.get_all_documents("travel.airports")
         assert len(lite_all_docs.collections[0].document_ids) > 0

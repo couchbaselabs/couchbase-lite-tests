@@ -8,6 +8,7 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    [HttpHandler("reset")]
     public static void ResetDatabaseHandler(NameValueCollection args, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryGetProperty("datasets", out var datasets) || datasets.ValueKind != JsonValueKind.Object) {
@@ -35,7 +36,7 @@ internal static partial class HandlerList
             tasks.Add(CBLTestServer.Manager.LoadDataset(datasetName, dataset.Value.EnumerateArray().Select(x => x.GetString()!)));
         }
 
-        if (!Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(500))) {
+        if (!Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(5))) {
             throw new ApplicationException("Timed out waiting for datasets to load");
         }
 

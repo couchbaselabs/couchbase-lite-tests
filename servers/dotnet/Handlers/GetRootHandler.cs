@@ -8,12 +8,13 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    [HttpHandler("")]
     public static void GetRootHandler(NameValueCollection args, JsonDocument body, HttpListenerResponse response)
     {
         var responseBody = new
         {
             version = typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
-            apiVersion = 1,
+            apiVersion = CBLTestServer.ApiVersion,
             cbl = "couchbase-lite-net",
             device = ServiceProvider.GetRequiredService<IDeviceInformation>()
         };
