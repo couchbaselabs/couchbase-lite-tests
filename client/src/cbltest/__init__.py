@@ -4,7 +4,7 @@ from typing import Dict, List
 from .requests import RequestFactory
 from .logging import LogLevel, cbl_setLogLevel
 from .extrapropsparser import _parse_extra_props
-from .configparser import ParsedConfig, SyncGatewayInfo, _parse_config
+from .configparser import CouchbaseServerInfo, ParsedConfig, SyncGatewayInfo, _parse_config
 from .assertions import _assert_not_null
 from .api.testserver import TestServer
 from .api.syncgateway import SyncGateway
@@ -85,12 +85,13 @@ class CBLPyTest:
         for sg in self.__config.sync_gateways:
             secure = index < cert_count and self.__config.sync_gateway_certs[index] is not None
             info = SyncGatewayInfo(sg)
-            self.__sync_gateways.append(SyncGateway(info.hostname, "admin", "password", info.port, info.admin_port, secure))
+            self.__sync_gateways.append(SyncGateway(info.hostname, info.rbac_user, info.rbac_password, info.port, info.admin_port, secure))
             index += 1
 
         self.__couchbase_servers: List[CouchbaseServer] = []
-        for url in self.__config.couchbase_servers:
-            self.__couchbase_servers.append(CouchbaseServer(url, "Administrator", "password"))
+        for cbs in self.__config.couchbase_servers:
+            info = CouchbaseServerInfo(cbs)
+            self.__couchbase_servers.append(CouchbaseServer(info.hostname, info.admin_user,info.admin_password))
 
 
     def __str__(self) -> str:

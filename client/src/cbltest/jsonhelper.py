@@ -43,3 +43,14 @@ def _get_int_or_default(d: dict, key: str, default: int) -> int:
         raise ValueError(f"Expecting an int for key {key} but found {ret_val} instead")
     
     return cast(int, ret_val)
+
+def _get_str_or_default(d: dict, key: str, default: str) -> str:
+    if key not in d:
+        cbl_warning(f"{key} not present in dictionary, using default {default}!")
+        return default
+    
+    ret_val = d[key]
+    if not isinstance(ret_val, str):
+        raise ValueError(f"Expecting a string for key {key} but found {ret_val} instead")
+    
+    return cast(str, ret_val)
