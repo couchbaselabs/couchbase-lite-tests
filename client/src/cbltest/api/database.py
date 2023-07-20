@@ -13,7 +13,7 @@ class DatabaseUpdater:
     A class which collects database operations to perform so that they can be sent in a batch
     """
     def __init__(self, db_name: str, request_factory: RequestFactory, index: int):
-        assert(request_factory.version == 1)
+        assert request_factory.version == 1, "This version of the CBLTest API requires request API v1"
         self.__db_name = db_name
         self.__updates: List[DatabaseUpdateEntry] = []
         self.__request_factory = request_factory

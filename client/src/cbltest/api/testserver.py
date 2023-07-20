@@ -16,7 +16,7 @@ class TestServer:
         return self.__url
     
     def __init__(self, request_factory: RequestFactory, index: int, url: str):
-        assert(request_factory.version == 1)
+        assert request_factory.version == 1, "This version of the CBLTest API requires request API v1"
         self.__index = index
         self.__url = url
         self.__request_factory = request_factory
