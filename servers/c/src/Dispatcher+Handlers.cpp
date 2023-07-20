@@ -321,8 +321,7 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
     result["activity"] = kStatuses[(int) status.activity];
 
     json progress;
-    progress["complete"] = status.progress.complete;
-    progress["documentCount"] = status.progress.documentCount;
+    progress["completed"] = status.progress.complete == 1.0;
     result["progress"] = progress;
 
     if (status.error.code > 0) {
