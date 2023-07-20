@@ -7,6 +7,10 @@ using namespace nlohmann;
 using namespace std;
 using namespace ts_support::exception;
 
+constexpr const int kSuccessStatusCode = 200;
+constexpr const int kRequestErrorStatusCode = 400;
+constexpr const int kServerErrorStatusCode = 500;
+
 Request::Request(mg_connection *conn, const TestServer *server) {
     const mg_request_info *info = mg_get_request_info(conn);
     _method = info->request_method;
@@ -39,35 +43,43 @@ const nlohmann::json &Request::jsonBody() {
                 s >> _jsonBody;
             }
         } catch (const exception &e) {
-            string message = string("Invalid JSON Body : ") + e.what();
-            throw domain_error(message);
+            string message = string("Invalid JSON in request body : ") + e.what();
+            throw RequestError(message);
         }
     }
     return _jsonBody;
 }
 
 int Request::respondWithOK() const {
-    return respond(200);
+    return respond(kSuccessStatusCode);
 }
 
 int Request::respondWithJSON(const json &json) const {
     auto jsonBody = json.dump();
-    return respond(200, jsonBody);
+    return respond(kSuccessStatusCode, jsonBody);
 }
 
-int Request::respondWithServerError(const char *message, int code) const {
-    assert(code >= 400);
+int Request::respondWithRequestError(const char *message) const {
     nlohmann::json json = json::object();
     json["domain"] = "TESTSERVER";
-    json["code"] = code;
+    json["code"] = kRequestErrorStatusCode;
     json["message"] = message;
     auto jsonBody = json.dump();
-    return respond(code, jsonBody);
+    return respond(kRequestErrorStatusCode, jsonBody);
+}
+
+int Request::respondWithServerError(const char *message) const {
+    nlohmann::json json = json::object();
+    json["domain"] = "TESTSERVER";
+    json["code"] = kServerErrorStatusCode;
+    json["message"] = message;
+    auto jsonBody = json.dump();
+    return respond(kServerErrorStatusCode, jsonBody);
 }
 
 int Request::respondWithCBLError(const ts_support::exception::CBLException &exception) const {
-    auto jsonBody = exception.json();
-    return respond(400, jsonBody);
+    auto json = exception.json();
+    return respond(kRequestErrorStatusCode, json.dump());
 }
 
 void Request::addCommonResponseHeaders() const {

@@ -3,6 +3,10 @@
 #include "TestServer.h"
 #include "support/Exception.h"
 
+#include <nlohmann/json.hpp>
+
+using namespace nlohmann;
+using namespace std;
 using namespace ts_support::exception;
 
 #define HANDLER(h) [this](Request& request) -> int { return h(request); }
@@ -27,14 +31,13 @@ int Dispatcher::handle(mg_connection *conn) const {
     try {
         if (request.path() != "/") {
             if (request.version() != TestServer::API_VERSION) {
-                return request.respondWithServerError("API Version Mismatched or Missing", 403);
+                return request.respondWithServerError("API Version Mismatched or Missing");
             }
 
             if (request.clientID().empty()) {
-                return request.respondWithServerError("Client ID Missing", 403);
+                return request.respondWithServerError("Client ID Missing");
             }
         }
-
         auto handler = findHandler(request);
         if (!handler) {
             return request.respondWithServerError("Request API Not Found");
@@ -42,6 +45,10 @@ int Dispatcher::handle(mg_connection *conn) const {
         return handler(request);
     } catch (const CBLException &e) {
         return request.respondWithCBLError(e);
+    } catch (const RequestError &e) {
+        return request.respondWithRequestError(e.what());
+    } catch (const json::exception &e) {
+        return request.respondWithRequestError(e.what());
     } catch (const exception &e) {
         return request.respondWithServerError(e.what());
     }

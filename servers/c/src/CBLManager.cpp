@@ -8,8 +8,8 @@
 #include <filesystem>
 #include <utility>
 
-using namespace filesystem;
 using namespace std;
+using namespace filesystem;
 using namespace ts_support::exception;
 
 #define DB_FILE_EXT ".cblite2"
@@ -171,7 +171,7 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
         if (pushFilter) {
             auto filter = ReplicationFilter::make_filter(pushFilter.value());
             if (!filter) {
-                throw domain_error("Cannot find push filter named " + pushFilter->name);
+                throw RequestError("Cannot find push filter named " + pushFilter->name);
             }
             context->filters[replColSpec.collection] = unique_ptr<ReplicationFilter>(filter);
             replCol.pushFilter = [](void *ctx, CBLDocument *doc, CBLDocumentFlags flags) -> bool {
@@ -185,7 +185,7 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
         if (pullFilter) {
             auto filter = ReplicationFilter::make_filter(pullFilter.value());
             if (!filter) {
-                throw domain_error("Cannot find pull filter named " + pullFilter->name);
+                throw RequestError("Cannot find pull filter named " + pullFilter->name);
             }
             context->filters[replColSpec.collection] = unique_ptr<ReplicationFilter>(filter);
             replCol.pullFilter = [](void *ctx, CBLDocument *doc, CBLDocumentFlags flags) -> bool {

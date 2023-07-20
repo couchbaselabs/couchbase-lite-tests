@@ -1,7 +1,7 @@
 #include "Exception.h"
 #include "Defer.h"
-#include <nlohmann/json.hpp>
 
+using namespace std;
 using namespace nlohmann;
 
 string errorMessage(const CBLError &error) {
@@ -10,20 +10,35 @@ string errorMessage(const CBLError &error) {
     return string(static_cast<const char *>(messageVal.buf), messageVal.size);
 }
 
+CBLErrorDomain crossPlatformDomain(const CBLError &error) {
+    return (error.domain == kCBLNetworkDomain || error.domain == kCBLWebSocketDomain) ? kCBLDomain : error.domain;
+}
+
+int crossPlatformCode(const CBLError &error) {
+    if (error.domain == kCBLNetworkDomain) {
+        return error.code + 5000;
+    } else if (error.domain == kCBLWebSocketDomain) {
+        return error.code + 10000;
+    } else {
+        return error.code;
+    }
+}
+
 ts_support::exception::CBLException::CBLException(const CBLError &error) {
     _error = error;
 
     stringstream ss;
     ss << "Couchbase Lite Error : "
-       << (int) _error.domain << "/"
-       << _error.code << ", "
+       << (int) crossPlatformCode(_error) << "/"
+       << crossPlatformCode(_error) << ", "
        << errorMessage(_error);
     _what = ss.str();
 }
 
-std::string ts_support::exception::CBLException::json() const {
+json ts_support::exception::CBLException::json() const {
     nlohmann::json result = json::object();
-    switch (_error.domain) {
+    auto domain = crossPlatformDomain(_error);
+    switch (domain) {
         case kCBLDomain:
             result["domain"] = "CBL";
             break;
@@ -36,16 +51,11 @@ std::string ts_support::exception::CBLException::json() const {
         case kCBLFleeceDomain:
             result["domain"] = "FLEECE";
             break;
-        case kCBLNetworkDomain:
-            result["domain"] = "NETWORK";
-            break;
-        case kCBLWebSocketDomain:
-            result["domain"] = "WEBSOCKET";
-            break;
         default:
             result["domain"] = "CBL";
     }
-    result["code"] = _error.code;
+    result["code"] = crossPlatformCode(_error);
     result["message"] = errorMessage(_error);
-    return result.dump();
+    return result;
 }
+
