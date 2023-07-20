@@ -32,7 +32,7 @@ class Replicator:
     def __init__(self, database: Database, endpoint: str, replicator_type: ReplicatorType = ReplicatorType.PUSH_AND_PULL,
                  continuous: bool = False, authenticator: ReplicatorAuthenticator = None, reset: bool = False,
                  collections: List[ReplicatorCollectionEntry] = []):
-        assert(database._request_factory.version == 1)
+        assert database._request_factory.version == 1, "This version of the cbl test API requires request API v1"
         self.__database = database
         self.__index = database._index
         self.__request_factory = database._request_factory
@@ -102,8 +102,8 @@ class Replicator:
         :param interval: The polling interval (default 1s)
         :param timeout: The time limit to wait for the state change
         """
-        assert(interval > 0.0)
-        assert(timeout > 1.0)
+        assert interval > 0.0, "Zero interval makes no sense, try again"
+        assert timeout > 1.0, "Timeout too short, must be at least 1 second"
 
         status_matches = False
         start = time()

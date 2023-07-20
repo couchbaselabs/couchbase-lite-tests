@@ -189,25 +189,17 @@ class ReplicatorActivityLevel(Enum):
 class ReplicatorProgress:
     """A class representing the progress of a replicator in terms of units and documents complete"""
 
-    __complete_key: Final[str] = "complete"
-    __document_count_key: Final[str] = "documentCount"
+    __completed_key: Final[str] = "completed"
 
     @property
-    def complete(self) -> float:
+    def completed(self) -> bool:
         """Gets the number of units completed so far"""
-        return self.__complete
-    
-    @property
-    def document_count(self) -> int:
-        """Gets the number of documents processed so far"""
-        return self.__document_count
+        return self.__completed
     
     def __init__(self, body: dict) -> None:
-        assert(isinstance(body, dict))
-        self.__complete = cast(float, body.get(self.__complete_key))
-        self.__document_count = cast(int, body.get(self.__document_count_key))
-        assert(isinstance(self.__complete, float))
-        assert(isinstance(self.__document_count, int))
+        assert isinstance(body, dict), "Invalid replicator progress value received (not an object)"
+        self.__completed = cast(bool, body.get(self.__completed_key))
+        assert isinstance(self.__completed, bool), "Invalid replicator progress value received ('completed' not a boolean)"
 
 class ReplicatorDocumentEntry:
     """A class representing the status of a replicated document"""
@@ -244,13 +236,17 @@ class ReplicatorDocumentEntry:
         return self.__error
 
     def __init__(self, body: dict) -> None:
-        assert(isinstance(body, dict))
+        assert isinstance(body, dict), "Invalid replicator document received (not an object)"
         self.__collection = cast(str, body.get(self.__collection_key))
-        assert(self.__collection is not None)
+        assert isinstance(self.__collection, str), "Invalid replicator document collection received (not a str)"
+        assert self.__collection is not None, "Null collection on replicator document received"
         self.__document_id = cast(str, body.get(self.__document_id_key))
-        assert(self.__document_id is not None)
+        assert isinstance(self.__document_id, str), "Invalid replicator document ID received (not a str)" 
+        assert self.__document_id is not None, "Null ID on replicator document received"
         self.__is_push = cast(bool, body.get(self.__is_push_key))
+        assert isinstance(self.__is_push, bool), "Invalid replicator document isPush received (not a boolean)"
         self.__flags = cast(int, body.get(self.__flags_key))
+        assert isinstance(self.__flags, int), "Invalid replicator document flags received (not an int)"
         self.__error = ErrorResponseBody.create(body.get(self.__error_key))
     
 class ReplicatorStatus:

@@ -204,10 +204,11 @@ class SyncGateway:
         await self._send_request("post", f"/{db_name}/_user/", JSONDictionary(body))
 
     def _analyze_dataset_response(self, response: any) -> None:
-        assert(isinstance(response, list))
+        assert isinstance(response, list), "Invalid bulk docs response (not a list)"
         typed_response = cast(list, response)
         for r in typed_response:
             info = cast(dict, r)
+            assert isinstance(info, dict), "Invalid item inside bulk docs response list (not an object)"
             if "error" in info:
                 raise CblSyncGatewayBadResponseError(info["status"], f"At least one bulk docs insert failed ({info['error']})")
 

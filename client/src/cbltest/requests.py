@@ -59,7 +59,7 @@ class TestServerRequest:
         # For those subclassing this, usually all you need to do is call this constructor
         # filling out the appropriate information via args
         if payload is not None and payload_type is not None:
-            assert(isinstance(payload, payload_type))
+            assert isinstance(payload, payload_type), f"Incorrect payload type for request (expecting '{payload_type}')"
 
         self.__version = available_api_version(version)
         self.__uuid = uuid
@@ -201,10 +201,9 @@ class RequestFactory:
         try:
             ret_val = await r.send(url, self.__session)
         except Exception as e:
-            cbl_error(f"Failed to send {r}")
+            cbl_error(f"Failed to send {r} ({str(e)})")
             writer.write_error(str(e))
-
-            return None
+            raise
         
         writer.write_end(str(ret_val), ret_val.serialize())
         return ret_val
