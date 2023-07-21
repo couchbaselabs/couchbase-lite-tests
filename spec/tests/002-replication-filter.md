@@ -1,7 +1,5 @@
 # Custom Filters
 
-{Need API Update}
-
 These are the list of the predefined custom push/pull filters used in the test cases.
 
 ### documentIDs
