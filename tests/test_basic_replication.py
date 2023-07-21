@@ -55,9 +55,9 @@ class TestBasicReplication:
         assert status.error is None
         sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airlines")
         lite_all_docs = await db.get_all_documents("travel.airlines")
-        assert len(sg_all_docs) == len(lite_all_docs.collections[0].document_ids)
-        sg_ids = set(lite_all_docs.collections[0].document_ids)
-        lite_ids = set(lite_all_docs.collections[0].document_ids)
+        assert len(sg_all_docs) == len(lite_all_docs.collections[0].documents)
+        sg_ids = set(lite_all_docs.collections[0].documents)
+        lite_ids = set(lite_all_docs.collections[0].documents)
         for id in sg_ids:
             assert id in lite_ids
 
@@ -107,9 +107,9 @@ class TestBasicReplication:
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airports")
         lite_all_docs = await db.get_all_documents("travel.airports")
-        assert len(lite_all_docs.collections[0].document_ids) > 0
-        assert len(sg_all_docs) == len(lite_all_docs.collections[0].document_ids)
-        sg_ids = set(lite_all_docs.collections[0].document_ids)
-        lite_ids = set(lite_all_docs.collections[0].document_ids)
+        assert len(lite_all_docs.collections[0].documents) > 0
+        assert len(sg_all_docs) == len(lite_all_docs.collections[0].documents)
+        sg_ids = set(lite_all_docs.collections[0].documents)
+        lite_ids = set(lite_all_docs.collections[0].documents)
         for id in sg_ids:
             assert id in lite_ids
