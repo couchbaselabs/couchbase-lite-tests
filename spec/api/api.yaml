@@ -61,13 +61,13 @@ paths:
           $ref: '#/components/responses/Error'
         '405':
           description: Operation Not Allowed
-  /getAllDocumentIDs:
+  /getAllDocuments:
     post:
       tags:
         - API
-      summary: Get all document IDs
-      description: Get all document IDs from the specified collections
-      operationId: getAllDocumentIDs
+      summary: Get all documents
+      description: Get info including of document IDs and revision IDs all document from the specified collections
+      operationId: getAllDocuments
       requestBody:
         description: |- 
           The request object provides a list of the collections in the specified database. The properties include: 
@@ -88,13 +88,13 @@ paths:
           description: |- 
             Success
 
-            The response body is a dictionary where keys are the collection name and values are an array of document IDs.
-            
+            The response body is an object where key is the collection name and the value is an array of objects containing document info including two keys, 'id' (documentID) and rev (revisionID).
+
             If the specified collections in the request, the dictionary will not contain those collections.
           content:
             application/json:
               schema: 
-                $ref: '#/components/schemas/DocumentIDs'
+                $ref: '#/components/schemas/CollectionDocuments'
         '400':
           $ref: '#/components/responses/Error'
         '405':
@@ -144,6 +144,8 @@ paths:
         description: |- 
           The request object containing the replicator configuration and the reset checkpoint flag 
           used when starting the replicator.
+
+          Note: TESTSERVER/400 error returned when no collections set in the specified collection
         content:
           application/json:
             schema:
@@ -292,6 +294,12 @@ components:
           items:
             type: string
           example: ['catalog.cloths', 'catalog.shoes']
+    CollectionDocuments:
+      type: object
+      additionalProperties:
+        type: string
+      example: { 'catalog.cloths': [{'id': 'c1', 'rev': '1-abc'}, {'id': 'c2', 'rev': '1-9ef'}], 
+                 'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1-e0f'}]}
     DocumentID:
       type: object
       required: ['collection', 'id']
@@ -302,14 +310,6 @@ components:
         id:
           type: string
           example: 'doc1'
-    DocumentIDs:
-      type: object
-      additionalProperties:
-        type: array
-        items:
-          type: string
-      example: { 'catalog.cloths': ['c001', 'c002'], 
-                 'catalog.shoes': ['s001', 's002', 's003']}
     DocumentReplication:
       type: object
       required: ['collection', 'documentID', 'isPush']
@@ -432,9 +432,11 @@ components:
       type: object
       required: ['collection']
       properties:
-        collection: 
-          type: string
-          example: 'store.cloths'
+        names: 
+          type: array
+          items:
+            type: string
+          example: ['store.cloths', 'store.shoes']
         channels:
           type: array
           items:
@@ -467,11 +469,11 @@ components:
           enum: ['STOPPED', 'OFFLINE', 'CONNECTING', 'IDLE', 'BUSY']
         progress:
           type: object
-          required: ['complete', 'documentCount']
+          required: ['completed']
           properties:
-            complete:
-              type: number
-              format: double
+            completed:
+              type: boolean
+              example: true
         documents:
           type: array
           items:
