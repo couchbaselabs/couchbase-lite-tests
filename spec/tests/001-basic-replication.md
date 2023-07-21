@@ -4,7 +4,7 @@
 
 ### Description
 
-Test that the replicator will stop with the `WebSocket 404 NotFound` error when the replicator is configured with non-existing SG collections.
+Test that the replicator will stop with the `WebSocket 10404 NotFound` error when the replicator is configured with non-existing SG collections.
 
 ### Steps
 
@@ -17,7 +17,7 @@ Test that the replicator will stop with the `WebSocket 404 NotFound` error when 
     * continuos: false
     * credentials: user1/pass
 4. Wait until the replicator is stopped.
-5. Check that the replicator's error status is the WebSocket 404 NotFound error.
+5. Check that the replicator's error CBL/10404 error.
 
 ## test_push
 
@@ -37,16 +37,6 @@ Test single shot push replication with multiple collections.
     * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
-6. Start the replicator with the same config as the step 3.
-7. Wait until the replicator is stopped.
-8. Check that there is no docs replicated (NEED_API)
-9. Update docs in the local database (NEED_API)
-   * Add 2 airports in `travel.airports`.
-   * Update 2 new airlines in `travel.airlines`.
-   * Remove 2 hotels in `travel.hotels`.
-10. Start the replicator with the same config as the step 3.
-11. Wait until the replicator is stopped.
-12. Check that all changes are replicated correctly.
 
 ## test_pull
 
@@ -66,16 +56,6 @@ Test single shot pull replication with multiple collections.
    * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
-6. Start the replicator with the same config as the step 3.
-7. Wait until the replicator is stopped.
-8. Check that there is no docs replicated (NEED_API)
-9. Update documents on SG.
-   * Add 2 routes in `travel.routes`.
-   * Update 2 landmarks in `travel.landmarks`.
-   * Remove 2 hotels in `travel.hotels`.
-10. Start the replicator with the same config as the step 3.
-11. Wait until the replicator is stopped.
-12. Check that all changes are replicated correctly.
 
 ## test_push_and_pull
 
@@ -95,20 +75,6 @@ Test single shot push-and-pull replication with multiple collections.
    * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
-6. Start the replicator with the same config as the step 3.
-7. Wait until the replicator is stopped.
-8. Check that there is no docs replicated (NEED_API)
-9. Update documents in the local database.
-   * Add 2 airports in `travel.airports`.
-   * Update 2 new airlines in `travel.airlines`.
-   * Remove 2 hotels in `travel.hotels`.
-10. Update documents on SG.
-   * Add 2 routes in `travel.routes`.
-   * Update 2 landmarks in `travel.landmarks`.
-   * Remove 2 hotels in `travel.hotels`.
-11. Start the replicator with the same config as the step 3.
-12. Wait until the replicator is stopped.
-13. Check that all changes are replicated correctly.
 
 ## test_continuous_push
 
@@ -206,16 +172,6 @@ Test push replication with the default collection.
     * continuos: false
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
-6. Start the replicator with the same config as the step 3.
-7. Wait until the replicator is stopped.
-8. Check that there is no docs replicated (NEED_API)
-9. Update docs in the local database (NEED_API)
-   * Add 2 new names in `_default._default`.
-   * Update 2 names in `_default._default`.
-   * Remove 2 names in `_default._default`.
-10. Start the replicator with the same config as the step 3.
-11. Wait until the replicator is stopped.
-12. Check that all changes are replicated correctly.
 
 ## test_pull_default_collection
 
@@ -234,16 +190,6 @@ Test pull replication with the default collection.
     * continuos: false
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
-6. Start the replicator with the same config as the step 3.
-7. Wait until the replicator is stopped.
-8. Check that there is no docs replicated (NEED_API)
-9. Update docs on SG
-   * Add 2 new names in `_default._default`.
-   * Update 2 names in `_default._default`.
-   * Remove 2 names in `_default._default`.
-10. Start the replicator with the same config as the step 3.
-11. Wait until the replicator is stopped.
-12. Check that all changes are replicated correctly.
 
 ## test_push_and_pull_default_collection
 
@@ -262,20 +208,6 @@ Test pull replication with the default collection.
     * continuos: false
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
-6. Start the replicator with the same config as the step 3.
-7. Wait until the replicator is stopped.
-8. Check that there is no docs replicated (NEED_API)
-9. Update docs in the local database (NEED_API)
-   * Add 2 new names in `_default._default`.
-   * Update 2 names in `_default._default`.
-   * Remove 2 names in `_default._default`.
-10. Update docs on SG
-   * Add 2 new names in `_default._default`.
-   * Update 2 names in `_default._default`.
-   * Remove 2 names in `_default._default`.
-11. Start the replicator with the same config as the step 3.
-12. Wait until the replicator is stopped.
-13. Check that all changes are replicated correctly.
 
 ## test_reset_checkpoint
 
@@ -294,7 +226,7 @@ Test that when the replicator starts with its checkpoint reset, the replication 
     * continuos: false
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
-6. Purge an airline from `travel.airlines` in the local database (NEED_API).
+6. Purge an airline from `travel.airlines` in the local database.
 7. Purge an airport from `travel.airports` on SG.
 8. Start the replicator with the same config as the step 3.
 9. Wait until the replicator is stopped.

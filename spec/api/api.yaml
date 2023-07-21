@@ -533,8 +533,6 @@ components:
           * 2: POSIX
           * 3: SQLITE
           * 4: FLEECE
-          * 5: NETWORK
-          * 6: WEBSOCKET
 
         The domains besides TESTSERVER are from CouchbaseLiteException.
 
