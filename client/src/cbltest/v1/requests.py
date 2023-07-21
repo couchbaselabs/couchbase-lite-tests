@@ -58,9 +58,9 @@ class PostResetRequestBody(TestServerRequestBody):
     def to_json(self) -> any:
         return {"datasets": self.__datasets}
     
-class PostGetAllDocumentIDsRequestBody(TestServerRequestBody):
+class PostGetAllDocumentsRequestBody(TestServerRequestBody):
     """
-    The body of a POST /getAllDocumentIDs request as specified in version 1 of the 
+    The body of a POST /getAllDocuments request as specified in version 1 of the 
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -77,7 +77,7 @@ class PostGetAllDocumentIDsRequestBody(TestServerRequestBody):
     @property
     def collections(self) -> List[str]:
         """
-        Gets the collections specified in the :class:`PostGetAllDocumentIDsRequestBody`
+        Gets the collections specified in the :class:`PostGetAllDocumentsRequestBody`
         """
         return self.__collections
     
@@ -463,13 +463,13 @@ class PostResetRequest(TestServerRequest):
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
         super().__init__(1, uuid, "reset", PostResetRequestBody, payload=payload)
 
-class PostGetAllDocumentIDsRequest(TestServerRequest):
+class PostGetAllDocumentsRequest(TestServerRequest):
     """
-    A POST /getAllDocumentIDs request as specified in version 1 of the 
+    A POST /getAllDocuments request as specified in version 1 of the 
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
-        super().__init__(1, uuid, "getAllDocumentIDs", PostGetAllDocumentIDsRequestBody, payload=payload)
+        super().__init__(1, uuid, "getAllDocuments", PostGetAllDocumentsRequestBody, payload=payload)
 
 class PostUpdateDatabaseRequest(TestServerRequest):
     """

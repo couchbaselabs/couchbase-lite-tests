@@ -7,7 +7,7 @@ namespace TestServer
     {
         #region Constants
 
-        public static readonly int ApiVersion = 1;
+        public static readonly int MaxApiVersion = 1;
 
         public static readonly string ServerID = Guid.NewGuid().ToString();
 
@@ -78,11 +78,17 @@ namespace TestServer
                 }
 
                 if (!IsValidMethod(nextRequest.Request)) {
-                    nextRequest.Response.WriteEmptyBody(HttpStatusCode.MethodNotAllowed);
+                    nextRequest.Response.WriteEmptyBody(MaxApiVersion, HttpStatusCode.MethodNotAllowed);
                     continue;
                 }
 
-                var _ = Router.Handle(nextRequest.Request.Url, nextRequest.Request.InputStream ?? NullStream, nextRequest.Response)
+                var version = 0;
+                var versionHeader = nextRequest.Request.Headers.Get(Router.ApiVersionHeader);
+                if(versionHeader != null) {
+                    int.TryParse(versionHeader, out version);
+                }
+                
+                var _ = Router.Handle(nextRequest.Request.Url, nextRequest.Request.InputStream ?? NullStream, nextRequest.Response, version)
                     .ContinueWith(t => Console.Error.WriteLine($"Exception caught during router handling: {t.Exception?.InnerException}"),
                     TaskContinuationOptions.OnlyOnFaulted);
             }

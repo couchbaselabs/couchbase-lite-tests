@@ -19,7 +19,7 @@ from .api.jsonserializable import JSONSerializable
 class TestServerRequestType(Enum):
     ROOT = "GetRootRequest"
     RESET = "PostResetRequest"
-    ALL_DOC_IDS = "PostGetAllDocumentIDsRequest"
+    ALL_DOC_IDS = "PostGetAllDocumentsRequest"
     UPDATE_DB = "PostUpdateDatabaseRequest"
     START_REPLICATOR = "PostStartReplicatorRequest"
     REPLICATOR_STATUS = "PostGetReplicatorStatusRequest"

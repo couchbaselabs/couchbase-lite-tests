@@ -8,7 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using TestServer.Handlers;
 
-using HandlerAction = System.Action<System.Collections.Specialized.NameValueCollection,
+using HandlerAction = System.Action<int,
     System.Text.Json.JsonDocument,
     System.Net.HttpListenerResponse>;
 
@@ -28,7 +28,7 @@ namespace TestServer.Handlers
             return (split[0], split[1]);
         }
 
-        private static bool TryDeserialize<T>(this JsonElement element, HttpListenerResponse response, [NotNullWhen(true)]out T? result)
+        private static bool TryDeserialize<T>(this JsonElement element, HttpListenerResponse response, int version, [NotNullWhen(true)]out T? result)
         {
             result = default;
             try {
@@ -38,7 +38,7 @@ namespace TestServer.Handlers
                 })!;
                 return true;
             } catch (JsonException ex) {
-                response.WriteBody(Router.CreateErrorResponse($"Invalid json received: {ex.Message}"), HttpStatusCode.BadRequest);
+                response.WriteBody(Router.CreateErrorResponse($"Invalid json received: {ex.Message}"), version, HttpStatusCode.BadRequest);
             }
 
             return false;
@@ -82,6 +82,8 @@ namespace TestServer
     public static class Router
     {
         #region Constants
+
+        public const string ApiVersionHeader = "CBLTest-API-Version";
 
         private static readonly IDictionary<string, HandlerAction> RouteMap =
             new Dictionary<string, HandlerAction>();
@@ -148,11 +150,21 @@ namespace TestServer
 
         #region Internal Methods
 
-        internal static async Task Handle(Uri endpoint, Stream body, HttpListenerResponse response)
+        internal static async Task Handle(Uri endpoint, Stream body, HttpListenerResponse response, int version)
         {
+            if(version > CBLTestServer.MaxApiVersion) {
+                response.WriteBody("The API version specified is not supported", CBLTestServer.MaxApiVersion, HttpStatusCode.Forbidden);
+                return;
+            }
+
             var path = endpoint.AbsolutePath!.TrimStart('/');
+            if (version == 0 && path != "") {
+                response.WriteBody($"{ApiVersionHeader} missing or set to 0 on a versioned endpoint", CBLTestServer.MaxApiVersion, HttpStatusCode.Forbidden);
+                return;
+            }
+
             if (!RouteMap.TryGetValue(path, out HandlerAction? action)) {
-                response.WriteEmptyBody(HttpStatusCode.NotFound);
+                response.WriteEmptyBody(version, HttpStatusCode.NotFound);
                 return;
             }
 
@@ -170,20 +182,19 @@ namespace TestServer
                 Console.WriteLine($"Error deserializing POST body for {endpoint}");
                 Console.WriteLine(msg);
                 var topEx = new ApplicationException($"Error deserializing POST body for {endpoint}", ex);
-                response.WriteBody(CreateErrorResponse(topEx), HttpStatusCode.BadRequest);
+                response.WriteBody(CreateErrorResponse(topEx), version, HttpStatusCode.BadRequest);
                 return;
             }
 
-            var args = endpoint.ParseQueryString();
             try {
-                action(args, bodyObj, response);
+                action(version, bodyObj, response);
             } catch (Exception ex) {
                 var msg = MultiExceptionString(ex);
                 Debug.WriteLine($"Error in handler for {endpoint}");
                 Debug.WriteLine(msg);
                 Console.WriteLine($"Error in handler for {endpoint}");
                 Console.WriteLine(msg);
-                response.WriteBody(CreateErrorResponse(msg), HttpStatusCode.InternalServerError);
+                response.WriteBody(CreateErrorResponse(msg), version, HttpStatusCode.InternalServerError);
             }
         }
 

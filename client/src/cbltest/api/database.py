@@ -1,12 +1,14 @@
 from __future__ import annotations
+from json import dumps
 
 from typing import Dict, List, cast
 
 from cbltest.requests import TestServerRequestType
-from cbltest.v1.responses import PostGetAllDocumentIDsResponse
-from cbltest.v1.requests import DatabaseUpdateEntry, DatabaseUpdateType, PostGetAllDocumentIDsRequestBody, PostUpdateDatabaseRequestBody
+from cbltest.v1.responses import PostGetAllDocumentsResponse, PostGetAllDocumentsEntry
+from cbltest.v1.requests import DatabaseUpdateEntry, DatabaseUpdateType, PostGetAllDocumentsRequestBody, PostUpdateDatabaseRequestBody
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory
+from cbltest.jsonhelper import _assert_string_entry
 
 class DatabaseUpdater:
     """
@@ -54,6 +56,28 @@ class DatabaseUpdater:
     def upsert_document(self, collection: str, id: str, new_properties: Dict[str, any] = None, removed_properties: List[str] = None):
         self.__updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties))
 
+class AllDocumentsEntry:
+    """
+    A class that represents a single entry inside of an all documents collection
+    """
+
+    @property
+    def id(self) -> str:
+        """Gets the ID of the document"""
+        return self.__id
+    
+    @property
+    def rev(self) -> str:
+        """Gets the rev ID of the document"""
+        return self.__rev
+
+    def __init__(self, body: PostGetAllDocumentsEntry):
+        self.__id = body.id
+        self.__rev = body.rev
+
+    def __str__(self) -> str:
+        return dumps({"id": self.__id, "rev": self.__rev})
+
 class AllDocumentsCollection:
     """
     A class that lists all of the documents in a given collection
@@ -66,15 +90,15 @@ class AllDocumentsCollection:
         return self.__name
     
     @property
-    def document_ids(self) -> List[str]:
+    def documents(self) -> List[AllDocumentsEntry]:
         """
         Gets the list of document IDs contained in the collection
         """
-        return self.__document_ids
+        return self.__documents
     
-    def __init__(self, name: str, ids: List[str]):
+    def __init__(self, name: str, docs: List[PostGetAllDocumentsEntry]):
         self.__name = name
-        self.__document_ids = ids
+        self.__documents = list(AllDocumentsEntry(x) for x in docs)
 
 class AllDocumentsMap:
     """
@@ -88,7 +112,7 @@ class AllDocumentsMap:
         """
         return self.__collections
     
-    def __init__(self, response: PostGetAllDocumentIDsResponse):
+    def __init__(self, response: PostGetAllDocumentsResponse):
         self.__collections: List[AllDocumentsCollection] = []
         for c in response.collection_keys:
             self.__collections.append(AllDocumentsCollection(c, response.documents_for_collection(c)))
@@ -129,7 +153,7 @@ class Database:
 
         :param collections: A variadic list of collection names
         """
-        payload = PostGetAllDocumentIDsRequestBody(self.__name, *collections)
+        payload = PostGetAllDocumentsRequestBody(self.__name, *collections)
         req = self.__request_factory.create_request(TestServerRequestType.ALL_DOC_IDS, payload)
         resp = await self.__request_factory.send_request(self.__index, req)
         if resp.error is not None:
@@ -137,4 +161,4 @@ class Database:
             cbl_trace(resp.error.message)
             return None
 
-        return AllDocumentsMap(cast(PostGetAllDocumentIDsResponse, resp))
+        return AllDocumentsMap(cast(PostGetAllDocumentsResponse, resp))

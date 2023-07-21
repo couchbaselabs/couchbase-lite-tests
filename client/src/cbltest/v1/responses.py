@@ -1,6 +1,8 @@
-from typing import Final, List, cast
+from typing import Dict, Final, List, cast
 from cbltest.responses import ErrorResponseBody, TestServerResponse
 from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorDocumentEntry, ReplicatorProgress
+
+from cbltest.jsonhelper import _assert_string_entry
 
 # Like the requests file, this file also follows the convention that all of the 
 # received responses are classes that end in 'Response'.  However, unlike the
@@ -18,23 +20,51 @@ class PostResetResponse(TestServerResponse):
     """
     def __init__(self, status_code: int, uuid:str, body: dict):
         super().__init__(status_code, uuid, 1, body, "reset")
+
+class PostGetAllDocumentsEntry:
+    __id_key: Final[str] = "id"
+    __rev_key: Final[str] = "rev"
+
+    @property
+    def id(self) -> str:
+        return self.__id
     
-class PostGetAllDocumentIDsResponse(TestServerResponse):
+    @property
+    def rev(self) -> str:
+        return self.__rev
+
+    def __init__(self, body: dict):
+        assert isinstance(body, dict), "Invalid PostGetAllDocumentsEntry received (not an object)"
+        self.__id = _assert_string_entry(body, self.__id_key)
+        self.__rev = _assert_string_entry(body, self.__rev_key)
+    
+class PostGetAllDocumentsResponse(TestServerResponse):
     """
-    A POST /getAllDocumentIDs response as specified in version 1 of the 
+    A POST /getAllDocuments response as specified in version 1 of the 
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
 
     Example Body::
 
         {
             "catalog.cloths": [
-                "c001",
-                "c002"
+                {
+                    "id": "c1",
+                    "rev": "1-abc"
+                },
+                {
+                    "id": "c2",
+                    "rev": "1-9ef"
+                }
             ],
-            "catalog.shoes": [
-                "s001",
-                "s002",
-                "s003"
+                "catalog.shoes": [
+                {
+                    "id": "s1",
+                    "rev": "1-ff0"
+                },
+                {
+                    "id": "s2",
+                    "rev": "1-e0f"
+                }
             ]
         }
     """
@@ -44,17 +74,22 @@ class PostGetAllDocumentIDsResponse(TestServerResponse):
         """Gets all the collections that are specified in the response"""
         return self.__payload.keys()
     
-    def documents_for_collection(self, collection: str) -> List[str]:
+    def documents_for_collection(self, collection: str) -> List[PostGetAllDocumentsEntry]:
         """
-        Gets the document IDs contained in the specified collection
+        Gets the documents contained in the specified collection
 
-        :param collection: The collection to return document IDs from
+        :param collection: The collection to return documents from
         """
         return self.__payload.get(collection)
     
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "getAllDocumentIDs")
-        self.__payload = body
+        super().__init__(status_code, uuid, 1, body, "getAllDocuments")
+        self.__payload: Dict[str, List[PostGetAllDocumentsEntry]] = {}
+        for k in body:
+            v = body[k]
+            self.__payload[k] = []
+            for entry in v:
+                self.__payload[k].append(PostGetAllDocumentsEntry(entry))
 
 class PostUpdateDatabaseResponse(TestServerResponse):
     """
