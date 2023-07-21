@@ -32,7 +32,7 @@ private:
 
     int handlePOSTReset(Request &request);
 
-    int handlePOSTGetAllDocumentIDs(Request &request);
+    int handlePOSTGetAllDocuments(Request &request);
 
     int handlePOSTUpdateDatabase(Request &request);
 

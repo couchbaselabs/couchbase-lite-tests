@@ -70,7 +70,7 @@ int Dispatcher::handlePOSTReset(Request &request) {
     return request.respondWithOK();
 }
 
-int Dispatcher::handlePOSTGetAllDocumentIDs(Request &request) {
+int Dispatcher::handlePOSTGetAllDocuments(Request &request) {
     json body = request.jsonBody();
     CheckBody(body);
 
@@ -85,7 +85,7 @@ int Dispatcher::handlePOSTGetAllDocumentIDs(Request &request) {
 
         if (col) {
             CBLError error{};
-            string str = "SELECT meta().id FROM " + colName;
+            string str = "SELECT meta().id, meta().revisionID FROM " + colName;
             CBLQuery *query = CBLDatabase_CreateQuery(db, kCBLN1QLLanguage, FLS(str), nullptr, &error);
             CheckError(error);
             AUTO_RELEASE(query);
@@ -94,13 +94,16 @@ int Dispatcher::handlePOSTGetAllDocumentIDs(Request &request) {
             CheckError(error);
             AUTO_RELEASE(rs);
 
-            vector<string> ids;
+            vector<json> docs;
             while (CBLResultSet_Next(rs)) {
+                json doc;
                 FLString idVal = FLValue_AsString(CBLResultSet_ValueAtIndex(rs, 0));
-                auto id = STR(idVal);
-                ids.push_back(id);
+                doc["id"] = STR(idVal);
+                FLString revVal = FLValue_AsString(CBLResultSet_ValueAtIndex(rs, 1));
+                doc["rev"] = STR(revVal);
+                docs.push_back(doc);
             }
-            result[colName] = ids;
+            result[colName] = docs;
         }
     }
     return request.respondWithJSON(result);
@@ -226,7 +229,7 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
 
     json body = request.jsonBody();
     CheckBody(body);
-
+    
     ReplicatorParams params;
     json config = GetValue<json>(body, "config");
     CheckIsObject(config, "config");
@@ -264,32 +267,48 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
 
     vector<ReplicationCollection> collections;
     for (auto &colObject: GetValue<vector<json>>(config, "collections")) {
-        ReplicationCollection col;
-        col.collection = GetValue<string>(colObject, "collection");
-        if (colObject.contains("channels")) {
-            col.channels = GetValue<vector<string>>(colObject, "channels");
+        vector<string> names;
+        if (colObject.contains("names")) {
+            names = GetValue<vector<string>>(colObject, "names");
+        } else {
+            // TODO: Remove this when python client makes changes to use names
+            auto name = GetValue<string>(colObject, "collection");
+            names.push_back(name);
         }
-        if (colObject.contains("documentIDs")) {
-            col.documentIDs = GetValue<vector<string>>(colObject, "documentIDs");
+
+        if (names.empty()) {
+            throw domain_error("No collections specified");
         }
-        if (colObject.contains("pushFilter")) {
-            auto filterObject = GetValue<json>(colObject, "pushFilter");
-            ReplicationFilterSpec filterSpec = {};
-            filterSpec.name = GetValue<string>(filterObject, "name");
-            filterSpec.params = filterObject.contains("params") ?
-                                GetValue<json>(filterObject, "params") : json::object();
-            col.pushFilter = filterSpec;
+
+        for (auto &name: names) {
+            ReplicationCollection col;
+            col.collection = name;
+            if (colObject.contains("channels")) {
+                col.channels = GetValue<vector<string>>(colObject, "channels");
+            }
+            if (colObject.contains("documentIDs")) {
+                col.documentIDs = GetValue<vector<string>>(colObject, "documentIDs");
+            }
+            if (colObject.contains("pushFilter")) {
+                auto filterObject = GetValue<json>(colObject, "pushFilter");
+                ReplicationFilterSpec filterSpec = {};
+                filterSpec.name = GetValue<string>(filterObject, "name");
+                filterSpec.params = filterObject.contains("params") ?
+                                    GetValue<json>(filterObject, "params") : json::object();
+                col.pushFilter = filterSpec;
+            }
+            if (colObject.contains("pullFilter")) {
+                auto filterObject = GetValue<json>(colObject, "pullFilter");
+                ReplicationFilterSpec filterSpec = {};
+                filterSpec.name = GetValue<string>(filterObject, "name");
+                filterSpec.params = filterObject.contains("params") ?
+                                    GetValue<json>(filterObject, "params") : json::object();
+                col.pullFilter = filterSpec;
+            }
+            collections.push_back(col);
         }
-        if (colObject.contains("pullFilter")) {
-            auto filterObject = GetValue<json>(colObject, "pullFilter");
-            ReplicationFilterSpec filterSpec = {};
-            filterSpec.name = GetValue<string>(filterObject, "name");
-            filterSpec.params = filterObject.contains("params") ?
-                                GetValue<json>(filterObject, "params") : json::object();
-            col.pullFilter = filterSpec;
-        }
-        collections.push_back(col);
     }
+
     params.collections = collections;
 
     bool reset = false;

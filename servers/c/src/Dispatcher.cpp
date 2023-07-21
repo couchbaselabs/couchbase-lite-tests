@@ -13,7 +13,7 @@ Dispatcher::Dispatcher(const TestServer *testServer) {
 
     addRule({"GET", "/", HANDLER(handleGETRoot)});
     addRule({"POST", "/reset", HANDLER(handlePOSTReset)});
-    addRule({"POST", "/getAllDocumentIDs", HANDLER(handlePOSTGetAllDocumentIDs)});
+    addRule({"POST", "/getAllDocuments", HANDLER(handlePOSTGetAllDocuments)});
     addRule({"POST", "/updateDatabase", HANDLER(handlePOSTUpdateDatabase)});
     addRule({"POST", "/startReplicator", HANDLER(handlePOSTStartReplicator)});
     addRule({"POST", "/getReplicatorStatus", HANDLER(handlePOSTGetReplicatorStatus)});
