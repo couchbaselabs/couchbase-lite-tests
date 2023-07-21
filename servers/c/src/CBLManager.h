@@ -71,7 +71,7 @@ private:
     /* Replicator id number */
     int64_t replicatorID = 0;
 
-    /** Map of replicator id and database object */
+    /** Map of replicator id and replicator object */
     std::unordered_map<std::string, CBLReplicator *> _replicators;
 
     /** Replicator context for keeping per replicator objects used by callbacks */
