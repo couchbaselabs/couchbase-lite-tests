@@ -83,15 +83,15 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("updateDatabase")]
-    public static void UpdateDatabaseHandler(NameValueCollection args, JsonDocument body, HttpListenerResponse response)
+    public static void UpdateDatabaseHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
-        if(!body.RootElement.TryDeserialize<UpdateDatabaseBody>(response, out var updateBody)) {
+        if(!body.RootElement.TryDeserialize<UpdateDatabaseBody>(response, version, out var updateBody)) {
             return;
         }
 
         var db = CBLTestServer.Manager.GetDatabase(updateBody.database);
         if(db == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{updateBody.database}'"), HttpStatusCode.BadRequest);
+            response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{updateBody.database}'"), version, HttpStatusCode.BadRequest);
             return;
         }
 
@@ -133,6 +133,6 @@ internal static partial class HandlerList
             }
         });
 
-        response.WriteEmptyBody();
+        response.WriteEmptyBody(version);
     }
 }

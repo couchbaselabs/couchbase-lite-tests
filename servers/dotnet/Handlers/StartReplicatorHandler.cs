@@ -111,15 +111,15 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("startReplicator")]
-    public static void StartReplicatorHandler(NameValueCollection args, JsonDocument body, HttpListenerResponse response)
+    public static void StartReplicatorHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
-        if(!body.RootElement.TryDeserialize<StartReplicatorBody>(response, out var deserializedBody)) {
+        if(!body.RootElement.TryDeserialize<StartReplicatorBody>(response, version, out var deserializedBody)) {
             return;
         }
 
         var db = CBLTestServer.Manager.GetDatabase(deserializedBody.config.database);
         if (db == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{deserializedBody.config.database}'!"), HttpStatusCode.BadRequest);
+            response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{deserializedBody.config.database}'!"), version, HttpStatusCode.BadRequest);
             return;
         }
 
@@ -131,7 +131,7 @@ internal static partial class HandlerList
                 var spec = CollectionSpec(c.collection);
                 var coll = db.GetCollection(spec.name, spec.scope);
                 if(coll == null) {
-                    response.WriteBody(Router.CreateErrorResponse($"Unable to find collection '{c.collection}'"), HttpStatusCode.BadRequest);
+                    response.WriteBody(Router.CreateErrorResponse($"Unable to find collection '{c.collection}'"), version, HttpStatusCode.BadRequest);
                     return;
                 }
 
@@ -155,6 +155,6 @@ internal static partial class HandlerList
         (var repl, var id) = CBLTestServer.Manager.RegisterObject(() => new Replicator(replConfig));
         repl.Start();
 
-        response.WriteBody(new { id });
+        response.WriteBody(new { id }, version);
     }
 }

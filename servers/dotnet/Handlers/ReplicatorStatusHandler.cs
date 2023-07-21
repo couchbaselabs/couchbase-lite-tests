@@ -35,15 +35,15 @@ internal static partial class HandlerList
     internal record struct ReplicatorStatusReturnBody(string activity, ReplicatorProgressReturnBody progress, ErrorReturnBody? error = null);
 
     [HttpHandler("getReplicatorStatus")]
-    public static void ReplicatorStatusHandler(NameValueCollection args, JsonDocument body, HttpListenerResponse response)
+    public static void ReplicatorStatusHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
-        if(!body.RootElement.TryDeserialize<ReplicatorStatusBody>(response, out var replicatorStatusBody)) {
+        if(!body.RootElement.TryDeserialize<ReplicatorStatusBody>(response, version, out var replicatorStatusBody)) {
             return;
         }
 
         var replicator = CBLTestServer.Manager.GetObject<Replicator>(replicatorStatusBody.id);
         if(replicator == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find replicator with id '{replicatorStatusBody.id}'"), HttpStatusCode.BadRequest);
+            response.WriteBody(Router.CreateErrorResponse($"Unable to find replicator with id '{replicatorStatusBody.id}'"), version, HttpStatusCode.BadRequest);
             return;
         }
 
@@ -62,6 +62,6 @@ internal static partial class HandlerList
         }
 
         var retVal = new ReplicatorStatusReturnBody(activity, new ReplicatorProgressReturnBody(complete), error);
-        response.WriteBody(retVal);
+        response.WriteBody(retVal, version);
     }
 }

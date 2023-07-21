@@ -55,7 +55,7 @@ async def cli_main():
     resp = await rf.send_request(0, request)
 
     # One last time
-    payload = PostGetAllDocumentIDsRequestBody("db1", "inventory.airlines")
+    payload = PostGetAllDocumentsRequestBody("db1", "inventory.airlines")
     request = rf.create_request(TestServerRequestType.ALL_DOC_IDS, payload)
     resp = await rf.send_request(0, request)
 
