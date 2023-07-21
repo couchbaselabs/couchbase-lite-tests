@@ -24,6 +24,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.couchbase.lite.mobiletest.errors.ServerError;
+
 
 public class JsonEach {
     public interface ObjectOp {
@@ -89,7 +91,7 @@ public class JsonEach {
                 continue;
             }
 
-            throw new IllegalArgumentException("unrecognized JSON type: ${value::class.java.name}");
+            throw new ServerError("unrecognized JSON type: ${value::class.java.name}");
         }
 
         block.endObject();
@@ -132,7 +134,7 @@ public class JsonEach {
                 continue;
             }
 
-            throw new IllegalArgumentException("unrecognized JSON type: ${value::class.java.name}");
+            throw new ServerError("unrecognized JSON type: ${value::class.java.name}");
         }
 
         block.endArray();

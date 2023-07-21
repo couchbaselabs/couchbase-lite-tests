@@ -17,22 +17,29 @@ package com.couchbase.lite.mobiletest.errors;
 
 import androidx.annotation.NonNull;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 
-
+// The base class for TestServer errors
 public class TestError extends RuntimeException {
-    public TestError(@NonNull String message) { super(message); }
-
-    public TestError(@NonNull String message, @NonNull Throwable cause) { super(message, cause); }
+    protected static final String DOMAIN_TESTSERVER = "TESTSERVER";
 
     @NonNull
-    public String printError() {
-        final StringWriter sw = new StringWriter();
-        sw.write(getLocalizedMessage());
-        sw.write("\n");
-        final PrintWriter pw = new PrintWriter(sw);
-        printStackTrace(pw);
-        return pw.toString();
+    private final String domain;
+    private final int code;
+
+    public TestError(@NonNull String domain, int code, @NonNull String message) {
+        super(message);
+        this.domain = domain;
+        this.code = code;
     }
+
+    public TestError(@NonNull String domain, int code, @NonNull String message, @NonNull Throwable cause) {
+        super(message, cause);
+        this.domain = domain;
+        this.code = code;
+    }
+
+    @NonNull
+    public String getDomain() { return domain; }
+
+    public int getCode() { return code; }
 }

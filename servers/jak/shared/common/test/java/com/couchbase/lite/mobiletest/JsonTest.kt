@@ -34,17 +34,17 @@ class JsonTest : BaseTest() {
         val data: MutableMap<String, Any?> = mutableMapOf("red" to null)
         data["green"] = listOf(true, "string", 43, 44L, 2.71828F, 2.71828)
 
-        val reply = ReplyBuilder().buildReply(data)
-        val request = RequestBuilder().buildRequest(reply.inputStream())
+        val reply = ReplyBuilder(data).buildReply()
+        val request = RequestBuilder(reply.inputStream()).buildRequest()
 
         Assert.assertNull(request.getString("red"))
 
         val list = request.getList("green")!!
         Assert.assertTrue(list.getBoolean(0)!!)
         Assert.assertEquals("string", list.getString(1))
-        Assert.assertEquals(43L, list.getLong(2)) // the parser does this..
+        Assert.assertEquals(43L, list.getLong(2)) // the parser does this
         Assert.assertEquals(44L, list.getLong(3))
-        Assert.assertEquals(2.71828, list.getDouble(4)) // the parser does this..
+        Assert.assertEquals(2.71828, list.getDouble(4)) // the parser does this
         Assert.assertEquals(2.71828, list.getDouble(5))
     }
 

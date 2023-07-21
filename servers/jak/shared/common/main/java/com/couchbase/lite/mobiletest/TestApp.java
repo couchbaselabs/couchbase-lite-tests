@@ -41,6 +41,7 @@ import com.couchbase.lite.LogLevel;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
 import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.util.StringUtils;
@@ -48,12 +49,11 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 
 public abstract class TestApp {
     public static final String HEADER_PROTOCOL_VERSION = "CBLTest-API-Version".toLowerCase(Locale.getDefault());
-    public static final int DEFAULT_PROTOCOL_VERSION = 1;
+    public static final int LATEST_SUPPORTED_PROTOCOL_VERSION = 1;
     public static final List<Integer> KNOWN_VERSIONS
-        = Collections.unmodifiableList(Arrays.asList(DEFAULT_PROTOCOL_VERSION));
+        = Collections.unmodifiableList(Arrays.asList(LATEST_SUPPORTED_PROTOCOL_VERSION));
 
     public static final String HEADER_CLIENT = "CBLTest-Client-ID".toLowerCase(Locale.getDefault());
-    public static final String DEFAULT_CLIENT = "c0ffee00-c0c0-50da-c01a-de1ec7ab1e00";
     public static final String HEADER_SERVER = "CBLTest-Server-ID";
 
     private static final AtomicReference<TestApp> APP = new AtomicReference<>();
@@ -61,7 +61,7 @@ public abstract class TestApp {
 
     public static void init(@NonNull TestApp app) {
         if (!APP.compareAndSet(null, app)) {
-            throw new IllegalStateException("Attempt to re-initialize the Test App");
+            throw new ServerError("Attempt to re-initialize the Test App");
         }
         app.init();
     }
@@ -69,7 +69,7 @@ public abstract class TestApp {
     @NonNull
     public static TestApp getApp() {
         final TestApp app = APP.get();
-        if (app == null) { throw new IllegalStateException("Test App has not been initialized"); }
+        if (app == null) { throw new ServerError("Test App has not been initialized"); }
         return app;
     }
 
@@ -163,7 +163,8 @@ public abstract class TestApp {
         return replSvc.get();
     }
 
-    public final void reset(@NonNull TypedMap req, @NonNull Memory mem) {
+    @NonNull
+    public final Map<String, Object> reset(@NonNull TypedMap req, @NonNull Memory mem) {
         final ReplicatorService rMgr = replSvc.getAndSet(null);
         if (rMgr != null) { rMgr.reset(mem); }
 
@@ -178,6 +179,8 @@ public abstract class TestApp {
         getDbSvc().init(req, newMem);
 
         getReplSvc().init(req, newMem);
+
+        return Collections.emptyMap();
     }
 
     @NonNull

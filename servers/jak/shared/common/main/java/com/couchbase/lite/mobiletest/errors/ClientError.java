@@ -17,9 +17,11 @@ package com.couchbase.lite.mobiletest.errors;
 
 import androidx.annotation.NonNull;
 
-
+// Use this to report a bad client request
 public class ClientError extends TestError {
-    public ClientError(@NonNull String message) { super(message); }
+    public ClientError(@NonNull String message) { super(DOMAIN_TESTSERVER, 400, message); }
 
-    public ClientError(@NonNull String message, @NonNull Throwable cause) { super(message, cause); }
+    public ClientError(@NonNull String message, @NonNull Throwable cause) {
+        super(DOMAIN_TESTSERVER, 400, message, cause);
+    }
 }

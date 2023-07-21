@@ -25,6 +25,8 @@ import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import com.couchbase.lite.mobiletest.errors.ClientError;
+
 
 public class CompareJsonObject implements JsonReduce.ObjectOp<Boolean> {
     private final JSONObject target;
@@ -71,7 +73,7 @@ public class CompareJsonObject implements JsonReduce.ObjectOp<Boolean> {
         if (num instanceof Long) { return num.equals(target.optLong(key)); }
         if (num instanceof Double) { return num.equals(target.optDouble(key)); }
 
-        throw new IllegalArgumentException("unrecognized Number: ${num::class.java.name}");
+        throw new ClientError("unrecognized Number: ${num::class.java.name}");
     }
 
     @NonNull

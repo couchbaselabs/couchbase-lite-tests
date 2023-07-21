@@ -18,6 +18,8 @@ import org.nanohttpd.protocols.http.response.Status;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.errors.TestError;
+import com.couchbase.lite.mobiletest.factories.ErrorBuilder;
+import com.couchbase.lite.mobiletest.factories.ReplyBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
@@ -30,8 +32,8 @@ public class Server extends NanoHTTPD {
     private static class SafeResponse extends Response {
         private final Reply reply;
 
-        SafeResponse(@NonNull Reply reply) {
-            super(Status.OK, "application/json", reply.getContent(), reply.getSize());
+        SafeResponse(@NonNull Status status, @NonNull Reply reply) {
+            super(status, "application/json", reply.getContent(), reply.getSize());
             this.reply = reply;
         }
 
@@ -63,50 +65,46 @@ public class Server extends NanoHTTPD {
         dispatcher = app.getDispatcher();
     }
 
-    @SuppressWarnings("PMD.PreserveStackTrace")
+    @SuppressWarnings({"PMD.PreserveStackTrace", "PMD.NPathComplexity"})
     @SuppressFBWarnings("REC_CATCH_EXCEPTION")
     @NonNull
     @Override
     public Response handle(@NonNull IHTTPSession session) {
-        int version = TestApp.DEFAULT_PROTOCOL_VERSION;
+        int version = -1;
         Response resp;
         Reply reply = null;
         try {
             final Map<String, String> headers = session.getHeaders();
 
             final String versionStr = headers.get(TestApp.HEADER_PROTOCOL_VERSION);
-            if (versionStr == null) {
-                Log.w(TAG, "Request does not specify a protocol version. Using version " + version);
-            }
-            else {
+            if (versionStr != null) {
                 try {
                     final int v = Integer.parseInt(versionStr);
                     if (TestApp.KNOWN_VERSIONS.contains(v)) { version = v; }
-                    else {
-                        Log.w(TAG, "Unrecognized protocol version: " + versionStr + ". Using version " + version);
-                    }
                 }
-                catch (NumberFormatException ignore) {
-                    Log.w(TAG, "Unrecognized protocol version: " + versionStr + ". Using version " + version);
-                }
-            }
-
-            String client = headers.get(TestApp.HEADER_CLIENT);
-            if (client == null) {
-                client = TestApp.DEFAULT_CLIENT;
-                Log.w(TAG, "Request does not specify a client Id. Using " + client);
+                catch (NumberFormatException ignore) { }
             }
 
             final Dispatcher.Method method = METHODS.get(session.getMethod());
-            if (method == null) { throw new IllegalArgumentException("Unimplemented method: " + session.getMethod()); }
+            if (method == null) { throw new ClientError("Unimplemented method: " + session.getMethod()); }
 
             final String endpoint = session.getUri();
-            if (StringUtils.isEmpty(endpoint)) { throw new IllegalArgumentException("Empty request"); }
+            if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }
+
+            String client = headers.get(TestApp.HEADER_CLIENT);
 
             Log.i(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
 
+            // Special handling for the 'GET /' endpoint
+            if ("/".equals(endpoint) && (Dispatcher.Method.GET.equals(method))) {
+                if (version < 0) { version = TestApp.LATEST_SUPPORTED_PROTOCOL_VERSION; }
+                if (client == null) { client = "anonymous"; }
+            }
+            if (version < 0) { throw new ClientError("No protocol version specified"); }
+            if (client == null) { throw new ClientError("No client specified"); }
+
             reply = dispatcher.handleRequest(client, version, method, endpoint, session.getInputStream());
-            resp = new SafeResponse(reply);
+            resp = new SafeResponse(Status.OK, reply);
         }
         catch (ClientError err) {
             Log.w(TAG, "Client error", err);
@@ -130,6 +128,12 @@ public class Server extends NanoHTTPD {
     @NonNull
     private Response handleError(@Nullable Reply reply, @NonNull Status status, @NonNull TestError err) {
         if (reply != null) { reply.close(); }
-        return Response.newFixedLengthResponse(status, "text/plain", err.printError());
+        try {
+            return new SafeResponse(status, new Reply(new ReplyBuilder(new ErrorBuilder(err).build()).buildReply()));
+        }
+        catch (Exception e) {
+            Log.w(TAG, "Catastrophic server failure", e);
+            return Response.newFixedLengthResponse(Status.INTERNAL_ERROR, "text/plain", err.toString());
+        }
     }
 }

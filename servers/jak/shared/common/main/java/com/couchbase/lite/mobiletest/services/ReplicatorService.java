@@ -27,6 +27,7 @@ import com.couchbase.lite.Replicator;
 import com.couchbase.lite.ReplicatorStatus;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.factories.ReplicatorConfigBuilder;
 import com.couchbase.lite.mobiletest.factories.ReplicatorStatusBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
@@ -54,8 +55,7 @@ public class ReplicatorService {
         final Replicator repl = new Replicator(configBuilder.build());
         liveRepls.put(replId, repl);
 
-        final Boolean shouldReset = configBuilder.shouldReset();
-        repl.start((shouldReset != null) && shouldReset);
+        repl.start(configBuilder.shouldReset());
         Log.i(TAG, "Started replicator: " + replId);
 
         final Map<String, Object> ret = new HashMap<>();
@@ -66,13 +66,13 @@ public class ReplicatorService {
     @NonNull
     public Map<String, Object> getReplStatusV1(@NonNull TypedMap req, @NonNull Memory mem) {
         final String id = req.getString(KEY_REPL_ID);
-        if (id == null) { throw new IllegalStateException("Replicator id not specified"); }
+        if (id == null) { throw new ClientError("Replicator id not specified"); }
 
         final TypedMap liveRepls = mem.getMap(SYM_OPEN_REPLS);
-        if (liveRepls == null) { throw new IllegalStateException("No such replicator: " + id); }
+        if (liveRepls == null) { throw new ClientError("No such replicator: " + id); }
 
         final Replicator repl = liveRepls.get(id, Replicator.class);
-        if (repl == null) { throw new IllegalStateException("No such replicator: " + id); }
+        if (repl == null) { throw new ClientError("No such replicator: " + id); }
 
         final ReplicatorStatus replStatus = repl.getStatus();
         Log.i(TAG, "Replicator status: " + replStatus);
@@ -81,17 +81,15 @@ public class ReplicatorService {
     }
 
     public void reset(@NonNull Memory memory) {
-        final TypedMap liveRepls = memory.getMap(SYM_OPEN_REPLS);
-        memory.put(SYM_OPEN_REPLS, null);
+        final Map<?, ?> repls = memory.remove(SYM_OPEN_REPLS, Map.class);
+        if ((repls == null) || repls.isEmpty()) { return; }
 
-        if ((liveRepls == null) || liveRepls.isEmpty()) { return; }
-
+        final TypedMap liveRepls = new TypedMap(repls);
         for (String key: liveRepls.getKeys()) {
             final Replicator repl = liveRepls.get(key, Replicator.class);
             if (repl != null) { repl.stop(); }
         }
     }
 
-    public void init(TypedMap req, Memory mem) {
-    }
+    public void init(TypedMap req, Memory mem) { }
 }
