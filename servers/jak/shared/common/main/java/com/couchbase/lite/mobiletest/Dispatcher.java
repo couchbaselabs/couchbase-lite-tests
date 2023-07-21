@@ -43,10 +43,7 @@ public final class Dispatcher {
     // build the dispatch table
     public void init() {
         addTest(1, "/", Method.GET, (r, m) -> app.getSystemInfo());
-        addTest(1, "/reset", Method.POST, (r, m) -> {
-            app.reset(r, m);
-            return Collections.emptyMap();
-        });
+        addTest(1, "/reset", Method.POST, app::reset);
         addTest(1, "/getAllDocumentIDs", Method.POST, (r, m) -> Collections.emptyMap());
         addTest(1, "/updateDatabase", Method.POST, (r, m) -> Collections.emptyMap());
         addTest(1, "/startReplicator", Method.POST, (r, m) -> app.getReplSvc().createReplV1(r, m));
@@ -56,7 +53,6 @@ public final class Dispatcher {
     }
 
     // This method returns a Reply.  Be sure to close it!
-    @SuppressWarnings("resource")
     @NonNull
     public Reply handleRequest(
         @NonNull String client,
@@ -73,12 +69,11 @@ public final class Dispatcher {
         }
 
         final Map<String, Object> result = test.run(
-            new RequestBuilder().buildRequest(req),
+            new RequestBuilder(req).buildRequest(),
             TestApp.getApp().getMemory(client));
 
         Log.w(TAG, "Request succeeded");
-
-        return new Reply(new ReplyBuilder().buildReply(result));
+        return new Reply(new ReplyBuilder(result).buildReply());
     }
 
     @Nullable

@@ -20,6 +20,7 @@ import com.couchbase.lite.CouchbaseLite;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
+import com.couchbase.lite.mobiletest.errors.ServerError;
 
 
 /**
@@ -31,7 +32,7 @@ public abstract class BaseTestApp extends TestApp {
     public BaseTestApp() {
         directory = new File(System.getProperty("java.io.tmpdir"), "TestServerTemp");
         if (!(directory.exists() || directory.mkdirs())) {
-            throw new IllegalStateException("Cannot create tmp directory: " + directory);
+            throw new ServerError("Cannot create tmp directory: " + directory);
         }
     }
 
@@ -106,7 +107,7 @@ public abstract class BaseTestApp extends TestApp {
             trustStore.setEntry("Servercerts", newEntry, protParam);
 
             final TLSIdentity identity = TLSIdentity.getIdentity(trustStore, "Servercerts", pass);
-            if (identity == null) { throw new CouchbaseLiteException("Identity not found"); }
+            if (identity == null) { throw new ServerError("Identity not found"); }
             return identity;
         }
     }
@@ -127,7 +128,7 @@ public abstract class BaseTestApp extends TestApp {
         trustStore.setEntry("Clientcerts", trustStore.getEntry("testkit", protParam), protParam);
 
         final TLSIdentity identity = TLSIdentity.getIdentity(trustStore, "Clientcerts", pass);
-        if (identity == null) { throw new CouchbaseLiteException("Identity not found"); }
+        if (identity == null) { throw new ServerError("Identity not found"); }
         return identity;
     }
 }

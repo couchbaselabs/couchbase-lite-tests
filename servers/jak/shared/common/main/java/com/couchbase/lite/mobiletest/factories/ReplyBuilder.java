@@ -26,10 +26,16 @@ import java.util.Map;
 import com.squareup.moshi.JsonWriter;
 import okio.Buffer;
 
+import com.couchbase.lite.mobiletest.errors.ServerError;
+
 
 public class ReplyBuilder {
+    private final Map<String, Object> reply;
+
+    public ReplyBuilder(@Nullable Map<String, Object> reply) { this.reply = reply; }
+
     @NonNull
-    public Buffer buildReply(@Nullable Map<String, Object> reply) throws IOException {
+    public Buffer buildReply() throws IOException {
         final Buffer buf = new Buffer();
         final JsonWriter writer = JsonWriter.of(buf);
         writer.setLenient(true);
@@ -43,7 +49,7 @@ public class ReplyBuilder {
         for (Map.Entry<?, ?> entry: value.entrySet()) {
             final Object key = entry.getKey();
             if (!(key instanceof String)) {
-                throw new IllegalArgumentException("Key is not a string in serialize: " + key);
+                throw new ServerError("Key is not a string in serialize: " + key);
             }
             writer.name((String) key);
             serializeValue(entry.getValue(), writer);
@@ -83,7 +89,7 @@ public class ReplyBuilder {
             return;
         }
 
-        throw new IllegalArgumentException("Value not a serializable type: " + value);
+        throw new ServerError("Value not a serializable type: " + value);
     }
 }
 

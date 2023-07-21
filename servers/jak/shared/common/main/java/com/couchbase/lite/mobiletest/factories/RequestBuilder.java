@@ -29,11 +29,16 @@ import com.squareup.moshi.JsonReader;
 import okio.Okio;
 
 import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.errors.ClientError;
 
 
 public class RequestBuilder {
+    private final InputStream json;
+
+    public RequestBuilder(@NonNull InputStream json) { this.json = json; }
+
     @NonNull
-    public TypedMap buildRequest(@NonNull InputStream json) throws IOException {
+    public TypedMap buildRequest() throws IOException {
         final JsonReader reader = JsonReader.of(Okio.buffer(Okio.source(json)));
         reader.setLenient(true);
         // ??? should check for extraneous stuff at the end of the document, wo hanging
@@ -80,7 +85,7 @@ public class RequestBuilder {
             case BEGIN_OBJECT:
                 return parseMap(json);
             default:
-                throw new IllegalArgumentException("Unexpected token: " + token);
+                throw new ClientError("Unexpected token: " + token);
         }
     }
 }

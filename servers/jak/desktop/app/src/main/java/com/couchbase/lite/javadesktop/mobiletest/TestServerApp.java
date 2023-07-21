@@ -12,6 +12,7 @@ import org.apache.commons.daemon.DaemonContext;
 
 import com.couchbase.lite.mobiletest.Server;
 import com.couchbase.lite.mobiletest.TestApp;
+import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.NetUtils;
 
@@ -68,7 +69,7 @@ public class TestServerApp implements Daemon {
     private static void startApp() {
         final TestServerApp app = new TestServerApp();
 
-        if (!APP.compareAndSet(null, app)) { throw new IllegalStateException("Attempt to restart app"); }
+        if (!APP.compareAndSet(null, app)) { throw new ServerError("Attempt to restart app"); }
 
         app.initApp();
         app.start();
@@ -92,7 +93,7 @@ public class TestServerApp implements Daemon {
     @Override
     public void start() {
         final Server server = new Server();
-        if (!SERVER.compareAndSet(null, server)) { throw new IllegalStateException("Attempt to restart server"); }
+        if (!SERVER.compareAndSet(null, server)) { throw new ServerError("Attempt to restart server"); }
 
         final String id = TestApp.getApp().getAppId();
         final List<InetAddress> addrs = NetUtils.getLocalAddresses();

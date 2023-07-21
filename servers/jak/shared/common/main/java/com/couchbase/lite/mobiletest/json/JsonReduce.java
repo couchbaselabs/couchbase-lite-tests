@@ -24,6 +24,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.couchbase.lite.mobiletest.errors.ServerError;
+
 
 public class JsonReduce<T> {
 
@@ -102,7 +104,7 @@ public class JsonReduce<T> {
                 continue;
             }
 
-            throw new IllegalArgumentException("unrecognized JSON type: ${value::class.java.name}");
+            throw new ServerError("unrecognized JSON type: ${value::class.java.name}");
         }
 
         return block.endObject(ret);
@@ -146,7 +148,7 @@ public class JsonReduce<T> {
                 continue;
             }
 
-            throw new IllegalArgumentException("unrecognized JSON type: ${value::class.java.name}");
+            throw new ServerError("unrecognized JSON type: ${value::class.java.name}");
         }
         return block.endArray(ret);
     }

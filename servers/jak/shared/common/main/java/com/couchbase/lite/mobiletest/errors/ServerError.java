@@ -18,8 +18,11 @@ package com.couchbase.lite.mobiletest.errors;
 import androidx.annotation.NonNull;
 
 
-public class ServerError extends TestError{
-    public ServerError(@NonNull String message) { super(message); }
+// Use this to report a server error
+public class ServerError extends TestError {
+    public ServerError(@NonNull String message) { super(DOMAIN_TESTSERVER, 500, message); }
 
-    public ServerError(@NonNull String message, @NonNull Throwable cause) { super(message, cause); }
+    public ServerError(@NonNull String message, @NonNull Throwable cause) {
+        super(DOMAIN_TESTSERVER, 500, message, cause);
+    }
 }

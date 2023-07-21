@@ -18,6 +18,8 @@ package com.couchbase.lite.mobiletest.data;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.couchbase.lite.mobiletest.errors.ServerError;
+
 
 abstract class TypedCollection {
     private final boolean strict;
@@ -30,6 +32,6 @@ abstract class TypedCollection {
         final Class<?> actualType = val.getClass();
         if (expectedType.isAssignableFrom(actualType)) { return expectedType.cast(val); }
         if (!strict) { return null; }
-        throw new IllegalStateException("Cannot convert " + actualType + " to " + expectedType);
+        throw new ServerError("Cannot convert " + actualType + " to " + expectedType);
     }
 }

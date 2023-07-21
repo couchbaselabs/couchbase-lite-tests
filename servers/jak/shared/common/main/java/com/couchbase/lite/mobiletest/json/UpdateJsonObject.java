@@ -21,6 +21,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.errors.ServerError;
+
 
 public class UpdateJsonObject implements JsonEach.ObjectOp {
     private final JSONObject target;
@@ -62,22 +65,18 @@ public class UpdateJsonObject implements JsonEach.ObjectOp {
         if (num instanceof Integer) { needsUpdate = num.equals(target.optInt(key)); }
         else if (num instanceof Long) { needsUpdate = num.equals(target.optLong(key)); }
         else if (num instanceof Double) { needsUpdate = num.equals(target.optDouble(key)); }
-        else { throw new IllegalArgumentException("unrecognized Number: " + num.getClass().getName()); }
+        else { throw new ClientError("unrecognized Number: " + num.getClass().getName()); }
         if (needsUpdate) { updateTarget(key, num); }
     }
 
     @Override
     public void boolVal(@NonNull String key, @NonNull Boolean bool) {
-        if (bool != target.optBoolean(key)) {
-            updateTarget(key, bool);
-        }
+        if (bool != target.optBoolean(key)) { updateTarget(key, bool); }
     }
 
     @Override
     public void nullVal(@NonNull String key) {
-        if (!target.isNull(key)) {
-            updateTarget(key, JSONObject.NULL);
-        }
+        if (!target.isNull(key)) { updateTarget(key, JSONObject.NULL); }
     }
 
     @Override
@@ -85,9 +84,7 @@ public class UpdateJsonObject implements JsonEach.ObjectOp {
 
     private void updateTarget(@NonNull String key, Object value) {
         try { target.put(key, value); }
-        catch (JSONException e) {
-            throw new IllegalArgumentException("Failed updating JSON at key: " + key, e);
-        }
+        catch (JSONException e) { throw new ServerError("Failed updating JSON at key: " + key, e); }
     }
 }
 

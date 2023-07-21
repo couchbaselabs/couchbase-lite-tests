@@ -21,6 +21,8 @@ import java.io.InputStream;
 
 import okio.Buffer;
 
+import com.couchbase.lite.mobiletest.errors.ServerError;
+
 
 public class Reply implements AutoCloseable {
     @NonNull
@@ -30,12 +32,12 @@ public class Reply implements AutoCloseable {
 
     @NonNull
     public InputStream getContent() {
-        if (!content.isOpen()) { throw new IllegalStateException("Attempt to get reply content after close"); }
+        if (!content.isOpen()) { throw new ServerError("Attempt to get reply content after close"); }
         return content.inputStream();
     }
 
     public long getSize() {
-        if (!content.isOpen()) { throw new IllegalStateException("Attempt to get reply size after close"); }
+        if (!content.isOpen()) { throw new ServerError("Attempt to get reply size after close"); }
         return content.size();
     }
 

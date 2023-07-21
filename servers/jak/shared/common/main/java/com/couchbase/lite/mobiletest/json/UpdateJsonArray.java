@@ -21,6 +21,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.errors.ServerError;
+
 
 public class UpdateJsonArray implements JsonEach.ArrayOp {
     private final JSONArray target;
@@ -61,7 +64,7 @@ public class UpdateJsonArray implements JsonEach.ArrayOp {
         if (num instanceof Integer) { needsUpdate = num.equals(target.optInt(idx)); }
         else if (num instanceof Long) { needsUpdate = num.equals(target.optLong(idx)); }
         else if (num instanceof Double) { needsUpdate = num.equals(target.optDouble(idx)); }
-        else { throw new IllegalArgumentException("unrecognized Number: " + num.getClass().getName()); }
+        else { throw new ClientError("unrecognized Number: " + num.getClass().getName()); }
         if (needsUpdate) { updateTarget(idx, num); }
     }
 
@@ -80,8 +83,6 @@ public class UpdateJsonArray implements JsonEach.ArrayOp {
 
     private void updateTarget(int idx, Object value) {
         try { target.put(idx, value); }
-        catch (JSONException e) {
-            throw new IllegalArgumentException("Failed updating JSON at index: " + idx, e);
-        }
+        catch (JSONException e) { throw new ServerError("Failed updating JSON at index: " + idx, e); }
     }
 }
