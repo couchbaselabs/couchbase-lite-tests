@@ -15,6 +15,7 @@ from .responses import GetRootResponse, TestServerResponse
 from .version import available_api_version
 from .httplog import get_next_writer
 from .api.jsonserializable import JSONSerializable
+from .api.error import CblTestServerBadResponseError
 
 class TestServerRequestType(Enum):
     ROOT = "GetRootRequest"
@@ -121,7 +122,7 @@ class TestServerRequest:
         ret_val = await self._create_response(resp, resp_version, uuid)
         cbl_trace(f"Received {ret_val} from {url}")
         if not resp.ok:
-            cbl_warning(f"{self} was not successful ({resp.status})")
+            raise CblTestServerBadResponseError(resp.status, ret_val, f"{self} was not successful ({resp.status})")
 
         return ret_val
     
@@ -200,6 +201,11 @@ class RequestFactory:
         
         try:
             ret_val = await r.send(url, self.__session)
+        except CblTestServerBadResponseError as e:
+            cbl_error(f"Failed to send {r} ({str(e)})")
+            msg = f"{str(e)}\n\n{e.response.serialize()}"
+            writer.write_error(msg)
+            raise
         except Exception as e:
             cbl_error(f"Failed to send {r} ({str(e)})")
             writer.write_error(str(e))

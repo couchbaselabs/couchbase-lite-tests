@@ -22,7 +22,7 @@ class TestBasicReplication:
         db = dbs[0]
 
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"), replicator_type=ReplicatorType.PUSH, collections=[
-            ReplicatorCollectionEntry("travel.airlines")
+            ReplicatorCollectionEntry(["travel.airlines"])
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
 
         await replicator.start()
@@ -47,7 +47,7 @@ class TestBasicReplication:
         db = dbs[0]
 
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), replicator_type=ReplicatorType.PUSH, collections=[
-            ReplicatorCollectionEntry("travel.airlines")
+            ReplicatorCollectionEntry(["travel.airlines"])
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
 
         await replicator.start()
