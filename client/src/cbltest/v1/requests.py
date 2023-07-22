@@ -342,7 +342,10 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
                 "database": "db1",
                 "collections": [
                 {
-                    "collection": "store.cloths",
+                    "names": [
+                        "store.cloths",
+                        "store.shoes"
+                    ],
                     "channels": [
                         "A",
                         "B"
@@ -366,9 +369,9 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
                 "replicatorType": "pushAndPull",
                 "continuous": true,
                 "authenticator": {
-                "type": "BASIC",
-                "username": "user1",
-                "password": "p@ssw0rd"
+                    "type": "BASIC",
+                    "username": "user1",
+                    "password": "p@ssw0rd"
                 }
             },
             "reset": false

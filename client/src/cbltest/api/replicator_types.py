@@ -49,14 +49,16 @@ class ReplicatorPushFilter(JSONSerializable):
 
 class ReplicatorCollectionEntry(JSONSerializable):
     @property
-    def name(self) -> str:
+    def names(self) -> List[str]:
         """Gets the name of the collection that the options will be applied to"""
-        return self.__name
+        return self.__names
     
-    def __init__(self, name: str = "_default", channels: List[str] = None, document_ids: List[str] = None,
+    def __init__(self, names: List[str] = ["_default"], channels: List[str] = None, document_ids: List[str] = None,
                  push_filter: ReplicatorPushFilter = None):
-        _assert_not_null(name, nameof(name))
-        self.__name = name
+        _assert_not_null(names, nameof(names))
+        assert len(names) > 0, "Must specify at least one name in the names array for ReplicatorCollectionEntry"
+
+        self.__names = names
         self.channels = channels
         """A list of channels to use when replicating with this collection"""
 
@@ -68,7 +70,7 @@ class ReplicatorCollectionEntry(JSONSerializable):
 
     def to_json(self) -> any:
         ret_val = {
-            "collection": self.__name
+            "names": self.__names
         }
 
         if self.channels is not None:

@@ -42,15 +42,15 @@ internal static partial class HandlerList
 
     internal readonly record struct StartReplicatorCollection
     {
-        public required string collection { get; init; }
+        public required IReadOnlyList<string> names { get; init; }
         public IReadOnlyList<string> channels { get; init; }
         public IReadOnlyList<string> documentIDs { get; init; }
 
         [JsonConstructor]
-        public StartReplicatorCollection(string collection, IReadOnlyList<string?>? channels = default,
+        public StartReplicatorCollection(IReadOnlyList<string> names, IReadOnlyList<string?>? channels = default,
              IReadOnlyList<string?>? documentIDs = default)
         {
-            this.collection = collection;
+            this.names = names;
             this.channels = channels.NotNull().ToList() ?? new List<string>();
             this.documentIDs = documentIDs.NotNull().ToList() ?? new List<string>();
         }
@@ -127,13 +127,19 @@ internal static partial class HandlerList
         var endpoint = new URLEndpoint(new Uri(deserializedBody.config.endpoint));
         if (deserializedBody.config.collections.Any()) {
             replConfig = new ReplicatorConfiguration(endpoint);
-            foreach(var c in deserializedBody.config.collections) {
-                var spec = CollectionSpec(c.collection);
-                var coll = db.GetCollection(spec.name, spec.scope);
-                if(coll == null) {
-                    response.WriteBody(Router.CreateErrorResponse($"Unable to find collection '{c.collection}'"), version, HttpStatusCode.BadRequest);
-                    return;
+            foreach (var c in deserializedBody.config.collections) {
+                var collections = new List<Collection>();
+                foreach(var name in c.names) {
+                    var spec = CollectionSpec(name);
+                    var coll = db.GetCollection(spec.name, spec.scope);
+                    if (coll == null) {
+                        response.WriteBody(Router.CreateErrorResponse($"Unable to find collection '{name}'"), version, HttpStatusCode.BadRequest);
+                        return;
+                    }
+
+                    collections.Add(coll);
                 }
+                
 
                 var collConfig = new CollectionConfiguration();
                 if(c.channels.Any()) {
@@ -144,7 +150,7 @@ internal static partial class HandlerList
                     collConfig.DocumentIDs = c.documentIDs.ToList();
                 }
 
-                replConfig.AddCollection(coll, collConfig);
+                replConfig.AddCollections(collections, collConfig);
             }
         } else {
             replConfig = new ReplicatorConfiguration(db, endpoint);
