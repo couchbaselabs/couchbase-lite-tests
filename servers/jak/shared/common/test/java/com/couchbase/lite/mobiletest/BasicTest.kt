@@ -22,7 +22,6 @@ import okio.source
 import org.junit.Assert
 import org.junit.Test
 import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 
 class BasicTest : BaseTest() {
     @Suppress("UNCHECKED_CAST")
@@ -43,7 +42,10 @@ class BasicTest : BaseTest() {
                 .fromJson(r.content.source().buffer()) as? Map<String, Any>
         }
 
-        Assert.assertEquals("CouchbaseLite ", (resp?.get("version") as? String)?.substring(0, 14))
+        Assert.assertTrue(
+            """Test Server \d+\.\d+\.\d+-\w+ using CouchbaseLite""".toRegex()
+                .containsMatchIn(resp?.get("additionalInfo") as? String ?: "")
+        )
     }
 
     @Test
@@ -56,8 +58,7 @@ class BasicTest : BaseTest() {
                 "foo",
                 ByteArrayInputStream("{}".toByteArray())
             )
-        }
-        catch (err: ClientError) {
+        } catch (err: ClientError) {
             val msg = err.message
             Assert.assertTrue(msg?.startsWith("Unrecognized request") ?: false)
             Assert.assertTrue(msg?.contains("@97") ?: false)
@@ -74,8 +75,7 @@ class BasicTest : BaseTest() {
                 "/",
                 ByteArrayInputStream("{}".toByteArray())
             )
-        }
-        catch (err: ClientError) {
+        } catch (err: ClientError) {
             val msg = err.message
             Assert.assertTrue(msg?.startsWith("Unrecognized request") ?: false)
             Assert.assertTrue(msg?.contains(" PUT ") ?: false)
@@ -92,8 +92,7 @@ class BasicTest : BaseTest() {
                 "/foo",
                 ByteArrayInputStream("{}".toByteArray())
             )
-        }
-        catch (err: ClientError) {
+        } catch (err: ClientError) {
             val msg = err.message
             Assert.assertTrue(msg?.startsWith("Unrecognized request") ?: false)
             Assert.assertTrue(msg?.contains(" /foo ") ?: false)

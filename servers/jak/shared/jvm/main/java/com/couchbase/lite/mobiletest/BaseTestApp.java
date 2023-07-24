@@ -42,17 +42,20 @@ public abstract class BaseTestApp extends TestApp {
     @NonNull
     @Override
     public Map<String, Object> getSystemInfo() {
-        final Map<String, Object> device = new HashMap<>();
-        device.put("model", System.getProperty("os.arch"));
-        device.put("systemName", System.getProperty("os.name"));
-        device.put("systemVersion", System.getProperty("os.version"));
-        device.put("systemApiVersion", System.getProperty("java.version"));
-
         final Map<String, Object> content = new HashMap<>();
-        content.put("version", CBLVersion.getVersionInfo());
-        content.put("apiVersion", "1.0");   // ???? WHat goes here?
-        content.put("cbl", "couchbase-lite-java-ee");
-        content.put("device", device);
+        content.put(KEY_SERVER_VERSION, CBLVersion.VERSION_NAME);
+        content.put(KEY_API, LATEST_SUPPORTED_PROTOCOL_VERSION);
+        content.put(KEY_CBL, "couchbase-lite-java-ee");
+        content.put(
+            KEY_ADDITIONAL_INFO,
+            "Java Test Server " + TestServerInfo.VERSION_NAME + " using " + CBLVersion.getVersionInfo());
+
+        final Map<String, Object> device = new HashMap<>();
+        device.put(KEY_DEVICE_MODEL, System.getProperty("os.arch"));
+        device.put(KEY_DEVICE_SYS_NAME, System.getProperty("os.name"));
+        device.put(KEY_DEVICE_SYS_VERSION, System.getProperty("os.version"));
+        device.put(KEY_DEVICE_SYS_API, System.getProperty("java.version"));
+        content.put(KEY_DEVICE, device);
 
         return content;
     }

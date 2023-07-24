@@ -36,7 +36,9 @@ import java.util.*
 
 
 class AndroidTestApp(private val context: Context) : TestApp() {
-    override fun initCBL()  {
+
+
+    override fun initCBL() {
         CouchbaseLite.init(context, true)
         val logger = Database.log.console
         logger.domains = LogDomain.ALL_DOMAINS
@@ -47,15 +49,17 @@ class AndroidTestApp(private val context: Context) : TestApp() {
 
     override fun getSystemInfo(): Map<String, Any> {
         return mapOf(
-            "version" to CBLVersion.getVersionInfo(),
-            "apiVersion" to BuildConfig.VERSION_CODE,
-            "cbl" to "couchbase-lite-android-ee-ktx",
-            "device" to mapOf(
-                "model" to Build.PRODUCT,
-                "systemName" to "android",
-                "systemVersion" to Build.VERSION.RELEASE,
-                "systemApiVersion" to Build.VERSION.SDK_INT
-            )
+            KEY_SERVER_VERSION to com.couchbase.lite.BuildConfig.VERSION_NAME,
+            KEY_API to LATEST_SUPPORTED_PROTOCOL_VERSION,
+            KEY_CBL to "couchbase-lite-android-ee-ktx",
+            KEY_DEVICE to mapOf(
+                KEY_DEVICE_MODEL to Build.PRODUCT,
+                KEY_DEVICE_SYS_NAME to "android",
+                KEY_DEVICE_SYS_VERSION to Build.VERSION.RELEASE,
+                KEY_DEVICE_SYS_API to Build.VERSION.SDK_INT
+            ),
+            KEY_ADDITIONAL_INFO
+                    to "Android Test Server ${BuildConfig.VERSION_NAME} using ${CBLVersion.getVersionInfo()}"
         )
     }
 
