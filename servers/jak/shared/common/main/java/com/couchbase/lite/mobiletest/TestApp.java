@@ -56,6 +56,16 @@ public abstract class TestApp {
     public static final String HEADER_CLIENT = "CBLTest-Client-ID".toLowerCase(Locale.getDefault());
     public static final String HEADER_SERVER = "CBLTest-Server-ID";
 
+    public static final String KEY_SERVER_VERSION = "version";
+    public static final String KEY_API = "apiVersion";
+    public static final String KEY_CBL = "cbl";
+    public static final String KEY_DEVICE = "device";
+    public static final String KEY_DEVICE_MODEL = "model";
+    public static final String KEY_DEVICE_SYS_NAME = "systemName";
+    public static final String KEY_DEVICE_SYS_VERSION = "systemVersion";
+    public static final String KEY_DEVICE_SYS_API = "systemApiVersion";
+    public static final String KEY_ADDITIONAL_INFO = "additionalInfo";
+
     private static final AtomicReference<TestApp> APP = new AtomicReference<>();
     private static final AtomicReference<String> APP_ID = new AtomicReference<>();
 

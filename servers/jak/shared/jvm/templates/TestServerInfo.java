@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2022 Couchbase, Inc All rights reserved.
+// Copyright (c) 2020 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,9 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest
+package com.couchbase.lite.mobiletest;
 
 
-const val TAG = "TEST"
+// THIS FILE IS AUTOMATICALLY CREATED FROM templates/CBLVersion.java
+// Edit the version in that directory!
+// Changes made to this file in the source directory will be lost.
+// See the "copyVersion" task in the build file.
+@SuppressWarnings("LineLength")
+public final class TestServerInfo {
+    private TestServerInfo() {}
 
-open class BaseTest { }
+    public static final String VERSION_NAME = "@VERSION@";
+}

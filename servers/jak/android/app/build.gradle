@@ -9,10 +9,11 @@ plugins {
 }
 
 ext {
+    BUILD_RELEASE = file("${ROOT_DIR}/version.txt").text.trim()
+    BUILD_NUMBER = (project.hasProperty("buildNumber") && buildNumber) ? buildNumber : "SNAPSHOT"
+    BUILD_VERSION = "${BUILD_RELEASE}-${BUILD_NUMBER}"
+
     COUCHBASE_LITE_VERSION = System.getProperty('version', "3.2.0-SNAPSHOT")
-
-    TEST_SERVER_VERSION = "TestServer_" + COUCHBASE_LITE_VERSION
-
     SPOTBUGS_VERSION = '4.7.3'
 
     SHARED_DIR = "${ROOT_DIR}/shared"
@@ -46,11 +47,9 @@ android {
         minSdkVersion ANDROID_MIN_SDK
         targetSdkVersion ANDROID_TARGET_SDK
         versionCode 30200
-        versionName TEST_SERVER_VERSION
+        versionName BUILD_VERSION
 
         multiDexEnabled true
-
-        buildConfigField "String", "TEST_SERVER_VERSION", "\"${TEST_SERVER_VERSION}\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }

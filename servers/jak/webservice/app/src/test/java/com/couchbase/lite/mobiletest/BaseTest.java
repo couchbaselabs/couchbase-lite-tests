@@ -21,8 +21,5 @@ import com.couchbase.lite.javaws.mobiletest.JavaWSTestApp;
 
 
 public class BaseTest {
-    @BeforeClass
-    public static void setupTests() {
-        TestApp.init(new JavaWSTestApp());
-    }
+    static { TestApp.init(new JavaWSTestApp()); }
 }

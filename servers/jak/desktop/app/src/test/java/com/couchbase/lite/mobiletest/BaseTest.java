@@ -21,8 +21,5 @@ import com.couchbase.lite.javadesktop.mobiletest.JavaDesktopTestApp;
 
 
 public class BaseTest {
-    @BeforeClass
-    public static void setupTests() {
-        TestApp.init(new JavaDesktopTestApp());
-    }
+    static { TestApp.init(new JavaDesktopTestApp()); }
 }
