@@ -4,10 +4,9 @@
 #include CBL_HEADER(CBLBase.h)
 
 #include <exception>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <sstream>
-
-using namespace std;
 
 namespace ts_support::exception {
     class CBLException : public std::exception {
@@ -18,11 +17,19 @@ namespace ts_support::exception {
 
         [[nodiscard]] const CBLError &error() const { return _error; }
 
-        [[nodiscard]] std::string json() const;
+        [[nodiscard]] nlohmann::json json() const;
 
     private:
-        string _what;
+        std::string _what;
         CBLError _error;
+    };
+
+    class RequestError : public std::logic_error {
+    public:
+        explicit RequestError(const std::string &s) : logic_error(s) {}
+
+    private:
+        std::string _what;
     };
 }
 
@@ -30,6 +37,6 @@ static inline void CheckError(CBLError &error) {
     if (error.code > 0) { throw ts_support::exception::CBLException(error); }
 }
 
-static inline void CheckNotNull(const void *obj, const string &message) {
-    if (!obj) { throw runtime_error(message); }
+static inline void CheckNotNull(const void *obj, const std::string &message) {
+    if (!obj) { throw std::runtime_error(message); }
 }
