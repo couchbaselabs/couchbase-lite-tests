@@ -31,7 +31,9 @@ public:
 
     [[nodiscard]] int respondWithJSON(const nlohmann::json &json) const;
 
-    [[nodiscard]] int respondWithServerError(const char *message = nullptr, int code = 400) const;
+    [[nodiscard]] int respondWithRequestError(const char *message) const;
+
+    [[nodiscard]] int respondWithServerError(const char *message) const;
 
     [[nodiscard]] int respondWithCBLError(const ts_support::exception::CBLException &exception) const;
 

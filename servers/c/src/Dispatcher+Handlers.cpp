@@ -4,12 +4,14 @@
 #include "support/Defer.h"
 #include "support/Define.h"
 #include "support/Device.h"
+#include "support/Exception.h"
 #include "support/Fleece.h"
 #include "support/JSON.h"
 #include "TestServer.h"
 
 using namespace std;
 using namespace nlohmann;
+using namespace ts_support::exception;
 
 using ReplicatorParams = CBLManager::ReplicatorParams;
 using ReplicationAuthenticator = CBLManager::ReplicationAuthenticator;
@@ -17,7 +19,7 @@ using ReplicationCollection = CBLManager::ReplicationCollection;
 
 static inline void CheckBody(const json &body) {
     if (!body.is_object()) {
-        throw domain_error("Request body is not json object");
+        throw RequestError("Request body is not json object");
     }
 }
 
@@ -60,7 +62,7 @@ int Dispatcher::handlePOSTReset(Request &request) {
             auto datasetName = dataset.first;
             auto dbNames = dataset.second;
             if (dbNames.empty()) {
-                throw domain_error("dataset '" + datasetName + "' has no database names");
+                throw RequestError("dataset '" + datasetName + "' has no database names");
             }
             for (auto &dbName: dbNames) {
                 _cblManager->loadDataset(datasetName, dbName);
@@ -111,7 +113,7 @@ int Dispatcher::handlePOSTGetAllDocuments(Request &request) {
 
 static void updateProperties(json &delta, FLMutableDict properties) { // NOLINT(misc-no-recursion)
     if (delta.type() != json::value_t::object) {
-        throw domain_error("Applied delta is not dictionary");
+        throw RequestError("Applied delta is not dictionary");
     }
 
     for (const auto &[deltaKey, deltaValue]: delta.items()) {
@@ -133,7 +135,7 @@ static void updateProperties(json &delta, FLMutableDict properties) { // NOLINT(
 
 static void removeProperties(json &removedProps, FLMutableDict properties) { // NOLINT(misc-no-recursion)
     if (removedProps.type() != json::value_t::object) {
-        throw domain_error("Removed properties is not dictionary");
+        throw RequestError("Removed properties is not dictionary");
     }
 
     for (const auto &[deletedKey, deletedValue]: removedProps.items()) {
@@ -149,7 +151,7 @@ static void removeProperties(json &removedProps, FLMutableDict properties) { // 
         } else if (deletedValue.type() == json::value_t::null) {
             FLMutableDict_Remove(properties, key);
         } else {
-            throw domain_error("Invalid removed property value");
+            throw RequestError("Invalid removed property value");
         }
     }
 }
@@ -229,7 +231,7 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
 
     json body = request.jsonBody();
     CheckBody(body);
-    
+
     ReplicatorParams params;
     json config = GetValue<json>(body, "config");
     CheckIsObject(config, "config");
@@ -246,7 +248,7 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
         } else if (replicatorType == kReplicatorTypePushAndPull) {
             params.replicatorType = kCBLReplicatorTypePushAndPull;
         } else {
-            throw domain_error("Invalid replicator type");
+            throw RequestError("Invalid replicator type");
         }
     }
 
@@ -275,9 +277,8 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
             auto name = GetValue<string>(colObject, "collection");
             names.push_back(name);
         }
-
         if (names.empty()) {
-            throw domain_error("No collections specified");
+            throw RequestError("No collections specified");
         }
 
         for (auto &name: names) {
@@ -332,7 +333,7 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
     auto id = GetValue<string>(body, "id");
     auto repl = _cblManager->replicator(id);
     if (!repl) {
-        throw std::domain_error("Replicator '" + id + "' not found");
+        throw RequestError("Replicator '" + id + "' not found");
     }
 
     json result;
@@ -344,16 +345,7 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
     result["progress"] = progress;
 
     if (status.error.code > 0) {
-        json error;
-        error["domain"] = (int) status.error.domain;
-        error["code"] = status.error.code;
-
-        FLSliceResult message = CBLError_Message(&status.error);
-        if (message.size > 0) {
-            error["message"] = STR(message);
-        }
-        FLSliceResult_Release(message);
-        result["error"] = error;
+        result["error"] = CBLException(status.error).json();
     }
 
     return request.respondWithJSON(result);
@@ -385,6 +377,7 @@ int Dispatcher::handlePOSTGetDocument(Request &request) {
         auto json = nlohmann::json::parse(STR(jsonSlice));
         return request.respondWithJSON(json);
     } else {
-        return request.respondWithServerError("Document Not Found");
+        throw RequestError("Document '" + docID + "' in collection '" + colName + "' of database '" + dbName +
+                           "' not found");
     }
 }
