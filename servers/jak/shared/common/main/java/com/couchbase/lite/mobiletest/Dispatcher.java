@@ -44,7 +44,7 @@ public final class Dispatcher {
     public void init() {
         addTest(1, "/", Method.GET, (r, m) -> app.getSystemInfo());
         addTest(1, "/reset", Method.POST, app::reset);
-        addTest(1, "/getAllDocumentIDs", Method.POST, (r, m) -> Collections.emptyMap());
+        addTest(1, "/getAllDocuments", Method.POST, (r, m) -> app.getDbSvc().getAllDocsV1(r, m));
         addTest(1, "/updateDatabase", Method.POST, (r, m) -> Collections.emptyMap());
         addTest(1, "/startReplicator", Method.POST, (r, m) -> app.getReplSvc().createReplV1(r, m));
         addTest(1, "/getReplicatorStatus", Method.POST, (r, m) -> app.getReplSvc().getReplStatusV1(r, m));

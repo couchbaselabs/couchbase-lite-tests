@@ -41,6 +41,19 @@ public class ReplicatorService {
 
     private static final String SYM_OPEN_REPLS = "~OPEN_REPLS";
 
+    public void reset(@NonNull Memory memory) {
+        final Map<?, ?> repls = memory.remove(SYM_OPEN_REPLS, Map.class);
+        if ((repls == null) || repls.isEmpty()) { return; }
+
+        final TypedMap liveRepls = new TypedMap(repls);
+        for (String key: liveRepls.getKeys()) {
+            final Replicator repl = liveRepls.get(key, Replicator.class);
+            if (repl != null) { repl.stop(); }
+        }
+    }
+
+    public void init(TypedMap req, Memory mem) { }
+
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @NonNull
     public Map<String, Object> createReplV1(@NonNull TypedMap req, @NonNull Memory mem) {
@@ -81,17 +94,4 @@ public class ReplicatorService {
         // !!! Need to supply the list of document replications
         return new ReplicatorStatusBuilder(replStatus, Collections.emptyList()).build();
     }
-
-    public void reset(@NonNull Memory memory) {
-        final Map<?, ?> repls = memory.remove(SYM_OPEN_REPLS, Map.class);
-        if ((repls == null) || repls.isEmpty()) { return; }
-
-        final TypedMap liveRepls = new TypedMap(repls);
-        for (String key: liveRepls.getKeys()) {
-            final Replicator repl = liveRepls.get(key, Replicator.class);
-            if (repl != null) { repl.stop(); }
-        }
-    }
-
-    public void init(TypedMap req, Memory mem) { }
 }
