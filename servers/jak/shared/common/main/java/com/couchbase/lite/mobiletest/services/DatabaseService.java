@@ -21,7 +21,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -52,6 +55,13 @@ public final class DatabaseService {
     private static final String DB_EXTENSION = C4Database.DB_EXTENSION;
 
     private static final String KEY_DATASETS = "datasets";
+
+    private static final List<String> LEGAL_KEYS;
+    static {
+        final List<String> l = new ArrayList<>();
+        l.add(KEY_DATASETS);
+        LEGAL_KEYS = Collections.unmodifiableList(l);
+    }
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @NonNull
@@ -86,7 +96,7 @@ public final class DatabaseService {
         Log.w(TAG, "Attempt to close a database that is not open: " + name);
     }
 
-    public void reset(@NonNull TypedMap req, @NonNull Memory mem) {
+    public void reset(@NonNull Memory mem) {
         final File dbDir = mem.remove(SYM_DB_DIR, File.class);
         if (dbDir == null) { throw new ServerError("Cannot find test directory for reset"); }
 
@@ -121,6 +131,7 @@ public final class DatabaseService {
         }
         mem.put(SYM_DB_DIR, dbDir);
 
+        req.validate(LEGAL_KEYS);
         final TypedMap datasets = req.getMap(KEY_DATASETS);
         if (datasets == null) { throw new ClientError("Missing dataset specification in init"); }
         for (String dataset: datasets.getKeys()) {
