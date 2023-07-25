@@ -77,7 +77,7 @@ public class ReplicatorStatusBuilder {
                 }
 
                 final CouchbaseLiteException err = replDoc.getError();
-                if (err != null) { docRepl.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err))); }
+                if (err != null) { docRepl.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err)).build()); }
 
                 docRepls.add(docRepl);
             }
@@ -92,7 +92,7 @@ public class ReplicatorStatusBuilder {
         if (!docRepls.isEmpty()) { resp.put(KEY_REPL_DOCS, docRepls); }
 
         final CouchbaseLiteException err = replStatus.getError();
-        if (err != null) { resp.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err))); }
+        if (err != null) { resp.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err)).build()); }
 
         resp.put(KEY_REPL_PROGRESS, progress);
 

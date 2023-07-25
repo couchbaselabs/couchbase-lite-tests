@@ -73,7 +73,7 @@ public class ReplicatorConfigBuilder {
     private static final List<String> LEGAL_KEYS;
     static {
         final List<String> l = new ArrayList<>();
-        l.add(KEY_DB);
+        l.add(KEY_CONFIG);
         l.add(KEY_RESET);
         LEGAL_KEYS = Collections.unmodifiableList(l);
     }
@@ -87,6 +87,7 @@ public class ReplicatorConfigBuilder {
         l.add(KEY_TYPE);
         l.add(KEY_IS_CONTINUOUS);
         l.add(KEY_AUTHENTICATOR);
+        l.add(KEY_RESET); // !!! Shouldnt be here!
         LEGAL_CONFIG_KEYS = Collections.unmodifiableList(l);
     }
 
@@ -176,10 +177,6 @@ public class ReplicatorConfigBuilder {
 
         final TypedMap authenticator = config.getMap(KEY_AUTHENTICATOR);
         if (authenticator != null) {
-            if (authenticator.getKeys().size() > 1) {
-                throw new ClientError("Replicator configuration specifies more than one authenticator");
-            }
-
             final String authType = authenticator.getString(KEY_AUTH_TYPE);
             if (authType == null) { throw new ClientError("Replicator authenticator doesn't specify a type"); }
 

@@ -46,7 +46,7 @@ public class ErrorBuilder {
         final Map<String, Object> json = new HashMap<>();
         json.put(KEY_DOMAIN, error.getDomain());
         json.put(KEY_CODE, error.getCode());
-        json.put(KEY_MESSAGE, pw.toString().replace("\\", "\\\\").replace("\"", "\\"));
+        json.put(KEY_MESSAGE, sw.toString().replace("\\", "\\\\").replace("\"", "\\"));
 
         return json;
     }
