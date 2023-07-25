@@ -81,5 +81,11 @@ public class TypedList extends TypedCollection {
     @Nullable
     public <T> T get(int pos, @NonNull Class<T> expectedType) { return checkType(expectedType, args.get(pos)); }
 
+    @Nullable
+    public Class<?> getType(int pos) {
+        final Object val = args.get(pos);
+        return (val == null) ? null : val.getClass();
+    }
+
     public void add(@Nullable Object val) { args.add(val); }
 }

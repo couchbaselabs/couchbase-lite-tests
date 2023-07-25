@@ -18,8 +18,8 @@ import org.nanohttpd.protocols.http.response.Status;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.errors.TestError;
-import com.couchbase.lite.mobiletest.factories.ErrorBuilder;
-import com.couchbase.lite.mobiletest.factories.ReplyBuilder;
+import com.couchbase.lite.mobiletest.tools.ErrorBuilder;
+import com.couchbase.lite.mobiletest.tools.ReplyBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
@@ -65,7 +65,7 @@ public class Server extends NanoHTTPD {
         dispatcher = app.getDispatcher();
     }
 
-    @SuppressWarnings({"PMD.PreserveStackTrace", "PMD.NPathComplexity"})
+    @SuppressWarnings("PMD.PreserveStackTrace")
     @SuppressFBWarnings("REC_CATCH_EXCEPTION")
     @NonNull
     @Override

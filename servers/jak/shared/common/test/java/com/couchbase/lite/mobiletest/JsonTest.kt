@@ -15,17 +15,19 @@
 //
 package com.couchbase.lite.mobiletest
 
-import com.couchbase.lite.mobiletest.factories.RequestBuilder
-import com.couchbase.lite.mobiletest.json.JsonEach
-import com.couchbase.lite.mobiletest.json.CompareJsonObject
-import com.couchbase.lite.mobiletest.json.UpdateJsonObject
-import com.couchbase.lite.mobiletest.json.PrintJson
-import com.couchbase.lite.mobiletest.json.JsonReduce
-import com.couchbase.lite.mobiletest.factories.ReplyBuilder
+import com.couchbase.lite.Database
+import com.couchbase.lite.MutableArray
+import com.couchbase.lite.MutableDictionary
+import com.couchbase.lite.MutableDocument
+import com.couchbase.lite.mobiletest.data.TreeEach
+import com.couchbase.lite.mobiletest.orts.DocUpdater
+import com.couchbase.lite.mobiletest.tools.PrintReq
+import com.couchbase.lite.mobiletest.tools.ReplyBuilder
+import com.couchbase.lite.mobiletest.tools.RequestBuilder
 
-import org.json.JSONObject
 import org.junit.Assert
 import org.junit.Test
+import java.io.ByteArrayInputStream
 
 class JsonTest : BaseTest() {
 
@@ -50,8 +52,7 @@ class JsonTest : BaseTest() {
 
     @Test
     fun testJsonPrinter() {
-        val json = JSONObject(
-            """
+        val json = """
                 {
                     "name": "Alice",
                     "age": 20,
@@ -70,127 +71,82 @@ class JsonTest : BaseTest() {
                     ],
                     gender: null
                 }
-            """.trimIndent()
-        )
+            """
 
-        JsonEach().forEach(json, PrintJson(""))
+        TreeEach().forEach(
+            RequestBuilder(ByteArrayInputStream(json.trimIndent().toByteArray())).buildRequest(),
+            PrintReq("")
+        )
     }
 
     @Test
-    fun testJsonIdentity() {
-        val json1 = JSONObject(
-            """
+    fun testDocUpdater() {
+        val address = MutableDictionary()
+        address.setString("streetAddress", "140 E. Seventh St.")
+        address.setString("city", "New York")
+
+        val children = MutableArray()
+
+        val child = MutableDictionary()
+        child.setString("gender", "M")
+        child.setInt("age", 12)
+        children.addDictionary(child)
+
+        // and empty spot for carol...
+        children.addDictionary(MutableDictionary())
+
+        val doc = MutableDocument()
+        doc.setString("name", "Eve")
+        doc.setString("gender", "F")
+        doc.setArray("children", children)
+        doc.setDictionary("address", address)
+
+        val json = """
                 {
                     "name": "Alice",
                     "age": 20,
                     "address": {
                         "streetAddress": "100 Wall Street",
-                        "city": "New York"
+                        "zip": 10118
                     },
-                    "phoneNumber": [
+                    "children": [
                         {
-                            "type": "home",
-                            "number": "212-333-1111"
-                        },{
-                            "type": "fax",
-                            "number": "646-444-2222"
-                        }
-                    ],
-                    gender: null
-                }
-            """.trimIndent()
-        )
-
-        val json2 = JSONObject(
-            """
-                {
-                    "name": "Alice",
-                    "age": 20,
-                    "address": {
-                        "streetAddress": "100 Wall Street",
-                        "city": "New York"
-                    },
-                    "phoneNumber": [
+                            "name": "Bob",
+                            "gender": "M",
+                            "age": 13
+                        },
                         {
-                            "type": "home",
-                            "number": "212-333-1111"
-                        },{
-                            "type": "fax",
-                            "number": "646-444-2222"
+                            "name": "Carol",
+                            "gender": "F",
+                            "age": 16.5
                         }
-                    ],
-                    gender: null
+                    ]
                 }
-            """.trimIndent()
-        )
-
-        Assert.assertTrue(JsonReduce<Boolean>().reduce(json1, CompareJsonObject(json2), true))
-    }
-
-    @Test
-    fun testJsonUpdate() {
-
-        val json1 = JSONObject(
             """
-                {
-                    "name": "Alice",
-                    "age": 20,
-                    "address": {
-                        "streetAddress": "100 Wall Street",
-                        "city": "New York"
-                    },
-                    "phoneNumber": [
-                        {
-                            "type": "home",
-                            "number": "212-333-1111"
-                        },{
-                            "type": "fax",
-                            "number": "646-444-2222"
-                        }
-                    ],
-                    gender: null
-                }
-            """.trimIndent()
+
+        val newDoc = DocUpdater(doc).update(
+            RequestBuilder(ByteArrayInputStream(json.trimIndent().toByteArray()))
+                .buildRequest()
         )
 
-        val json2 = JSONObject(
-            """
-                {
-                    "address": {
-                        "streetAddress": "140 E. Seventh St."
-                    },
-                    gender: "F"
-                }
-            """.trimIndent()
-        )
+        Assert.assertEquals("Alice", newDoc.getString("name"))
+        Assert.assertEquals("F", newDoc.getString("gender"))
+        Assert.assertEquals(20, newDoc.getInt("age"))
 
-        val json3 = JSONObject(
-            """
-                {
-                    "name": "Alice",
-                    "age": 20,
-                    "address": {
-                        "streetAddress": "140 E. Seventh St.",
-                        "city": "New York"
-                    },
-                    "phoneNumber": [
-                        {
-                            "type": "home",
-                            "number": "212-333-1111"
-                        },{
-                            "type": "fax",
-                            "number": "646-444-2222"
-                        }
-                    ],
-                    gender: "F"
-                }
-            """.trimIndent()
-        )
+        val newAddr = newDoc.getDictionary("address")
+        Assert.assertEquals("100 Wall Street", newAddr?.getString("streetAddress"))
+        Assert.assertEquals("New York", newAddr?.getString("city"))
+        Assert.assertEquals(10118L, newAddr?.getLong("zip"))
 
-        JsonEach().forEach(json2, UpdateJsonObject(json1))
+        val newChildren = newDoc.getArray("children")
+        var newChild = newChildren?.getDictionary(0)
+        Assert.assertEquals("Bob", newChild?.getString("name"))
+        Assert.assertEquals("M", newChild?.getString("gender"))
+        Assert.assertEquals(13.0F, newChild?.getFloat("age"))
 
-        JsonEach().forEach(json1, PrintJson(""))
-
-        Assert.assertTrue(JsonReduce<Boolean>().reduce(json1, CompareJsonObject(json3), true))
+        newChild = newChildren?.getDictionary(1)
+        Assert.assertEquals("Carol", newChild?.getString("name"))
+        Assert.assertEquals("F", newChild?.getString("gender"))
+        Assert.assertEquals(16.5F, newChild?.getFloat("age"))
     }
 }

@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.json;
+package com.couchbase.lite.mobiletest.orts;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -91,3 +91,60 @@ public class CompareJsonArray implements JsonReduce.ArrayOp<Boolean> {
     @Override
     public Boolean endArray(@NonNull Boolean acc) { return acc && !indices.contains(Boolean.FALSE); }
 }
+
+
+
+
+    // Obsolete...
+//    @Test
+//    fun testJsonIdentity() {
+//        val json1 = JSONObject(
+//            """
+//                {
+//                    "name": "Alice",
+//                    "age": 20,
+//                    "address": {
+//                        "streetAddress": "100 Wall Street",
+//                        "city": "New York"
+//                    },
+//                    "phoneNumber": [
+//                        {
+//                            "type": "home",
+//                            "number": "212-333-1111"
+//                        },{
+//                            "type": "fax",
+//                            "number": "646-444-2222"
+//                        }
+//                    ],
+//                    gender: null
+//                }
+//            """.trimIndent()
+//        )
+//
+//        val json2 = JSONObject(
+//            """
+//                {
+//                    "name": "Alice",
+//                    "age": 20,
+//                    "address": {
+//                        "streetAddress": "100 Wall Street",
+//                        "city": "New York"
+//                    },
+//                    "phoneNumber": [
+//                        {
+//                            "type": "home",
+//                            "number": "212-333-1111"
+//                        },{
+//                            "type": "fax",
+//                            "number": "646-444-2222"
+//                        }
+//                    ],
+//                    gender: null
+//                }
+//            """.trimIndent()
+//        )
+//
+//        Assert.assertTrue(
+//            JsonReduce<Boolean>()
+//                .reduce(json1, CompareJsonObject(json2), true))
+//    }
