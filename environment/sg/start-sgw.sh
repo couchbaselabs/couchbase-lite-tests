@@ -6,6 +6,8 @@ if [ "$#" -lt 1 ]; then
 fi
 SSL=$1
 
+echo "SSL = ${SSL}"
+
 SCRIPT=$(readlink -f "$0")
 ROOT_DIR=$(dirname "${SCRIPT}")
 CONFIG_DIR="${ROOT_DIR}/config"
@@ -47,7 +49,7 @@ nohup /opt/couchbase-sync-gateway/bin/sync_gateway "${BOOTSTRAP_CONFIG_FILE}" &
 
 # Wait for it to be ready:
 wait_for_uri 200 ${SG_URL_SCHEME}://localhost:4984
-status=$(curl -s -k --location -X GET --user "admin:password" -o /dev/null -w "%{http_code}" http://localhost:4985/_all_dbs)
+status=$(curl -s -k --location -X GET --user "admin:password" -o /dev/null -w "%{http_code}" ${SG_URL_SCHEME}://localhost:4985/_all_dbs)
 if [ "$status" -ge 200 -a "$status" -lt 300 ]; then
    echo "Sync Gateway is up!"
 else

@@ -4,6 +4,7 @@
 
 #include "support/CBLHeader.h"
 #include CBL_HEADER(CouchbaseLite.h)
+#include FLEECE_HEADER(Fleece.h)
 
 #include <mutex>
 #include <nlohmann/json.hpp>
@@ -51,6 +52,7 @@ public:
         CBLReplicatorType replicatorType{kCBLReplicatorTypePushAndPull};
         bool continuous{false};
         std::optional<ReplicationAuthenticator> authenticator;
+        bool enablePinCert{false};
     };
 
     std::string startReplicator(const ReplicatorParams &params, bool reset);
@@ -59,6 +61,8 @@ public:
 
 private:
     CBLDatabase *databaseUnlocked(const std::string &name);
+
+    FLSliceResult getServerCert();
 
     std::mutex _mutex;
 
