@@ -18,7 +18,6 @@ package com.couchbase.lite.mobiletest.services;
 import androidx.annotation.NonNull;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -98,7 +97,7 @@ public final class DatabaseService {
 
     public void reset(@NonNull Memory mem) {
         final File dbDir = mem.remove(SYM_DB_DIR, File.class);
-        if (dbDir == null) { throw new ServerError("Cannot find test directory for reset"); }
+        if (dbDir == null) { return; }
 
         final Map<?, ?> dbs = mem.remove(SYM_OPEN_DBS, Map.class);
         if ((dbs == null) || dbs.isEmpty()) { return; }
@@ -135,20 +134,24 @@ public final class DatabaseService {
         final TypedMap datasets = req.getMap(KEY_DATASETS);
         if (datasets == null) { throw new ClientError("Missing dataset specification in init"); }
         for (String dataset: datasets.getKeys()) {
-            final TypedList databases = req.getList(dataset);
-            if (databases == null) { throw new ClientError("Missing target databases in dataset spec in init"); }
+            final TypedList databases = datasets.getList(dataset);
+            if (databases == null) {
+                throw new ClientError("Missing target databases in dataset " + dataset + " in init");
+            }
             for (int i = 0; i < databases.size(); i++) {
                 final String dbName = databases.getString(i);
-                if (dbName == null) { throw new ClientError("Empty target databases in dataset spec in init"); }
+                if (dbName == null) {
+                    throw new ClientError("Empty target databases in dataset " + dataset + " in init");
+                }
                 installDataset(dataset, dbName, mem);
             }
         }
     }
 
     // New stream constructors are supported only in API 26+
-    @SuppressWarnings("IOStreamConstructor")
+    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     private void installDataset(@NonNull String datasetName, @NonNull String dbName, @NonNull Memory mem) {
-        final File dbDir = mem.remove(SYM_DB_DIR, File.class);
+        final File dbDir = mem.get(SYM_DB_DIR, File.class);
         if (dbDir == null) { throw new ServerError("Cannot find test directory on install dataset"); }
 
         final String dbFullName = datasetName + DB_EXTENSION;
@@ -162,7 +165,7 @@ public final class DatabaseService {
         }
         if (!unzipDir.mkdirs()) { throw new ServerError("Failed creating unzip tmp directory"); }
 
-        try (InputStream in = new FileInputStream(dbFullName + ZIP_EXTENSION)) { fileUtils.unzip(in, unzipDir); }
+        try (InputStream in = TestApp.getApp().getAsset(dbFullName + ZIP_EXTENSION)) { fileUtils.unzip(in, unzipDir); }
         catch (IOException e) { throw new ServerError("Failed unzipping dataset: " + datasetName, e); }
 
         try {

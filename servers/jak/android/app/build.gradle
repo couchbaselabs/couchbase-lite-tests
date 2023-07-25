@@ -80,7 +80,9 @@ android {
                 "${SHARED_DIR}/common/main/java",
                 "${SHARED_DIR}/server/main/java"
             ]
-            resources.srcDirs = ["${SHARED_DIR}/assets"]
+            assets.srcDirs = [
+                "${SHARED_DIR}/assets"
+            ]
         }
         androidTest {
             java.srcDirs = [
