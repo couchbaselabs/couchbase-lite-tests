@@ -25,9 +25,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
+import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.DatabaseConfiguration;
@@ -39,6 +41,8 @@ import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
+import com.couchbase.lite.mobiletest.factories.CollectionDocsBuilder;
+import com.couchbase.lite.mobiletest.factories.CollectionsBuilder;
 import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.StringUtils;
@@ -54,47 +58,23 @@ public final class DatabaseService {
     private static final String DB_EXTENSION = C4Database.DB_EXTENSION;
 
     private static final String KEY_DATASETS = "datasets";
+    private static final String KEY_DATABASE = "database";
+    private static final String KEY_COLLECTIONS = "collections";
 
-    private static final List<String> LEGAL_KEYS;
+    private static final List<String> LEGAL_COLLECTION_KEYS;
+    static {
+        final List<String> l = new ArrayList<>();
+        l.add(KEY_DATABASE);
+        l.add(KEY_COLLECTIONS);
+        LEGAL_COLLECTION_KEYS = Collections.unmodifiableList(l);
+    }
+
+    private static final List<String> LEGAL_DATASET_KEYS;
     static {
         final List<String> l = new ArrayList<>();
         l.add(KEY_DATASETS);
-        LEGAL_KEYS = Collections.unmodifiableList(l);
+        LEGAL_DATASET_KEYS = Collections.unmodifiableList(l);
     }
-
-    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
-    @NonNull
-    public Database openDb(@NonNull String name, @NonNull Memory mem) {
-        TypedMap openDbs = mem.getMap(SYM_OPEN_DBS);
-        if (openDbs != null) {
-            final Database db = openDbs.get(name, Database.class);
-            if (db != null) { return db; }
-        }
-        else {
-            mem.put(SYM_OPEN_DBS, new HashMap<>());
-            // openDbs cannot be null
-            openDbs = mem.getMap(SYM_OPEN_DBS);
-        }
-
-        final File dbDir = mem.get(SYM_DB_DIR, File.class);
-        if (dbDir == null) { throw new ServerError("Cannot find test directory for open"); }
-
-        final Database db;
-        final DatabaseConfiguration dbConfig = new DatabaseConfiguration().setDirectory(dbDir.getPath());
-        try { db = new Database(name, dbConfig); }
-        catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed opening database: " + name, e); }
-
-        openDbs.put(name, db);
-        Log.i(TAG, "Created database: " + name);
-
-        return db;
-    }
-
-    public void closeDb(@NonNull String name, @NonNull Memory mem) {
-        if (closeDbInternal(name, mem)) { return; }
-        Log.w(TAG, "Attempt to close a database that is not open: " + name);
-    }
-
     public void reset(@NonNull Memory mem) {
         final File dbDir = mem.remove(SYM_DB_DIR, File.class);
         if (dbDir == null) { return; }
@@ -130,7 +110,7 @@ public final class DatabaseService {
         }
         mem.put(SYM_DB_DIR, dbDir);
 
-        req.validate(LEGAL_KEYS);
+        req.validate(LEGAL_DATASET_KEYS);
         final TypedMap datasets = req.getMap(KEY_DATASETS);
         if (datasets == null) { throw new ClientError("Missing dataset specification in init"); }
         for (String dataset: datasets.getKeys()) {
@@ -148,7 +128,36 @@ public final class DatabaseService {
         }
     }
 
+    @NonNull
+    public Database getOpenDb(@NonNull String name, @NonNull Memory mem) {
+        final TypedMap openDbs = mem.getMap(SYM_OPEN_DBS);
+        if (openDbs == null) { throw new ClientError("There are no open databases"); }
+        final Database db = openDbs.get(name, Database.class);
+        if (db == null) { throw new ClientError("Database not open: " + name); }
+        return db;
+    }
+
+    public void closeDb(@NonNull String name, @NonNull Memory mem) {
+        if (closeDbInternal(name, mem)) { return; }
+        Log.w(TAG, "Attempt to close a database that is not open: " + name);
+    }
+
+    @NonNull
+    public Map<String, Object> getAllDocsV1(@NonNull TypedMap req, @NonNull Memory mem) {
+        req.validate(LEGAL_COLLECTION_KEYS);
+
+        final String dbName = req.getString(KEY_DATABASE);
+        if (dbName == null) { throw new ClientError("All Docs request doesn't specify a database"); }
+        final Database db = getOpenDb(dbName, mem);
+
+        final Set<Collection> collections = new CollectionsBuilder(req.getList(KEY_COLLECTIONS), db).build();
+        if (collections == null) { throw new ClientError("All Docs request doesn't specify collections"); }
+
+        return new CollectionDocsBuilder(collections).build();
+    }
+
     // New stream constructors are supported only in API 26+
+    @SuppressWarnings("ConstantConditions")
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     private void installDataset(@NonNull String datasetName, @NonNull String dbName, @NonNull Memory mem) {
         final File dbDir = mem.get(SYM_DB_DIR, File.class);
@@ -179,6 +188,27 @@ public final class DatabaseService {
         }
 
         openDb(dbName, mem);
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
+    private void openDb(@NonNull String name, @NonNull Memory mem) {
+        TypedMap openDbs = mem.getMap(SYM_OPEN_DBS);
+        if ((openDbs != null) && (openDbs.get(name, Database.class) != null)) { return; }
+
+        mem.put(SYM_OPEN_DBS, new HashMap<>());
+        openDbs = mem.getMap(SYM_OPEN_DBS);
+
+        final File dbDir = mem.get(SYM_DB_DIR, File.class);
+        if (dbDir == null) { throw new ServerError("Cannot find test directory for open"); }
+
+        final Database db;
+        final DatabaseConfiguration dbConfig = new DatabaseConfiguration().setDirectory(dbDir.getPath());
+        try { db = new Database(name, dbConfig); }
+        catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed opening database: " + name, e); }
+
+        openDbs.put(name, db);
+        Log.i(TAG, "Created database: " + name);
     }
 
     private boolean closeDbInternal(@NonNull String name, @NonNull Memory mem) {

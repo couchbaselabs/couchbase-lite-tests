@@ -21,15 +21,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
 import com.couchbase.lite.BasicAuthenticator;
-import com.couchbase.lite.Collection;
 import com.couchbase.lite.CollectionConfiguration;
-import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.ReplicatorConfiguration;
@@ -40,7 +36,6 @@ import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.data.TypedList;
 import com.couchbase.lite.mobiletest.data.TypedMap;
-import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 
@@ -146,7 +141,7 @@ public class ReplicatorConfigBuilder {
             throw new ClientError("Replicator configuration doesn't specify a list of collections");
         }
 
-        final Database db = TestApp.getApp().getDbSvc().openDb(dbName, memory);
+        final Database db = TestApp.getApp().getDbSvc().getOpenDb(dbName, memory);
 
         final ReplicatorConfiguration replConfig;
         if (collections.isEmpty()) { replConfig = new ReplicatorConfiguration(db, endpoint); }
@@ -204,29 +199,9 @@ public class ReplicatorConfigBuilder {
             if (replCollection == null) { throw new ClientError("Replication collection spec is null: " + i); }
             replCollection.validate(LEGAL_COLLECTION_KEYS);
 
-            final TypedList collFqns = replCollection.getList(KEY_NAMES);
-            if (collFqns == null) {
-                throw new ClientError("Replication collection doesn't specify collection names: " + i);
-            }
-
-            final Set<Collection> collections = new HashSet<>();
-            for (int j = 0; j < collFqns.size(); j++) {
-                final String collFqn = collFqns.getString(j);
-                if (collFqn == null) { throw new ClientError("Empty collection name (" + i + ", " + j + ")"); }
-
-                final String[] collName = collFqn.split("\\.");
-                if ((collName.length != 2) || collName[0].isEmpty() || collName[1].isEmpty()) {
-                    throw new ClientError("Cannot parse collection name: " + collFqn);
-                }
-
-                final Collection collection;
-                try { collection = db.getCollection(collName[1], collName[0]); }
-                catch (CouchbaseLiteException e) {
-                    throw new CblApiFailure("Failed retrieving collection: " + collFqn, e);
-                }
-                collections.add(collection);
-            }
-            replConfig.addCollections(collections, buildCollectionConfig(replCollection));
+            replConfig.addCollections(
+                new CollectionsBuilder(replCollection.getList(KEY_NAMES), db).build(),
+                buildCollectionConfig(replCollection));
         }
     }
 
