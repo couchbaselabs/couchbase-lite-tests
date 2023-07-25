@@ -17,6 +17,7 @@ package com.couchbase.lite.mobiletest.services;
 
 import androidx.annotation.NonNull;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -77,7 +78,8 @@ public class ReplicatorService {
         final ReplicatorStatus replStatus = repl.getStatus();
         Log.i(TAG, "Replicator status: " + replStatus);
 
-        return new ReplicatorStatusBuilder(replStatus).build();
+        // !!! Need to supply the list of document replications
+        return new ReplicatorStatusBuilder(replStatus, Collections.emptyList()).build();
     }
 
     public void reset(@NonNull Memory memory) {

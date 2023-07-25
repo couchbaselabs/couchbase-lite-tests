@@ -18,10 +18,14 @@ package com.couchbase.lite.mobiletest.data;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import com.couchbase.lite.mobiletest.errors.ClientError;
 
 
 // Read only, relatively type safe object store
@@ -44,8 +48,14 @@ public class TypedMap extends TypedCollection {
 
     public boolean contains(@NonNull String key) { return args.containsKey(key); }
 
+    public void validate(Collection<String> expected) {
+        final Set<String> keys = getKeys();
+        keys.removeAll(expected);
+        if (!keys.isEmpty()) { throw new ClientError("Unexpected keys: " + String.join(",", keys)); }
+    }
+
     @NonNull
-    public Set<String> getKeys() { return args.keySet(); }
+    public Set<String> getKeys() { return new HashSet<String>(args.keySet()); }
 
     @Nullable
     public Boolean getBoolean(@NonNull String key) { return get(key, Boolean.class); }

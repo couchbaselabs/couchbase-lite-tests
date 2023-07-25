@@ -179,7 +179,7 @@ public abstract class TestApp {
         if (rMgr != null) { rMgr.reset(mem); }
 
         final DatabaseService dMgr = dbSvc.getAndSet(null);
-        if (dMgr != null) { dMgr.reset(req, mem); }
+        if (dMgr != null) { dMgr.reset(mem); }
 
         final String client = mem.getClient();
         symTabs.remove(client);
