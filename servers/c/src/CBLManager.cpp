@@ -6,6 +6,7 @@
 #include "support/Zip.h"
 
 #include <filesystem>
+#include <fstream>
 #include <utility>
 
 using namespace std;
@@ -15,11 +16,15 @@ using namespace ts_support::exception;
 #define DB_FILE_EXT ".cblite2"
 #define DB_FILE_ZIP_EXT ".cblite2.zip"
 #define DB_FILE_ZIP_EXTRACTED_DIR "extracted"
-#define ASSET_DATABASES_DIR "databases"
+#define ASSET_DATASET_DIR "dataset"
+#define ASSET_CERT_FILE "cert/cert.pem"
 
 CBLManager::CBLManager(string databaseDir, string assetDir) {
     _databaseDir = std::move(databaseDir);
     _assetDir = std::move(assetDir);
+    
+    // TODO: Enable console log
+    // CBLLog_SetConsoleLevel(kCBLLogInfo);
 }
 
 void CBLManager::reset() {
@@ -67,8 +72,11 @@ void CBLManager::loadDataset(const string &name, const string &targetDatabaseNam
     }
 
     string fromDbPath;
-    auto dbAssetPath = path(_assetDir).append(ASSET_DATABASES_DIR);
+    auto dbAssetPath = path(_assetDir).append(ASSET_DATASET_DIR);
     auto zipFilePath = path(dbAssetPath).append(name + DB_FILE_ZIP_EXT);
+
+    auto p = zipFilePath.string();
+
     if (filesystem::exists(zipFilePath)) {
         auto extDirPath = path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
         ts_support::zip::extractZip(zipFilePath.string(), extDirPath.string());
@@ -119,6 +127,23 @@ CBLCollection *CBLManager::collection(const CBLDatabase *db, const std::string &
         CheckNotNull(col, "Collection Not Found");
     }
     return col;
+}
+
+FLSliceResult CBLManager::getServerCert() {
+    auto certPath = path(_assetDir).append(ASSET_CERT_FILE);
+    ifstream ifs(certPath.string(), ios::in | ios::binary);
+    DEFER {
+              ifs.close();
+          };
+    ifs.exceptions(ifstream::failbit | ifstream::badbit);
+    ifs.seekg(0, ios::end);
+
+    auto length = ifs.tellg();
+    ifs.seekg(0, ios::beg);
+
+    auto result = FLSliceResult_New(length);
+    ifs.read((char *) result.buf, length);
+    return result;
 }
 
 std::string CBLManager::startReplicator(const ReplicatorParams &params, bool reset) {
@@ -212,13 +237,22 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
     }
 
     CBLReplicatorConfiguration config{};
+    config.context = context.get();
     config.endpoint = endpoint;
     config.collections = replCols.data();
     config.collectionCount = replCols.size();
     config.replicatorType = params.replicatorType;
     config.continuous = params.continuous;
     config.authenticator = auth;
-    config.context = context.get();
+
+    FLSliceResult cert = FLSliceResult_CreateWith(nullptr, 0);
+    if (params.endpoint.compare(0, 6, "wss://") == 0 && params.enablePinCert) {
+        cert = getServerCert();
+        config.pinnedServerCertificate = FLSliceResult_AsSlice(cert);
+    }
+    DEFER {
+              FLSliceResult_Release(cert);
+          };
 
     CBLReplicator *repl = CBLReplicator_Create(&config, &error);
     CheckError(error);

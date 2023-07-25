@@ -9,11 +9,7 @@
 - (instancetype)init {
     self = [super init];
     if (self) {
-        TestServer::Context context = {
-            ts_support::files::tempDir("CBL-C-TestServer", true),
-            ts_support::files::assetDir()
-        };
-        _server = new TestServer(context);
+        _server = new TestServer();
     }
     return self;
 }
