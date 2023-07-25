@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.factories;
+package com.couchbase.lite.mobiletest.tools;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;

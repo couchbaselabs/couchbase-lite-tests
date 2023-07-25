@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.factories;
+package com.couchbase.lite.mobiletest.tools;
 
 import androidx.annotation.NonNull;
 
@@ -40,7 +40,6 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 
 
-@SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
 public class ReplicatorConfigBuilder {
     private static final String KEY_RESET = "reset";
     private static final String KEY_CONFIG = "config";
@@ -112,7 +111,7 @@ public class ReplicatorConfigBuilder {
 
     public boolean shouldReset() { return shouldReset; }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings({"deprecation", "PMD.NPathComplexity"})
     @NonNull
     public ReplicatorConfiguration build() {
         req.validate(LEGAL_KEYS);
@@ -260,6 +259,7 @@ public class ReplicatorConfigBuilder {
 
     @NonNull
     private ReplicationFilter buildReplicatorFilter(@NonNull TypedMap spec) {
+        if (spec == null) { throw new ClientError("Spec is null"); }
         throw new ServerError("Filters not yet supported");
     }
 }
