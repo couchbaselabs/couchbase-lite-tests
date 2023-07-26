@@ -415,8 +415,7 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
             "database": self.__database,
             "endpoint": self.__endpoint,
             "replicatorType": str(self.replicatorType),
-            "continuous": self.continuous,
-            "reset": self.reset
+            "continuous": self.continuous
         }
 
         if self.collections is not None:
@@ -426,7 +425,8 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
             raw["authenticator"] = self.authenticator.to_json()
 
         ret_val = {
-            "config": raw
+            "config": raw,
+            "reset": self.reset
         }
         
         return ret_val
