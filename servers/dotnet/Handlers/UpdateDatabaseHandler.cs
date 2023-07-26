@@ -31,14 +31,14 @@ internal static partial class HandlerList
 
         public required string documentID { get; init; }
 
-        public IReadOnlyDictionary<string, object> updatedProperties { get; init; }
+        public JsonElement? updatedProperties { get; init; }
 
-        public IReadOnlyDictionary<string, object> removedProperties { get; init; }
+        public JsonElement? removedProperties { get; init; }
 
         [JsonConstructor]
         public UpdateDatabaseEntry(string type, string collection, string documentID, 
-            IReadOnlyDictionary<string, object>? updatedProperties = null,
-            IReadOnlyDictionary<string, object>? removedProperties = null)
+            JsonElement? updatedProperties = null,
+            JsonElement? removedProperties = null)
         {
             if(type.ToUpperInvariant() == "UPDATE") {
                 Type = UpdateDatabaseType.Update;
@@ -53,8 +53,8 @@ internal static partial class HandlerList
             this.type = type;
             this.documentID = documentID;
             this.collection = collection;
-            this.updatedProperties = updatedProperties ?? new Dictionary<string, object>();
-            this.removedProperties = removedProperties ?? new Dictionary<string, object>();
+            this.updatedProperties = updatedProperties;
+            this.removedProperties = removedProperties;
         }
     }
 
@@ -80,6 +80,47 @@ internal static partial class HandlerList
         }
 
         return db.CreateCollection(collSpec.name, collSpec.scope);
+    }
+
+    private static void UpdateDictionaryProperties(IMutableDictionary dict, JsonElement delta)
+    {
+        if(delta.ValueKind != JsonValueKind.Object) {
+            throw new InvalidOperationException("UpdateDictionaryProperties called with a non-object delta");
+        }
+
+        foreach(var deltaEntry in delta.EnumerateObject()) {
+            if(deltaEntry.Value.ValueKind == JsonValueKind.Object) {
+                var existingDict = dict.GetDictionary(deltaEntry.Name);
+                if(existingDict == null) {
+                    existingDict = new MutableDictionaryObject();
+                    dict.SetDictionary(deltaEntry.Name, existingDict);
+                }
+
+                UpdateDictionaryProperties(existingDict, deltaEntry.Value);
+            } else {
+                dict.SetValue(deltaEntry.Name, deltaEntry.Value.ToDocumentObject());
+            }
+        }
+    }
+
+    private static void RemoveDictionaryProperties(IMutableDictionary dict, JsonElement delta)
+    {
+        if (delta.ValueKind != JsonValueKind.Object) {
+            throw new InvalidOperationException("UpdateDictionaryProperties called with a non-object delta");
+        }
+
+        foreach (var deltaEntry in delta.EnumerateObject()) {
+            if (deltaEntry.Value.ValueKind == JsonValueKind.Object) {
+                var existingDict = dict.GetDictionary(deltaEntry.Name);
+                if (existingDict == null) {
+                    return;
+                }
+
+                RemoveDictionaryProperties(existingDict, deltaEntry.Value);
+            } else {
+                dict.Remove(deltaEntry.Name);
+            }
+        }
     }
 
     [HttpHandler("updateDatabase")]
@@ -118,12 +159,12 @@ internal static partial class HandlerList
                     }
                     case UpdateDatabaseType.Update: {
                         using var doc = collection.GetDocument(entry.documentID)?.ToMutable() ?? new MutableDocument(entry.documentID);
-                        foreach (var prop in entry.updatedProperties) {
-                            doc.SetValue(prop.Key, prop.Value.ToDocumentObject());
+                        if(entry.updatedProperties != null) {
+                            UpdateDictionaryProperties(doc, entry.updatedProperties.Value);
                         }
-
-                        foreach (var prop in entry.removedProperties) {
-                            doc.Remove(prop.Key);
+                        
+                        if(entry.removedProperties != null) {
+                            RemoveDictionaryProperties(doc, entry.removedProperties.Value);
                         }
 
                         collection.Save(doc);
