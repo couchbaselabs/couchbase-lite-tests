@@ -22,7 +22,7 @@ class TestServer:
         self.__request_factory = request_factory
 
 
-    async def create_and_reset_db(self, dataset: str, db_names: List[str]) -> Optional[List[Database]]:
+    async def create_and_reset_db(self, dataset: str, db_names: List[str]) -> List[Database]:
         """
         Creates and returns a set of Databases based on the given dataset
 
@@ -32,14 +32,7 @@ class TestServer:
         payload = PostResetRequestBody()
         payload.add_dataset(dataset, db_names)
         request = self.__request_factory.create_request(TestServerRequestType.RESET, payload)
-        resp = await self.__request_factory.send_request(self.__index, request)
-        if not resp:
-            raise CblTestError("Failed to send reset DB message, see http log")
-        if resp.error:
-            cbl_error("Failed to reset DB, see trace log for details")
-            cbl_trace(resp.error.message)
-            return None
-        
+        await self.__request_factory.send_request(self.__index, request)
         ret_val: List[Database] = []
         for db_name in db_names:
             ret_val.append(Database(self.__request_factory, self.__index, db_name))
