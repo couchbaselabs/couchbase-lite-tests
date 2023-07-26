@@ -1,6 +1,6 @@
 from json import dumps, loads
 from pathlib import Path
-from typing import Dict, List, cast
+from typing import Dict, List, cast, Any, Optional
 from urllib.parse import urljoin
 from aiohttp import ClientSession, BasicAuth
 from varname import nameof
@@ -16,7 +16,7 @@ class _CollectionMap(JSONSerializable):
         return self.__scope_name
     
     @property
-    def collections(self) -> str:
+    def collections(self) -> List[str]:
         return list(self.__collections.keys())
     
     def __init__(self, scope_name: str) -> None:
@@ -30,7 +30,7 @@ class _CollectionMap(JSONSerializable):
         
         self.__collections[collection_name] = {}
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         return {"collections": self.__collections}
 
 class PutDatabasePayload(JSONSerializable):
@@ -52,7 +52,7 @@ class PutDatabasePayload(JSONSerializable):
     def collections(self, scope: str) -> List[str]:
         map = self.__scopes.get(scope)
         if not map:
-            return None
+            raise KeyError(f"No collections present for {scope}")
         
         return map.collections
 
@@ -69,15 +69,16 @@ class PutDatabasePayload(JSONSerializable):
         self.__scopes[scope_name] = col_map
         col_map.add_collection(collection_name)
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
+        scopes: dict = {}
         ret_val = {
-            "scopes": {},
+            "scopes": scopes,
             "bucket": self.bucket,
             "num_index_replicas": self.num_index_replicas
         }
 
         for s in self.__scopes:
-            ret_val["scopes"][s] = self.__scopes[s].to_json()
+            scopes[s] = self.__scopes[s].to_json()
 
         return ret_val
     
@@ -125,7 +126,7 @@ class SyncGateway:
         self.__admin_url = f"{scheme}{url}:{admin_port}"
         self.__replication_url = f"{ws_scheme}{url}:{port}"
 
-    async def _send_request(self, method: str, path: str, payload: JSONSerializable = None) -> any:
+    async def _send_request(self, method: str, path: str, payload: Optional[JSONSerializable] = None) -> Any:
         headers = {"Content-Type": "application/json"} if payload is not None else None
         data = None if payload is None else payload.serialize()
         writer = get_next_writer()
@@ -183,13 +184,12 @@ class SyncGateway:
         :param channel_access: The channels that the user will have access to, as a dictionary 
             keyed by collection containing an array of channels
         """
+        collection_access: Dict[str, dict] = {}
         body = {
             "name": name,
             "password": password,
-            "collection_access": {}
+            "collection_access": collection_access
         }
-
-        collection_access = body["collection_access"]
 
         if channel_access is not None:
             for coll in channel_access:
@@ -203,7 +203,7 @@ class SyncGateway:
 
         await self._send_request("post", f"/{db_name}/_user/", JSONDictionary(body))
 
-    def _analyze_dataset_response(self, response: any) -> None:
+    def _analyze_dataset_response(self, response: list) -> None:
         assert isinstance(response, list), "Invalid bulk docs response (not a list)"
         typed_response = cast(list, response)
         for r in typed_response:
@@ -222,15 +222,16 @@ class SyncGateway:
         :param db_name: The name of the database to populate
         :param path: The path of the JSON file to use as input
         """
-        last_scope: str = None
-        last_coll: str = None
-        collected = []
+        last_scope: str = ""
+        last_coll: str = ""
+        collected: List[dict] = []
         with open(path, "r", encoding='utf8') as fin:
             json_line = fin.readline()
             while json_line:
-                json = loads(json_line)
-                scope = json["scope"]
-                collection = json["collection"]
+                json = cast(dict, loads(json_line))
+                assert isinstance(json, dict), f"Invalid entry in {path}!"
+                scope = cast(str, json["scope"])
+                collection = cast(str, json["collection"])
                 if last_scope != scope or last_coll != collection or len(collected) > 500:
                     if last_scope and last_coll:
                         resp = await self._send_request("post", f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs", 
@@ -245,7 +246,7 @@ class SyncGateway:
 
         resp = await self._send_request("post", f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs", 
                                         JSONDictionary({"docs": collected}))
-        self._analyze_dataset_response(resp)
+        self._analyze_dataset_response(cast(list, resp))
 
     async def get_all_documents(self, db_name: str, scope: str = "_default", collection: str = "_default") -> AllDocumentsResponse:
         resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_all_docs")

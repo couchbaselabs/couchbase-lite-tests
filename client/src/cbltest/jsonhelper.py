@@ -1,8 +1,8 @@
-from typing import List, cast
+from typing import List, cast, Optional
 
 from .logging import cbl_warning
 
-def _get_string_list(d: dict, key: str) -> List[str]:
+def _get_string_list(d: dict, key: str) -> Optional[List[str]]:
     if key not in d:
         return None
         

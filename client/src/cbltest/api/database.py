@@ -1,14 +1,14 @@
 from __future__ import annotations
 from json import dumps
 
-from typing import Dict, List, cast
+from typing import Dict, List, cast, Any, Optional
 
-from cbltest.requests import TestServerRequestType
+from cbltest.requests import TestServerRequestType, TestServerRequest
 from cbltest.v1.responses import PostGetAllDocumentsResponse, PostGetAllDocumentsEntry
 from cbltest.v1.requests import DatabaseUpdateEntry, DatabaseUpdateType, PostGetAllDocumentsRequestBody, PostUpdateDatabaseRequestBody
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory
-from cbltest.jsonhelper import _assert_string_entry
+from cbltest.adapters import _create_adapter
 
 class DatabaseUpdater:
     """
@@ -16,17 +16,18 @@ class DatabaseUpdater:
     """
     def __init__(self, db_name: str, request_factory: RequestFactory, index: int):
         assert request_factory.version == 1, "This version of the CBLTest API requires request API v1"
-        self.__db_name = db_name
-        self.__updates: List[DatabaseUpdateEntry] = []
+        self._db_name = db_name
+        self._updates: List[DatabaseUpdateEntry] = []
         self.__request_factory = request_factory
         self.__index = index
+        self.__adapter = _create_adapter("DatabaseUpdaterAdapter", request_factory.version)
 
     async def __aenter__(self):
-        self.__updates.clear()
+        self._updates.clear()
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        payload = PostUpdateDatabaseRequestBody(self.__db_name, self.__updates)
+        payload = self.__adapter.create_request_body(self)
         request = self.__request_factory.create_request(TestServerRequestType.UPDATE_DB, payload)
         resp = await self.__request_factory.send_request(self.__index, request)
         if resp.error is not None:
@@ -42,7 +43,7 @@ class DatabaseUpdater:
         :param collection: The collection to which the document belongs (scope-qualified)
         :param id: The ID of the document to delete
         """
-        self.__updates.append(DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id))
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id))
 
     def purge_document(self, collection: str, id: str):
         """
@@ -51,10 +52,11 @@ class DatabaseUpdater:
         :param collection: The collection to which the document belongs (scope-qualified)
         :param id: The ID of the document to purge
         """
-        self.__updates.append(DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id))
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id))
 
-    def upsert_document(self, collection: str, id: str, new_properties: Dict[str, any] = None, removed_properties: List[str] = None):
-        self.__updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties))
+    def upsert_document(self, collection: str, id: str, new_properties: Optional[Dict[str, Any]] = None, 
+                        removed_properties: Optional[List[str]] = None):
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties))
 
 class AllDocumentsEntry:
     """
@@ -156,9 +158,4 @@ class Database:
         payload = PostGetAllDocumentsRequestBody(self.__name, *collections)
         req = self.__request_factory.create_request(TestServerRequestType.ALL_DOC_IDS, payload)
         resp = await self.__request_factory.send_request(self.__index, req)
-        if resp.error is not None:
-            cbl_error("Failed to get all documents (see trace log for details)")
-            cbl_trace(resp.error.message)
-            return None
-
         return AllDocumentsMap(cast(PostGetAllDocumentsResponse, resp))

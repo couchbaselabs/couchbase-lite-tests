@@ -8,7 +8,7 @@ from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 
 class TestBasicReplication:
     @pytest.mark.asyncio
-    async def test_replicate_non_existing_sg_collections(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_replicate_non_existing_sg_collections(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         sg_payload = PutDatabasePayload("names")
         sg_payload.add_collection()
@@ -28,9 +28,10 @@ class TestBasicReplication:
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error.code == 404
+        return None
 
     @pytest.mark.asyncio
-    async def test_push(self, cblpytest: CBLPyTest):
+    async def test_push(self, cblpytest: CBLPyTest) -> None:
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         sg_payload = PutDatabasePayload("travel")
         sg_payload.add_collection("travel", "airlines")
@@ -80,6 +81,7 @@ class TestBasicReplication:
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        return None
 
     @pytest.mark.asyncio
     async def test_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
@@ -98,7 +100,7 @@ class TestBasicReplication:
         db = dbs[0]
 
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), replicator_type=ReplicatorType.PULL, collections=[
-            ReplicatorCollectionEntry("travel.airports")
+            ReplicatorCollectionEntry(["travel.airports"])
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
 
         await replicator.start()

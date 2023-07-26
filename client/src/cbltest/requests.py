@@ -3,11 +3,12 @@ from abc import abstractmethod
 from enum import Enum
 from pathlib import Path
 from shutil import rmtree
-from typing import cast
+from typing import cast, Optional, Type
 from urllib.parse import urljoin
 from uuid import UUID, uuid4
 from aiohttp import ClientSession, ClientResponse
 from importlib import import_module
+from typing import Any
 
 from .configparser import ParsedConfig
 from .logging import cbl_error, cbl_info, cbl_trace, cbl_warning
@@ -15,7 +16,7 @@ from .responses import GetRootResponse, TestServerResponse
 from .version import available_api_version
 from .httplog import get_next_writer
 from .api.jsonserializable import JSONSerializable
-from .api.error import CblTestServerBadResponseError
+from .api.error import CblTestError, CblTestServerBadResponseError
 
 class TestServerRequestType(Enum):
     ROOT = "GetRootRequest"
@@ -43,20 +44,20 @@ class TestServerRequestBody(JSONSerializable):
         self.__version = available_api_version(version)
 
     @abstractmethod
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         pass
 
 class TestServerRequest:
     """The base class from which all requests derive, and in which all work is done"""    
     @property
-    def payload(self) -> TestServerRequestBody:
+    def payload(self) -> Optional[TestServerRequestBody]:
         """Gets the body of the request.  The actual type is simply the request typename with 'Body' appended.
         
         E.g. PostResetRequest -> PostResetRequestBody"""
         return self.__payload
     
-    def __init__(self, version: int, uuid: UUID, http_name: str, payload_type = None, 
-                 method: str = "post", payload: TestServerRequestBody = None):
+    def __init__(self, version: int, uuid: UUID, http_name: str, payload_type: Optional[Type] = None, 
+                 method: str = "post", payload: Optional[TestServerRequestBody] = None):
         # For those subclassing this, usually all you need to do is call this constructor
         # filling out the appropriate information via args
         if payload is not None and payload_type is not None:
@@ -85,7 +86,7 @@ class TestServerRequest:
 
         return cast(TestServerResponse, response_class(r.status, uuid, content))
     
-    async def send(self, url: str, session: ClientSession = None) -> TestServerResponse:
+    async def send(self, url: str, session: Optional[ClientSession] = None) -> TestServerResponse:
         """
         Send the request to the specified URL, though `RequestFactory.send_request` is preferred.
         
@@ -99,7 +100,7 @@ class TestServerRequest:
             headers["CBLTest-API-Version"] = str(self.__version)
             headers["CBLTest-Client-ID"] = str(self.__uuid)
         
-        data: str = None
+        data: str | None = None
         if self.__payload is not None:
             data = self.__payload.serialize() 
 
@@ -111,6 +112,9 @@ class TestServerRequest:
 
         resp_version_header = resp.headers.get("CBLTest-API-Version")
         uuid = resp.headers.get("CBLTest-Server-ID")
+        if uuid is None:
+            raise CblTestError("Missing CBLTest-Server-ID header from response")
+        
         resp_version = int(resp_version_header) if resp_version_header is not None else 0
         if resp_version != self.__version:
             if resp_version == 0:
@@ -119,10 +123,10 @@ class TestServerRequest:
             elif self.__version != 0:
                 cbl_warning(f"Response version for {resp_version} does not match request version {self.__version}!")
 
-        ret_val = await self._create_response(resp, resp_version, uuid)
+        ret_val = await self._create_response(resp, resp_version, cast(str, uuid))
         cbl_trace(f"Received {ret_val} from {url}")
         if not resp.ok:
-            raise CblTestServerBadResponseError(resp.status, ret_val, f"{self} was not successful ({resp.status})")
+            raise CblTestServerBadResponseError(resp.status, ret_val, f"{self} returned {resp.status}")
 
         return ret_val
     
@@ -139,7 +143,7 @@ class GetRootRequest(TestServerRequest):
         super().__init__(0, uuid, "", method="get")
     
     async def _create_response(self, r: ClientResponse, version: int, uuid: str) -> TestServerResponse:
-        return GetRootResponse(self.number, r.status, uuid, await r.json())
+        return GetRootResponse(r.status, uuid, await r.json())
 
 
 class RequestFactory:
@@ -169,8 +173,8 @@ class RequestFactory:
         cbl_info(f"RequestFactory created with API version {self.__version} ({self.__uuid})")
         
 
-    def _create_request(self, name: str, payload: TestServerRequestBody = None) -> TestServerRequest:
-        if self.__version != payload.version:
+    def _create_request(self, name: str, payload: Optional[TestServerRequestBody] = None) -> TestServerRequest:
+        if payload is not None and self.__version != payload.version:
             raise ValueError(f"Request factory version {self.__version} does not match payload version {payload.version}!")
         
         module = import_module(f"cbltest.v{self.__version}.requests")
@@ -180,7 +184,7 @@ class RequestFactory:
         
         return cast(TestServerRequest, request_class(self.__uuid, payload))
     
-    def create_request(self, type: TestServerRequestType, payload: TestServerRequestBody = None) -> TestServerRequest:
+    def create_request(self, type: TestServerRequestType, payload: Optional[TestServerRequestBody] = None) -> TestServerRequest:
         """
         Creates a request to send.
 

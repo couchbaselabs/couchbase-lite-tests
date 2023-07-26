@@ -1,4 +1,6 @@
-def _assert_not_null(arg: any, name: str) -> any:
+from typing import Any
+
+def _assert_not_null(arg: Any, name: str) -> Any:
     if arg is None:
         raise TypeError(f"{name} cannot be null!")
     

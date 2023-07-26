@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from json import dumps
+from typing import Any
 
 class JSONSerializable(ABC):
     """A class that can be conveniently serialized to pretty JSON"""
@@ -8,7 +9,7 @@ class JSONSerializable(ABC):
         return dumps(self.to_json(), indent=2)
 
     @abstractmethod
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         """Converts the object into a JSON compatible one"""
         pass
 
@@ -17,5 +18,5 @@ class JSONDictionary(JSONSerializable):
     def __init__(self, d: dict): 
         self.__dict = d
         
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         return self.__dict

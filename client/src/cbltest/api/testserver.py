@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory, TestServerRequestType
@@ -22,7 +22,7 @@ class TestServer:
         self.__request_factory = request_factory
 
 
-    async def create_and_reset_db(self, dataset: str, db_names: List[str]) -> List[Database]:
+    async def create_and_reset_db(self, dataset: str, db_names: List[str]) -> Optional[List[Database]]:
         """
         Creates and returns a set of Databases based on the given dataset
 

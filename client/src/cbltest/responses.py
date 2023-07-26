@@ -1,7 +1,7 @@
 from __future__ import annotations
 from enum import Enum
 from json import dumps
-from typing import Dict, Final, cast
+from typing import Dict, Final, cast, Any, Optional
 
 from cbltest.version import available_api_version
 from cbltest.api.jsonserializable import JSONSerializable
@@ -53,7 +53,7 @@ class ErrorResponseBody:
         return self.__message
     
     @classmethod
-    def create(c, body: dict) -> ErrorResponseBody:
+    def create(c, body: Optional[dict]) -> Optional[ErrorResponseBody]:
         """
         Creates an :class:`ErrorResponseBody` if the provided body contains the appropriate
         content, or returns `None` otherwise
@@ -83,7 +83,7 @@ class TestServerResponse(JSONSerializable):
         return self.__uuid
     
     @property
-    def error(self) -> ErrorResponseBody:
+    def error(self) -> Optional[ErrorResponseBody]:
         """Gets the error sent by the remote server, if any"""
         return self.__error
 
@@ -97,7 +97,7 @@ class TestServerResponse(JSONSerializable):
         self.__http_name = http_name
         self.__http_method = http_method
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         """Serializes the body of the response to a JSON string"""
         return self.__payload
 
@@ -130,13 +130,13 @@ class GetRootResponse(TestServerResponse):
         return self.__cbl
     
     @property
-    def device(self) -> Dict[str, any]:
+    def device(self) -> Dict[str, Any]:
         """Gets details about the device that the remote server is running on"""
         return self.__device
     
-    def __init__(self, request_id: int, status_code: int, uuid: str, json: dict):
+    def __init__(self, status_code: int, uuid: str, json: dict):
         self.__lib_version = cast(str, json.get(self.__version_key))
         self.__api_version = cast(int, json.get(self.__api_version_key))
         self.__cbl = cast(str, json.get(self.__cbl_key))
-        self.__device = cast(Dict[str, any], json.get(self.__device_key))
-        super().__init__(request_id, status_code, uuid, self.__api_version, json, "", "get")
+        self.__device = cast(Dict[str, Any], json.get(self.__device_key))
+        super().__init__(status_code, uuid, self.__api_version, json, "", "get")
