@@ -1,6 +1,6 @@
 from pathlib import Path 
 from json import load, dumps
-from typing import Final, List, cast
+from typing import Final, List, cast, Optional
 
 from .jsonhelper import _assert_contains_string_list, _get_int_or_default, _get_string_list, _assert_string_entry, _get_str_or_default
 
@@ -9,7 +9,7 @@ class SyncGatewayInfo:
 
     __hostname_key: Final[str] = "hostname"
     __port_key: Final[str] = "port"
-    __admin_port_key: Final[str] = "admin_port",
+    __admin_port_key: Final[str] = "admin_port"
     __rbac_user_key: Final[str] = "rbac_user"
     __rbac_password_key: Final[str] = "rbac_password"
 
@@ -98,7 +98,7 @@ class ParsedConfig:
         return self.__couchbase_servers
     
     @property
-    def sync_gateway_certs(self) -> List[str]:
+    def sync_gateway_certs(self) -> Optional[List[str]]:
         """The optional list of sync gateway certificates for using TLS"""
         return self.__sync_gateway_certs
     

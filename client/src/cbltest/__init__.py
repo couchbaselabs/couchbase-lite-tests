@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, cast
 
 from .requests import RequestFactory
 from .logging import LogLevel, cbl_setLogLevel
@@ -33,12 +33,12 @@ class CBLPyTest:
         return self.__log_level
     
     @property
-    def extra_props(self) -> Dict[str, str]:
+    def extra_props(self) -> Optional[Dict[str, str]]:
         """Gets the extra properties provided as parsed from the provided JSON file path"""
         return self.__extra_props
     
     @property
-    def output_path(self) -> Path:
+    def output_path(self) -> Optional[Path]:
         """Gets the output path for greenboard results"""
         return self.__output_path
     
@@ -59,7 +59,8 @@ class CBLPyTest:
     def couchbase_servers(self) -> List[CouchbaseServer]:
         return self.__couchbase_servers
     
-    def __init__(self, config_path: str, log_level: LogLevel = LogLevel.VERBOSE, extra_props_path: str = None, output_path: str = None):
+    def __init__(self, config_path: str, log_level: LogLevel = LogLevel.VERBOSE, extra_props_path: Optional[str] = None, 
+                 output_path: Optional[str] = None):
         _assert_not_null(config_path, nameof(config_path))
         self.__config = _parse_config(config_path)
         self.__log_level = LogLevel(log_level)
@@ -82,16 +83,18 @@ class CBLPyTest:
         self.__sync_gateways: List[SyncGateway] = []
         index = 0
         cert_count = 0 if self.__config.sync_gateway_certs is None else len(self.__config.sync_gateway_certs)
+        sgw_certs = cast(list, self.__config.sync_gateway_certs)
         for sg in self.__config.sync_gateways:
-            secure = index < cert_count and self.__config.sync_gateway_certs[index] is not None
-            info = SyncGatewayInfo(sg)
-            self.__sync_gateways.append(SyncGateway(info.hostname, info.rbac_user, info.rbac_password, info.port, info.admin_port, secure))
+            secure = index < cert_count and sgw_certs[index] is not None
+            sgw_info = SyncGatewayInfo(sg)
+            self.__sync_gateways.append(SyncGateway(sgw_info.hostname, sgw_info.rbac_user, sgw_info.rbac_password, 
+                                                    sgw_info.port, sgw_info.admin_port, secure))
             index += 1
 
         self.__couchbase_servers: List[CouchbaseServer] = []
         for cbs in self.__config.couchbase_servers:
-            info = CouchbaseServerInfo(cbs)
-            self.__couchbase_servers.append(CouchbaseServer(info.hostname, info.admin_user,info.admin_password))
+            cbs_info = CouchbaseServerInfo(cbs)
+            self.__couchbase_servers.append(CouchbaseServer(cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password))
 
 
     def __str__(self) -> str:

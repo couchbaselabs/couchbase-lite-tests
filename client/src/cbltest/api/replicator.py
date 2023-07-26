@@ -1,6 +1,6 @@
 import asyncio
 from time import time
-from typing import List, cast
+from typing import List, cast, Optional
 
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.v1.responses import PostGetReplicatorStatusResponse, PostStartReplicatorResponse
@@ -27,17 +27,17 @@ class Replicator:
     @property
     def is_started(self) -> bool:
         """Returns `True` if the replicator has started"""
-        return self.__id is not None
+        return self.__id != ""
 
     def __init__(self, database: Database, endpoint: str, replicator_type: ReplicatorType = ReplicatorType.PUSH_AND_PULL,
-                 continuous: bool = False, authenticator: ReplicatorAuthenticator = None, reset: bool = False,
+                 continuous: bool = False, authenticator: Optional[ReplicatorAuthenticator] = None, reset: bool = False,
                  collections: List[ReplicatorCollectionEntry] = []):
         assert database._request_factory.version == 1, "This version of the cbl test API requires request API v1"
         self.__database = database
         self.__index = database._index
         self.__request_factory = database._request_factory
         self.__endpoint = endpoint
-        self.__id: str = None
+        self.__id: str = ""
         self.replicator_type = replicator_type
         """The direction of the replicator"""
 
@@ -85,11 +85,6 @@ class Replicator:
         payload = PostGetReplicatorStatusRequestBody(self.__id)
         req = self.__request_factory.create_request(TestServerRequestType.REPLICATOR_STATUS, payload)
         resp = await self.__request_factory.send_request(self.__index, req)
-        if resp.error is not None:
-            cbl_error("Failed to get replicator status (see trace log for details)")
-            cbl_trace(resp.error.message)
-            return None
-        
         cast_resp = cast(PostGetReplicatorStatusResponse, resp)
         return ReplicatorStatus(cast_resp.progress, cast_resp.activity, cast_resp.replicator_error)
     

@@ -1,6 +1,6 @@
 from enum import Enum
 from json import dumps
-from typing import Dict, List, cast
+from typing import Dict, List, cast, Any, Optional
 from uuid import UUID
 from varname import nameof
 
@@ -55,7 +55,7 @@ class PostResetRequestBody(TestServerRequestBody):
         """
         self.__datasets[name] = result_db_names
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         return {"datasets": self.__datasets}
     
 class PostGetAllDocumentsRequestBody(TestServerRequestBody):
@@ -89,7 +89,7 @@ class PostGetAllDocumentsRequestBody(TestServerRequestBody):
 
         self.__collections = list(collections) if collections is not None else []
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         return {"database": self.database, "collections": self.__collections}
     
 class DatabaseUpdateType(Enum):
@@ -116,7 +116,7 @@ class DatabaseUpdateEntry(JSONSerializable):
     """
     
     def __init__(self, type: DatabaseUpdateType, collection: str, document_id: str,
-                 updated_properties: Dict[str, any] = None, removed_properties: List[str] = None) -> None:
+                 updated_properties: Optional[Dict[str, Any]] = None, removed_properties: Optional[List[str]] = None) -> None:
         self.type: DatabaseUpdateEntry = cast(DatabaseUpdateEntry, _assert_not_null(type, nameof(type)))
         """The type of update to be performed"""
 
@@ -126,7 +126,7 @@ class DatabaseUpdateEntry(JSONSerializable):
         self.document_id: str = cast(str, _assert_not_null(document_id, nameof(document_id)))
         """The ID of the document to be modified"""
 
-        self.updated_properties: Dict[str, any] = updated_properties
+        self.updated_properties: Optional[Dict[str, Any]] = updated_properties
         """
         The properties to be updated on a given document. 
         Note that to remove a property, `removed_properties` must be used.
@@ -134,7 +134,7 @@ class DatabaseUpdateEntry(JSONSerializable):
         It has no meaning if `type` is not `UPDATE`
         """
 
-        self.removed_properties: List[str] = removed_properties
+        self.removed_properties: Optional[List[str]] = removed_properties
         """
         The properties to be removed on a given document. 
         The values of the dictionary entries should simply be null.
@@ -155,7 +155,7 @@ class DatabaseUpdateEntry(JSONSerializable):
         
         return len(self.removed_properties) > 0 if self.removed_properties is not None else False
     
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         if not self.is_valid():
             return None
         
@@ -205,31 +205,32 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
         }
     """
     
-    def __init__(self, database: str = None, updates: List[DatabaseUpdateEntry] = None):
+    def __init__(self, database: Optional[str] = None, updates: Optional[List[DatabaseUpdateEntry]] = None):
         super().__init__(1)
-        self.database: str = database
+        self.database = database
         """The database that the updates will be applied to once executed"""
 
-        self.updates: List[DatabaseUpdateEntry] = updates
+        self.updates = updates
         """
         The list of updates on the :class:`PostUpdateDatabaseRequestBody`.
         This list can be directly added to or removed from.
         """
 
-    def to_json(self) -> any:
-        raw = {
+    def to_json(self) -> Any:
+        raw: Dict[str, Any] = {
             "database": self.database
         }
 
         raw_entries = []
 
-        for e in self.updates:
-            raw_entry = e.to_json()
-            if raw_entry is None:
-                cbl_warning("Skipping invalid DatabaseUpdateEntry in body serialization!")
-                continue
+        if self.updates is not None:
+            for e in cast(list, self.updates):
+                raw_entry = e.to_json()
+                if raw_entry is None:
+                    cbl_warning("Skipping invalid DatabaseUpdateEntry in body serialization!")
+                    continue
 
-            raw_entries.append(raw_entry)
+                raw_entries.append(raw_entry)
 
         raw["updates"] = raw_entries
         return raw
@@ -246,7 +247,7 @@ class SnapshotDocumentEntry(JSONSerializable):
         self.id: str = id
         """The ID of the snapshotted document"""
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         return {"collection": self.collection, "id": self.id}
     
 class PostSnapshotDocumentsRequestBody(TestServerRequestBody):
@@ -271,12 +272,12 @@ class PostSnapshotDocumentsRequestBody(TestServerRequestBody):
         """
         return self.__entries
     
-    def __init__(self, entries: List[SnapshotDocumentEntry] = None):
+    def __init__(self, entries: Optional[List[SnapshotDocumentEntry]] = None):
         super().__init__(1)
         self.__entries = entries if entries is not None else []
 
-    def to_json(self) -> any:
-        return [e.to_json() for e in self.__entries] if self.__entries is not None else []
+    def to_json(self) -> Any:
+        return [e.to_json() for e in self.__entries]
 
 class PostVerifyDocumentsRequestBody(TestServerRequestBody):
     """
@@ -316,14 +317,14 @@ class PostVerifyDocumentsRequestBody(TestServerRequestBody):
         """Gets the database that will be used to retrieve the current state"""
         return self.__database
     
-    def __init__(self, database: str, snapshot: str, changes: List[DatabaseUpdateEntry] = None):
+    def __init__(self, database: str, snapshot: str, changes: Optional[List[DatabaseUpdateEntry]] = None):
         super().__init__(1)
         self.__snapshot = snapshot
         self.__database = database
         self.changes = changes
         """A list of changes to verify in the database (as compared to the `snapshot`)"""
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         return {
             "snapshot": self.__snapshot,
             "database": self.__database,
@@ -399,7 +400,7 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
         """Whether or not this is a continuous replication (i.e. doesn't stop when finished
         with its initial changes)"""
 
-        self.authenticator: ReplicatorAuthenticator = None
+        self.authenticator: Optional[ReplicatorAuthenticator] = None
         """The authenticator to use to perform authentication with the remote"""
 
         self.reset: bool = False
@@ -408,7 +409,7 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
         self.collections: List[ReplicatorCollectionEntry] = []
         """The per-collection configuration to use inside the replication"""
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         """Serializes the :class:`PostStartReplicatorRequestBody` to a JSON string"""
         raw = {
             "database": self.__database,
@@ -451,7 +452,7 @@ class PostGetReplicatorStatusRequestBody(TestServerRequestBody):
         super().__init__(1)
         self.__id = id
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         """Serializes the :class:`PostGetReplicatorStatusRequestBody` to a JSON string"""
         return {"id": self.__id}
     

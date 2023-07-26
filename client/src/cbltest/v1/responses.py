@@ -1,4 +1,4 @@
-from typing import Dict, Final, List, cast
+from typing import Dict, Final, List, cast, Optional
 from cbltest.responses import ErrorResponseBody, TestServerResponse
 from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorDocumentEntry, ReplicatorProgress
 
@@ -72,7 +72,7 @@ class PostGetAllDocumentsResponse(TestServerResponse):
     @property
     def collection_keys(self) -> List[str]:
         """Gets all the collections that are specified in the response"""
-        return self.__payload.keys()
+        return list(self.__payload.keys())
     
     def documents_for_collection(self, collection: str) -> List[PostGetAllDocumentsEntry]:
         """
@@ -80,7 +80,7 @@ class PostGetAllDocumentsResponse(TestServerResponse):
 
         :param collection: The collection to return documents from
         """
-        return self.__payload.get(collection)
+        return cast(List[PostGetAllDocumentsEntry], self.__payload.get(collection))
     
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "getAllDocuments")
@@ -217,7 +217,7 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
         return self.__progress
     
     @property
-    def replicator_error(self) -> ErrorResponseBody:
+    def replicator_error(self) -> Optional[ErrorResponseBody]:
         """Gets the error that occurred during replication, if any"""
         return self.__replicator_error
     
@@ -236,4 +236,6 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
         self.__progress = ReplicatorProgress(cast(dict, body.get(self.__progress_key)))
         self.__replicator_error = ErrorResponseBody.create(body.get(self.__replicator_error_key))
         if self.__documents_key in body:
-            self.__documents = [ReplicatorDocumentEntry(d) for d in body.get(self.__documents_key)]
+            docs = body.get(self.__documents_key)
+            assert isinstance(docs, dict)
+            self.__documents = [ReplicatorDocumentEntry(d) for d in cast(dict, docs)]

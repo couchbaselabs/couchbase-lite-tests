@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from enum import Enum
-from typing import Dict, Final, List, cast
+from typing import Any, Final, List, cast, Optional
 from varname import nameof
 
 from cbltest.assertions import _assert_not_null
@@ -15,10 +15,10 @@ class ReplicatorPushFilterParameters(JSONSerializable):
     """
 
     def __init__(self) -> None:
-        self.document_ids: List[str] = None
+        self.document_ids: Optional[List[str]] = None
         """The document IDs to filter, if any"""
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         if self.document_ids is None:
             return None
         
@@ -42,7 +42,7 @@ class ReplicatorPushFilter(JSONSerializable):
         self.parameters = cast(ReplicatorPushFilterParameters, None)
         """The parameters to be applied to the push filter"""
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         ret_val = {"name": self.name}
         if self.parameters is not None:
             ret_val["params"] = self.parameters.to_json()
@@ -53,8 +53,8 @@ class ReplicatorCollectionEntry(JSONSerializable):
         """Gets the name of the collection that the options will be applied to"""
         return self.__names
     
-    def __init__(self, names: List[str] = ["_default"], channels: List[str] = None, document_ids: List[str] = None,
-                 push_filter: ReplicatorPushFilter = None):
+    def __init__(self, names: List[str] = ["_default"], channels: Optional[List[str]] = None, document_ids: Optional[List[str]] = None,
+                 push_filter: Optional[ReplicatorPushFilter] = None):
         _assert_not_null(names, nameof(names))
         assert len(names) > 0, "Must specify at least one name in the names array for ReplicatorCollectionEntry"
 
@@ -68,7 +68,7 @@ class ReplicatorCollectionEntry(JSONSerializable):
         self.push_filter = push_filter
         """The push filter to use for this collection, if any"""
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         ret_val = {
             "names": self.__names
         }
@@ -113,7 +113,7 @@ class ReplicatorAuthenticator(JSONSerializable):
         self.__type = type
 
     @abstractmethod
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         pass
     
 class ReplicatorBasicAuthenticator(ReplicatorAuthenticator):
@@ -133,7 +133,7 @@ class ReplicatorBasicAuthenticator(ReplicatorAuthenticator):
         self.__username = username
         self.__password = password
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         """Transforms the :class:`ReplicatorBasicAuthenticator` into a JSON dictionary"""
         return {
             "type": self.type,
@@ -159,7 +159,7 @@ class ReplicatorSessionAuthenticator(ReplicatorAuthenticator):
         self.__session_id = session_id
         self.__cookie_name = cookie_name
 
-    def to_json(self) -> any:
+    def to_json(self) -> Any:
         return {
             "type": self.type,
             "sessionID": self.__session_id,
@@ -233,7 +233,7 @@ class ReplicatorDocumentEntry:
         return self.__flags
     
     @property
-    def error(self) -> ErrorResponseBody:
+    def error(self) -> Optional[ErrorResponseBody]:
         """Gets the error that prevented the document from being replicated, if any"""
         return self.__error
 
@@ -249,7 +249,7 @@ class ReplicatorDocumentEntry:
         assert isinstance(self.__is_push, bool), "Invalid replicator document isPush received (not a boolean)"
         self.__flags = cast(int, body.get(self.__flags_key))
         assert isinstance(self.__flags, int), "Invalid replicator document flags received (not an int)"
-        self.__error = ErrorResponseBody.create(body.get(self.__error_key))
+        self.__error = ErrorResponseBody.create(cast(dict, body.get(self.__error_key)))
     
 class ReplicatorStatus:
     """
@@ -266,11 +266,11 @@ class ReplicatorStatus:
         return self.__activity
     
     @property
-    def error(self) -> ErrorResponseBody:
+    def error(self) -> Optional[ErrorResponseBody]:
         """Gets the error for the Replicator, if any"""
         return self.__error
     
-    def __init__(self, progress: ReplicatorProgress, activity: ReplicatorActivityLevel, error: ErrorResponseBody):
+    def __init__(self, progress: ReplicatorProgress, activity: ReplicatorActivityLevel, error: Optional[ErrorResponseBody]):
         self.__progress = progress
         self.__activity = activity
         self.__error = error
