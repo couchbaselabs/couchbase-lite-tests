@@ -27,7 +27,7 @@ class TestBasicReplication:
 
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error.code == 404
+        assert status.error is not None and status.error.code == 404
         return None
 
     @pytest.mark.asyncio
@@ -73,9 +73,7 @@ class TestBasicReplication:
             b.upsert_document("travel.airlines", "airline_2", removed_properties=["country"])
 
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), replicator_type=ReplicatorType.PUSH, collections=[
-            ReplicatorCollectionEntry("travel.airlines"),
-            ReplicatorCollectionEntry("travel.hotels"),
-            ReplicatorCollectionEntry("travel.airports")
+            ReplicatorCollectionEntry(["travel.airlines", "travel.hotels", "travel.airports"])
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)

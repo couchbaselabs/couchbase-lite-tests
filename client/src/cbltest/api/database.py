@@ -8,7 +8,6 @@ from cbltest.v1.responses import PostGetAllDocumentsResponse, PostGetAllDocument
 from cbltest.v1.requests import DatabaseUpdateEntry, DatabaseUpdateType, PostGetAllDocumentsRequestBody, PostUpdateDatabaseRequestBody
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory
-from cbltest.adapters import _create_adapter
 
 class DatabaseUpdater:
     """
@@ -20,14 +19,13 @@ class DatabaseUpdater:
         self._updates: List[DatabaseUpdateEntry] = []
         self.__request_factory = request_factory
         self.__index = index
-        self.__adapter = _create_adapter("DatabaseUpdaterAdapter", request_factory.version)
 
     async def __aenter__(self):
         self._updates.clear()
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        payload = self.__adapter.create_request_body(self)
+        payload = PostUpdateDatabaseRequestBody(self._db_name, self._updates)
         request = self.__request_factory.create_request(TestServerRequestType.UPDATE_DB, payload)
         resp = await self.__request_factory.send_request(self.__index, request)
         if resp.error is not None:
