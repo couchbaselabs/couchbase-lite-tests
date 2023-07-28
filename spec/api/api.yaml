@@ -11,7 +11,20 @@ info:
     The response headers of all APIs will contains the following response headers:
     * CBLTest-API-Version (integer)
     * CBLTest-Server-ID (UUID)
-  version: 0.1.3
+
+    Notes:
+    * Any enum values are case insensitive.
+
+    Changes
+    
+    0.1.4
+    * Fixed required fields and update description in ServerInfo.
+    * Added additionalInfo to the ServerInfo.
+    * Fixed required fields in ReplicationCollection.
+    * Changed DocumentReplication.flags type from int to array of enums.
+    * Added 'enableDocumentListener' to ReplicatorConfiguration.
+    * Added a note that any enum values are case insensitive.
+  version: 0.1.4
 tags:
   - name: API
 paths:
@@ -23,10 +36,11 @@ paths:
       description: |- 
         Get Test Server information containing the following information (tentative):
 
-        * version : Test Server version number. This is probably the same as CBL release number?
-        * apiVersion: API version number. This probably increases when we have breaking changes?
+        * version : Test Server version number which is the same as CBL release number.
+        * apiVersion: API version number. This will increase when we have breaking change.
         * cbl: The name of the CBL library used.
         * device : Device or platform information that the test server is running on.
+        * additionalInfo: Any additional info regarding the server.
       responses:
         '200':
           description: Success
@@ -328,9 +342,11 @@ components:
           type: boolean
           example: true
         flags: 
-          type: integer
-          format: int32
-          example: 2
+          type: array
+          items:
+            type: string
+            enum: [deleted, accessRemoved]
+            example: ['deleted']
         error:
           $ref: '#/components/schemas/Error'
     DatabaseUpdateItem:
@@ -432,9 +448,13 @@ components:
           oneOf:
             - $ref: '#/components/schemas/ReplicatorBasicAuthenticator'
             - $ref: '#/components/schemas/ReplicatorSessionAuthenticator'
+        enableDocumentListener:
+          description: 'When enable the document listener, the ReplicatorStatus will include the documents containing a list of DocumentReplication. The default is false.'
+          type: boolean
+          example: false
     ReplicationCollection:
       type: object
-      required: ['collection']
+      required: ['names']
       properties:
         names: 
           type: array
@@ -479,6 +499,10 @@ components:
               type: boolean
               example: true
         documents:
+          description: |- 
+            'This will include only when enableDocumentListener is set to true in ReplicatorConfiguration when calling /startReplicator. 
+             The returned documents will be deleted after the documents are returned so the subsequnce call to get the replicator status 
+             will not contain the previous returned documents.'
           type: array
           items:
             $ref: '#/components/schemas/DocumentReplication'
@@ -496,19 +520,24 @@ components:
           example: { 'catalog': ['db1', 'db2'] }
     ServerInfo:
       type: object
-      required: ['version']
+      required: ['version', 'apiVersion', 'cbl', 'device']
       properties:
         version:
+          description: 'Server version which is the same as CBL version.'
           type: string
           example: "3.1.0"
         apiVersion:
+          description: 'API version number. This will increase when we have breaking changes.'
           type: integer
           example: 1
         cbl:
+          description: 'The name of the CBL library used.'
           type: string
           example: "couchbase-lite-android"
         device:
+          description: 'Device or platform information that the test server is running on.'
           type: object
+          required: ['systemName', 'systemVersion']
           properties:
             model:
               description: 'Device Model Name'
@@ -526,6 +555,10 @@ components:
               description: 'Operating System API Version'
               type: string
               example: '19'
+        additionalInfo:
+          description: 'Any additional info regarding the server'
+          type: string
+          example: "CBL Commit 61671d0"
   responses:
     Error:
       description: |- 
