@@ -25,7 +25,7 @@ static inline void CheckBody(const json &body) {
 
 int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-member-functions-to-static)
     json result;
-    result["version"] = TestServer::VERSION;
+    result["version"] = CBLManager::version();
     result["apiVersion"] = TestServer::API_VERSION;
     result["cbl"] = TestServer::CBL_PLATFORM_NAME;
 
@@ -47,7 +47,8 @@ int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-
         device["systemApiVersion"] = apiVersion;
     }
     result["device"] = device;
-
+    result["additionalInfo"] = "Edition: " + CBLManager::edition() + ", Build: " + to_string(CBLManager::buildNumber());
+    
     return request.respondWithJSON(result);
 }
 
