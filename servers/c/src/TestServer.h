@@ -8,7 +8,6 @@ struct mg_connection;
 class TestServer {
 public:
     static constexpr const char *CBL_PLATFORM_NAME = "couchbase-lite-c";
-    static constexpr const char *VERSION = "3.1.0";
     static constexpr unsigned short API_VERSION = 1;
     static constexpr unsigned short PORT = 8080;
 

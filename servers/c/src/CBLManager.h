@@ -18,6 +18,18 @@ struct CBLDatabase;
 
 class CBLManager {
 public:
+    static std::string version() { return CBLITE_VERSION; }
+
+    static int buildNumber() { return CBLITE_BUILD_NUMBER; }
+
+    static std::string edition() {
+#ifdef COUCHBASE_ENTERPRISE
+        return "Enterprise";
+#else
+        return "Community";
+#endif
+    }
+
     CBLManager(std::string databaseDir, std::string assetDir);
 
     void reset();

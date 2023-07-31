@@ -2,8 +2,8 @@
 #include <thread>
 
 #include <civetweb.h>
-#include "cbl/CouchbaseLite.h"
 
+#include "CBLManager.h"
 #include "support/Files.h"
 #include "TestServer.h"
 
@@ -17,11 +17,8 @@ int main() {
         TestServer server = TestServer();
         server.start();
 
-        cout << "Using CBL C version " << CBLITE_VERSION << "-" << CBLITE_BUILD_NUMBER;
-#ifdef COUCHBASE_ENTERPRISE
-        cout << " (Enterprise)";
-#endif
-        cout << endl;
+        cout << "Using CBL-C " << CBLManager::version() << "-" << CBLManager::buildNumber();
+        cout << " (" << CBLManager::edition() << ")" << endl;
         cout << "Listening on port " << TestServer::PORT << "..." << endl;
 
         while (true) {
