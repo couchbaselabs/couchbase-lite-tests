@@ -139,23 +139,41 @@ paths:
         dictionary properties and array elements. The keypath looks like "foo.bar[1].baz" - The keypath components are 
         separated by dot ('.'). Each path is represented by the key name in a dictionary object, and the index brackets 
         at the end of the key name points to an array element in an array object. A '\' can be used to escape a special 
-        character ('.', '[' or '$') in the key name.
+        character ('.', '[', ']', '\' or '$') in the key name.
 
         The value at the location specified by the keypath is replaced with the value associated with the keypath, in the object 
-        regardless of its type. When a keypath includes a non-existent property (that is, an object that does not contain 
-        the specified key), the key is added and its value set as a dictionary or an array if the key refers to an array element
-        (the key end with array index brackets). 
+        regardless of its type. When a path in the keypath refers to a non-existent property, the key is added and 
+        its value set as a dictionary or an array depending on the type of the path.
 
-        When the keypath includes an array index that is out of bounds (the array is smaller than the specified index) the array 
+        When a path in the keypath includes an array index that is out of bounds (the array is smaller than the specified index), the array 
         is padded with nulls until it is exactly large enough to make the specified index legal.  
         
-        A keypath that includes an element of the wrong type -- a object when an array index is specified in the path, 
-        an array when object property appears in the path, or any path that crosses a scaler -- is an error.
+        When a path (dictionary or array) in the keypath doesn't match the actual value type, the error will be returned. 
+        
+        Examples,
 
+        Document:
+        { 
+          "name", {"first": "John", "last": "Doe"}, 
+          "addresses": [{"city": "San Francisco"}, {"city": "Palo Alto"}]
+        }
+
+        updatedProperties:
+
+        name.last = "Tiger" ->  {"name", {"first": "John", "last": "Tiger"}, ...}
+        name.middle = "Sky" ->  {"name", {"first": "John", "middle": "sky", "last": "Tiger"}, ...}
+        name = "John Doe" -> {"name", "John Doe"}
+
+        name.first.value = "John" ->  Error as the value of "first" is not the dictionary
+
+        addresses[0].city = "Santa Clara" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}], ...}
+        addresses[4].city = "San Mateo" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}, null, {"city": "San Mateo"}], ...}
+        phones[1] = "650-123-4567" -> {"phones": [null, "650-123-4567"]}
+        
         removedProperties:
 
         An array of the keypaths which refer to ditionary keys or array elements to be removed. If a keypath refer to a non-existent
-        property or array element, the error will be returned. When removing multiple items in an array, the order of the array indexes 
+        property or array element, the remove for the keypath will be no-ops. When removing multiple items in an array, the order of the array indexes 
         should be from high to low to avoid index mutation during the removal.
 
       operationId: updateDatabase
