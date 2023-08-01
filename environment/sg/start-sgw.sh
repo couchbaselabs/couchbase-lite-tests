@@ -6,8 +6,6 @@ if [ "$#" -lt 1 ]; then
 fi
 SSL=$1
 
-echo "SSL = ${SSL}"
-
 SCRIPT=$(readlink -f "$0")
 ROOT_DIR=$(dirname "${SCRIPT}")
 CONFIG_DIR="${ROOT_DIR}/config"
