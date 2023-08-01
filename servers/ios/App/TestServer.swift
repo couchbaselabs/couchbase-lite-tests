@@ -9,14 +9,16 @@ import Vapor
 
 class TestServer : ObservableObject {
     var app : Vapor.Application
+    let dbConnection : DatabaseManager
     
-    init(port: Int) {
+    init(port: Int, dbManager: DatabaseManager) {
+        self.dbConnection = dbManager
         do {
             var env = try Environment.detect()
             try LoggingSystem.bootstrap(from: &env)
             
             app = Application(env)
-            try TestServer.configure(app, port)
+            try configure(app, port)
         } catch {
             fatalError(error.localizedDescription)
         }
@@ -32,7 +34,7 @@ class TestServer : ObservableObject {
         
     }
     
-    private static func configure(_ app: Application, _ port: Int) throws {
+    private func configure(_ app: Application, _ port: Int) throws {
         // uncomment to serve files from /Public folder
         // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
         
@@ -45,9 +47,14 @@ class TestServer : ObservableObject {
         // register routes
     }
     
-    private static func routes(_ app: Application) async throws {
+    private func routes(_ app: Application) async throws {
         app.get { req async in
             "It works!"
+        }
+        
+        app.post("reset") { [self] req async in
+            dbConnection.reset()
+            return "Reset"
         }
     }
 }

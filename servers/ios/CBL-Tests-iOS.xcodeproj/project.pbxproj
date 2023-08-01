@@ -13,6 +13,8 @@
 		EA19C6882A793C3800197481 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EA19C6872A793C3800197481 /* Preview Assets.xcassets */; };
 		EA79A99D2A7940C900530ADE /* Vapor in Frameworks */ = {isa = PBXBuildFile; productRef = EA79A99C2A7940C900530ADE /* Vapor */; };
 		EA94790E2A7943CD000C584A /* TestServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA94790D2A7943CD000C584A /* TestServer.swift */; };
+		EAE658B22A795B0700C26657 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE658B12A795B0700C26657 /* DatabaseManager.swift */; };
+		EAE658B72A795BAE00C26657 /* CouchbaseLiteSwift in Frameworks */ = {isa = PBXBuildFile; productRef = EAE658B62A795BAE00C26657 /* CouchbaseLiteSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,6 +25,7 @@
 		EA19C6872A793C3800197481 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		EA94790D2A7943CD000C584A /* TestServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestServer.swift; sourceTree = "<group>"; };
 		EAE658B02A7955A500C26657 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		EAE658B12A795B0700C26657 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -30,6 +33,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EAE658B72A795BAE00C26657 /* CouchbaseLiteSwift in Frameworks */,
 				EA79A99D2A7940C900530ADE /* Vapor in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -47,6 +51,7 @@
 				EA19C6842A793C3800197481 /* Assets.xcassets */,
 				EA19C6862A793C3800197481 /* Preview Content */,
 				EA19C67E2A793C3700197481 /* Products */,
+				EAE658B52A795BAE00C26657 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -70,8 +75,16 @@
 			isa = PBXGroup;
 			children = (
 				EA94790D2A7943CD000C584A /* TestServer.swift */,
+				EAE658B12A795B0700C26657 /* DatabaseManager.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		EAE658B52A795BAE00C26657 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -92,6 +105,7 @@
 			name = "CBL-Tests-iOS";
 			packageProductDependencies = (
 				EA79A99C2A7940C900530ADE /* Vapor */,
+				EAE658B62A795BAE00C26657 /* CouchbaseLiteSwift */,
 			);
 			productName = "CBL-Tests-iOS";
 			productReference = EA19C67D2A793C3700197481 /* CBL-Tests-iOS.app */;
@@ -151,6 +165,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EAE658B22A795B0700C26657 /* DatabaseManager.swift in Sources */,
 				EA19C6832A793C3700197481 /* ContentView.swift in Sources */,
 				EA94790E2A7943CD000C584A /* TestServer.swift in Sources */,
 				EA19C6812A793C3700197481 /* CBL_Tests_iOSApp.swift in Sources */,
@@ -381,6 +396,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = EA79A99B2A7940C900530ADE /* XCRemoteSwiftPackageReference "vapor" */;
 			productName = Vapor;
+		};
+		EAE658B62A795BAE00C26657 /* CouchbaseLiteSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EA9479102A794975000C584A /* XCRemoteSwiftPackageReference "couchbase-lite-swift-ee" */;
+			productName = CouchbaseLiteSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
