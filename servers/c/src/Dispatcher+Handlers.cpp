@@ -48,7 +48,7 @@ int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-
     }
     result["device"] = device;
     result["additionalInfo"] = "Edition: " + CBLManager::edition() + ", Build: " + to_string(CBLManager::buildNumber());
-    
+
     return request.respondWithJSON(result);
 }
 
@@ -268,6 +268,10 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
         }
     }
 
+    if (config.contains("enableDocumentListener")) {
+        params.enableDocumemntListener = GetValue<bool>(config, "enableDocumentListener");
+    }
+
     vector<ReplicationCollection> collections;
     for (auto &colObject: GetValue<vector<json>>(config, "collections")) {
         vector<string> names;
@@ -332,13 +336,13 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
     CheckBody(body);
 
     auto id = GetValue<string>(body, "id");
-    auto repl = _cblManager->replicator(id);
-    if (!repl) {
+    auto replStatus = _cblManager->status(id);
+    if (!replStatus) {
         throw RequestError("Replicator '" + id + "' not found");
     }
 
     json result;
-    auto status = CBLReplicator_Status(repl);
+    auto status = replStatus->status;
     result["activity"] = kStatuses[(int) status.activity];
 
     json progress;
@@ -349,6 +353,29 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
         result["error"] = CBLException(status.error).json();
     }
 
+    if (replStatus->replicatedDocs) {
+        vector<json> docs;
+        auto &batches = replStatus->replicatedDocs.value();
+        for (auto &batch: batches) {
+            for (auto &replDoc: batch) {
+                json doc;
+                doc["isPush"] = replDoc.isPush;
+                doc["collection"] = replDoc.collection;
+                doc["documentID"] = replDoc.documentID;
+                if (replDoc.error.code > 0) {
+                    doc["error"] = CBLException(replDoc.error).json();
+                }
+                if (replDoc.flags) {
+                    vector<string> flags;
+                    if (replDoc.flags & kCBLDocumentFlagsDeleted) { flags.emplace_back("DELETED"); }
+                    if (replDoc.flags & kCBLDocumentFlagsAccessRemoved) { flags.emplace_back("ACCESSREMOVED"); }
+                    if (!flags.empty()) { doc["flags"] = flags; }
+                }
+                docs.push_back(doc);
+            }
+        }
+        result["docs"] = docs;
+    }
     return request.respondWithJSON(result);
 }
 

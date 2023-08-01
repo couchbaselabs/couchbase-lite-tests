@@ -47,21 +47,21 @@ void CBLManager::reset() {
         _databases.clear();
     }
 
-    // Release all replicators and their collections:
+    // Release all replicators, their collections, and document listener tokens:
     {
-        auto it = _replicators.begin();
-        while (it != _replicators.end()) {
-            CBLReplicator *repl = it->second;
-            auto config = CBLReplicator_Config(repl);
+        auto it = _contextMaps.begin();
+        while (it != _contextMaps.end()) {
+            auto &context = it->second;
+            auto config = CBLReplicator_Config(context->replicator);
             for (int i = 0; i < config->collectionCount; i++) {
                 auto replCol = config->collections[i];
                 CBLCollection_Release(replCol.collection);
             }
-            CBLReplicator_Release(repl);
+            CBLReplicator_Release(context->replicator);
+            CBLListener_Remove(context->token);
             it++;
         }
-        _replicators.clear();
-        _contexts.clear();
+        _contextMaps.clear();
     }
 }
 
@@ -163,6 +163,7 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
           };
 
     auto context = make_unique<ReplicatorContext>();
+    context->manager = this;
 
     for (auto &replColSpec: params.collections) {
         auto spec = CollectionSpec(replColSpec.collection);
@@ -256,17 +257,66 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
 
     CBLReplicator *repl = CBLReplicator_Create(&config, &error);
     CheckError(error);
+
+    string id = "@replicator::" + to_string(++_replicatorID);
+    context->replicatorID = id;
+    context->replicator = repl;
+
+    if (params.enableDocumemntListener) {
+        auto token = CBLReplicator_AddDocumentReplicationListener(repl, [](void *ctx,
+                                                                           CBLReplicator *r,
+                                                                           bool isPush,
+                                                                           unsigned numDocuments,
+                                                                           const CBLReplicatedDocument *documents) {
+            vector<ReplicatedDocument> docs{};
+            for (int i = 0; i < numDocuments; i++) {
+                ReplicatedDocument doc{};
+                doc.isPush = isPush;
+                doc.collection = CollectionSpec(STR(documents[i].scope), STR(documents[i].collection)).fullName();
+                doc.documentID = STR(documents[i].ID);
+                doc.flags = documents[i].flags;
+                doc.error = documents[i].error;
+                docs.push_back(doc);
+            }
+            auto context = (ReplicatorContext *) ctx;
+            context->manager->addDocumentReplication(context->replicatorID, docs);
+        }, context.get());
+        context->token = token;
+    }
+
+    _contextMaps[id] = std::move(context);
+
     CBLReplicator_Start(repl, reset);
 
-    _contexts.push_back(std::move(context));
-
-    string id = "@replicator::" + to_string(++replicatorID);
-    _replicators[id] = repl;
     success = true;
     return id;
 }
 
 CBLReplicator *CBLManager::replicator(const string &id) {
     lock_guard<mutex> lock(_mutex);
-    return _replicators[id];
+    if (_contextMaps.find(id) == _contextMaps.end()) {
+        return nullptr;
+    }
+    return _contextMaps[id]->replicator;
+}
+
+void CBLManager::addDocumentReplication(const std::string &id, const vector<ReplicatedDocument> &docs) {
+    lock_guard<mutex> lock(_mutex);
+    if (_contextMaps.find(id) != _contextMaps.end()) {
+        _contextMaps[id]->replicatedDocs.push_back(docs);
+    }
+}
+
+std::optional<CBLManager::ReplicatorStatus> CBLManager::status(const std::string &id) {
+    lock_guard<mutex> lock(_mutex);
+    if (_contextMaps.find(id) != _contextMaps.end()) {
+        ReplicatorStatus result{};
+        result.status = CBLReplicator_Status(_contextMaps[id]->replicator);
+        if (_contextMaps[id]->token) {
+            result.replicatedDocs = _contextMaps[id]->replicatedDocs;
+            _contextMaps[id]->replicatedDocs = {};
+        }
+        return result;
+    }
+    return nullopt;
 }
