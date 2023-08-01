@@ -21,6 +21,8 @@ public:
 
     explicit CollectionSpec(const CBLCollection *collection);
 
+    CollectionSpec(const std::string &scope, const std::string &name);
+
     [[nodiscard]] const std::string &scope() const { return _scope; }
 
     [[nodiscard]] const std::string &name() const { return _name; }

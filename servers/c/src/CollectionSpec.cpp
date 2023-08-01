@@ -10,3 +10,9 @@ CollectionSpec::CollectionSpec(const CBLCollection *collection) {
     _name = STR(CBLCollection_Name(collection));
     _fullName = _scope + "." + _name;
 }
+
+CollectionSpec::CollectionSpec(const std::string &scope, const std::string &name) {
+    _scope = scope;
+    _name = name;
+    _fullName = scope + "." + name;
+}
