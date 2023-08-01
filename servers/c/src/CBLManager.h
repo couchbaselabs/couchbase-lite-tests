@@ -65,16 +65,34 @@ public:
         bool continuous{false};
         std::optional<ReplicationAuthenticator> authenticator;
         bool enablePinCert{false};
+        bool enableDocumemntListener{false};
+    };
+
+    struct ReplicatedDocument {
+        bool isPush{false};
+        std::string collection;
+        std::string documentID;
+        CBLDocumentFlags flags{0};
+        CBLError error{};
+    };
+
+    struct ReplicatorStatus {
+        CBLReplicatorStatus status;
+        std::optional<std::vector<std::vector<ReplicatedDocument>>> replicatedDocs;
     };
 
     std::string startReplicator(const ReplicatorParams &params, bool reset);
 
     CBLReplicator *replicator(const std::string &id);
 
+    std::optional<ReplicatorStatus> status(const std::string &id);
+
 private:
     CBLDatabase *databaseUnlocked(const std::string &name);
 
     FLSliceResult getServerCert();
+
+    void addDocumentReplication(const std::string &id, const std::vector<ReplicatedDocument> &docs);
 
     std::mutex _mutex;
 
@@ -85,17 +103,28 @@ private:
     std::unordered_map<std::string, CBLDatabase *> _databases;
 
     /* Replicator id number */
-    int64_t replicatorID = 0;
+    int64_t _replicatorID = 0;
 
-    /** Map of replicator id and replicator object */
-    std::unordered_map<std::string, CBLReplicator *> _replicators;
-
-    /** Replicator context for keeping per replicator objects used by callbacks */
+    /** Replicator context for keeping per replicator objects and being referenced by callbacks */
     struct ReplicatorContext {
+        /** CBLManager Object */
+        CBLManager *manager{nullptr};
+
+        /** Replicator ID */
+        std::string replicatorID;
+
+        /** Replicator */
+        CBLReplicator *replicator{nullptr};
+
+        /** Document Listener Token */
+        CBLListenerToken *token{nullptr};
+
         /** Map of collection name and replication filter object */
-        std::unordered_map<std::string, std::unique_ptr<ReplicationFilter>> filters;
+        std::unordered_map<std::string, std::unique_ptr<ReplicationFilter>> filters{};
+
+        /** Replicated Documents in batch */
+        std::vector<std::vector<ReplicatedDocument>> replicatedDocs{};
     };
 
-    /** Vector for keeping replicator contexts. */
-    std::vector<std::unique_ptr<ReplicatorContext>> _contexts;
+    std::unordered_map<std::string, std::unique_ptr<ReplicatorContext>> _contextMaps;
 };
