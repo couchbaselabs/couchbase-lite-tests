@@ -6,5 +6,7 @@
 #include <nlohmann/json.hpp>
 
 namespace ts_support::fleece {
-    void setSlotValue(FLSlot slot, const nlohmann::json &json);
+    void updateProperties(FLMutableDict dict, FLSlice keyPath, const nlohmann::json &value);
+
+    void removeProperties(FLMutableDict dict, FLSlice keyPath);
 }
