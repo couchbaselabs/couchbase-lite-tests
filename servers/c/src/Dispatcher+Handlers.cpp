@@ -112,51 +112,6 @@ int Dispatcher::handlePOSTGetAllDocuments(Request &request) {
     return request.respondWithJSON(result);
 }
 
-static void updateProperties(json &delta, FLMutableDict properties) { // NOLINT(misc-no-recursion)
-    if (delta.type() != json::value_t::object) {
-        throw RequestError("Applied delta is not dictionary");
-    }
-
-    for (const auto &[deltaKey, deltaValue]: delta.items()) {
-        auto key = FLS(deltaKey);
-        if (deltaValue.type() == json::value_t::object) {
-            auto dict = FLMutableDict_GetMutableDict(properties, key);
-            if (!dict) {
-                dict = FLMutableDict_New();
-                FLMutableDict_SetDict(properties, key, dict);
-                FLMutableDict_Release(dict);
-            }
-            updateProperties(deltaValue, dict);
-        } else {
-            auto slot = FLMutableDict_Set(properties, key);
-            ts_support::fleece::setSlotValue(slot, deltaValue);
-        }
-    }
-}
-
-static void removeProperties(json &removedProps, FLMutableDict properties) { // NOLINT(misc-no-recursion)
-    if (removedProps.type() != json::value_t::object) {
-        throw RequestError("Removed properties is not dictionary");
-    }
-
-    for (const auto &[deletedKey, deletedValue]: removedProps.items()) {
-        auto key = FLS(deletedKey);
-        if (deletedValue.type() == json::value_t::object) {
-            auto dict = FLMutableDict_GetMutableDict(properties, key);
-            if (!dict) {
-                dict = FLMutableDict_New();
-                FLMutableDict_SetDict(properties, key, dict);
-                FLMutableDict_Release(dict);
-            }
-            removeProperties(deletedValue, dict);
-        } else if (deletedValue.type() == json::value_t::null) {
-            FLMutableDict_Remove(properties, key);
-        } else {
-            throw RequestError("Invalid removed property value");
-        }
-    }
-}
-
 int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
     static constexpr const char *kUpdateDatabaseTypeUpdate = "UPDATE";
     static constexpr const char *kUpdateDatabaseTypeDelete = "DELETE";
@@ -193,16 +148,30 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
                     doc = CBLDocument_CreateWithID(FLS(docID));
                 }
 
-                auto props = FLDict_AsMutable(CBLDocument_Properties(doc));
+                auto props = CBLDocument_MutableProperties(doc);
 
                 if (update.contains("updatedProperties")) {
-                    json updatedProps = update["updatedProperties"];
-                    updateProperties(updatedProps, props);
+                    auto updatedProps = GetValue<vector<unordered_map<string, json>>>(update, "updatedProperties");
+                    for (auto &keyPaths: updatedProps) {
+                        for (auto &keyPath: keyPaths) {
+                            try {
+                                ts_support::fleece::updateProperties(props, FLS(keyPath.first), keyPath.second);
+                            } catch (const exception &e) {
+                                throw RequestError(e.what());
+                            }
+                        }
+                    }
                 }
 
                 if (update.contains("removedProperties")) {
-                    json removedProps = update["removedProperties"];
-                    removeProperties(removedProps, props);
+                    auto keyPaths = GetValue<vector<string>>(update, "removedProperties");
+                    for (auto &keyPath: keyPaths) {
+                        try {
+                            ts_support::fleece::removeProperties(props, FLS(keyPath));
+                        } catch (const exception &e) {
+                            throw RequestError(e.what());
+                        }
+                    }
                 }
 
                 CBLCollection_SaveDocument(col, doc, &error);
