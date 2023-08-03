@@ -1,7 +1,7 @@
 from typing import Any, List, Type, cast, Optional, TypeVar
 import sys
 
-if sys.version_info >= (3, 11):
+if sys.version_info >= (3, 10):
     from typing import (
         get_args,
         get_origin
@@ -90,7 +90,7 @@ def _get_typed_required(d: dict, key: str, type: Type[T]) -> T:
     origin = get_origin(type)
     if origin is None:
         origin = type
-        
+
     ret_val = d[key]
     if not isinstance(ret_val, cast(Type, origin)):
         raise ValueError(f"Expecting {str(type)} for key {key} but found {ret_val} instead")
