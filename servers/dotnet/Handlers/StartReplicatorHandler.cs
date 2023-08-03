@@ -1,7 +1,6 @@
 ﻿using Couchbase.Lite;
 using Couchbase.Lite.Sync;
-using System.Collections.Specialized;
-using System.Diagnostics.CodeAnalysis;
+using System.Collections;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,6 +9,74 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    internal readonly record struct DocumentReplicationEvent
+    {
+        public required bool isPush { get; init; }
+
+        public required string collection { get; init; }
+
+        public required string documentID { get; init; }
+
+        public required IReadOnlyList<string> flags { get; init; }
+
+        public ErrorReturnBody? error { get; init; }
+    }
+
+    internal sealed class ReplicatorDocumentListener : IDisposable, IEnumerable<DocumentReplicationEvent>
+    {
+        private ListenerToken _listenerToken;
+        private List<DocumentReplicationEventArgs> _events = new List<DocumentReplicationEventArgs>();
+
+        public ReplicatorDocumentListener(Replicator replicator)
+        {
+            _listenerToken = replicator.AddDocumentReplicationListener(HandleChange);
+        }
+
+
+
+        private void HandleChange(object? sender, DocumentReplicationEventArgs e)
+        {
+            _events.Add(e);
+        }
+
+        public void Dispose()
+        {
+            _listenerToken.Remove();
+        }
+
+        public IEnumerator<DocumentReplicationEvent> GetEnumerator()
+        {
+            var events = Interlocked.Exchange(ref _events, new List<DocumentReplicationEventArgs>());
+            foreach (var entry in events) {
+                foreach (var doc in entry.Documents) {
+                    ErrorReturnBody? error = null;
+                    if(doc.Error != null) {
+                        error = new ErrorReturnBody
+                        {
+                            code = doc.Error.Error,
+                            domain = (int)doc.Error.Domain + 1,
+                            message = doc.Error.Message
+                        };
+                    }
+
+                    yield return new DocumentReplicationEvent
+                    {
+                        isPush = entry.IsPush,
+                        collection = $"{doc.ScopeName}.{doc.CollectionName}",
+                        documentID = doc.Id,
+                        flags = new[] { doc.Flags.ToString() },
+                        error = error
+                    };
+                }
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return ((IEnumerable<DocumentReplicationEvent>)this).GetEnumerator();
+        }
+    }
+
     internal readonly record struct StartReplicatorAuthenticator
     {
         private const string BasicType = "BASIC";
@@ -73,16 +140,19 @@ internal static partial class HandlerList
 
         public ReplicatorType ReplicatorType { get; }
 
+        public bool enableDocumentListener { get; init; }
+
         [JsonConstructor]
         public StartReplicatorConfig(string database, string endpoint,
             string replicatorType, bool continuous, IReadOnlyList<StartReplicatorCollection> collections,
-            StartReplicatorAuthenticator? authenticator = null)
+            StartReplicatorAuthenticator? authenticator = null, bool enableDocumentListener = false)
         {
             this.database = database;
             this.endpoint = endpoint;
             this.continuous = continuous;
             this.collections = collections;
             this.authenticator = authenticator;
+            this.enableDocumentListener = enableDocumentListener;
 
             if (replicatorType.ToLowerInvariant() == "pull") {
                 ReplicatorType = ReplicatorType.Pull;
@@ -159,7 +229,12 @@ internal static partial class HandlerList
         replConfig.Authenticator = deserializedBody.config.authenticator?.CreateAuthenticator();
 
         (var repl, var id) = CBLTestServer.Manager.RegisterObject(() => new Replicator(replConfig));
-        repl.Start();
+        if(deserializedBody.config.enableDocumentListener) {
+            var listener = new ReplicatorDocumentListener(repl);
+            CBLTestServer.Manager.RegisterObject(() => new ReplicatorDocumentListener(repl), $"{id}_listener");
+        }
+
+        repl.Start(deserializedBody.reset);
 
         response.WriteBody(new { id }, version);
     }

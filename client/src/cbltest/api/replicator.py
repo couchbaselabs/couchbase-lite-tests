@@ -8,7 +8,9 @@ from cbltest.v1.requests import PostGetReplicatorStatusRequestBody, PostStartRep
 from cbltest.requests import TestServerRequestType
 from cbltest.api.error import CblTestError, CblTimeoutError
 from cbltest.api.database import Database
-from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorAuthenticator, ReplicatorCollectionEntry, ReplicatorType, ReplicatorStatus
+from cbltest.api.replicator_types import (
+    ReplicatorActivityLevel, ReplicatorAuthenticator, ReplicatorCollectionEntry, 
+    ReplicatorType, ReplicatorStatus, ReplicatorDocumentEntry)
 
 class Replicator:
     """
@@ -28,34 +30,55 @@ class Replicator:
     def is_started(self) -> bool:
         """Returns `True` if the replicator has started"""
         return self.__id != ""
+    
+    @property
+    def document_updates(self) -> List[ReplicatorDocumentEntry]:
+        """
+        Gets the list of document updates received from the server and caches them.
+        
+        .. note:: These entries will persist indefinitely until 
+            :func:`clear_document_entries()<cbltest.api.replicator.Replicator.clear_document_entries>`
+            is called
+
+        
+        """
+        return self.__document_updates
 
     def __init__(self, database: Database, endpoint: str, replicator_type: ReplicatorType = ReplicatorType.PUSH_AND_PULL,
                  continuous: bool = False, authenticator: Optional[ReplicatorAuthenticator] = None, reset: bool = False,
-                 collections: List[ReplicatorCollectionEntry] = []):
+                 collections: List[ReplicatorCollectionEntry] = [], enable_document_listener: bool = False):
         assert database._request_factory.version == 1, "This version of the cbl test API requires request API v1"
         self.__database = database
         self.__index = database._index
         self.__request_factory = database._request_factory
         self.__endpoint = endpoint
         self.__id: str = ""
-        self.replicator_type = replicator_type
+        self.__document_updates: List[ReplicatorDocumentEntry] = []
+        self.replicator_type: ReplicatorType = replicator_type
         """The direction of the replicator"""
 
-        self.continuous = continuous
+        self.continuous: bool = continuous
         """Whether or not this replicator is continuous"""
 
-        self.authenticator = authenticator
+        self.authenticator: Optional[ReplicatorAuthenticator] = authenticator
         """The authenticator to use, if any"""
 
-        self.reset = reset
+        self.reset: bool = reset
         """Whether or not to restart the replicator from the beginning"""
 
-        self.collections = collections if collections is not None else []
+        self.collections: List[ReplicatorCollectionEntry] = collections if collections is not None else []
         """The collections to use in this replication"""
+
+        self.enable_document_listener: bool = enable_document_listener
+        """If True, document updates will be present in calls to get_status"""
 
     def add_default_collection(self) -> None:
         """A convenience method for adding the default config for the default collection, if desired"""
         self.collections.append(ReplicatorCollectionEntry())
+
+    def clear_document_updates(self) -> None:
+        """Clears the cached document updates received so far by the server"""
+        self.__document_updates.clear()
 
     async def start(self) -> None:
         """
@@ -65,6 +88,7 @@ class Replicator:
         payload.replicatorType = self.replicator_type
         payload.continuous = self.continuous
         payload.authenticator = self.authenticator
+        payload.enableDocumentListener = self.enable_document_listener
         payload.reset = self.reset
         payload.collections = self.collections
         req = self.__request_factory.create_request(TestServerRequestType.START_REPLICATOR, payload)
@@ -86,6 +110,7 @@ class Replicator:
         req = self.__request_factory.create_request(TestServerRequestType.REPLICATOR_STATUS, payload)
         resp = await self.__request_factory.send_request(self.__index, req)
         cast_resp = cast(PostGetReplicatorStatusResponse, resp)
+        self.__document_updates.extend(cast_resp.documents)
         return ReplicatorStatus(cast_resp.progress, cast_resp.activity, cast_resp.replicator_error)
     
     async def wait_for(self, activity: ReplicatorActivityLevel, interval: float = 1.0, 

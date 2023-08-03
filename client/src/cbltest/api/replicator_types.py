@@ -1,11 +1,13 @@
+from __future__ import annotations
 from abc import abstractmethod
-from enum import Enum
+from enum import Enum, Flag, auto
 from typing import Any, Final, List, cast, Optional
 from varname import nameof
 
 from cbltest.assertions import _assert_not_null
 from cbltest.responses import ErrorResponseBody
 from cbltest.api.jsonserializable import JSONSerializable
+from cbltest.jsonhelper import _get_typed, _get_typed_required
 
 class ReplicatorPushFilterParameters(JSONSerializable):
     """
@@ -203,6 +205,52 @@ class ReplicatorProgress:
         self.__completed = cast(bool, body.get(self.__completed_key))
         assert isinstance(self.__completed, bool), "Invalid replicator progress value received ('completed' not a boolean)"
 
+class ReplicatorDocumentFlags(Flag):
+    NONE = auto()
+    """The absence of flags"""
+
+    DELETED = auto()
+    """A flag indicating the document was deleted by another party"""
+
+    ACCESS_REMOVED = auto()
+    """A flag indicating that this replicator lost access to a document"""
+
+    @classmethod
+    def parse(cls, input: str) -> ReplicatorDocumentFlags:
+        assert isinstance(input, str), f"Non-string input to ReplicatorDocumentFlags {input}"
+        upper = input.upper()
+        if upper == "DELETED":
+            return ReplicatorDocumentFlags.DELETED
+        
+        if upper == "ACCESSREMOVED":
+            return ReplicatorDocumentFlags.ACCESS_REMOVED
+        
+        raise ValueError(f"Unrecognized input ReplicatorDocumentFlags {input}")
+    
+    @classmethod
+    def parse_all(cls, input: List[str]) -> ReplicatorDocumentFlags:
+        ret_val = ReplicatorDocumentFlags.NONE
+        for i in input:
+            ret_val |= cls.parse(i)
+
+        return ret_val
+
+    def __str__(self) -> str:
+        if self == ReplicatorDocumentFlags.NONE:
+            return ""
+        
+        flags = []
+        # https://github.com/python/mypy/issues/9642
+        # Need to cast self to not be Literal type
+        uncast_self = cast(ReplicatorDocumentFlags, self)
+        if uncast_self & ReplicatorDocumentFlags.DELETED:
+            flags.append("DELETED")
+
+        if uncast_self & ReplicatorDocumentFlags.ACCESS_REMOVED:
+            flags.append("ACCESSREMOVED")
+
+        return "|".join(flags)
+
 class ReplicatorDocumentEntry:
     """A class representing the status of a replicated document"""
 
@@ -228,7 +276,7 @@ class ReplicatorDocumentEntry:
         return self.__is_push
     
     @property
-    def flags(self) -> int:
+    def flags(self) -> ReplicatorDocumentFlags:
         """Gets the flags that were set on the document when it was replicated"""
         return self.__flags
     
@@ -247,9 +295,9 @@ class ReplicatorDocumentEntry:
         assert self.__document_id is not None, "Null ID on replicator document received"
         self.__is_push = cast(bool, body.get(self.__is_push_key))
         assert isinstance(self.__is_push, bool), "Invalid replicator document isPush received (not a boolean)"
-        self.__flags = cast(int, body.get(self.__flags_key))
+        self.__flags = ReplicatorDocumentFlags.parse_all(_get_typed_required(body, self.__flags_key, List[str]))
         assert isinstance(self.__flags, int), "Invalid replicator document flags received (not an int)"
-        self.__error = ErrorResponseBody.create(cast(dict, body.get(self.__error_key)))
+        self.__error: Optional[ErrorResponseBody] = ErrorResponseBody.create(cast(dict, body.get(self.__error_key)))
     
 class ReplicatorStatus:
     """

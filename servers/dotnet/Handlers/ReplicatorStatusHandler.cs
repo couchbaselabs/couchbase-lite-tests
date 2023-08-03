@@ -32,7 +32,8 @@ internal static partial class HandlerList
 
     internal readonly record struct ErrorReturnBody(int domain, int code, string message);
 
-    internal record struct ReplicatorStatusReturnBody(string activity, ReplicatorProgressReturnBody progress, ErrorReturnBody? error = null);
+    internal record struct ReplicatorStatusReturnBody(string activity, ReplicatorProgressReturnBody progress, 
+        IReadOnlyList<DocumentReplicationEvent> documents, ErrorReturnBody? error = null);
 
     [HttpHandler("getReplicatorStatus")]
     public static void ReplicatorStatusHandler(int version, JsonDocument body, HttpListenerResponse response)
@@ -61,7 +62,13 @@ internal static partial class HandlerList
             };
         }
 
-        var retVal = new ReplicatorStatusReturnBody(activity, new ReplicatorProgressReturnBody(complete), error);
+        var docs = new List<DocumentReplicationEvent>();
+        var listener = CBLTestServer.Manager.GetObject<ReplicatorDocumentListener>($"{replicatorStatusBody.id}_listener");
+        if(listener != null) {
+            docs = listener.ToList();
+        }
+
+        var retVal = new ReplicatorStatusReturnBody(activity, new ReplicatorProgressReturnBody(complete), docs, error);
         response.WriteBody(retVal, version);
     }
 }
