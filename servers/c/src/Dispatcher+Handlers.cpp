@@ -135,6 +135,9 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
             auto spec = CollectionSpec(colName);
             auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
             CheckError(error);
+            if (!col) {
+                throw RequestError("Collection '" + spec.fullName() + "' Not Found");
+            }
             AUTO_RELEASE(col);
 
             auto docID = GetValue<string>(update, "documentID");
