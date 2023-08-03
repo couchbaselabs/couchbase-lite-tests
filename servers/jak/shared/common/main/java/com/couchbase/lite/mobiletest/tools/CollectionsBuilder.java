@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.factories;
+package com.couchbase.lite.mobiletest.tools;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -22,11 +22,11 @@ import java.util.HashSet;
 import java.util.Set;
 
 import com.couchbase.lite.Collection;
-import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
+import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.data.TypedList;
-import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.services.DatabaseService;
 
 
 public class CollectionsBuilder {
@@ -34,10 +34,13 @@ public class CollectionsBuilder {
     private final TypedList collFqns;
     @NonNull
     private final Database db;
+    @NonNull
+    private final DatabaseService dbSvc;
 
     public CollectionsBuilder(@Nullable TypedList collFqns, @NonNull Database db) {
         this.collFqns = collFqns;
         this.db = db;
+        this.dbSvc = TestApp.getApp().getDbSvc();
     }
 
     @NonNull
@@ -48,18 +51,7 @@ public class CollectionsBuilder {
         for (int j = 0; j < collFqns.size(); j++) {
             final String collFqn = collFqns.getString(j);
             if (collFqn == null) { throw new ClientError("Empty collection name (" + j + ")"); }
-
-            final String[] collName = collFqn.split("\\.");
-            if ((collName.length != 2) || collName[0].isEmpty() || collName[1].isEmpty()) {
-                throw new ClientError("Cannot parse collection name: " + collFqn);
-            }
-
-            final Collection collection;
-            try { collection = db.getCollection(collName[1], collName[0]); }
-            catch (CouchbaseLiteException e) {
-                throw new CblApiFailure("Failed retrieving collection: " + collFqn, e);
-            }
-            collections.add(collection);
+            collections.add(dbSvc.getCollection(db, collFqn));
         }
 
         return collections;

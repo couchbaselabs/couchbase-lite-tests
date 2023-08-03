@@ -95,9 +95,19 @@ public class TypedMap extends TypedCollection {
         return (val == null) ? null : new TypedMap(val);
     }
 
+    // Bypass the whole typing mechanism
+    @Nullable
+    public Object getObject(@NonNull String key) { return args.get(key); }
+
     @Nullable
     public <T> T get(@NonNull String key, @NonNull Class<T> expectedType) {
         return checkType(expectedType, args.get(key));
+    }
+
+    @Nullable
+    public Class<?> getType(@NonNull String key) {
+        final Object val = args.get(key);
+        return (val == null) ? null : val.getClass();
     }
 
     public void put(@NonNull String key, @Nullable Object val) { args.put(key, val); }

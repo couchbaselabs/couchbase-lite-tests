@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.json;
+package com.couchbase.lite.mobiletest.orts;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;

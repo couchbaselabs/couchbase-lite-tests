@@ -29,8 +29,8 @@ import com.couchbase.lite.ReplicatorStatus;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.ClientError;
-import com.couchbase.lite.mobiletest.factories.ReplicatorConfigBuilder;
-import com.couchbase.lite.mobiletest.factories.ReplicatorStatusBuilder;
+import com.couchbase.lite.mobiletest.tools.ReplicatorConfigBuilder;
+import com.couchbase.lite.mobiletest.tools.ReplicatorStatusBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
@@ -52,7 +52,9 @@ public class ReplicatorService {
         }
     }
 
-    public void init(TypedMap req, Memory mem) { }
+     public void init(TypedMap req, Memory mem) {
+        // There is just nothing to do here, at this point.
+    }
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @NonNull

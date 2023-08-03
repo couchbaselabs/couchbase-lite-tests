@@ -16,6 +16,7 @@
 package com.couchbase.lite.mobiletest.services;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,7 +26,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
@@ -33,6 +33,8 @@ import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.DatabaseConfiguration;
+import com.couchbase.lite.Document;
+import com.couchbase.lite.MutableDocument;
 import com.couchbase.lite.internal.core.C4Database;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.TestApp;
@@ -41,8 +43,10 @@ import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
-import com.couchbase.lite.mobiletest.factories.CollectionDocsBuilder;
-import com.couchbase.lite.mobiletest.factories.CollectionsBuilder;
+import com.couchbase.lite.mobiletest.tools.CollectionDocsBuilder;
+import com.couchbase.lite.mobiletest.tools.CollectionsBuilder;
+import com.couchbase.lite.mobiletest.tools.DocPruner;
+import com.couchbase.lite.mobiletest.tools.DocUpdater;
 import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.StringUtils;
@@ -60,6 +64,12 @@ public final class DatabaseService {
     private static final String KEY_DATASETS = "datasets";
     private static final String KEY_DATABASE = "database";
     private static final String KEY_COLLECTIONS = "collections";
+    private static final String KEY_UPDATES = "updates";
+    private static final String KEY_TYPE = "type";
+    private static final String KEY_COLLECTION = "collection";
+    private static final String KEY_DOC_ID = "documentID";
+    private static final String KEY_UPDATE_PROPS = "updatedProperties";
+    private static final String KEY_REMOVED_PROPS = "removedProperties";
 
     private static final List<String> LEGAL_COLLECTION_KEYS;
     static {
@@ -75,6 +85,28 @@ public final class DatabaseService {
         l.add(KEY_DATASETS);
         LEGAL_DATASET_KEYS = Collections.unmodifiableList(l);
     }
+
+    private static final List<String> LEGAL_UPDATES_KEYS;
+    static {
+        final List<String> l = new ArrayList<>();
+        l.add(KEY_DATABASE);
+        l.add(KEY_UPDATES);
+        LEGAL_UPDATES_KEYS = Collections.unmodifiableList(l);
+    }
+
+    private static final List<String> LEGAL_UPDATE_KEYS;
+    static {
+        final List<String> l = new ArrayList<>();
+        l.add(KEY_TYPE);
+        l.add(KEY_COLLECTION);
+        l.add(KEY_DOC_ID);
+        l.add(KEY_UPDATE_PROPS);
+        l.add(KEY_REMOVED_PROPS);
+        LEGAL_UPDATE_KEYS = Collections.unmodifiableList(l);
+    }
+    // Instance methods
+
+
     public void reset(@NonNull Memory mem) {
         final File dbDir = mem.remove(SYM_DB_DIR, File.class);
         if (dbDir == null) { return; }
@@ -142,18 +174,70 @@ public final class DatabaseService {
         Log.w(TAG, "Attempt to close a database that is not open: " + name);
     }
 
+    @Nullable
+    public Collection getCollection(@NonNull Database db, @NonNull String collectionFullName) {
+        final String[] collName = collectionFullName.split("\\.");
+        if ((collName.length != 2) || collName[0].isEmpty() || collName[1].isEmpty()) {
+            throw new ClientError("Cannot parse collection name: " + collectionFullName);
+        }
+
+        try { return db.getCollection(collName[1], collName[0]); }
+        catch (CouchbaseLiteException e) {
+            throw new CblApiFailure("Failed retrieving collection: " + collectionFullName, e);
+        }
+    }
+
     @NonNull
     public Map<String, Object> getAllDocsV1(@NonNull TypedMap req, @NonNull Memory mem) {
         req.validate(LEGAL_COLLECTION_KEYS);
+        return new CollectionDocsBuilder(
+            new CollectionsBuilder(req.getList(KEY_COLLECTIONS), getNamedDb(req, mem)).build())
+            .build();
+    }
 
-        final String dbName = req.getString(KEY_DATABASE);
-        if (dbName == null) { throw new ClientError("All Docs request doesn't specify a database"); }
-        final Database db = getOpenDb(dbName, mem);
+    @NonNull
+    public Map<String, Object> updateDbV1(@NonNull TypedMap req, @NonNull Memory mem) {
+        req.validate(LEGAL_UPDATES_KEYS);
 
-        final Set<Collection> collections = new CollectionsBuilder(req.getList(KEY_COLLECTIONS), db).build();
-        if (collections == null) { throw new ClientError("All Docs request doesn't specify collections"); }
+        final TypedList updates = req.getList(KEY_UPDATES);
+        if (updates == null) { throw new ClientError("Database update request has no updates"); }
 
-        return new CollectionDocsBuilder(collections).build();
+        final Database db = getNamedDb(req, mem);
+        final int n = updates.size();
+        for (int i = 0; i < n; i++) {
+            final TypedMap update = updates.getMap(i);
+            if (update == null) { throw new ServerError("Null update request"); }
+            update.validate(LEGAL_UPDATE_KEYS);
+
+            final String collectionName = update.getString(KEY_COLLECTION);
+            if (collectionName == null) { throw new ClientError("Database update request is missing collection name"); }
+
+            final Collection collection = getCollection(db, collectionName);
+            if (collection == null) { throw new ClientError("Database update request is missing a document id"); }
+
+            final String id = update.getString(KEY_DOC_ID);
+            if (id == null) { throw new ClientError("Database update request is missing a document id"); }
+
+            final Document doc;
+            try { doc = collection.getDocument(id); }
+            catch (CouchbaseLiteException e) {
+                throw new CblApiFailure("Failed retrieving document: " + id + " from collection " + collectionName, e);
+            }
+            if (doc == null) {
+                throw new ServerError("Failed retrieving document: " + id + " from collection " + collectionName);
+            }
+
+            MutableDocument mDoc = doc.toMutable();
+            final TypedList changes = update.getList(KEY_UPDATE_PROPS);
+            if (changes != null) { mDoc = new DocUpdater(mDoc).update(changes); }
+
+            final TypedList deletions = update.getList(KEY_REMOVED_PROPS);
+            if (deletions != null) { mDoc = new DocPruner(mDoc).prune(deletions); }
+
+            try { collection.save(mDoc); }
+            catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed saving updated document", e); }
+        }
+        return Collections.emptyMap();
     }
 
     // New stream constructors are supported only in API 26+
@@ -227,5 +311,12 @@ public final class DatabaseService {
         }
 
         return false;
+    }
+
+    @NonNull
+    private Database getNamedDb(@NonNull TypedMap req, @NonNull Memory mem) {
+        final String dbName = req.getString(KEY_DATABASE);
+        if (dbName == null) { throw new ClientError("All Docs request doesn't specify a database"); }
+        return getOpenDb(dbName, mem);
     }
 }
