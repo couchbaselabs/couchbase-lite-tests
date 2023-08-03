@@ -52,6 +52,7 @@
 	<ItemGroup>
 		<PackageReference Include="Couchbase.Lite.Enterprise" Version="3.2.0-b0039" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="7.0.0" />
+		<PackageReference Include="sly" Version="2.9.4.7" />
 	</ItemGroup>
 
 </Project>

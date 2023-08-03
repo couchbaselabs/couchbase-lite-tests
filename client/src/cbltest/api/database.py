@@ -52,7 +52,7 @@ class DatabaseUpdater:
         """
         self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id))
 
-    def upsert_document(self, collection: str, id: str, new_properties: Optional[Dict[str, Any]] = None, 
+    def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None, 
                         removed_properties: Optional[List[str]] = None):
         self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties))
 

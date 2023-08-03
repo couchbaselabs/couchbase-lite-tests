@@ -116,7 +116,7 @@ class DatabaseUpdateEntry(JSONSerializable):
     """
     
     def __init__(self, type: DatabaseUpdateType, collection: str, document_id: str,
-                 updated_properties: Optional[Dict[str, Any]] = None, removed_properties: Optional[List[str]] = None) -> None:
+                 updated_properties: Optional[List[Dict[str, Any]]] = None, removed_properties: Optional[List[str]] = None) -> None:
         self.type: DatabaseUpdateEntry = cast(DatabaseUpdateEntry, _assert_not_null(type, nameof(type)))
         """The type of update to be performed"""
 
@@ -126,18 +126,17 @@ class DatabaseUpdateEntry(JSONSerializable):
         self.document_id: str = cast(str, _assert_not_null(document_id, nameof(document_id)))
         """The ID of the document to be modified"""
 
-        self.updated_properties: Optional[Dict[str, Any]] = updated_properties
+        self.updated_properties: Optional[List[Dict[str, Any]]] = updated_properties
         """
         The properties to be updated on a given document. 
         Note that to remove a property, `removed_properties` must be used.
-        The values of the dictionary entries should simply be null.
-        It has no meaning if `type` is not `UPDATE`
+        Each entry in the list is a dictionary with keypath keys and values
+        to be edited.
         """
 
         self.removed_properties: Optional[List[str]] = removed_properties
         """
-        The properties to be removed on a given document. 
-        The values of the dictionary entries should simply be null.
+        The keypaths to be removed on a given document. 
         It has no meaning if `type` is not `UPDATE`
         """
 
@@ -172,9 +171,7 @@ class DatabaseUpdateEntry(JSONSerializable):
             raw["updatedProperties"] = self.updated_properties
 
         if self.removed_properties is not None and len(self.removed_properties) > 0:
-            raw["removedProperties"] = {}
-            for p in self.removed_properties:
-                raw["removedProperties"][p] = None
+            raw["removedProperties"] = self.removed_properties
 
         return raw
     
@@ -182,27 +179,6 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
     """
     The body of a POST /updateDatabase request as specified in version 1 of the 
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
-
-    Example Body::
-
-        {
-            "database": "db1",
-            "updates": [
-                {
-                    "type": "UPDATE",
-                    "collection": "store.cloths",
-                    "documentID": "doc1",
-                    "updatedProperties": {
-                        "name": "Cool Sport Tech Fleece Shirt"
-                    },
-                    "removedProperties": {
-                        "vendor": {
-                        "info": null
-                        }
-                    }
-                }
-            ]
-        }
     """
     
     def __init__(self, database: Optional[str] = None, updates: Optional[List[DatabaseUpdateEntry]] = None):
@@ -224,7 +200,7 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
         raw_entries = []
 
         if self.updates is not None:
-            for e in cast(list, self.updates):
+            for e in cast(List[DatabaseUpdateEntry], self.updates):
                 raw_entry = e.to_json()
                 if raw_entry is None:
                     cbl_warning("Skipping invalid DatabaseUpdateEntry in body serialization!")
