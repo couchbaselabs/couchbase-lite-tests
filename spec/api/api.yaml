@@ -16,6 +16,9 @@ info:
     * Any enum values are case insensitive.
 
     Changes
+
+    0.1.5
+    * Changed /updateDatabase to use keypaths for specifying the changes
     
     0.1.4
     * Fixed required fields and update description in ServerInfo.
@@ -123,8 +126,56 @@ paths:
         - API
       summary: Update documents in the database.
       description: |-
-        Perform document updates in batch. The request body contains an array of DatabaseUpdateItem object which describes how documents are updated, deleted or purged.
-        For updating a document, the changes to the document are specified as delta in updatedProperties and removedProperties key of the DatabaseUpdateItem.
+        Perform document updates in batch. The request body contains an array of DatabaseUpdateItem object which describes 
+        how documents are updated, deleted or purged. For updating a document, the changes to the document are specified 
+        in 'updatedProperties' and 'removedProperties'.
+
+        updatedProperties:
+
+        An array of objects. Each object contains one or more keys that are keypaths into the document to be updated with the 
+        values associated with the keys. The objects in the array are evaluated in their natural order.
+
+        The keypath identifies a unique location in the document's property tree starting from the root that follows 
+        dictionary properties and array elements. The keypath looks like "foo.bar[1].baz" - The keypath components are 
+        separated by dot ('.'). Each path is represented by the key name in a dictionary object, and the index brackets 
+        at the end of the key name points to an array element in an array object. A '\' can be used to escape a special 
+        character ('.', '[', ']', '\' or '$') in the key name.
+
+        The value at the location specified by the keypath is replaced with the value associated with the keypath, in the object 
+        regardless of its type. When a path in the keypath refers to a non-existent property, the key is added and 
+        its value set as a dictionary or an array depending on the type of the path.
+
+        When a path in the keypath includes an array index that is out of bounds (the array is smaller than the specified index), the array 
+        is padded with nulls until it is exactly large enough to make the specified index legal.  
+        
+        When a path (dictionary or array) in the keypath doesn't match the actual value type, the error will be returned. 
+        
+        Examples,
+
+        Document:
+        { 
+          "name", {"first": "John", "last": "Doe"}, 
+          "addresses": [{"city": "San Francisco"}, {"city": "Palo Alto"}]
+        }
+
+        updatedProperties:
+
+        name.last = "Tiger" ->  {"name", {"first": "John", "last": "Tiger"}, ...}
+        name.middle = "Sky" ->  {"name", {"first": "John", "middle": "sky", "last": "Tiger"}, ...}
+        name = "John Doe" -> {"name", "John Doe"}
+
+        name.first.value = "John" ->  Error as the value of "first" is not the dictionary
+
+        addresses[0].city = "Santa Clara" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}], ...}
+        addresses[4].city = "San Mateo" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}, null, {"city": "San Mateo"}], ...}
+        phones[1] = "650-123-4567" -> {"phones": [null, "650-123-4567"]}
+        
+        removedProperties:
+
+        An array of the keypaths which refer to ditionary keys or array elements to be removed. If a keypath refer to a non-existent
+        property or array element, the remove for the keypath will be no-ops. When removing multiple items in an array, the order of the array indexes 
+        should be from high to low to avoid index mutation during the removal.
+
       operationId: updateDatabase
       requestBody:
         description: |-
@@ -364,13 +415,19 @@ components:
           type: string
           example: 'doc1'
         updatedProperties:
-          type: object
-          additionalProperties: { }
-          example: {'name': 'Cool Sport Tech Fleece Shirt'}
+          type: array
+          items:
+            type: object
+            additionalProperties: { }
+            example: [
+              {'people[47].address': {'street': 'Oak St. ', 'city': 'Auburn'} },
+              {'people[3].address': {'street': 'Elm St. ', 'city': 'Sibley'} }
+            ]
         removedProperties:
-          type: object
-          additionalProperties: { }
-          example: {'vendor': {'info': null}}
+          type: array
+          items:
+            type: string
+            example: [ 'people[22].address', 'people[3]' ]
     Error:
       type: object
       required: ['domain', 'code']
