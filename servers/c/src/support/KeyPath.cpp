@@ -70,7 +70,7 @@ static pair<Path, size_t> parseArrayIndex(const string &keyPath, size_t startInd
 
 vector<Path> ts_support::keypath::parseKeyPath(const string &keyPath) {
     if (keyPath.length() == 0) {
-        throw KeyPathError(keyPath, "Empty key path");
+        throw runtime_error("Empty key path is not allowed");
     }
 
     vector<Path> paths;
@@ -78,18 +78,21 @@ vector<Path> ts_support::keypath::parseKeyPath(const string &keyPath) {
     while (i < keyPath.length()) {
         char ch = keyPath[i];
         if (i == 0) {
-            if (ch == '$') { // Special '$.' prefix which indicates the beginning of the key path
-                i++; // Skip '$'
-                if (i < keyPath.length()) {
-                    ch = keyPath[i];
+            // Do not allow the key path to start with $ unless it is used with '.' or being escaped.
+            // Do not allow the key path to start with '.' or ']' unless it is being escaped.
+            if (ch == '$') {
+                if (i < (keyPath.length() - 1) && keyPath[i + 1] == '.') {
+                    ch = keyPath[++i]; // Skip '$'
+                } else {
+                    throw runtime_error("The prefix '$' is not followed by '.'");
                 }
-                if (ch != '.') {
-                    throw KeyPathError(keyPath, "Prefix '$' is not followed by '.'");
-                }
+            } else if (ch == '.' || ch == ']') {
+                throw runtime_error("A special character '" + string(1, ch) +
+                                    "' is not allowed to use at index " + to_string(i));
             }
         }
 
-        if (ch == '.' || i == 0) {
+        if (ch == '.' || (i == 0 && ch != '[')) {
             auto result = parseDictKey(keyPath, (ch == '.' ? i + 1 : i));
             paths.push_back(result.first);
             i = result.second + 1;
@@ -98,7 +101,7 @@ vector<Path> ts_support::keypath::parseKeyPath(const string &keyPath) {
             paths.push_back(result.first);
             i = result.second + 1;
         } else {
-            throw KeyPathError(keyPath, "Illegal character found at index " + to_string(i));
+            throw runtime_error("A character '" + string(1, ch) + "' is not allowed to use at index " + to_string(i));
         }
     }
     return paths;
