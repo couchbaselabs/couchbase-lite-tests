@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
@@ -31,14 +32,14 @@ internal static partial class HandlerList
 
         public required string documentID { get; init; }
 
-        public JsonElement? updatedProperties { get; init; }
+        public IReadOnlyList<IReadOnlyDictionary<string, object>>? updatedProperties { get; init; }
 
-        public JsonElement? removedProperties { get; init; }
+        public IReadOnlyList<string>? removedProperties { get; init; }
 
         [JsonConstructor]
-        public UpdateDatabaseEntry(string type, string collection, string documentID, 
-            JsonElement? updatedProperties = null,
-            JsonElement? removedProperties = null)
+        public UpdateDatabaseEntry(string type, string collection, string documentID,
+            IReadOnlyList<IReadOnlyDictionary<string, object>>? updatedProperties = null,
+            IReadOnlyList<string>? removedProperties = null)
         {
             if(type.ToUpperInvariant() == "UPDATE") {
                 Type = UpdateDatabaseType.Update;
@@ -82,44 +83,19 @@ internal static partial class HandlerList
         return db.CreateCollection(collSpec.name, collSpec.scope);
     }
 
-    private static void UpdateDictionaryProperties(IMutableDictionary dict, JsonElement delta)
+    private static void UpdateDictionaryProperties(IMutableDictionary dict, IReadOnlyList<IReadOnlyDictionary<string, object>> updates)
     {
-        if(delta.ValueKind != JsonValueKind.Object) {
-            throw new InvalidOperationException("UpdateDictionaryProperties called with a non-object delta");
-        }
-
-        foreach(var deltaEntry in delta.EnumerateObject()) {
-            if(deltaEntry.Value.ValueKind == JsonValueKind.Object) {
-                var existingDict = dict.GetDictionary(deltaEntry.Name);
-                if(existingDict == null) {
-                    existingDict = new MutableDictionaryObject();
-                    dict.SetDictionary(deltaEntry.Name, existingDict);
-                }
-
-                UpdateDictionaryProperties(existingDict, deltaEntry.Value);
-            } else {
-                dict.SetValue(deltaEntry.Name, deltaEntry.Value.ToDocumentObject());
+        foreach (var update in updates) {
+            foreach(var prop in update) {
+                KeyPathParser.Update(dict, prop.Key.TrimStart('.', '$'), prop.Value);
             }
         }
     }
 
-    private static void RemoveDictionaryProperties(IMutableDictionary dict, JsonElement delta)
+    private static void RemoveDictionaryProperties(IMutableDictionary dict, IReadOnlyList<string> props)
     {
-        if (delta.ValueKind != JsonValueKind.Object) {
-            throw new InvalidOperationException("UpdateDictionaryProperties called with a non-object delta");
-        }
-
-        foreach (var deltaEntry in delta.EnumerateObject()) {
-            if (deltaEntry.Value.ValueKind == JsonValueKind.Object) {
-                var existingDict = dict.GetDictionary(deltaEntry.Name);
-                if (existingDict == null) {
-                    return;
-                }
-
-                RemoveDictionaryProperties(existingDict, deltaEntry.Value);
-            } else {
-                dict.Remove(deltaEntry.Name);
-            }
+        foreach(var prop in props) {
+            KeyPathParser.Remove(dict, prop.TrimStart('.', '$'));
         }
     }
 
@@ -136,43 +112,52 @@ internal static partial class HandlerList
             return;
         }
 
-        db.InBatch(() =>
-        {
-            foreach (var entry in updateBody.updates) {
-                using var collection = GetCollection(db, entry.collection);
-                switch (entry.Type) {
-                    case UpdateDatabaseType.Delete: {
-                        using var doc = collection.GetDocument(entry.documentID);
-                        if (doc != null) {
-                            collection.Delete(doc);
-                        }
+        try {
+            db.InBatch(() =>
+            {
+                foreach (var entry in updateBody.updates) {
+                    using var collection = GetCollection(db, entry.collection);
+                    switch (entry.Type) {
+                        case UpdateDatabaseType.Delete: {
+                            using var doc = collection.GetDocument(entry.documentID);
+                            if (doc != null) {
+                                collection.Delete(doc);
+                            }
 
-                        break;
-                    }
-                    case UpdateDatabaseType.Purge: {
-                        using var doc = collection.GetDocument(entry.documentID);
-                        if (doc != null) {
-                            collection.Purge(doc);
+                            break;
                         }
+                        case UpdateDatabaseType.Purge: {
+                            using var doc = collection.GetDocument(entry.documentID);
+                            if (doc != null) {
+                                collection.Purge(doc);
+                            }
 
-                        break;
-                    }
-                    case UpdateDatabaseType.Update: {
-                        using var doc = collection.GetDocument(entry.documentID)?.ToMutable() ?? new MutableDocument(entry.documentID);
-                        if(entry.updatedProperties != null) {
-                            UpdateDictionaryProperties(doc, entry.updatedProperties.Value);
+                            break;
                         }
-                        
-                        if(entry.removedProperties != null) {
-                            RemoveDictionaryProperties(doc, entry.removedProperties.Value);
-                        }
+                        case UpdateDatabaseType.Update: {
+                            using var doc = collection.GetDocument(entry.documentID)?.ToMutable() ?? new MutableDocument(entry.documentID);
+                            if (entry.updatedProperties != null) {
+                                UpdateDictionaryProperties(doc, entry.updatedProperties);
+                            }
 
-                        collection.Save(doc);
-                        break;
+                            if (entry.removedProperties != null) {
+                                RemoveDictionaryProperties(doc, entry.removedProperties);
+                            }
+
+                            collection.Save(doc);
+                            break;
+                        }
                     }
                 }
-            }
-        });
+            });
+        } catch(KeyPathException e) {
+            response.WriteBody(new ErrorReturnBody
+            {
+                domain = 0,
+                code = 1,
+                message = e.Message
+            }, version, HttpStatusCode.BadRequest);
+        }
 
         response.WriteEmptyBody(version);
     }

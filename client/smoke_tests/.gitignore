@@ -1,0 +1,4 @@
+testserver.log
+http_log
+.pytest_cache
+__pycache__

@@ -67,8 +67,8 @@ class TestBasicReplication:
         async with db.batch_updater() as b:
             b.delete_document("travel.hotels", "hotel_1")
             b.delete_document("travel.hotels", "hotel_2")
-            b.upsert_document("travel.airports", "test_airport_1", {"name": "Bob"})
-            b.upsert_document("travel.airports", "test_airport_2", {"name": "Bill"})
+            b.upsert_document("travel.airports", "test_airport_1", [{"name": "Bob"}])
+            b.upsert_document("travel.airports", "test_airport_2", [{"name": "Bill"}])
             b.upsert_document("travel.airlines", "airline_1", removed_properties=["country"])
             b.upsert_document("travel.airlines", "airline_2", removed_properties=["country"])
 
