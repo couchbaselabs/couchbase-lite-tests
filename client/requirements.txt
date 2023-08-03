@@ -2,3 +2,4 @@ aiohttp
 varname
 opentelemetry-api
 couchbase
+typing_extensions; python_version < '3.10'
