@@ -3,7 +3,7 @@
 #include "CBLHeader.h"
 #include CBL_HEADER(CBLBase.h)
 
-#include <exception>
+#include <stdexcept>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <sstream>
@@ -27,9 +27,6 @@ namespace ts_support::exception {
     class RequestError : public std::logic_error {
     public:
         explicit RequestError(const std::string &s) : logic_error(s) {}
-
-    private:
-        std::string _what;
     };
 }
 

@@ -25,6 +25,7 @@ set(SOURCE_FILES
         src/TestServer.cpp
         src/support/Exception.cpp
         src/support/Fleece.cpp
+        src/support/KeyPath.cpp
         src/support/UUID.cpp
         src/support/Zip.cpp)
 
