@@ -1,8 +1,6 @@
 #include "Fleece.h"
 #include "Define.h"
-#include "Defer.h"
-
-#include <vector>
+#include "KeyPath.h"
 
 using namespace std;
 using namespace nlohmann;
@@ -57,37 +55,6 @@ void setSlotValue(FLSlot slot, const json &value) { // NOLINT(misc-no-recursion)
     }
 }
 
-vector<pair<std::string, int>> getKeyPathComponents(FLSlice keyPath) {
-    FLError error{};
-    auto path = FLKeyPath_New(keyPath, &error);
-    if (!path) {
-        throw runtime_error("Invalid key path : " + STR(keyPath));
-    }
-    DEFER { FLKeyPath_Free(path); };
-
-    vector<pair<std::string, int>> components;
-    int i = 0;
-    while (true) {
-        FLSlice key{};
-        int32_t index = -1;
-        if (!FLKeyPath_GetElement(path, i++, &key, &index))
-            break;
-        if (key.buf) {
-            components.emplace_back(STR(key), -1);
-        } else {
-            if (index < 0) {
-                throw runtime_error("Invalid key path, array index < 0 : " + STR(keyPath));
-            }
-            components.emplace_back("", index);
-        }
-    }
-    return components;
-}
-
-bool isDictPath(pair<string, int> &path) {
-    return !path.first.empty();
-}
-
 FLValue getMutableDictValue(FLMutableDict mDict, FLString key) {
     auto dict = FLMutableDict_GetMutableDict(mDict, key);
     if (dict) {
@@ -100,7 +67,7 @@ FLValue getMutableDictValue(FLMutableDict mDict, FLString key) {
     return FLDict_Get(mDict, key);
 }
 
-FLValue getMutableArrayValue(FLMutableArray mArray, int index) {
+FLValue getMutableArrayValue(FLMutableArray mArray, size_t index) {
     auto dict = FLMutableArray_GetMutableDict(mArray, index);
     if (dict) {
         return (FLValue) dict;
@@ -113,29 +80,29 @@ FLValue getMutableArrayValue(FLMutableArray mArray, int index) {
 }
 
 void ts_support::fleece::updateProperties(FLMutableDict props, FLSlice keyPath, const nlohmann::json &value) {
-    auto paths = getKeyPathComponents(keyPath);
+    auto paths = ts_support::keypath::parseKeyPath(STR(keyPath));
 
     int i = 0;
     auto parent = (FLValue) props;
     for (auto &path: paths) {
-        if (isDictPath(path)) { // Dictionary path
+        if (path.key) { // Dict path
             FLMutableDict dict = FLDict_AsMutable(FLValue_AsDict(parent));
             if (!dict) {
                 throw runtime_error("Mismatch type between key path and value (not dict value) : " + STR(keyPath));
             }
 
             // Last path component, set the value:
-            auto key = FLS(path.first);
+            auto key = FLS(path.key.value());
             if (paths.size() == i + 1) {
                 auto slot = FLMutableDict_Set(dict, key);
                 setSlotValue(slot, value);
                 return;
             }
-
+            
             // Look ahead and create a new parent for non-existing path:
             FLValue val = getMutableDictValue(dict, key);
             if (val == nullptr) {
-                if (isDictPath(paths[i + 1])) {
+                if (paths[i + 1].key) {
                     auto newDict = FLMutableDict_New();
                     FLMutableDict_SetDict(dict, key, newDict);
                     FLMutableDict_Release(newDict);
@@ -155,7 +122,7 @@ void ts_support::fleece::updateProperties(FLMutableDict props, FLSlice keyPath, 
             }
 
             // Resize and pad with null if needed:
-            auto index = path.second;
+            auto index = path.index.value();
             bool resize = index >= FLArray_Count(array);
             if (resize) {
                 FLMutableArray_Resize(array, index + 1);
@@ -171,7 +138,7 @@ void ts_support::fleece::updateProperties(FLMutableDict props, FLSlice keyPath, 
             // Look ahead and create a new parent for non-existing path:
             FLValue val = getMutableArrayValue(array, index);
             if (val == nullptr || resize) {
-                if (isDictPath(paths[i + 1])) {
+                if (paths[i + 1].key) { // Dict path
                     auto newDict = FLMutableDict_New();
                     FLMutableArray_SetDict(array, index, newDict);
                     FLMutableDict_Release(newDict);
@@ -190,19 +157,19 @@ void ts_support::fleece::updateProperties(FLMutableDict props, FLSlice keyPath, 
 }
 
 void ts_support::fleece::removeProperties(FLMutableDict props, FLSlice keyPath) {
-    auto paths = getKeyPathComponents(keyPath);
+    auto paths = ts_support::keypath::parseKeyPath(STR(keyPath));
 
     int i = 0;
     auto parent = (FLValue) props;
     for (auto &path: paths) {
-        if (isDictPath(path)) { // Dictionary path
+        if (path.key) { // Dict path
             FLMutableDict dict = FLDict_AsMutable(FLValue_AsDict(parent));
             if (!dict) {
                 throw runtime_error("Mismatch type between key path and value (not dict value) : " + STR(keyPath));
             }
 
             // Get value:
-            auto key = FLS(path.first);
+            auto key = FLS(path.key.value());
             auto val = getMutableDictValue(dict, key);
             if (val == nullptr) {
                 return; // No value for the key
@@ -222,7 +189,7 @@ void ts_support::fleece::removeProperties(FLMutableDict props, FLSlice keyPath) 
                 throw runtime_error("Mismatch type between key path and value (not array value) : " + STR(keyPath));
             }
 
-            auto index = path.second;
+            auto index = path.index.value();
             if (index >= FLArray_Count(array)) {
                 return; // index out of bound
             }
