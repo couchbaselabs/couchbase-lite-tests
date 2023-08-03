@@ -2,7 +2,7 @@ from typing import Dict, Final, List, cast, Optional
 from cbltest.responses import ErrorResponseBody, TestServerResponse
 from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorDocumentEntry, ReplicatorProgress
 
-from cbltest.jsonhelper import _assert_string_entry
+from cbltest.jsonhelper import _assert_string_entry, _get_typed
 
 # Like the requests file, this file also follows the convention that all of the 
 # received responses are classes that end in 'Response'.  However, unlike the
@@ -185,7 +185,7 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
                     "collection": "store.cloths",
                     "documentID": "doc1",
                     "isPush": true,
-                    "flags": 2,
+                    "flags": ["REMOVED"],
                     "error": {
                         "domain": 1,
                         "code": 1,
@@ -235,7 +235,5 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
         self.__activity = ReplicatorActivityLevel[cast(str, body.get(self.__activity_key)).upper()]
         self.__progress = ReplicatorProgress(cast(dict, body.get(self.__progress_key)))
         self.__replicator_error = ErrorResponseBody.create(body.get(self.__replicator_error_key))
-        if self.__documents_key in body:
-            docs = body.get(self.__documents_key)
-            assert isinstance(docs, dict)
-            self.__documents = [ReplicatorDocumentEntry(d) for d in cast(dict, docs)]
+        docs = _get_typed(body, self.__documents_key, List[ReplicatorDocumentEntry])
+        self.__documents = [ReplicatorDocumentEntry(d) for d in docs] if docs is not None else []

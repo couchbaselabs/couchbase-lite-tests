@@ -1,6 +1,20 @@
-from typing import List, cast, Optional
+from typing import Any, List, Type, cast, Optional, TypeVar
+import sys
+
+if sys.version_info >= (3, 11):
+    from typing import (
+        get_args,
+        get_origin
+    )
+else:
+    from typing_extensions import (
+        get_args,
+        get_origin
+    )
 
 from .logging import cbl_warning
+
+T = TypeVar("T")
 
 def _get_string_list(d: dict, key: str) -> Optional[List[str]]:
     if key not in d:
@@ -54,3 +68,31 @@ def _get_str_or_default(d: dict, key: str, default: str) -> str:
         raise ValueError(f"Expecting a string for key {key} but found {ret_val} instead")
     
     return cast(str, ret_val)
+
+def _get_typed(d: dict, key: str, type: Type[T]) ->Optional[T]:
+    if key not in d:
+        return None
+    
+    origin = get_origin(type)
+    if origin is None:
+        origin = type
+    
+    ret_val = d[key]
+    if not isinstance(ret_val, cast(Type, origin)):
+        raise ValueError(f"Expecting {str(type)} for key {key} but found {ret_val} instead")
+    
+    return cast(T, ret_val)
+
+def _get_typed_required(d: dict, key: str, type: Type[T]) -> T:
+    if key not in d:
+        raise ValueError(f"Missing requied key {key} in dictionary!")
+    
+    origin = get_origin(type)
+    if origin is None:
+        origin = type
+        
+    ret_val = d[key]
+    if not isinstance(ret_val, cast(Type, origin)):
+        raise ValueError(f"Expecting {str(type)} for key {key} but found {ret_val} instead")
+    
+    return cast(T, ret_val)

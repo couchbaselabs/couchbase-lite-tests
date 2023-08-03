@@ -90,10 +90,10 @@ namespace TestServer
             return _activeDatabases.TryGetValue(name, out var db) ? db : null;
         }
 
-        public (T, string) RegisterObject<T>(Func<T> generator) where T : class, IDisposable
+        public (T, string) RegisterObject<T>(Func<T> generator, string? id = null) where T : class, IDisposable
         {
             var retVal = generator();
-            var key = Guid.NewGuid().ToString();
+            var key = id ?? Guid.NewGuid().ToString();
             _activeDisposables.Add(key, retVal);
             return (retVal, key);
         }
