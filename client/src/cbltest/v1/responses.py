@@ -2,7 +2,7 @@ from typing import Dict, Final, List, cast, Optional
 from cbltest.responses import ErrorResponseBody, TestServerResponse
 from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorDocumentEntry, ReplicatorProgress
 
-from cbltest.jsonhelper import _assert_string_entry, _get_typed
+from cbltest.jsonhelper import _assert_string_entry, _get_typed, _get_typed_required
 
 # Like the requests file, this file also follows the convention that all of the 
 # received responses are classes that end in 'Response'.  However, unlike the
@@ -130,19 +130,44 @@ class PostVerifyDocumentsResponse(TestServerResponse):
     Example Body::
 
         {
-            "result": true
+            "result": true,
+            "description": "What went wrong if false"
         }
     """
     __result_key: Final[str] = "result"
+    __description_key: Final[str] = "description"
+    __expected_key: Final[str] = "expected"
+    __actual_key: Final[str] = "actual"
 
     @property
     def result(self) -> bool:
-        "Gets the result of the verification"
+        """Gets the result of the verification"""
         return self.__result
+    
+    @property
+    def description(self) -> Optional[str]:
+        """Gets the description of what went wrong if result is false"""
+        return self.__description
+    
+    @property
+    def expected(self) -> Optional[dict]:
+        """Gets the expected document body if the bodies did not match"""
+        return self.__expected
+    
+    @property
+    def actual(self) -> Optional[dict]:
+        """Gets the actual document body if the bodies did not match"""
+        return self.__actual
     
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "verifyDocuments")
-        self.__result = cast(bool, body.get(self.__result_key))
+        if self.__result_key not in body:
+            return
+        
+        self.__result = _get_typed_required(body, self.__result_key, bool)
+        self.__description = _get_typed(body, self.__description_key, str)
+        self.__expected = _get_typed(body, self.__expected_key, dict)
+        self.__actual = _get_typed(body, self.__actual_key, dict)
     
 class PostStartReplicatorResponse(TestServerResponse):
     """
@@ -235,5 +260,5 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
         self.__activity = ReplicatorActivityLevel[cast(str, body.get(self.__activity_key)).upper()]
         self.__progress = ReplicatorProgress(cast(dict, body.get(self.__progress_key)))
         self.__replicator_error = ErrorResponseBody.create(body.get(self.__replicator_error_key))
-        docs = _get_typed(body, self.__documents_key, List[ReplicatorDocumentEntry])
+        docs = _get_typed(body, self.__documents_key, dict)
         self.__documents = [ReplicatorDocumentEntry(d) for d in docs] if docs is not None else []

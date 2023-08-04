@@ -25,7 +25,7 @@ class TestServerRequestType(Enum):
     UPDATE_DB = "PostUpdateDatabaseRequest"
     START_REPLICATOR = "PostStartReplicatorRequest"
     REPLICATOR_STATUS = "PostGetReplicatorStatusRequest"
-    SNAPSHOT_DOCS = "PostSnapshotDocumentRequest"
+    SNAPSHOT_DOCS = "PostSnapshotDocumentsRequest"
     VERIFY_DOCS = "PostVerifyDocumentsRequest"
 
     def __str__(self) -> str:

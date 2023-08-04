@@ -253,11 +253,6 @@ namespace TestServer.Utilities
                         }
 
                         var nextNode = PathNode.Create(array.GetValue(currentIndex), currentIndex);
-                        if (nextNode.Type == PathNodeType.Scalar) {
-                            // This array contains a scalar at the requested position, but the keypath is not terminated yet
-                            throw new KeyPathException($"Scalar found inside of array at position {currentIndex}", token);
-                        }
-
                         currentIndex = -1;
                         pathStack.Push(nextNode);
                         break;
@@ -306,11 +301,6 @@ namespace TestServer.Utilities
                         current = BackfillDictIfNeeded(pathStack, current);
                         var dict = current.Dict;
                         var nextNode = PathNode.Create(dict.GetValue(currentKey), currentKey);
-                        if (nextNode.Type == PathNodeType.Scalar) {
-                            // This dictionary contains a scalar at the requested key, but the keypath is not terminated yet
-                            throw new KeyPathException($"Scalar found inside of dictionary for key '{currentKey}'", token);
-                        }
-
                         pathStack.Push(nextNode);
                         currentKey = "";
                         break;
@@ -332,15 +322,13 @@ namespace TestServer.Utilities
                         if(currentKey.Length > 0) {
                             // This needs to be finished now since there is no final dot
                             current = BackfillDictIfNeeded(pathStack, current);
-                        } else if(current.Type == PathNodeType.Missing || current.Type == PathNodeType.Array) {
+                        } else {
                             // Because arrays always have an explicit termination character, 
                             // the complete information is always on the stack.  Unwind it
                             // a bit so the next logic can be consistent with dict
                             currentIndex = current.ParentIndex;
                             pathStack.Pop();
                             current = pathStack.Peek();
-                        } else {
-                            throw new ApplicationException("Ended up in an uncertain state about whether the end of the keypath is a dict or array");
                         }
                       
                         if (current.Type == PathNodeType.Dict) {
@@ -408,7 +396,7 @@ namespace TestServer.Utilities
                         }
 
                         var nextNode = PathNode.Create(array.GetValue(currentIndex), currentIndex);
-                        if (nextNode.Type == PathNodeType.Scalar || nextNode.Type == PathNodeType.Missing) {
+                        if (nextNode.Type == PathNodeType.Missing) {
                             // This path does not contain a container
                             return;
                         }
@@ -446,7 +434,7 @@ namespace TestServer.Utilities
 
                         var dict = current.Dict;
                         var nextNode = PathNode.Create(dict.GetValue(currentKey), currentKey);
-                        if (nextNode.Type == PathNodeType.Scalar || nextNode.Type == PathNodeType.Missing) {
+                        if (nextNode.Type == PathNodeType.Missing) {
                             // This path does not contain a container
                             return;
                         }

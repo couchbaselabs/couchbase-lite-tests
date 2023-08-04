@@ -4,10 +4,39 @@ from json import dumps
 from typing import Dict, List, cast, Any, Optional
 
 from cbltest.requests import TestServerRequestType, TestServerRequest
-from cbltest.v1.responses import PostGetAllDocumentsResponse, PostGetAllDocumentsEntry
-from cbltest.v1.requests import DatabaseUpdateEntry, DatabaseUpdateType, PostGetAllDocumentsRequestBody, PostUpdateDatabaseRequestBody
+from cbltest.v1.responses import PostGetAllDocumentsResponse, PostGetAllDocumentsEntry, PostSnapshotDocumentsResponse, PostVerifyDocumentsResponse
+from cbltest.v1.requests import (DatabaseUpdateEntry, DatabaseUpdateType, PostGetAllDocumentsRequestBody, 
+                                 PostUpdateDatabaseRequestBody, SnapshotDocumentEntry, PostSnapshotDocumentsRequestBody,
+                                 PostVerifyDocumentsRequestBody)
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory
+
+class SnapshotUpdater:
+    def __init__(self, id: str):
+        self._id = id
+        self._updates: List[DatabaseUpdateEntry] = []
+
+    def delete_document(self, collection: str, id: str):
+        """
+        Adds a delete document operation to be performed
+
+        :param collection: The collection to which the document belongs (scope-qualified)
+        :param id: The ID of the document to delete
+        """
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id))
+
+    def purge_document(self, collection: str, id: str):
+        """
+        Adds a purge document operation to be performed
+
+        :param collection: The collection to which the document belongs (scope-qualified)
+        :param id: The ID of the document to purge
+        """
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id))
+
+    def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None, 
+                        removed_properties: Optional[List[str]] = None):
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties))
 
 class DatabaseUpdater:
     """
@@ -117,6 +146,38 @@ class AllDocumentsMap:
         for c in response.collection_keys:
             self.__collections.append(AllDocumentsCollection(c, response.documents_for_collection(c)))
 
+class Snapshot:
+    @property
+    def id(self) -> str:
+        return self.__id
+
+    def __init__(self, id: str) -> None:
+        self.__id = id
+
+class VerifyResult:
+    @property
+    def result(self) -> bool:
+        """Gets the result of the verification"""
+        return self.__response.result
+    
+    @property
+    def description(self) -> Optional[str]:
+        """Gets the description of what went wrong if result is false"""
+        return self.__response.description
+    
+    @property
+    def expected(self) -> Optional[dict]:
+        """Gets the expected document body if the bodies did not match"""
+        return self.__response.expected
+    
+    @property
+    def actual(self) -> Optional[dict]:
+        """Gets the actual document body if the bodies did not match"""
+        return self.__response.actual
+    
+    def __init__(self, rest_response: PostVerifyDocumentsResponse) -> None:
+        self.__response = rest_response
+
 class Database:
     """
     A class for interacting with a Couchbase Lite database inside of a test server.
@@ -157,3 +218,27 @@ class Database:
         req = self.__request_factory.create_request(TestServerRequestType.ALL_DOC_IDS, payload)
         resp = await self.__request_factory.send_request(self.__index, req)
         return AllDocumentsMap(cast(PostGetAllDocumentsResponse, resp))
+    
+    async def create_snapshot(self, documents: List[SnapshotDocumentEntry]) -> str:
+        """
+        Creates a snapshot on the database to use for later verification
+
+        :param documents: A list of documents to include in the snapshot
+        """
+        payload = PostSnapshotDocumentsRequestBody(self.__name, documents)
+        req = self.__request_factory.create_request(TestServerRequestType.SNAPSHOT_DOCS, payload)
+        resp = await self.__request_factory.send_request(self.__index, req)
+        return cast(PostSnapshotDocumentsResponse, resp).snapshot_id
+    
+    async def verify_documents(self, updater: SnapshotUpdater) -> VerifyResult:
+        """
+        Verifies a set of documents in the database by applying changes to a snapshot
+        and checking that the on disk results match
+
+        :param snapshot: The snapshot ID to use as a base
+        :param changes: The changes to apply to the snapshot first
+        """
+        payload = PostVerifyDocumentsRequestBody(self.__name, updater._id, updater._updates)
+        req = self.__request_factory.create_request(TestServerRequestType.VERIFY_DOCS, payload)
+        resp = await self.__request_factory.send_request(self.__index, req)
+        return VerifyResult(cast(PostVerifyDocumentsResponse, resp))
