@@ -5,10 +5,15 @@
 #include CBL_HEADER(CBLLog.h)
 
 #include <chrono>
+#include <stdexcept>
 #include <iostream>
 
 #ifdef __ANDROID__
 #include <android/log.h>
+#endif
+
+#ifdef _MSC_VER
+#include "asprintf.h"
 #endif
 
 using namespace date;
@@ -82,8 +87,10 @@ static std::chrono::seconds GetLocalTZOffset(struct tm *localtime) {
     // as seconds WEST of GMT (so UTC-8 would be 28,800, not -28,800)
 #ifdef WIN32
     long s;
-        throwIf(_get_timezone(&s) != 0, fleece::InternalError, "Unable to query local system time zone");
-        auto offset = seconds(-s);
+    if (_get_timezone(&s) != 0) {
+        throw runtime_error("Unable to query local system time zone");
+    }
+    auto offset = seconds(-s);
 #elif defined(__DARWIN_UNIX03) || defined(__ANDROID__) || defined(_XOPEN_SOURCE) || defined(_SVID_SOURCE)
     auto offset = seconds(-timezone);
 #else

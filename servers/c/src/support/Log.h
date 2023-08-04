@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Define.h"
+
 #include <cstdint>
 
 namespace ts_support::logger {

@@ -267,7 +267,7 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
                                                                            unsigned numDocuments,
                                                                            const CBLReplicatedDocument *documents) {
             vector<ReplicatedDocument> docs{};
-            for (int i = 0; i < numDocuments; i++) {
+            for (unsigned i = 0; i < numDocuments; i++) {
                 ReplicatedDocument doc{};
                 doc.isPush = isPush;
                 doc.collection = CollectionSpec(STR(documents[i].scope), STR(documents[i].collection)).fullName();

@@ -66,6 +66,15 @@ target_compile_definitions(
 )
 
 if(MSVC)
+    target_include_directories(
+            testserver PRIVATE
+            src/msvc
+    )
+    target_sources(
+            testserver PRIVATE
+            src/msvc/asprintf.c
+            src/msvc/vasprintf-msvc.c
+    )
     target_link_libraries(
             testserver PRIVATE
             zlibstatic
