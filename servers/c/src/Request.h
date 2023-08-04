@@ -20,6 +20,8 @@ public:
 
     [[nodiscard]] std::string path() const { return _path; }
 
+    [[nodiscard]] std::string name() const { return _method + " " + _path; }
+
     [[nodiscard]] int version() const;
 
     [[nodiscard]] std::string clientID() const;

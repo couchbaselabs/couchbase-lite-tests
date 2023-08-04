@@ -22,9 +22,7 @@ using namespace ts_support::exception;
 CBLManager::CBLManager(string databaseDir, string assetDir) {
     _databaseDir = std::move(databaseDir);
     _assetDir = std::move(assetDir);
-
-    // TODO: Enable console log
-    // CBLLog_SetConsoleLevel(kCBLLogInfo);
+//    logger::init(logger::LogLevel::info);
 }
 
 void CBLManager::reset() {
@@ -269,7 +267,7 @@ std::string CBLManager::startReplicator(const ReplicatorParams &params, bool res
                                                                            unsigned numDocuments,
                                                                            const CBLReplicatedDocument *documents) {
             vector<ReplicatedDocument> docs{};
-            for (int i = 0; i < numDocuments; i++) {
+            for (unsigned i = 0; i < numDocuments; i++) {
                 ReplicatedDocument doc{};
                 doc.isPush = isPush;
                 doc.collection = CollectionSpec(STR(documents[i].scope), STR(documents[i].collection)).fullName();
