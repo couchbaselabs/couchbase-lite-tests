@@ -29,31 +29,34 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 
 
-public class CollectionsBuilder {
-    @Nullable
+// Consider some way of closeing these at the end of a request.
+public class CollectionsBuilder implements AutoCloseable {
+    @NonNull
     private final TypedList collFqns;
     @NonNull
     private final Database db;
     @NonNull
     private final DatabaseService dbSvc;
+    @NonNull
+    private final Set<Collection> collections = new HashSet<>();
 
     public CollectionsBuilder(@Nullable TypedList collFqns, @NonNull Database db) {
+        if (collFqns == null) { throw new ClientError("Replication collection doesn't specify collection names"); }
         this.collFqns = collFqns;
         this.db = db;
         this.dbSvc = TestApp.getApp().getDbSvc();
     }
 
-    @NonNull
-    public Set<Collection> build() {
-        if (collFqns == null) { throw new ClientError("Replication collection doesn't specify collection names"); }
+    public void close() { for (Collection collection: collections) { collection.close(); } }
 
-        final Set<Collection> collections = new HashSet<>();
-        for (int j = 0; j < collFqns.size(); j++) {
-            final String collFqn = collFqns.getString(j);
-            if (collFqn == null) { throw new ClientError("Empty collection name (" + j + ")"); }
-            collections.add(dbSvc.getCollection(db, collFqn));
+    public Set<Collection> getCollections() {
+        if (collections.isEmpty()) {
+            for (int j = 0; j < collFqns.size(); j++) {
+                final String collFqn = collFqns.getString(j);
+                if (collFqn == null) { throw new ClientError("Empty collection name (" + j + ")"); }
+                collections.add(dbSvc.getCollection(db, collFqn));
+            }
         }
-
-        return collections;
+        return new HashSet<>(collections);
     }
 }
