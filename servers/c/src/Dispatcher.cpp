@@ -2,11 +2,13 @@
 #include "Request.h"
 #include "TestServer.h"
 #include "support/Exception.h"
+#include "support/Log.h"
 
 #include <nlohmann/json.hpp>
 
 using namespace nlohmann;
 using namespace std;
+using namespace ts_support::logger;
 using namespace ts_support::exception;
 
 #define HANDLER(h) [this](Request& request) -> int { return h(request); }
@@ -29,6 +31,7 @@ Dispatcher::Dispatcher(const TestServer *testServer) {
 int Dispatcher::handle(mg_connection *conn) const {
     Request request = Request(conn, _testServer);
     try {
+        log(LogLevel::info, "Request %s", request.name().c_str());
         if (request.path() != "/") {
             if (request.version() != TestServer::API_VERSION) {
                 return request.respondWithServerError("API Version Mismatched or Missing");
@@ -49,7 +52,7 @@ int Dispatcher::handle(mg_connection *conn) const {
         return request.respondWithRequestError(e.what());
     } catch (const json::exception &e) {
         return request.respondWithRequestError(e.what());
-    } catch (const exception &e) {
+    } catch (const std::exception &e) {
         return request.respondWithServerError(e.what());
     }
 }

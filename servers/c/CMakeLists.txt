@@ -26,6 +26,7 @@ set(SOURCE_FILES
         src/support/Exception.cpp
         src/support/Fleece.cpp
         src/support/KeyPath.cpp
+        src/support/Log.cpp
         src/support/UUID.cpp
         src/support/Zip.cpp)
 

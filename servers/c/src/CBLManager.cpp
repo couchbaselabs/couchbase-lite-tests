@@ -22,9 +22,7 @@ using namespace ts_support::exception;
 CBLManager::CBLManager(string databaseDir, string assetDir) {
     _databaseDir = std::move(databaseDir);
     _assetDir = std::move(assetDir);
-
-    // TODO: Enable console log
-    // CBLLog_SetConsoleLevel(kCBLLogInfo);
+//    logger::init(logger::LogLevel::info);
 }
 
 void CBLManager::reset() {
