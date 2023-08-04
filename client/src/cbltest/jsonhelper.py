@@ -39,7 +39,7 @@ def _assert_contains_string_list(d: dict, key: str) -> List[str]:
 
 def _assert_string_entry(d: dict, key: str) -> str:
     if key not in d:
-        raise ValueError(f"Missing requied key {key} in dictionary!")
+        raise ValueError(f"Missing required key {key} in dictionary!")
     
     ret_val = d[key]
     if not isinstance(ret_val, str):
@@ -85,7 +85,7 @@ def _get_typed(d: dict, key: str, type: Type[T]) ->Optional[T]:
 
 def _get_typed_required(d: dict, key: str, type: Type[T]) -> T:
     if key not in d:
-        raise ValueError(f"Missing requied key {key} in dictionary!")
+        raise ValueError(f"Missing required key {key} in dictionary!")
     
     origin = get_origin(type)
     if origin is None:

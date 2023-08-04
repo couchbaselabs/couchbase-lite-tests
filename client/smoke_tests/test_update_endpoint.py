@@ -80,9 +80,12 @@ class TestUpdateDatabase:
             
             # Add a key with a nested key inside to an existing dictionary
             "name.other_secret.super_secret", 
+
+            # Replace an element in an array
+            "contact.email[0]",
             
             # Replace dictionary with scalar
-            "contact"
+            "contact",
             
             # Replace array with scalar
             "likes"]

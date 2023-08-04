@@ -47,20 +47,14 @@ namespace TestServer.Utilities
         public static PathNode Create(object? input, string parentKey)
         {
             var retVal = CreateInternal(input);
-            if (retVal.Type == PathNodeType.Dict || retVal.Type == PathNodeType.Missing) {
-                retVal._parentKey = parentKey;
-            }
-
+            retVal._parentKey = parentKey;
             return retVal;
         }
 
         public static PathNode Create(object? input, int parentIndex)
         {
             var retVal = CreateInternal(input);
-            if (retVal.Type == PathNodeType.Array || retVal.Type == PathNodeType.Missing) {
-                retVal._parentIndex = parentIndex;
-            }
-
+            retVal._parentIndex = parentIndex;
             return retVal;
         }
 

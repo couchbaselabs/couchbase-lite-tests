@@ -8,6 +8,7 @@ from cbltest.logging import cbl_warning
 from cbltest.requests import TestServerRequest, TestServerRequestBody
 from cbltest.assertions import _assert_not_null
 from cbltest.api.replicator_types import ReplicatorAuthenticator, ReplicatorCollectionEntry, ReplicatorType
+from cbltest.api.database_types import SnapshotDocumentEntry
 from cbltest.api.jsonserializable import JSONSerializable
 
 # Some conventions that are followed in this file are that all request classes that
@@ -211,21 +212,6 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
         raw["updates"] = raw_entries
         return raw
     
-class SnapshotDocumentEntry(JSONSerializable):
-    """
-    A class for recording the fully qualified name of a document to be saved in a snapshot.
-    This class is used in conjunction with :class:`PostSnapshotDocumentsRequestBody`
-    """
-    def __init__(self, collection: str, id: str):
-        self.collection: str = collection
-        """The collection that the snapshotted document belongs to"""
-
-        self.id: str = id
-        """The ID of the snapshotted document"""
-
-    def to_json(self) -> Any:
-        return {"collection": self.collection, "id": self.id}
-    
 class PostSnapshotDocumentsRequestBody(TestServerRequestBody):
     """
     The body of a POST /snapshotDocuments request as specified in version 1 of the 
@@ -233,13 +219,19 @@ class PostSnapshotDocumentsRequestBody(TestServerRequestBody):
 
     Example Body::
 
-        [
+        database: "db1",
+        documents: [
             {
                 "collection": "store.cloths",
                 "id": "doc1"
             }
         ]
     """
+
+    @property
+    def database(self) -> str:
+        """Gets the database that this snapshot will be taken from"""
+        return self.__database
 
     def entries(self) -> List[SnapshotDocumentEntry]:
         """
@@ -248,12 +240,16 @@ class PostSnapshotDocumentsRequestBody(TestServerRequestBody):
         """
         return self.__entries
     
-    def __init__(self, entries: Optional[List[SnapshotDocumentEntry]] = None):
+    def __init__(self, database: str, entries: Optional[List[SnapshotDocumentEntry]] = None):
         super().__init__(1)
+        self.__database = database
         self.__entries = entries if entries is not None else []
 
     def to_json(self) -> Any:
-        return [e.to_json() for e in self.__entries]
+        return {
+            "database": self.__database,
+            "documents": [e.to_json() for e in self.__entries]
+        }
 
 class PostVerifyDocumentsRequestBody(TestServerRequestBody):
     """
@@ -349,7 +345,8 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
                     "type": "BASIC",
                     "username": "user1",
                     "password": "p@ssw0rd"
-                }
+                },
+                "enableDocumentListener": false
             },
             "reset": false
         }
@@ -384,6 +381,9 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
 
         self.collections: List[ReplicatorCollectionEntry] = []
         """The per-collection configuration to use inside the replication"""
+
+        self.enableDocumentListener: bool = False
+        """If set to True, calls to getReplicatorStatus will return a list of document events"""
 
     def to_json(self) -> Any:
         """Serializes the :class:`PostStartReplicatorRequestBody` to a JSON string"""
