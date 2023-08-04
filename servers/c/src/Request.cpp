@@ -1,10 +1,13 @@
 #include "Request.h"
 #include "TestServer.h"
+#include "support/Log.h"
+
 #include <civetweb.h>
 #include <sstream>
 
 using namespace nlohmann;
 using namespace std;
+using namespace ts_support::logger;
 using namespace ts_support::exception;
 
 constexpr const int kSuccessStatusCode = 200;
@@ -42,7 +45,7 @@ const nlohmann::json &Request::jsonBody() {
             if (s.tellp() >= 2) {
                 s >> _jsonBody;
             }
-        } catch (const exception &e) {
+        } catch (const std::exception &e) {
             string message = string("Invalid JSON in request body : ") + e.what();
             throw RequestError(message);
         }
@@ -103,6 +106,17 @@ int Request::respond(int status, const optional<string> &json) const {
     mg_response_header_send(_conn);
     if (json) {
         mg_write(_conn, json->c_str(), json->size());
+    }
+
+    if (status == kSuccessStatusCode) {
+        log(LogLevel::info, "Response %s : OK (%d)", name().c_str(), status);
+    } else {
+        if (json) {
+            log(LogLevel::info, "Response %s : Error (%d) : %s", name().c_str(), status,
+                json->c_str());
+        } else {
+            log(LogLevel::info, "Response %s : Error (%d)", name().c_str(), status);
+        }
     }
     return status;
 }

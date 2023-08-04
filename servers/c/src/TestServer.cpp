@@ -11,7 +11,6 @@
 #include "support/UUID.h"
 
 using namespace std;
-using namespace ts_support;
 using namespace ts_support::exception;
 using namespace ts_support::files;
 

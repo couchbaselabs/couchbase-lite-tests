@@ -26,6 +26,7 @@ set(SOURCE_FILES
         src/support/Exception.cpp
         src/support/Fleece.cpp
         src/support/KeyPath.cpp
+        src/support/Log.cpp
         src/support/UUID.cpp
         src/support/Zip.cpp)
 
@@ -65,6 +66,15 @@ target_compile_definitions(
 )
 
 if(MSVC)
+    target_include_directories(
+            testserver PRIVATE
+            src/msvc
+    )
+    target_sources(
+            testserver PRIVATE
+            src/msvc/asprintf.c
+            src/msvc/vasprintf-msvc.c
+    )
     target_link_libraries(
             testserver PRIVATE
             zlibstatic
