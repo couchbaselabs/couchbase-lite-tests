@@ -17,6 +17,9 @@ info:
 
     Changes
 
+    0.1.6
+    * Add JSON Path Spec to /updateDatabase
+
     0.1.5
     * Changed /updateDatabase to use keypaths for specifying the changes
     
@@ -27,7 +30,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 0.1.4
+  version: 0.1.6
 tags:
   - name: API
 paths:
@@ -132,7 +135,7 @@ paths:
 
         updatedProperties:
 
-        An array of objects. Each object contains one or more keys that are keypaths into the document to be updated with the 
+        An array of objects. Each object contains one or more keys that are key paths into the document to be updated with the 
         values associated with the keys. The objects in the array are evaluated in their natural order.
 
         The keypath identifies a unique location in the document's property tree starting from the root that follows 
@@ -148,7 +151,7 @@ paths:
         When a path in the keypath includes an array index that is out of bounds (the array is smaller than the specified index), the array 
         is padded with nulls until it is exactly large enough to make the specified index legal.  
         
-        When a path (dictionary or array) in the keypath doesn't match the actual value type, the error will be returned. 
+        When a path (dictionary or array) in the keypath doesn't match the actual value type, the error will be returned.
         
         Examples,
 
@@ -158,7 +161,7 @@ paths:
           "addresses": [{"city": "San Francisco"}, {"city": "Palo Alto"}]
         }
 
-        updatedProperties:
+        Updates:
 
         name.last = "Tiger" ->  {"name", {"first": "John", "last": "Tiger"}, ...}
         name.middle = "Sky" ->  {"name", {"first": "John", "middle": "sky", "last": "Tiger"}, ...}
@@ -172,10 +175,29 @@ paths:
         
         removedProperties:
 
-        An array of the keypaths which refer to ditionary keys or array elements to be removed. If a keypath refer to a non-existent
+        An array of the key paths which refer to ditionary keys or array elements to be removed. If a keypath refer to a non-existent
         property or array element, the remove for the keypath will be no-ops. When removing multiple items in an array, the order of the array indexes 
         should be from high to low to avoid index mutation during the removal.
 
+        keypath Specificition
+
+        keypath  ::= ( [ DOLLAR DOT ] <property> | <index> ) <path>
+ 
+        path     ::= (DOT <property> | <index>)* EOP
+ 
+        index    ::= OBRACKET DIGIT+ CBRACKET
+ 
+        property ::= ANY+
+ 
+        EOP      ::= End of path
+        DOT      ::= '.'
+        DOLLAR   ::= '$'
+        OBRACKET ::= '['
+        CBRACKET ::= ']'
+        DIGIT    ::=  '0' |'1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+        ANY      ::= (! (DOT | OBRACKET | CBRACKET | EOP) ) | ESCAPE
+        ESCAPE   ::= '\' (! EOP )
+        
       operationId: updateDatabase
       requestBody:
         description: |-
