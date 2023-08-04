@@ -154,6 +154,9 @@ class RequestFactory:
     It will be created by :class:`CBLPyTest` using the parsed configuration.  It will log
     every HTTP request and response into a folder called "http_log"
     """
+
+    __first_run: bool = True
+
     @property
     def version(self) -> int:
         """Gets the API version that this factory is using"""
@@ -161,10 +164,13 @@ class RequestFactory:
     
     def __init__(self, config: ParsedConfig):
         self.__record_path = Path("http_log")
-        if self.__record_path.exists():
+        if RequestFactory.__first_run and self.__record_path.exists():
             rmtree(self.__record_path)
 
-        self.__record_path.mkdir()
+        RequestFactory.__first_run = False
+
+        if not self.__record_path.exists():
+            self.__record_path.mkdir()
 
         self.__uuid = uuid4()
         self.__session = ClientSession()
