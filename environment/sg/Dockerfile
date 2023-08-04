@@ -27,6 +27,7 @@ COPY start-sgw.sh /opt/sg
 
 WORKDIR /opt/sg
 
+RUN apt-get update
 RUN apt -yqq install systemctl
 RUN dpkg -i ./couchbase-sync-gateway.deb
 
