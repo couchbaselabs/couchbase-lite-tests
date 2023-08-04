@@ -38,9 +38,12 @@ import com.couchbase.lite.mobiletest.data.TypedList;
 import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
+import com.couchbase.lite.mobiletest.util.Log;
 
 
 public class ReplicatorConfigBuilder {
+    private static final String TAG = "REPL_CONFIG";
+
     private static final String KEY_RESET = "reset";
     private static final String KEY_CONFIG = "config";
     private static final String KEY_DB = "database";
@@ -186,6 +189,7 @@ public class ReplicatorConfigBuilder {
             }
         }
 
+        Log.i(TAG, "Build config: " + replConfig);
         return replConfig;
     }
 
@@ -198,8 +202,9 @@ public class ReplicatorConfigBuilder {
             if (replCollection == null) { throw new ClientError("Replication collection spec is null: " + i); }
             replCollection.validate(LEGAL_COLLECTION_KEYS);
 
+            // the collections created here will not get closed explicitly...
             replConfig.addCollections(
-                new CollectionsBuilder(replCollection.getList(KEY_NAMES), db).build(),
+                new CollectionsBuilder(replCollection.getList(KEY_NAMES), db).getCollections(),
                 buildCollectionConfig(replCollection));
         }
     }

@@ -101,11 +101,11 @@ public class FileUtils {
                     if (parent != null) { mkPath(new File(parent)); }
                     try (FileOutputStream fos = new FileOutputStream(newFile)) { copyStream(zis, fos); }
                 }
-                Log.d(TAG, "Unzipped file " + newFile);
                 ze = zis.getNextEntry();
             }
             zis.closeEntry();
         }
+        Log.d(TAG, "Unzipped file " + dest);
     }
 
     private void addFilesList(@NonNull File dir, @NonNull List<String> files) {

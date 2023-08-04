@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.tools.DbUpdater;
 import com.couchbase.lite.mobiletest.tools.ReplyBuilder;
 import com.couchbase.lite.mobiletest.tools.RequestBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
@@ -45,7 +46,7 @@ public final class Dispatcher {
         addTest(1, "/", Method.GET, (r, m) -> app.getSystemInfo());
         addTest(1, "/reset", Method.POST, app::reset);
         addTest(1, "/getAllDocuments", Method.POST, (r, m) -> app.getDbSvc().getAllDocsV1(r, m));
-        addTest(1, "/updateDatabase", Method.POST, (r, m) -> app.getDbSvc().updateDbV1(r, m));
+        addTest(1, "/updateDatabase", Method.POST, (r, m) -> new DbUpdater(app.getDbSvc()).updateDbV1(r, m));
         addTest(1, "/startReplicator", Method.POST, (r, m) -> app.getReplSvc().createReplV1(r, m));
         addTest(1, "/getReplicatorStatus", Method.POST, (r, m) -> app.getReplSvc().getReplStatusV1(r, m));
         addTest(1, "/snapshotDocuments", Method.POST, (r, m) -> Collections.emptyMap());

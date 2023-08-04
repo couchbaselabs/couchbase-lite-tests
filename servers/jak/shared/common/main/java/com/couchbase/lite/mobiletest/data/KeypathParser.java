@@ -18,12 +18,15 @@ package com.couchbase.lite.mobiletest.data;
 import androidx.annotation.NonNull;
 
 import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.util.Log;
 
 
 /**
+ * Grammar:
+ * <p>
  * <p>keypath  ::= ( [ DOLLAR DOT ] &lt;property> | &lt;index> ) &lt;path>
  * <p>
- * <p>path     ::= (DOT &lt;property> | &lt;index>)* EOP
+ * <p>path     ::= ( DOT &lt;property> | &lt;index> )* EOP
  * <p>
  * <p>index    ::= OBRACKET DIGIT+ CBRACKET
  * <p>
@@ -35,7 +38,7 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
  * <p>OBRACKET ::= '['
  * <p>CBRACKET ::= ']'
  * <p>DIGIT    ::=  '0' |'1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
- * <p>ANY      ::= (! (DOT | OBRACKET | CBRACKET | EOP) ) | ESCAPE
+ * <p>ANY      ::= (! ( DOT | OBRACKET | CBRACKET | EOP ) ) | ESCAPE
  * <p>ESCAPE   ::= '\' (! EOP )
  */
 public class KeypathParser {
@@ -48,6 +51,7 @@ public class KeypathParser {
     private String curChar;
     private CharClass curCharClass;
 
+    // definitely not thread safe...
     @NonNull
     public KeyPath parse(@NonNull String keyPath) {
         this.keyPath = keyPath;
