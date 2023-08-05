@@ -19,6 +19,7 @@ info:
 
     0.1.7
     * Fixed missing database in snapshotDocuments request
+    * Added required keys to snapshotDocuments request
     * Add 'description' key to the verifyDocuments response
 
     0.1.6
@@ -354,6 +355,7 @@ paths:
           application/json:
             schema: 
               type: object
+              required: ['database', 'snapshot', 'changes']
               properties:
                 database:
                   type: string
