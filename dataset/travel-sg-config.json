@@ -1,50 +1,50 @@
 {
-    "config": {
-      "bucket": "travel",
-      "scopes": {
-        "travel": {
-          "collections": {
-            "airlines": {
-              "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
-            },
-            "routes": {
-              "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
-            },
-            "airports": {
-              "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
-            },
-            "landmarks": {
-              "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
-            },
-            "hotels": {
-              "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
-            }
+  "config": {
+    "bucket": "travel",
+    "scopes": {
+      "travel": {
+        "collections": {
+          "airlines": {
+            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
+          },
+          "routes": {
+            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
+          },
+          "airports": {
+            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
+          },
+          "landmarks": {
+            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
+          },
+          "hotels": {
+            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
           }
         }
       }
-    },
-    "users": {
-      "user1": {
-        "password": "pass",
-        "collection_access": {
-          "travel": {
-            "airlines": {
-              "admin_channels": ["*"]
-            },
-            "routes": {
-              "admin_channels": ["*"]
-            },
-            "airports": {
-              "admin_channels": ["*"]
-            },
-            "landmarks": {
-              "admin_channels": ["*"]
-            },
-            "hotels": {
-              "admin_channels": ["*"]
-            }
+    }
+  },
+  "users": {
+    "user1": {
+      "password": "pass",
+      "collection_access": {
+        "travel": {
+          "airlines": {
+            "admin_channels": ["*"]
+          },
+          "routes": {
+            "admin_channels": ["*"]
+          },
+          "airports": {
+            "admin_channels": ["*"]
+          },
+          "landmarks": {
+            "admin_channels": ["*"]
+          },
+          "hotels": {
+            "admin_channels": ["*"]
           }
         }
       }
     }
   }
+}
