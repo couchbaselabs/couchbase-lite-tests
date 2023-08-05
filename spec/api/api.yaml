@@ -19,6 +19,7 @@ info:
 
     0.1.7
     * Fixed missing database in snapshotDocuments request
+    * Add 'description' key to the verifyDocuments response
 
     0.1.6
     * Added JSON Path Spec to /updateDatabase
@@ -376,7 +377,11 @@ paths:
                 properties:
                   result: 
                     type: boolean
-                    example: true
+                    example: false
+                  description:
+                    description: 'Additional info describing the result'
+                    type: string
+                    example: "Document 'scope.collection.doc1' was not deleted."
         '400':
           $ref: '#/components/responses/Error'
         '500':
