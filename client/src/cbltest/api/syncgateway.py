@@ -9,6 +9,8 @@ from cbltest.httplog import get_next_writer
 from cbltest.assertions import _assert_not_null
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
+from cbltest.jsonhelper import _get_typed, _get_typed_required
+from cbltest.logging import cbl_warning
     
 class _CollectionMap(JSONSerializable):
     @property
@@ -24,11 +26,11 @@ class _CollectionMap(JSONSerializable):
         self.__scope_name = scope_name
         self.__collections: Dict[str, dict] = {}
 
-    def add_collection(self, collection_name: str) -> None:
+    def add_collection(self, collection_name: str, payload: dict) -> None:
         if collection_name in self.__collections:
             raise ValueError(f"{collection_name} already exists in this map")
         
-        self.__collections[collection_name] = {}
+        self.__collections[collection_name] = payload
 
     def to_json(self) -> Any:
         return {"collections": self.__collections}
@@ -37,14 +39,21 @@ class PutDatabasePayload(JSONSerializable):
     """
     A class containing configuration options for a Sync Gateway database endpoint
     """
-    def __init__(self, bucket: str):
-        _assert_not_null(bucket, nameof(bucket))
-        self.num_index_replicas: int = 0
-        """The number of index replicas to use"""
-        self.bucket = bucket
+    def __init__(self, dataset_contents: dict):
+        _assert_not_null(dataset_contents, nameof(dataset_contents))
+        dataset_config = _get_typed_required(dataset_contents, "config", dict)
+
+        self.bucket = _get_typed_required(dataset_config, "bucket", str)
         """The bucket name in the backing Couchbase Server"""
 
         self.__scopes: Dict[str, _CollectionMap] = {}
+        scopes = _get_typed_required(dataset_config, "scopes", dict)
+        for scope in scopes:
+            scope_dict = _get_typed_required(scopes, scope, dict)
+            collections = _get_typed_required(scope_dict, "collections", dict)
+            for collection in collections:
+                collection_dict = _get_typed_required(collections, collection, dict)
+                self.add_collection(collection_dict, scope, collection)
 
     def scopes(self) -> List[str]:
         return list(self.__scopes.keys())
@@ -56,7 +65,7 @@ class PutDatabasePayload(JSONSerializable):
         
         return map.collections
 
-    def add_collection(self, scope_name: str = "_default", collection_name: str = "_default") -> None:
+    def add_collection(self, payload: dict = {}, scope_name: str = "_default", collection_name: str = "_default") -> None:
         """
         Adds a collection to the configuration of the database (must exist on Couchbase Server).
         The scope name and collection name both default to "_default".
@@ -67,14 +76,14 @@ class PutDatabasePayload(JSONSerializable):
         _assert_not_null(scope_name, nameof(scope_name))
         col_map = self.__scopes.get(scope_name, _CollectionMap(collection_name))
         self.__scopes[scope_name] = col_map
-        col_map.add_collection(collection_name)
+        col_map.add_collection(collection_name, payload)
 
     def to_json(self) -> Any:
         scopes: dict = {}
         ret_val = {
             "scopes": scopes,
             "bucket": self.bucket,
-            "num_index_replicas": self.num_index_replicas
+            "num_index_replicas": 0
         }
 
         for s in self.__scopes:
@@ -160,7 +169,16 @@ class SyncGateway:
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
         """
-        await self._send_request("put", f"/{db_name}", payload)
+        try:
+            await self._send_request("put", f"/{db_name}", payload)
+        except CblSyncGatewayBadResponseError as e:
+            if e.code == 500:
+                cbl_warning("Sync gateway returned 500 from PUT database call, retrying...")
+                await self.put_database(db_name, payload)
+            else:
+                raise
+
+        
 
     async def delete_database(self, db_name: str) -> None:
         """
@@ -174,7 +192,7 @@ class SyncGateway:
         """
         await self._send_request("delete", f"/{db_name}")
 
-    async def add_user(self, db_name: str, name: str, password: str, channel_access: Dict[str, List[str]]) -> None:
+    async def add_user(self, db_name: str, name: str, password: str, collection_access: dict) -> None:
         """
         Adds the specified user to a Sync Gateway database with the specified channel access
 
@@ -184,22 +202,11 @@ class SyncGateway:
         :param channel_access: The channels that the user will have access to, as a dictionary 
             keyed by collection containing an array of channels
         """
-        collection_access: Dict[str, dict] = {}
         body = {
             "name": name,
             "password": password,
             "collection_access": collection_access
         }
-
-        if channel_access is not None:
-            for coll in channel_access:
-                split = coll.split(".")
-                scope = split[0] if len(split) > 1 else "_default"
-                collection = split[1] if len(split) > 1 else split[0]
-                if scope not in collection_access:
-                    collection_access[scope] = {}
-
-                collection_access[scope][collection] = {"admin_channels": channel_access[coll]}
 
         await self._send_request("post", f"/{db_name}/_user/", JSONDictionary(body))
 

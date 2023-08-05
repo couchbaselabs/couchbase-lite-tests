@@ -260,5 +260,5 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
         self.__activity = ReplicatorActivityLevel[cast(str, body.get(self.__activity_key)).upper()]
         self.__progress = ReplicatorProgress(cast(dict, body.get(self.__progress_key)))
         self.__replicator_error = ErrorResponseBody.create(body.get(self.__replicator_error_key))
-        docs = _get_typed(body, self.__documents_key, dict)
+        docs = _get_typed(body, self.__documents_key, list)
         self.__documents = [ReplicatorDocumentEntry(d) for d in docs] if docs is not None else []
