@@ -22,7 +22,7 @@ namespace TestServer.Handlers
         {
             var split = inputName.Split('.');
             if(split.Length == 1) {
-                return ("_default", split[0]);
+                throw new JsonException($"Invalid collection name (must be scope qualified): {inputName}");
             }
 
             return (split[0], split[1]);
@@ -134,10 +134,8 @@ namespace TestServer
                     var errCode = (int)ex.Error;
                     var domain = TestServerErrorDomain.CouchbaseLite;
                     if(ex.Error > (int)CouchbaseLiteError.HTTPBase) {
-                        errCode -= (int)CouchbaseLiteError.HTTPBase;
                         domain = TestServerErrorDomain.Websocket;
                     } else if(ex.Error > (int)CouchbaseLiteError.NetworkBase) {
-                        errCode -= (int)CouchbaseLiteError.NetworkBase;
                         domain = TestServerErrorDomain.Network;
                     }
 
@@ -149,6 +147,16 @@ namespace TestServer
         #endregion
 
         #region Internal Methods
+
+        internal static void HandleException(Exception ex, Uri endpoint, int version, HttpListenerResponse response)
+        {
+            var msg = MultiExceptionString(ex);
+            Debug.WriteLine($"Error in handler for {endpoint}");
+            Debug.WriteLine(msg);
+            Console.WriteLine($"Error in handler for {endpoint}");
+            Console.WriteLine(msg);
+            response.WriteBody(CreateErrorResponse(msg), version, HttpStatusCode.InternalServerError);
+        }
 
         internal static async Task Handle(Uri endpoint, Stream body, HttpListenerResponse response, int version)
         {
@@ -188,13 +196,20 @@ namespace TestServer
 
             try {
                 action(version, bodyObj, response);
+            } catch (TargetInvocationException ex) {
+                switch(ex.InnerException) {
+                    case null:
+                        HandleException(ex, endpoint, version, response);
+                        break;
+                    case JsonException e:
+                        response.WriteBody(CreateErrorResponse(e.Message), version, HttpStatusCode.BadRequest);
+                        break;
+                    default:
+                        HandleException(ex.InnerException, endpoint, version, response);
+                        break;
+                }
             } catch (Exception ex) {
-                var msg = MultiExceptionString(ex);
-                Debug.WriteLine($"Error in handler for {endpoint}");
-                Debug.WriteLine(msg);
-                Console.WriteLine($"Error in handler for {endpoint}");
-                Console.WriteLine(msg);
-                response.WriteBody(CreateErrorResponse(msg), version, HttpStatusCode.InternalServerError);
+                HandleException(ex, endpoint, version, response);
             }
         }
 

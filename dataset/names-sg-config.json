@@ -1,0 +1,26 @@
+{
+  "config": {
+    "bucket": "names",
+    "scopes": {
+      "_default": {
+        "collections": {
+          "_default": {
+            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
+          }
+        }
+      }
+    }
+  },
+  "users": {
+    "user1": {
+      "password": "pass",
+      "collection_access": {
+        "_default": {
+          "_default": {
+            "admin_channels": ["*"]
+          }
+        }
+      }
+    }
+  }
+}

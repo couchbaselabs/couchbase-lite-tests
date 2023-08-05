@@ -45,7 +45,7 @@ class TestUpdateDatabase:
         for attempt in bad_attempts:   
             with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
                 async with db.batch_updater() as b:
-                    b.upsert_document("_default", "name_1", [{attempt: 5}])
+                    b.upsert_document("_default._default", "name_1", [{attempt: 5}])
 
         good_attempts = [
             # Add a brand new root key (with the optional JSON path $ for bonus points)
@@ -94,4 +94,4 @@ class TestUpdateDatabase:
         # them one at a time edit this loop to match the previous 'bad_attempts' one
         async with db.batch_updater() as b:
             for attempt in good_attempts:  
-                b.upsert_document("_default", "name_1", [{attempt: 5}])
+                b.upsert_document("_default._default", "name_1", [{attempt: 5}])

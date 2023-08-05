@@ -10,13 +10,7 @@ class TestBasicReplication:
     @pytest.mark.asyncio
     async def test_replicate_non_existing_sg_collections(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
-        sg_payload = PutDatabasePayload("names")
-        sg_payload.add_collection()
-        await cloud.put_empty_database("names", sg_payload, "names")
-        await cblpytest.sync_gateways[0].load_dataset("names", dataset_path / "names-sg.json")
-        await cblpytest.sync_gateways[0].add_user("names", "user1", "pass", {
-            "_default._default": ["*"]
-        })
+        await cloud.configure_dataset(dataset_path, "names")
 
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
@@ -27,22 +21,13 @@ class TestBasicReplication:
 
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is not None and status.error.code == 404
+        assert status.error is not None and status.error.code == 10404
         return None
 
     @pytest.mark.asyncio
-    async def test_push(self, cblpytest: CBLPyTest) -> None:
+    async def test_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
-        sg_payload = PutDatabasePayload("travel")
-        sg_payload.add_collection("travel", "airlines")
-        sg_payload.add_collection("travel", "airports")
-        sg_payload.add_collection("travel", "hotels")
-        await cloud.put_empty_database("travel", sg_payload, "travel")
-        await cblpytest.sync_gateways[0].add_user("travel", "user1", "pass", {
-            "travel.airlines": ["*"],
-            "travel.airports": ["*"],
-            "travel.hotels": ["*"]
-        })
+        await cloud.configure_dataset(dataset_path, "travel")
 
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
@@ -84,15 +69,7 @@ class TestBasicReplication:
     @pytest.mark.asyncio
     async def test_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
-        sg_payload = PutDatabasePayload("travel")
-        sg_payload.add_collection("travel", "landmarks")
-        sg_payload.add_collection("travel", "airports")
-        sg_payload.add_collection("travel", "hotels")
-        await cloud.put_empty_database("travel", sg_payload, "travel")
-        await cblpytest.sync_gateways[0].add_user("travel", "user1", "pass", {
-            "travel.airports": ["*"]
-        })
-        await cblpytest.sync_gateways[0].load_dataset("travel", dataset_path / "travel-sg.json")
+        await cloud.configure_dataset(dataset_path, "travel")
 
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]

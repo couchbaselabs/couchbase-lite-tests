@@ -24,12 +24,12 @@ class TestSnapshotVerify:
     async def test_verify_good_update(self, cblpytest: CBLPyTest) -> None:
         db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default", "name_1")
+            SnapshotDocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:
-            self.upsert_multiple([b, snapshot_updater], "_default", "name_1", [{"test": "value"}])
+            self.upsert_multiple([b, snapshot_updater], "_default._default", "name_1", [{"test": "value"}])
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == True, f"The verification failed: {verify_result.description}"
@@ -38,12 +38,12 @@ class TestSnapshotVerify:
     async def test_verify_good_delete(self, cblpytest: CBLPyTest) -> None:
         db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default", "name_1")
+            SnapshotDocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:
-            self.delete_multiple([b, snapshot_updater], "_default", "name_1")
+            self.delete_multiple([b, snapshot_updater], "_default._default", "name_1")
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == True, f"The verification failed: {verify_result.description}"
@@ -52,14 +52,14 @@ class TestSnapshotVerify:
     async def test_verify_bad_delete(self, cblpytest: CBLPyTest) -> None:
         db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default", "name_2")
+            SnapshotDocumentEntry("_default._default", "name_2")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:
-            b.delete_document([b, snapshot_updater], "_default", "name_1")
+            b.delete_document([b, snapshot_updater], "_default._default", "name_1")
 
-        snapshot_updater.delete_document("_default", "name_2")
+        snapshot_updater.delete_document("_default._default", "name_2")
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description is not None
@@ -68,12 +68,12 @@ class TestSnapshotVerify:
     async def test_verify_good_purge(self, cblpytest: CBLPyTest) -> None:
         db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default", "name_1")
+            SnapshotDocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:
-            self.purge_multiple([b, snapshot_updater], "_default", "name_1")
+            self.purge_multiple([b, snapshot_updater], "_default._default", "name_1")
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == True, f"The verification failed: {verify_result.description}"
@@ -82,14 +82,14 @@ class TestSnapshotVerify:
     async def test_verify_bad_purge(self, cblpytest: CBLPyTest) -> None:
         db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default", "name_2")
+            SnapshotDocumentEntry("_default._default", "name_2")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:
-            b.purge_document([b, snapshot_updater], "_default", "name_1")
+            b.purge_document([b, snapshot_updater], "_default._default", "name_1")
 
-        snapshot_updater.purge_document("_default", "name_2")
+        snapshot_updater.purge_document("_default._default", "name_2")
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description is not None
@@ -98,14 +98,14 @@ class TestSnapshotVerify:
     async def test_verify_bad_single_dict_update(self, cblpytest: CBLPyTest) -> None:
         db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default", "name_1")
+            SnapshotDocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:
-            b.upsert_document("_default", "name_1", [{"name.first": "Value"}])
+            b.upsert_document("_default._default", "name_1", [{"name.first": "Value"}])
 
-        snapshot_updater.upsert_document("_default", "name_1", [{"name.first": "bad_value"}])
+        snapshot_updater.upsert_document("_default._default", "name_1", [{"name.first": "bad_value"}])
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description is not None
@@ -116,14 +116,14 @@ class TestSnapshotVerify:
     async def test_verify_bad_single_array_update(self, cblpytest: CBLPyTest) -> None:
         db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default", "name_1")
+            SnapshotDocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:
-            b.upsert_document("_default", "name_1", [{"contact.email[0]": "foo@bar.com"}])
+            b.upsert_document("_default._default", "name_1", [{"contact.email[0]": "foo@bar.com"}])
 
-        snapshot_updater.upsert_document("_default", "name_1", [{"contact.email[0]": "foo@baz.com"}])
+        snapshot_updater.upsert_document("_default._default", "name_1", [{"contact.email[0]": "foo@baz.com"}])
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description is not None
@@ -134,14 +134,14 @@ class TestSnapshotVerify:
     async def test_verify_bad_array_order_update(self, cblpytest: CBLPyTest) -> None:
         db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default", "name_1")
+            SnapshotDocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:
-            b.upsert_document("_default", "name_1", [{"contact.email[0]": "foo@bar.com"}])
+            b.upsert_document("_default._default", "name_1", [{"contact.email[0]": "foo@bar.com"}])
 
-        snapshot_updater.upsert_document("_default", "name_1", [{"contact.email[1]": "foo@bar.com"}])
+        snapshot_updater.upsert_document("_default._default", "name_1", [{"contact.email[1]": "foo@bar.com"}])
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description is not None
@@ -152,10 +152,10 @@ class TestSnapshotVerify:
     async def test_verify_bad_snapshot(self, cblpytest: CBLPyTest) -> None:
         db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default", "name_1")
+            SnapshotDocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
-        snapshot_updater.purge_document("_default", "name_2")
+        snapshot_updater.purge_document("_default._default", "name_2")
         with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
             verify_result = await db.verify_documents(snapshot_updater)
