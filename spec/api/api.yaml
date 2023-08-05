@@ -17,8 +17,11 @@ info:
 
     Changes
 
+    0.1.7
+    * Fixed missing database in snapshotDocuments request
+
     0.1.6
-    * Add JSON Path Spec to /updateDatabase
+    * Added JSON Path Spec to /updateDatabase
 
     0.1.5
     * Changed /updateDatabase to use keypaths for specifying the changes
@@ -30,7 +33,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 0.1.6
+  version: 0.1.7
 tags:
   - name: API
 paths:
@@ -305,9 +308,16 @@ paths:
         content:
           application/json:
             schema:
-              type: array
-              items:
-                $ref: '#/components/schemas/DocumentID'
+              type: object
+              required: ['database', 'documents']
+              properties:
+                database:
+                  type: string
+                  example: 'db1'
+                documents:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/DocumentID'
         required: true
       responses:
         '200':
