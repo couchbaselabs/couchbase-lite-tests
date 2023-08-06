@@ -12,6 +12,7 @@
 // Type-checking for printf-style vararg functions:
 #ifdef _MSC_VER
 #   define __printflike(A, B)
+#   define strcasecmp  _stricmp
 #else
 #   ifndef __printflike
 #       define __printflike(fmtarg, firstvararg) __attribute__((__format__(__printf__, fmtarg, firstvararg)))
