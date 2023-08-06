@@ -1,6 +1,9 @@
 #include "Fleece.h"
+#include "Defer.h"
 #include "Define.h"
 #include "KeyPath.h"
+
+#include FLEECE_HEADER(FLExpert.h)
 
 using namespace std;
 using namespace nlohmann;
@@ -51,7 +54,58 @@ void setSlotValue(FLSlot slot, const json &value) { // NOLINT(misc-no-recursion)
         case json::value_t::binary:
         case json::value_t::discarded:
         default:
-            throw runtime_error("Unsupported JSON value as fleece value");
+            throw logic_error("Cannot convert JSON value to fleece value");
+    }
+}
+
+nlohmann::json ts_support::fleece::toJSON(FLValue value) {
+    auto type = FLValue_GetType(value);
+    switch (type) {
+        case kFLNull:
+            return nullptr;
+        case kFLBoolean:
+            return FLValue_AsBool(value);
+        case kFLNumber: {
+            if (FLValue_IsInteger(value)) {
+                if (FLValue_IsUnsigned(value)) {
+                    return FLValue_AsUnsigned(value);
+                } else {
+                    return FLValue_AsInt(value);
+                }
+            } else if (FLValue_IsDouble(value)) {
+                return FLValue_AsDouble(value);
+            } else {
+                return FLValue_AsFloat(value);
+            }
+        }
+        case kFLString: {
+            return STR(FLValue_AsString(value));
+        }
+        case kFLDict: {
+            json dict = json::object();
+            FLDictIterator iter;
+            FLDictIterator_Begin(FLValue_AsDict(value), &iter);
+            FLValue value;
+            while (NULL != (value = FLDictIterator_GetValue(&iter))) {
+                FLString key = FLDictIterator_GetKeyString(&iter);
+                dict[STR(key)] = toJSON(value);
+                FLDictIterator_Next(&iter);
+            }
+            return dict;
+        }
+        case kFLArray: {
+            json array = json::array();
+            FLArrayIterator iter;
+            FLArrayIterator_Begin(FLValue_AsArray(value), &iter);
+            FLValue value;
+            while (NULL != (value = FLArrayIterator_GetValue(&iter))) {
+                array.push_back(toJSON(value));
+                FLArrayIterator_Next(&iter);
+            }
+            return array;
+        }
+        default:
+            throw logic_error("Cannot convert fleece value to JSON");
     }
 }
 
@@ -98,7 +152,7 @@ void ts_support::fleece::updateProperties(FLMutableDict props, FLSlice keyPath, 
                 setSlotValue(slot, value);
                 return;
             }
-            
+
             // Look ahead and create a new parent for non-existing path:
             FLValue val = getMutableDictValue(dict, key);
             if (val == nullptr) {
@@ -205,4 +259,19 @@ void ts_support::fleece::removeProperties(FLMutableDict props, FLSlice keyPath) 
         }
         i++;
     }
+}
+
+FLDict ts_support::fleece::compareDicts(FLDict dict1, FLDict dict2) {
+    auto delta = FLCreateJSONDelta((FLValue) dict1, (FLValue) dict2);
+    if (!delta) {
+        throw logic_error("Create JSON Delta Failed");
+    }
+    DEFER { FLSliceResult_Release(delta); };
+
+    FLError error = kFLNoError;
+    auto deltaDict = FLMutableDict_NewFromJSON(FLSliceResult_AsSlice(delta), &error);
+    if (error != kFLNoError) {
+        throw logic_error("Create Delta Dictionary Failed");
+    }
+    return deltaDict;
 }

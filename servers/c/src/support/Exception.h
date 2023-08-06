@@ -35,5 +35,5 @@ static inline void CheckError(CBLError &error) {
 }
 
 static inline void CheckNotNull(const void *obj, const std::string &message) {
-    if (!obj) { throw std::runtime_error(message); }
+    if (!obj) { throw ts_support::exception::RequestError(message); }
 }

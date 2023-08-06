@@ -9,8 +9,12 @@
 #include "support/JSON.h"
 #include "TestServer.h"
 
+#include <cstring>
+#include <sstream>
+
 using namespace std;
 using namespace nlohmann;
+using namespace ts_support;
 using namespace ts_support::exception;
 
 using ReplicatorParams = CBLManager::ReplicatorParams;
@@ -21,6 +25,18 @@ static inline void CheckBody(const json &body) {
     if (!body.is_object()) {
         throw RequestError("Request body is not json object");
     }
+}
+
+static inline bool EnumEquals(const string &enum1, const string &enum2) {
+    return strcasecmp(enum1.c_str(), enum2.c_str()) == 0;
+}
+
+template<typename ... Args>
+static string Concat(const Args &... args) {
+    stringstream ss;
+    int unpack[] = {0, ((void) (ss << args), 0) ...};
+    static_cast<void>(unpack);
+    return ss.str();
 }
 
 int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-member-functions-to-static)
@@ -83,7 +99,7 @@ int Dispatcher::handlePOSTGetAllDocuments(Request &request) {
     auto db = _cblManager->database(dbName);
     json result = json::object();
     for (auto &colName: colNames) {
-        auto col = _cblManager->collection(db, colName, false);
+        auto col = CBLManager::collection(db, colName, false);
         AUTO_RELEASE(col);
 
         if (col) {
@@ -112,11 +128,11 @@ int Dispatcher::handlePOSTGetAllDocuments(Request &request) {
     return request.respondWithJSON(result);
 }
 
-int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
-    static constexpr const char *kUpdateDatabaseTypeUpdate = "UPDATE";
-    static constexpr const char *kUpdateDatabaseTypeDelete = "DELETE";
-    static constexpr const char *kUpdateDatabaseTypePurge = "PURGE";
+static constexpr const char *kUpdateDatabaseTypeUpdate = "UPDATE";
+static constexpr const char *kUpdateDatabaseTypeDelete = "DELETE";
+static constexpr const char *kUpdateDatabaseTypePurge = "PURGE";
 
+int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
     json body = request.jsonBody();
     CheckBody(body);
 
@@ -146,7 +162,7 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
             AUTO_RELEASE(doc);
 
             auto type = GetValue<string>(update, "type");
-            if (type == kUpdateDatabaseTypeUpdate) {
+            if (EnumEquals(type, kUpdateDatabaseTypeUpdate)) {
                 if (!doc) {
                     doc = CBLDocument_CreateWithID(FLS(docID));
                 }
@@ -159,7 +175,7 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
                         for (auto &keyPath: keyPaths) {
                             try {
                                 ts_support::fleece::updateProperties(props, FLS(keyPath.first), keyPath.second);
-                            } catch (const exception &e) {
+                            } catch (const std::exception &e) {
                                 throw RequestError(e.what());
                             }
                         }
@@ -171,7 +187,7 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
                     for (auto &keyPath: keyPaths) {
                         try {
                             ts_support::fleece::removeProperties(props, FLS(keyPath));
-                        } catch (const exception &e) {
+                        } catch (const std::exception &e) {
                             throw RequestError(e.what());
                         }
                     }
@@ -179,12 +195,12 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
 
                 CBLCollection_SaveDocument(col, doc, &error);
                 CheckError(error);
-            } else if (type == kUpdateDatabaseTypeDelete) {
+            } else if (EnumEquals(type, kUpdateDatabaseTypeDelete)) {
                 if (doc) {
                     CBLCollection_DeleteDocument(col, doc, &error);
                     CheckError(error);
                 }
-            } else if (type == kUpdateDatabaseTypePurge) {
+            } else if (EnumEquals(type, kUpdateDatabaseTypePurge)) {
                 if (doc) {
                     CBLCollection_PurgeDocument(col, doc, &error);
                     CheckError(error);
@@ -214,11 +230,11 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
 
     if (config.contains("replicatorType")) {
         auto replicatorType = GetValue<string>(config, "replicatorType");
-        if (replicatorType == kReplicatorTypePush) {
+        if (EnumEquals(replicatorType, kReplicatorTypePush)) {
             params.replicatorType = kCBLReplicatorTypePush;
-        } else if (replicatorType == kReplicatorTypePull) {
+        } else if (EnumEquals(replicatorType, kReplicatorTypePull)) {
             params.replicatorType = kCBLReplicatorTypePull;
-        } else if (replicatorType == kReplicatorTypePushAndPull) {
+        } else if (EnumEquals(replicatorType, kReplicatorTypePushAndPull)) {
             params.replicatorType = kCBLReplicatorTypePushAndPull;
         } else {
             throw RequestError("Invalid replicator type");
@@ -232,7 +248,8 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
     if (config.contains("authenticator")) {
         json authObject = config["authenticator"];
         CheckIsObject(authObject, "authenticator");
-        if (GetValue<string>(authObject, "type") == kAuthTypeBasic) {
+        auto authType = GetValue<string>(authObject, "type");
+        if (EnumEquals(authType, kAuthTypeBasic)) {
             ReplicationAuthenticator auth;
             auth.username = GetValue<string>(authObject, "username");
             auth.password = GetValue<string>(authObject, "password");
@@ -308,7 +325,7 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
     CheckBody(body);
 
     auto id = GetValue<string>(body, "id");
-    auto replStatus = _cblManager->status(id);
+    auto replStatus = _cblManager->replicatorStatus(id);
     if (!replStatus) {
         throw RequestError("Replicator '" + id + "' not found");
     }
@@ -351,6 +368,131 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
     return request.respondWithJSON(result);
 }
 
+int Dispatcher::handlePOSTSnapshotDocuments(Request &request) {
+    json body = request.jsonBody();
+    CheckBody(body);
+
+    auto dbName = GetValue<string>(body, "database");
+    auto documents = GetValue<vector<json>>(body, "documents");
+
+    auto db = _cblManager->database(dbName);
+    auto snapshot = _cblManager->createSnapshot();
+    try {
+        for (auto &docInfo: documents) {
+            auto collectionName = GetValue<string>(docInfo, "collection");
+            auto docID = GetValue<string>(docInfo, "id");
+            auto doc = CBLManager::document(db, collectionName, docID);
+            AUTO_RELEASE(doc);
+            snapshot->putDocument(collectionName, docID, doc);
+        }
+    } catch (const std::exception &e) {
+        _cblManager->deleteSnapshot(snapshot->id());
+        throw e;
+    }
+
+    json result;
+    result["id"] = snapshot->id();
+    return request.respondWithJSON(result);
+}
+
+int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
+    json body = request.jsonBody();
+    CheckBody(body);
+
+    bool verifiedResult = true;
+    string description;
+
+    json expected = nullptr;
+    json actual = nullptr;
+
+    auto dbName = GetValue<string>(body, "database");
+    auto db = _cblManager->database(dbName);
+
+    auto snapshotID = GetValue<string>(body, "snapshot");
+    auto snapshot = _cblManager->snapshot(snapshotID);
+
+    auto changes = GetValue<vector<json>>(body, "changes");
+    for (auto &change: changes) {
+        auto colName = GetValue<string>(change, "collection");
+        auto docID = GetValue<string>(change, "documentID");
+        auto snapshotDoc = snapshot->document(colName, docID);
+        auto curDoc = CBLManager::document(db, colName, docID);
+        AUTO_RELEASE(curDoc);
+
+        auto type = GetValue<string>(change, "type");
+        if (EnumEquals(type, kUpdateDatabaseTypeUpdate)) {
+            if (!curDoc) {
+                verifiedResult = false;
+                description = Concat("Document '", colName, ".", docID, "' not exist");
+                break;
+            }
+
+            CBLDocument *expectedDoc = snapshotDoc ?
+                                       CBLDocument_MutableCopy(snapshotDoc) :
+                                       CBLDocument_CreateWithID(FLS(docID));
+            AUTO_RELEASE(expectedDoc);
+            auto expectedProps = CBLDocument_MutableProperties(expectedDoc);
+            if (change.contains("updatedProperties")) {
+                auto updatedProps = GetValue<vector<unordered_map<string, json>>>(change, "updatedProperties");
+                for (auto &keyPaths: updatedProps) {
+                    for (auto &keyPath: keyPaths) {
+                        try {
+                            ts_support::fleece::updateProperties(expectedProps, FLS(keyPath.first), keyPath.second);
+                        } catch (const std::exception &e) {
+                            throw RequestError(e.what());
+                        }
+                    }
+                }
+            }
+
+            if (change.contains("removedProperties")) {
+                auto keyPaths = GetValue<vector<string>>(change, "removedProperties");
+                for (auto &keyPath: keyPaths) {
+                    try {
+                        ts_support::fleece::removeProperties(expectedProps, FLS(keyPath));
+                    } catch (const std::exception &e) {
+                        throw RequestError(e.what());
+                    }
+                }
+            }
+
+            auto props = CBLDocument_Properties(curDoc);
+            FLDict delta = ts_support::fleece::compareDicts(props, expectedProps);
+            DEFER { FLDict_Release(delta); };
+            if (FLDict_Count(delta) > 0) {
+                verifiedResult = false;
+                auto deltaJSON = FLValue_ToJSON5((FLValue) delta);
+                DEFER { FLSliceResult_Release(deltaJSON); };
+                description = Concat("Document '", colName, ".", docID, "' has unexpected changes; delta : ",
+                                     STR(deltaJSON));
+                actual = ts_support::fleece::toJSON((FLValue) props);
+                expected = ts_support::fleece::toJSON((FLValue) expectedProps);
+                break;
+            }
+        } else if (EnumEquals(type, kUpdateDatabaseTypeDelete) ||
+                   EnumEquals(type, kUpdateDatabaseTypePurge)) {
+            if (curDoc) {
+                verifiedResult = false;
+                description = Concat("Document '", colName, ".", docID, "' not deleted or purged");
+                break;
+            }
+        }
+    }
+
+    json result;
+    result["result"] = verifiedResult;
+    if (!description.empty()) {
+        result["description"] = description;
+    }
+    if (actual.type() == json::value_t::object) {
+        result["actual"] = actual;
+    }
+    if (expected.type() == json::value_t::object) {
+        result["expected"] = expected;
+    }
+    return request.respondWithJSON(result);
+}
+
 // Handler Functions For Testing
 
 int Dispatcher::handlePOSTGetDocument(Request &request) {
@@ -377,7 +519,6 @@ int Dispatcher::handlePOSTGetDocument(Request &request) {
         auto json = nlohmann::json::parse(STR(jsonSlice));
         return request.respondWithJSON(json);
     } else {
-        throw RequestError("Document '" + docID + "' in collection '" + colName + "' of database '" + dbName +
-                           "' not found");
+        throw RequestError(Concat("Document '", colName, ".", docID, "' not found"));
     }
 }

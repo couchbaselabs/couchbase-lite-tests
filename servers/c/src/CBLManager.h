@@ -32,6 +32,8 @@ public:
 
     CBLManager(std::string databaseDir, std::string assetDir);
 
+    /// Database
+
     void reset();
 
     void loadDataset(const std::string &name, const std::string &targetDatabaseName);
@@ -43,6 +45,10 @@ public:
     CBLDatabase *database(const std::string &name);
 
     static CBLCollection *collection(const CBLDatabase *db, const std::string &name, bool mustExist = true);
+
+    static const CBLDocument *document(const CBLDatabase *db, const std::string &collectionName, const std::string id);
+
+    /// Replicator
 
     struct ReplicationCollection {
         std::string collection;
@@ -85,7 +91,33 @@ public:
 
     CBLReplicator *replicator(const std::string &id);
 
-    std::optional<ReplicatorStatus> status(const std::string &id);
+    std::optional<ReplicatorStatus> replicatorStatus(const std::string &id);
+
+    /// Snapshot
+
+    class Snapshot {
+    public:
+        Snapshot();
+
+        ~Snapshot();
+
+        std::string id() { return _id; }
+
+        void putDocument(const std::string &collectionName, const std::string &documentID, const CBLDocument *document);
+
+        const CBLDocument *document(const std::string &collectionName, const std::string &documentID);
+
+    private:
+
+        std::string _id;
+        std::unordered_map<std::string, const CBLDocument *> _documents;
+    };
+
+    Snapshot *createSnapshot();
+
+    Snapshot *snapshot(const std::string &id);
+
+    void deleteSnapshot(const std::string &id);
 
 private:
     CBLDatabase *databaseUnlocked(const std::string &name);
@@ -120,11 +152,13 @@ private:
         CBLListenerToken *token{nullptr};
 
         /** Map of collection name and replication filter object */
-        std::unordered_map<std::string, std::unique_ptr<ReplicationFilter>> filters{};
+        std::unordered_map<std::string, std::unique_ptr<ReplicationFilter>> filters;
 
         /** Replicated Documents in batch */
-        std::vector<std::vector<ReplicatedDocument>> replicatedDocs{};
+        std::vector<std::vector<ReplicatedDocument>> replicatedDocs;
     };
 
     std::unordered_map<std::string, std::unique_ptr<ReplicatorContext>> _contextMaps;
+
+    std::unordered_map<std::string, std::unique_ptr<Snapshot>> _snapShots;
 };

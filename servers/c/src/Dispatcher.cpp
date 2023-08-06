@@ -23,6 +23,8 @@ Dispatcher::Dispatcher(const TestServer *testServer) {
     addRule({"POST", "/updateDatabase", HANDLER(handlePOSTUpdateDatabase)});
     addRule({"POST", "/startReplicator", HANDLER(handlePOSTStartReplicator)});
     addRule({"POST", "/getReplicatorStatus", HANDLER(handlePOSTGetReplicatorStatus)});
+    addRule({"POST", "/snapshotDocuments", HANDLER(handlePOSTSnapshotDocuments)});
+    addRule({"POST", "/verifyDocuments", HANDLER(handlePOSTVerifyDocuments)});
 
     // For testing:
     addRule({"POST", "/test/getDocument", HANDLER(handlePOSTGetDocument)});
@@ -51,6 +53,8 @@ int Dispatcher::handle(mg_connection *conn) const {
     } catch (const RequestError &e) {
         return request.respondWithRequestError(e.what());
     } catch (const json::exception &e) {
+        return request.respondWithRequestError(e.what());
+    } catch (const std::logic_error &e) {
         return request.respondWithRequestError(e.what());
     } catch (const std::exception &e) {
         return request.respondWithServerError(e.what());

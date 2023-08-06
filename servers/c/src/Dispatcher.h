@@ -40,6 +40,10 @@ private:
 
     int handlePOSTGetReplicatorStatus(Request &request);
 
+    int handlePOSTSnapshotDocuments(Request &request);
+
+    int handlePOSTVerifyDocuments(Request &request);
+
     // Handler Functions for Testing:
     int handlePOSTGetDocument(Request &request);
 

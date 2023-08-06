@@ -3,6 +3,7 @@
 #include "support/Defer.h"
 #include "support/Define.h"
 #include "support/Exception.h"
+#include "support/UUID.h"
 #include "support/Zip.h"
 
 #include <filesystem>
@@ -11,6 +12,7 @@
 
 using namespace std;
 using namespace filesystem;
+using namespace ts_support;
 using namespace ts_support::exception;
 
 #define DB_FILE_EXT ".cblite2"
@@ -22,8 +24,9 @@ using namespace ts_support::exception;
 CBLManager::CBLManager(string databaseDir, string assetDir) {
     _databaseDir = std::move(databaseDir);
     _assetDir = std::move(assetDir);
-//    logger::init(logger::LogLevel::info);
 }
+
+/// Database
 
 void CBLManager::reset() {
     lock_guard<mutex> lock(_mutex);
@@ -116,7 +119,7 @@ CBLDatabase *CBLManager::databaseUnlocked(const string &name) {
     return db;
 }
 
-CBLCollection *CBLManager::collection(const CBLDatabase *db, const std::string &name, bool mustExist) {
+CBLCollection *CBLManager::collection(const CBLDatabase *db, const string &name, bool mustExist) {
     CBLError error{};
     auto spec = CollectionSpec(name);
     auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
@@ -126,6 +129,16 @@ CBLCollection *CBLManager::collection(const CBLDatabase *db, const std::string &
     }
     return col;
 }
+
+const CBLDocument *CBLManager::document(const CBLDatabase *db, const string &collectionName, const string id) {
+    auto collection = CBLManager::collection(db, collectionName);
+    CBLError error{};
+    auto doc = CBLCollection_GetDocument(collection, FLS(id), &error);
+    CheckError(error);
+    return doc;
+}
+
+/// Replicator
 
 FLSliceResult CBLManager::getServerCert() {
     auto certPath = path(_assetDir).append(ASSET_CERT_FILE);
@@ -305,7 +318,7 @@ void CBLManager::addDocumentReplication(const std::string &id, const vector<Repl
     }
 }
 
-std::optional<CBLManager::ReplicatorStatus> CBLManager::status(const std::string &id) {
+std::optional<CBLManager::ReplicatorStatus> CBLManager::replicatorStatus(const std::string &id) {
     lock_guard<mutex> lock(_mutex);
     if (_contextMaps.find(id) != _contextMaps.end()) {
         ReplicatorStatus result{};
@@ -317,4 +330,48 @@ std::optional<CBLManager::ReplicatorStatus> CBLManager::status(const std::string
         return result;
     }
     return nullopt;
+}
+
+/// Snapshot
+
+CBLManager::Snapshot::Snapshot() {
+    _id = key::generateUUID();
+}
+
+CBLManager::Snapshot::~Snapshot() {
+    for (const auto &doc: _documents) {
+        CBLDocument_Release(doc.second);
+    }
+    _documents.clear();
+}
+
+void CBLManager::Snapshot::putDocument(const string &collectionName, const string &docID, const CBLDocument *doc) {
+    // Note: document could be NULL
+    CBLDocument_Retain(doc);
+    _documents[collectionName + "." + docID] = doc;
+}
+
+const CBLDocument *CBLManager::Snapshot::document(const string &collectionName, const string &docID) {
+    auto key = collectionName + "." + docID;
+    if (_documents.find(key) == _documents.end()) {
+        throw RequestError("Document was not snapped shot : " + key);
+    }
+    return _documents[key];
+}
+
+CBLManager::Snapshot *CBLManager::createSnapshot() {
+    auto s = new Snapshot();
+    unique_ptr<Snapshot> snapshot{s};
+    _snapShots[s->id()] = std::move(snapshot);
+    return s;
+}
+
+CBLManager::Snapshot *CBLManager::snapshot(const string &id) {
+    auto snapshot = _snapShots[id].get();
+    CheckNotNull(snapshot, "Snapshot '" + id + "' Not Found");
+    return snapshot;
+}
+
+void CBLManager::deleteSnapshot(const string &id) {
+    _snapShots.erase(id);
 }
