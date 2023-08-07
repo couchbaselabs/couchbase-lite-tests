@@ -29,7 +29,7 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 
 
-// Consider some way of closeing these at the end of a request.
+// ??? Consider some way of closing these at the end of a request.
 public class CollectionsBuilder implements AutoCloseable {
     @NonNull
     private final TypedList collFqns;
@@ -49,6 +49,7 @@ public class CollectionsBuilder implements AutoCloseable {
 
     public void close() { for (Collection collection: collections) { collection.close(); } }
 
+    @NonNull
     public Set<Collection> getCollections() {
         if (collections.isEmpty()) {
             for (int j = 0; j < collFqns.size(); j++) {

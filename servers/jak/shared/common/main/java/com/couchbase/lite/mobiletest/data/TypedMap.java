@@ -55,7 +55,7 @@ public class TypedMap extends TypedCollection {
     }
 
     @NonNull
-    public Set<String> getKeys() { return new HashSet<String>(args.keySet()); }
+    public Set<String> getKeys() { return new HashSet<>(args.keySet()); }
 
     @Nullable
     public Boolean getBoolean(@NonNull String key) { return get(key, Boolean.class); }

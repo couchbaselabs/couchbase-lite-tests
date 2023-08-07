@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.tools;
+package com.couchbase.lite.mobiletest.endpoints;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -21,6 +21,7 @@ import androidx.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import com.couchbase.lite.Collection;
@@ -36,10 +37,9 @@ import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
-import com.couchbase.lite.mobiletest.util.Log;
 
 
-public class DbUpdater {
+public class UpdateDbV1 {
     private static final String KEY_TYPE = "type";
     private static final String TYPE_UPDATE = "update";
     private static final String TYPE_DELETE = "delete";
@@ -71,12 +71,14 @@ public class DbUpdater {
         LEGAL_UPDATE_KEYS = Collections.unmodifiableList(l);
     }
 
-    private final DatabaseService dbSvc;
-
-    public DbUpdater(DatabaseService dbSvc) { this.dbSvc = dbSvc; }
 
     @NonNull
-    public Map<String, Object> updateDbV1(@NonNull TypedMap req, @NonNull Memory mem) {
+    private final DatabaseService dbSvc;
+
+    public UpdateDbV1(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
+
+    @NonNull
+    public Map<String, Object> updateDb(@NonNull TypedMap req, @NonNull Memory mem) {
         req.validate(LEGAL_UPDATES_KEYS);
 
         final TypedList updates = req.getList(KEY_UPDATES);
@@ -109,7 +111,7 @@ public class DbUpdater {
 
             final String updateType = update.getString(KEY_TYPE);
             if (updateType == null) { throw new ClientError("Update has no type"); }
-            switch (updateType.toLowerCase()) {
+            switch (updateType.toLowerCase(Locale.getDefault())) {
                 case TYPE_DELETE:
                     deleteDocument(doc, collection);
                     break;
@@ -146,7 +148,6 @@ public class DbUpdater {
         final Map<String, Object> data = mDoc.toMap();
 
         final TypedList changes = update.getList(KEY_UPDATE_PROPS);
-        Log.d("########", "PARSING CHANGES: " + changes.size());
         if (changes != null) {
             final int m = changes.size();
             for (int j = 0; j < m; j++) {

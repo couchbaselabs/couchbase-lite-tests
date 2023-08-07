@@ -29,13 +29,13 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(viewBinding.getRoot());
+        setContentView(viewBinding.root)
     }
 
     override fun onStart() {
         super.onStart()
 
-        viewBinding.server.text = TestApp.getApp().getAppVersion()
+        viewBinding.server.text = TestApp.getApp().appVersion
         try {
             val uri = model.startServer()
             viewBinding.status.text = getString(R.string.running, uri?.toString() ?: "unknown")

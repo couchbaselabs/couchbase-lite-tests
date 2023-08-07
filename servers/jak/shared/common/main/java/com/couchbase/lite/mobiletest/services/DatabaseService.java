@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
@@ -42,8 +41,6 @@ import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
-import com.couchbase.lite.mobiletest.tools.CollectionDocsBuilder;
-import com.couchbase.lite.mobiletest.tools.CollectionsBuilder;
 import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.StringUtils;
@@ -60,15 +57,6 @@ public final class DatabaseService {
 
     private static final String KEY_DATASETS = "datasets";
     private static final String KEY_DATABASE = "database";
-    private static final String KEY_COLLECTIONS = "collections";
-
-    private static final List<String> LEGAL_COLLECTION_KEYS;
-    static {
-        final List<String> l = new ArrayList<>();
-        l.add(KEY_DATABASE);
-        l.add(KEY_COLLECTIONS);
-        LEGAL_COLLECTION_KEYS = Collections.unmodifiableList(l);
-    }
 
     private static final List<String> LEGAL_DATASET_KEYS;
     static {
@@ -156,14 +144,6 @@ public final class DatabaseService {
         try { return db.getCollection(collName[1], collName[0]); }
         catch (CouchbaseLiteException e) {
             throw new CblApiFailure("Failed retrieving collection: " + collectionFullName, e);
-        }
-    }
-
-    @NonNull
-    public Map<String, Object> getAllDocsV1(@NonNull TypedMap req, @NonNull Memory mem) {
-        req.validate(LEGAL_COLLECTION_KEYS);
-        try (CollectionsBuilder builder = new CollectionsBuilder(req.getList(KEY_COLLECTIONS), getNamedDb(req, mem))) {
-            return new CollectionDocsBuilder(builder.getCollections()).build();
         }
     }
 

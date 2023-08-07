@@ -27,7 +27,7 @@ ext {
 
     CBL_VERSION='3.2.0-SNAPSHOT'
 
-    ANDROID_MIN_SDK = 22
+    ANDROID_MIN_SDK = 24
     ANDROID_TARGET_SDK = 30
 
     ROOT_DIR = "${projectDir}/.."

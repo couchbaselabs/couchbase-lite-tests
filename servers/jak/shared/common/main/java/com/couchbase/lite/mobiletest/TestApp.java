@@ -40,7 +40,6 @@ import com.couchbase.lite.LogDomain;
 import com.couchbase.lite.LogLevel;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
-import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
@@ -160,11 +159,20 @@ public abstract class TestApp {
     }
 
     @NonNull
+    public final Memory clearMemory(@NonNull String client) {
+        symTabs.remove(client);
+        return getMemory(client);
+    }
+
+    @NonNull
     public final DatabaseService getDbSvc() {
         final DatabaseService mgr = dbSvc.get();
         if (mgr == null) { dbSvc.compareAndSet(null, new DatabaseService()); }
         return dbSvc.get();
     }
+
+    @Nullable
+    public final DatabaseService clearDbSvc() { return dbSvc.getAndSet(null); }
 
     @NonNull
     public final ReplicatorService getReplSvc() {
@@ -173,25 +181,8 @@ public abstract class TestApp {
         return replSvc.get();
     }
 
-    @NonNull
-    public final Map<String, Object> reset(@NonNull TypedMap req, @NonNull Memory mem) {
-        final ReplicatorService rMgr = replSvc.getAndSet(null);
-        if (rMgr != null) { rMgr.reset(mem); }
-
-        final DatabaseService dMgr = dbSvc.getAndSet(null);
-        if (dMgr != null) { dMgr.reset(mem); }
-
-        final String client = mem.getClient();
-        symTabs.remove(client);
-
-        final Memory newMem = getMemory(client);
-
-        getDbSvc().init(req, newMem);
-
-        getReplSvc().init(req, newMem);
-
-        return Collections.emptyMap();
-    }
+    @Nullable
+    public final ReplicatorService clearReplSvc() { return replSvc.getAndSet(null); }
 
     @NonNull
     protected final Date getExpirationTime() {

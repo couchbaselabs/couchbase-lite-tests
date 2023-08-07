@@ -100,14 +100,14 @@ public final class NetUtils {
             if (ifaceAddrs.isEmpty()) { continue; }
 
             // sort the addresses in each list
-            Collections.sort(ifaceAddrs, comparator);
+            ifaceAddrs.sort(comparator);
             addrs.add(ifaceAddrs);
         }
 
         if (addrs.isEmpty()) { return null; }
 
         // sort the lists of addresses by their first element
-        Collections.sort(addrs, (addrList1, addrList2) -> comparator.compare(addrList1.get(0), addrList2.get(0)));
+        addrs.sort((addrList1, addrList2) -> comparator.compare(addrList1.get(0), addrList2.get(0)));
         final List<InetAddress> allAddrs = new ArrayList<>();
         for (List<InetAddress> ifaceAddrs: addrs) { allAddrs.addAll(ifaceAddrs); }
 

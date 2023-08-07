@@ -15,8 +15,6 @@
 //
 package com.couchbase.lite.mobiletest;
 
-import org.junit.BeforeClass;
-
 import com.couchbase.lite.javaws.mobiletest.JavaWSTestApp;
 
 
