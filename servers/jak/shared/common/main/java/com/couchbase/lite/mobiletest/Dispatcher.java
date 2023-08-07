@@ -24,8 +24,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.endpoints.CreateReplV1;
+import com.couchbase.lite.mobiletest.endpoints.GetAllDocsV1;
+import com.couchbase.lite.mobiletest.endpoints.GetReplStatusV1;
+import com.couchbase.lite.mobiletest.endpoints.ResetV1;
+import com.couchbase.lite.mobiletest.endpoints.UpdateDbV1;
 import com.couchbase.lite.mobiletest.errors.ClientError;
-import com.couchbase.lite.mobiletest.tools.DbUpdater;
 import com.couchbase.lite.mobiletest.tools.ReplyBuilder;
 import com.couchbase.lite.mobiletest.tools.RequestBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
@@ -36,21 +41,31 @@ public final class Dispatcher {
 
     public enum Method {GET, PUT, POST, DELETE}
 
-    private final Map<Integer, Map<String, Map<Method, Test>>> dispatchTable = new HashMap<>();
+    @FunctionalInterface
+    interface Endpoint {
+        @NonNull
+        Map<String, Object> run(@NonNull TypedMap req, @NonNull Memory mem);
+    }
+
+    private final Map<Integer, Map<String, Map<Method, Endpoint>>> dispatchTable = new HashMap<>();
     private final TestApp app;
 
     public Dispatcher(@NonNull TestApp app) { this.app = app; }
 
     // build the dispatch table
     public void init() {
-        addTest(1, "/", Method.GET, (r, m) -> app.getSystemInfo());
-        addTest(1, "/reset", Method.POST, app::reset);
-        addTest(1, "/getAllDocuments", Method.POST, (r, m) -> app.getDbSvc().getAllDocsV1(r, m));
-        addTest(1, "/updateDatabase", Method.POST, (r, m) -> new DbUpdater(app.getDbSvc()).updateDbV1(r, m));
-        addTest(1, "/startReplicator", Method.POST, (r, m) -> app.getReplSvc().createReplV1(r, m));
-        addTest(1, "/getReplicatorStatus", Method.POST, (r, m) -> app.getReplSvc().getReplStatusV1(r, m));
-        addTest(1, "/snapshotDocuments", Method.POST, (r, m) -> Collections.emptyMap());
-        addTest(1, "/verifyDocuments", Method.POST, (r, m) -> Collections.emptyMap());
+        addEndpoint(1, "/", Method.GET, (r, m) -> app.getSystemInfo());
+        addEndpoint(1, "/reset", Method.POST, (r, m) -> new ResetV1(app).reset(r, m));
+        addEndpoint(1, "/getAllDocuments", Method.POST, (r, m) -> new GetAllDocsV1(app.getDbSvc()).getAllDocs(r, m));
+        addEndpoint(1, "/updateDatabase", Method.POST, (r, m) -> new UpdateDbV1(app.getDbSvc()).updateDb(r, m));
+        addEndpoint(1, "/startReplicator", Method.POST, (r, m) -> new CreateReplV1(app.getReplSvc()).createRepl(r, m));
+        addEndpoint(
+            1,
+            "/getReplicatorStatus",
+            Method.POST,
+            (r, m) -> new GetReplStatusV1(app.getReplSvc()).getReplStatus(r, m));
+        addEndpoint(1, "/snapshotDocuments", Method.POST, (r, m) -> Collections.emptyMap());
+        addEndpoint(1, "/verifyDocuments", Method.POST, (r, m) -> Collections.emptyMap());
     }
 
     // This method returns a Reply.  Be sure to close it!
@@ -62,14 +77,14 @@ public final class Dispatcher {
         @NonNull String path,
         @NonNull InputStream req
     ) throws IOException {
-        final Test test = getTest(version, path, method);
-        if (test == null) {
+        final Endpoint endpoint = getEndpoint(version, path, method);
+        if (endpoint == null) {
             final String msg = "Unrecognized request: " + method + " " + path + " @" + version;
             Log.w(TAG, msg);
             throw new ClientError(msg);
         }
 
-        final Map<String, Object> result = test.run(
+        final Map<String, Object> result = endpoint.run(
             new RequestBuilder(req).buildRequest(),
             TestApp.getApp().getMemory(client));
 
@@ -78,29 +93,19 @@ public final class Dispatcher {
     }
 
     @Nullable
-    private Test getTest(int version, @NonNull String path, @NonNull Method method) {
-        final Map<String, Map<Method, Test>> vMap = dispatchTable.get(version);
+    private Endpoint getEndpoint(int version, @NonNull String path, @NonNull Method method) {
+        final Map<String, Map<Method, Endpoint>> vMap = dispatchTable.get(version);
         if (vMap != null) {
-            final Map<Method, Test> veMap = vMap.get(path);
+            final Map<Method, Endpoint> veMap = vMap.get(path);
             if (veMap != null) { return veMap.get(method); }
         }
         return null;
     }
 
-    private void addTest(int version, @NonNull String path, @NonNull Method method, @NonNull Test action) {
-        Map<String, Map<Method, Test>> vMap = dispatchTable.get(version);
-        if (vMap == null) {
-            vMap = new HashMap<>();
-            dispatchTable.put(version, vMap);
-        }
-        Map<Method, Test> veMap = vMap.get(path);
-        if (veMap == null) {
-            veMap = new HashMap<>();
-            vMap.put(path, veMap);
-        }
-        if (veMap.get(method) != null) {
-            Log.w(TAG, "Replacing method: " + path + "@" + method + " v" + version);
-        }
+    private void addEndpoint(int version, @NonNull String path, @NonNull Method method, @NonNull Endpoint action) {
+        final Map<String, Map<Method, Endpoint>> vMap = dispatchTable.computeIfAbsent(version, k -> new HashMap<>());
+        final Map<Method, Endpoint> veMap = vMap.computeIfAbsent(path, k -> new HashMap<>());
+        if (veMap.get(method) != null) { Log.w(TAG, "Replacing method: " + path + "@" + method + " v" + version); }
         veMap.put(method, action);
     }
 }

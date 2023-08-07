@@ -15,7 +15,6 @@
 //
 package com.couchbase.lite.mobiletest
 
-import com.couchbase.lite.Database
 import com.couchbase.lite.MutableArray
 import com.couchbase.lite.MutableDictionary
 import com.couchbase.lite.MutableDocument
@@ -24,7 +23,6 @@ import com.couchbase.lite.mobiletest.orts.DocUpdater
 import com.couchbase.lite.mobiletest.tools.PrintReq
 import com.couchbase.lite.mobiletest.tools.ReplyBuilder
 import com.couchbase.lite.mobiletest.tools.RequestBuilder
-
 import org.junit.Assert
 import org.junit.Test
 import java.io.ByteArrayInputStream

@@ -16,6 +16,7 @@
 package com.couchbase.lite.mobiletest.tools;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -84,7 +85,7 @@ public class ReplicatorConfigBuilder {
         l.add(KEY_TYPE);
         l.add(KEY_IS_CONTINUOUS);
         l.add(KEY_AUTHENTICATOR);
-        l.add(KEY_RESET); // !!! Shouldnt be here!
+        l.add(KEY_RESET);
         LEGAL_CONFIG_KEYS = Collections.unmodifiableList(l);
     }
 
@@ -213,27 +214,11 @@ public class ReplicatorConfigBuilder {
     private CollectionConfiguration buildCollectionConfig(@NonNull TypedMap spec) {
         final CollectionConfiguration collectionConfig = new CollectionConfiguration();
 
-        final TypedList chSpec = spec.getList(KEY_CHANNELS);
-        if (chSpec != null) {
-            final int n = chSpec.size();
-            final List<String> channels = new ArrayList<>(n);
-            for (int i = 0; i < n; i++) {
-                final String channel = chSpec.getString(i);
-                if (channel != null) { channels.add(channel); }
-            }
-            collectionConfig.setChannels(channels);
-        }
+        final List<String> channels = getList(spec.getList(KEY_CHANNELS));
+        if (channels != null) { collectionConfig.setChannels(channels); }
 
-        final TypedList docIdSpec = spec.getList(KEY_DOCUMENT_IDS);
-        if (docIdSpec != null) {
-            final int n = docIdSpec.size();
-            final List<String> docIds = new ArrayList<>(n);
-            for (int i = 0; i < n; i++) {
-                final String docId = docIdSpec.getString(i);
-                if (docId != null) { docIds.add(docId); }
-            }
-            collectionConfig.setDocumentIDs(docIds);
-        }
+        final List<String> docIds = getList(spec.getList(KEY_DOCUMENT_IDS));
+        if (docIds != null) { collectionConfig.setDocumentIDs(docIds); }
 
         final TypedMap pushFilter = spec.getMap(KEY_PUSH_FILTER);
         if (pushFilter != null) { collectionConfig.setPushFilter(buildReplicatorFilter(pushFilter)); }
@@ -261,10 +246,21 @@ public class ReplicatorConfigBuilder {
         return new SessionAuthenticator(session, spec.getString(KEY_SESSION_AUTH_COOKIE));
     }
 
+    @Nullable
+    private List<String> getList(@Nullable TypedList spec) {
+        if (spec == null) { return null; }
+        final int n = spec.size();
+        final List<String> list = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            final String item = spec.getString(i);
+            if (item != null) { list.add(item); }
+        }
+        return list;
+    }
 
     @NonNull
     private ReplicationFilter buildReplicatorFilter(@NonNull TypedMap spec) {
-        if (spec == null) { throw new ClientError("Spec is null"); }
+        if (spec == null) { throw new ClientError("Spec is null"); } // throw PMD a bone
         throw new ServerError("Filters not yet supported");
     }
 }

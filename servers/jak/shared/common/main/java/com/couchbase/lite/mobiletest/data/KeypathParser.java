@@ -18,7 +18,6 @@ package com.couchbase.lite.mobiletest.data;
 import androidx.annotation.NonNull;
 
 import com.couchbase.lite.mobiletest.errors.ClientError;
-import com.couchbase.lite.mobiletest.util.Log;
 
 
 /**
