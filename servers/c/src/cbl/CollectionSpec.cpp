@@ -1,9 +1,10 @@
 #include "CollectionSpec.h"
 
-#include "support/CBLHeader.h"
+// support
+#include "CBLHeader.h"
 #include CBL_HEADER(CouchbaseLite.h)
 
-#include "support/Define.h"
+#include "Define.h"
 
 CollectionSpec::CollectionSpec(const CBLCollection *collection) {
     _scope = STR(CBLScope_Name(CBLCollection_Scope(collection)));

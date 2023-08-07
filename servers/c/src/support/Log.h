@@ -1,10 +1,12 @@
 #pragma once
 
+// support
 #include "Define.h"
 
+// lib
 #include <cstdint>
 
-namespace ts_support::logger {
+namespace ts::support::logger {
     enum class LogLevel : uint8_t {
         debug = 0,
         verbose,

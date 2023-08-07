@@ -1,17 +1,23 @@
+#include "TestServer.h"
+
+// cbl
+#include "CBLInfo.h"
+
+// support
+#include "Files.h"
+#include "Log.h"
+
+// lib
+#include <civetweb.h>
 #include <iostream>
 #include <thread>
 
-#include <civetweb.h>
-
-#include "CBLManager.h"
-#include "support/Files.h"
-#include "support/Log.h"
-#include "TestServer.h"
-
 using namespace std;
-using namespace ts_support;
-using namespace ts_support::files;
-using namespace ts_support::logger;
+using namespace ts;
+using namespace ts::cbl;
+using namespace ts::support;
+using namespace ts::support::logger;
+using namespace ts::support::files;
 
 int main() {
     try {
@@ -22,8 +28,8 @@ int main() {
         TestServer server = TestServer();
         server.start();
 
-        cout << "Using CBL-C " << CBLManager::version() << "-" << CBLManager::buildNumber();
-        cout << " (" << CBLManager::edition() << ")" << endl;
+        cout << "Using CBL-C " << cbl_info::version() << "-" << cbl_info::build();
+        cout << " (" << cbl_info::edition() << ")" << endl;
         cout << "Listening on port " << TestServer::PORT << "..." << endl;
 
         while (true) {
