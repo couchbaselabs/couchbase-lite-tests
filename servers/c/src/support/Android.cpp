@@ -12,7 +12,7 @@ using namespace ts_support::android;
 
 static AndroidContext sContext;
 
-void ts_support::android::initAndroidContext(const AndroidContext &context) {
+void ts::support::android::initAndroidContext(const AndroidContext &context) {
     assert(!context.filesDir.empty());
     assert(!context.tempDir.empty());
     assert(!context.assetsDir.empty());
@@ -28,7 +28,7 @@ void ts_support::android::initAndroidContext(const AndroidContext &context) {
     CheckError(err);
 }
 
-const AndroidContext *ts_support::android::androidContext() {
+const AndroidContext *ts::support::android::androidContext() {
     if (sContext.filesDir.empty()) {
         return nullptr;
     }

@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace ts_support::files {
+namespace ts::support::files {
     std::string filesDir(const std::string &subdir, bool create);
 
     std::string assetsDir();

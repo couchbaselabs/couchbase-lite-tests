@@ -16,19 +16,30 @@ find_package(CouchbaseLite 3.1.0 REQUIRED PATHS lib/libcblite)
 
 set(SOURCE_FILES
         src/main.cpp
-        src/CollectionSpec.cpp
-        src/CBLManager.cpp
-        src/CBLReplicationFilter.cpp
         src/Dispatcher.cpp
-        src/Dispatcher+Handlers.cpp
         src/Request.cpp
         src/TestServer.cpp
+        src/cbl/CBLInfo.h
+        src/cbl/CBLManager.cpp
+        src/cbl/CBLReplicationFilter.cpp
+        src/cbl/CollectionSpec.cpp
+        src/cbl/Fleece.cpp
+        src/cbl/KeyPath.cpp
+        src/cbl/Snapshot.cpp
+        src/dispatcher/GetRoot.cpp
+        src/dispatcher/PostGetAllDocuments.cpp
+        src/dispatcher/PostGetDocument.cpp
+        src/dispatcher/PostGetReplicatorStatus.cpp
+        src/dispatcher/PostReset.cpp
+        src/dispatcher/PostSnapshotDocuments.cpp
+        src/dispatcher/PostStartReplicator.cpp
+        src/dispatcher/PostUpdateDatabase.cpp
+        src/dispatcher/PostVerifyDocuments.cpp
         src/support/Exception.cpp
-        src/support/Fleece.cpp
-        src/support/KeyPath.cpp
         src/support/Log.cpp
         src/support/UUID.cpp
-        src/support/Zip.cpp)
+        src/support/ZipUtil.cpp
+)
 
 add_executable(testserver ${SOURCE_FILES})
 
@@ -56,6 +67,11 @@ target_link_libraries(
 
 target_include_directories(
         testserver PRIVATE
+        src
+        src/cbl
+        src/dispatcher
+        src/support
+        src/support/ext
         ${civetweb_SOURCE_DIR}/include
 )
 
@@ -68,12 +84,12 @@ target_compile_definitions(
 if(MSVC)
     target_include_directories(
             testserver PRIVATE
-            src/msvc
+            src/support/msvc
     )
     target_sources(
             testserver PRIVATE
-            src/msvc/asprintf.c
-            src/msvc/vasprintf-msvc.c
+            src/support/msvc/asprintf.c
+            src/support/msvc/vasprintf-msvc.c
     )
     target_link_libraries(
             testserver PRIVATE

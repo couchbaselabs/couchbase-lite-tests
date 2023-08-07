@@ -3,12 +3,12 @@
 #include "CBLHeader.h"
 #include CBL_HEADER(CBLBase.h)
 
-#include <stdexcept>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
 #include <string>
 #include <sstream>
 
-namespace ts_support::exception {
+namespace ts::support::exception {
     class CBLException : public std::exception {
     public:
         explicit CBLException(const CBLError &error);
@@ -31,9 +31,9 @@ namespace ts_support::exception {
 }
 
 static inline void CheckError(CBLError &error) {
-    if (error.code > 0) { throw ts_support::exception::CBLException(error); }
+    if (error.code > 0) { throw ts::support::exception::CBLException(error); }
 }
 
 static inline void CheckNotNull(const void *obj, const std::string &message) {
-    if (!obj) { throw ts_support::exception::RequestError(message); }
+    if (!obj) { throw ts::support::exception::RequestError(message); }
 }
