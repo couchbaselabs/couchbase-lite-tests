@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace ts_support::android {
+namespace ts::support::android {
     struct AndroidContext {
         std::string filesDir;
         std::string tempDir;

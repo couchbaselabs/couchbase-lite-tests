@@ -21,7 +21,7 @@ static string getOSVersion() {
     return [[[NSProcessInfo processInfo] operatingSystemVersionString] cStringUsingEncoding:NSASCIIStringEncoding];
 }
 
-string ts_support::device::deviceModel() {
+string ts::support::device::deviceModel() {
 #if TARGET_IPHONE_SIMULATOR
     return "iOS Simulator";
 #elif TARGET_OS_IPHONE
@@ -33,7 +33,7 @@ string ts_support::device::deviceModel() {
 #endif
 }
 
-string ts_support::device::osName() {
+string ts::support::device::osName() {
 #if TARGET_IPHONE_SIMULATOR || TARGET_OS_IPHONE
     return "iOS";
 #elif TARGET_OS_MAC
@@ -43,7 +43,7 @@ string ts_support::device::osName() {
 #endif
 }
 
-string ts_support::device::osVersion() {
+string ts::support::device::osVersion() {
 #if TARGET_IPHONE_SIMULATOR || TARGET_OS_IPHONE || TARGET_OS_MAC
     return getOSVersion();
 #else
@@ -51,7 +51,7 @@ string ts_support::device::osVersion() {
 #endif
 }
 
-string ts_support::device::apiVersion() {
+string ts::support::device::apiVersion() {
     return "";
 }
 

@@ -73,7 +73,8 @@ static string getDistroInfo() {
 }
 #endif
 
-std::string ts_support::device::deviceModel() {
+
+std::string ts::support::device::deviceModel() {
 #if __ANDROID__
     char product_model_str[PROP_VALUE_MAX];
     __system_property_get("ro.product.model", product_model_str);
@@ -83,7 +84,7 @@ std::string ts_support::device::deviceModel() {
 #endif
 }
 
-std::string ts_support::device::osName() {
+std::string ts::support::device::osName() {
 #if __ANDROID__
     return "Android";
 #elif _MSC_VER
@@ -95,7 +96,7 @@ std::string ts_support::device::osName() {
 #endif
 }
 
-std::string ts_support::device::osVersion() {
+std::string ts::support::device::osVersion() {
 #if __ANDROID__
     char sdk_ver_str[PROP_VALUE_MAX];
     __system_property_get("ro.build.version.sdk", sdk_ver_str);
@@ -120,7 +121,7 @@ std::string ts_support::device::osVersion() {
 #endif
 }
 
-std::string ts_support::device::apiVersion() {
+std::string ts::support::device::apiVersion() {
 #if __ANDROID__
     char rel_ver_str[PROP_VALUE_MAX];
     __system_property_get("ro.build.version.release", rel_ver_str);

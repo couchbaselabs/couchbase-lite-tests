@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace ts_support::device {
+namespace ts::support::device {
     std::string deviceModel();
 
     std::string osName();
