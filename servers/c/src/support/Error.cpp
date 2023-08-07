@@ -1,10 +1,10 @@
-#include "Exception.h"
+#include "Error.h"
 #include "Defer.h"
 
 using namespace std;
 using namespace nlohmann;
 
-namespace ts::support {
+namespace ts::support::error {
     string errorMessage(const CBLError &error) {
         FLSliceResult messageVal = CBLError_Message(&error);
         DEFER { FLSliceResult_Release(messageVal); };
@@ -25,7 +25,7 @@ namespace ts::support {
         }
     }
 
-    exception::CBLException::CBLException(const CBLError &error) {
+    CBLException::CBLException(const CBLError &error) {
         _error = error;
 
         stringstream ss;
@@ -36,7 +36,7 @@ namespace ts::support {
         _what = ss.str();
     }
 
-    json exception::CBLException::json() const {
+    json CBLException::json() const {
         nlohmann::json result = json::object();
         auto domain = crossPlatformDomain(_error);
         switch (domain) {

@@ -8,7 +8,7 @@
 #include <string>
 #include <sstream>
 
-namespace ts::support::exception {
+namespace ts::support::error {
     class CBLException : public std::exception {
     public:
         explicit CBLException(const CBLError &error);
@@ -28,12 +28,8 @@ namespace ts::support::exception {
     public:
         explicit RequestError(const std::string &s) : logic_error(s) {}
     };
-}
 
-static inline void CheckError(CBLError &error) {
-    if (error.code > 0) { throw ts::support::exception::CBLException(error); }
-}
-
-static inline void CheckNotNull(const void *obj, const std::string &message) {
-    if (!obj) { throw ts::support::exception::RequestError(message); }
+    static inline void CheckError(CBLError &error) {
+        if (error.code > 0) { throw CBLException(error); }
+    }
 }
