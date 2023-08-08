@@ -5,7 +5,6 @@
 #include "Android.h"
 #endif
 
-#include "Error.h"
 #include "Files.h"
 #include "UUID.h"
 
@@ -14,7 +13,6 @@
 #include <string>
 
 using namespace std;
-using namespace ts::support::error;
 using namespace ts::support::files;
 using namespace ts::support::key;
 
