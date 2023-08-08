@@ -64,7 +64,7 @@ internal static partial class HandlerList
                         isPush = entry.IsPush,
                         collection = $"{doc.ScopeName}.{doc.CollectionName}",
                         documentID = doc.Id,
-                        flags = new[] { doc.Flags.ToString() },
+                        flags = new[] { doc.Flags == 0 ? "" : doc.Flags.ToString() },
                         error = error
                     };
                 }

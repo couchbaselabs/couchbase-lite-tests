@@ -391,7 +391,8 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
             "database": self.__database,
             "endpoint": self.__endpoint,
             "replicatorType": str(self.replicatorType),
-            "continuous": self.continuous
+            "continuous": self.continuous,
+            "enableDocumentListener": self.enableDocumentListener
         }
 
         if self.collections is not None:
