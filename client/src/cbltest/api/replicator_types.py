@@ -218,6 +218,9 @@ class ReplicatorDocumentFlags(Flag):
     @classmethod
     def parse(cls, input: str) -> ReplicatorDocumentFlags:
         assert isinstance(input, str), f"Non-string input to ReplicatorDocumentFlags {input}"
+        if len(input) == 0: 
+            return ReplicatorDocumentFlags.NONE
+        
         upper = input.upper()
         if upper == "DELETED":
             return ReplicatorDocumentFlags.DELETED
@@ -287,16 +290,12 @@ class ReplicatorDocumentEntry:
 
     def __init__(self, body: dict) -> None:
         assert isinstance(body, dict), "Invalid replicator document received (not an object)"
-        self.__collection = cast(str, body.get(self.__collection_key))
-        assert isinstance(self.__collection, str), "Invalid replicator document collection received (not a str)"
+        self.__collection = _get_typed_required(body, self.__collection_key, str)
         assert self.__collection is not None, "Null collection on replicator document received"
-        self.__document_id = cast(str, body.get(self.__document_id_key))
-        assert isinstance(self.__document_id, str), "Invalid replicator document ID received (not a str)" 
+        self.__document_id = _get_typed_required(body, self.__document_id_key, str)
         assert self.__document_id is not None, "Null ID on replicator document received"
-        self.__is_push = cast(bool, body.get(self.__is_push_key))
-        assert isinstance(self.__is_push, bool), "Invalid replicator document isPush received (not a boolean)"
+        self.__is_push = _get_typed_required(body, self.__is_push_key, bool)
         self.__flags = ReplicatorDocumentFlags.parse_all(_get_typed_required(body, self.__flags_key, List[str]))
-        assert isinstance(self.__flags, int), "Invalid replicator document flags received (not an int)"
         self.__error: Optional[ErrorResponseBody] = ErrorResponseBody.create(cast(dict, body.get(self.__error_key)))
     
 class ReplicatorStatus:
