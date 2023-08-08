@@ -140,7 +140,7 @@ class TestBasicReplication:
             * continuous: false
             * credentials: user1/pass
         '''
-        replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), replicator_type=ReplicatorType.PULL, collections=[
+        replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), replicator_type=ReplicatorType.PUSH_AND_PULL, collections=[
             ReplicatorCollectionEntry(["travel.airlines", "travel.airports", "travel.hotels", "travel.landmarks", "travel.routes"])
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
 
