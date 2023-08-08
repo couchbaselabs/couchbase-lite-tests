@@ -12,8 +12,26 @@ info:
     * CBLTest-API-Version (integer)
     * CBLTest-Server-ID (UUID)
 
-    Notes:
-    * Any enum values are case insensitive.
+    Enum values:
+    * Any enum values in the spec are case insensitive.
+
+    KeyPath:
+    * The /updateDatabase and /verifyDocuments API are using the JSON's keypath to
+      refer to a specific path in the document's properties tree.
+    * The keypath structure can be described as follows:
+
+      keypath  ::= ( [ DOLLAR DOT ] <property> | <index> ) <path>
+      path     ::= (DOT <property> | <index>)* EOP
+      index    ::= OBRACKET DIGIT+ CBRACKET
+      property ::= ANY+
+      EOP      ::= End of path
+      DOT      ::= '.'
+      DOLLAR   ::= '$'
+      OBRACKET ::= '['
+      CBRACKET ::= ']'
+      DIGIT    ::=  '0' |'1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+      ANY      ::= (! (DOT | OBRACKET | CBRACKET | EOP) ) | ESCAPE
+      ESCAPE   ::= '\' (! EOP )
 
     Changes
 
@@ -144,10 +162,8 @@ paths:
         values associated with the keys. The objects in the array are evaluated in their natural order.
 
         The keypath identifies a unique location in the document's property tree starting from the root that follows 
-        dictionary properties and array elements. The keypath looks like "foo.bar[1].baz" - The keypath components are 
-        separated by dot ('.'). Each path is represented by the key name in a dictionary object, and the index brackets 
-        at the end of the key name points to an array element in an array object. A '\' can be used to escape a special 
-        character ('.', '[', ']', '\' or '$') in the key name.
+        dictionary properties and array elements. The keypath looks like "foo.bar[1].baz". The keypath structure can be found
+        in the description at the beginning of this specification.
 
         The value at the location specified by the keypath is replaced with the value associated with the keypath, in the object 
         regardless of its type. When a path in the keypath refers to a non-existent property, the key is added and 
@@ -168,8 +184,8 @@ paths:
 
         Updates:
 
-        name.last = "Tiger" ->  {"name", {"first": "John", "last": "Tiger"}, ...}
-        name.middle = "Sky" ->  {"name", {"first": "John", "middle": "sky", "last": "Tiger"}, ...}
+        name.last = "Tiger" -> {"name", {"first": "John", "last": "Tiger"}, ...}
+        name.middle = "Sky" -> {"name", {"first": "John", "middle": "sky", "last": "Tiger"}, ...}
         name = "John Doe" -> {"name", "John Doe"}
 
         name.first.value = "John" ->  Error as the value of "first" is not the dictionary
@@ -183,25 +199,6 @@ paths:
         An array of the key paths which refer to ditionary keys or array elements to be removed. If a keypath refer to a non-existent
         property or array element, the remove for the keypath will be no-ops. When removing multiple items in an array, the order of the array indexes 
         should be from high to low to avoid index mutation during the removal.
-
-        keypath Specificition
-
-        keypath  ::= ( [ DOLLAR DOT ] <property> | <index> ) <path>
- 
-        path     ::= (DOT <property> | <index>)* EOP
- 
-        index    ::= OBRACKET DIGIT+ CBRACKET
- 
-        property ::= ANY+
- 
-        EOP      ::= End of path
-        DOT      ::= '.'
-        DOLLAR   ::= '$'
-        OBRACKET ::= '['
-        CBRACKET ::= ']'
-        DIGIT    ::=  '0' |'1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
-        ANY      ::= (! (DOT | OBRACKET | CBRACKET | EOP) ) | ESCAPE
-        ESCAPE   ::= '\' (! EOP )
         
       operationId: updateDatabase
       requestBody:
