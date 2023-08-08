@@ -35,11 +35,11 @@ set(SOURCE_FILES
         src/dispatcher/PostStartReplicator.cpp
         src/dispatcher/PostUpdateDatabase.cpp
         src/dispatcher/PostVerifyDocuments.cpp
-        src/support/Exception.cpp
+        src/support/Error.cpp
         src/support/Log.cpp
         src/support/UUID.cpp
         src/support/ZipUtil.cpp
-)
+        src/support/Precondition.h)
 
 add_executable(testserver ${SOURCE_FILES})
 

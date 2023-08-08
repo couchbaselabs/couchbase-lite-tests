@@ -11,7 +11,7 @@
 using namespace nlohmann;
 using namespace std;
 using namespace ts::support::logger;
-using namespace ts::support::exception;
+using namespace ts::support::error;
 
 namespace ts {
     constexpr const int kSuccessStatusCode = 200;

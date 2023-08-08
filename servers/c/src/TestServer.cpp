@@ -5,7 +5,7 @@
 #include "Android.h"
 #endif
 
-#include "Exception.h"
+#include "Error.h"
 #include "Files.h"
 #include "UUID.h"
 
@@ -14,7 +14,7 @@
 #include <string>
 
 using namespace std;
-using namespace ts::support::exception;
+using namespace ts::support::error;
 using namespace ts::support::files;
 using namespace ts::support::key;
 
@@ -46,7 +46,7 @@ namespace ts {
         string port_str = to_string(PORT);
         const char *options[3] = {"listening_ports", port_str.c_str(), nullptr};
         _server = mg_start(nullptr, nullptr, options);
-        CheckNotNull(_server, "Cannot start server");
+        if (!_server) { throw runtime_error("Cannot start server"); }
 
         mg_set_request_handler(_server, "/*", [](mg_connection *conn, void *context) -> int {
             auto server = static_cast<TestServer *>(context);
