@@ -3,10 +3,10 @@ from typing import List
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cloud import CouchbaseCloud
-from cbltest.api.database import AllDocumentsEntry
 from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry, ReplicatorActivityLevel
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.error_types import ErrorDomain
+from cbltest.api.test_functions import compare_local_and_remote
 
 class TestBasicReplication:
     @pytest.mark.asyncio
@@ -67,18 +67,8 @@ class TestBasicReplication:
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
         # 5. Check that all docs are replicated correctly.
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airlines")
-        lite_all_docs = await db.get_all_documents("travel.airlines", "travel.airports", "travel.hotels")
-        compare_result = db.compare_doc_results(lite_all_docs.collections[0].documents, sg_all_docs.rows, ReplicatorType.PUSH)
-        assert compare_result.success, f"{compare_result.message} (travel.airlines)"
-
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airports")
-        compare_result = db.compare_doc_results(lite_all_docs.collections[1].documents, sg_all_docs.rows, ReplicatorType.PUSH)
-        assert compare_result.success, f"{compare_result.message} (travel.airports)"
-
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "hotels")
-        compare_result = db.compare_doc_results(lite_all_docs.collections[2].documents, sg_all_docs.rows, ReplicatorType.PUSH)
-        assert compare_result.success, f"{compare_result.message} (travel.hotels)"
+        compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "travel", 
+                                 ["travel.airlines", "travel.airports", "travel.hotels"])
 
     @pytest.mark.asyncio
     async def test_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
@@ -109,18 +99,8 @@ class TestBasicReplication:
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
         # 5. Check that all docs are replicated correctly.
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "routes")
-        lite_all_docs = await db.get_all_documents("travel.routes", "travel.landmarks", "travel.hotels")
-        compare_result = db.compare_doc_results(lite_all_docs.collections[0].documents, sg_all_docs.rows, ReplicatorType.PULL)
-        assert compare_result.success, f"{compare_result.message} (travel.routes)"
-
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "landmarks")
-        compare_result = db.compare_doc_results(lite_all_docs.collections[1].documents, sg_all_docs.rows, ReplicatorType.PULL)
-        assert compare_result.success, f"{compare_result.message} (travel.landmarks)"
-
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "hotels")
-        compare_result = db.compare_doc_results(lite_all_docs.collections[2].documents, sg_all_docs.rows, ReplicatorType.PULL)
-        assert compare_result.success, f"{compare_result.message} (travel.hotels)"
+        compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "travel", 
+                                 ["travel.routes", "travel.landmarks", "travel.hotels"])
 
     @pytest.mark.asyncio
     async def test_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
@@ -151,23 +131,5 @@ class TestBasicReplication:
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
         # 5. Check that all docs are replicated correctly.
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airlines")
-        lite_all_docs = await db.get_all_documents("travel.airlines", "travel.airports", "travel.hotels", "travel.landmarks", "travel.routes")
-        compare_result = db.compare_doc_results(lite_all_docs.collections[0].documents, sg_all_docs.rows, ReplicatorType.PUSH_AND_PULL)
-        assert compare_result.success, f"{compare_result.message} (travel.airlines)"
-
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airports")
-        compare_result = db.compare_doc_results(lite_all_docs.collections[1].documents, sg_all_docs.rows, ReplicatorType.PUSH_AND_PULL)
-        assert compare_result.success, f"{compare_result.message} (travel.airports)"
-
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "hotels")
-        compare_result = db.compare_doc_results(lite_all_docs.collections[2].documents, sg_all_docs.rows, ReplicatorType.PUSH_AND_PULL)
-        assert compare_result.success, f"{compare_result.message} (travel.hotels)"
-
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "landmarks")
-        compare_result = db.compare_doc_results(lite_all_docs.collections[3].documents, sg_all_docs.rows, ReplicatorType.PUSH_AND_PULL)
-        assert compare_result.success, f"{compare_result.message} (travel.landmarks)"
-
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "routes")
-        compare_result = db.compare_doc_results(lite_all_docs.collections[4].documents, sg_all_docs.rows, ReplicatorType.PUSH_AND_PULL)
-        assert compare_result.success, f"{compare_result.message} (travel.routes)"
+        compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "travel", 
+                                 ["travel.airlines", "travel.airports", "travel.hotels", "travel.landmarks", "travel.routes"])
