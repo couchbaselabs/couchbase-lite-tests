@@ -125,21 +125,13 @@ namespace TestServer
         {
             switch(ex.Domain) {
                 case CouchbaseLiteErrorType.POSIX:
-                    return (TestServerErrorDomain.POSIX, (int)ex.Error);
+                    return (TestServerErrorDomain.POSIX, ex.Error);
                 case CouchbaseLiteErrorType.SQLite:
-                    return (TestServerErrorDomain.SQLite, (int)ex.Error);
+                    return (TestServerErrorDomain.SQLite, ex.Error);
                 case CouchbaseLiteErrorType.Fleece:
-                    return (TestServerErrorDomain.Fleece, (int)ex.Error);
+                    return (TestServerErrorDomain.Fleece, ex.Error);
                 default: {
-                    var errCode = (int)ex.Error;
-                    var domain = TestServerErrorDomain.CouchbaseLite;
-                    if(ex.Error > (int)CouchbaseLiteError.HTTPBase) {
-                        domain = TestServerErrorDomain.Websocket;
-                    } else if(ex.Error > (int)CouchbaseLiteError.NetworkBase) {
-                        domain = TestServerErrorDomain.Network;
-                    }
-
-                    return (domain, errCode);
+                    return (TestServerErrorDomain.CouchbaseLite, ex.Error);
                 }
             }
         }

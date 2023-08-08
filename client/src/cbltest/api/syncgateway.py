@@ -91,7 +91,7 @@ class PutDatabasePayload(JSONSerializable):
 
         return ret_val
     
-class _AllDocumentsResponseRow:
+class AllDocumentsResponseRow:
     @property
     def key(self) -> str:
         return self.__key
@@ -111,7 +111,7 @@ class _AllDocumentsResponseRow:
     
 class AllDocumentsResponse:
     @property 
-    def rows(self) -> List[_AllDocumentsResponseRow]:
+    def rows(self) -> List[AllDocumentsResponseRow]:
         return self.__rows
     
     def __len__(self) -> int:
@@ -119,9 +119,9 @@ class AllDocumentsResponse:
     
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
-        self.__rows: List[_AllDocumentsResponseRow] = []
+        self.__rows: List[AllDocumentsResponseRow] = []
         for row in input["rows"]:
-            self.__rows.append(_AllDocumentsResponseRow(row["key"], row["id"], row["value"]["rev"]))
+            self.__rows.append(AllDocumentsResponseRow(row["key"], row["id"], row["value"]["rev"]))
 
 class SyncGateway:
     """

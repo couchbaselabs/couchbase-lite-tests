@@ -45,9 +45,7 @@ internal static partial class HandlerList
             .Select(x => x.GetString()!)) {
             using var q = dbObject.CreateQuery($"SELECT meta().id, meta().revisionID FROM {collName}");
             var results = q.Execute().Select(x => new AllDocumentsResponse(x.GetString(0)!, x.GetString(1)!)).ToList();
-            if(results.Any()) {
-                retVal[collName] = results;
-            }
+            retVal[collName] = results;
         }
 
         response.WriteBody(retVal, version);
