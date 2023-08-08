@@ -46,7 +46,7 @@ namespace ts {
     private:
         void addCommonResponseHeaders() const;
 
-        int respond(int status, const std::optional<std::string> &json = std::nullopt) const;
+        [[nodiscard]] int respond(int status, const std::optional<std::string> &json = std::nullopt) const;
 
         mg_connection *_conn;
         const TestServer *_server;

@@ -7,8 +7,8 @@
 
 namespace ts_support::keypath {
     struct Path {
-        std::optional<std::string> key;  ///< Dict key, or no key
-        std::optional<size_t> index;     ///< Array index, only if no key
+        std::optional<std::string> key;      ///< Dict key, or no key
+        std::optional<uint32_t> index;       ///< Array index, only if no key
     };
 
     class KeyPathError : public std::logic_error {
