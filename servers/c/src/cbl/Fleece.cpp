@@ -58,7 +58,7 @@ void setSlotValue(FLSlot slot, const json &value) { // NOLINT(misc-no-recursion)
     }
 }
 
-nlohmann::json ts_support::fleece::toJSON(FLValue value) {
+nlohmann::json ts_support::fleece::toJSON(FLValue value) { // NOLINT(misc-no-recursion)
     auto type = FLValue_GetType(value);
     switch (type) {
         case kFLNull:
@@ -85,10 +85,10 @@ nlohmann::json ts_support::fleece::toJSON(FLValue value) {
             json dict = json::object();
             FLDictIterator iter;
             FLDictIterator_Begin(FLValue_AsDict(value), &iter);
-            FLValue value;
-            while (NULL != (value = FLDictIterator_GetValue(&iter))) {
+            FLValue val;
+            while (nullptr != (val = FLDictIterator_GetValue(&iter))) {
                 FLString key = FLDictIterator_GetKeyString(&iter);
-                dict[STR(key)] = toJSON(value);
+                dict[STR(key)] = toJSON(val);
                 FLDictIterator_Next(&iter);
             }
             return dict;
@@ -97,9 +97,9 @@ nlohmann::json ts_support::fleece::toJSON(FLValue value) {
             json array = json::array();
             FLArrayIterator iter;
             FLArrayIterator_Begin(FLValue_AsArray(value), &iter);
-            FLValue value;
-            while (NULL != (value = FLArrayIterator_GetValue(&iter))) {
-                array.push_back(toJSON(value));
+            FLValue val;
+            while (nullptr != (val = FLArrayIterator_GetValue(&iter))) {
+                array.push_back(toJSON(val));
                 FLArrayIterator_Next(&iter);
             }
             return array;
@@ -121,7 +121,7 @@ FLValue getMutableDictValue(FLMutableDict mDict, FLString key) {
     return FLDict_Get(mDict, key);
 }
 
-FLValue getMutableArrayValue(FLMutableArray mArray, size_t index) {
+FLValue getMutableArrayValue(FLMutableArray mArray, uint32_t index) {
     auto dict = FLMutableArray_GetMutableDict(mArray, index);
     if (dict) {
         return (FLValue) dict;

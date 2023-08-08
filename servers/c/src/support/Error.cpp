@@ -8,7 +8,7 @@ namespace ts::support::error {
     string errorMessage(const CBLError &error) {
         FLSliceResult messageVal = CBLError_Message(&error);
         DEFER { FLSliceResult_Release(messageVal); };
-        return string(static_cast<const char *>(messageVal.buf), messageVal.size);
+        return {static_cast<const char *>(messageVal.buf), messageVal.size};
     }
 
     CBLErrorDomain crossPlatformDomain(const CBLError &error) {
@@ -25,9 +25,7 @@ namespace ts::support::error {
         }
     }
 
-    CBLException::CBLException(const CBLError &error) {
-        _error = error;
-
+    CBLException::CBLException(const CBLError &error) : _error(error) {
         stringstream ss;
         ss << "Couchbase Lite Error : "
            << (int) crossPlatformCode(_error) << "/"

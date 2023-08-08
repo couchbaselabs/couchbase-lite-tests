@@ -5,9 +5,9 @@
 using namespace std;
 using namespace ts_support::keypath;
 
-static size_t toArrayIndex(const std::string &str) {
+static uint32_t toArrayIndex(const std::string &str) {
     stringstream ss(str);
-    size_t result;
+    uint32_t result;
     ss >> result;
     if (ss.fail()) {
         throw logic_error("Invalid array index found");

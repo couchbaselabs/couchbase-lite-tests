@@ -16,7 +16,7 @@ namespace ts::cbl {
     public:
         static ReplicationFilter *make_filter(const ReplicationFilterSpec &spec);
 
-        explicit ReplicationFilter(const ReplicationFilterSpec &spec) : _spec(spec) {}
+        explicit ReplicationFilter(ReplicationFilterSpec spec) : _spec(std::move(spec)) {}
 
         virtual ~ReplicationFilter() = default;
 
