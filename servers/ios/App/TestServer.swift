@@ -14,11 +14,11 @@ class TestServer : ObservableObject {
     init(port: Int, dbManager: DatabaseManager) {
         self.dbConnection = dbManager
         do {
-            var env = try Environment.detect()
+            var env : Environment = .development
             try LoggingSystem.bootstrap(from: &env)
             
             app = Application(env)
-            try configure(app, port)
+            configure(app, port)
         } catch {
             fatalError(error.localizedDescription)
         }
@@ -34,28 +34,22 @@ class TestServer : ObservableObject {
         
     }
     
-    private func configure(_ app: Application, _ port: Int) throws {
+    private func configure(_ app: Application, _ port: Int) {
         // uncomment to serve files from /Public folder
         // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
         
         app.http.server.configuration.hostname = "0.0.0.0"
         app.http.server.configuration.port = port
+        
+        // Use custom error middleware
+        app.middleware = .init()
+        app.middleware.use(TestServerErrorMiddleware())
 
-        Task {
-            try await routes(app)
-        }
-        // register routes
+        setupRoutes(app)
     }
     
-    private func routes(_ app: Application) async throws {
-        app.get { req async in
-            "It works!"
-        }
-        
-        app.post("reset") { [self] req async in
-            dbConnection.reset()
-            return "Reset"
-        }
+    private func setupRoutes(_ app: Application) {
+        app.get("", use: Handlers.getRoot)
     }
 }
 

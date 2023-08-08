@@ -10,13 +10,16 @@ import SwiftUI
 @main
 struct CBL_Tests_iOSApp: App {
     let testServer: TestServer
-    let databaseManager: DatabaseManager
     
     init() {        
-        databaseManager = DatabaseManager()
-        testServer = TestServer(port: 80, dbManager: databaseManager)
-        Task { [weak testServer] in
-            await testServer?.run()
+        DatabaseManager.InitializeShared()
+        if let databaseManager = DatabaseManager.shared {
+            testServer = TestServer(port: 80, dbManager: databaseManager)
+            Task { [weak testServer] in
+                await testServer?.run()
+            }
+        } else {
+            fatalError("Failed to initialize DatabaseManager singleton!")
         }
     }
     
