@@ -38,27 +38,13 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
                 auto props = CBLDocument_MutableProperties(doc);
 
                 if (update.contains("updatedProperties")) {
-                    auto updatedProps = GetValue<vector<unordered_map<string, json>>>(update, "updatedProperties");
-                    for (auto &keyPaths: updatedProps) {
-                        for (auto &keyPath: keyPaths) {
-                            try {
-                                ts_support::fleece::updateProperties(props, FLS(keyPath.first), keyPath.second);
-                            } catch (const std::exception &e) {
-                                throw RequestError(e.what());
-                            }
-                        }
-                    }
+                    auto updateItems = GetValue<vector<unordered_map<string, json>>>(update, "updatedProperties");
+                    ts_support::fleece::updateProperties(props, updateItems);
                 }
 
                 if (update.contains("removedProperties")) {
                     auto keyPaths = GetValue<vector<string>>(update, "removedProperties");
-                    for (auto &keyPath: keyPaths) {
-                        try {
-                            ts_support::fleece::removeProperties(props, FLS(keyPath));
-                        } catch (const std::exception &e) {
-                            throw RequestError(e.what());
-                        }
-                    }
+                    ts_support::fleece::removeProperties(props, keyPaths);
                 }
 
                 CBLCollection_SaveDocument(col, doc, &error);
