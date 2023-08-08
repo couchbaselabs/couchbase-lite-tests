@@ -35,25 +35,30 @@ info:
 
     Changes
 
-    0.1.7
+    0.1.8 (08/08/23)
+    * Fixed missing ReplicationCollection.pullFilter
+    * Added spec/replication-filter.md
+    * Made DocumentReplication.flags required
+
+    0.1.7 (08/04/23)
     * Fixed missing database in snapshotDocuments request
     * Added required keys to snapshotDocuments request
     * Add 'description' key to the verifyDocuments response
 
-    0.1.6
+    0.1.6 (08/04/23)
     * Added JSON Path Spec to /updateDatabase
 
-    0.1.5
+    0.1.5 (08/02/23)
     * Changed /updateDatabase to use keypaths for specifying the changes
     
-    0.1.4
+    0.1.4 (07/28/23)
     * Fixed required fields and update description in ServerInfo.
     * Added additionalInfo to the ServerInfo.
     * Fixed required fields in ReplicationCollection.
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 0.1.7
+  version: 0.1.8
 tags:
   - name: API
 paths:
@@ -417,7 +422,7 @@ components:
           example: 'doc1'
     DocumentReplication:
       type: object
-      required: ['collection', 'documentID', 'isPush']
+      required: ['collection', 'documentID', 'isPush', 'flags']
       properties:
         collection:
           type: string
@@ -429,6 +434,7 @@ components:
           type: boolean
           example: true
         flags: 
+          description: 'The document replication flags. An empty array indicates no flags.'
           type: array
           items:
             type: string
@@ -550,23 +556,37 @@ components:
       required: ['names']
       properties:
         names: 
+          description: An array of collections that share the same configuration.
           type: array
           items:
             type: string
           example: ['store.cloths', 'store.shoes']
         channels:
+          description: Channel names filter
           type: array
           items:
             type: string
           example: ['A', 'B']
         documentIDs:
+          description: Document IDs filter
           type: array
           items:
             type: string
           example: ['doc1', 'doc2']
         pushFilter:
+          description: Push Filter - A filter function called before push a document
+          $ref: '#/components/schemas/ReplicationFilter'
+        pullFilter:
+          description: Pull Filter - A filter function called before saving a pulled document
           $ref: '#/components/schemas/ReplicationFilter'
     ReplicationFilter:
+      description: |- 
+        Replication Function to call before pushing a document or before saving a pulled documents.
+        The replication filter is predefined and implemented in the test server. Each filter will be given 
+        with a unique name that will be used to reference to the filter and will have a different parameters
+        or none to pass to.
+
+        See: spec/replication-filter.md for the list of predefined replication filters.
       type: object
       required: ['name']
       properties:
