@@ -10,7 +10,7 @@
 // support
 #include "Defer.h"
 #include "Define.h"
-#include "Exception.h"
+#include "Error.h"
 #include "Fleece.h"
 #include "JSON.h"
 
@@ -22,7 +22,7 @@ using namespace nlohmann;
 using namespace ts;
 using namespace ts::cbl;
 using namespace ts::support;
-using namespace ts::support::exception;
+using namespace ts::support::error;
 using namespace ts::support::json_util;
 using namespace std;
 

@@ -3,7 +3,7 @@
 #include "TestServer.h"
 
 // support
-#include "Exception.h"
+#include "Error.h"
 #include "Log.h"
 
 // lib
@@ -14,7 +14,7 @@ using namespace std;
 
 using namespace ts::cbl;
 using namespace ts::support::logger;
-using namespace ts::support::exception;
+using namespace ts::support::error;
 
 #define HANDLER(h) [this](Request& request) -> int { return h(request); }
 

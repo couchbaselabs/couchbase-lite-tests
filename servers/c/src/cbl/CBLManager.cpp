@@ -4,7 +4,8 @@
 // support
 #include "Defer.h"
 #include "Define.h"
-#include "Exception.h"
+#include "Error.h"
+#include "Precondition.h"
 #include "ZipUtil.h"
 
 // lib
@@ -16,7 +17,7 @@ using namespace std;
 using namespace filesystem;
 
 using namespace ts::support;
-using namespace ts::support::exception;
+using namespace ts::support::error;
 
 #define DB_FILE_EXT ".cblite2"
 #define DB_FILE_ZIP_EXT ".cblite2.zip"

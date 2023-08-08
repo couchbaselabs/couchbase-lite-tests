@@ -1,7 +1,7 @@
 #pragma once
 
 // support
-#include "Exception.h"
+#include "Error.h"
 
 // lib
 #include <nlohmann/json.hpp>
@@ -41,7 +41,7 @@ namespace ts {
 
         [[nodiscard]] int respondWithServerError(const char *message) const;
 
-        [[nodiscard]] int respondWithCBLError(const ts::support::exception::CBLException &exception) const;
+        [[nodiscard]] int respondWithCBLError(const ts::support::error::CBLException &exception) const;
 
     private:
         void addCommonResponseHeaders() const;
