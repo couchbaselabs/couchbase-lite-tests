@@ -1,92 +1,123 @@
 from pathlib import Path
+from typing import List
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cloud import CouchbaseCloud
-from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.api.database import AllDocumentsEntry
 from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry, ReplicatorActivityLevel
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
+from cbltest.api.error_types import ErrorDomain
 
 class TestBasicReplication:
     @pytest.mark.asyncio
     async def test_replicate_non_existing_sg_collections(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # 1. Reset SG and load `names` dataset
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "names")
 
+        # 2. Reset local database, and load `travel` dataset
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
+        # 3. Start a replicator
+        #   * collections : `travel.airlines`
+        #   * endpoint: `/names`
+        #   * type: push
+        #   * continuous: false
+        #   * credentials: user1/pass
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"), replicator_type=ReplicatorType.PUSH, collections=[
             ReplicatorCollectionEntry(["travel.airlines"])
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
-
         await replicator.start()
+
+        # 4. Wait until the replicator is stopped
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is not None and status.error.code == 10404
-        return None
+        
+        # 5. Check that the replicator's error is CBL/10404
+        assert status.error is not None \
+            and status.error.code == 10404 \
+            and status.error.domain == ErrorDomain.CBL
 
     @pytest.mark.asyncio
     async def test_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # 1. Reset SG and load `travel` dataset.
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "travel")
 
+        # Reset local database, and load `travel` dataset.
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
+        '''
+        3. Start a replicator: 
+            * collections : `travel.airlines`, `travel.airports`, `travel.hotels`
+            * endpoint: `/travel`
+            * type: push
+            * continuous: false
+            * credentials: user1/pass
+        '''
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), replicator_type=ReplicatorType.PUSH, collections=[
-            ReplicatorCollectionEntry(["travel.airlines"])
-        ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
-
-        await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airlines")
-        lite_all_docs = await db.get_all_documents("travel.airlines")
-        assert len(sg_all_docs) == len(lite_all_docs.collections[0].documents)
-        sg_ids = set(lite_all_docs.collections[0].documents)
-        lite_ids = set(lite_all_docs.collections[0].documents)
-        for id in sg_ids:
-            assert id in lite_ids
-
-        # TODO: Need document listener API for steps 6-8
-
-        async with db.batch_updater() as b:
-            b.delete_document("travel.hotels", "hotel_1")
-            b.delete_document("travel.hotels", "hotel_2")
-            b.upsert_document("travel.airports", "test_airport_1", [{"name": "Bob"}])
-            b.upsert_document("travel.airports", "test_airport_2", [{"name": "Bill"}])
-            b.upsert_document("travel.airlines", "airline_1", removed_properties=["country"])
-            b.upsert_document("travel.airlines", "airline_2", removed_properties=["country"])
-
-        replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), replicator_type=ReplicatorType.PUSH, collections=[
-            ReplicatorCollectionEntry(["travel.airlines", "travel.hotels", "travel.airports"])
+            ReplicatorCollectionEntry(["travel.airlines", "travel.airports", "travel.hotels"])
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
+
+        # 4. Wait until the replicator is stopped.
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        return None
+
+        # 5. Check that all docs are replicated correctly.
+        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airlines")
+        lite_all_docs = await db.get_all_documents("travel.airlines", "travel.airports", "travel.hotels")
+        compare_result = db.compare_doc_results(lite_all_docs.collections[0].documents, sg_all_docs.rows, ReplicatorType.PUSH)
+        assert compare_result.success, f"{compare_result.message} (travel.airlines)"
+
+        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airports")
+        compare_result = db.compare_doc_results(lite_all_docs.collections[1].documents, sg_all_docs.rows, ReplicatorType.PUSH)
+        assert compare_result.success, f"{compare_result.message} (travel.airports)"
+
+        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "hotels")
+        compare_result = db.compare_doc_results(lite_all_docs.collections[2].documents, sg_all_docs.rows, ReplicatorType.PUSH)
+        assert compare_result.success, f"{compare_result.message} (travel.hotels)"
 
     @pytest.mark.asyncio
     async def test_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
+        # 1. Reset SG and load `travel` dataset.
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "travel")
 
+        # Reset local database, and load `travel` dataset.
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
+        '''
+        3. Start a replicator: 
+            * collections : `travel.routes`, `travel.landmarks`, `travel.hotels`
+            * endpoint: `/travel`
+            * type: pull
+            * continuous: false
+            * credentials: user1/pass
+        '''
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), replicator_type=ReplicatorType.PULL, collections=[
-            ReplicatorCollectionEntry(["travel.airports"])
+            ReplicatorCollectionEntry(["travel.routes", "travel.landmarks", "travel.hotels"])
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
 
+        # 4. Wait until the replicator is stopped.
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airports")
-        lite_all_docs = await db.get_all_documents("travel.airports")
-        assert len(lite_all_docs.collections[0].documents) > 0
-        assert len(sg_all_docs) == len(lite_all_docs.collections[0].documents)
-        sg_ids = set(lite_all_docs.collections[0].documents)
-        lite_ids = set(lite_all_docs.collections[0].documents)
-        for id in sg_ids:
-            assert id in lite_ids
+        
+        # 5. Check that all docs are replicated correctly.
+        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "routes")
+        lite_all_docs = await db.get_all_documents("travel.routes", "travel.landmarks", "travel.hotels")
+        compare_result = db.compare_doc_results(lite_all_docs.collections[0].documents, sg_all_docs.rows, ReplicatorType.PULL)
+        assert compare_result.success, f"{compare_result.message} (travel.routes)"
+
+        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "landmarks")
+        compare_result = db.compare_doc_results(lite_all_docs.collections[1].documents, sg_all_docs.rows, ReplicatorType.PULL)
+        assert compare_result.success, f"{compare_result.message} (travel.landmarks)"
+
+        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "hotels")
+        compare_result = db.compare_doc_results(lite_all_docs.collections[2].documents, sg_all_docs.rows, ReplicatorType.PULL)
+        assert compare_result.success, f"{compare_result.message} (travel.hotels)"
