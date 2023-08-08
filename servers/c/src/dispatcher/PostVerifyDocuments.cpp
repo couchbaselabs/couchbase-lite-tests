@@ -38,27 +38,13 @@ int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
             AUTO_RELEASE(expectedDoc);
             auto expectedProps = CBLDocument_MutableProperties(expectedDoc);
             if (change.contains("updatedProperties")) {
-                auto updatedProps = GetValue<vector<unordered_map<string, json>>>(change, "updatedProperties");
-                for (auto &keyPaths: updatedProps) {
-                    for (auto &keyPath: keyPaths) {
-                        try {
-                            ts_support::fleece::updateProperties(expectedProps, FLS(keyPath.first), keyPath.second);
-                        } catch (const std::exception &e) {
-                            throw RequestError(e.what());
-                        }
-                    }
-                }
+                auto updateItems = GetValue<vector<unordered_map<string, json>>>(change, "updatedProperties");
+                ts_support::fleece::updateProperties(expectedProps, updateItems);
             }
 
             if (change.contains("removedProperties")) {
                 auto keyPaths = GetValue<vector<string>>(change, "removedProperties");
-                for (auto &keyPath: keyPaths) {
-                    try {
-                        ts_support::fleece::removeProperties(expectedProps, FLS(keyPath));
-                    } catch (const std::exception &e) {
-                        throw RequestError(e.what());
-                    }
-                }
+                ts_support::fleece::removeProperties(expectedProps, keyPaths);
             }
 
             auto props = CBLDocument_Properties(curDoc);
