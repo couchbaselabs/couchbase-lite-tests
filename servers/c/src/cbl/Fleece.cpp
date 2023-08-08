@@ -134,9 +134,10 @@ FLValue getMutableArrayValue(FLMutableArray mArray, uint32_t index) {
 }
 
 /** Return mutable dict or mutable array as parent.
- *  if parent specify in the path is not found, if createParent is true, the parents will be created,
- *  otherwise NULL FLValue will be returned. For array parent, if the specified index in the key path
- *  is out-of-bound, the array will be resized and padded with null. */
+ *  When parent specified in the path is not found:
+ *  - If the createParent is true, the parents will be created. For array parent, the array will be resized and padded
+ *    with null to cover the specified array index in the key path.
+ *  - Otherwise, NULL FLValue will be returned. */
 FLValue getParent(FLMutableDict props, FLSlice keyPath, bool createParent) {
     auto paths = ts_support::keypath::parseKeyPath(STR(keyPath));
 
@@ -226,7 +227,7 @@ FLValue getParent(FLMutableDict props, FLSlice keyPath, bool createParent) {
     return parent;
 }
 
-void ts_support::fleece::updateProperty(FLMutableDict props, FLSlice keyPath, const nlohmann::json &value) {
+void updateProperty(FLMutableDict props, FLSlice keyPath, const nlohmann::json &value) {
     auto paths = ts_support::keypath::parseKeyPath(STR(keyPath));
     auto parent = getParent(props, keyPath, true);
     if (FLValue_GetType(parent) == kFLDict) {
@@ -247,7 +248,7 @@ void ts_support::fleece::updateProperty(FLMutableDict props, FLSlice keyPath, co
     }
 }
 
-void ts_support::fleece::removeProperty(FLMutableDict props, FLSlice keyPath) {
+void removeProperty(FLMutableDict props, FLSlice keyPath) {
     auto paths = ts_support::keypath::parseKeyPath(STR(keyPath));
     auto parent = getParent(props, keyPath, false);
     if (FLValue_GetType(parent) == kFLDict) {
@@ -264,17 +265,17 @@ void ts_support::fleece::removeProperty(FLMutableDict props, FLSlice keyPath) {
     }
 }
 
-void ts_support::fleece::updateProperties(FLMutableDict dict, vector<unordered_map<string, json>> updates) {
+void ts_support::fleece::updateProperties(FLMutableDict dict, const vector<unordered_map<string, json>> &updates) {
     for (auto &keyPaths: updates) {
         for (auto &keyPath: keyPaths) {
-            ts_support::fleece::updateProperty(dict, FLS(keyPath.first), keyPath.second);
+            updateProperty(dict, FLS(keyPath.first), keyPath.second);
         }
     }
 }
 
-void ts_support::fleece::removeProperties(FLMutableDict dict, vector<string> keyPaths) {
+void ts_support::fleece::removeProperties(FLMutableDict dict, const vector<string> &keyPaths) {
     for (auto &keyPath: keyPaths) {
-        ts_support::fleece::removeProperty(dict, FLS(keyPath));
+        removeProperty(dict, FLS(keyPath));
     }
 }
 
