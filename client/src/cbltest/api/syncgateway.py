@@ -123,6 +123,16 @@ class AllDocumentsResponse:
         for row in input["rows"]:
             self.__rows.append(AllDocumentsResponseRow(row["key"], row["id"], row["value"]["rev"]))
 
+class DocumentUpdateEntry(JSONSerializable):
+    def __init__(self, id: str, revid: str, body: dict):
+        self.__body = body.copy()
+        self.__body["_id"] = id
+        self.__body["_rev"] = revid
+
+
+    def to_json(self) -> Any:
+        return self.__body
+    
 class SyncGateway:
     """
     A class for interacting with a given Sync Gateway instance
@@ -135,12 +145,13 @@ class SyncGateway:
         self.__admin_url = f"{scheme}{url}:{admin_port}"
         self.__replication_url = f"{ws_scheme}{url}:{port}"
 
-    async def _send_request(self, method: str, path: str, payload: Optional[JSONSerializable] = None) -> Any:
+    async def _send_request(self, method: str, path: str, payload: Optional[JSONSerializable] = None,
+                            params: Optional[Dict[str, str]] = None) -> Any:
         headers = {"Content-Type": "application/json"} if payload is not None else None
         data = None if payload is None else payload.serialize()
         writer = get_next_writer()
         writer.write_begin(f"Sync Gateway [{self.__admin_url}] -> {method.upper()} {path}", data if data is not None else "")
-        resp = await self.__admin_session.request(method, path, data=data, headers=headers)
+        resp = await self.__admin_session.request(method, path, data=data, headers=headers, params=params)
         if resp.content_type.startswith("application/json"):
             ret_val = await resp.json()
             data = dumps(ret_val, indent=2)
@@ -177,8 +188,6 @@ class SyncGateway:
                 await self.put_database(db_name, payload)
             else:
                 raise
-
-        
 
     async def delete_database(self, db_name: str) -> None:
         """
@@ -256,7 +265,26 @@ class SyncGateway:
         self._analyze_dataset_response(cast(list, resp))
 
     async def get_all_documents(self, db_name: str, scope: str = "_default", collection: str = "_default") -> AllDocumentsResponse:
+        """
+        Gets all the documents in the given collection from Sync Gateway (id and revid)
+        
+        :param db_name: The name of the Sync Gateway database to query
+        :param scope: The scope to use when querying Sync Gateway
+        :param collection: The collection to use when querying Sync Gateway
+        """
         resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_all_docs")
         assert isinstance(resp, dict)
         return AllDocumentsResponse(cast(dict, resp))
 
+    async def update_documents(self, db_name: str, updates: List[DocumentUpdateEntry],
+                               scope: str = "_default", collection: str = "_default") -> None:
+        body = {
+            "docs": list(u.to_json() for u in updates)
+        }
+
+        await self._send_request("post", f"/{db_name}.{scope}.{collection}/_bulk_docs", 
+                                        JSONDictionary(body))
+        
+    async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "_default", collection: str = "_default") -> None:
+        await self._send_request("delete", f"/{db_name}.{scope}.{collection}/{doc_id}",
+                                 params={"rev": revid})
