@@ -19,7 +19,6 @@ set(SOURCE_FILES
         src/Dispatcher.cpp
         src/Request.cpp
         src/TestServer.cpp
-        src/cbl/CBLInfo.h
         src/cbl/CBLManager.cpp
         src/cbl/CBLReplicationFilter.cpp
         src/cbl/CollectionSpec.cpp
@@ -38,8 +37,7 @@ set(SOURCE_FILES
         src/support/Error.cpp
         src/support/Log.cpp
         src/support/UUID.cpp
-        src/support/ZipUtil.cpp
-        src/support/Precondition.h)
+        src/support/ZipUtil.cpp)
 
 add_executable(testserver ${SOURCE_FILES})
 

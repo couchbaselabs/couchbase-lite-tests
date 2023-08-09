@@ -12,20 +12,31 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(SHARED_SRC_DIR ${PROJECT_SOURCE_DIR}/shared)
 set(SHARED_SRC
-        ${SHARED_SRC_DIR}/CollectionSpec.cpp
-        ${SHARED_SRC_DIR}/CBLManager.cpp
-        ${SHARED_SRC_DIR}/CBLReplicationFilter.cpp
         ${SHARED_SRC_DIR}/Dispatcher.cpp
-        ${SHARED_SRC_DIR}/Dispatcher+Handlers.cpp
         ${SHARED_SRC_DIR}/Request.cpp
         ${SHARED_SRC_DIR}/TestServer.cpp
+        ${SHARED_SRC_DIR}/cbl/CBLManager.cpp
+        ${SHARED_SRC_DIR}/cbl/CBLReplicationFilter.cpp
+        ${SHARED_SRC_DIR}/cbl/CollectionSpec.cpp
+        ${SHARED_SRC_DIR}/cbl/Fleece.cpp
+        ${SHARED_SRC_DIR}/cbl/KeyPath.cpp
+        ${SHARED_SRC_DIR}/cbl/Snapshot.cpp
+        ${SHARED_SRC_DIR}/dispatcher/GetRoot.cpp
+        ${SHARED_SRC_DIR}/dispatcher/PostGetAllDocuments.cpp
+        ${SHARED_SRC_DIR}/dispatcher/PostGetDocument.cpp
+        ${SHARED_SRC_DIR}/dispatcher/PostGetReplicatorStatus.cpp
+        ${SHARED_SRC_DIR}/dispatcher/PostReset.cpp
+        ${SHARED_SRC_DIR}/dispatcher/PostSnapshotDocuments.cpp
+        ${SHARED_SRC_DIR}/dispatcher/PostStartReplicator.cpp
+        ${SHARED_SRC_DIR}/dispatcher/PostUpdateDatabase.cpp
+        ${SHARED_SRC_DIR}/dispatcher/PostVerifyDocuments.cpp
         ${SHARED_SRC_DIR}/support/Android.cpp
         ${SHARED_SRC_DIR}/support/Device.cpp
-        ${SHARED_SRC_DIR}/support/Exception.cpp
+        ${SHARED_SRC_DIR}/support/Error.cpp
         ${SHARED_SRC_DIR}/support/Files.cpp
-        ${SHARED_SRC_DIR}/support/Fleece.cpp
+        ${SHARED_SRC_DIR}/support/Log.cpp
         ${SHARED_SRC_DIR}/support/UUID.cpp
-        ${SHARED_SRC_DIR}/support/Zip.cpp)
+        ${SHARED_SRC_DIR}/support/ZipUtil.cpp)
 
 set(LIB_SRC
         ${SHARED_SRC}
@@ -57,6 +68,10 @@ target_link_libraries(testserver
 target_include_directories(
         testserver PRIVATE
         ${SHARED_SRC_DIR}
+        ${SHARED_SRC_DIR}/cbl
+        ${SHARED_SRC_DIR}/dispatcher
+        ${SHARED_SRC_DIR}/support
+        ${SHARED_SRC_DIR}/support/ext
         ${civetweb_SOURCE_DIR}/include)
 
 target_compile_definitions(

@@ -12,7 +12,7 @@
 using namespace std;
 
 #ifdef __ANDROID__
-using namespace ts_support::android;
+using namespace ts::support::android;
 #endif
 
 namespace ts::support {

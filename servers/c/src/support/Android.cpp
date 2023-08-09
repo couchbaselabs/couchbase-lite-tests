@@ -1,14 +1,15 @@
 #ifdef __ANDROID__
 
 #include "Android.h"
-#include "Exception.h"
+#include "Error.h"
 
 #include "CBLHeader.h"
 #include CBL_HEADER(CouchbaseLite.h)
 
 #include <assert.h>
 
-using namespace ts_support::android;
+using namespace ts::support::android;
+using namespace ts::support::error;
 
 static AndroidContext sContext;
 
@@ -19,9 +20,9 @@ void ts::support::android::initAndroidContext(const AndroidContext &context) {
 
     sContext = context;
 
-    CBLInitContext init{
-            .filesDir = sContext.filesDir.c_str(),
-            .tempDir = sContext.tempDir.c_str()
+    CBLInitContext init {
+        .filesDir = sContext.filesDir.c_str(),
+        .tempDir = sContext.tempDir.c_str()
     };
     CBLError err{};
     CBL_Init(init, &err);
