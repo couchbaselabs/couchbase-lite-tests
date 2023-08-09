@@ -2,6 +2,8 @@
 #include "TestServer.h"
 #include "Files.h"
 
+using namespace ts;
+
 @implementation CBLTestServer {
     TestServer *_server;
 }
