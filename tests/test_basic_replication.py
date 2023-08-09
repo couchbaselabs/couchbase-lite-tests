@@ -36,7 +36,7 @@ class TestBasicReplication:
         # 5. Check that the replicator's error is CBL/10404
         assert status.error is not None \
             and status.error.code == 10404 \
-            and status.error.domain == ErrorDomain.CBL
+            and ErrorDomain.equal(status.error.domain, ErrorDomain.CBL)
 
     @pytest.mark.asyncio
     async def test_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:

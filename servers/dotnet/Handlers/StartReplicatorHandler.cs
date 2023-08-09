@@ -51,10 +51,11 @@ internal static partial class HandlerList
                 foreach (var doc in entry.Documents) {
                     ErrorReturnBody? error = null;
                     if(doc.Error != null) {
+                        var details = Router.MapError(doc.Error);
                         error = new ErrorReturnBody
                         {
-                            code = doc.Error.Error,
-                            domain = (int)doc.Error.Domain + 1,
+                            code = details.code,
+                            domain = details.domain,
                             message = doc.Error.Message
                         };
                     }
@@ -64,7 +65,7 @@ internal static partial class HandlerList
                         isPush = entry.IsPush,
                         collection = $"{doc.ScopeName}.{doc.CollectionName}",
                         documentID = doc.Id,
-                        flags = new[] { doc.Flags == 0 ? "" : doc.Flags.ToString() },
+                        flags = new[] { doc.Flags == 0 ? "None" : doc.Flags.ToString() },
                         error = error
                     };
                 }

@@ -30,7 +30,7 @@ internal static partial class HandlerList
 
     internal readonly record struct ReplicatorProgressReturnBody(bool completed);
 
-    internal readonly record struct ErrorReturnBody(int domain, int code, string message);
+    internal readonly record struct ErrorReturnBody(string domain, int code, string message);
 
     internal record struct ReplicatorStatusReturnBody(string activity, ReplicatorProgressReturnBody progress, 
         IReadOnlyList<DocumentReplicationEvent> documents, ErrorReturnBody? error = null);
@@ -56,7 +56,7 @@ internal static partial class HandlerList
             var (domain, code) = Router.MapError(couchbaseEx);
             error = new ErrorReturnBody
             {
-                domain = (int)domain,
+                domain = domain,
                 code = code,
                 message = couchbaseEx.Message
             };

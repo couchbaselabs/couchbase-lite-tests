@@ -153,7 +153,7 @@ internal static partial class HandlerList
         } catch(KeyPathException e) {
             response.WriteBody(new ErrorReturnBody
             {
-                domain = 0,
+                domain = TestServerErrorDomain.TestServer,
                 code = 1,
                 message = e.Message
             }, version, HttpStatusCode.BadRequest);
