@@ -8,14 +8,20 @@
 import CouchbaseLiteSwift
 
 protocol MutableObjectProtocol {
+    @discardableResult
     func setValue(_ value: Any?, at index: Int) -> Self
+    @discardableResult
     func setValue(_ value: Any?, forKey key: String) -> Self
+    @discardableResult
     func removeValue(at index: Int) -> Self
+    @discardableResult
     func removeValue(forKey key: String) -> Self
     func array(at index: Int) -> MutableArrayObject?
     func dictionary(at index: Int) -> MutableDictionaryObject?
     func array(forKey key: String) -> MutableArrayObject?
     func dictionary(forKey key: String) -> MutableDictionaryObject?
+    func contains(key: String) -> Bool
+    var count: Int { get }
 }
 
 extension MutableArrayObject : MutableObjectProtocol {
@@ -37,6 +43,11 @@ extension MutableArrayObject : MutableObjectProtocol {
     func dictionary(forKey key: String) -> CouchbaseLiteSwift.MutableDictionaryObject? {
         print("Warning: attempted to call `dictionary(forKey:)` on MutableArrayObject")
         return nil
+    }
+    
+    func contains(key: String) -> Bool {
+        print("Warning: attempted to call `contains(key:)` on MutableArrayObject")
+        return false
     }
 }
 

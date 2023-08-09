@@ -8,61 +8,117 @@
 import CouchbaseLiteSwift
 
 struct DocumentUpdater {
-    public static func processUpdate(item: ContentTypes.DatabaseUpdateItem) {
+    public static func processUpdate(item: ContentTypes.DatabaseUpdateItem) throws {
         guard let collection = DatabaseManager.shared?.collection(item.collection)
         else { return }
-        item.updatedProperties.forEach { updateDict in
-            updateDict.forEach { keyPath, value in
+        
+        for updateDict in item.updatedProperties {
+            for (keyPath, value) in updateDict {
                 var parser = KeyPathParser(input: keyPath)
-                if let components = parser.parse(),
-                    !components.isEmpty,
-                    let parentProperty = getParentProperty(collection: collection, docID: item.documentID, keyPathComponents: components) {
-                        update(parentProperty: parentProperty, propertyKey: components.last!, value: value)
+                guard let components = parser.parse(), !components.isEmpty
+                else {
+                    throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
                 }
+                // Ensure first component is not an array index
+                switch components.first! {
+                case .index: do {
+                    throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
+                }
+                default: break
+                }
+                
+                let parentProperty = try getParentProperty(collection: collection, docID: item.documentID, keyPathComponents: components)
+                update(parentProperty: parentProperty, propertyKey: components.last!, value: value)
             }
         }
-        item.removedProperties.forEach { keyPath in
+        
+        for keyPath in item.removedProperties {
             var parser = KeyPathParser(input: keyPath)
-            if let components = parser.parse(),
-               !components.isEmpty,
-               let parentProperty = getParentProperty(collection: collection, docID: item.documentID, keyPathComponents: components) {
-                remove(parentProperty: parentProperty, propertyKey: components.last!)
+            guard let components = parser.parse(), !components.isEmpty
+            else {
+                throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
             }
+            
+            switch components.first! {
+            case .index: do {
+                throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
+            }
+            default: break
+            }
+            
+            let parentProperty = try getParentProperty(collection: collection, docID: item.documentID, keyPathComponents: components)
+            
+            remove(parentProperty: parentProperty, propertyKey: components.last!)
         }
     }
     
-    private static func getParentProperty(collection: Collection, docID: String, keyPathComponents: [KeyPathComponent]) -> MutableObjectProtocol? {
+    private static func getParentProperty(collection: Collection, docID: String, keyPathComponents: [KeyPathComponent]) throws -> MutableObjectProtocol {
         guard let doc = try? collection.document(id: docID)
-        else { return nil }
+        else { throw TestServerError.cblDocNotFound }
         
         let mutableDoc = doc.toMutable()
         
-        var current : MutableObjectProtocol? = mutableDoc
+        var current : MutableObjectProtocol = mutableDoc
         
         // Ignore last as we want to return the parent of the target property
         for (i, component) in keyPathComponents.dropLast(1).enumerated() {
             
-            guard let currentSafe = current
-                    // Should throw error here
-            else { fatalError("Error applying doc update - couldn't parse keypath") }
-            
-            let isLast = i == keyPathComponents.count - 1
+            let nextIsArray: Bool = {
+                if i < keyPathComponents.count - 1 {
+                    switch keyPathComponents[i + 1] {
+                    case .index:
+                        return true
+                    case .property:
+                        return false
+                    }
+                }
+                return false
+            }()
             
             switch component {
             case .index(let index):
-                switch keyPathComponents[i + 1] {
-                    case .index:
-                        current = currentSafe.array(at: index)
-                    case .property:
-                        current = currentSafe.dictionary(at: index)
+                // Backfill array with null if it does not reach index
+                if index >= current.count {
+                    if(index > current.count) {
+                        for i in (current.count)...(index - 1) {
+                            current.setValue(nil, at: i)
+                        }
+                    }
+                    if(nextIsArray) {
+                        current.setValue(MutableArrayObject(), at: index)
+                    } else {
+                        current.setValue(MutableDictionaryObject(), at: index)
+                    }
+                }
+                
+                if(nextIsArray) {
+                    guard let arr = current.array(at: index)
+                    else { throw TestServerError.internalErr }
+                    current = arr
+                } else {
+                    guard let dict = current.dictionary(at: index)
+                    else { throw TestServerError.internalErr }
+                    current = dict
                 }
 
             case .property(let name):
-                switch keyPathComponents[i + 1] {
-                    case .index:
-                        current = currentSafe.array(forKey: name)
-                    case .property:
-                        current = currentSafe.dictionary(forKey: name)
+                // Create property if it does not exist
+                if !current.contains(key: name) {
+                    if(nextIsArray) {
+                        current.setValue(MutableArrayObject(), forKey: name)
+                    } else {
+                        current.setValue(MutableDictionaryObject(), forKey: name)
+                    }
+                }
+                
+                if(nextIsArray) {
+                    guard let arr = current.array(forKey: name)
+                    else { throw TestServerError.internalErr }
+                    current = arr
+                } else {
+                    guard let dict = current.dictionary(forKey: name)
+                    else { throw TestServerError.internalErr }
+                    current = dict
                 }
             }
         }

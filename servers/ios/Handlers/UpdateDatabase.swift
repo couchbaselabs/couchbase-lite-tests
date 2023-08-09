@@ -17,7 +17,7 @@ extension Handlers {
         
         switch(updateRequest.type) {
         case .UPDATE:
-            DocumentUpdater.processUpdate(item: updateRequest)
+            try DocumentUpdater.processUpdate(item: updateRequest)
         case .DELETE:
             guard let collection = DatabaseManager.shared?.collection(updateRequest.collection)
             else {

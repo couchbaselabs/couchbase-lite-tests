@@ -14,11 +14,20 @@ extension Handlers {
         else {
             throw TestServerError.badRequest
         }
-        guard let collectionDocs = ContentTypes.CollectionDocuments(collectionNames: collections.collections),
-              collectionDocs.count > 0
-        else {
-            throw TestServerError(domain: .TESTSERVER, code: 500, message: "Internal server error.")
-        }
-        return collectionDocs
+        return try getCollectionsDocuments(collections: collections.collections)
     }
+}
+
+fileprivate func getCollectionsDocuments(collections: [String]) throws -> ContentTypes.CollectionDocuments {
+    var result = ContentTypes.CollectionDocuments()
+    guard let dbManager = DatabaseManager.shared
+    else { throw TestServerError.cblDBNotOpen }
+    for collectionName in collections {
+        guard let query = DatabaseManager.shared?.createQuery(queryString: "SELECT meta().id, meta().revisionID FROM \(collectionName)")
+        else { throw TestServerError(domain: .CBL, code: CBLError.invalidQuery, message: "Failed to create docs query.") }
+        guard let collectionDocs = try? query.execute().map({ result in ContentTypes.CollectionDoc(id: result.string(at: 0)!, rev: result.string(at: 1)!) })
+        else { throw TestServerError(domain: .CBL, code: CBLError.invalidQuery, message: "Failed to execute docs query.") }
+        result[collectionName] = collectionDocs
+    }
+    return result
 }
