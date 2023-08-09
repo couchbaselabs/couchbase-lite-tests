@@ -5,6 +5,8 @@
 #include "support/Android.h"
 
 using namespace std;
+using namespace ts;
+using namespace ts::support;
 
 extern "C"
 JNIEXPORT void JNICALL
@@ -12,7 +14,7 @@ Java_com_couchbase_lite_testserver_TestServerKt_initAndroidContext(JNIEnv *env, 
     const char *filesDir = env->GetStringUTFChars(files_dir, nullptr);
     const char *tempDir = env->GetStringUTFChars(temp_dir, nullptr);
     const char *assetsDir = env->GetStringUTFChars(assets_dir, nullptr);
-    ts_support::android::initAndroidContext({
+    android::initAndroidContext({
         string(filesDir),
         string(tempDir),
         string(assetsDir)

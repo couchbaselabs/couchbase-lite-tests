@@ -143,12 +143,12 @@ namespace ts::support {
 #ifdef __ANDROID__
         string tag("CouchbaseLite/TS");
         if (domain) {
-            tag += " [" + domain + "]";
+            tag += " [" + string(domain) + "]";
         }
         static const int androidLevels[5] = {ANDROID_LOG_DEBUG, ANDROID_LOG_INFO,
                                              ANDROID_LOG_INFO, ANDROID_LOG_WARN,
                                              ANDROID_LOG_ERROR};
-        __android_log_write(androidLevels[(int) level], tag.c_str(), msg);
+        __android_log_write(androidLevels[(int) level], tag.c_str(), message);
 #else
 
         auto levelName = kLogLevelNames[(int) level];

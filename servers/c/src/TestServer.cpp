@@ -17,13 +17,13 @@ using namespace ts::support::files;
 using namespace ts::support::key;
 
 #ifdef __ANDROID__
-using namespace ts_support::android;
+using namespace ts::support::android;
 #endif
 
 namespace ts {
     TestServer::TestServer() {
 #ifdef __ANDROID__
-        CheckNotNull(androidContext(), "Android Context is not initialized");
+        if (!androidContext()) { throw runtime_error("Android Context is not initialized"); }
 #endif
         _context = {filesDir("CBL-C-TestServer", true), assetsDir()};
         _dispatcher = new Dispatcher(this);
