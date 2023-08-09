@@ -2,29 +2,33 @@ from __future__ import annotations
 from enum import Enum
 from typing import Final, Optional
 
-class ErrorDomain(Enum):
+class ErrorDomain:
     """An enum representing the domain of an error returned by the server"""
 
-    TESTSERVER = 0
+    TESTSERVER: Final[str] = "TESTSERVER"
     """The test server itself encountered an error (not a library bug)"""
 
-    CBL = 1
+    CBL: Final[str] = "COUCHBASELITE"
     """High level Couchbase Lite error"""
 
-    POSIX = 2
+    POSIX: Final[str] = "POSIX"
     """Low level OS error"""
 
-    SQLITE = 3
+    SQLITE: Final[str] = "SQLITE"
     """Error returned from SQLite"""
 
-    FLEECE = 4
+    FLEECE: Final[str] = "FLEECE"
     """Error returned from Fleece"""
 
-    NETWORK = 5
+    NETWORK: Final[str] = "NETWORK"
     """Error in network connection"""
 
-    WEBSOCKET = 6
+    WEBSOCKET: Final[str] = "WEBSOCKET"
     """Web socket protocol error"""
+
+    @classmethod
+    def equal(cls, val: str, expected: str) -> bool:
+        return val.upper() == expected
 
 class ErrorResponseBody:
     """A class representing an error condition returned from the server"""
@@ -34,7 +38,7 @@ class ErrorResponseBody:
     __error_msg_key: Final[str] = "message"
 
     @property
-    def domain(self) -> ErrorDomain:
+    def domain(self) -> str:
         """Gets the domain of the returned error"""
         return self.__domain
     
@@ -62,7 +66,7 @@ class ErrorResponseBody:
         
         return None
 
-    def __init__(self, domain: ErrorDomain, code: int, message: str):
+    def __init__(self, domain: str, code: int, message: str):
         self.__domain = domain
         self.__code = code
         self.__message = message

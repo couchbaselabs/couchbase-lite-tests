@@ -78,6 +78,9 @@ def _get_typed(d: dict, key: str, type: Type[T]) ->Optional[T]:
         origin = type
     
     ret_val = d[key]
+    if ret_val is None:
+        return ret_val
+    
     if not isinstance(ret_val, cast(Type, origin)):
         raise ValueError(f"Expecting {str(type)} for key {key} but found {ret_val} instead")
     

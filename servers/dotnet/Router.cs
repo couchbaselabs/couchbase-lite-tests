@@ -57,15 +57,15 @@ namespace TestServer.Handlers
 
 namespace TestServer
 {
-    public enum TestServerErrorDomain : int
+    public static class TestServerErrorDomain
     {
-        TestServer,
-        CouchbaseLite,
-        POSIX,
-        SQLite,
-        Fleece,
-        Network,
-        Websocket
+        public static readonly string TestServer = "TestServer";
+        public static readonly string CouchbaseLite = "CouchbaseLite";
+        public static readonly string POSIX = "POSIX";
+        public static readonly string SQLite = "SQLite";
+        public static readonly string Fleece = "Fleece";
+        public static readonly string Network = "Network";
+        public static readonly string WebSocket = "WebSocket";
     }
 
     [AttributeUsage(AttributeTargets.Method)]
@@ -121,7 +121,7 @@ namespace TestServer
             };
         }
 
-        public static (TestServerErrorDomain, int) MapError(CouchbaseException ex)
+        public static (string domain, int code) MapError(CouchbaseException ex)
         {
             switch(ex.Domain) {
                 case CouchbaseLiteErrorType.POSIX:

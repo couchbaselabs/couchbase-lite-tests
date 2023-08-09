@@ -218,10 +218,10 @@ class ReplicatorDocumentFlags(Flag):
     @classmethod
     def parse(cls, input: str) -> ReplicatorDocumentFlags:
         assert isinstance(input, str), f"Non-string input to ReplicatorDocumentFlags {input}"
-        if len(input) == 0: 
+        upper = input.upper()
+        if upper == "NONE":
             return ReplicatorDocumentFlags.NONE
         
-        upper = input.upper()
         if upper == "DELETED":
             return ReplicatorDocumentFlags.DELETED
         
@@ -240,7 +240,7 @@ class ReplicatorDocumentFlags(Flag):
 
     def __str__(self) -> str:
         if self == ReplicatorDocumentFlags.NONE:
-            return ""
+            return "NONE"
         
         flags = []
         # https://github.com/python/mypy/issues/9642
