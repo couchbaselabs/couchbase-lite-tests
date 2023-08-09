@@ -7,24 +7,35 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		403489872A833AA2002DA787 /* GetRoot.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4034896D2A833AA1002DA787 /* GetRoot.cpp */; };
+		403489882A833AA2002DA787 /* PostGetReplicatorStatus.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4034896E2A833AA1002DA787 /* PostGetReplicatorStatus.cpp */; };
+		403489892A833AA2002DA787 /* PostGetDocument.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4034896F2A833AA1002DA787 /* PostGetDocument.cpp */; };
+		4034898A2A833AA2002DA787 /* PostSnapshotDocuments.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 403489702A833AA1002DA787 /* PostSnapshotDocuments.cpp */; };
+		4034898B2A833AA2002DA787 /* PostUpdateDatabase.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 403489712A833AA1002DA787 /* PostUpdateDatabase.cpp */; };
+		4034898C2A833AA2002DA787 /* PostGetAllDocuments.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 403489722A833AA1002DA787 /* PostGetAllDocuments.cpp */; };
+		4034898D2A833AA2002DA787 /* PostStartReplicator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 403489732A833AA1002DA787 /* PostStartReplicator.cpp */; };
+		4034898E2A833AA2002DA787 /* PostReset.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 403489752A833AA1002DA787 /* PostReset.cpp */; };
+		4034898F2A833AA2002DA787 /* PostVerifyDocuments.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 403489762A833AA1002DA787 /* PostVerifyDocuments.cpp */; };
+		403489902A833AA2002DA787 /* CBLManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 403489782A833AA1002DA787 /* CBLManager.cpp */; };
+		403489912A833AA2002DA787 /* KeyPath.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4034897B2A833AA1002DA787 /* KeyPath.cpp */; };
+		403489922A833AA2002DA787 /* Snapshot.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4034897D2A833AA1002DA787 /* Snapshot.cpp */; };
+		403489932A833AA2002DA787 /* CBLReplicationFilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4034897E2A833AA1002DA787 /* CBLReplicationFilter.cpp */; };
+		403489942A833AA2002DA787 /* CollectionSpec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 403489842A833AA1002DA787 /* CollectionSpec.cpp */; };
+		403489952A833AA2002DA787 /* Fleece.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 403489852A833AA1002DA787 /* Fleece.cpp */; };
+		403489982A833ADD002DA787 /* Error.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 403489962A833ADD002DA787 /* Error.cpp */; };
+		4034899D2A833B15002DA787 /* Log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4034899C2A833B15002DA787 /* Log.cpp */; };
+		403489A12A833B2F002DA787 /* ZipUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 403489A02A833B2F002DA787 /* ZipUtil.cpp */; };
 		409CE1A32A3BFA9300620CAA /* TestServerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1A22A3BFA9300620CAA /* TestServerApp.swift */; };
 		409CE1A52A3BFA9300620CAA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1A42A3BFA9300620CAA /* ContentView.swift */; };
 		409CE1A72A3BFA9500620CAA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 409CE1A62A3BFA9500620CAA /* Assets.xcassets */; };
 		409CE1AA2A3BFA9500620CAA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 409CE1A92A3BFA9500620CAA /* Preview Assets.xcassets */; };
 		409CE1B32A3CD96000620CAA /* CBLTestServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1B22A3CD96000620CAA /* CBLTestServer.mm */; };
-		409CE1D82A3CD9BE00620CAA /* CBLManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1B82A3CD9BE00620CAA /* CBLManager.cpp */; };
 		409CE1D92A3CD9BE00620CAA /* Request.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1BA2A3CD9BE00620CAA /* Request.cpp */; };
 		409CE1DA2A3CD9BE00620CAA /* TestServer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1BC2A3CD9BE00620CAA /* TestServer.cpp */; };
 		409CE1DB2A3CD9BE00620CAA /* Device+Apple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1BE2A3CD9BE00620CAA /* Device+Apple.mm */; };
-		409CE1DC2A3CD9BE00620CAA /* Exception.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1C22A3CD9BE00620CAA /* Exception.cpp */; };
 		409CE1DE2A3CD9BE00620CAA /* UUID.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1C52A3CD9BE00620CAA /* UUID.cpp */; };
-		409CE1E02A3CD9BE00620CAA /* Zip.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1CC2A3CD9BE00620CAA /* Zip.cpp */; };
 		409CE1E12A3CD9BE00620CAA /* Files+Apple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1CD2A3CD9BE00620CAA /* Files+Apple.mm */; };
-		409CE1E22A3CD9BE00620CAA /* Fleece.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1CE2A3CD9BE00620CAA /* Fleece.cpp */; };
 		409CE1E32A3CD9BE00620CAA /* Dispatcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1CF2A3CD9BE00620CAA /* Dispatcher.cpp */; };
-		409CE1E42A3CD9BE00620CAA /* CBLReplicationFilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1D02A3CD9BE00620CAA /* CBLReplicationFilter.cpp */; };
-		409CE1E52A3CD9BE00620CAA /* Dispatcher+Handlers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1D42A3CD9BE00620CAA /* Dispatcher+Handlers.cpp */; };
-		409CE1E62A3CD9BE00620CAA /* CollectionSpec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1D52A3CD9BE00620CAA /* CollectionSpec.cpp */; };
 		409CE1EC2A3CDA9600620CAA /* civetweb.c in Sources */ = {isa = PBXBuildFile; fileRef = 409CE1EB2A3CDA9600620CAA /* civetweb.c */; };
 		409CE2FA2A3CDB8400620CAA /* zip_err_str.c in Sources */ = {isa = PBXBuildFile; fileRef = 409CE2F92A3CDB8400620CAA /* zip_err_str.c */; };
 		409CE2FD2A3CE38A00620CAA /* CouchbaseLite.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 409CE2FC2A3CE38900620CAA /* CouchbaseLite.xcframework */; };
@@ -163,6 +174,39 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		4034896D2A833AA1002DA787 /* GetRoot.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GetRoot.cpp; sourceTree = "<group>"; };
+		4034896E2A833AA1002DA787 /* PostGetReplicatorStatus.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostGetReplicatorStatus.cpp; sourceTree = "<group>"; };
+		4034896F2A833AA1002DA787 /* PostGetDocument.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostGetDocument.cpp; sourceTree = "<group>"; };
+		403489702A833AA1002DA787 /* PostSnapshotDocuments.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostSnapshotDocuments.cpp; sourceTree = "<group>"; };
+		403489712A833AA1002DA787 /* PostUpdateDatabase.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostUpdateDatabase.cpp; sourceTree = "<group>"; };
+		403489722A833AA1002DA787 /* PostGetAllDocuments.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostGetAllDocuments.cpp; sourceTree = "<group>"; };
+		403489732A833AA1002DA787 /* PostStartReplicator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostStartReplicator.cpp; sourceTree = "<group>"; };
+		403489742A833AA1002DA787 /* Dispatcher+Common.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "Dispatcher+Common.h"; sourceTree = "<group>"; };
+		403489752A833AA1002DA787 /* PostReset.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostReset.cpp; sourceTree = "<group>"; };
+		403489762A833AA1002DA787 /* PostVerifyDocuments.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostVerifyDocuments.cpp; sourceTree = "<group>"; };
+		403489782A833AA1002DA787 /* CBLManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CBLManager.cpp; sourceTree = "<group>"; };
+		403489792A833AA1002DA787 /* CBLInfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLInfo.h; sourceTree = "<group>"; };
+		4034897A2A833AA1002DA787 /* Fleece.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Fleece.h; sourceTree = "<group>"; };
+		4034897B2A833AA1002DA787 /* KeyPath.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = KeyPath.cpp; sourceTree = "<group>"; };
+		4034897C2A833AA1002DA787 /* CBLHeader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLHeader.h; sourceTree = "<group>"; };
+		4034897D2A833AA1002DA787 /* Snapshot.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Snapshot.cpp; sourceTree = "<group>"; };
+		4034897E2A833AA1002DA787 /* CBLReplicationFilter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CBLReplicationFilter.cpp; sourceTree = "<group>"; };
+		4034897F2A833AA1002DA787 /* CBLManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLManager.h; sourceTree = "<group>"; };
+		403489802A833AA1002DA787 /* CollectionSpec.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CollectionSpec.h; sourceTree = "<group>"; };
+		403489812A833AA1002DA787 /* CBLReplicatorParams.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLReplicatorParams.h; sourceTree = "<group>"; };
+		403489822A833AA1002DA787 /* KeyPath.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KeyPath.h; sourceTree = "<group>"; };
+		403489832A833AA1002DA787 /* Snapshot.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Snapshot.h; sourceTree = "<group>"; };
+		403489842A833AA1002DA787 /* CollectionSpec.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CollectionSpec.cpp; sourceTree = "<group>"; };
+		403489852A833AA1002DA787 /* Fleece.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Fleece.cpp; sourceTree = "<group>"; };
+		403489862A833AA1002DA787 /* CBLReplicationFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLReplicationFilter.h; sourceTree = "<group>"; };
+		403489962A833ADD002DA787 /* Error.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Error.cpp; path = ../../../src/support/Error.cpp; sourceTree = "<group>"; };
+		403489972A833ADD002DA787 /* Error.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Error.h; path = ../../../src/support/Error.h; sourceTree = "<group>"; };
+		4034899A2A833AF0002DA787 /* date.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = date.h; sourceTree = "<group>"; };
+		4034899B2A833B15002DA787 /* Log.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Log.h; path = ../../../src/support/Log.h; sourceTree = "<group>"; };
+		4034899C2A833B15002DA787 /* Log.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Log.cpp; path = ../../../src/support/Log.cpp; sourceTree = "<group>"; };
+		4034899E2A833B28002DA787 /* Precondition.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Precondition.h; path = ../../../src/support/Precondition.h; sourceTree = "<group>"; };
+		4034899F2A833B2F002DA787 /* ZipUtil.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ZipUtil.h; path = ../../../src/support/ZipUtil.h; sourceTree = "<group>"; };
+		403489A02A833B2F002DA787 /* ZipUtil.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ZipUtil.cpp; path = ../../../src/support/ZipUtil.cpp; sourceTree = "<group>"; };
 		409CE19F2A3BFA9300620CAA /* TestServer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestServer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		409CE1A22A3BFA9300620CAA /* TestServerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestServerApp.swift; sourceTree = "<group>"; };
 		409CE1A42A3BFA9300620CAA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -171,37 +215,24 @@
 		409CE1B02A3CD95F00620CAA /* TestServer-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TestServer-Bridging-Header.h"; sourceTree = "<group>"; };
 		409CE1B12A3CD96000620CAA /* CBLTestServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CBLTestServer.h; sourceTree = "<group>"; };
 		409CE1B22A3CD96000620CAA /* CBLTestServer.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = CBLTestServer.mm; sourceTree = "<group>"; };
-		409CE1B82A3CD9BE00620CAA /* CBLManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CBLManager.cpp; sourceTree = "<group>"; };
 		409CE1B92A3CD9BE00620CAA /* TestServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestServer.h; sourceTree = "<group>"; };
 		409CE1BA2A3CD9BE00620CAA /* Request.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Request.cpp; sourceTree = "<group>"; };
 		409CE1BB2A3CD9BE00620CAA /* Dispatcher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Dispatcher.h; sourceTree = "<group>"; };
 		409CE1BC2A3CD9BE00620CAA /* TestServer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TestServer.cpp; sourceTree = "<group>"; };
 		409CE1BE2A3CD9BE00620CAA /* Device+Apple.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = "Device+Apple.mm"; sourceTree = "<group>"; };
 		409CE1BF2A3CD9BE00620CAA /* Device.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Device.h; sourceTree = "<group>"; };
-		409CE1C02A3CD9BE00620CAA /* Fleece.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Fleece.h; sourceTree = "<group>"; };
 		409CE1C12A3CD9BE00620CAA /* UUID.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = UUID.h; sourceTree = "<group>"; };
-		409CE1C22A3CD9BE00620CAA /* Exception.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Exception.cpp; sourceTree = "<group>"; };
 		409CE1C32A3CD9BE00620CAA /* Define.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Define.h; sourceTree = "<group>"; };
 		409CE1C42A3CD9BE00620CAA /* Device.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Device.cpp; sourceTree = "<group>"; };
 		409CE1C52A3CD9BE00620CAA /* UUID.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = UUID.cpp; sourceTree = "<group>"; };
 		409CE1C62A3CD9BE00620CAA /* Files.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Files.cpp; sourceTree = "<group>"; };
 		409CE1C72A3CD9BE00620CAA /* JSON.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JSON.h; sourceTree = "<group>"; };
-		409CE1C82A3CD9BE00620CAA /* Zip.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Zip.h; sourceTree = "<group>"; };
 		409CE1C92A3CD9BE00620CAA /* Defer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Defer.h; sourceTree = "<group>"; };
 		409CE1CA2A3CD9BE00620CAA /* Files.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Files.h; sourceTree = "<group>"; };
-		409CE1CB2A3CD9BE00620CAA /* Exception.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Exception.h; sourceTree = "<group>"; };
-		409CE1CC2A3CD9BE00620CAA /* Zip.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Zip.cpp; sourceTree = "<group>"; };
 		409CE1CD2A3CD9BE00620CAA /* Files+Apple.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = "Files+Apple.mm"; sourceTree = "<group>"; };
-		409CE1CE2A3CD9BE00620CAA /* Fleece.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Fleece.cpp; sourceTree = "<group>"; };
 		409CE1CF2A3CD9BE00620CAA /* Dispatcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Dispatcher.cpp; sourceTree = "<group>"; };
-		409CE1D02A3CD9BE00620CAA /* CBLReplicationFilter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CBLReplicationFilter.cpp; sourceTree = "<group>"; };
-		409CE1D12A3CD9BE00620CAA /* CBLManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLManager.h; sourceTree = "<group>"; };
 		409CE1D22A3CD9BE00620CAA /* Request.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Request.h; sourceTree = "<group>"; };
-		409CE1D32A3CD9BE00620CAA /* CollectionSpec.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CollectionSpec.h; sourceTree = "<group>"; };
-		409CE1D42A3CD9BE00620CAA /* Dispatcher+Handlers.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "Dispatcher+Handlers.cpp"; sourceTree = "<group>"; };
-		409CE1D52A3CD9BE00620CAA /* CollectionSpec.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CollectionSpec.cpp; sourceTree = "<group>"; };
 		409CE1D62A3CD9BE00620CAA /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
-		409CE1D72A3CD9BE00620CAA /* CBLReplicationFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLReplicationFilter.h; sourceTree = "<group>"; };
 		409CE1EB2A3CDA9600620CAA /* civetweb.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = civetweb.c; path = "vendor/cmake/_deps/civetweb-src/src/civetweb.c"; sourceTree = SOURCE_ROOT; };
 		409CE2F92A3CDB8400620CAA /* zip_err_str.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_err_str.c; path = vendor/cmake/zip_err_str.c; sourceTree = SOURCE_ROOT; };
 		409CE2FC2A3CE38900620CAA /* CouchbaseLite.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = CouchbaseLite.xcframework; path = Frameworks/CouchbaseLite.xcframework; sourceTree = "<group>"; };
@@ -346,7 +377,6 @@
 		409CE38C2A3CE89500620CAA /* zip_source_is_deleted.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_source_is_deleted.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_source_is_deleted.c"; sourceTree = SOURCE_ROOT; };
 		409CE38D2A3CE89500620CAA /* zip_source_compress.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_source_compress.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_source_compress.c"; sourceTree = SOURCE_ROOT; };
 		409CE38E2A3CE89500620CAA /* zip_ftell.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_ftell.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_ftell.c"; sourceTree = SOURCE_ROOT; };
-		409CE40F2A3CEC2400620CAA /* CBLHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CBLHeader.h; sourceTree = "<group>"; };
 		409CE4162A3CFE9100620CAA /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../../assets; sourceTree = "<group>"; };
 		409CE4182A3D062900620CAA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -363,6 +393,56 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		4034896C2A833AA1002DA787 /* dispatcher */ = {
+			isa = PBXGroup;
+			children = (
+				403489742A833AA1002DA787 /* Dispatcher+Common.h */,
+				4034896D2A833AA1002DA787 /* GetRoot.cpp */,
+				403489722A833AA1002DA787 /* PostGetAllDocuments.cpp */,
+				4034896F2A833AA1002DA787 /* PostGetDocument.cpp */,
+				4034896E2A833AA1002DA787 /* PostGetReplicatorStatus.cpp */,
+				403489752A833AA1002DA787 /* PostReset.cpp */,
+				403489702A833AA1002DA787 /* PostSnapshotDocuments.cpp */,
+				403489732A833AA1002DA787 /* PostStartReplicator.cpp */,
+				403489712A833AA1002DA787 /* PostUpdateDatabase.cpp */,
+				403489762A833AA1002DA787 /* PostVerifyDocuments.cpp */,
+			);
+			name = dispatcher;
+			path = ../../src/dispatcher;
+			sourceTree = "<group>";
+		};
+		403489772A833AA1002DA787 /* cbl */ = {
+			isa = PBXGroup;
+			children = (
+				4034897C2A833AA1002DA787 /* CBLHeader.h */,
+				403489792A833AA1002DA787 /* CBLInfo.h */,
+				403489782A833AA1002DA787 /* CBLManager.cpp */,
+				4034897F2A833AA1002DA787 /* CBLManager.h */,
+				4034897E2A833AA1002DA787 /* CBLReplicationFilter.cpp */,
+				403489862A833AA1002DA787 /* CBLReplicationFilter.h */,
+				403489812A833AA1002DA787 /* CBLReplicatorParams.h */,
+				403489842A833AA1002DA787 /* CollectionSpec.cpp */,
+				403489802A833AA1002DA787 /* CollectionSpec.h */,
+				403489852A833AA1002DA787 /* Fleece.cpp */,
+				4034897A2A833AA1002DA787 /* Fleece.h */,
+				4034897B2A833AA1002DA787 /* KeyPath.cpp */,
+				403489822A833AA1002DA787 /* KeyPath.h */,
+				4034897D2A833AA1002DA787 /* Snapshot.cpp */,
+				403489832A833AA1002DA787 /* Snapshot.h */,
+			);
+			name = cbl;
+			path = ../../src/cbl;
+			sourceTree = "<group>";
+		};
+		403489992A833AF0002DA787 /* ext */ = {
+			isa = PBXGroup;
+			children = (
+				4034899A2A833AF0002DA787 /* date.h */,
+			);
+			name = ext;
+			path = ../../../src/support/ext;
+			sourceTree = "<group>";
+		};
 		409CE1962A3BFA9300620CAA = {
 			isa = PBXGroup;
 			children = (
@@ -418,17 +498,11 @@
 		409CE1B72A3CD9BE00620CAA /* shared */ = {
 			isa = PBXGroup;
 			children = (
+				403489772A833AA1002DA787 /* cbl */,
+				4034896C2A833AA1002DA787 /* dispatcher */,
 				409CE1BD2A3CD9BE00620CAA /* support */,
-				409CE40F2A3CEC2400620CAA /* CBLHeader.h */,
-				409CE1B82A3CD9BE00620CAA /* CBLManager.cpp */,
-				409CE1D12A3CD9BE00620CAA /* CBLManager.h */,
-				409CE1D02A3CD9BE00620CAA /* CBLReplicationFilter.cpp */,
-				409CE1D72A3CD9BE00620CAA /* CBLReplicationFilter.h */,
-				409CE1D52A3CD9BE00620CAA /* CollectionSpec.cpp */,
-				409CE1D32A3CD9BE00620CAA /* CollectionSpec.h */,
 				409CE1CF2A3CD9BE00620CAA /* Dispatcher.cpp */,
 				409CE1BB2A3CD9BE00620CAA /* Dispatcher.h */,
-				409CE1D42A3CD9BE00620CAA /* Dispatcher+Handlers.cpp */,
 				409CE1D62A3CD9BE00620CAA /* main.cpp */,
 				409CE1BA2A3CD9BE00620CAA /* Request.cpp */,
 				409CE1D22A3CD9BE00620CAA /* Request.h */,
@@ -441,23 +515,25 @@
 		409CE1BD2A3CD9BE00620CAA /* support */ = {
 			isa = PBXGroup;
 			children = (
+				403489992A833AF0002DA787 /* ext */,
 				409CE1C92A3CD9BE00620CAA /* Defer.h */,
 				409CE1C32A3CD9BE00620CAA /* Define.h */,
 				409CE1C42A3CD9BE00620CAA /* Device.cpp */,
 				409CE1BF2A3CD9BE00620CAA /* Device.h */,
 				409CE1BE2A3CD9BE00620CAA /* Device+Apple.mm */,
-				409CE1C22A3CD9BE00620CAA /* Exception.cpp */,
-				409CE1CB2A3CD9BE00620CAA /* Exception.h */,
+				403489962A833ADD002DA787 /* Error.cpp */,
+				403489972A833ADD002DA787 /* Error.h */,
 				409CE1C62A3CD9BE00620CAA /* Files.cpp */,
 				409CE1CA2A3CD9BE00620CAA /* Files.h */,
 				409CE1CD2A3CD9BE00620CAA /* Files+Apple.mm */,
-				409CE1CE2A3CD9BE00620CAA /* Fleece.cpp */,
-				409CE1C02A3CD9BE00620CAA /* Fleece.h */,
 				409CE1C72A3CD9BE00620CAA /* JSON.h */,
+				4034899C2A833B15002DA787 /* Log.cpp */,
+				4034899B2A833B15002DA787 /* Log.h */,
+				4034899E2A833B28002DA787 /* Precondition.h */,
 				409CE1C52A3CD9BE00620CAA /* UUID.cpp */,
 				409CE1C12A3CD9BE00620CAA /* UUID.h */,
-				409CE1CC2A3CD9BE00620CAA /* Zip.cpp */,
-				409CE1C82A3CD9BE00620CAA /* Zip.h */,
+				403489A02A833B2F002DA787 /* ZipUtil.cpp */,
+				4034899F2A833B2F002DA787 /* ZipUtil.h */,
 			);
 			path = support;
 			sourceTree = "<group>";
@@ -718,8 +794,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				409CE3C02A3CE89500620CAA /* zip_file_strerror.c in Sources */,
+				403489A12A833B2F002DA787 /* ZipUtil.cpp in Sources */,
 				409CE3D02A3CE89500620CAA /* zip_hash.c in Sources */,
 				409CE40D2A3CE89500620CAA /* zip_source_compress.c in Sources */,
+				403489902A833AA2002DA787 /* CBLManager.cpp in Sources */,
 				409CE3C62A3CE89500620CAA /* zip_dirent.c in Sources */,
 				409CE3972A3CE89500620CAA /* zip_fopen_index.c in Sources */,
 				409CE3CF2A3CE89500620CAA /* zip_file_set_comment.c in Sources */,
@@ -732,11 +810,11 @@
 				409CE3F52A3CE89500620CAA /* zip_source_begin_write.c in Sources */,
 				409CE1D92A3CD9BE00620CAA /* Request.cpp in Sources */,
 				409CE3BB2A3CE89500620CAA /* zip_set_default_password.c in Sources */,
+				4034898F2A833AA2002DA787 /* PostVerifyDocuments.cpp in Sources */,
 				409CE3A82A3CE89500620CAA /* zip_algorithm_deflate.c in Sources */,
 				409CE3AB2A3CE89500620CAA /* zip_set_name.c in Sources */,
 				409CE3EF2A3CE89500620CAA /* zip_set_archive_flag.c in Sources */,
 				409CE3D32A3CE89500620CAA /* zip_add_entry.c in Sources */,
-				409CE1E02A3CD9BE00620CAA /* Zip.cpp in Sources */,
 				409CE3FE2A3CE89500620CAA /* zip_close.c in Sources */,
 				409CE3C52A3CE89500620CAA /* zip_strerror.c in Sources */,
 				409CE3E02A3CE89500620CAA /* zip_source_winzip_aes_encode.c in Sources */,
@@ -749,20 +827,24 @@
 				409CE3BF2A3CE89500620CAA /* zip_file_get_external_attributes.c in Sources */,
 				409CE3F92A3CE89500620CAA /* zip_libzip_version.c in Sources */,
 				409CE3FB2A3CE89500620CAA /* zip_crypto_commoncrypto.c in Sources */,
+				403489932A833AA2002DA787 /* CBLReplicationFilter.cpp in Sources */,
+				403489912A833AA2002DA787 /* KeyPath.cpp in Sources */,
 				409CE3A52A3CE89500620CAA /* zip_file_error_clear.c in Sources */,
+				4034898B2A833AA2002DA787 /* PostUpdateDatabase.cpp in Sources */,
 				409CE4072A3CE89500620CAA /* zip_source_window.c in Sources */,
 				409CE3FF2A3CE89500620CAA /* zip_source_close.c in Sources */,
 				409CE3DF2A3CE89500620CAA /* zip_open.c in Sources */,
 				409CE3D92A3CE89500620CAA /* zip_error_to_str.c in Sources */,
 				409CE3962A3CE89500620CAA /* zip_fopen_index_encrypted.c in Sources */,
 				409CE3AD2A3CE89500620CAA /* zip_source_tell.c in Sources */,
+				403489922A833AA2002DA787 /* Snapshot.cpp in Sources */,
 				409CE3D22A3CE89500620CAA /* zip_source_remove.c in Sources */,
 				409CE4012A3CE89500620CAA /* zip_source_file_stdio.c in Sources */,
 				409CE3B32A3CE89500620CAA /* zip_error_get.c in Sources */,
 				409CE4042A3CE89500620CAA /* zip_source_zip.c in Sources */,
 				409CE2FA2A3CDB8400620CAA /* zip_err_str.c in Sources */,
+				4034898D2A833AA2002DA787 /* PostStartReplicator.cpp in Sources */,
 				409CE40B2A3CE89500620CAA /* zip_winzip_aes.c in Sources */,
-				409CE1E62A3CD9BE00620CAA /* CollectionSpec.cpp in Sources */,
 				409CE3C12A3CE89500620CAA /* zip_file_set_encryption.c in Sources */,
 				409CE3FD2A3CE89500620CAA /* zip_file_get_offset.c in Sources */,
 				409CE3992A3CE89500620CAA /* zip_source_commit_write.c in Sources */,
@@ -770,24 +852,29 @@
 				409CE3AE2A3CE89500620CAA /* zip_file_set_external_attributes.c in Sources */,
 				409CE3E72A3CE89500620CAA /* zip_random_unix.c in Sources */,
 				409CE1DB2A3CD9BE00620CAA /* Device+Apple.mm in Sources */,
-				409CE1E52A3CD9BE00620CAA /* Dispatcher+Handlers.cpp in Sources */,
 				409CE3CA2A3CE89500620CAA /* zip_entry.c in Sources */,
 				409CE40E2A3CE89500620CAA /* zip_ftell.c in Sources */,
 				409CE3B72A3CE89500620CAA /* zip_source_seek_write.c in Sources */,
+				403489892A833AA2002DA787 /* PostGetDocument.cpp in Sources */,
+				4034898E2A833AA2002DA787 /* PostReset.cpp in Sources */,
 				409CE3DC2A3CE89500620CAA /* zip_discard.c in Sources */,
 				409CE39C2A3CE89500620CAA /* zip_fdopen.c in Sources */,
 				409CE3D82A3CE89500620CAA /* zip_file_add.c in Sources */,
 				409CE3EE2A3CE89500620CAA /* zip_source_supports.c in Sources */,
+				403489942A833AA2002DA787 /* CollectionSpec.cpp in Sources */,
+				403489952A833AA2002DA787 /* Fleece.cpp in Sources */,
 				409CE3A62A3CE89500620CAA /* zip_source_layered.c in Sources */,
 				409CE3D12A3CE89500620CAA /* zip_set_archive_comment.c in Sources */,
 				409CE3F02A3CE89500620CAA /* zip_source_get_file_attributes.c in Sources */,
 				409CE3B02A3CE89500620CAA /* zip_source_winzip_aes_decode.c in Sources */,
 				409CE1DE2A3CD9BE00620CAA /* UUID.cpp in Sources */,
 				409CE3B82A3CE89500620CAA /* zip_unchange_data.c in Sources */,
+				403489882A833AA2002DA787 /* PostGetReplicatorStatus.cpp in Sources */,
 				409CE3952A3CE89500620CAA /* zip_error_get_sys_type.c in Sources */,
 				409CE3F72A3CE89500620CAA /* zip_get_num_files.c in Sources */,
 				409CE1B32A3CD96000620CAA /* CBLTestServer.mm in Sources */,
 				409CE3CE2A3CE89500620CAA /* zip_stat.c in Sources */,
+				403489982A833ADD002DA787 /* Error.cpp in Sources */,
 				409CE3DA2A3CE89500620CAA /* zip_name_locate.c in Sources */,
 				409CE3EA2A3CE89500620CAA /* zip_source_buffer.c in Sources */,
 				409CE1A32A3BFA9300620CAA /* TestServerApp.swift in Sources */,
@@ -795,13 +882,11 @@
 				409CE3D42A3CE89500620CAA /* zip_delete.c in Sources */,
 				409CE3BC2A3CE89500620CAA /* zip_unchange_archive.c in Sources */,
 				409CE3E82A3CE89500620CAA /* zip_file_rename.c in Sources */,
-				409CE1E22A3CD9BE00620CAA /* Fleece.cpp in Sources */,
 				409CE3F82A3CE89500620CAA /* zip_source_pkware_decode.c in Sources */,
 				409CE3902A3CE89500620CAA /* zip_fclose.c in Sources */,
 				409CE3B62A3CE89500620CAA /* zip_source_begin_write_cloning.c in Sources */,
 				409CE3C72A3CE89500620CAA /* zip_source_pkware_encode.c in Sources */,
 				409CE3BE2A3CE89500620CAA /* zip_error_strerror.c in Sources */,
-				409CE1E42A3CD9BE00620CAA /* CBLReplicationFilter.cpp in Sources */,
 				409CE4002A3CE89500620CAA /* zip_utf-8.c in Sources */,
 				409CE3C42A3CE89500620CAA /* zip_string.c in Sources */,
 				409CE3E42A3CE89500620CAA /* zip_get_encryption_implementation.c in Sources */,
@@ -816,7 +901,6 @@
 				409CE3AA2A3CE89500620CAA /* zip_get_archive_comment.c in Sources */,
 				409CE3A42A3CE89500620CAA /* zip_dir_add.c in Sources */,
 				409CE3EC2A3CE89500620CAA /* zip_unchange_all.c in Sources */,
-				409CE1DC2A3CD9BE00620CAA /* Exception.cpp in Sources */,
 				409CE1DA2A3CD9BE00620CAA /* TestServer.cpp in Sources */,
 				409CE3AC2A3CE89500620CAA /* zip_fread.c in Sources */,
 				409CE1EC2A3CDA9600620CAA /* civetweb.c in Sources */,
@@ -826,11 +910,12 @@
 				409CE3E92A3CE89500620CAA /* zip_source_zip_new.c in Sources */,
 				409CE3A72A3CE89500620CAA /* zip_set_file_comment.c in Sources */,
 				409CE1E12A3CD9BE00620CAA /* Files+Apple.mm in Sources */,
-				409CE1D82A3CD9BE00620CAA /* CBLManager.cpp in Sources */,
 				409CE4052A3CE89500620CAA /* zip_file_error_get.c in Sources */,
 				409CE3C92A3CE89500620CAA /* zip_source_crc.c in Sources */,
 				409CE3ED2A3CE89500620CAA /* zip_add_dir.c in Sources */,
 				409CE3A22A3CE89500620CAA /* zip_mkstempm.c in Sources */,
+				403489872A833AA2002DA787 /* GetRoot.cpp in Sources */,
+				4034898C2A833AA2002DA787 /* PostGetAllDocuments.cpp in Sources */,
 				409CE3F42A3CE89500620CAA /* zip_set_file_compression.c in Sources */,
 				409CE4032A3CE89500620CAA /* zip_error.c in Sources */,
 				409CE3A32A3CE89500620CAA /* zip_file_set_mtime.c in Sources */,
@@ -848,6 +933,8 @@
 				409CE39B2A3CE89500620CAA /* zip_source_free.c in Sources */,
 				409CE40C2A3CE89500620CAA /* zip_source_is_deleted.c in Sources */,
 				409CE3E52A3CE89500620CAA /* zip_error_clear.c in Sources */,
+				4034898A2A833AA2002DA787 /* PostSnapshotDocuments.cpp in Sources */,
+				4034899D2A833B15002DA787 /* Log.cpp in Sources */,
 				409CE3932A3CE89500620CAA /* zip_extra_field.c in Sources */,
 				409CE39F2A3CE89500620CAA /* zip_source_tell_write.c in Sources */,
 			);
