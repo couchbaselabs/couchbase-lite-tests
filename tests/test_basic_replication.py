@@ -67,7 +67,7 @@ class TestBasicReplication:
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
         # 5. Check that all docs are replicated correctly.
-        compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "travel", 
+        await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "travel", 
                                  ["travel.airlines", "travel.airports", "travel.hotels"])
 
     @pytest.mark.asyncio
@@ -99,7 +99,7 @@ class TestBasicReplication:
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
         # 5. Check that all docs are replicated correctly.
-        compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "travel", 
+        await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "travel", 
                                  ["travel.routes", "travel.landmarks", "travel.hotels"])
 
     @pytest.mark.asyncio
@@ -131,5 +131,5 @@ class TestBasicReplication:
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
         # 5. Check that all docs are replicated correctly.
-        compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "travel", 
+        await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "travel", 
                                  ["travel.airlines", "travel.airports", "travel.hotels", "travel.landmarks", "travel.routes"])
