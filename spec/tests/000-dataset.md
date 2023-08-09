@@ -325,8 +325,8 @@ function (doc, oldDoc, meta) {
 | _default.posts      | 5           | post_1 ... 5     |
 
 **Note:**
-* post_1, post_2, and post_3 will have `channels` as ["user1", "public"].
-* post_4, post_5 will have `channels` as ["public"].
+* post_1, post_2, and post_3 will have `channels` as ["group1", "group2"].
+* post_4, post_5 will have `channels` as ["group2"].
 
 ### SG Config
 
