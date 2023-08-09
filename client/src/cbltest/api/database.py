@@ -196,7 +196,7 @@ class Database:
         req = self.__request_factory.create_request(TestServerRequestType.ALL_DOC_IDS, payload)
         resp = await self.__request_factory.send_request(self.__index, req)
         cast_resp = cast(PostGetAllDocumentsResponse, resp)
-        ret_val: Dict[str, PostGetAllDocumentsEntry] = {}
+        ret_val: Dict[str, List[AllDocumentsEntry]] = {}
         for c in cast_resp.collection_keys:
             ret_val[c] = list(AllDocumentsEntry(d) for d in cast_resp.documents_for_collection(c))
 

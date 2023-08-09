@@ -47,11 +47,11 @@ def compare_doc_results(local: List[AllDocumentsEntry], remote: List[AllDocument
         local_dict = {}
         remote_dict = {}
 
-        for entry in local:
-            local_dict[entry.id] = entry.rev
+        for local_entry in local:
+            local_dict[local_entry.id] = local_entry.rev
 
-        for entry in remote:
-            remote_dict[entry.id] = entry.revid
+        for remote_entry in remote:
+            remote_dict[remote_entry.id] = remote_entry.revid
 
         if mode == ReplicatorType.PUSH:
             source = local_dict
