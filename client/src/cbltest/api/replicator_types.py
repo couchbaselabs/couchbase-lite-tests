@@ -9,7 +9,7 @@ from cbltest.responses import ErrorResponseBody
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.jsonhelper import _get_typed, _get_typed_required
 
-class ReplicatorPushFilterParameters(JSONSerializable):
+class ReplicatorFilterParameters(JSONSerializable):
     """
     A class representing parameters to be passed to a push filter.
     In theory this could be anything, but in practice it has always been
@@ -28,10 +28,10 @@ class ReplicatorPushFilterParameters(JSONSerializable):
             "documentIDs": self.document_ids
         }
 
-class ReplicatorPushFilter(JSONSerializable):
+class ReplicatorFilter(JSONSerializable):
     """
-    A class representing a push filter to use on a replication to limit
-    the documents that get sent from local to remote.
+    A class representing a filter to use on a replication to limit
+    the documents that get sent.
     """
 
     @property
@@ -41,8 +41,8 @@ class ReplicatorPushFilter(JSONSerializable):
     
     def __init__(self, name: str):
         self.__name = name
-        self.parameters = cast(ReplicatorPushFilterParameters, None)
-        """The parameters to be applied to the push filter"""
+        self.parameters = cast(ReplicatorFilterParameters, None)
+        """The parameters to be applied to the filter"""
 
     def to_json(self) -> Any:
         ret_val = {"name": self.name}
@@ -56,7 +56,7 @@ class ReplicatorCollectionEntry(JSONSerializable):
         return self.__names
     
     def __init__(self, names: List[str] = ["_default"], channels: Optional[List[str]] = None, document_ids: Optional[List[str]] = None,
-                 push_filter: Optional[ReplicatorPushFilter] = None):
+                 push_filter: Optional[ReplicatorFilter] = None, pull_filter: Optional[ReplicatorFilter] = None):
         _assert_not_null(names, nameof(names))
         assert len(names) > 0, "Must specify at least one name in the names array for ReplicatorCollectionEntry"
 
@@ -69,6 +69,9 @@ class ReplicatorCollectionEntry(JSONSerializable):
 
         self.push_filter = push_filter
         """The push filter to use for this collection, if any"""
+
+        self.pull_filter = pull_filter
+        """The pull filter to use for this collection, if any"""
 
     def to_json(self) -> Any:
         ret_val = {
@@ -83,6 +86,9 @@ class ReplicatorCollectionEntry(JSONSerializable):
 
         if self.push_filter is not None:
             ret_val["pushFilter"] = self.push_filter.to_json()
+
+        if self.pull_filter is not None:
+            ret_val["pullFilter"] = self.pull_filter.to_json()
 
         return ret_val
 

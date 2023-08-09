@@ -60,12 +60,10 @@ namespace TestServer
     public static class TestServerErrorDomain
     {
         public static readonly string TestServer = "TestServer";
-        public static readonly string CouchbaseLite = "CouchbaseLite";
+        public static readonly string CouchbaseLite = "CBL";
         public static readonly string POSIX = "POSIX";
         public static readonly string SQLite = "SQLite";
         public static readonly string Fleece = "Fleece";
-        public static readonly string Network = "Network";
-        public static readonly string WebSocket = "WebSocket";
     }
 
     [AttributeUsage(AttributeTargets.Method)]
