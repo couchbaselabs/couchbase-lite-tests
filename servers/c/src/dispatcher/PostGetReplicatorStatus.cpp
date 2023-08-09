@@ -36,16 +36,17 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
                 if (replDoc.error.code > 0) {
                     doc["error"] = CBLException(replDoc.error).json();
                 }
+                vector<string> flags;
                 if (replDoc.flags) {
-                    vector<string> flags;
                     if (replDoc.flags & kCBLDocumentFlagsDeleted) { flags.emplace_back("DELETED"); }
                     if (replDoc.flags & kCBLDocumentFlagsAccessRemoved) { flags.emplace_back("ACCESSREMOVED"); }
-                    if (!flags.empty()) { doc["flags"] = flags; }
                 }
+                doc["flags"] = flags;
+
                 docs.push_back(doc);
             }
         }
-        result["docs"] = docs;
+        result["documents"] = docs;
     }
     return request.respondWithJSON(result);
 }
