@@ -9,16 +9,19 @@ import Vapor
 
 extension Handlers {
     static let resetHandler: EndpointHandlerEmptyResponse = { req throws in
-        if let databaseManager = DatabaseManager.shared {
-            do {
-                try databaseManager.reset()
-                return Response(status: .ok)
-            } catch let error as TestServerError {
-                throw error
-            }
-        }
+        guard let databaseManager = DatabaseManager.shared
         else {
             throw TestServerError.cblDBNotOpen
         }
+        
+        if let resetConfig = try? req.content.decode(ContentTypes.ResetConfiguration.self),
+           !resetConfig.datasets.isEmpty {
+            let datasetName = resetConfig.datasets.keys.first!
+            try databaseManager.reset(dataset: datasetName)
+        } else {
+            try databaseManager.reset()
+        }
+        
+        return Response(status: .ok)
     }
 }

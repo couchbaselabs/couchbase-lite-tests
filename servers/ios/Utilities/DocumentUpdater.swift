@@ -10,16 +10,38 @@ import CouchbaseLiteSwift
 struct DocumentUpdater {
     public static func processUpdate(item: ContentTypes.DatabaseUpdateItem) throws {
         guard let collection = DatabaseManager.shared?.collection(item.collection)
-        else { return }
+        else { throw TestServerError.cblDBNotOpen }
         
-        for updateDict in item.updatedProperties {
-            for (keyPath, value) in updateDict {
+        if let updatedProperties = item.updatedProperties {
+            for updateDict in updatedProperties {
+                for (keyPath, value) in updateDict {
+                    var parser = KeyPathParser(input: keyPath)
+                    guard let components = try parser.parse(), !components.isEmpty
+                    else {
+                        throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
+                    }
+                    // Ensure first component is not an array index
+                    switch components.first! {
+                    case .index: do {
+                        throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
+                    }
+                    default: break
+                    }
+                    
+                    let parentProperty = try getParentProperty(collection: collection, docID: item.documentID, keyPathComponents: components)
+                    update(parentProperty: parentProperty, propertyKey: components.last!, value: value)
+                }
+            }
+        }
+        
+        if let removedProperties = item.removedProperties {
+            for keyPath in removedProperties {
                 var parser = KeyPathParser(input: keyPath)
-                guard let components = parser.parse(), !components.isEmpty
+                guard let components = try parser.parse(), !components.isEmpty
                 else {
                     throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
                 }
-                // Ensure first component is not an array index
+                
                 switch components.first! {
                 case .index: do {
                     throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
@@ -28,27 +50,9 @@ struct DocumentUpdater {
                 }
                 
                 let parentProperty = try getParentProperty(collection: collection, docID: item.documentID, keyPathComponents: components)
-                update(parentProperty: parentProperty, propertyKey: components.last!, value: value)
+                
+                remove(parentProperty: parentProperty, propertyKey: components.last!)
             }
-        }
-        
-        for keyPath in item.removedProperties {
-            var parser = KeyPathParser(input: keyPath)
-            guard let components = parser.parse(), !components.isEmpty
-            else {
-                throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
-            }
-            
-            switch components.first! {
-            case .index: do {
-                throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
-            }
-            default: break
-            }
-            
-            let parentProperty = try getParentProperty(collection: collection, docID: item.documentID, keyPathComponents: components)
-            
-            remove(parentProperty: parentProperty, propertyKey: components.last!)
         }
     }
     
@@ -80,12 +84,11 @@ struct DocumentUpdater {
                 // Backfill array with null if it does not reach index
                 if index >= current.count {
                     if(index > current.count) {
-                        for i in (current.count)...(index - 1) {
-                            current.setValue(nil, at: i)
-                        }
+                        backfillArray(array: current, uptoInclusive: index)
                     }
                     if(nextIsArray) {
                         current.setValue(MutableArrayObject(), at: index)
+                        
                     } else {
                         current.setValue(MutableDictionaryObject(), at: index)
                     }
@@ -93,11 +96,13 @@ struct DocumentUpdater {
                 
                 if(nextIsArray) {
                     guard let arr = current.array(at: index)
-                    else { throw TestServerError.internalErr }
+                    // If arr doesn't exist, this component was probably a scalar
+                    else { throw TestServerError.badRequest }
                     current = arr
                 } else {
                     guard let dict = current.dictionary(at: index)
-                    else { throw TestServerError.internalErr }
+                    // If dict doesn't exist, this component was probably a scalar
+                    else { throw TestServerError.badRequest }
                     current = dict
                 }
 
@@ -113,11 +118,13 @@ struct DocumentUpdater {
                 
                 if(nextIsArray) {
                     guard let arr = current.array(forKey: name)
-                    else { throw TestServerError.internalErr }
+                    // If arr doesn't exist, this component was probably a scalar
+                    else { throw TestServerError.badRequest }
                     current = arr
                 } else {
                     guard let dict = current.dictionary(forKey: name)
-                    else { throw TestServerError.internalErr }
+                    // If dict doesn't exist, this component was probably a scalar
+                    else { throw TestServerError.badRequest }
                     current = dict
                 }
             }
@@ -126,12 +133,22 @@ struct DocumentUpdater {
         return current
     }
     
-    private static func update(parentProperty: MutableObjectProtocol, propertyKey: KeyPathComponent, value: Any) {
+    private static func update(parentProperty: MutableObjectProtocol, propertyKey: KeyPathComponent, value: AnyCodable) {
         switch propertyKey {
         case .index(let index):
-            _ = parentProperty.setValue(value, at: index)
+            backfillArray(array: parentProperty, uptoInclusive: index)
+            parentProperty.setValue(value.value, at: index)
         case .property(let name):
-            _ = parentProperty.setValue(value, forKey: name)
+            parentProperty.setValue(value.value, forKey: name)
+        }
+    }
+    
+    private static func backfillArray(array: MutableObjectProtocol, uptoInclusive: Int) {
+        if uptoInclusive > array.count,
+           let array = array as? MutableArrayObject {
+            for _ in array.count...uptoInclusive {
+                array.addValue(nil)
+            }
         }
     }
     

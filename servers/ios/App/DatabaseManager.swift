@@ -6,9 +6,9 @@
 //
 
 import CouchbaseLiteSwift
+import ZipArchive
 
-class DatabaseManager {
-    
+class DatabaseManager {    
     static var shared : DatabaseManager?
     
     private let dbName: String
@@ -54,7 +54,10 @@ class DatabaseManager {
     }
     
     public func collection(_ name: String) -> Collection? {
-        return try? database?.collection(name: name)
+        let scopeAndColl = name.components(separatedBy: ".")
+        guard let scope = scopeAndColl.first, let coll = scopeAndColl.last
+        else { return nil }
+        return try? database?.collection(name: coll, scope: scope)
     }
     
     // Returns [scope_name.collection_name]
@@ -74,8 +77,10 @@ class DatabaseManager {
         }
     }
     
-    public func reset() throws {
-        guard let path = database?.path
+    public func reset(dataset: String? = nil) throws {
+        guard let path = database?.path,
+              let config = database?.config,
+              let name = database?.name
         else { throw TestServerError.cblDBNotOpen }
         closeDatabase()
         
@@ -83,14 +88,43 @@ class DatabaseManager {
             let fm = FileManager()
             try fm.removeItem(atPath: path)
         } catch  {
-            throw TestServerError(domain: .TESTSERVER, code: error._code, message: "Failed to delete database file")
+            throw TestServerError(domain: .TESTSERVER, code: 500, message: "Failed to delete database file.")
+        }
+        
+        if let dataset = dataset {
+            // TODO: Multiple DBs, use db name param from request
+            try DatabaseManager.loadDataset(withName: dataset, dbName: name, dbConfig: config)
         }
         
         do {
-            database = try Database(name: self.dbName)
+            database = try Database(name: name)
         } catch {
-            throw TestServerError(domain: .CBL, code: CBLError.cantOpenFile, message: "Couldn't open database")
+            throw TestServerError(domain: .CBL, code: CBLError.cantOpenFile, message: "Couldn't open database.")
+        }
+    }
+    
+    private static func loadDataset(withName name: String, dbName: String, dbConfig: DatabaseConfiguration) throws {
+        guard let datasetZipURL = Bundle.main.url(forResource: name, withExtension: "cblite2.zip")
+        else { throw TestServerError(domain: .TESTSERVER, code: 400, message: "Dataset does not exist") }
+        
+        // datasetZipURL is "../x.cblite2.zip", datasetURL is "../x.cblite2"
+        let datasetURL = datasetZipURL.deletingPathExtension()
+        let fm = FileManager()
+        
+        // If the dataset has not been unzipped previously
+        if(!fm.fileExists(atPath: datasetURL.relativePath)) {
+            // Unzip dataset archive
+            guard SSZipArchive.unzipFile(atPath: datasetZipURL.relativePath,
+                                         toDestination: datasetZipURL.deletingLastPathComponent().relativePath)
+            else {
+                throw TestServerError(domain: .CBL, code: CBLError.cantOpenFile, message: "Couldn't unzip dataset archive.")
+            }
         }
         
+        do {
+            try Database.copy(fromPath: datasetURL.relativePath, toDatabase: dbName, withConfig: dbConfig)
+        } catch {
+            throw TestServerError(domain: .CBL, code: CBLError.cantOpenFile, message: "Couldn't copy dataset to database.")
+        }
     }
 }

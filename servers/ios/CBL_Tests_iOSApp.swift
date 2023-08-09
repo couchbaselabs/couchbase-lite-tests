@@ -14,7 +14,7 @@ struct CBL_Tests_iOSApp: App {
     init() {        
         DatabaseManager.InitializeShared()
         if let databaseManager = DatabaseManager.shared {
-            testServer = TestServer(port: 80, dbManager: databaseManager)
+            testServer = TestServer(port: 8080, dbManager: databaseManager)
             Task { [weak testServer] in
                 await testServer?.run()
             }

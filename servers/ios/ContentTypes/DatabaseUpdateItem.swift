@@ -67,43 +67,7 @@ extension ContentTypes {
         let type: ActionType
         let collection: String
         let documentID: String
-        let updatedProperties: Array<Dictionary<String, Any>>
-        let removedProperties: Array<String>
-        
-        // Coding keys
-        private enum CodingKeys: String, CodingKey {
-            case type, collection, documentID, updatedProperties, removedProperties
-        }
-        
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            type = try container.decode(ActionType.self, forKey: .type)
-            collection = try container.decode(String.self, forKey: .collection)
-            documentID = try container.decode(String.self, forKey: .documentID)
-            removedProperties = try container.decode([String].self, forKey: .removedProperties)
-            
-            // Decode the 'updatedProperties' as Data because we don't know the types in advance
-            let updatedPropertiesData = try container.decode(Data.self, forKey: .updatedProperties)
-            
-            // Use JSONSerialization to convert the Data to [String: Any]
-            let jsonObject = try JSONSerialization.jsonObject(with: updatedPropertiesData, options: [])
-            if let jsonArray = jsonObject as? [[String: Any]] {
-                updatedProperties = jsonArray
-            } else {
-                throw DecodingError.dataCorruptedError(forKey: .updatedProperties, in: container, debugDescription: "Expected an array of dictionaries")
-            }
-        }
-        
-        func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(type, forKey: .type)
-            try container.encode(collection, forKey: .collection)
-            try container.encode(documentID, forKey: .documentID)
-            try container.encode(removedProperties, forKey: .removedProperties)
-            
-            // Use JSONSerialization to convert the 'updatedProperties' to Data
-            let jsonData = try JSONSerialization.data(withJSONObject: updatedProperties, options: [])
-            try container.encode(jsonData, forKey: .updatedProperties)
-        }
+        let updatedProperties: Array<Dictionary<String, AnyCodable>>?
+        let removedProperties: Array<String>?
     }
 }

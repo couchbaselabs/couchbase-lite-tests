@@ -11,6 +11,9 @@ class TestServer : ObservableObject {
     var app : Vapor.Application
     let dbConnection : DatabaseManager
     
+    public static let maxAPIVersion = 1
+    public static let serverID = UUID()
+    
     init(port: Int, dbManager: DatabaseManager) {
         self.dbConnection = dbManager
         do {
@@ -43,6 +46,7 @@ class TestServer : ObservableObject {
         
         // Use custom error middleware
         app.middleware = .init()
+        app.middleware.use(HeadersMiddleware())
         app.middleware.use(TestServerErrorMiddleware())
 
         setupRoutes(app)
@@ -50,6 +54,9 @@ class TestServer : ObservableObject {
     
     private func setupRoutes(_ app: Application) {
         app.get("", use: Handlers.getRoot)
+        app.post("reset", use: Handlers.resetHandler)
+        app.post("getAllDocuments", use: Handlers.getAllDocuments)
+        app.post("updateDatabase", use: Handlers.updateDatabase)
     }
 }
 
