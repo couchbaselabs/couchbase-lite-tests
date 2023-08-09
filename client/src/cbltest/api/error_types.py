@@ -1,5 +1,4 @@
 from __future__ import annotations
-from enum import Enum
 from typing import Final, Optional
 
 class ErrorDomain:
@@ -8,7 +7,7 @@ class ErrorDomain:
     TESTSERVER: Final[str] = "TESTSERVER"
     """The test server itself encountered an error (not a library bug)"""
 
-    CBL: Final[str] = "COUCHBASELITE"
+    CBL: Final[str] = "CBL"
     """High level Couchbase Lite error"""
 
     POSIX: Final[str] = "POSIX"
@@ -19,12 +18,6 @@ class ErrorDomain:
 
     FLEECE: Final[str] = "FLEECE"
     """Error returned from Fleece"""
-
-    NETWORK: Final[str] = "NETWORK"
-    """Error in network connection"""
-
-    WEBSOCKET: Final[str] = "WEBSOCKET"
-    """Web socket protocol error"""
 
     @classmethod
     def equal(cls, val: str, expected: str) -> bool:
