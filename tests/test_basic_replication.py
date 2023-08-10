@@ -91,9 +91,9 @@ class TestBasicReplication:
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), replicator_type=ReplicatorType.PULL, collections=[
             ReplicatorCollectionEntry(["travel.routes", "travel.landmarks", "travel.hotels"])
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+        await replicator.start()
 
         # 4. Wait until the replicator is stopped.
-        await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
