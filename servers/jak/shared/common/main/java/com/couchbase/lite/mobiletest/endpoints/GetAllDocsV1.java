@@ -19,19 +19,32 @@ import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import com.couchbase.lite.Collection;
+import com.couchbase.lite.CouchbaseLiteException;
+import com.couchbase.lite.DataSource;
+import com.couchbase.lite.Meta;
+import com.couchbase.lite.QueryBuilder;
+import com.couchbase.lite.Result;
+import com.couchbase.lite.ResultSet;
+import com.couchbase.lite.SelectResult;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
-import com.couchbase.lite.mobiletest.tools.CollectionDocsBuilder;
 import com.couchbase.lite.mobiletest.tools.CollectionsBuilder;
 
 
 public class GetAllDocsV1 {
     private static final String KEY_DATABASE = "database";
     private static final String KEY_COLLECTIONS = "collections";
+
+    private static final String KEY_ID = "id";
+    private static final String KEY_REV = "rev";
 
     private static final List<String> LEGAL_COLLECTION_KEYS;
     static {
@@ -50,9 +63,42 @@ public class GetAllDocsV1 {
     @NonNull
     public Map<String, Object> getAllDocs(@NonNull TypedMap req, @NonNull Memory mem) {
         req.validate(LEGAL_COLLECTION_KEYS);
-        try (CollectionsBuilder builder
-                 = new CollectionsBuilder(req.getList(KEY_COLLECTIONS), dbSvc.getNamedDb(req, mem))) {
-            return new CollectionDocsBuilder(builder.getCollections()).build();
+        try (CollectionsBuilder colls = new CollectionsBuilder(
+            req.getList(KEY_COLLECTIONS),
+            dbSvc.getNamedDb(req, mem))) {
+            return getAllDocs(colls.getCollections());
         }
+    }
+
+    @NonNull
+    private Map<String, Object> getAllDocs(Set<Collection> collections) {
+        final Map<String, Object> colls = new HashMap<>();
+        for (Collection collection: collections) {
+            final String collectionName = collection.getScope().getName() + "." + collection.getName();
+
+            final List<Result> results;
+            try (ResultSet rs = QueryBuilder.select(
+                    SelectResult.expression(Meta.id).as(KEY_ID),
+                    SelectResult.expression(Meta.revisionID).as(KEY_REV))
+                .from(DataSource.collection(collection))
+                .execute()) {
+                results = rs.allResults();
+            }
+            catch (CouchbaseLiteException err) {
+                throw new CblApiFailure("Failed querying docs for collection: " + collectionName, err);
+            }
+
+            final List<Map<String, String>> docs = new ArrayList<>();
+            for (Result result: results) {
+                final Map<String, String> doc = new HashMap<>();
+                doc.put(KEY_ID, result.getString(KEY_ID));
+                doc.put(KEY_REV, result.getString(KEY_REV));
+                docs.add(doc);
+            }
+
+            colls.put(collectionName, docs);
+        }
+
+        return colls;
     }
 }

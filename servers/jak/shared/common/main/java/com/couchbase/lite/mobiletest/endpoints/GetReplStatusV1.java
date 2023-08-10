@@ -17,16 +17,24 @@ package com.couchbase.lite.mobiletest.endpoints;
 
 import androidx.annotation.NonNull;
 
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import com.couchbase.lite.CouchbaseLiteException;
+import com.couchbase.lite.DocumentFlag;
+import com.couchbase.lite.DocumentReplication;
+import com.couchbase.lite.ReplicatedDocument;
 import com.couchbase.lite.Replicator;
+import com.couchbase.lite.ReplicatorProgress;
 import com.couchbase.lite.ReplicatorStatus;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
-import com.couchbase.lite.mobiletest.tools.ReplicatorStatusBuilder;
+import com.couchbase.lite.mobiletest.tools.ErrorBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
@@ -34,6 +42,16 @@ public class GetReplStatusV1 {
     private static final String TAG = "REPL_STATUS_V1";
 
     private static final String KEY_REPL_ID = "id";
+
+    private static final String KEY_REPL_ACTIVITY = "activity";
+    private static final String KEY_REPL_PROGRESS = "progress";
+    private static final String KEY_REPL_DOCS = "documents";
+    private static final String KEY_REPL_DOCS_COMPLETE = "completed";
+    private static final String KEY_REPL_COLLECTION = "collection";
+    private static final String KEY_REPL_DOC_ID = "documentID";
+    private static final String KEY_REPL_PUSH = "isPush";
+    private static final String KEY_REPL_FLAGS = "flags";
+    private static final String KEY_REPL_ERROR = "error";
 
     @NonNull
     private final ReplicatorService replSvc;
@@ -51,7 +69,54 @@ public class GetReplStatusV1 {
         final ReplicatorStatus replStatus = repl.getStatus();
         Log.i(TAG, "Replicator status: " + replStatus);
 
-        // !!! Need to supply the list of document replications
-        return new ReplicatorStatusBuilder(replStatus, Collections.emptyList()).build();
+        final Map<String, Object> resp = new HashMap<>();
+        getStatus(resp, replStatus);
+
+        final List<DocumentReplication> docs = replSvc.getReplicatedDocs(mem, id);
+        if (docs != null) {
+            final List<Map<String, Object>> docRepls = getReplicatedDocs(docs);
+            if (!docRepls.isEmpty()) { resp.put(KEY_REPL_DOCS, docRepls); }
+        }
+
+        return resp;
+    }
+
+    public void getStatus(Map<String, Object> resp, @NonNull ReplicatorStatus replStatus) {
+        final Map<String, Object> progress = new HashMap<>();
+        final ReplicatorProgress replProgress = replStatus.getProgress();
+        progress.put(KEY_REPL_DOCS_COMPLETE, replProgress.getCompleted() >= replProgress.getTotal());
+
+        final CouchbaseLiteException err = replStatus.getError();
+        if (err != null) { resp.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err)).build()); }
+
+        resp.put(KEY_REPL_PROGRESS, progress);
+
+        resp.put(KEY_REPL_ACTIVITY, replStatus.getActivityLevel().toString());
+    }
+
+    @NonNull
+    private List<Map<String, Object>> getReplicatedDocs(@NonNull List<DocumentReplication> replicatedDocs) {
+        final List<Map<String, Object>> docRepls = new ArrayList<>();
+        for (DocumentReplication replicatedDoc: replicatedDocs) {
+            for (ReplicatedDocument replDoc: replicatedDoc.getDocuments()) {
+                final Map<String, Object> docRepl = new HashMap<>();
+
+                docRepl.put(KEY_REPL_COLLECTION, replDoc.getCollectionScope() + "." + replDoc.getCollectionName());
+
+                docRepl.put(KEY_REPL_DOC_ID, replDoc.getID());
+
+                docRepl.put(KEY_REPL_PUSH, replicatedDoc.isPush());
+
+                final List<String> flagList = new ArrayList<>();
+                for (DocumentFlag flag: replDoc.getFlags()) { flagList.add(flag.toString()); }
+                docRepl.put(KEY_REPL_FLAGS, flagList);
+
+                final CouchbaseLiteException err = replDoc.getError();
+                if (err != null) { docRepl.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err)).build()); }
+
+                docRepls.add(docRepl);
+            }
+        }
+        return docRepls;
     }
 }
