@@ -1,6 +1,6 @@
 ﻿using Foundation;
 
-namespace testserver;
+namespace TestServer;
 
 [Register("AppDelegate")]
 public class AppDelegate : MauiUIApplicationDelegate
