@@ -1,6 +1,6 @@
 # Test Cases
 
-## test_replicate_non_existing_sg_collections
+## #1 test_replicate_non_existing_sg_collections
 
 ### Description
 
@@ -19,7 +19,7 @@ Test that the replicator will stop with the `WebSocket 10404 NotFound` error whe
 4. Wait until the replicator is stopped.
 5. Check that the replicator's error CBL/10404 error.
 
-## test_push
+## #2 test_push
 
 ### Description
 
@@ -38,7 +38,7 @@ Test single shot push replication with multiple collections.
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
-## test_pull
+## #3 test_pull
 
 ### Description
 
@@ -57,7 +57,7 @@ Test single shot pull replication with multiple collections.
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
-## test_push_and_pull
+## #4 test_push_and_pull
 
 ### Description
 
@@ -76,7 +76,7 @@ Test single shot push-and-pull replication with multiple collections.
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
-## test_continuous_push
+## #5 test_continuous_push
 
 ### Description
 
@@ -103,7 +103,7 @@ Test continuous push replication with multiple collections.
 8. Wait until receiving all document replication events.
 9. Check that all updates are replicated correctly.
 
-## test_continuous_pull
+## #6 test_continuous_pull
 
 ### Description
 
@@ -130,7 +130,7 @@ Test continuous pull replication with multiple collections.
 8. Wait until receiving all document replication events.
 9. Check that all updates are replicated correctly.
 
-## test_continuous_push_and_pull
+## #7 test_continuous_push_and_pull
 
 ### Description
 
@@ -161,7 +161,7 @@ Test continuous push and pull replication with multiple collections.
 9. Wait until receiving all document replication events.
 10. Check that all updates are replicated correctly.
 
-## test_push_default_collection
+## #8 test_push_default_collection
 
 ### Description
 
@@ -180,7 +180,7 @@ Test push replication with the default collection.
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
-## test_pull_default_collection
+## #9 test_pull_default_collection
 
 ### Description
 
@@ -193,13 +193,13 @@ Test pull replication with the default collection.
 3. Start a replicator:
    * endpoint: `/names`
    * collections : `_default._default` 
-   * type: push
+   * type: pull
    * continuos: false
    * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
-## test_push_and_pull_default_collection
+## #10 test_push_and_pull_default_collection
 
 ### Description
 
@@ -218,7 +218,7 @@ Test pull replication with the default collection.
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
-## test_reset_checkpoint_push
+## #11 test_reset_checkpoint_push
 
 ### Description
 

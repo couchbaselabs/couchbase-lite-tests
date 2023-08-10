@@ -15,6 +15,8 @@
 //
 package com.couchbase.lite.mobiletest.data;
 
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 

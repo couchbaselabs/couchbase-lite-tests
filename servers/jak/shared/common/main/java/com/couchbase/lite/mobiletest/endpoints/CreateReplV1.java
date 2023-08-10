@@ -16,17 +16,36 @@
 package com.couchbase.lite.mobiletest.endpoints;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
+import com.couchbase.lite.BasicAuthenticator;
+import com.couchbase.lite.CollectionConfiguration;
+import com.couchbase.lite.Database;
+import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
+import com.couchbase.lite.ReplicatorConfiguration;
+import com.couchbase.lite.ReplicatorType;
+import com.couchbase.lite.SessionAuthenticator;
+import com.couchbase.lite.URLEndpoint;
 import com.couchbase.lite.mobiletest.Memory;
+import com.couchbase.lite.mobiletest.TestApp;
+import com.couchbase.lite.mobiletest.data.TypedList;
 import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
-import com.couchbase.lite.mobiletest.tools.ReplicatorConfigBuilder;
+import com.couchbase.lite.mobiletest.tools.CollectionsBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
@@ -34,6 +53,62 @@ public class CreateReplV1 {
     private static final String TAG = "CREATE_REPL_V1";
 
     private static final String KEY_REPL_ID = "id";
+
+    private static final String KEY_RESET = "reset";
+    private static final String KEY_CONFIG = "config";
+    private static final String KEY_DB = "database";
+    private static final String KEY_COLLECTIONS = "collections";
+    private static final String KEY_ENDPOINT = "endpoint";
+    private static final String KEY_TYPE = "replicatorType";
+    private static final String TYPE_PUSH_AND_PULL = "pushandpull";
+    private static final String TYPE_PUSH = "push";
+    private static final String TYPE_PULL = "pull";
+    private static final String KEY_IS_CONTINUOUS = "continuous";
+    private static final String KEY_AUTHENTICATOR = "authenticator";
+    private static final String KEY_AUTH_TYPE = "type";
+    private static final String AUTH_TYPE_BASIC = "basic";
+    private static final String KEY_BASIC_AUTH_USER = "username";
+    private static final String KEY_BASIC_AUTH_PASSWORD = "password";
+    private static final String AUTH_TYPE_SESSION = "session";
+    private static final String KEY_SESSION_AUTH_ID = "sessionID";
+    private static final String KEY_SESSION_AUTH_COOKIE = "cookieName";
+    private static final String KEY_NAMES = "names";
+    private static final String KEY_CHANNELS = "channels";
+    private static final String KEY_DOCUMENT_IDS = "documentIDs";
+    private static final String KEY_PUSH_FILTER = "pushFilter";
+    private static final String KEY_ENABLE_DOC_LISTENER = "enableDocumentListener";
+
+    private static final List<String> LEGAL_KEYS;
+    static {
+        final List<String> l = new ArrayList<>();
+        l.add(KEY_CONFIG);
+        l.add(KEY_RESET);
+        LEGAL_KEYS = Collections.unmodifiableList(l);
+    }
+
+    private static final List<String> LEGAL_CONFIG_KEYS;
+    static {
+        final List<String> l = new ArrayList<>();
+        l.add(KEY_DB);
+        l.add(KEY_COLLECTIONS);
+        l.add(KEY_ENDPOINT);
+        l.add(KEY_TYPE);
+        l.add(KEY_IS_CONTINUOUS);
+        l.add(KEY_AUTHENTICATOR);
+        l.add(KEY_RESET);
+        l.add(KEY_ENABLE_DOC_LISTENER);
+        LEGAL_CONFIG_KEYS = Collections.unmodifiableList(l);
+    }
+
+    private static final List<String> LEGAL_COLLECTION_KEYS;
+    static {
+        final List<String> l = new ArrayList<>();
+        l.add(KEY_NAMES);
+        l.add(KEY_CHANNELS);
+        l.add(KEY_DOCUMENT_IDS);
+        l.add(KEY_PUSH_FILTER);
+        LEGAL_COLLECTION_KEYS = Collections.unmodifiableList(l);
+    }
 
 
     @NonNull
@@ -44,15 +119,168 @@ public class CreateReplV1 {
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @NonNull
     public Map<String, Object> createRepl(@NonNull TypedMap req, @NonNull Memory mem) {
-        final ReplicatorConfigBuilder configBuilder = new ReplicatorConfigBuilder(req, mem);
-        final Replicator repl = new Replicator(configBuilder.build());
+        req.validate(LEGAL_KEYS);
+
+        final TypedMap config = req.getMap(KEY_CONFIG);
+        if (config == null) { throw new ClientError("No replicator configuration specified"); }
+        config.validate(LEGAL_CONFIG_KEYS);
+
+        final ReplicatorConfiguration replConfig = buildConfig(config, mem);
+        final Replicator repl = new Replicator(replConfig);
         final String replId = replSvc.addRepl(mem, repl);
 
-        repl.start(configBuilder.shouldReset());
+        final Boolean enableListener = config.getBoolean(KEY_ENABLE_DOC_LISTENER);
+        if ((enableListener != null) && enableListener) {
+            replSvc.addDocListener(mem, replId, repl);
+            Log.i(TAG, "Added doc listener: " + replId);
+        }
+
+        final Boolean shouldReset = req.getBoolean(KEY_RESET);
+        repl.start((shouldReset != null) && shouldReset);
         Log.i(TAG, "Started replicator: " + replId);
 
         final Map<String, Object> ret = new HashMap<>();
         ret.put(KEY_REPL_ID, replId);
         return ret;
+    }
+
+    @SuppressWarnings({"deprecation", "PMD.NPathComplexity"})
+    @NonNull
+    public ReplicatorConfiguration buildConfig(@NonNull TypedMap config, @NonNull Memory mem) {
+        final String uri = config.getString(KEY_ENDPOINT);
+        if (uri == null) { throw new ClientError("Replicator configuration doesn't specify an endpoint"); }
+
+        final URLEndpoint endpoint;
+        try { endpoint = new URLEndpoint(new URI(uri)); }
+        catch (URISyntaxException e) {
+            throw new ClientError("Replicator configuration contains an unparsable endpoint: " + uri, e);
+        }
+
+        final String dbName = config.getString(KEY_DB);
+        if (dbName == null) { throw new ClientError("Replicator configuration doesn't specify a database"); }
+
+        final TypedList collections = config.getList(KEY_COLLECTIONS);
+        if (collections == null) {
+            throw new ClientError("Replicator configuration doesn't specify a list of collections");
+        }
+
+        final Database db = TestApp.getApp().getDbSvc().getOpenDb(dbName, mem);
+
+        final ReplicatorConfiguration replConfig;
+        if (collections.isEmpty()) { replConfig = new ReplicatorConfiguration(db, endpoint); }
+        else {
+            replConfig = new ReplicatorConfiguration(endpoint);
+            addCollections(db, collections, replConfig);
+        }
+
+        final String replType = config.getString(KEY_TYPE);
+        if (replType != null) {
+            switch (replType.toLowerCase(Locale.getDefault())) {
+                case TYPE_PUSH_AND_PULL:
+                    replConfig.setType(ReplicatorType.PUSH_AND_PULL);
+                    break;
+                case TYPE_PUSH:
+                    replConfig.setType(ReplicatorType.PUSH);
+                    break;
+                case TYPE_PULL:
+                    replConfig.setType(ReplicatorType.PULL);
+                    break;
+                default:
+                    throw new ClientError("Unrecognized replicator type: " + replType);
+            }
+        }
+
+        final Boolean isContinuous = config.getBoolean(KEY_IS_CONTINUOUS);
+        if (isContinuous != null) { replConfig.setContinuous(isContinuous); }
+
+        final TypedMap authenticator = config.getMap(KEY_AUTHENTICATOR);
+        if (authenticator != null) {
+            final String authType = authenticator.getString(KEY_AUTH_TYPE);
+            if (authType == null) { throw new ClientError("Replicator authenticator doesn't specify a type"); }
+
+            switch (authType.toLowerCase(Locale.getDefault())) {
+                case AUTH_TYPE_BASIC:
+                    replConfig.setAuthenticator(buildBasicAuthenticator(authenticator));
+                    break;
+                case AUTH_TYPE_SESSION:
+                    replConfig.setAuthenticator(buildSessionAuthenticator(authenticator));
+                    break;
+                default:
+                    throw new ClientError("Unrecognized authenticator type: " + replType);
+            }
+        }
+
+        Log.i(TAG, "Build config: " + replConfig);
+        return replConfig;
+    }
+
+    private void addCollections(
+        @NonNull Database db,
+        @NonNull TypedList spec,
+        @NonNull ReplicatorConfiguration replConfig) {
+        for (int i = 0; i < spec.size(); i++) {
+            final TypedMap replCollection = spec.getMap(i);
+            if (replCollection == null) { throw new ClientError("Replication collection spec is null: " + i); }
+            replCollection.validate(LEGAL_COLLECTION_KEYS);
+
+            // the collections created here will not get closed explicitly...
+            replConfig.addCollections(
+                new CollectionsBuilder(replCollection.getList(KEY_NAMES), db).getCollections(),
+                buildCollectionConfig(replCollection));
+        }
+    }
+
+    @NonNull
+    private CollectionConfiguration buildCollectionConfig(@NonNull TypedMap spec) {
+        final CollectionConfiguration collectionConfig = new CollectionConfiguration();
+
+        final List<String> channels = getList(spec.getList(KEY_CHANNELS));
+        if (channels != null) { collectionConfig.setChannels(channels); }
+
+        final List<String> docIds = getList(spec.getList(KEY_DOCUMENT_IDS));
+        if (docIds != null) { collectionConfig.setDocumentIDs(docIds); }
+
+        final TypedMap pushFilter = spec.getMap(KEY_PUSH_FILTER);
+        if (pushFilter != null) { collectionConfig.setPushFilter(buildReplicatorFilter(pushFilter)); }
+
+        return collectionConfig;
+    }
+
+    @NonNull
+    private BasicAuthenticator buildBasicAuthenticator(@NonNull TypedMap spec) {
+        final String user = spec.getString(KEY_BASIC_AUTH_USER);
+        if ((user == null) || user.isEmpty()) { throw new ClientError("Basic authenticator doesn't specify a user"); }
+
+        final String pwd = spec.getString(KEY_BASIC_AUTH_PASSWORD);
+        if ((pwd == null) || pwd.isEmpty()) { throw new ClientError("Basic authenticator doesn't specify a password"); }
+
+        return new BasicAuthenticator(user, pwd.toCharArray());
+    }
+
+    @NonNull
+    private SessionAuthenticator buildSessionAuthenticator(@NonNull TypedMap spec) {
+        final String session = spec.getString(KEY_SESSION_AUTH_ID);
+        if ((session == null) || session.isEmpty()) {
+            throw new ClientError("Session authenticator doesn't specify a session id");
+        }
+        return new SessionAuthenticator(session, spec.getString(KEY_SESSION_AUTH_COOKIE));
+    }
+
+    @Nullable
+    private List<String> getList(@Nullable TypedList spec) {
+        if (spec == null) { return null; }
+        final int n = spec.size();
+        final List<String> list = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            final String item = spec.getString(i);
+            if (item != null) { list.add(item); }
+        }
+        return list;
+    }
+
+    @NonNull
+    private ReplicationFilter buildReplicatorFilter(@NonNull TypedMap spec) {
+        if (spec == null) { throw new ClientError("Spec is null"); } // throw PMD a bone
+        throw new ServerError("Filters not yet supported");
     }
 }

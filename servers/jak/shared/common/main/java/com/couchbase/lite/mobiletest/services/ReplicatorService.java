@@ -19,21 +19,25 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
+import com.couchbase.lite.DocumentReplication;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.tools.DocReplListener;
 
 
 public class ReplicatorService {
-    private static final String SYM_OPEN_REPLS = "~OPEN_REPLS";
+    private static final String SYM_REPLICATORS = "~REPLICATORS";
+    private static final String SYM_LISTENERS = "~LISTENERS";
 
     public void reset(@NonNull Memory memory) {
-        final Map<?, ?> repls = memory.remove(SYM_OPEN_REPLS, Map.class);
+        final Map<?, ?> repls = memory.remove(SYM_REPLICATORS, Map.class);
         if ((repls == null) || repls.isEmpty()) { return; }
 
         final TypedMap liveRepls = new TypedMap(repls);
@@ -48,19 +52,45 @@ public class ReplicatorService {
     @NonNull
     public String addRepl(@NonNull Memory mem, @NonNull Replicator repl) {
         final String replId = UUID.randomUUID().toString();
-        TypedMap liveRepls = mem.getMap(SYM_OPEN_REPLS);
+        TypedMap liveRepls = mem.getMap(SYM_REPLICATORS);
         if (liveRepls == null) {
-            mem.put(SYM_OPEN_REPLS, new HashMap<>());
+            mem.put(SYM_REPLICATORS, new HashMap<>());
             // liveRepls cannot be null
-            liveRepls = mem.getMap(SYM_OPEN_REPLS);
+            liveRepls = mem.getMap(SYM_REPLICATORS);
         }
         liveRepls.put(replId, repl);
         return replId;
     }
 
+    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
+    @SuppressWarnings("ConstantConditions")
+    public void addDocListener(@NonNull Memory mem, @NonNull String replId, @NonNull Replicator repl) {
+        TypedMap liveListeners = mem.getMap(SYM_LISTENERS);
+        if (liveListeners == null) {
+            mem.put(SYM_LISTENERS, new HashMap<>());
+            // liveRepls cannot be null
+            liveListeners = mem.getMap(SYM_LISTENERS);
+        }
+
+        final DocReplListener listener = new DocReplListener();
+        liveListeners.put(replId, listener);
+
+        repl.addDocumentReplicationListener(listener);
+    }
+
     @Nullable
     public Replicator getRepl(@NonNull Memory mem, @NonNull String replId) {
-        final TypedMap liveRepls = mem.getMap(SYM_OPEN_REPLS);
+        final TypedMap liveRepls = mem.getMap(SYM_REPLICATORS);
         return (liveRepls == null) ? null : liveRepls.get(replId, Replicator.class);
+    }
+
+    @Nullable
+    public List<DocumentReplication> getReplicatedDocs(@NonNull Memory mem, @NonNull String replId) {
+        final TypedMap liveListeners = mem.getMap(SYM_LISTENERS);
+        if (liveListeners != null) {
+            final DocReplListener listener = liveListeners.get(replId, DocReplListener.class);
+            if (listener != null) { return listener.getReplications(); }
+        }
+        return null;
     }
 }

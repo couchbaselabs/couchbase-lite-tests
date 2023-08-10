@@ -89,7 +89,6 @@ public class UpdateDbV1 {
         for (int i = 0; i < n; i++) {
             final TypedMap update = updates.getMap(i);
             if (update == null) { throw new ServerError("Null update request"); }
-
             update.validate(LEGAL_UPDATE_KEYS);
 
             final String collectionName = update.getString(KEY_COLLECTION);
@@ -119,7 +118,7 @@ public class UpdateDbV1 {
                     purgeDocument(doc, collection);
                     break;
                 case TYPE_UPDATE:
-                    updateDocument(doc, update, collection);
+                    updateDocument((doc != null) ? doc.toMutable() : new MutableDocument(id), update, collection);
                     break;
                 default:
                     throw new ClientError("Unrecognized update type: " + updateType);
@@ -141,11 +140,10 @@ public class UpdateDbV1 {
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed purging document", e); }
     }
 
-    private void updateDocument(@Nullable Document doc, @NonNull TypedMap update, @NonNull Collection collection) {
-        final KeypathParser parser = new KeypathParser();
-
-        final MutableDocument mDoc = (doc != null) ? doc.toMutable() : new MutableDocument();
+    private void updateDocument(@NonNull MutableDocument mDoc, @NonNull TypedMap update, @NonNull Collection coll) {
         final Map<String, Object> data = mDoc.toMap();
+
+        final KeypathParser parser = new KeypathParser();
 
         final TypedList changes = update.getList(KEY_UPDATE_PROPS);
         if (changes != null) {
@@ -167,7 +165,7 @@ public class UpdateDbV1 {
             }
         }
 
-        try { collection.save(mDoc.setData(data)); }
+        try { coll.save(mDoc.setData(data)); }
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed saving updated document", e); }
     }
 }
