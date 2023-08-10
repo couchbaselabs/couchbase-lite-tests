@@ -11,8 +11,8 @@ Test that the replicator will stop with the `WebSocket 10404 NotFound` error whe
 1. Reset SG and load `names` dataset.
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator: 
-    * collections : `travel.airlines`
     * endpoint: `/names`
+    * collections : `travel.airlines`
     * type: push
     * continuos: false
     * credentials: user1/pass
@@ -30,8 +30,8 @@ Test single shot push replication with multiple collections.
 1. Reset SG and load `travel` dataset.
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator: 
-    * collections : `travel.airlines`, `travel.airports`, `travel.hotels`
     * endpoint: `/travel`
+    * collections : `travel.airlines`, `travel.airports`, `travel.hotels`
     * type: push
     * continuos: false
     * credentials: user1/pass
@@ -49,8 +49,8 @@ Test single shot pull replication with multiple collections.
 1. Reset SG and load `travel` dataset.
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator:
-   * collections : `travel.routes`, `travel.landmarks`, `travel.hotels`
    * endpoint: `/travel`
+   * collections : `travel.routes`, `travel.landmarks`, `travel.hotels`
    * type: pull
    * continuos: false
    * credentials: user1/pass
@@ -68,8 +68,8 @@ Test single shot push-and-pull replication with multiple collections.
 1. Reset SG and load `travel` dataset.
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator:
-   * collections : `travel.airlines`, `travel.airports`, `travel.hotels`, `travel.landmarks`, `travel.routes`
    * endpoint: `/travel`
+   * collections : `travel.airlines`, `travel.airports`, `travel.hotels`, `travel.landmarks`, `travel.routes`
    * type: push-and-pull
    * continuos: false
    * credentials: user1/pass
@@ -87,19 +87,21 @@ Test continuous push replication with multiple collections.
 1. Reset SG and load `travel` dataset.
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator: 
-   * collections : `travel.airlines`, `travel.airports`, `travel.hotels`
    * endpoint: `/travel`
+   * collections : `travel.airlines`, `travel.airports`, `travel.hotels`
    * type: push
    * continuos: true
+   * enableDocumentListener: true
    * credentials: user1/pass
 4. Wait until the replicator is idle.
 5. Check that all docs are replicated correctly.
-6. Update documents in the local database.
+6. Clear current document replication events.
+7. Update documents in the local database.
    * Add 2 airports in `travel.airports`.
    * Update 2 new airlines in `travel.airlines`.
    * Remove 2 hotels in `travel.hotels`.
-7. Wait until the replicator is idle.
-8. Check that all updates are replicated correctly.
+8. Wait until receiving all document replication events.
+9. Check that all updates are replicated correctly.
 
 ## test_continuous_pull
 
@@ -112,19 +114,21 @@ Test continuous pull replication with multiple collections.
 1. Reset SG and load `travel` dataset.
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator:
-   * collections : `travel.routes`, `travel.landmarks`, `travel.hotels`
    * endpoint: `/travel`
+   * collections : `travel.routes`, `travel.landmarks`, `travel.hotels`
    * type: pull
    * continuos: true
+   * enableDocumentListener: true
    * credentials: user1/pass
-3. Wait until the replicator is idle.
-4. Check that all docs are replicated correctly.
-5. Update documents on SG.
+4. Wait until the replicator is idle.
+5. Check that all docs are replicated correctly.
+6. Clear current document replication events.
+7. Update documents on SG.
    * Add 2 routes in `travel.routes`.
    * Update 2 landmarks in `travel.landmarks`.
    * Remove 2 hotels in `travel.hotels`.
-6. Wait until the replicator is idle.
-7. Check that all updates are replicated correctly.
+8. Wait until receiving all document replication events.
+9. Check that all updates are replicated correctly.
 
 ## test_continuous_push_and_pull
 
@@ -137,23 +141,25 @@ Test continuous push and pull replication with multiple collections.
 1. Reset SG and load `travel` dataset.
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator:
-   * collections : `travel.airlines`, `travel.airports`, `travel.hotels`, `travel.landmarks`, `travel.routes`
    * endpoint: `/travel`
+   * collections : `travel.airlines`, `travel.airports`, `travel.hotels`, `travel.landmarks`, `travel.routes`
    * type: push-and-pull
    * continuos: true
+   * enableDocumentListener: true
    * credentials: user1/pass
 4. Wait until the replicator is idle.
 5. Check that all docs are replicated correctly.
-6. Update documents in the local database.
+6. Clear current document replication events.
+7. Update documents in the local database.
    * Add 2 airports in `travel.airports`.
    * Update 2 new airlines in `travel.airlines`.
    * Remove 2 hotels in `travel.hotels`.
-7. Update documents on SG.
+8. Update documents on SG.
    * Add 2 routes in `travel.routes`.
    * Update 2 landmarks in `travel.landmarks`.
    * Remove 2 hotels in `travel.hotels`.
-8. Wait until the replicator is idle.
-9. Check that all updates are replicated correctly.
+9. Wait until receiving all document replication events.
+10. Check that all updates are replicated correctly.
 
 ## test_push_default_collection
 
@@ -166,10 +172,10 @@ Test push replication with the default collection.
 1. Reset SG and load `names` dataset.
 2. Reset local database, and load `names` dataset.
 3. Start a replicator:
-    * collections : `_default._default`
-    * endpoint: `/names`
-    * type: push
-    * continuos: false
+   * endpoint: `/names`
+   * collections : `_default._default`
+   * type: push
+   * continuos: false
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
@@ -184,10 +190,10 @@ Test pull replication with the default collection.
 1. Reset SG and load `names` dataset.
 2. Reset local database, and load `names` dataset.
 3. Start a replicator:
-    * collections : `_default._default`
-    * endpoint: `/names`
-    * type: push
-    * continuos: false
+   * endpoint: `/names`
+   * collections : `_default._default` 
+   * type: push
+   * continuos: false
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
@@ -202,10 +208,10 @@ Test pull replication with the default collection.
 1. Reset SG and load `names` dataset.
 2. Reset local database, and load `names` dataset.
 3. Start a replicator:
-    * collections : `_default._default`
-    * endpoint: `/names`
-    * type: push_and_pull
-    * continuos: false
+   * endpoint: `/names`
+   * collections : `_default._default`
+   * type: push_and_pull
+   * continuos: false
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
@@ -220,10 +226,10 @@ Test that when the replicator starts with its checkpoint reset, the replication 
 1. Reset SG and load `travel` dataset.
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator:
-    * collections : `travel.airlines`, `travel.airports`
-    * endpoint: `/travel`
-    * type: push-and-pull
-    * continuos: false
+   * endpoint: `/travel`
+   * collections : `travel.airlines`, `travel.airports` 
+   * type: push-and-pull
+   * continuos: false
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 6. Purge an airline from `travel.airlines` in the local database.
