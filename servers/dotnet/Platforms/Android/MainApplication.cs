@@ -1,7 +1,7 @@
 ﻿using Android.App;
 using Android.Runtime;
 
-namespace testserver;
+namespace TestServer;
 
 [Application]
 public class MainApplication : MauiApplication
