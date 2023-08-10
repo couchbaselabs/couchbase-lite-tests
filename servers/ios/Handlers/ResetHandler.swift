@@ -16,10 +16,13 @@ extension Handlers {
         
         if let resetConfig = try? req.content.decode(ContentTypes.ResetConfiguration.self),
            !resetConfig.datasets.isEmpty {
-            let datasetName = resetConfig.datasets.keys.first!
-            try databaseManager.reset(dataset: datasetName)
+            for resetReq in resetConfig.datasets {
+                for dbName in resetReq.value {
+                    try databaseManager.reset(dbName: dbName, dataset: resetReq.key)
+                }
+            }
         } else {
-            try databaseManager.reset()
+            try databaseManager.resetAll()
         }
         
         return Response(status: .ok)

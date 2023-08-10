@@ -8,8 +8,8 @@
 import CouchbaseLiteSwift
 
 struct DocumentUpdater {
-    public static func processUpdate(item: ContentTypes.DatabaseUpdateItem) throws {
-        guard let collection = DatabaseManager.shared?.collection(item.collection)
+    public static func processUpdate(item: ContentTypes.DatabaseUpdateItem, inDB dbName: String) throws {
+        guard let collection = try DatabaseManager.shared?.collection(item.collection, inDB: dbName)
         else { throw TestServerError.cblDBNotOpen }
         
         if let updatedProperties = item.updatedProperties {
