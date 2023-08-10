@@ -124,11 +124,15 @@ class AllDocumentsResponse:
             self.__rows.append(AllDocumentsResponseRow(row["key"], row["id"], row["value"]["rev"]))
 
 class DocumentUpdateEntry(JSONSerializable):
+    """
+    A class that represents an update to a document. 
+    For creating a new document, set revid to None.
+    """
     def __init__(self, id: str, revid: str, body: dict):
         self.__body = body.copy()
         self.__body["_id"] = id
-        self.__body["_rev"] = revid
-
+        if revid:
+            self.__body["_rev"] = revid
 
     def to_json(self) -> Any:
         return self.__body
