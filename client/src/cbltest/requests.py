@@ -200,7 +200,7 @@ class RequestFactory:
         if type != TestServerRequestType.ROOT and payload is None:
             raise ValueError("No payload provided!")
         
-        return self._create_request(str(type), payload)
+        return GetRootRequest(self.__uuid) if type == TestServerRequestType.ROOT else self._create_request(str(type), payload)
     
     async def send_request(self, index: int, r: TestServerRequest) -> TestServerResponse:
         """Sends a request to the URL at the provided index (as indexes by test_servers in

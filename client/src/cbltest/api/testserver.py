@@ -1,8 +1,9 @@
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.v1.requests import PostResetRequestBody
+from cbltest.responses import GetRootResponse
 from cbltest.api.error import CblTestError
 from cbltest.api.database import Database
 
@@ -21,6 +22,13 @@ class TestServer:
         self.__url = url
         self.__request_factory = request_factory
 
+    async def get_info(self) -> GetRootResponse:
+        """
+        Retrieves the information about the running test server
+        """
+        request = self.__request_factory.create_request(TestServerRequestType.ROOT)
+        resp = await self.__request_factory.send_request(self.__index, request)
+        return cast(GetRootResponse, resp)
 
     async def create_and_reset_db(self, dataset: str, db_names: List[str]) -> List[Database]:
         """
