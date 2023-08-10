@@ -303,6 +303,31 @@ class ReplicatorDocumentEntry:
         self.__is_push = _get_typed_required(body, self.__is_push_key, bool)
         self.__flags = ReplicatorDocumentFlags.parse_all(_get_typed_required(body, self.__flags_key, List[str]))
         self.__error: Optional[ErrorResponseBody] = ErrorResponseBody.create(cast(dict, body.get(self.__error_key)))
+
+class WaitForDocumentEventEntry:
+    @property
+    def collection(self) -> str:
+        return self.__collection
+    
+    @property
+    def id(self) -> str:
+        return self.__id
+    
+    def __init__(self, collection: str, id: str):
+        assert isinstance(collection, str), "WaitForDocumentEventEntry: collection not a string"
+        assert isinstance(id, str), "WaitForDocumentEventEntry: id not a string"
+        self.__collection = collection
+        self.__id = id
+
+    def __hash__(self) -> int:
+        return hash(f"{self.__collection}{self.__id}")
+    
+    def __eq__(self, obj: Any) -> bool:
+        if not isinstance(obj, WaitForDocumentEventEntry):
+            return False
+        
+        other = cast(WaitForDocumentEventEntry, obj)
+        return other.collection == self.collection and other.id == self.id
     
 class ReplicatorStatus:
     """

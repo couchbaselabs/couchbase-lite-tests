@@ -1,6 +1,7 @@
 import asyncio
+from itertools import islice
 from time import time
-from typing import List, cast, Optional
+from typing import List, cast, Optional, Set
 
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.v1.responses import PostGetReplicatorStatusResponse, PostStartReplicatorResponse
@@ -10,7 +11,7 @@ from cbltest.api.error import CblTestError, CblTimeoutError
 from cbltest.api.database import Database
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel, ReplicatorAuthenticator, ReplicatorCollectionEntry, 
-    ReplicatorType, ReplicatorStatus, ReplicatorDocumentEntry)
+    ReplicatorType, ReplicatorStatus, ReplicatorDocumentEntry, WaitForDocumentEventEntry)
 
 class Replicator:
     """
@@ -140,5 +141,34 @@ class Replicator:
             
         return next_status
         
+    async def wait_for_doc_events(self, events: Set[WaitForDocumentEventEntry], max_retries: int = 5) -> ReplicatorStatus:
+        """
+        This function will wait for a continuous replicator to become idle, and then check for document
+        replication events to determine if it has reached a certain point or not.
 
-        
+        :param events: The events to check for on the replicator
+        :param max_retries: The max number of retries before giving up (default 5)
+        """
+        assert self.continuous, "wait_for_doc_events not applicable for non-continuous replicator"
+        events = events.copy()
+        iteration = 0
+        processed = 0
+        while iteration < max_retries:
+            status = await self.wait_for(ReplicatorActivityLevel.IDLE)
+            assert status.error is None, \
+                f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+            
+            # Skip the ones we previously looked at to save time
+            for event in islice(self.document_updates, processed, None):
+                entry = WaitForDocumentEventEntry(event.collection, event.document_id)
+                if entry in events:
+                    events.remove(entry)
+
+                processed += 1
+
+            if len(events) == 0:
+                return status
+            
+            await asyncio.sleep(0.5)
+
+        raise CblTimeoutError("Timeout waiting for document update events")

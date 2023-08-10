@@ -228,6 +228,7 @@ internal static partial class HandlerList
         }
 
         replConfig.Authenticator = deserializedBody.config.authenticator?.CreateAuthenticator();
+        replConfig.Continuous = deserializedBody.config.continuous;
 
         (var repl, var id) = CBLTestServer.Manager.RegisterObject(() => new Replicator(replConfig));
         if(deserializedBody.config.enableDocumentListener) {
