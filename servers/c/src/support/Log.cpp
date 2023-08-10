@@ -93,7 +93,7 @@ namespace ts::support {
         if (_get_timezone(&s) != 0) {
             throw runtime_error("Unable to query local system time zone");
         }
-        auto offset = seconds(-s);
+        auto offset = std::chrono::seconds(-s);
 #elif defined(__DARWIN_UNIX03) || defined(__ANDROID__) || defined(_XOPEN_SOURCE) || defined(_SVID_SOURCE)
         auto offset = std::chrono::seconds(-timezone);
 #else
@@ -118,7 +118,7 @@ namespace ts::support {
 
     static void writeTimestamp(Timestamp t, ostream &out) {
         local_time<std::chrono::microseconds> tp{std::chrono::seconds(t.secs) + std::chrono::microseconds(t.microsecs)};
-        struct tm tmpTime = FromTimestamp(duration_cast<std::chrono::seconds>(tp.time_since_epoch()));
+        struct tm tmpTime = FromTimestamp(std::chrono::duration_cast<std::chrono::seconds>(tp.time_since_epoch()));
         tp -= GetLocalTZOffset(&tmpTime);
         out << format("%T| ", tp);
     }
