@@ -1,0 +1,10 @@
+Packages
+.build
+xcuserdata
+DerivedData/
+.DS_Store
+.swiftpm
+Package.resolved
+.env
+IDEWorkspaceChecks.plist
+project.xcworkspace
