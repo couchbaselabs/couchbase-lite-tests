@@ -71,7 +71,7 @@ public class GetAllDocsV1 {
     }
 
     @NonNull
-    private Map<String, Object> getAllDocs(Set<Collection> collections) {
+    private Map<String, Object> getAllDocs(@NonNull Set<Collection> collections) {
         final Map<String, Object> colls = new HashMap<>();
         for (Collection collection: collections) {
             final String collectionName = collection.getScope().getName() + "." + collection.getName();

@@ -23,9 +23,11 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
@@ -43,7 +45,8 @@ import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.data.TypedList;
 import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.ClientError;
-import com.couchbase.lite.mobiletest.errors.ServerError;
+import com.couchbase.lite.mobiletest.services.DeletedDocFilter;
+import com.couchbase.lite.mobiletest.services.DocIdFilter;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.tools.CollectionsBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
@@ -64,6 +67,7 @@ public class CreateReplV1 {
     private static final String TYPE_PUSH = "push";
     private static final String TYPE_PULL = "pull";
     private static final String KEY_IS_CONTINUOUS = "continuous";
+    private static final String KEY_ENABLE_DOC_LISTENER = "enableDocumentListener";
     private static final String KEY_AUTHENTICATOR = "authenticator";
     private static final String KEY_AUTH_TYPE = "type";
     private static final String AUTH_TYPE_BASIC = "basic";
@@ -76,7 +80,11 @@ public class CreateReplV1 {
     private static final String KEY_CHANNELS = "channels";
     private static final String KEY_DOCUMENT_IDS = "documentIDs";
     private static final String KEY_PUSH_FILTER = "pushFilter";
-    private static final String KEY_ENABLE_DOC_LISTENER = "enableDocumentListener";
+    private static final String KEY_PULL_FILTER = "pullFilter";
+    private static final String KEY_NAME = "name";
+    private static final String FILTER_DELETED = "deleteddocumentsonly";
+    private static final String FILTER_DOC_ID = "documentids";
+    private static final String KEY_DOC_IDS = "documentIDs";
 
     private static final List<String> LEGAL_KEYS;
     static {
@@ -110,6 +118,22 @@ public class CreateReplV1 {
         LEGAL_COLLECTION_KEYS = Collections.unmodifiableList(l);
     }
 
+
+    private static final List<String> LEGAL_BASIC_AUTH_KEYS;
+    static {
+        final List<String> l = new ArrayList<>();
+        l.add(KEY_BASIC_AUTH_USER);
+        l.add(KEY_BASIC_AUTH_PASSWORD);
+        LEGAL_BASIC_AUTH_KEYS = Collections.unmodifiableList(l);
+    }
+
+    private static final List<String> LEGAL_SESSION_AUTH_KEYS;
+    static {
+        final List<String> l = new ArrayList<>();
+        l.add(KEY_SESSION_AUTH_ID);
+        l.add(KEY_SESSION_AUTH_COOKIE);
+        LEGAL_SESSION_AUTH_KEYS = Collections.unmodifiableList(l);
+    }
 
     @NonNull
     private final ReplicatorService replSvc;
@@ -243,11 +267,16 @@ public class CreateReplV1 {
         final TypedMap pushFilter = spec.getMap(KEY_PUSH_FILTER);
         if (pushFilter != null) { collectionConfig.setPushFilter(buildReplicatorFilter(pushFilter)); }
 
+        final TypedMap pullFilter = spec.getMap(KEY_PULL_FILTER);
+        if (pullFilter != null) { collectionConfig.setPullFilter(buildReplicatorFilter(pullFilter)); }
+
         return collectionConfig;
     }
 
     @NonNull
     private BasicAuthenticator buildBasicAuthenticator(@NonNull TypedMap spec) {
+        spec.validate(LEGAL_BASIC_AUTH_KEYS);
+
         final String user = spec.getString(KEY_BASIC_AUTH_USER);
         if ((user == null) || user.isEmpty()) { throw new ClientError("Basic authenticator doesn't specify a user"); }
 
@@ -259,6 +288,8 @@ public class CreateReplV1 {
 
     @NonNull
     private SessionAuthenticator buildSessionAuthenticator(@NonNull TypedMap spec) {
+        spec.validate(LEGAL_SESSION_AUTH_KEYS);
+
         final String session = spec.getString(KEY_SESSION_AUTH_ID);
         if ((session == null) || session.isEmpty()) {
             throw new ClientError("Session authenticator doesn't specify a session id");
@@ -280,7 +311,35 @@ public class CreateReplV1 {
 
     @NonNull
     private ReplicationFilter buildReplicatorFilter(@NonNull TypedMap spec) {
-        if (spec == null) { throw new ClientError("Spec is null"); } // throw PMD a bone
-        throw new ServerError("Filters not yet supported");
+        final String name = spec.getString(KEY_NAME);
+        if (name == null) { throw new ClientError("Filter doesn't specify a name"); }
+        switch (name.toLowerCase(Locale.getDefault())) {
+            case FILTER_DOC_ID:
+                return buildDocIdFilter(spec);
+            case FILTER_DELETED:
+                return new DeletedDocFilter();
+            default:
+                throw new ClientError("Unrecognized filter name");
+        }
+    }
+
+    @NonNull
+    private ReplicationFilter buildDocIdFilter(@NonNull TypedMap spec) {
+        final TypedMap documentIds = spec.getMap(KEY_DOC_IDS);
+        if (documentIds == null) { throw new ClientError("DocId filter specifies no doc ids"); }
+
+        final Set<String> permitted = new HashSet<>();
+
+        final Set<String> collections = documentIds.getKeys();
+        for (String collection: collections) {
+            final TypedList collectionDocs = documentIds.getList(collection);
+            if (collectionDocs == null) {
+                throw new ClientError("DocId filter: no doc ids specified for collection " + collection);
+            }
+            final int n = collectionDocs.size();
+            for (int i = 0; i < n; i++) { permitted.add(collection + "." + collectionDocs.getString(i)); }
+        }
+
+        return new DocIdFilter(permitted);
     }
 }

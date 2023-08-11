@@ -70,7 +70,7 @@ public class GetReplStatusV1 {
         Log.i(TAG, "Replicator status: " + replStatus);
 
         final Map<String, Object> resp = new HashMap<>();
-        getStatus(resp, replStatus);
+        buildStatus(resp, replStatus);
 
         final List<DocumentReplication> docs = replSvc.getReplicatedDocs(mem, id);
         if (docs != null) {
@@ -81,7 +81,7 @@ public class GetReplStatusV1 {
         return resp;
     }
 
-    public void getStatus(Map<String, Object> resp, @NonNull ReplicatorStatus replStatus) {
+    public void buildStatus(Map<String, Object> resp, @NonNull ReplicatorStatus replStatus) {
         final Map<String, Object> progress = new HashMap<>();
         final ReplicatorProgress replProgress = replStatus.getProgress();
         progress.put(KEY_REPL_DOCS_COMPLETE, replProgress.getCompleted() >= replProgress.getTotal());

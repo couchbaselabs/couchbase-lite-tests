@@ -13,9 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.tools;
-
-import android.util.Log;
+package com.couchbase.lite.mobiletest.services;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -27,7 +25,7 @@ import com.couchbase.lite.DocumentReplication;
 import com.couchbase.lite.DocumentReplicationListener;
 
 
-public class DocReplListener implements DocumentReplicationListener {
+class DocReplListener implements DocumentReplicationListener {
     private List<DocumentReplication> replications;
 
     @Override
