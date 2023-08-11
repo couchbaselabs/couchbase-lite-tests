@@ -128,7 +128,7 @@ class DocumentUpdateEntry(JSONSerializable):
     A class that represents an update to a document. 
     For creating a new document, set revid to None.
     """
-    def __init__(self, id: str, revid: str, body: dict):
+    def __init__(self, id: str, revid: Optional[str], body: dict):
         self.__body = body.copy()
         self.__body["_id"] = id
         if revid:
