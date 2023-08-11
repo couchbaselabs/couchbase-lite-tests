@@ -12,6 +12,8 @@ class DatabaseManager {
     public static var shared : DatabaseManager?
     
     private var databases : [ String : Database ] = [:]
+    private var replicators : [ UUID : Replicator ] = [:]
+    private var replicatorDocuments : [ UUID : [ContentTypes.DocumentReplication] ] = [:]
     
     public static func InitializeShared() {
         if shared == nil {
@@ -50,10 +52,135 @@ class DatabaseManager {
         }
     }
     
+    public func startReplicator(config: ContentTypes.ReplicatorConfiguration, reset: Bool) throws -> UUID {
+        guard let database = databases[config.database]
+        else { throw TestServerError.cblDBNotOpen }
+        
+        guard let endpointURL = URL(string: config.endpoint)
+        else { throw TestServerError.badRequest }
+        
+        var replConfig = ReplicatorConfiguration(target: URLEndpoint(url: endpointURL))
+        
+        replConfig.authenticator = try DatabaseManager.getCBLAuthenticator(from: config.authenticator)
+        
+        switch(config.replicatorType) {
+        case .push:
+            replConfig.replicatorType = .push
+        case .pull:
+            replConfig.replicatorType = .pull
+        case .pushpull:
+            replConfig.replicatorType = .pushAndPull
+        }
+        
+        replConfig.continuous = config.continuous
+        
+        for configColl in config.collections {
+            let collections = try configColl.names.map({ collName in
+                guard let collection = try collection(collName, inDB: database)
+                else { throw TestServerError.badRequest }
+                return collection
+            })
+            var collConfig = CollectionConfiguration()
+            collConfig.channels = configColl.channels
+            collConfig.documentIDs = configColl.documentIDs
+            // TODO: Push/pull filter
+            replConfig.addCollections(collections, config: collConfig)
+        }
+        
+        let replicatorID = UUID()
+        
+        let replicator = Replicator(config: replConfig)
+        
+        replicators[replicatorID] = replicator
+        
+        // Whenever a document is replicated, add it to the replicatorDocuments dict
+        if(config.enableDocumentListener) {
+            replicatorDocuments[replicatorID] = []
+            replicator.addDocumentReplicationListener({ [weak self] docChange in
+                guard self != nil
+                else { return }
+                for doc in docChange.documents {
+                    var docFlags: [ContentTypes.DocumentReplicationFlags] = []
+                    
+                    switch doc.flags {
+                    case .accessRemoved:
+                        docFlags.append(.accessRemoved)
+                    case .deleted:
+                        docFlags.append(.deleted)
+                    default:
+                        break
+                    }
+                    
+                    var error: TestServerError? = nil
+                    
+                    if let docError = doc.error as NSError? {
+                        error = TestServerError(domain: .CBL, code: docError.code, message: docError.localizedDescription)
+                    }
+                    
+                    self!.replicatorDocuments[replicatorID]?.append(
+                        ContentTypes.DocumentReplication(
+                            collection: "\(doc.scope).\(doc.collection)",
+                            documentID: doc.id,
+                            isPush: docChange.isPush,
+                            flags: docFlags,
+                            error: error)
+                    )
+                }
+            })
+        }
+        
+        replicator.start(reset: reset)
+        
+        return replicatorID
+    }
+    
+    public func replicatorStatus(forID replID: UUID) -> ContentTypes.ReplicatorStatus? {
+        guard let replicator = replicators[replID]
+        else { return nil }
+        
+        var activity: ContentTypes.ReplicatorActivity = .STOPPED
+        
+        switch replicator.status.activity {
+        case .busy:
+            activity = .BUSY
+        case .connecting:
+            activity = .CONNECTING
+        case .idle:
+            activity = .IDLE
+        case .offline:
+            activity = .OFFLINE
+        case .stopped:
+            activity = .STOPPED
+        @unknown default:
+            fatalError("Encountered unknown enum value from CBLReplicator.status.activity")
+        }
+        
+        let progress = ContentTypes.ReplicatorStatus.Progress(completed: replicator.status.progress.completed == replicator.status.progress.total)
+        
+        var error: TestServerError? = nil
+        if let replError = replicator.status.error as NSError? {
+            error = TestServerError(domain: .CBL, code: replError.code, message: replError.localizedDescription)
+        }
+        
+        var documents: [ContentTypes.DocumentReplication]? = nil
+        
+        if let replicatedDocuments = replicatorDocuments[replID] {
+            documents = replicatedDocuments
+            // Clear documents that have already been returned, per spec
+            replicatorDocuments[replID] = []
+        }
+        
+        return ContentTypes.ReplicatorStatus(activity: activity, progress: progress, documents: documents, error: error)
+    }
+    
     public func collection(_ name: String, inDB dbName: String) throws -> Collection? {
         guard let database = databases[dbName]
         else { throw TestServerError.cblDBNotOpen }
         
+        return try collection(name, inDB: database)
+    }
+    
+    public func collection(_ name: String, inDB database: Database) throws -> Collection? {
         let scopeAndColl = name.components(separatedBy: ".")
         guard let scope = scopeAndColl.first, let coll = scopeAndColl.last
         else { throw TestServerError.badRequest }
@@ -121,6 +248,17 @@ class DatabaseManager {
     public func resetAll() throws {
         for dbName in databases.keys {
             try reset(dbName: dbName)
+        }
+    }
+    
+    private static func getCBLAuthenticator(from auth: ReplicatorAuthenticator) throws -> Authenticator {
+        switch auth {
+        case let auth as ContentTypes.ReplicatorBasicAuthenticator:
+            return BasicAuthenticator(username: auth.username, password: auth.password)
+        case let auth as ContentTypes.ReplicatorSessionAuthenticator:
+            return SessionAuthenticator(sessionID: auth.sessionID, cookieName: auth.cookieName)
+        default:
+            throw TestServerError.badRequest
         }
     }
     

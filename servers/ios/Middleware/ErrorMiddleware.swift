@@ -29,10 +29,10 @@ struct ErrorResponseFactory {
         return EncodeErrorResponse(request: request, status: status, headers: headers, error: error)
     }
     
-    public static func DefaultErrorResponse(_ request: Request) -> Response {
+    public static func UnknownErrorResponse(_ request: Request, _ nserror: NSError) -> Response {
         let error = TestServerError(domain: .TESTSERVER,
                                     code: 500,
-                                    message: "Failed to handle internal error.")
+                                    message: "Encountered unknown error: \(nserror.localizedDescription)")
         
         let status: HTTPStatus = .internalServerError
         let headers: HTTPHeaders = [:]
@@ -49,7 +49,7 @@ class TestServerErrorMiddleware : Middleware {
             if let error = error as? TestServerError {
                 return ErrorResponseFactory.CreateErrorResponse(request, error)
             } else {
-                return ErrorResponseFactory.DefaultErrorResponse(request)
+                return ErrorResponseFactory.UnknownErrorResponse(request, error as NSError)
             }
             
         }

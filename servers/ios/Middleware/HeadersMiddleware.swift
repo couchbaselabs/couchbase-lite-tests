@@ -13,13 +13,16 @@ class HeadersMiddleware : AsyncMiddleware {
         
         print(request)
         
-        let isGetRoot = request.route?.method == .GET && request.route?.path.isEmpty ?? false
+        let isGetRoot = request.route?.description == "GET /"
         
         var version = 0
         
         do {
+            // Request headers aren't required for `GET /`
             version = isGetRoot ? 0 : try verifyHeaders(request.headers)
         } catch(let error as TestServerError) {
+            // This middleware sits before the error middleware, so we have to create this
+            // error ourselves
             let response = ErrorResponseFactory.CreateErrorResponse(request, error)
             return withResponseHeaders(response, version: version)
         }
@@ -27,6 +30,8 @@ class HeadersMiddleware : AsyncMiddleware {
         request.headers.contentType = .json
         
         let response = try await next.respond(to: request)
+        
+        print(response)
         
         return withResponseHeaders(response, version: version)
     }

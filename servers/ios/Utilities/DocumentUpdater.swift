@@ -12,55 +12,62 @@ struct DocumentUpdater {
         guard let collection = try DatabaseManager.shared?.collection(item.collection, inDB: dbName)
         else { throw TestServerError.cblDBNotOpen }
         
-        if let updatedProperties = item.updatedProperties {
+        guard let doc = try? collection.document(id: item.documentID)
+        else { throw TestServerError.cblDocNotFound }
+        
+        var mutableDoc = doc.toMutable()
+        try update(doc: mutableDoc, updatedProperties: item.updatedProperties, removedProperties: item.removedProperties)
+        do {
+            try collection.save(document: mutableDoc)
+        } catch(let error as NSError) {
+            throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
+        }
+    }
+    
+    public static func update(doc: MutableDocument, updatedProperties: Array<Dictionary<String, AnyCodable>>? = nil, removedProperties: Array<String>? = nil) throws {
+        
+        if let updatedProperties = updatedProperties {
             for updateDict in updatedProperties {
                 for (keyPath, value) in updateDict {
                     var parser = KeyPathParser(input: keyPath)
                     guard let components = try parser.parse(), !components.isEmpty
                     else {
-                        throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
+                        throw TestServerError.badRequest
                     }
                     // Ensure first component is not an array index
                     switch components.first! {
-                    case .index: do {
-                        throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
-                    }
+                    case .index: throw TestServerError.badRequest
                     default: break
                     }
                     
-                    let parentProperty = try getParentProperty(collection: collection, docID: item.documentID, keyPathComponents: components)
+                    let parentProperty = try getParentProperty(mutableDoc: doc, keyPathComponents: components)
                     update(parentProperty: parentProperty, propertyKey: components.last!, value: value)
                 }
             }
         }
         
-        if let removedProperties = item.removedProperties {
+        if let removedProperties = removedProperties {
             for keyPath in removedProperties {
                 var parser = KeyPathParser(input: keyPath)
                 guard let components = try parser.parse(), !components.isEmpty
                 else {
-                    throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
+                    throw TestServerError.badRequest
                 }
                 
                 switch components.first! {
-                case .index: do {
-                    throw TestServerError(domain: .TESTSERVER, code: 400, message: "Invalid keypath.")
-                }
+                case .index: throw TestServerError.badRequest
                 default: break
                 }
                 
-                let parentProperty = try getParentProperty(collection: collection, docID: item.documentID, keyPathComponents: components)
+                let parentProperty = try getParentProperty(mutableDoc: doc, keyPathComponents: components)
                 
                 remove(parentProperty: parentProperty, propertyKey: components.last!)
             }
         }
+        
     }
     
-    private static func getParentProperty(collection: Collection, docID: String, keyPathComponents: [KeyPathComponent]) throws -> MutableObjectProtocol {
-        guard let doc = try? collection.document(id: docID)
-        else { throw TestServerError.cblDocNotFound }
-        
-        let mutableDoc = doc.toMutable()
+    private static func getParentProperty(mutableDoc: MutableDocument, keyPathComponents: [KeyPathComponent]) throws -> MutableObjectProtocol {
         
         var current : MutableObjectProtocol = mutableDoc
         

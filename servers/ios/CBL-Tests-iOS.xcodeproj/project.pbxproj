@@ -12,6 +12,25 @@
 		EA19C6852A793C3800197481 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EA19C6842A793C3800197481 /* Assets.xcassets */; };
 		EA19C6882A793C3800197481 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EA19C6872A793C3800197481 /* Preview Assets.xcassets */; };
 		EA3D1A482A83FA1B0059EE0E /* ZipArchive in Frameworks */ = {isa = PBXBuildFile; productRef = EA3D1A472A83FA1B0059EE0E /* ZipArchive */; };
+		EA3D1A4A2A8508B70059EE0E /* SnapshotDocuments.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A492A8508B70059EE0E /* SnapshotDocuments.swift */; };
+		EA3D1A4C2A8509100059EE0E /* SnapshotRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A4B2A8509100059EE0E /* SnapshotRequest.swift */; };
+		EA3D1A4E2A8509780059EE0E /* SnapshotID.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A4D2A8509780059EE0E /* SnapshotID.swift */; };
+		EA3D1A502A8509FC0059EE0E /* Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A4F2A8509FC0059EE0E /* Snapshot.swift */; };
+		EA3D1A522A85364D0059EE0E /* VerifyResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A512A85364D0059EE0E /* VerifyResponse.swift */; };
+		EA3D1A542A8542440059EE0E /* DocComparison.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A532A8542440059EE0E /* DocComparison.swift */; };
+		EA3D1A562A854E3B0059EE0E /* VerifyDocuments.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A552A854E3B0059EE0E /* VerifyDocuments.swift */; };
+		EA3D1A582A854E780059EE0E /* VerifyRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A572A854E780059EE0E /* VerifyRequest.swift */; };
+		EA3D1A5A2A865D4D0059EE0E /* Replicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A592A865D4D0059EE0E /* Replicator.swift */; };
+		EA3D1A5C2A865DB40059EE0E /* ReplicatorAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A5B2A865DB40059EE0E /* ReplicatorAuthenticator.swift */; };
+		EA3D1A5E2A865FCC0059EE0E /* ReplicatorConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A5D2A865FCC0059EE0E /* ReplicatorConfiguration.swift */; };
+		EA3D1A602A8661D90059EE0E /* ReplicationCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A5F2A8661D90059EE0E /* ReplicationCollection.swift */; };
+		EA3D1A622A86622C0059EE0E /* ReplicationFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A612A86622C0059EE0E /* ReplicationFilter.swift */; };
+		EA3D1A642A8662FF0059EE0E /* ReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A632A8662FF0059EE0E /* ReplicatorStatus.swift */; };
+		EA3D1A662A8663A50059EE0E /* ServerInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A652A8663A50059EE0E /* ServerInfo.swift */; };
+		EA3D1A6D2A866D930059EE0E /* CBLVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A6C2A866D930059EE0E /* CBLVersion.swift */; };
+		EA3D1A6F2A8676960059EE0E /* StartReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A6E2A8676960059EE0E /* StartReplicator.swift */; };
+		EA3D1A712A86794A0059EE0E /* StartReplicatorRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A702A86794A0059EE0E /* StartReplicatorRequest.swift */; };
+		EA3D1A732A8682690059EE0E /* GetReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A722A8682690059EE0E /* GetReplicatorStatus.swift */; };
 		EA79A99D2A7940C900530ADE /* Vapor in Frameworks */ = {isa = PBXBuildFile; productRef = EA79A99C2A7940C900530ADE /* Vapor */; };
 		EA94790E2A7943CD000C584A /* TestServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA94790D2A7943CD000C584A /* TestServer.swift */; };
 		EAE658B22A795B0700C26657 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE658B12A795B0700C26657 /* DatabaseManager.swift */; };
@@ -47,6 +66,26 @@
 		EA19C6822A793C3700197481 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		EA19C6842A793C3800197481 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		EA19C6872A793C3800197481 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		EA3D1A492A8508B70059EE0E /* SnapshotDocuments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotDocuments.swift; sourceTree = "<group>"; };
+		EA3D1A4B2A8509100059EE0E /* SnapshotRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotRequest.swift; sourceTree = "<group>"; };
+		EA3D1A4D2A8509780059EE0E /* SnapshotID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotID.swift; sourceTree = "<group>"; };
+		EA3D1A4F2A8509FC0059EE0E /* Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Snapshot.swift; sourceTree = "<group>"; };
+		EA3D1A512A85364D0059EE0E /* VerifyResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyResponse.swift; sourceTree = "<group>"; };
+		EA3D1A532A8542440059EE0E /* DocComparison.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocComparison.swift; sourceTree = "<group>"; };
+		EA3D1A552A854E3B0059EE0E /* VerifyDocuments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyDocuments.swift; sourceTree = "<group>"; };
+		EA3D1A572A854E780059EE0E /* VerifyRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyRequest.swift; sourceTree = "<group>"; };
+		EA3D1A592A865D4D0059EE0E /* Replicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Replicator.swift; sourceTree = "<group>"; };
+		EA3D1A5B2A865DB40059EE0E /* ReplicatorAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicatorAuthenticator.swift; sourceTree = "<group>"; };
+		EA3D1A5D2A865FCC0059EE0E /* ReplicatorConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicatorConfiguration.swift; sourceTree = "<group>"; };
+		EA3D1A5F2A8661D90059EE0E /* ReplicationCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationCollection.swift; sourceTree = "<group>"; };
+		EA3D1A612A86622C0059EE0E /* ReplicationFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationFilter.swift; sourceTree = "<group>"; };
+		EA3D1A632A8662FF0059EE0E /* ReplicatorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicatorStatus.swift; sourceTree = "<group>"; };
+		EA3D1A652A8663A50059EE0E /* ServerInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerInfo.swift; sourceTree = "<group>"; };
+		EA3D1A692A8668C40059EE0E /* GetCBLVersion.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = GetCBLVersion.sh; sourceTree = "<group>"; };
+		EA3D1A6C2A866D930059EE0E /* CBLVersion.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CBLVersion.swift; sourceTree = "<group>"; };
+		EA3D1A6E2A8676960059EE0E /* StartReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartReplicator.swift; sourceTree = "<group>"; };
+		EA3D1A702A86794A0059EE0E /* StartReplicatorRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartReplicatorRequest.swift; sourceTree = "<group>"; };
+		EA3D1A722A8682690059EE0E /* GetReplicatorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetReplicatorStatus.swift; sourceTree = "<group>"; };
 		EA94790D2A7943CD000C584A /* TestServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestServer.swift; sourceTree = "<group>"; };
 		EAE658B02A7955A500C26657 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		EAE658B12A795B0700C26657 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
@@ -92,21 +131,23 @@
 		EA19C6742A793C3700197481 = {
 			isa = PBXGroup;
 			children = (
+				EA9479062A7942F6000C584A /* App */,
+				EA19C6842A793C3800197481 /* Assets.xcassets */,
+				EA19C6802A793C3700197481 /* CBL_Tests_iOSApp.swift */,
+				EA3D1A6C2A866D930059EE0E /* CBLVersion.swift */,
+				EAE658C32A7A7FC300C26657 /* ContentTypes */,
+				EA19C6822A793C3700197481 /* ContentView.swift */,
+				EAE658B52A795BAE00C26657 /* Frameworks */,
+				EA3D1A692A8668C40059EE0E /* GetCBLVersion.sh */,
+				EAE658B82A7A73C200C26657 /* Handlers */,
 				EAF9CC362A83D9C500BCEC1A /* Middleware */,
 				EAF9CC302A83D21700BCEC1A /* names.cblite2.zip */,
 				EAF9CC2F2A83D21700BCEC1A /* posts.cblite2.zip */,
-				EAF9CC2E2A83D21700BCEC1A /* travel.cblite2.zip */,
-				EAF9CC212A826A6300BCEC1A /* Utilities */,
-				EAE658C32A7A7FC300C26657 /* ContentTypes */,
-				EAE658B82A7A73C200C26657 /* Handlers */,
-				EAE658B02A7955A500C26657 /* README.md */,
-				EA9479062A7942F6000C584A /* App */,
-				EA19C6802A793C3700197481 /* CBL_Tests_iOSApp.swift */,
-				EA19C6822A793C3700197481 /* ContentView.swift */,
-				EA19C6842A793C3800197481 /* Assets.xcassets */,
 				EA19C6862A793C3800197481 /* Preview Content */,
 				EA19C67E2A793C3700197481 /* Products */,
-				EAE658B52A795BAE00C26657 /* Frameworks */,
+				EAE658B02A7955A500C26657 /* README.md */,
+				EAF9CC2E2A83D21700BCEC1A /* travel.cblite2.zip */,
+				EAF9CC212A826A6300BCEC1A /* Utilities */,
 			);
 			sourceTree = "<group>";
 		};
@@ -150,6 +191,10 @@
 				EAE658D22A7AA74F00C26657 /* ResetHandler.swift */,
 				EAF9CC242A82934500BCEC1A /* UpdateDatabase.swift */,
 				EAF9CC2A2A82A16700BCEC1A /* GetAllDocuments.swift */,
+				EA3D1A492A8508B70059EE0E /* SnapshotDocuments.swift */,
+				EA3D1A552A854E3B0059EE0E /* VerifyDocuments.swift */,
+				EA3D1A6E2A8676960059EE0E /* StartReplicator.swift */,
+				EA3D1A722A8682690059EE0E /* GetReplicatorStatus.swift */,
 			);
 			path = Handlers;
 			sourceTree = "<group>";
@@ -166,6 +211,18 @@
 				EAE658DC2A7AB68F00C26657 /* DatabaseUpdateItem.swift */,
 				EAF9CC2C2A82A1E400BCEC1A /* CollectionDocuments.swift */,
 				EAF9CC372A83EA3E00BCEC1A /* UpdateRequest.swift */,
+				EA3D1A4B2A8509100059EE0E /* SnapshotRequest.swift */,
+				EA3D1A4D2A8509780059EE0E /* SnapshotID.swift */,
+				EA3D1A512A85364D0059EE0E /* VerifyResponse.swift */,
+				EA3D1A572A854E780059EE0E /* VerifyRequest.swift */,
+				EA3D1A592A865D4D0059EE0E /* Replicator.swift */,
+				EA3D1A5B2A865DB40059EE0E /* ReplicatorAuthenticator.swift */,
+				EA3D1A5D2A865FCC0059EE0E /* ReplicatorConfiguration.swift */,
+				EA3D1A5F2A8661D90059EE0E /* ReplicationCollection.swift */,
+				EA3D1A612A86622C0059EE0E /* ReplicationFilter.swift */,
+				EA3D1A632A8662FF0059EE0E /* ReplicatorStatus.swift */,
+				EA3D1A652A8663A50059EE0E /* ServerInfo.swift */,
+				EA3D1A702A86794A0059EE0E /* StartReplicatorRequest.swift */,
 			);
 			path = ContentTypes;
 			sourceTree = "<group>";
@@ -177,6 +234,8 @@
 				EAF9CC262A829E2300BCEC1A /* MutableObjectProtocol.swift */,
 				EAF9CC282A829E6800BCEC1A /* DocumentUpdater.swift */,
 				EAF9CC392A83F23A00BCEC1A /* AnyCodable.swift */,
+				EA3D1A4F2A8509FC0059EE0E /* Snapshot.swift */,
+				EA3D1A532A8542440059EE0E /* DocComparison.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -197,6 +256,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = EA19C68B2A793C3800197481 /* Build configuration list for PBXNativeTarget "CBL-Tests-iOS" */;
 			buildPhases = (
+				EA3D1A6A2A8669300059EE0E /* ShellScript */,
 				EA19C6792A793C3700197481 /* Sources */,
 				EA19C67A2A793C3700197481 /* Frameworks */,
 				EA19C67B2A793C3700197481 /* Resources */,
@@ -268,35 +328,74 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		EA3D1A6A2A8669300059EE0E /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/zsh;
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\n/Users/callumbirks/cblite/couchbase-lite-tests/servers/ios/GetCBLVersion.sh\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		EA19C6792A793C3700197481 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA3D1A5A2A865D4D0059EE0E /* Replicator.swift in Sources */,
 				EAE658B22A795B0700C26657 /* DatabaseManager.swift in Sources */,
 				EAF9CC232A826A6D00BCEC1A /* KeyPathParser.swift in Sources */,
+				EA3D1A6D2A866D930059EE0E /* CBLVersion.swift in Sources */,
 				EA19C6832A793C3700197481 /* ContentView.swift in Sources */,
+				EA3D1A602A8661D90059EE0E /* ReplicationCollection.swift in Sources */,
 				EAF9CC382A83EA3E00BCEC1A /* UpdateRequest.swift in Sources */,
 				EA94790E2A7943CD000C584A /* TestServer.swift in Sources */,
 				EAF9CC3A2A83F23A00BCEC1A /* AnyCodable.swift in Sources */,
+				EA3D1A662A8663A50059EE0E /* ServerInfo.swift in Sources */,
 				EAE658D12A7A947400C26657 /* ErrorMiddleware.swift in Sources */,
+				EA3D1A4A2A8508B70059EE0E /* SnapshotDocuments.swift in Sources */,
 				EAF9CC292A829E6800BCEC1A /* DocumentUpdater.swift in Sources */,
 				EAE658D92A7AB2E000C26657 /* DocumentReplication.swift in Sources */,
+				EA3D1A5C2A865DB40059EE0E /* ReplicatorAuthenticator.swift in Sources */,
 				EAF9CC2B2A82A16700BCEC1A /* GetAllDocuments.swift in Sources */,
 				EAF9CC272A829E2300BCEC1A /* MutableObjectProtocol.swift in Sources */,
+				EA3D1A582A854E780059EE0E /* VerifyRequest.swift in Sources */,
 				EAE658CB2A7A823000C26657 /* ContentTypes.swift in Sources */,
 				EAF9CC252A82934500BCEC1A /* UpdateDatabase.swift in Sources */,
 				EAE658C22A7A7B8400C26657 /* GetRootHandler.swift in Sources */,
+				EA3D1A542A8542440059EE0E /* DocComparison.swift in Sources */,
 				EAE658C02A7A7B2C00C26657 /* Handler.swift in Sources */,
 				EAF9CC2D2A82A1E400BCEC1A /* CollectionDocuments.swift in Sources */,
 				EAE658D72A7AB29300C26657 /* DocumentID.swift in Sources */,
+				EA3D1A522A85364D0059EE0E /* VerifyResponse.swift in Sources */,
+				EA3D1A5E2A865FCC0059EE0E /* ReplicatorConfiguration.swift in Sources */,
 				EAE658C72A7A81AF00C26657 /* Collections.swift in Sources */,
 				EAE658D52A7AAF4900C26657 /* ResetConfiguration.swift in Sources */,
+				EA3D1A712A86794A0059EE0E /* StartReplicatorRequest.swift in Sources */,
+				EA3D1A502A8509FC0059EE0E /* Snapshot.swift in Sources */,
 				EAE658DD2A7AB68F00C26657 /* DatabaseUpdateItem.swift in Sources */,
+				EA3D1A4C2A8509100059EE0E /* SnapshotRequest.swift in Sources */,
+				EA3D1A732A8682690059EE0E /* GetReplicatorStatus.swift in Sources */,
+				EA3D1A6F2A8676960059EE0E /* StartReplicator.swift in Sources */,
+				EA3D1A622A86622C0059EE0E /* ReplicationFilter.swift in Sources */,
+				EA3D1A4E2A8509780059EE0E /* SnapshotID.swift in Sources */,
+				EA3D1A642A8662FF0059EE0E /* ReplicatorStatus.swift in Sources */,
 				EAE658D32A7AA74F00C26657 /* ResetHandler.swift in Sources */,
 				EAE658DB2A7AB58D00C26657 /* TestServerError.swift in Sources */,
 				EAF9CC352A83D86B00BCEC1A /* HeadersMiddleware.swift in Sources */,
 				EA19C6812A793C3700197481 /* CBL_Tests_iOSApp.swift in Sources */,
+				EA3D1A562A854E3B0059EE0E /* VerifyDocuments.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

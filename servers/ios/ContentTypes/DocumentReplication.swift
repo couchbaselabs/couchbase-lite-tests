@@ -34,8 +34,8 @@ extension ContentTypes {
         let collection: String
         let documentID: String
         let isPush: Bool
-        let flags: DocumentReplicationFlags
-        let error: TestServerError
+        let flags: [DocumentReplicationFlags]
+        let error: TestServerError?
     }
     enum DocumentReplicationFlags : String, Codable {
         case deleted = "deleted"

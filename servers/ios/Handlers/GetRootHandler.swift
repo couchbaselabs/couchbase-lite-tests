@@ -8,7 +8,7 @@
 import Vapor
 
 extension Handlers {
-    static let getRoot : EndpointHandler<String> = { req throws in
-        return "It works!"
+    static let getRoot : EndpointHandler<ContentTypes.ServerInfo> = { req throws in
+        return ContentTypes.ServerInfo()
     }
 }

@@ -10,8 +10,25 @@ import Foundation
 struct AnyCodable: Codable {
     let value: Any
 
-    init(_ value: Any) {
-        self.value = value
+    init(_ value: Any) throws {
+        // Potentially unwrap if value is AnyCodable
+        let value = value is AnyCodable ? (value as! AnyCodable).value : value
+        switch value {
+        case let value as Bool:
+            self.value = value
+        case let value as Int:
+            self.value = value
+        case let value as Double:
+            self.value = value
+        case let value as String:
+            self.value = value
+        case let value as [Any]:
+            self.value = try value.map { try AnyCodable($0) }
+        case let value as [String : Any]:
+            self.value = try value.mapValues { try AnyCodable($0) }
+        default:
+            throw TestServerError(domain: .TESTSERVER, code: 500, message: "Internal error parsing value type")
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -45,9 +62,9 @@ struct AnyCodable: Codable {
         case let value as String:
             try container.encode(value)
         case let value as [Any]:
-            try container.encode(value.map { AnyCodable($0) })
+            try container.encode(value.map { try AnyCodable($0) })
         case let value as [String: Any]:
-            try container.encode(value.mapValues { AnyCodable($0) })
+            try container.encode(value.mapValues { try AnyCodable($0) })
         default:
             throw EncodingError.invalidValue(self.value, EncodingError.Context(codingPath: container.codingPath, debugDescription: "AnyCodable value cannot be encoded"))
         }
