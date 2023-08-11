@@ -29,7 +29,6 @@ import com.couchbase.lite.DocumentReplication;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.data.TypedMap;
-import com.couchbase.lite.mobiletest.tools.DocReplListener;
 
 
 public class ReplicatorService {
