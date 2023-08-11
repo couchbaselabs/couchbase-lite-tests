@@ -124,9 +124,9 @@ class TestBasicReplication:
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), replicator_type=ReplicatorType.PUSH_AND_PULL, collections=[
             ReplicatorCollectionEntry(["travel.airlines", "travel.airports", "travel.hotels", "travel.landmarks", "travel.routes"])
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+        await replicator.start()
 
         # 4. Wait until the replicator is stopped.
-        await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
@@ -155,7 +155,9 @@ class TestBasicReplication:
             * credentials: user1/pass
         '''
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), 
-                                collections=[ReplicatorCollectionEntry(["travel.airlines", "travel.airports", "travel.hotels"])],
+                                collections=[ReplicatorCollectionEntry(["travel.airlines", 
+                                                                        "travel.airports", 
+                                                                        "travel.hotels"])],
                                 replicator_type=ReplicatorType.PUSH, 
                                 continuous=True, 
                                 enable_document_listener=True,
@@ -224,7 +226,9 @@ class TestBasicReplication:
             * credentials: user1/pass
         '''
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"),
-                                collections=[ReplicatorCollectionEntry(["travel.routes", "travel.landmarks", "travel.hotels"])],
+                                collections=[ReplicatorCollectionEntry(["travel.routes", 
+                                                                        "travel.landmarks", 
+                                                                        "travel.hotels"])],
                                 replicator_type=ReplicatorType.PULL, 
                                 continuous=True, 
                                 enable_document_listener=True, 
@@ -251,16 +255,18 @@ class TestBasicReplication:
         '''
         # Add 2 routes in `travel.routes`
         routes_updates: List[DocumentUpdateEntry] = [] 
-        routes_updates.append(DocumentUpdateEntry("test_route_1", None, body={"airline": "Skyline", 
-                                                                              "channels": ["United States"], 
-                                                                              "country": "United States", 
-                                                                              "sourceairport": "SFO", 
-                                                                              "destinationairport": "NRT"}))
-        routes_updates.append(DocumentUpdateEntry("test_route_2", None, body={"airline": "Nimbus", 
-                                                                              "channels": ["United States"], 
-                                                                              "country": "United States", 
-                                                                              "sourceairport": "SFO", 
-                                                                              "destinationairport": "BKK"}))
+        routes_updates.append(DocumentUpdateEntry("test_route_1", None, body={
+            "airline": "Skyline", 
+            "channels": ["United States"], 
+            "country": "United States", 
+            "sourceairport": "SFO", 
+            "destinationairport": "NRT"}))
+        routes_updates.append(DocumentUpdateEntry("test_route_2", None, body={
+            "airline": "Nimbus", 
+            "channels": ["United States"], 
+            "country": "United States", 
+            "sourceairport": "SFO", 
+            "destinationairport": "BKK"}))
         await cblpytest.sync_gateways[0].update_documents("travel", routes_updates, "travel", "routes")
         
         # Update 2 landmarks in `travel.landmarks`
@@ -268,20 +274,22 @@ class TestBasicReplication:
         landmarks_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "landmarks")
         for doc in landmarks_all_docs.rows:
             if doc.id == "landmark_100":
-                landmarks_updates.append(DocumentUpdateEntry(doc.id, doc.revid, {"name": "Wallace Creek Trail", 
-                                                                                 "channels": ["United States"],
-                                                                                 "content": "Wallace Creek is a creek with a twist.",
-                                                                                 "city": "McKittrick", 
-                                                                                 "state": "CA", 
-                                                                                 "country": "United States"}))
+                landmarks_updates.append(DocumentUpdateEntry(doc.id, doc.revid, {
+                    "name": "Wallace Creek Trail", 
+                    "channels": ["United States"],
+                    "content": "Wallace Creek is a creek with a twist.",
+                    "city": "McKittrick", 
+                    "state": "CA", 
+                    "country": "United States"}))
             elif doc.id == "landmark_200":
-                landmarks_updates.append(DocumentUpdateEntry(doc.id, doc.revid, {"name": "Mission San Jose and Museum", 
-                                                                                 "channels": ["United States"],
-                                                                                 "content": "This mission founded in 1797 by Fermin Lasuen as the 14th mission.",
-                                                                                 "city": "Fremont", 
-                                                                                 "state": "CA", 
-                                                                                 "country": 
-                                                                                 "United States"}))
+                landmarks_updates.append(DocumentUpdateEntry(doc.id, doc.revid, {
+                    "name": "Mission San Jose and Museum", 
+                    "channels": ["United States"],
+                    "content": "This mission founded in 1797 by Fermin Lasuen.",
+                    "city": "Fremont", 
+                    "state": "CA", 
+                    "country": 
+                    "United States"}))
         await cblpytest.sync_gateways[0].update_documents("travel", landmarks_updates, "travel", "landmarks")
 
         # Remove 2 hotels in `travel.hotels`
@@ -324,8 +332,11 @@ class TestBasicReplication:
             * credentials: user1/pass
         '''
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), 
-                                collections=[ReplicatorCollectionEntry(["travel.airlines", "travel.airports", "travel.hotels", 
-                                                                        "travel.landmarks", "travel.routes"])], 
+                                collections=[ReplicatorCollectionEntry(["travel.airlines", 
+                                                                        "travel.airports", 
+                                                                        "travel.hotels", 
+                                                                        "travel.landmarks", 
+                                                                        "travel.routes"])], 
                                 replicator_type=ReplicatorType.PUSH_AND_PULL, 
                                 continuous=True, 
                                 enable_document_listener=True, 
@@ -339,7 +350,8 @@ class TestBasicReplication:
                 
         # 5. Check that all docs are replicated correctly.
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "travel", 
-                                 ["travel.airlines", "travel.airports", "travel.hotels", "travel.landmarks", "travel.routes"])
+                                       ["travel.airlines", "travel.airports", "travel.hotels", 
+                                        "travel.landmarks", "travel.routes"])
         
         # 6. Clear current document replication events.
         replicator.clear_document_updates()
@@ -351,8 +363,8 @@ class TestBasicReplication:
             * Remove 2 hotels in travel.hotels.
         '''
         async with db.batch_updater() as b:
-            b.upsert_document("travel.airports", "test_airport_1", [{"name": "Airport 1", "channels": ["United States"]}])
-            b.upsert_document("travel.airports", "test_airport_2", [{"name": "Airport 2", "channels": ["United Kingdom"]}])
+            b.upsert_document("travel.airports", "test_airport_1", [{"name": "AirPort1", "channels": ["United States"]}])
+            b.upsert_document("travel.airports", "test_airport_2", [{"name": "AirPort2", "channels": ["United Kingdom"]}])
             b.upsert_document("travel.airlines", "airline_1", removed_properties=["country"])
             b.upsert_document("travel.airlines", "airline_2", removed_properties=["country"])
             b.delete_document("travel.hotels", "hotel_1")
@@ -366,16 +378,19 @@ class TestBasicReplication:
         '''
         # Add 2 routes in `travel.routes`
         routes_updates: List[DocumentUpdateEntry] = []
-        routes_updates.append(DocumentUpdateEntry("test_route_1", None, body={"airline": "Skyline", 
-                                                                              "channels": ["United States"], 
-                                                                              "country": "United States", 
-                                                                              "sourceairport": "SFO", 
-                                                                              "destinationairport": "NRT"}))
-        routes_updates.append(DocumentUpdateEntry("test_route_2", None, body={"airline": "Nimbus", 
-                                                                              "channels": ["United States"], 
-                                                                              "country": "United States", 
-                                                                              "sourceairport": "SFO", 
-                                                                              "destinationairport": "BKK"}))
+        routes_updates.append(DocumentUpdateEntry("test_route_1", None, body={
+            "airline": "Skyline",
+            "channels": ["United States"],
+            "country": "United States",
+            "sourceairport": "SFO",
+            "destinationairport": "NRT"
+        }))
+        routes_updates.append(DocumentUpdateEntry("test_route_2", None, body={
+            "airline": "Nimbus", 
+            "channels": ["United States"], 
+            "country": "United States", 
+            "sourceairport": "SFO", 
+            "destinationairport": "BKK"}))
         await cblpytest.sync_gateways[0].update_documents("travel", routes_updates, "travel", "routes")
         
         # Update 2 landmarks in `travel.landmarks`
@@ -383,19 +398,21 @@ class TestBasicReplication:
         landmarks_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "landmarks")
         for doc in landmarks_all_docs.rows:
             if doc.id == "landmark_100":
-                landmarks_updates.append(DocumentUpdateEntry(doc.id, doc.revid, {"name": "Wallace Creek Trail", 
-                                                                                 "channels": ["United States"],
-                                                                                 "content": "Wallace Creek is a creek with a twist.",
-                                                                                 "city": "McKittrick", 
-                                                                                 "state": "CA", 
-                                                                                 "country": "United States"}))
+                landmarks_updates.append(DocumentUpdateEntry(doc.id, doc.revid, {
+                    "name": "Wallace Creek Trail", 
+                    "channels": ["United States"],
+                    "content": "Wallace Creek is a creek with a twist.",
+                    "city": "McKittrick", 
+                    "state": "CA", 
+                    "country": "United States"}))
             elif doc.id == "landmark_200":
-                landmarks_updates.append(DocumentUpdateEntry(doc.id, doc.revid, {"name": "Mission San Jose and Museum", 
-                                                                                 "channels": ["United States"],
-                                                                                 "content": "This mission founded in 1797 by Fermin Lasuen as the 14th mission.",
-                                                                                 "city": "Fremont", 
-                                                                                 "state": "CA", 
-                                                                                 "country": "United States"}))
+                landmarks_updates.append(DocumentUpdateEntry(doc.id, doc.revid, {
+                    "name": "Mission San Jose and Museum", 
+                    "channels": ["United States"],
+                    "content": "This mission founded in 1797 by Fermin Lasuen.",
+                    "city": "Fremont", 
+                    "state": "CA", 
+                    "country": "United States"}))
         await cblpytest.sync_gateways[0].update_documents("travel", landmarks_updates, "travel", "landmarks")
 
         # Remove 2 hotels in `travel.hotels`
@@ -422,7 +439,8 @@ class TestBasicReplication:
 
         # 10. Check that all updates are replicated correctly.
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "travel", 
-                                       ["travel.airlines", "travel.airports", "travel.hotels", "travel.landmarks", "travel.routes"])
+                                       ["travel.airlines", "travel.airports", "travel.hotels", 
+                                        "travel.landmarks", "travel.routes"])
         
     @pytest.mark.skip(reason="CBL-4805")
     @pytest.mark.asyncio
@@ -490,12 +508,12 @@ class TestBasicReplication:
         
         # 12. Check that the purged airline doc is pushed back to SG
         sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airlines")
-        found_sg_purged_doc = False
+        found_doc = False
         for doc in sg_all_docs.rows:
             if doc.id == sg_purged_doc_id:
-                found_sg_purged_doc = True
+                found_doc = True
                 break
-        assert found_sg_purged_doc, f"{sg_purged_doc_id} was not pushed back after start the replicator with reset checkpoint enabled"
+        assert found_doc, f"{sg_purged_doc_id} was not pushed back to SG after reset checkpoint"
 
     @pytest.mark.asyncio
     async def test_reset_checkpoint_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
@@ -547,7 +565,7 @@ class TestBasicReplication:
         # 9. Check that the purged airport doc doesn't exist in CBL database.
         lite_all_docs = await db.get_all_documents("travel.airports")
         for doc in lite_all_docs["travel.airports"]:
-            assert doc.id != lite_purged_doc_id, f"Unexpected purged document found in lite database: {doc.id}"
+            assert doc.id != lite_purged_doc_id, f"Unexpected purged document found in local database: {doc.id}"
         
         # 10. Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), 
@@ -564,9 +582,9 @@ class TestBasicReplication:
         
         # 12. Check that the purged airport doc is pulled back in CBL database.
         lite_all_docs = await db.get_all_documents("travel.airports")
-        found_lite_purged_doc = False
+        found_doc = False
         for doc in lite_all_docs["travel.airports"]:
             if doc.id == lite_purged_doc_id:
-                found_lite_purged_doc = True
+                found_doc = True
                 break
-        assert found_lite_purged_doc, f"{lite_purged_doc_id} was not pulled back after start the replicator with reset checkpoint enabled"
+        assert found_doc, f"{lite_purged_doc_id} was not pulled back to local database after reset checkpoint"
