@@ -424,3 +424,149 @@ class TestBasicReplication:
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "travel", 
                                        ["travel.airlines", "travel.airports", "travel.hotels", "travel.landmarks", "travel.routes"])
         
+    @pytest.mark.skip(reason="CBL-4805")
+    @pytest.mark.asyncio
+    async def test_reset_checkpoint_push(self, cblpytest: CBLPyTest, dataset_path: Path):
+        # 1. Reset SG and load `travel` dataset.
+        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
+        await cloud.configure_dataset(dataset_path, "travel")
+
+        # Reset local database, and load `travel` dataset.
+        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        db = dbs[0]
+
+        '''
+        3. Start a replicator:
+            * endpoint: `/travel`
+            * collections : `travel.airlines`
+            * type: push
+            * continuous: false
+            * credentials: user1/pass
+        '''
+        replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), 
+                                collections=[ReplicatorCollectionEntry(["travel.airlines"])], 
+                                replicator_type=ReplicatorType.PUSH, 
+                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+        await replicator.start()
+
+        # 4. Wait until the replicator is stopped.
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, \
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        
+        # 5. Check that all docs are replicated correctly.
+        await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "travel", 
+                                 ["travel.airlines"])
+        
+        # 6. Purge an airline doc from `travel.airlines` on SG.
+        sg_purged_doc_id = "airline_10"
+        await cblpytest.sync_gateways[0].purge_document(sg_purged_doc_id, "travel", "travel", "airlines")
+
+        # 7. Start the replicator with the same config as the step 3.
+        await replicator.start()
+
+        # 8. Wait until the replicator is stopped.
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, \
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+          
+        # 9. Check that the purged airline doc doesn't exist on SG.
+        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airlines")
+        for doc in sg_all_docs.rows:
+            assert doc.id != sg_purged_doc_id, f"Unexpected purged document found in SG: {doc.id}"
+
+        # 10. Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.
+        replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), 
+                                collections=[ReplicatorCollectionEntry(["travel.airlines"])], 
+                                replicator_type=ReplicatorType.PUSH, 
+                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                                reset=True)
+        await replicator.start()
+
+        # 11. Wait until the replicator is stopped.
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, \
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        
+        # 12. Check that the purged airline doc is pushed back to SG
+        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airlines")
+        found_sg_purged_doc = False
+        for doc in sg_all_docs.rows:
+            if doc.id == sg_purged_doc_id:
+                found_sg_purged_doc = True
+                break
+        assert found_sg_purged_doc, f"{sg_purged_doc_id} was not pushed back after start the replicator with reset checkpoint enabled"
+
+    @pytest.mark.asyncio
+    async def test_reset_checkpoint_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
+        # 1. Reset SG and load `travel` dataset.
+        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
+        await cloud.configure_dataset(dataset_path, "travel")
+
+        # Reset local database, and load `travel` dataset.
+        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        db = dbs[0]
+
+        '''
+        3. Start a replicator:
+            * endpoint: `/travel`
+            * collections : `travel.airports`
+            * type: pull
+            * continuous: false
+            * credentials: user1/pass
+        '''
+        replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), 
+                                    collections=[ReplicatorCollectionEntry(["travel.airports"])], 
+                                    replicator_type=ReplicatorType.PULL, 
+                                    authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+        await replicator.start()
+
+        # 4. Wait until the replicator is stopped.
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, \
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+            
+        
+        # 5. Check that all docs are replicated correctly.
+        await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "travel", 
+                                       ["travel.airports"])
+        
+        # 6. Purge an airport doc from `travel.airports` in the local database.
+        lite_purged_doc_id = "airport_20"
+        async with db.batch_updater() as b:
+            b.purge_document("travel.airports", lite_purged_doc_id)
+
+        # 7. Start the replicator with the same config as the step 3.
+        await replicator.start()
+
+        # 8. Wait until the replicator is stopped.
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, \
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        
+        # 9. Check that the purged airport doc doesn't exist in CBL database.
+        lite_all_docs = await db.get_all_documents("travel.airports")
+        for doc in lite_all_docs["travel.airports"]:
+            assert doc.id != lite_purged_doc_id, f"Unexpected purged document found in lite database: {doc.id}"
+        
+        # 10. Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.
+        replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), 
+                                collections=[ReplicatorCollectionEntry(["travel.airports"])], 
+                                replicator_type=ReplicatorType.PULL, 
+                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                                reset=True)
+        await replicator.start()
+
+        # 11. Wait until the replicator is stopped.
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, \
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        
+        # 12. Check that the purged airport doc is pulled back in CBL database.
+        lite_all_docs = await db.get_all_documents("travel.airports")
+        found_lite_purged_doc = False
+        for doc in lite_all_docs["travel.airports"]:
+            if doc.id == lite_purged_doc_id:
+                found_lite_purged_doc = True
+                break
+        assert found_lite_purged_doc, f"{lite_purged_doc_id} was not pulled back after start the replicator with reset checkpoint enabled"
