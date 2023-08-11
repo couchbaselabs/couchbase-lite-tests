@@ -15,7 +15,7 @@ struct DocumentUpdater {
         guard let doc = try? collection.document(id: item.documentID)
         else { throw TestServerError.cblDocNotFound }
         
-        var mutableDoc = doc.toMutable()
+        let mutableDoc = doc.toMutable()
         try update(doc: mutableDoc, updatedProperties: item.updatedProperties, removedProperties: item.removedProperties)
         do {
             try collection.save(document: mutableDoc)
@@ -24,6 +24,7 @@ struct DocumentUpdater {
         }
     }
     
+    // This function does not save the updated doc, the caller must do that if desired
     public static func update(doc: MutableDocument, updatedProperties: Array<Dictionary<String, AnyCodable>>? = nil, removedProperties: Array<String>? = nil) throws {
         
         if let updatedProperties = updatedProperties {

@@ -71,7 +71,7 @@ extension Snapshot {
             
             // We can force-unwrap here because we earlier checked that snapshot has snapshotKey
             let snapshotDoc = snapshot[snapshotKey]!
-            var mutableSnapshotDoc = snapshotDoc?.toMutable() ?? MutableDocument(id: change.documentID)
+            let mutableSnapshotDoc = snapshotDoc?.toMutable() ?? MutableDocument(id: change.documentID)
             
             try DocumentUpdater.update(doc: mutableSnapshotDoc, updatedProperties: change.updatedProperties, removedProperties: change.removedProperties)
             

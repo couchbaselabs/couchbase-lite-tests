@@ -24,13 +24,14 @@
 		EA3D1A5C2A865DB40059EE0E /* ReplicatorAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A5B2A865DB40059EE0E /* ReplicatorAuthenticator.swift */; };
 		EA3D1A5E2A865FCC0059EE0E /* ReplicatorConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A5D2A865FCC0059EE0E /* ReplicatorConfiguration.swift */; };
 		EA3D1A602A8661D90059EE0E /* ReplicationCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A5F2A8661D90059EE0E /* ReplicationCollection.swift */; };
-		EA3D1A622A86622C0059EE0E /* ReplicationFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A612A86622C0059EE0E /* ReplicationFilter.swift */; };
+		EA3D1A622A86622C0059EE0E /* ReplicationFilterRQ.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A612A86622C0059EE0E /* ReplicationFilterRQ.swift */; };
 		EA3D1A642A8662FF0059EE0E /* ReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A632A8662FF0059EE0E /* ReplicatorStatus.swift */; };
 		EA3D1A662A8663A50059EE0E /* ServerInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A652A8663A50059EE0E /* ServerInfo.swift */; };
 		EA3D1A6D2A866D930059EE0E /* CBLVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A6C2A866D930059EE0E /* CBLVersion.swift */; };
 		EA3D1A6F2A8676960059EE0E /* StartReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A6E2A8676960059EE0E /* StartReplicator.swift */; };
 		EA3D1A712A86794A0059EE0E /* StartReplicatorRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A702A86794A0059EE0E /* StartReplicatorRequest.swift */; };
 		EA3D1A732A8682690059EE0E /* GetReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A722A8682690059EE0E /* GetReplicatorStatus.swift */; };
+		EA3D1A762A86A2490059EE0E /* ReplicationFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A752A86A2490059EE0E /* ReplicationFilter.swift */; };
 		EA79A99D2A7940C900530ADE /* Vapor in Frameworks */ = {isa = PBXBuildFile; productRef = EA79A99C2A7940C900530ADE /* Vapor */; };
 		EA94790E2A7943CD000C584A /* TestServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA94790D2A7943CD000C584A /* TestServer.swift */; };
 		EAE658B22A795B0700C26657 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE658B12A795B0700C26657 /* DatabaseManager.swift */; };
@@ -78,7 +79,7 @@
 		EA3D1A5B2A865DB40059EE0E /* ReplicatorAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicatorAuthenticator.swift; sourceTree = "<group>"; };
 		EA3D1A5D2A865FCC0059EE0E /* ReplicatorConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicatorConfiguration.swift; sourceTree = "<group>"; };
 		EA3D1A5F2A8661D90059EE0E /* ReplicationCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationCollection.swift; sourceTree = "<group>"; };
-		EA3D1A612A86622C0059EE0E /* ReplicationFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationFilter.swift; sourceTree = "<group>"; };
+		EA3D1A612A86622C0059EE0E /* ReplicationFilterRQ.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationFilterRQ.swift; sourceTree = "<group>"; };
 		EA3D1A632A8662FF0059EE0E /* ReplicatorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicatorStatus.swift; sourceTree = "<group>"; };
 		EA3D1A652A8663A50059EE0E /* ServerInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerInfo.swift; sourceTree = "<group>"; };
 		EA3D1A692A8668C40059EE0E /* GetCBLVersion.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = GetCBLVersion.sh; sourceTree = "<group>"; };
@@ -86,6 +87,7 @@
 		EA3D1A6E2A8676960059EE0E /* StartReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartReplicator.swift; sourceTree = "<group>"; };
 		EA3D1A702A86794A0059EE0E /* StartReplicatorRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartReplicatorRequest.swift; sourceTree = "<group>"; };
 		EA3D1A722A8682690059EE0E /* GetReplicatorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetReplicatorStatus.swift; sourceTree = "<group>"; };
+		EA3D1A752A86A2490059EE0E /* ReplicationFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationFilter.swift; sourceTree = "<group>"; };
 		EA94790D2A7943CD000C584A /* TestServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestServer.swift; sourceTree = "<group>"; };
 		EAE658B02A7955A500C26657 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		EAE658B12A795B0700C26657 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
@@ -219,7 +221,7 @@
 				EA3D1A5B2A865DB40059EE0E /* ReplicatorAuthenticator.swift */,
 				EA3D1A5D2A865FCC0059EE0E /* ReplicatorConfiguration.swift */,
 				EA3D1A5F2A8661D90059EE0E /* ReplicationCollection.swift */,
-				EA3D1A612A86622C0059EE0E /* ReplicationFilter.swift */,
+				EA3D1A612A86622C0059EE0E /* ReplicationFilterRQ.swift */,
 				EA3D1A632A8662FF0059EE0E /* ReplicatorStatus.swift */,
 				EA3D1A652A8663A50059EE0E /* ServerInfo.swift */,
 				EA3D1A702A86794A0059EE0E /* StartReplicatorRequest.swift */,
@@ -236,6 +238,7 @@
 				EAF9CC392A83F23A00BCEC1A /* AnyCodable.swift */,
 				EA3D1A4F2A8509FC0059EE0E /* Snapshot.swift */,
 				EA3D1A532A8542440059EE0E /* DocComparison.swift */,
+				EA3D1A752A86A2490059EE0E /* ReplicationFilter.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -371,6 +374,7 @@
 				EAF9CC2B2A82A16700BCEC1A /* GetAllDocuments.swift in Sources */,
 				EAF9CC272A829E2300BCEC1A /* MutableObjectProtocol.swift in Sources */,
 				EA3D1A582A854E780059EE0E /* VerifyRequest.swift in Sources */,
+				EA3D1A762A86A2490059EE0E /* ReplicationFilter.swift in Sources */,
 				EAE658CB2A7A823000C26657 /* ContentTypes.swift in Sources */,
 				EAF9CC252A82934500BCEC1A /* UpdateDatabase.swift in Sources */,
 				EAE658C22A7A7B8400C26657 /* GetRootHandler.swift in Sources */,
@@ -388,7 +392,7 @@
 				EA3D1A4C2A8509100059EE0E /* SnapshotRequest.swift in Sources */,
 				EA3D1A732A8682690059EE0E /* GetReplicatorStatus.swift in Sources */,
 				EA3D1A6F2A8676960059EE0E /* StartReplicator.swift in Sources */,
-				EA3D1A622A86622C0059EE0E /* ReplicationFilter.swift in Sources */,
+				EA3D1A622A86622C0059EE0E /* ReplicationFilterRQ.swift in Sources */,
 				EA3D1A4E2A8509780059EE0E /* SnapshotID.swift in Sources */,
 				EA3D1A642A8662FF0059EE0E /* ReplicatorStatus.swift in Sources */,
 				EAE658D32A7AA74F00C26657 /* ResetHandler.swift in Sources */,

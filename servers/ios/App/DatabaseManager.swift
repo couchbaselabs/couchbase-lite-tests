@@ -83,7 +83,12 @@ class DatabaseManager {
             var collConfig = CollectionConfiguration()
             collConfig.channels = configColl.channels
             collConfig.documentIDs = configColl.documentIDs
-            // TODO: Push/pull filter
+            if let pullFilter = configColl.pullFilter {
+                collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter)
+            }
+            if let pushFilter = configColl.pushFilter {
+                collConfig.pushFilter = try DatabaseManager.getCBLReplicationFilter(from: pushFilter)
+            }
             replConfig.addCollections(collections, config: collConfig)
         }
         
@@ -225,7 +230,7 @@ class DatabaseManager {
     
     public func reset(dbName: String, dataset: String? = nil) throws {
         // If database is open, close
-        if let database = databases[dbName] {
+        if databases[dbName] != nil {
             try closeDatabase(withName: dbName)
         }
         
@@ -260,6 +265,10 @@ class DatabaseManager {
         default:
             throw TestServerError.badRequest
         }
+    }
+    
+    private static func getCBLReplicationFilter(from filter: ContentTypes.ReplicationFilter) throws -> ReplicationFilter {
+        return try ReplicationFilterFactory.getFilter(withName: filter.name, params: filter.params)
     }
     
     private static func loadDataset(withName name: String, dbName: String) throws {

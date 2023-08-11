@@ -9,10 +9,7 @@ import Foundation
 import Vapor
 
 class HeadersMiddleware : AsyncMiddleware {
-    func respond(to request: Vapor.Request, chainingTo next: Vapor.AsyncResponder) async throws -> Vapor.Response {
-        
-        print(request)
-        
+    func respond(to request: Vapor.Request, chainingTo next: Vapor.AsyncResponder) async throws -> Vapor.Response {        
         let isGetRoot = request.route?.description == "GET /"
         
         var version = 0
@@ -30,8 +27,6 @@ class HeadersMiddleware : AsyncMiddleware {
         request.headers.contentType = .json
         
         let response = try await next.respond(to: request)
-        
-        print(response)
         
         return withResponseHeaders(response, version: version)
     }
