@@ -18,7 +18,7 @@ PACKAGE_RESOLVED_FILE="$SRCROOT/CBL-Tests-iOS.xcodeproj/project.xcworkspace/xcsh
 PACKAGE_VERSION=$(/opt/homebrew/bin/jq -r '.pins[] | select(.identity == "couchbase-lite-swift-ee") | .state.version' "$PACKAGE_RESOLVED_FILE")
 
 # Path to the Swift file that will be generated
-OUTPUT_FILE="$SRCROOT/PackageVersion.swift"
+OUTPUT_FILE="$SRCROOT/CBLVersion.swift"
 
 # Create the directory if it doesn't exist
 mkdir -p "$(dirname "$OUTPUT_FILE")"
@@ -27,6 +27,6 @@ mkdir -p "$(dirname "$OUTPUT_FILE")"
 rm $OUTPUT_FILE
 
 # Write the Swift file
-echo "struct PackageVersion {" > $OUTPUT_FILE
+echo "struct CBLVersion {" > $OUTPUT_FILE
 echo "    static let version = \"$PACKAGE_VERSION\"" >> $OUTPUT_FILE
 echo "}" >> $OUTPUT_FILE
