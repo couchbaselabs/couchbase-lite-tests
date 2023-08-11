@@ -23,20 +23,18 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
                 throw RequestError("Collection '" + spec.fullName() + "' Not Found");
             }
             AUTO_RELEASE(col);
-
+            
             auto docID = GetValue<string>(update, "documentID");
-            CBLDocument *doc = CBLCollection_GetMutableDocument(col, FLS(docID), &error);
-            CheckError(error);
-            AUTO_RELEASE(doc);
-
             auto type = GetValue<string>(update, "type");
             if (EnumEquals(type, kUpdateDatabaseTypeUpdate)) {
+                CBLDocument *doc = CBLCollection_GetMutableDocument(col, FLS(docID), &error);
+                CheckError(error);
                 if (!doc) {
                     doc = CBLDocument_CreateWithID(FLS(docID));
                 }
+                AUTO_RELEASE(doc);
 
                 auto props = CBLDocument_MutableProperties(doc);
-
                 if (update.contains("updatedProperties")) {
                     auto updateItems = GetValue<vector<unordered_map<string, json>>>(update, "updatedProperties");
                     ts_support::fleece::updateProperties(props, updateItems);
@@ -50,15 +48,15 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
                 CBLCollection_SaveDocument(col, doc, &error);
                 CheckError(error);
             } else if (EnumEquals(type, kUpdateDatabaseTypeDelete)) {
+                CBLDocument *doc = CBLCollection_GetMutableDocument(col, FLS(docID), &error);
+                CheckError(error);
                 if (doc) {
                     CBLCollection_DeleteDocument(col, doc, &error);
                     CheckError(error);
                 }
             } else if (EnumEquals(type, kUpdateDatabaseTypePurge)) {
-                if (doc) {
-                    CBLCollection_PurgeDocument(col, doc, &error);
-                    CheckError(error);
-                }
+                CBLCollection_PurgeDocumentByID(col, FLS(docID), &error);
+                CheckError(error);
             }
         }
         commit = true;

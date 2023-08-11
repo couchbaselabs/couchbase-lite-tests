@@ -176,6 +176,7 @@ Test push replication with the default collection.
    * collections : `_default._default`
    * type: push
    * continuos: false
+   * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
@@ -194,6 +195,7 @@ Test pull replication with the default collection.
    * collections : `_default._default` 
    * type: push
    * continuos: false
+   * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
@@ -212,14 +214,15 @@ Test pull replication with the default collection.
    * collections : `_default._default`
    * type: push_and_pull
    * continuos: false
+   * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
 
-## test_reset_checkpoint
+## test_reset_checkpoint_push
 
 ### Description
 
-Test that when the replicator starts with its checkpoint reset, the replication starts from the beginning again.
+Test that when the push replicator starts with its checkpoint reset, the push replication starts from the beginning again.
 
 ### Steps
 
@@ -227,16 +230,42 @@ Test that when the replicator starts with its checkpoint reset, the replication 
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator:
    * endpoint: `/travel`
-   * collections : `travel.airlines`, `travel.airports` 
-   * type: push-and-pull
+   * collections : `travel.airlines`
+   * type: push
    * continuos: false
+   * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
-6. Purge an airline from `travel.airlines` in the local database.
-7. Purge an airport from `travel.airports` on SG.
-8. Start the replicator with the same config as the step 3.
-9. Wait until the replicator is stopped.
-10. Check that the purged airline still doesn't exist in CBL database, and the purged airport still doesn't exist on SG.
-11. Start the replicator with the same config as the step 2 BUT with `reset checkpoint set to true`.
-12. Wait until the replicator is stopped.
-13. Check that the purged airline is back in CBL database, and the purged airport is also back on SG.
+6. Purge an airline doc from `travel.airlines` on SG.
+7. Start the replicator with the same config as the step 3.
+8. Wait until the replicator is stopped.
+9. Check that the purged airline doc doesn't exist on SG.
+10. Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.
+11. Wait until the replicator is stopped.
+12. Check that the purged airline doc is pushed back to SG
+
+## test_reset_checkpoint_pull
+
+### Description
+
+Test that when the pull replicator starts with its checkpoint reset, the pull replication starts from the beginning again.
+
+### Steps
+
+1. Reset SG and load `travel` dataset.
+2. Reset local database, and load `travel` dataset.
+3. Start a replicator:
+   * endpoint: `/travel`
+   * collections : `travel.airports`
+   * type: pull
+   * continuos: false
+   * credentials: user1/pass
+4. Wait until the replicator is stopped.
+5. Check that all docs are replicated correctly.
+6. Purge an airport doc from `travel.airports` in the local database.
+7. Start the replicator with the same config as the step 3.
+8. Wait until the replicator is stopped.
+9. Check that the purged airport doc doesn't exist in CBL database.
+10. Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.
+11. Wait until the replicator is stopped.
+12. 12. Check that the purged airport doc is pulled back in CBL database.

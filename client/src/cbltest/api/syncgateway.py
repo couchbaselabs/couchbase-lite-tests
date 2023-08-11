@@ -292,3 +292,11 @@ class SyncGateway:
     async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "_default", collection: str = "_default") -> None:
         await self._send_request("delete", f"/{db_name}.{scope}.{collection}/{doc_id}",
                                  params={"rev": revid})
+        
+    async def purge_document(self, doc_id: str, db_name: str, scope: str = "_default", collection: str = "_default") -> None:
+        body = {
+            doc_id: ["*"]
+        }
+        
+        await self._send_request("post", f"/{db_name}.{scope}.{collection}/_purge", 
+                                 JSONDictionary(body))
