@@ -10,17 +10,17 @@ class LogLevel(Enum):
     VERBOSE = "verbose"
     DEBUG = "debug"
 
-_cbl_log = getLogger("CBL")
-_cbl_log.setLevel(DEBUG)
-basicConfig(format='%(created)f [%(levelname)s]: %(message)s',
-            filename="testserver.log", encoding="utf-8")
-
+file = FileHandler(filename="testserver.log", encoding="utf-8")
+file.setFormatter(Formatter('%(created)f [%(levelname)s]: %(message)s'))
 console = StreamHandler(stdout)
 console.setLevel(DEBUG)
-formatter = Formatter('%(asctime)s [%(levelname)s]: %(message)s')
-console.setFormatter(formatter)
-_cbl_log.addHandler(console)
+console.setFormatter(Formatter('%(asctime)s [%(levelname)s]: %(message)s'))
 
+
+_cbl_log = getLogger("CBL")
+_cbl_log.setLevel(DEBUG)
+_cbl_log.addHandler(file)
+_cbl_log.addHandler(console)
 _cbl_log.info(f"-- Python test client v{VERSION} started --\n")
 
 def cbl_setLogLevel(level: LogLevel):

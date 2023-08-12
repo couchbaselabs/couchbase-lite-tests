@@ -22,6 +22,6 @@ def pytest_addoption(parser) -> None:
     parser.addoption("--cbl-log-level", metavar="LEVEL", 
                     choices=["error", "warning", "info", "verbose", "debug"], 
                     help="The log level output for the test run",
-                    default="verbose")
+                    default="warning")
     parser.addoption("--test-props", metavar="PATH", help="The path to read extra test properties from")
     parser.addoption("--output", metavar="PATH", help="The path to write Greenboard results to")
