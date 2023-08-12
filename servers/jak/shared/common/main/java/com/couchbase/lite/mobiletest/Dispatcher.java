@@ -20,7 +20,6 @@ import androidx.annotation.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,7 +28,9 @@ import com.couchbase.lite.mobiletest.endpoints.CreateReplV1;
 import com.couchbase.lite.mobiletest.endpoints.GetAllDocsV1;
 import com.couchbase.lite.mobiletest.endpoints.GetReplStatusV1;
 import com.couchbase.lite.mobiletest.endpoints.ResetV1;
+import com.couchbase.lite.mobiletest.endpoints.SnapshotDocsV1;
 import com.couchbase.lite.mobiletest.endpoints.UpdateDbV1;
+import com.couchbase.lite.mobiletest.endpoints.VerifyDocsV1;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.tools.ReplyBuilder;
 import com.couchbase.lite.mobiletest.tools.RequestBuilder;
@@ -64,8 +65,8 @@ public final class Dispatcher {
             "/getReplicatorStatus",
             Method.POST,
             (r, m) -> new GetReplStatusV1(app.getReplSvc()).getReplStatus(r, m));
-        addEndpoint(1, "/snapshotDocuments", Method.POST, (r, m) -> Collections.emptyMap());
-        addEndpoint(1, "/verifyDocuments", Method.POST, (r, m) -> Collections.emptyMap());
+        addEndpoint(1, "/snapshotDocuments", Method.POST, (r, m) -> new SnapshotDocsV1(app.getDbSvc()).snapshot(r, m));
+        addEndpoint(1, "/verifyDocuments", Method.POST, (r, m) -> new VerifyDocsV1(app.getDbSvc()).verify(r, m));
     }
 
     // This method returns a Reply.  Be sure to close it!
