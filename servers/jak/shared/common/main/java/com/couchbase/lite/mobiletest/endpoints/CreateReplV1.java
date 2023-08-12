@@ -122,6 +122,7 @@ public class CreateReplV1 {
     private static final List<String> LEGAL_BASIC_AUTH_KEYS;
     static {
         final List<String> l = new ArrayList<>();
+        l.add(KEY_AUTH_TYPE);
         l.add(KEY_BASIC_AUTH_USER);
         l.add(KEY_BASIC_AUTH_PASSWORD);
         LEGAL_BASIC_AUTH_KEYS = Collections.unmodifiableList(l);
@@ -130,6 +131,7 @@ public class CreateReplV1 {
     private static final List<String> LEGAL_SESSION_AUTH_KEYS;
     static {
         final List<String> l = new ArrayList<>();
+        l.add(KEY_AUTH_TYPE);
         l.add(KEY_SESSION_AUTH_ID);
         l.add(KEY_SESSION_AUTH_COOKIE);
         LEGAL_SESSION_AUTH_KEYS = Collections.unmodifiableList(l);

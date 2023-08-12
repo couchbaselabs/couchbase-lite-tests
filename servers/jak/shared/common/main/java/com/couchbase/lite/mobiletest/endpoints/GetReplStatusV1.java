@@ -18,6 +18,7 @@ package com.couchbase.lite.mobiletest.endpoints;
 import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +53,17 @@ public class GetReplStatusV1 {
     private static final String KEY_REPL_PUSH = "isPush";
     private static final String KEY_REPL_FLAGS = "flags";
     private static final String KEY_REPL_ERROR = "error";
+
+    private static final EnumMap<DocumentFlag, String> DOC_FLAGS;
+    static {
+        final EnumMap<DocumentFlag, String> m = new EnumMap<>(DocumentFlag.class);
+        m.put(DocumentFlag.DELETED, "DELETED");
+        m.put(DocumentFlag.ACCESS_REMOVED, "ACCESSREMOVED");
+        DOC_FLAGS = m;
+    }
+
+
+
 
     @NonNull
     private final ReplicatorService replSvc;
@@ -108,7 +120,7 @@ public class GetReplStatusV1 {
                 docRepl.put(KEY_REPL_PUSH, replicatedDoc.isPush());
 
                 final List<String> flagList = new ArrayList<>();
-                for (DocumentFlag flag: replDoc.getFlags()) { flagList.add(flag.toString()); }
+                for (DocumentFlag flag: replDoc.getFlags()) { flagList.add(DOC_FLAGS.get(flag)); }
                 docRepl.put(KEY_REPL_FLAGS, flagList);
 
                 final CouchbaseLiteException err = replDoc.getError();

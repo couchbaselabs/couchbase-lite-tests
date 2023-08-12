@@ -3,7 +3,10 @@ package com.couchbase.lite.mobiletest;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -65,7 +68,7 @@ public class Server extends NanoHTTPD {
         dispatcher = app.getDispatcher();
     }
 
-    @SuppressWarnings("PMD.PreserveStackTrace")
+    @SuppressWarnings({"PMD.PreserveStackTrace", "PMD.CloseResource"})
     @SuppressFBWarnings("REC_CATCH_EXCEPTION")
     @NonNull
     @Override
@@ -95,15 +98,22 @@ public class Server extends NanoHTTPD {
 
             Log.i(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
 
+            InputStream req = session.getInputStream();
+
             // Special handling for the 'GET /' endpoint
             if ("/".equals(endpoint) && (Dispatcher.Method.GET.equals(method))) {
                 if (version < 0) { version = TestApp.LATEST_SUPPORTED_PROTOCOL_VERSION; }
                 if (client == null) { client = "anonymous"; }
+                // This is particularly annoying.
+                // GET really shouldn't have a req.... but we did agree at one time
+                // that all interactions between the client and the server would contain an object.
+                // !!! This needs a better solution.  GETs don't have requests.
+                req = new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8));
             }
             if (version < 0) { throw new ClientError("No protocol version specified"); }
             if (client == null) { throw new ClientError("No client specified"); }
 
-            reply = dispatcher.handleRequest(client, version, method, endpoint, session.getInputStream());
+            reply = dispatcher.handleRequest(client, version, method, endpoint, req);
             resp = new SafeResponse(Status.OK, reply);
         }
         catch (ClientError err) {
