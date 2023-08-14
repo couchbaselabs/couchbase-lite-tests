@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List
 import pytest
 from cbltest import CBLPyTest
+from cbltest.globals import CBLPyTestGlobal
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry, ReplicatorActivityLevel, WaitForDocumentEventEntry 
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
@@ -10,6 +11,11 @@ from cbltest.api.error_types import ErrorDomain
 from cbltest.api.test_functions import compare_local_and_remote
 
 class TestBasicReplication:
+    def setup_method(self, method):
+        # If writing a new test do not forget this step or the test server
+        # will not be informed about the currently running test
+        CBLPyTestGlobal.running_test_name = method.__name__
+
     @pytest.mark.asyncio
     async def test_replicate_non_existing_sg_collections(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         # 1. Reset SG and load `names` dataset
