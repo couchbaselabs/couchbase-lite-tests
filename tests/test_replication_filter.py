@@ -1,5 +1,6 @@
 from pathlib import Path
 from cbltest import CBLPyTest
+from cbltest.globals import CBLPyTestGlobal
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import ReplicatorCollectionEntry, ReplicatorBasicAuthenticator, ReplicatorType, ReplicatorActivityLevel
 import pytest
@@ -7,6 +8,11 @@ import pytest
 from cbltest.api.cloud import CouchbaseCloud
 
 class TestReplicationFilter:
+    def setup_method(self, method):
+        # If writing a new test do not forget this step or the test server
+        # will not be informed about the currently running test
+        CBLPyTestGlobal.running_test_name = method.__name__
+
     @pytest.mark.asyncio
     async def test_push_document_ids_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         # 1. Reset SG and load `travel` dataset.

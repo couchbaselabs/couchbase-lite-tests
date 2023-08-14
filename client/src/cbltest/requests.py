@@ -17,6 +17,7 @@ from .version import available_api_version
 from .httplog import get_next_writer
 from .api.jsonserializable import JSONSerializable
 from .api.error import CblTestError, CblTestServerBadResponseError
+from .globals import CBLPyTestGlobal
 
 class TestServerRequestType(Enum):
     ROOT = "GetRootRequest"
@@ -68,6 +69,7 @@ class TestServerRequest:
         self.__payload = payload
         self.__http_name = http_name
         self.__method = method
+        self.__test_name = CBLPyTestGlobal.running_test_name
     
     def _http_name(self) -> str:
         return f"v1 {self.__method.capitalize()} /{self.__http_name}"
@@ -99,6 +101,9 @@ class TestServerRequest:
         if self.__version > 0:
             headers["CBLTest-API-Version"] = str(self.__version)
             headers["CBLTest-Client-ID"] = str(self.__uuid)
+
+        if self.__test_name is not None:
+            headers["CBLTest-Test-Name"] = self.__test_name
         
         data: str | None = None
         if self.__payload is not None:
@@ -131,7 +136,8 @@ class TestServerRequest:
         return ret_val
     
     def __str__(self) -> str:
-        return f"-> {self.__uuid} v{self.__version} {self.__method.upper()} /{self.__http_name}"
+        test_name = self.__test_name if self.__test_name is not None else "(test name not set!)"
+        return f"{test_name}\n-> {self.__uuid} v{self.__version} {self.__method.upper()} /{self.__http_name}"
 
 # Only this request is not versioned
 class GetRootRequest(TestServerRequest):
