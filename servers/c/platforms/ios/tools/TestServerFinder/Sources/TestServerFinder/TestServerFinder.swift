@@ -8,7 +8,7 @@ public struct TestServerFinder {
     let queue = DispatchQueue(label: "TestServerFinderQueue", target: .global())
        
     init() {
-        browser = NWBrowser(for: .bonjour(type: "_TestServerIPAddress._tcp", domain: nil), using: NWParameters())
+        browser = NWBrowser(for: .bonjour(type: "_testserver._tcp", domain: nil), using: NWParameters())
     }
     
     enum BrowsingError: Error {
@@ -17,7 +17,7 @@ public struct TestServerFinder {
     
     func start(timeout: TimeInterval = 30) async throws -> String {
         return try await withCheckedThrowingContinuation { cont in
-            var result: (String?, Error?)
+            var result: String?
             
             let timeoutTask = Task {
                 try await Task.sleep(nanoseconds: UInt64(timeout) * NSEC_PER_SEC)
@@ -31,10 +31,8 @@ public struct TestServerFinder {
                     cont.resume(throwing: error)
                 case .cancelled:
                     timeoutTask.cancel()
-                    if let result = result.0 {
-                        cont.resume(returning: result)
-                    } else if let err = result.1 {
-                        cont.resume(throwing: err)
+                    if let r = result {
+                        cont.resume(returning: r)
                     } else {
                         cont.resume(throwing: BrowsingError.Timeout)
                     }
@@ -46,18 +44,9 @@ public struct TestServerFinder {
             browser.browseResultsChangedHandler = { results, changes in
                 for change in changes {
                     switch change {
-                    case .added(let res):
-                        let params = NWParameters(tls: nil, tcp: NWProtocolTCP.Options())
-                        let connection = NWConnection(to: res.endpoint, using: params)
-                        connection.start(queue: self.queue)
-                        
-                        connection.receive(minimumIncompleteLength: 1, maximumLength: Int.max) {
-                            content, contentContext, isComplete, error in
-                            if let data = content {
-                                result = (String(data: data, encoding: .utf8), nil)
-                            } else if let err = error {
-                                result = (nil, err)
-                            }
+                    case .added(let r):
+                        if case .service(let name, _, _, _) = r.endpoint {
+                            result = name
                             browser.cancel()
                         }
                     default:
