@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.endpoints;
+package com.couchbase.lite.mobiletest.endpoints.v1;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -40,19 +40,17 @@ import com.couchbase.lite.ReplicatorConfiguration;
 import com.couchbase.lite.ReplicatorType;
 import com.couchbase.lite.SessionAuthenticator;
 import com.couchbase.lite.URLEndpoint;
-import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.TestApp;
+import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.data.TypedList;
 import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.ClientError;
-import com.couchbase.lite.mobiletest.services.DeletedDocFilter;
-import com.couchbase.lite.mobiletest.services.DocIdFilter;
+import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
-import com.couchbase.lite.mobiletest.tools.CollectionsBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
-public class CreateReplV1 {
+public class CreateRepl {
     private static final String TAG = "CREATE_REPL_V1";
 
     private static final String KEY_REPL_ID = "id";
@@ -138,26 +136,31 @@ public class CreateReplV1 {
     }
 
     @NonNull
+    private final DatabaseService dbSvc;
+    @NonNull
     private final ReplicatorService replSvc;
 
-    public CreateReplV1(@NonNull ReplicatorService replSvc) { this.replSvc = replSvc; }
+    public CreateRepl(@NonNull DatabaseService dbSvc, @NonNull ReplicatorService replSvc) {
+        this.dbSvc = dbSvc;
+        this.replSvc = replSvc;
+    }
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @NonNull
-    public Map<String, Object> createRepl(@NonNull TypedMap req, @NonNull Memory mem) {
+    public Map<String, Object> createRepl(@NonNull TypedMap req, @NonNull TestContext ctxt) {
         req.validate(LEGAL_KEYS);
 
         final TypedMap config = req.getMap(KEY_CONFIG);
         if (config == null) { throw new ClientError("No replicator configuration specified"); }
         config.validate(LEGAL_CONFIG_KEYS);
 
-        final ReplicatorConfiguration replConfig = buildConfig(config, mem);
+        final ReplicatorConfiguration replConfig = buildConfig(config, ctxt);
         final Replicator repl = new Replicator(replConfig);
-        final String replId = replSvc.addRepl(mem, repl);
+        final String replId = replSvc.addRepl(ctxt, repl);
 
         final Boolean enableListener = config.getBoolean(KEY_ENABLE_DOC_LISTENER);
         if ((enableListener != null) && enableListener) {
-            replSvc.addDocListener(mem, replId, repl);
+            replSvc.addDocListener(ctxt, replId, repl);
             Log.i(TAG, "Added doc listener: " + replId);
         }
 
@@ -172,7 +175,7 @@ public class CreateReplV1 {
 
     @SuppressWarnings({"deprecation", "PMD.NPathComplexity"})
     @NonNull
-    public ReplicatorConfiguration buildConfig(@NonNull TypedMap config, @NonNull Memory mem) {
+    public ReplicatorConfiguration buildConfig(@NonNull TypedMap config, @NonNull TestContext ctxt) {
         final String uri = config.getString(KEY_ENDPOINT);
         if (uri == null) { throw new ClientError("Replicator configuration doesn't specify an endpoint"); }
 
@@ -190,13 +193,13 @@ public class CreateReplV1 {
             throw new ClientError("Replicator configuration doesn't specify a list of collections");
         }
 
-        final Database db = TestApp.getApp().getDbSvc().getOpenDb(dbName, mem);
+        final Database db = TestApp.getApp().getDbSvc().getOpenDb(ctxt, dbName);
 
         final ReplicatorConfiguration replConfig;
         if (collections.isEmpty()) { replConfig = new ReplicatorConfiguration(db, endpoint); }
         else {
             replConfig = new ReplicatorConfiguration(endpoint);
-            addCollections(db, collections, replConfig);
+            addCollections(db, collections, replConfig, ctxt);
         }
 
         final String replType = config.getString(KEY_TYPE);
@@ -243,15 +246,19 @@ public class CreateReplV1 {
     private void addCollections(
         @NonNull Database db,
         @NonNull TypedList spec,
-        @NonNull ReplicatorConfiguration replConfig) {
+        @NonNull ReplicatorConfiguration replConfig,
+        @NonNull TestContext ctxt
+    ) {
         for (int i = 0; i < spec.size(); i++) {
             final TypedMap replCollection = spec.getMap(i);
             if (replCollection == null) { throw new ClientError("Replication collection spec is null: " + i); }
             replCollection.validate(LEGAL_COLLECTION_KEYS);
 
-            // the collections created here will not get closed explicitly...
+            final TypedList collectionFqns = replCollection.getList(KEY_NAMES);
+            if (collectionFqns == null) { throw new ClientError("no collections specified"); }
+
             replConfig.addCollections(
-                new CollectionsBuilder(replCollection.getList(KEY_NAMES), db).getCollections(),
+                dbSvc.getCollections(db, collectionFqns, ctxt),
                 buildCollectionConfig(replCollection));
         }
     }
@@ -319,7 +326,7 @@ public class CreateReplV1 {
             case FILTER_DOC_ID:
                 return buildDocIdFilter(spec);
             case FILTER_DELETED:
-                return new DeletedDocFilter();
+                return replSvc.getDeletedDocFilter();
             default:
                 throw new ClientError("Unrecognized filter name");
         }
@@ -342,6 +349,6 @@ public class CreateReplV1 {
             for (int i = 0; i < n; i++) { permitted.add(collection + "." + collectionDocs.getString(i)); }
         }
 
-        return new DocIdFilter(permitted);
+        return replSvc.getDocIdFilter(permitted);
     }
 }

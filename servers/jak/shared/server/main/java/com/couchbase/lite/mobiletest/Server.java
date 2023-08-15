@@ -3,12 +3,7 @@ package com.couchbase.lite.mobiletest;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -47,29 +42,21 @@ public class Server extends NanoHTTPD {
         }
     }
 
-    private static final Map<Method, Dispatcher.Method> METHODS;
-    static {
-        final Map<Method, Dispatcher.Method> m = new HashMap<>();
-        m.put(Method.GET, Dispatcher.Method.GET);
-        m.put(Method.PUT, Dispatcher.Method.PUT);
-        m.put(Method.POST, Dispatcher.Method.POST);
-        m.put(Method.DELETE, Dispatcher.Method.DELETE);
-        METHODS = Collections.unmodifiableMap(m);
-    }
-
 
     private final String appId;
-    private final Dispatcher dispatcher;
+    private final GetDispatcher getDispatcher;
+    private final PostDispatcher postDispatcher;
 
     public Server() {
         super(PORT);
         final TestApp app = TestApp.getApp();
         appId = app.getAppId();
-        dispatcher = app.getDispatcher();
+        getDispatcher = new GetDispatcher(app);
+        postDispatcher = new PostDispatcher(app);
     }
 
     @SuppressWarnings({"PMD.PreserveStackTrace", "PMD.CloseResource"})
-    @SuppressFBWarnings("REC_CATCH_EXCEPTION")
+    @SuppressFBWarnings("NP_LOAD_OF_KNOWN_NULL_VALUE")
     @NonNull
     @Override
     public Response handle(@NonNull IHTTPSession session) {
@@ -88,32 +75,26 @@ public class Server extends NanoHTTPD {
                 catch (NumberFormatException ignore) { }
             }
 
-            final Dispatcher.Method method = METHODS.get(session.getMethod());
-            if (method == null) { throw new ClientError("Unimplemented method: " + session.getMethod()); }
+            final Method method = session.getMethod();
+            if (method == null) { throw new ClientError("Unimplemented method: " + method); }
 
             final String endpoint = session.getUri();
             if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }
 
-            String client = headers.get(TestApp.HEADER_CLIENT);
+            final String client = headers.get(TestApp.HEADER_CLIENT);
 
             Log.i(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
-
-            InputStream req = session.getInputStream();
-
-            // Special handling for the 'GET /' endpoint
-            if ("/".equals(endpoint) && (Dispatcher.Method.GET.equals(method))) {
-                if (version < 0) { version = TestApp.LATEST_SUPPORTED_PROTOCOL_VERSION; }
-                if (client == null) { client = "anonymous"; }
-                // This is particularly annoying.
-                // GET really shouldn't have a req.... but we did agree at one time
-                // that all interactions between the client and the server would contain an object.
-                // !!! This needs a better solution.  GETs don't have requests.
-                req = new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8));
+            switch (method) {
+                case GET:
+                    reply = getDispatcher.handleRequest(client, version, endpoint);
+                    break;
+                case POST:
+                    reply = postDispatcher.handleRequest(client, version, endpoint, session.getInputStream());
+                    break;
+                default:
+                    throw new ClientError("Unimplemented method: " + method);
             }
-            if (version < 0) { throw new ClientError("No protocol version specified"); }
-            if (client == null) { throw new ClientError("No client specified"); }
 
-            reply = dispatcher.handleRequest(client, version, method, endpoint, req);
             resp = new SafeResponse(Status.OK, reply);
         }
         catch (ClientError err) {

@@ -83,12 +83,10 @@ public abstract class TestApp {
     }
 
 
-    private final Map<String, Memory> symTabs = new HashMap<>();
+    private final Map<String, TestContext> testContexts = new HashMap<>();
 
     private final AtomicReference<DatabaseService> dbSvc = new AtomicReference<>();
     private final AtomicReference<ReplicatorService> replSvc = new AtomicReference<>();
-
-    private Dispatcher dispatcher;
 
     protected abstract void initCBL();
 
@@ -130,11 +128,6 @@ public abstract class TestApp {
         return "Test Server (" + getPlatform() + ") :: " + CBLVersion.getVersionInfo();
     }
 
-    // The dispatcher is down here because it probably takes it a while to initialize.
-    // Do it early, before showing the UI...
-    @NonNull
-    public final Dispatcher getDispatcher() { return dispatcher; }
-
     @NonNull
     public final List<Certificate> getAuthenticatorCertsList() throws CertificateException, IOException {
         final CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
@@ -148,20 +141,20 @@ public abstract class TestApp {
     }
 
     @NonNull
-    public final Memory getMemory(@NonNull String client) {
-        Memory mem = symTabs.get(client);
-        if (mem != null) { return mem; }
+    public final TestContext getTestContext(@NonNull String client) {
+        TestContext ctxt = testContexts.get(client);
+        if (ctxt != null) { return ctxt; }
 
-        mem = new Memory(client);
-        symTabs.put(client, mem);
+        ctxt = new TestContext(client);
+        testContexts.put(client, ctxt);
 
-        return mem;
+        return ctxt;
     }
 
     @NonNull
-    public final Memory clearMemory(@NonNull String client) {
-        symTabs.remove(client);
-        return getMemory(client);
+    public final TestContext resetContext(@NonNull String client) {
+        testContexts.remove(client);
+        return getTestContext(client);
     }
 
     @NonNull
@@ -208,10 +201,5 @@ public abstract class TestApp {
 
         Database.log.getConsole().setLevel(LogLevel.DEBUG);
         Database.log.getConsole().setDomains(LogDomain.ALL_DOMAINS);
-
-        // The dispatcher is down here because it probably takes it a while to initialize.
-        // Do it early, before showing the UI...
-        dispatcher = new Dispatcher(this);
-        dispatcher.init();
     }
 }

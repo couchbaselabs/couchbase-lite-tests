@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.endpoints;
+package com.couchbase.lite.mobiletest.endpoints.v1;
 
 import androidx.annotation.NonNull;
 
@@ -30,7 +30,7 @@ import com.couchbase.lite.ReplicatedDocument;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.ReplicatorProgress;
 import com.couchbase.lite.ReplicatorStatus;
-import com.couchbase.lite.mobiletest.Memory;
+import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
@@ -39,7 +39,7 @@ import com.couchbase.lite.mobiletest.tools.ErrorBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
-public class GetReplStatusV1 {
+public class GetReplStatus {
     private static final String TAG = "REPL_STATUS_V1";
 
     private static final String KEY_REPL_ID = "id";
@@ -63,20 +63,18 @@ public class GetReplStatusV1 {
     }
 
 
-
-
     @NonNull
     private final ReplicatorService replSvc;
 
-    public GetReplStatusV1(@NonNull ReplicatorService replSvc) { this.replSvc = replSvc; }
+    public GetReplStatus(@NonNull ReplicatorService replSvc) { this.replSvc = replSvc; }
 
     @NonNull
-    public Map<String, Object> getReplStatus(@NonNull TypedMap req, @NonNull Memory mem) {
-        final String id = req.getString(KEY_REPL_ID);
-        if (id == null) { throw new ClientError("Replicator id not specified"); }
+    public Map<String, Object> getReplStatus(@NonNull TypedMap req, @NonNull TestContext ctxt) {
+        final String replId = req.getString(KEY_REPL_ID);
+        if (replId == null) { throw new ClientError("Replicator id not specified"); }
 
-        final Replicator repl = replSvc.getRepl(mem, id);
-        if (repl == null) { throw new ClientError("No such replicator: " + id); }
+        final Replicator repl = replSvc.getRepl(ctxt, replId);
+        if (repl == null) { throw new ClientError("No such replicator: " + replId); }
 
         final ReplicatorStatus replStatus = repl.getStatus();
         Log.i(TAG, "Replicator status: " + replStatus);
@@ -84,7 +82,7 @@ public class GetReplStatusV1 {
         final Map<String, Object> resp = new HashMap<>();
         buildStatus(resp, replStatus);
 
-        final List<DocumentReplication> docs = replSvc.getReplicatedDocs(mem, id);
+        final List<DocumentReplication> docs = replSvc.getReplicatedDocs(ctxt, replId);
         if (docs != null) {
             final List<Map<String, Object>> docRepls = getReplicatedDocs(docs);
             if (!docRepls.isEmpty()) { resp.put(KEY_REPL_DOCS, docRepls); }

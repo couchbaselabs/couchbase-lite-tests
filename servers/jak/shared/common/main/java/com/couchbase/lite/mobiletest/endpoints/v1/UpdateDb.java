@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.endpoints;
+package com.couchbase.lite.mobiletest.endpoints.v1;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -29,7 +29,7 @@ import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.MutableDocument;
-import com.couchbase.lite.mobiletest.Memory;
+import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.data.KeypathParser;
 import com.couchbase.lite.mobiletest.data.TypedList;
 import com.couchbase.lite.mobiletest.data.TypedMap;
@@ -39,7 +39,7 @@ import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 
 
-public class UpdateDbV1 {
+public class UpdateDb {
     private static final String KEY_TYPE = "type";
     private static final String TYPE_UPDATE = "update";
     private static final String TYPE_DELETE = "delete";
@@ -75,16 +75,19 @@ public class UpdateDbV1 {
     @NonNull
     private final DatabaseService dbSvc;
 
-    public UpdateDbV1(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
+    public UpdateDb(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
 
     @NonNull
-    public Map<String, Object> updateDb(@NonNull TypedMap req, @NonNull Memory mem) {
+    public Map<String, Object> updateDb(@NonNull TypedMap req, @NonNull TestContext ctxt) {
         req.validate(LEGAL_UPDATES_KEYS);
 
         final TypedList updates = req.getList(KEY_UPDATES);
         if (updates == null) { throw new ClientError("Database update request has no updates"); }
 
-        final Database db = dbSvc.getNamedDb(req, mem);
+        final String dbName = req.getString(KEY_DATABASE);
+        if (dbName == null) { throw new ClientError("All Docs request doesn't specify a database"); }
+
+        final Database db = dbSvc.getOpenDb(ctxt, dbName);
         final int n = updates.size();
         for (int i = 0; i < n; i++) {
             final TypedMap update = updates.getMap(i);
@@ -94,13 +97,10 @@ public class UpdateDbV1 {
             final String collectionName = update.getString(KEY_COLLECTION);
             if (collectionName == null) { throw new ClientError("Database update request is missing collection name"); }
 
-            final Collection collection = dbSvc.getCollection(db, collectionName);
-            if (collection == null) {
-                throw new ClientError("Failed retrieving collection" + collectionName + " from db " + db.getName());
-            }
-
             final String id = update.getString(KEY_DOC_ID);
             if (id == null) { throw new ClientError("Database update request is missing a document id"); }
+
+            final Collection collection = dbSvc.getCollection(db, collectionName, ctxt);
 
             final Document doc;
             try { doc = collection.getDocument(id); }

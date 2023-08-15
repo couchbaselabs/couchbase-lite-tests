@@ -16,26 +16,23 @@
 package com.couchbase.lite.mobiletest.services;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import java.util.Set;
 
 import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.DatabaseConfiguration;
 import com.couchbase.lite.internal.core.C4Database;
-import com.couchbase.lite.mobiletest.Memory;
 import com.couchbase.lite.mobiletest.TestApp;
+import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.data.TypedList;
 import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
@@ -49,14 +46,10 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 public final class DatabaseService {
     private static final String TAG = "DB_SVC";
 
-    private static final String SYM_OPEN_DBS = "~OPEN_DBS";
-    private static final String SYM_DB_DIR = "~DB_DIR";
-
     private static final String ZIP_EXTENSION = ".zip";
     private static final String DB_EXTENSION = C4Database.DB_EXTENSION;
 
     private static final String KEY_DATASETS = "datasets";
-    private static final String KEY_DATABASE = "database";
 
     private static final List<String> LEGAL_DATASET_KEYS;
     static {
@@ -67,32 +60,7 @@ public final class DatabaseService {
     // Instance methods
 
 
-    public void reset(@NonNull Memory mem) {
-        final File dbDir = mem.remove(SYM_DB_DIR, File.class);
-        if (dbDir == null) { return; }
-
-        final Map<?, ?> dbs = mem.remove(SYM_OPEN_DBS, Map.class);
-        if ((dbs == null) || dbs.isEmpty()) { return; }
-        final TypedMap openDbs = new TypedMap(dbs);
-
-        for (String key: openDbs.getKeys()) {
-            final Database db = openDbs.get(key, Database.class);
-            if (db == null) {
-                Log.w(TAG, "Attempt to close non-existent database: " + key);
-                continue;
-            }
-
-            final String dbName = db.getName();
-            try { db.close(); }
-            catch (CouchbaseLiteException e) {
-                throw new CblApiFailure("Failed closing database: " + dbName + " in " + dbDir, e);
-            }
-        }
-
-        if (!new FileUtils().deleteRecursive(dbDir)) { Log.w(TAG, "failed deleting db dir on reset: " + dbDir); }
-    }
-
-    public void init(TypedMap req, Memory mem) {
+    public void init(TypedMap req, TestContext ctxt) {
         final TestApp app = TestApp.getApp();
 
         final String testDir = "tests_" + StringUtils.randomString(6);
@@ -100,7 +68,7 @@ public final class DatabaseService {
         if (!dbDir.mkdirs() || !dbDir.canWrite()) {
             throw new ServerError("Could not create db dir on init: " + dbDir);
         }
-        mem.put(SYM_DB_DIR, dbDir);
+        ctxt.setDbDir(dbDir);
 
         req.validate(LEGAL_DATASET_KEYS);
         final TypedMap datasets = req.getMap(KEY_DATASETS);
@@ -115,50 +83,61 @@ public final class DatabaseService {
                 if (dbName == null) {
                     throw new ClientError("Empty target databases in dataset " + dataset + " in init");
                 }
-                installDataset(dataset, dbName, mem);
+                installDataset(dataset, dbName, ctxt);
             }
         }
     }
 
     @NonNull
-    public Database getOpenDb(@NonNull String name, @NonNull Memory mem) {
-        final TypedMap openDbs = mem.getMap(SYM_OPEN_DBS);
-        if (openDbs == null) { throw new ClientError("There are no open databases"); }
-        final Database db = openDbs.get(name, Database.class);
-        if (db == null) { throw new ClientError("Database not open: " + name); }
+    public Database getOpenDb(@NonNull TestContext ctxt, @NonNull String dbName) {
+        final Database db = ctxt.getDb(dbName);
+        if (db == null) { throw new ClientError("Database not open: " + dbName); }
         return db;
     }
 
-    public void closeDb(@NonNull String name, @NonNull Memory mem) {
-        if (closeDbInternal(name, mem)) { return; }
+    public void closeDb(@NonNull String name, @NonNull TestContext ctxt) {
+        if (closeDbInternal(name, ctxt)) { return; }
         Log.w(TAG, "Attempt to close a database that is not open: " + name);
     }
 
-    @Nullable
-    public Collection getCollection(@NonNull Database db, @NonNull String collectionFullName) {
-        final String[] collName = collectionFullName.split("\\.");
-        if ((collName.length != 2) || collName[0].isEmpty() || collName[1].isEmpty()) {
-            throw new ClientError("Cannot parse collection name: " + collectionFullName);
+    @NonNull
+    public Set<Collection> getCollections(
+        @NonNull Database db,
+        @NonNull TypedList collFqns,
+        @NonNull TestContext ctxt) {
+        final Set<Collection> collections = new HashSet<>();
+        for (int j = 0; j < collFqns.size(); j++) {
+            final String collFqn = collFqns.getString(j);
+            if (collFqn == null) { throw new ClientError("Empty collection name (" + j + ")"); }
+            collections.add(getCollection(db, collFqn, ctxt));
         }
-
-        try { return db.getCollection(collName[1], collName[0]); }
-        catch (CouchbaseLiteException e) {
-            throw new CblApiFailure("Failed retrieving collection: " + collectionFullName, e);
-        }
+        return collections;
     }
 
     @NonNull
-    public Database getNamedDb(@NonNull TypedMap req, @NonNull Memory mem) {
-        final String dbName = req.getString(KEY_DATABASE);
-        if (dbName == null) { throw new ClientError("All Docs request doesn't specify a database"); }
-        return getOpenDb(dbName, mem);
+    public Collection getCollection(@NonNull Database db, @NonNull String collFqn, @NonNull TestContext ctxt) {
+        final String[] collName = collFqn.split("\\.");
+        if ((collName.length != 2) || collName[0].isEmpty() || collName[1].isEmpty()) {
+            throw new ClientError("Cannot parse collection name: " + collFqn);
+        }
+
+        final Collection collection;
+        try { collection = db.getCollection(collName[1], collName[0]); }
+        catch (CouchbaseLiteException e) {
+            throw new CblApiFailure("Failed retrieving collection: " + collFqn + " from db " + db.getName(), e);
+        }
+        if (collection == null) {
+            throw new ClientError("Database " + db.getName() + " does not contain collection " + collFqn);
+        }
+
+        ctxt.addOpenCollection(collection);
+
+        return collection;
     }
 
     // New stream constructors are supported only in API 26+
-    @SuppressWarnings("ConstantConditions")
-    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
-    private void installDataset(@NonNull String datasetName, @NonNull String dbName, @NonNull Memory mem) {
-        final File dbDir = mem.get(SYM_DB_DIR, File.class);
+    private void installDataset(@NonNull String datasetName, @NonNull String dbName, @NonNull TestContext ctxt) {
+        final File dbDir = ctxt.getDbDir();
         if (dbDir == null) { throw new ServerError("Cannot find test directory on install dataset"); }
 
         final String dbFullName = datasetName + DB_EXTENSION;
@@ -172,7 +151,10 @@ public final class DatabaseService {
         }
         if (!unzipDir.mkdirs()) { throw new ServerError("Failed creating unzip tmp directory"); }
 
-        try (InputStream in = TestApp.getApp().getAsset(dbFullName + ZIP_EXTENSION)) { fileUtils.unzip(in, unzipDir); }
+        try (InputStream in = TestApp.getApp().getAsset(dbFullName + ZIP_EXTENSION)) {
+            if (in == null) { throw new ServerError("Can't open resource " + dbFullName + ZIP_EXTENSION); }
+            fileUtils.unzip(in, unzipDir);
+        }
         catch (IOException e) { throw new ServerError("Failed unzipping dataset: " + datasetName, e); }
 
         try {
@@ -185,42 +167,33 @@ public final class DatabaseService {
             throw new CblApiFailure("Failed copying dataset: " + datasetName + " to " + dbName, e);
         }
 
-        openDb(dbName, mem);
+        openDb(dbName, ctxt);
     }
 
-    @SuppressWarnings("ConstantConditions")
-    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
-    private void openDb(@NonNull String name, @NonNull Memory mem) {
-        TypedMap openDbs = mem.getMap(SYM_OPEN_DBS);
-        if ((openDbs != null) && (openDbs.get(name, Database.class) != null)) { return; }
+    private void openDb(@NonNull String name, @NonNull TestContext ctxt) {
+        Database db = ctxt.getDb(name);
+        if (db != null) { return; }
 
-        mem.put(SYM_OPEN_DBS, new HashMap<>());
-        openDbs = mem.getMap(SYM_OPEN_DBS);
-
-        final File dbDir = mem.get(SYM_DB_DIR, File.class);
+        final File dbDir = ctxt.getDbDir();
         if (dbDir == null) { throw new ServerError("Cannot find test directory for open"); }
 
-        final Database db;
         final DatabaseConfiguration dbConfig = new DatabaseConfiguration().setDirectory(dbDir.getPath());
         try { db = new Database(name, dbConfig); }
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed opening database: " + name, e); }
 
-        openDbs.put(name, db);
+        ctxt.addDb(name, db);
         Log.i(TAG, "Created database: " + name);
     }
 
-    private boolean closeDbInternal(@NonNull String name, @NonNull Memory mem) {
-        final TypedMap openDbs = mem.getMap(SYM_OPEN_DBS);
-        if (openDbs != null) {
-            final Database db = openDbs.remove(name, Database.class);
-            if (db != null) {
-                try {
-                    db.close();
-                    return true;
-                }
-                catch (CouchbaseLiteException e) {
-                    throw new CblApiFailure("Failed closing database: " + name, e);
-                }
+    private boolean closeDbInternal(@NonNull String name, @NonNull TestContext ctxt) {
+        final Database db = ctxt.removeDb(name);
+        if (db != null) {
+            try {
+                db.close();
+                return true;
+            }
+            catch (CouchbaseLiteException e) {
+                throw new CblApiFailure("Failed closing database: " + name, e);
             }
         }
 

@@ -13,27 +13,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.endpoints;
+package com.couchbase.lite.mobiletest.endpoints.v1;
 
 import androidx.annotation.NonNull;
 
+import java.util.Collections;
 import java.util.Map;
 
-import com.couchbase.lite.mobiletest.Memory;
+import com.couchbase.lite.mobiletest.TestApp;
+import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.data.TypedMap;
-import com.couchbase.lite.mobiletest.errors.ServerError;
-import com.couchbase.lite.mobiletest.services.DatabaseService;
 
 
-@SuppressWarnings({"PMD.UnusedPrivateField", "PMD.SingularField"})
-public class VerifyDocsV1 {
+public class Reset {
     @NonNull
-    private final DatabaseService dbSvc;
+    private final TestApp app;
 
-    public VerifyDocsV1(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
+    public Reset(@NonNull TestApp app) { this.app = app; }
 
     @NonNull
-    public Map<String, Object> verify(@NonNull TypedMap req, @NonNull Memory mem) {
-        throw new ServerError("Verify docs not yet implemented");
+    public final Map<String, Object> reset(@NonNull TypedMap req, @NonNull TestContext ctxt) {
+        final String client = ctxt.getClient();
+
+        app.clearReplSvc();
+        app.clearDbSvc();
+        ctxt.close();
+
+        final TestContext newCtxt = app.resetContext(client);
+        app.getDbSvc().init(req, newCtxt);
+        app.getReplSvc().init(req, newCtxt);
+
+        return Collections.emptyMap();
     }
 }
+
