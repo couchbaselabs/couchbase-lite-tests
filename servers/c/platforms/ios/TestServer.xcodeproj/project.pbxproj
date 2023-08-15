@@ -159,7 +159,7 @@
 		40348C602A8B0144002DA787 /* zip_source_window.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348BDF2A8B0143002DA787 /* zip_source_window.c */; };
 		40348C612A8B0144002DA787 /* zip_source_write.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348BE02A8B0143002DA787 /* zip_source_write.c */; };
 		40348C632A8B0255002DA787 /* zip_crypto_commoncrypto.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348BB52A8B0142002DA787 /* zip_crypto_commoncrypto.c */; };
-		40348C662A8B02BF002DA787 /* IPAddressServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40348C652A8B02BF002DA787 /* IPAddressServer.swift */; };
+		406CE9E62A8C02C8003ACFBB /* IPAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 406CE9E52A8C02C8003ACFBB /* IPAddress.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -387,7 +387,7 @@
 		40348BE02A8B0143002DA787 /* zip_source_write.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_source_write.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_source_write.c"; sourceTree = SOURCE_ROOT; };
 		40348BE12A8B0143002DA787 /* zip_crypto_gnutls.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_crypto_gnutls.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_crypto_gnutls.c"; sourceTree = SOURCE_ROOT; };
 		40348BE22A8B0143002DA787 /* compat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = compat.h; path = "vendor/cmake/_deps/libzip-src/lib/compat.h"; sourceTree = SOURCE_ROOT; };
-		40348C652A8B02BF002DA787 /* IPAddressServer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IPAddressServer.swift; sourceTree = "<group>"; };
+		406CE9E52A8C02C8003ACFBB /* IPAddress.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IPAddress.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -422,11 +422,11 @@
 		40348A6D2A8AF842002DA787 /* TestServer */ = {
 			isa = PBXGroup;
 			children = (
-				40348C642A8B029D002DA787 /* support */,
+				40348A872A8AFA8C002DA787 /* xcconfigs */,
+				406CE9E42A8C02C8003ACFBB /* support */,
 				40348AF82A8AFEA7002DA787 /* shared */,
 				40348A932A8AFCA1002DA787 /* bridge */,
 				40348A8A2A8AFBEB002DA787 /* vendor */,
-				40348A872A8AFA8C002DA787 /* xcconfigs */,
 				40348A6E2A8AF842002DA787 /* AppDelegate.swift */,
 				40348A702A8AF842002DA787 /* SceneDelegate.swift */,
 				40348A722A8AF842002DA787 /* ViewController.swift */,
@@ -723,10 +723,10 @@
 			name = libzip;
 			sourceTree = "<group>";
 		};
-		40348C642A8B029D002DA787 /* support */ = {
+		406CE9E42A8C02C8003ACFBB /* support */ = {
 			isa = PBXGroup;
 			children = (
-				40348C652A8B02BF002DA787 /* IPAddressServer.swift */,
+				406CE9E52A8C02C8003ACFBB /* IPAddress.swift */,
 			);
 			path = support;
 			sourceTree = "<group>";
@@ -883,7 +883,7 @@
 				40348B382A8AFEA7002DA787 /* PostGetReplicatorStatus.cpp in Sources */,
 				40348C502A8B0144002DA787 /* zip_source_call.c in Sources */,
 				40348C312A8B0144002DA787 /* zip_file_set_comment.c in Sources */,
-				40348C662A8B02BF002DA787 /* IPAddressServer.swift in Sources */,
+				406CE9E62A8C02C8003ACFBB /* IPAddress.swift in Sources */,
 				40348BE52A8B0143002DA787 /* zip_source_seek.c in Sources */,
 				40348C332A8B0144002DA787 /* zip_source_remove.c in Sources */,
 				40348C2D2A8B0144002DA787 /* zip_extra_field_api.c in Sources */,

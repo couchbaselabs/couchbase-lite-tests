@@ -8,8 +8,14 @@ using namespace ts;
     TestServer *_server;
 }
 
-+ (void)initialize {
-    TestServer::init();
++ (instancetype)shared {
+    static TSTestServer *instance;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        TestServer::init();
+        instance = [[self alloc] init];
+    });
+    return instance;
 }
 
 - (instancetype)init {
