@@ -136,8 +136,8 @@ class TestServerRequest:
         return ret_val
     
     def __str__(self) -> str:
-        test_name = self.__test_name if self.__test_name is not None else "(test name not set!)"
-        return f"{test_name}\n-> {self.__uuid} v{self.__version} {self.__method.upper()} /{self.__http_name}"
+        test_name = self.__test_name if self.__test_name is not None else "test name not set!"
+        return f"({test_name}) -> {self.__uuid} v{self.__version} {self.__method.upper()} /{self.__http_name}"
 
 # Only this request is not versioned
 class GetRootRequest(TestServerRequest):

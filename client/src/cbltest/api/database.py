@@ -10,8 +10,7 @@ from cbltest.v1.requests import (DatabaseUpdateEntry, DatabaseUpdateType, PostGe
                                  PostVerifyDocumentsRequestBody)
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory
-from cbltest.api.syncgateway import AllDocumentsResponseRow
-from cbltest.api.replicator_types import ReplicatorType
+from cbltest.api.error import CblTestError
 
 class SnapshotUpdater:
     def __init__(self, id: str):
@@ -38,6 +37,7 @@ class SnapshotUpdater:
 
     def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None, 
                         removed_properties: Optional[List[str]] = None):
+        assert isinstance(new_properties, list), "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
         self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties))
 
 class DatabaseUpdater:
@@ -50,12 +50,16 @@ class DatabaseUpdater:
         self._updates: List[DatabaseUpdateEntry] = []
         self.__request_factory = request_factory
         self.__index = index
+        self.__error: Optional[str] = None
 
     async def __aenter__(self):
         self._updates.clear()
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
+        if self.__error is not None:
+            raise CblTestError(self.__error)
+        
         payload = PostUpdateDatabaseRequestBody(self._db_name, self._updates)
         request = self.__request_factory.create_request(TestServerRequestType.UPDATE_DB, payload)
         resp = await self.__request_factory.send_request(self.__index, request)
@@ -85,6 +89,10 @@ class DatabaseUpdater:
 
     def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None, 
                         removed_properties: Optional[List[str]] = None):
+        if not isinstance(new_properties, list):
+            self.__error = "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
+            return
+    
         self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties))
 
 class AllDocumentsEntry:

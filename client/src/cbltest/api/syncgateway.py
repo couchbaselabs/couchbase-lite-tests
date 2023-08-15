@@ -7,7 +7,7 @@ from varname import nameof
 
 from cbltest.httplog import get_next_writer
 from cbltest.assertions import _assert_not_null
-from cbltest.api.error import CblSyncGatewayBadResponseError
+from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 from cbltest.jsonhelper import _get_typed, _get_typed_required
 from cbltest.logging import cbl_warning
@@ -136,6 +136,40 @@ class DocumentUpdateEntry(JSONSerializable):
 
     def to_json(self) -> Any:
         return self.__body
+    
+class RemoteDocument(JSONSerializable):
+    """
+    A class that represents the results of a document retrieved from Sync Gateway
+    """
+
+    @property
+    def id(self) -> str:
+        return self.__id
+    
+    @property
+    def revid(self) -> str:
+        return self.__rev
+    
+    @property
+    def body(self) -> dict:
+        return self.__body
+
+    def __init__(self, body: dict) -> None:
+        if "error" in body:
+            raise ValueError("Trying to create remote document from error response")
+        
+        self.__body = body.copy()
+        self.__id = cast(str, body["_id"])
+        self.__rev = cast(str, body["_rev"])
+        del self.__body["id"]
+        del self.__body["_rev"]
+
+    def to_json(self) -> Any:
+        ret_val = self.__body.copy()
+        ret_val["_id"] = self.__id
+        ret_val["_rev"] = self.__rev
+        return ret_val
+
     
 class SyncGateway:
     """
@@ -300,3 +334,17 @@ class SyncGateway:
         
         await self._send_request("post", f"/{db_name}.{scope}.{collection}/_purge", 
                                  JSONDictionary(body))
+        
+    async def get_document(self, db_name: str, doc_id: str, scope: str = "_default", collection: str = "_default") -> Optional[RemoteDocument]:
+        response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
+        if not isinstance(response, dict):
+            raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
+        
+        cast_resp = cast(dict, response)
+        if "error" in cast_resp:
+            if cast_resp["reason"] == "missing":
+                return None
+            
+            raise CblSyncGatewayBadResponseError(500, f"Get doc from sync gateway had error '{cast_resp['reason']}'")
+        
+        return RemoteDocument(cast_resp)
