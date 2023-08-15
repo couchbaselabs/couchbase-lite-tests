@@ -5,25 +5,19 @@
 
 // support
 #include "Files.h"
-#include "Log.h"
 
 // lib
-#include <civetweb.h>
 #include <iostream>
 #include <thread>
 
 using namespace std;
 using namespace ts;
 using namespace ts::cbl;
-using namespace ts::support;
-using namespace ts::support::logger;
 using namespace ts::support::files;
 
 int main() {
     try {
-        logger::init(LogLevel::info);
-
-        mg_init_library(0);
+        TestServer::init();
 
         TestServer server = TestServer();
         server.start();

@@ -6,6 +6,7 @@
 #endif
 
 #include "Files.h"
+#include "Log.h"
 #include "UUID.h"
 
 // lib
@@ -13,6 +14,7 @@
 #include <string>
 
 using namespace std;
+using namespace ts::support;
 using namespace ts::support::files;
 using namespace ts::support::key;
 
@@ -20,8 +22,22 @@ using namespace ts::support::key;
 using namespace ts::support::android;
 #endif
 
+static bool sTestServerInitialized = false;
+
 namespace ts {
+    void TestServer::init() {
+        if (sTestServerInitialized) { return; }
+        
+        logger::init(logger::LogLevel::info);
+        mg_init_library(0);
+        sTestServerInitialized = true;
+    }
+
     TestServer::TestServer() {
+        if (!sTestServerInitialized) {
+            throw runtime_error("TestServer::init() hasn't been called");
+        }
+
 #ifdef __ANDROID__
         if (!androidContext()) { throw runtime_error("Android Context is not initialized"); }
 #endif

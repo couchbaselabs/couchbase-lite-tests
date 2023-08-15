@@ -1,11 +1,15 @@
-#import "CBLTestServer.h"
+#import "TSTestServer.h"
 #include "TestServer.h"
 #include "Files.h"
 
 using namespace ts;
 
-@implementation CBLTestServer {
+@implementation TSTestServer {
     TestServer *_server;
+}
+
++ (void)initialize {
+    TestServer::init();
 }
 
 - (instancetype)init {
