@@ -13,6 +13,9 @@ class CouchbaseServer:
     A class that interacts with a Couchbase Server cluster
     """
     def __init__(self, url: str, username: str, password: str):
+        if "://" not in url:
+            url = f"couchbase://{url}"
+            
         auth = PasswordAuthenticator(username, password)
         opts = ClusterOptions(auth)
         self.__cluster = Cluster(url, opts)
