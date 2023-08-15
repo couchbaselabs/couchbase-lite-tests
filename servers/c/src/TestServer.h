@@ -19,6 +19,8 @@ namespace ts {
             std::string assetsDir;
         };
 
+        static void init();
+
         explicit TestServer();
 
         ~TestServer();
