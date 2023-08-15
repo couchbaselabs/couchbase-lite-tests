@@ -32,21 +32,17 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
 // Not thread safe...
 public class TypedMap extends TypedCollection {
     @NonNull
-    private final Map<String, Object> args;
+    private final Map<String, Object> data;
 
     public TypedMap() { this(new HashMap<>()); }
 
-    public TypedMap(@NonNull Map<?, ?> args) { this(args, true); }
+    public TypedMap(@NonNull Map<?, ?> data) { this(data, true); }
 
     @SuppressWarnings("unchecked")
-    public TypedMap(@NonNull Map<?, ?> args, boolean strict) {
+    public TypedMap(@NonNull Map<?, ?> data, boolean strict) {
         super(strict);
-        this.args = (Map<String, Object>) args;
+        this.data = (Map<String, Object>) data;
     }
-
-    public final boolean isEmpty() { return args.isEmpty(); }
-
-    public boolean contains(@NonNull String key) { return args.containsKey(key); }
 
     public void validate(Collection<String> expected) {
         final Set<String> keys = getKeys();
@@ -55,7 +51,7 @@ public class TypedMap extends TypedCollection {
     }
 
     @NonNull
-    public Set<String> getKeys() { return new HashSet<>(args.keySet()); }
+    public Set<String> getKeys() { return new HashSet<>(data.keySet()); }
 
     @Nullable
     public Boolean getBoolean(@NonNull String key) { return get(key, Boolean.class); }
@@ -97,23 +93,18 @@ public class TypedMap extends TypedCollection {
 
     // Bypass the whole typing mechanism
     @Nullable
-    public Object getObject(@NonNull String key) { return args.get(key); }
+    public Object getObject(@NonNull String key) { return data.get(key); }
 
     @Nullable
     public <T> T get(@NonNull String key, @NonNull Class<T> expectedType) {
-        return checkType(expectedType, args.get(key));
+        return checkType(expectedType, data.get(key));
     }
 
     @Nullable
     public Class<?> getType(@NonNull String key) {
-        final Object val = args.get(key);
+        final Object val = data.get(key);
         return (val == null) ? null : val.getClass();
     }
 
-    public void put(@NonNull String key, @Nullable Object val) { args.put(key, val); }
-
-    @Nullable
-    public <T> T remove(@NonNull String key, @NonNull Class<T> expectedType) {
-        return checkType(expectedType, args.remove(key));
-    }
+    public void put(@NonNull String key, @Nullable Object val) { data.put(key, val); }
 }

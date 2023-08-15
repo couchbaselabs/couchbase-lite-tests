@@ -29,17 +29,10 @@ class BasicTest : BaseTest() {
     fun testGetVersion() {
         var resp: Map<String, Any>?
 
-        TestApp.getApp().dispatcher.handleRequest(
-            "testing",
-            1,
-            Dispatcher.Method.GET,
-            "/",
-            ByteArrayInputStream("{}".toByteArray())
-        ).use { r ->
-            Assert.assertNotNull(r)
-
+        GetDispatcher(TestApp.getApp()).handleRequest("testing", 1, "/").use { ctxt ->
+            Assert.assertNotNull(ctxt)
             resp = Moshi.Builder().build().adapter(Any::class.java)
-                .fromJson(r.content.source().buffer()) as? Map<String, Any>
+                .fromJson(ctxt.content.source().buffer()) as? Map<String, Any>
         }
 
         Assert.assertTrue(
@@ -51,50 +44,32 @@ class BasicTest : BaseTest() {
     @Test
     fun testBadRequestVersion() {
         try {
-            TestApp.getApp().dispatcher.handleRequest(
+            PostDispatcher(TestApp.getApp()).handleRequest(
                 "testing",
                 97,
-                Dispatcher.Method.GET,
-                "foo",
+                "/reset",
                 ByteArrayInputStream("{}".toByteArray())
             )
         } catch (err: ClientError) {
             val msg = err.message
-            Assert.assertTrue(msg?.startsWith("Unrecognized request") ?: false)
+            println(msg)
+            Assert.assertTrue(msg?.startsWith("Unrecognized post request") ?: false)
             Assert.assertTrue(msg?.contains("@97") ?: false)
-        }
-    }
-
-    @Test
-    fun testBadRequestMethod() {
-        try {
-            TestApp.getApp().dispatcher.handleRequest(
-                "testClient",
-                1,
-                Dispatcher.Method.PUT,
-                "/",
-                ByteArrayInputStream("{}".toByteArray())
-            )
-        } catch (err: ClientError) {
-            val msg = err.message
-            Assert.assertTrue(msg?.startsWith("Unrecognized request") ?: false)
-            Assert.assertTrue(msg?.contains(" PUT ") ?: false)
         }
     }
 
     @Test
     fun testBadRequestEndpoint() {
         try {
-            TestApp.getApp().dispatcher.handleRequest(
+            PostDispatcher(TestApp.getApp()).handleRequest(
                 "testing",
                 1,
-                Dispatcher.Method.GET,
                 "/foo",
                 ByteArrayInputStream("{}".toByteArray())
             )
         } catch (err: ClientError) {
             val msg = err.message
-            Assert.assertTrue(msg?.startsWith("Unrecognized request") ?: false)
+            Assert.assertTrue(msg?.startsWith("Unrecognized post request") ?: false)
             Assert.assertTrue(msg?.contains(" /foo ") ?: false)
         }
     }

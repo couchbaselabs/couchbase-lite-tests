@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.endpoints;
+package com.couchbase.lite.mobiletest.endpoints.v1;
 
 import androidx.annotation.NonNull;
 
@@ -32,14 +32,15 @@ import com.couchbase.lite.QueryBuilder;
 import com.couchbase.lite.Result;
 import com.couchbase.lite.ResultSet;
 import com.couchbase.lite.SelectResult;
-import com.couchbase.lite.mobiletest.Memory;
+import com.couchbase.lite.mobiletest.TestContext;
+import com.couchbase.lite.mobiletest.data.TypedList;
 import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
+import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
-import com.couchbase.lite.mobiletest.tools.CollectionsBuilder;
 
 
-public class GetAllDocsV1 {
+public class GetAllDocs {
     private static final String KEY_DATABASE = "database";
     private static final String KEY_COLLECTIONS = "collections";
 
@@ -58,16 +59,19 @@ public class GetAllDocsV1 {
     @NonNull
     private final DatabaseService dbSvc;
 
-    public GetAllDocsV1(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
+    public GetAllDocs(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
 
     @NonNull
-    public Map<String, Object> getAllDocs(@NonNull TypedMap req, @NonNull Memory mem) {
+    public Map<String, Object> getAllDocs(@NonNull TypedMap req, @NonNull TestContext ctxt) {
         req.validate(LEGAL_COLLECTION_KEYS);
-        try (CollectionsBuilder colls = new CollectionsBuilder(
-            req.getList(KEY_COLLECTIONS),
-            dbSvc.getNamedDb(req, mem))) {
-            return getAllDocs(colls.getCollections());
-        }
+
+        final TypedList collectionFqns = req.getList(KEY_COLLECTIONS);
+        if (collectionFqns == null) { throw new ClientError("no collections specified"); }
+
+        final String dbName = req.getString(KEY_DATABASE);
+        if (dbName == null) { throw new ClientError("All Docs request doesn't specify a database"); }
+
+        return getAllDocs(dbSvc.getCollections(dbSvc.getOpenDb(ctxt, dbName), collectionFqns, ctxt));
     }
 
     @NonNull

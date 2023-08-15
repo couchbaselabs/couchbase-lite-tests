@@ -25,23 +25,23 @@ import com.couchbase.lite.DocumentReplication;
 import com.couchbase.lite.DocumentReplicationListener;
 
 
-class DocReplListener implements DocumentReplicationListener {
-    private List<DocumentReplication> replications;
+public class DocReplListener implements DocumentReplicationListener {
+    private List<DocumentReplication> replicatedDocs;
 
     @Override
     public void replication(@NonNull DocumentReplication replication) {
         synchronized (this) {
-            if (replications == null) { replications = new ArrayList<>(); }
-            replications.add(replication);
+            if (replicatedDocs == null) { replicatedDocs = new ArrayList<>(); }
+            replicatedDocs.add(replication);
         }
     }
 
     @Nullable
-    public List<DocumentReplication> getReplications() {
+    public List<DocumentReplication> getReplicatedDocs() {
         final List<DocumentReplication> repls;
         synchronized (this) {
-            repls = replications;
-            replications = null;
+            repls = replicatedDocs;
+            replicatedDocs = null;
         }
         return repls;
     }

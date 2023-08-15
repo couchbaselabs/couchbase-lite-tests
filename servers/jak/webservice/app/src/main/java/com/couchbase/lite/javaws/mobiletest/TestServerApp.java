@@ -12,7 +12,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.couchbase.lite.internal.utils.StringUtils;
-import com.couchbase.lite.mobiletest.Dispatcher;
+import com.couchbase.lite.mobiletest.GetDispatcher;
+import com.couchbase.lite.mobiletest.PostDispatcher;
 import com.couchbase.lite.mobiletest.Reply;
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.errors.ClientError;
@@ -27,33 +28,42 @@ import com.couchbase.lite.mobiletest.util.Log;
 public class TestServerApp extends HttpServlet {
     private static final String TAG = "MAIN";
 
+    private enum Method {UNKNOWN, GET, POST}
+
     // Servlets are serializable...
     private static final long serialVersionUID = 42L;
 
+    private transient GetDispatcher getDispatcher;
+    private transient PostDispatcher postDispatcher;
+
     @Override
-    public void init() { TestApp.init(new JavaWSTestApp()); }
+    public void init() {
+        final TestApp app = new JavaWSTestApp();
+        TestApp.init(app);
+        getDispatcher = new GetDispatcher(app);
+        postDispatcher = new PostDispatcher(app);
+    }
 
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
-        dispatchRequest(Dispatcher.Method.GET, req, resp);
+        dispatchRequest(Method.GET, req, resp);
     }
 
     @Override
     protected void doPut(HttpServletRequest req, HttpServletResponse resp) {
-        dispatchRequest(Dispatcher.Method.PUT, req, resp);
+        dispatchRequest(Method.UNKNOWN, req, resp);
     }
 
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) {
-        dispatchRequest(Dispatcher.Method.POST, req, resp);
+        dispatchRequest(Method.POST, req, resp);
     }
 
     @Override
     protected void doDelete(HttpServletRequest req, HttpServletResponse resp) {
-        dispatchRequest(Dispatcher.Method.DELETE, req, resp);
+        dispatchRequest(Method.UNKNOWN, req, resp);
     }
 
-    @SuppressWarnings({"PMD.PreserveStackTrace", "PMD.NPathComplexity"})
-    private void dispatchRequest(Dispatcher.Method method, HttpServletRequest req, HttpServletResponse resp) {
-        final TestApp app = TestApp.getApp();
+    @SuppressWarnings({"PMD.PreserveStackTrace", "PMD.NPathComplexity", "PMD.ExceptionAsFlowControl"})
+    private void dispatchRequest(Method method, HttpServletRequest req, HttpServletResponse resp) {
         int version = -1;
         try {
             final String versionStr = req.getHeader(TestApp.HEADER_PROTOCOL_VERSION);
@@ -68,29 +78,32 @@ public class TestServerApp extends HttpServlet {
             final String endpoint = req.getRequestURI();
             if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }
 
-            String client = req.getHeader(TestApp.HEADER_CLIENT);
+            final String client = req.getHeader(TestApp.HEADER_CLIENT);
             Log.i(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
+            Reply reply = null;
+            try {
+                switch (method) {
+                    case GET:
+                        reply = getDispatcher.handleRequest(client, version, endpoint);
+                        break;
+                    case POST:
+                        reply = postDispatcher.handleRequest(client, version, endpoint, req.getInputStream());
+                        break;
+                    default:
+                        throw new ClientError("Unimplemented method: " + method);
+                }
 
-            // Special handling for the 'GET /' endpoint
-            if ("/".equals(endpoint) && (Dispatcher.Method.GET.equals(method))) {
-                if (version < 0) { version = TestApp.LATEST_SUPPORTED_PROTOCOL_VERSION; }
-                if (client == null) { client = "anonymous"; }
-            }
-
-            if (version < 0) { throw new ClientError("No protocol version specified"); }
-            if (client == null) { throw new ClientError("No client specified"); }
-
-            resp.setHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));
-            resp.setHeader(TestApp.HEADER_SERVER, app.getAppId());
-
-            final Dispatcher dispatcher = app.getDispatcher();
-            try (Reply reply = dispatcher.handleRequest(client, version, method, endpoint, req.getInputStream())) {
+                resp.setHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));
+                resp.setHeader(TestApp.HEADER_SERVER, TestApp.getApp().getAppId());
                 buildResponse(reply, resp);
 
                 resp.setStatus(HttpServletResponse.SC_OK);
 
                 resp.setHeader("Content-Type", "application/json");
                 resp.setHeader("Content-Length", String.valueOf(reply.getSize()));
+            }
+            finally {
+                if (reply != null) { reply.close(); }
             }
         }
         catch (ClientError err) {

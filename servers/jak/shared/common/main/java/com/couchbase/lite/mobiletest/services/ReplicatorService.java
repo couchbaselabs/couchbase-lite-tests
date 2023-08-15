@@ -18,78 +18,80 @@ package com.couchbase.lite.mobiletest.services;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.HashMap;
+import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-
+import com.couchbase.lite.Collection;
+import com.couchbase.lite.Document;
+import com.couchbase.lite.DocumentFlag;
 import com.couchbase.lite.DocumentReplication;
+import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
-import com.couchbase.lite.mobiletest.Memory;
+import com.couchbase.lite.Scope;
+import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.data.TypedMap;
 
 
 public class ReplicatorService {
-    private static final String SYM_REPLICATORS = "~REPLICATORS";
-    private static final String SYM_LISTENERS = "~LISTENERS";
-
-    public void reset(@NonNull Memory memory) {
-        final Map<?, ?> repls = memory.remove(SYM_REPLICATORS, Map.class);
-        if ((repls == null) || repls.isEmpty()) { return; }
-
-        final TypedMap liveRepls = new TypedMap(repls);
-        for (String key: liveRepls.getKeys()) {
-            final Replicator repl = liveRepls.get(key, Replicator.class);
-            if (repl != null) { repl.stop(); }
+    static class DeletedDocFilter implements ReplicationFilter {
+        @Override
+        public boolean filtered(@NonNull Document ignore, @NonNull EnumSet<DocumentFlag> flags) {
+            return flags.contains(DocumentFlag.DELETED);
         }
     }
 
-    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
-    @SuppressWarnings("ConstantConditions")
-    @NonNull
-    public String addRepl(@NonNull Memory mem, @NonNull Replicator repl) {
-        final String replId = UUID.randomUUID().toString();
-        TypedMap liveRepls = mem.getMap(SYM_REPLICATORS);
-        if (liveRepls == null) {
-            mem.put(SYM_REPLICATORS, new HashMap<>());
-            // liveRepls cannot be null
-            liveRepls = mem.getMap(SYM_REPLICATORS);
+    static class DocIdFilter implements ReplicationFilter {
+        public static final String DOT = ".";
+
+        @NonNull
+        private final Set<String> permittedDocs;
+
+        DocIdFilter(@NonNull Set<String> docs) { permittedDocs = docs; }
+
+        @Override
+        public boolean filtered(@NonNull Document document, @NonNull EnumSet<DocumentFlag> ignore) {
+            final Collection collection = document.getCollection();
+            return permittedDocs.contains(
+                ((collection == null) ? Scope.DEFAULT_NAME : collection.getScope().getName())
+                    + DOT
+                    + ((collection == null) ? Collection.DEFAULT_NAME : collection.getName())
+                    + DOT
+                    + document.getId());
         }
-        liveRepls.put(replId, repl);
+    }
+
+
+    public void init(@NonNull TypedMap ignore1, @NonNull TestContext ignore2) {
+        // nothing to do here...
+    }
+
+    @NonNull
+    public String addRepl(@NonNull TestContext ctxt, @NonNull Replicator repl) {
+        final String replId = UUID.randomUUID().toString();
+        ctxt.addRepl(replId, repl);
         return replId;
     }
 
-    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
-    @SuppressWarnings("ConstantConditions")
-    public void addDocListener(@NonNull Memory mem, @NonNull String replId, @NonNull Replicator repl) {
-        TypedMap liveListeners = mem.getMap(SYM_LISTENERS);
-        if (liveListeners == null) {
-            mem.put(SYM_LISTENERS, new HashMap<>());
-            // liveRepls cannot be null
-            liveListeners = mem.getMap(SYM_LISTENERS);
-        }
-
+    public void addDocListener(@NonNull TestContext ctxt, @NonNull String replId, @NonNull Replicator repl) {
         final DocReplListener listener = new DocReplListener();
-        liveListeners.put(replId, listener);
-
         repl.addDocumentReplicationListener(listener);
+        ctxt.addDocReplListener(replId, listener);
     }
 
     @Nullable
-    public Replicator getRepl(@NonNull Memory mem, @NonNull String replId) {
-        final TypedMap liveRepls = mem.getMap(SYM_REPLICATORS);
-        return (liveRepls == null) ? null : liveRepls.get(replId, Replicator.class);
-    }
+    public Replicator getRepl(@NonNull TestContext ctxt, @NonNull String replId) { return ctxt.getRepl(replId); }
 
     @Nullable
-    public List<DocumentReplication> getReplicatedDocs(@NonNull Memory mem, @NonNull String replId) {
-        final TypedMap liveListeners = mem.getMap(SYM_LISTENERS);
-        if (liveListeners != null) {
-            final DocReplListener listener = liveListeners.get(replId, DocReplListener.class);
-            if (listener != null) { return listener.getReplications(); }
-        }
-        return null;
+    public List<DocumentReplication> getReplicatedDocs(@NonNull TestContext ctxt, @NonNull String replId) {
+        final DocReplListener listener = ctxt.getReplDocListener(replId);
+        return (listener == null) ? null : listener.getReplicatedDocs();
     }
+
+    @NonNull
+    public ReplicationFilter getDeletedDocFilter() { return new DeletedDocFilter(); }
+
+    @NonNull
+    public ReplicationFilter getDocIdFilter(@NonNull Set<String> permitted) { return new DocIdFilter(permitted); }
 }
