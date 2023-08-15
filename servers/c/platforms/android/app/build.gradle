@@ -9,7 +9,7 @@ android {
 
     ext {
         PROJECT_DIR = "${projectDir}"
-        ASSET_DIR = "${PROJECT_DIR}/../../assets"
+        ASSET_DIR = "${PROJECT_DIR}/../../../assets"
     }
 
     defaultConfig {
