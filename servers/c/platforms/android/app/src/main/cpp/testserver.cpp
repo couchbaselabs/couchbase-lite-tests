@@ -27,6 +27,7 @@ Java_com_couchbase_lite_testserver_TestServerKt_initAndroidContext(JNIEnv *env, 
 extern "C"
 JNIEXPORT jlong JNICALL
 Java_com_couchbase_lite_testserver_TestServer_createServer(JNIEnv *env, [[maybe_unused]] jobject thiz) {
+    TestServer::init();
     auto server = new TestServer();
     return (jlong) server;
 }
