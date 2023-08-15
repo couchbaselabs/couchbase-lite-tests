@@ -1,6 +1,9 @@
 import Foundation
 import Network
 
+/// Start a bonjour service listener  with type = "_testserver._tcp" and name = en0's IP address.
+/// Clients can just check the service name to obtain the IP Address information. The service will just do nothing
+/// and will end the connection when a client connects to the service.
 public class IPAddressServer {
     let address: String
     let listener: NWListener
@@ -12,7 +15,7 @@ public class IPAddressServer {
         }
         self.address = address
         self.listener = try! NWListener(using: NWParameters(tls: nil, tcp: NWProtocolTCP.Options()))
-        self.listener.service = NWListener.Service(name: self.address, type: "_TestServerIPAddress._tcp");
+        self.listener.service = NWListener.Service(name: self.address, type: "_testserver._tcp");
     }
     
     public func start() {
@@ -30,12 +33,10 @@ public class IPAddressServer {
         }
         
         listener.newConnectionHandler = { conn in
-            TSLogger.info("IPAddress Server (\(self.address)) receiving a connection ...")
-            conn.start(queue: self.queue)
-            let data = self.address.data(using: .utf8)
-            conn.send(content: data, contentContext: .defaultMessage, isComplete: true, completion: .idempotent)
+            // do nothing
+            conn.cancel()
         }
-        listener.start(queue: .main)
+        listener.start(queue: queue)
     }
 }
 
