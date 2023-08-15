@@ -2,6 +2,7 @@ import UIKit
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
+    let kStartBonjourService = false
     var server: TSTestServer!
     var ipAddressServer: IPAddressServer!
     
@@ -11,9 +12,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         self.server = TSTestServer()
         self.server.start()
         
-        ipAddressServer = IPAddressServer()
-        ipAddressServer.start()
-        
+        if kStartBonjourService {
+            ipAddressServer = IPAddressServer()
+            ipAddressServer.start()
+        }
         return true
     }
 
