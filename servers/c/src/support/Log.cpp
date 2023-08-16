@@ -6,8 +6,9 @@
 
 // lib
 #include <chrono>
-#include <stdexcept>
+#include <cstdarg>
 #include <iostream>
+#include <stdexcept>
 
 #ifdef __ANDROID__
 #include <android/log.h>
