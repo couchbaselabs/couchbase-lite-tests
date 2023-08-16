@@ -239,6 +239,42 @@ class SyncGateway:
         """
         await self._send_request("delete", f"/{db_name}")
 
+    def create_collection_access_dict(self, input: Dict[str, List[str]]) -> dict:
+        """
+        Creates a collection access dictionary in the format that Sync Gateway expects,
+        given an input dictionary keyed by collection with a list of channels
+
+        :param input: The simplified input dictionary of collection -> channels
+        """
+
+        ret_val = {}
+        for c in input:
+            if not isinstance(c, str):
+                raise ValueError("Non-string key found in input dictionary to create_collection_access_dict")
+            
+            channels = input[c]
+            if not isinstance(channels, list):
+                raise ValueError(f"Non-list found for value of collection {c} in create_collection_access_dict")
+            
+            if "." not in c:
+                raise ValueError(f"Input collection '{c}' in create_collection_access_dict needs to be fully qualified")
+            
+            spec = c.split(".")
+            if len(spec) != 2:
+                raise ValueError(f"Input collection '{c}' has too many dots in create_collection_access_dict")
+            
+            if spec[0] not in ret_val:
+                scope_dict = {}
+                ret_val[spec[0]] = scope_dict
+            else:
+                scope_dict = ret_val[spec[0]]
+
+            scope_dict[spec[1]] = {
+                "admin_channels": input[c]
+            }
+
+        return ret_val
+
     async def add_user(self, db_name: str, name: str, password: str, collection_access: dict) -> None:
         """
         Adds the specified user to a Sync Gateway database with the specified channel access
@@ -246,8 +282,9 @@ class SyncGateway:
         :param db_name: The name of the Database to add the user to
         :param name: The username to add
         :param password: The password for the user that will be added
-        :param channel_access: The channels that the user will have access to, as a dictionary 
-            keyed by collection containing an array of channels
+        :param channel_access: The channels that the user will have access to.  This needs to 
+            be formatted in the way Sync Gateway expects it, so if you are unsure use
+            :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
         """
         body = {
             "name": name,
@@ -255,7 +292,7 @@ class SyncGateway:
             "collection_access": collection_access
         }
 
-        await self._send_request("post", f"/{db_name}/_user/", JSONDictionary(body))
+        await self._send_request("put", f"/{db_name}/_user/{name}", JSONDictionary(body))
 
     def _analyze_dataset_response(self, response: list) -> None:
         assert isinstance(response, list), "Invalid bulk docs response (not a list)"

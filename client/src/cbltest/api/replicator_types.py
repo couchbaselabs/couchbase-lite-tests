@@ -195,7 +195,7 @@ class ReplicatorProgress:
         assert isinstance(self.__completed, bool), "Invalid replicator progress value received ('completed' not a boolean)"
 
 class ReplicatorDocumentFlags(Flag):
-    NONE = auto()
+    NONE = 0
     """The absence of flags"""
 
     DELETED = auto()

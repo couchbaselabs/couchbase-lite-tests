@@ -286,7 +286,7 @@ class TestReplicationFilter:
 
         # 7. Start the replicator with the same config as the step 3.
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=3000)
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
