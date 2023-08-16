@@ -2,17 +2,26 @@ cmake_minimum_required(VERSION 3.11)
 cmake_policy(VERSION 3.11)
 cmake_policy(SET CMP0077 NEW)
 
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+set(CMAKE_OSX_ARCHITECTURES x86_64 arm64)
+
 project(TestServer)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/out)
 
 add_subdirectory(vendor)
 
 get_directory_property(civetweb_SOURCE_DIR DIRECTORY vendor DEFINITION civetweb_SOURCE_DIR)
 
 message(STATUS ${CMAKE_LIBRARY_ARCHITECTURE})
-
 find_package(CouchbaseLite 3.1.0 REQUIRED PATHS lib/libcblite)
+
+if(APPLE)
+    set(CMAKE_INSTALL_RPATH "@loader_path")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(CMAKE_INSTALL_RPATH "\$ORIGIN")
+endif()
 
 set(SOURCE_FILES
         src/main.cpp
@@ -96,3 +105,8 @@ if(MSVC)
 endif()
 
 file(COPY assets DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+install(
+        TARGETS testserver
+        RUNTIME DESTINATION bin
+)
