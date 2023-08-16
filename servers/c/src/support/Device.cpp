@@ -23,7 +23,7 @@ extern "C" NTSYSAPI NTSTATUS NTAPI RtlGetVersion(
 #include <regex>
 #include <sys/utsname.h>
 
-static std::optional<string> tryKey(const char* filename, string&& key) {
+static std::optional<std::string> tryKey(const char* filename, std::string&& key) {
     static const std::regex r("(.*)=(.*)");
     std::ifstream fin(filename);
     if(!fin) {
@@ -31,7 +31,7 @@ static std::optional<string> tryKey(const char* filename, string&& key) {
     }
 
     fin.exceptions(std::ios_base::badbit);
-    string line;
+    std::string line;
     std::smatch match;
     while(std::getline(fin, line)) {
         if(std::regex_match(line, match, r)) {
@@ -44,7 +44,7 @@ static std::optional<string> tryKey(const char* filename, string&& key) {
     return {};
 }
 
-static string getDistroInfo() {
+static std::string getDistroInfo() {
     // os-release is apparently the standard these days
     if(auto os = tryKey("/etc/os-release", "PRETTY_NAME")) {
         return *os;
@@ -69,7 +69,7 @@ static string getDistroInfo() {
         return "Unknown Linux";
     }
 
-    return string(uts.sysname) + ' ' + uts.release;
+    return std::string(uts.sysname) + ' ' + uts.release;
 }
 #endif
 

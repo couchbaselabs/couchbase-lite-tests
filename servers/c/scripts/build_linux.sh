@@ -16,7 +16,7 @@ BLD_NUM=${3}
 OS_ARCH=`uname -m`
 if [ ${OS_ARCH} = "aarch64" ]
 then
-  OS_ARCH = "arm64"
+  OS_ARCH="arm64"
 fi
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -31,7 +31,6 @@ pushd $DOWNLOAD_DIR > /dev/null
 if [ -z "$BLD_NUM" ]
 then
     ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-linux-${OS_ARCH}.tar.gz
-    echo "$ZIP_FILENAME"
     curl -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
 else
     ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-${BLD_NUM}-linux-${OS_ARCH}.tar.gz
