@@ -50,7 +50,7 @@ try {
     Copy-Item "$DOWNLOAD_DIR\libcblite-$VERSION\bin\cblite.dll" out\bin
 
     # Copy assets
-    Copy-Item -ErrorAction Ignore assets out\bin
+    Copy-Item -ErrorAction Ignore -Recurse assets out\bin
 } finally {
     Pop-Location
 }
