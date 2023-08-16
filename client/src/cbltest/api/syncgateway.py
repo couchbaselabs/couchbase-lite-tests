@@ -342,7 +342,7 @@ class SyncGateway:
         
         cast_resp = cast(dict, response)
         if "error" in cast_resp:
-            if cast_resp["reason"] == "missing":
+            if cast_resp["reason"] == "missing" or cast_resp["reason"] == "deleted":
                 return None
             
             raise CblSyncGatewayBadResponseError(500, f"Get doc from sync gateway had error '{cast_resp['reason']}'")

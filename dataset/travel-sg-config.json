@@ -5,19 +5,19 @@
       "travel": {
         "collections": {
           "airlines": {
-            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
+            "sync": "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
           },
           "routes": {
-            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
+            "sync": "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
           },
           "airports": {
-            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
+            "sync": "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
           },
           "landmarks": {
-            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
+            "sync": "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
           },
           "hotels": {
-            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
+            "sync": "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
           }
         }
       }

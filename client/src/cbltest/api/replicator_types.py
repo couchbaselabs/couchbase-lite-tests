@@ -1,32 +1,13 @@
 from __future__ import annotations
 from abc import abstractmethod
 from enum import Enum, Flag, auto
-from typing import Any, Final, List, cast, Optional
+from typing import Any, Dict, Final, List, cast, Optional
 from varname import nameof
 
 from cbltest.assertions import _assert_not_null
 from cbltest.responses import ErrorResponseBody
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.jsonhelper import _get_typed, _get_typed_required
-
-class ReplicatorFilterParameters(JSONSerializable):
-    """
-    A class representing parameters to be passed to a push filter.
-    In theory this could be anything, but in practice it has always been
-    just documentIDs.
-    """
-
-    def __init__(self) -> None:
-        self.document_ids: Optional[List[str]] = None
-        """The document IDs to filter, if any"""
-
-    def to_json(self) -> Any:
-        if self.document_ids is None:
-            return None
-        
-        return {
-            "documentIDs": self.document_ids
-        }
 
 class ReplicatorFilter(JSONSerializable):
     """
@@ -36,18 +17,20 @@ class ReplicatorFilter(JSONSerializable):
 
     @property
     def name(self) -> str:
-        """Gets the name of the push filter"""
+        """Gets the name of the filter"""
         return self.__name
     
-    def __init__(self, name: str):
+    def __init__(self, name: str, parameters: Optional[dict] = None):
         self.__name = name
-        self.parameters = cast(ReplicatorFilterParameters, None)
+        self.parameters = parameters
         """The parameters to be applied to the filter"""
 
     def to_json(self) -> Any:
-        ret_val = {"name": self.name}
+        ret_val: Dict[str, Any] = {"name": self.name}
         if self.parameters is not None:
-            ret_val["params"] = self.parameters.to_json()
+            ret_val["params"] = self.parameters
+
+        return ret_val
 
 class ReplicatorCollectionEntry(JSONSerializable):
     @property

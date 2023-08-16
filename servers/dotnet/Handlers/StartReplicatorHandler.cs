@@ -6,9 +6,32 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace TestServer.Handlers;
+using FilterGenerator = Func<IReadOnlyDictionary<string, object>?, HandlerList.IReplicatorFilter>;
 
 internal static partial class HandlerList
 {
+    internal interface IReplicatorFilter
+    {
+        bool Execute(Document doc, DocumentFlags flags);
+    }
+
+    internal static class ReplicatorFilters
+    {
+        public static readonly IReadOnlyDictionary<string, FilterGenerator> FilterMap =
+            new Dictionary<string, FilterGenerator>
+        {
+            ["deletedDocumentsOnly"] = (_) => new ReplicatorDeletedOnlyFilter()
+        };
+    }
+
+    internal sealed class ReplicatorDeletedOnlyFilter : IReplicatorFilter
+    {
+        public bool Execute(Document doc, DocumentFlags flags)
+        {
+            return flags.HasFlag(DocumentFlags.Deleted);
+        }
+    }
+
     internal readonly record struct DocumentReplicationEvent
     {
         public required bool isPush { get; init; }
@@ -108,19 +131,37 @@ internal static partial class HandlerList
         }
     }
 
+    internal record class StartReplicatorFilter
+    {
+        public required string name { get; init; }
+
+        public IReadOnlyDictionary<string, object>? parameters { get; init; }
+
+        [JsonConstructor]
+        public StartReplicatorFilter(string name, IReadOnlyDictionary<string, object>? parameters = null)
+        {
+            this.name = name;
+            this.parameters = parameters;
+        }
+    }
+
     internal readonly record struct StartReplicatorCollection
     {
         public required IReadOnlyList<string> names { get; init; }
         public IReadOnlyList<string> channels { get; init; }
         public IReadOnlyList<string> documentIDs { get; init; }
+        public StartReplicatorFilter? pushFilter { get; init; }
+        public StartReplicatorFilter? pullFilter { get; init; }
 
         [JsonConstructor]
         public StartReplicatorCollection(IReadOnlyList<string> names, IReadOnlyList<string?>? channels = default,
-             IReadOnlyList<string?>? documentIDs = default)
+             IReadOnlyList<string?>? documentIDs = default, StartReplicatorFilter? pushFilter = null, StartReplicatorFilter? pullFilter = null)
         {
             this.names = names;
             this.channels = channels.NotNull().ToList() ?? new List<string>();
             this.documentIDs = documentIDs.NotNull().ToList() ?? new List<string>();
+            this.pushFilter = pushFilter;
+            this.pullFilter = pullFilter;
         }
     }
 
@@ -221,6 +262,26 @@ internal static partial class HandlerList
                     collConfig.DocumentIDs = c.documentIDs.ToList();
                 }
 
+                if(c.pushFilter != null) {
+                    if(!ReplicatorFilters.FilterMap.ContainsKey(c.pushFilter.name)) {
+                        throw new JsonException($"Unknown push filter {c.pushFilter.name}");
+                    }
+
+                    var filter = ReplicatorFilters.FilterMap[c.pushFilter.name](c.pushFilter.parameters);
+                    CBLTestServer.Manager.KeepAlive(filter);
+                    collConfig.PushFilter = filter.Execute;
+                }
+
+                if(c.pullFilter != null) {
+                    if (!ReplicatorFilters.FilterMap.ContainsKey(c.pullFilter.name)) {
+                        throw new JsonException($"Unknown push filter {c.pullFilter.name}");
+                    }
+
+                    var filter = ReplicatorFilters.FilterMap[c.pullFilter.name](c.pullFilter.parameters);
+                    CBLTestServer.Manager.KeepAlive(filter);
+                    collConfig.PullFilter = filter.Execute;
+                }
+
                 replConfig.AddCollections(collections, collConfig);
             }
         } else {
@@ -229,6 +290,7 @@ internal static partial class HandlerList
 
         replConfig.Authenticator = deserializedBody.config.authenticator?.CreateAuthenticator();
         replConfig.Continuous = deserializedBody.config.continuous;
+        replConfig.ReplicatorType = deserializedBody.config.ReplicatorType;
 
         (var repl, var id) = CBLTestServer.Manager.RegisterObject(() => new Replicator(replConfig));
         if(deserializedBody.config.enableDocumentListener) {
