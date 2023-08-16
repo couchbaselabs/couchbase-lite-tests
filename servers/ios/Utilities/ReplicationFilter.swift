@@ -11,11 +11,11 @@ import CouchbaseLiteSwift
 struct ReplicationFilterFactory {
     static func documentIDs(params: Dictionary<String, AnyCodable>?) throws -> ReplicationFilter {
         guard let docIDsWrapped = params?["documentIDs"]
-        else { throw TestServerError.badRequest }
+        else { throw TestServerError.badRequest("Could not find key 'documentIDs' in params.") }
         
         // docIDs should be a dictionary of collection name to array of docID
         guard let validDocIDs = docIDsWrapped.value as? [String : [String]]
-        else { throw TestServerError.badRequest }
+        else { throw TestServerError.badRequest("documentIDs should be a Dict<String, Arr<String>>.") }
         
         return { document, _ in
             return validDocIDs.contains(where: { (_, docIDs) in docIDs.contains(document.id) })
@@ -35,7 +35,7 @@ struct ReplicationFilterFactory {
     
     static func getFilter(withName name: String, params: Dictionary<String, AnyCodable>? = nil) throws -> ReplicationFilter {
         guard let filter = availableFilters(rawValue: name)
-        else { throw TestServerError.badRequest }
+        else { throw TestServerError.badRequest("Could not find filter with name '\(name)'") }
         
         switch filter {
         case .documentIDs:

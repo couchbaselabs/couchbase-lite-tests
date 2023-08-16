@@ -10,13 +10,13 @@ import Foundation
 extension Handlers {
     static let getReplicatorStatus : EndpointHandler<ContentTypes.ReplicatorStatus> = { req throws in
         guard let requestedReplicator = try? req.content.decode(ContentTypes.Replicator.self)
-        else { throw TestServerError.badRequest }
+        else { throw TestServerError.badRequest("Request body does not match the 'Replicator' schema.") }
         
         guard let dbManager = DatabaseManager.shared
         else { throw TestServerError.cblDBNotOpen }
         
         guard let replStatus = dbManager.replicatorStatus(forID: requestedReplicator.id)
-        else { throw TestServerError.badRequest }
+        else { throw TestServerError.badRequest("Replicator with ID '\(requestedReplicator.id)' does not exist.") }
         
         return replStatus
     }

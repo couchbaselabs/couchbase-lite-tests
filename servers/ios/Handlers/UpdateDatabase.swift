@@ -12,7 +12,7 @@ extension Handlers {
     static let updateDatabase : EndpointHandlerEmptyResponse = { req throws in
         guard let updateRequest = try? req.content.decode(ContentTypes.UpdateRequest.self)
         else {
-            throw TestServerError.badRequest
+            throw TestServerError.badRequest("Request body is not a valid Update request.")
         }
 
         for update in updateRequest.updates {

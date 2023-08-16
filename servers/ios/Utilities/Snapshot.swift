@@ -18,7 +18,7 @@ extension Snapshot {
         var newSnapshot = Snapshot()
         for docID in docIDs {
             guard let collection = try dbManager.collection(docID.collection, inDB: dbName)
-            else { throw TestServerError.badRequest }
+            else { throw TestServerError.badRequest("Cannot find collection '\(docID.collection)' in db '\(dbName)'") }
             
             do {
                 let doc = try collection.document(id: docID.id)
@@ -36,7 +36,7 @@ extension Snapshot {
     static func verifyChanges(dbName: String, snapshotID: String, changes: [ContentTypes.DatabaseUpdateItem]) throws -> ContentTypes.VerifyResponse {
         guard let uuid = UUID(uuidString: snapshotID),
               let snapshot = currentSnapshots[uuid]
-        else { throw TestServerError.badRequest }
+        else { throw TestServerError.badRequest("Snapshot with ID '\(snapshotID)' does not exist.") }
         
         guard let dbManager = DatabaseManager.shared
         else { throw TestServerError.cblDBNotOpen }
@@ -45,10 +45,10 @@ extension Snapshot {
             let snapshotKey = "\(change.collection).\(change.documentID)"
             
             guard snapshot.keys.contains(snapshotKey)
-            else { throw TestServerError.badRequest }
+            else { throw TestServerError.badRequest("Snapshot '\(snapshotID)' does not contain document '\(change.collection).\(change.documentID)'") }
             
             guard let collection = try dbManager.collection(change.collection, inDB: dbName)
-            else { throw TestServerError.badRequest }
+            else { throw TestServerError.badRequest("Cannot find collection '\(change.collection)' in db '\(dbName)'") }
             
             var existingDoc: Document? = nil
             

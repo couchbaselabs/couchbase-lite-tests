@@ -10,7 +10,7 @@ import Foundation
 extension Handlers {
     static let startReplicator: EndpointHandler<ContentTypes.Replicator> = { req throws in
         guard let replStartRq = try? req.content.decode(ContentTypes.StartReplicatorRequest.self)
-        else { throw TestServerError.badRequest }
+        else { throw TestServerError.badRequest("Request body is not a valid startReplicator Request.") }
         
         guard let dbManager = DatabaseManager.shared
         else { throw TestServerError.cblDBNotOpen }

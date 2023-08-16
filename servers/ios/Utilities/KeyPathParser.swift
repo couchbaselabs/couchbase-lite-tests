@@ -36,7 +36,7 @@ struct KeyPathParser {
         if let component = try parseProperty(first: true) {
             components.append(component)
         } else {
-            throw TestServerError.badRequest
+            throw TestServerError.badRequest("First KeyPath component should be a property.")
         }
         
         // Parse any remaining components
@@ -46,7 +46,7 @@ struct KeyPathParser {
         
         // We can't parse any more valid components, but we haven't reached the end of the keypath string
         if(index != input.endIndex) {
-            throw TestServerError.badRequest
+            throw TestServerError.badRequest("KeyPath '\(input)' is invalid.")
         }
         
         return components
@@ -54,7 +54,7 @@ struct KeyPathParser {
     
     private mutating func parseProperty(first: Bool = false) throws -> KeyPathComponent? {
         if(!first) {
-            guard expect(".") else { throw TestServerError.badRequest }
+            guard expect(".") else { throw TestServerError.badRequest("KeyPath '\(input)' is invalid.") }
         }
         
         var property = ""
@@ -71,7 +71,7 @@ struct KeyPathParser {
         
         guard !property.isEmpty
         else {
-            throw TestServerError.badRequest
+            throw TestServerError.badRequest("KeyPath '\(input)' is invalid.")
         }
         
         return .property(property)
@@ -87,7 +87,7 @@ struct KeyPathParser {
         
         for char in digitsStr {
             if(!char.isNumber) {
-                throw TestServerError.badRequest
+                throw TestServerError.badRequest("KeyPath '\(input)' contains invalid array index.")
             }
         }
         
@@ -95,7 +95,7 @@ struct KeyPathParser {
         
         guard !digitsStr.isEmpty, let digits = Int(digitsStr)
         else {
-            throw TestServerError.badRequest
+            throw TestServerError.badRequest("KeyPath '\(input)' contains invalid array index.")
         }
         
         return .index(digits)
