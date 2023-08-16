@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory=$true)][string]$Editionm,
+    [Parameter(Mandatory=$true)][string]$Edition,
     [Parameter(Mandatory=$true)][string]$Version,
     [Parameter(Mandatory=$false)][string]$BuildNum
 )
