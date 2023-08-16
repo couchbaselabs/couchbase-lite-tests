@@ -12,7 +12,7 @@ extension Handlers {
     static let getAllDocuments: EndpointHandler<ContentTypes.CollectionDocuments> = { req throws in
         guard let collections = try? req.content.decode(ContentTypes.Collections.self)
         else {
-            throw TestServerError.badRequest
+            throw TestServerError.badRequest("Request body does not match the 'Collections' scheme.")
         }
         return try getCollectionsDocuments(database: collections.database, collections: collections.collections)
     }

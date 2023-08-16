@@ -57,7 +57,7 @@ class DatabaseManager {
         else { throw TestServerError.cblDBNotOpen }
         
         guard let endpointURL = URL(string: config.endpoint)
-        else { throw TestServerError.badRequest }
+        else { throw TestServerError.badRequest("Endpoint URL is not a valid URL.") }
         
         var replConfig = ReplicatorConfiguration(target: URLEndpoint(url: endpointURL))
         
@@ -77,7 +77,7 @@ class DatabaseManager {
         for configColl in config.collections {
             let collections = try configColl.names.map({ collName in
                 guard let collection = try collection(collName, inDB: database)
-                else { throw TestServerError.badRequest }
+                else { throw TestServerError.badRequest("Collection '\(collName)' does not exist in \(config.database).") }
                 return collection
             })
             var collConfig = CollectionConfiguration()
@@ -188,7 +188,7 @@ class DatabaseManager {
     public func collection(_ name: String, inDB database: Database) throws -> Collection? {
         let scopeAndColl = name.components(separatedBy: ".")
         guard let scope = scopeAndColl.first, let coll = scopeAndColl.last
-        else { throw TestServerError.badRequest }
+        else { throw TestServerError.badRequest("'\(name)' is not a valid qualified collection name.") }
         
         do {
             return try database.collection(name: coll, scope: scope)
@@ -263,7 +263,7 @@ class DatabaseManager {
         case let auth as ContentTypes.ReplicatorSessionAuthenticator:
             return SessionAuthenticator(sessionID: auth.sessionID, cookieName: auth.cookieName)
         default:
-            throw TestServerError.badRequest
+            throw TestServerError.badRequest("'authenticator' parameter did not match a valid authenticator.")
         }
     }
     

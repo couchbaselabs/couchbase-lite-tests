@@ -12,10 +12,9 @@ struct DocumentUpdater {
         guard let collection = try DatabaseManager.shared?.collection(item.collection, inDB: dbName)
         else { throw TestServerError.cblDBNotOpen }
         
-        guard let doc = try? collection.document(id: item.documentID)
-        else { throw TestServerError.cblDocNotFound }
+        let doc = try? collection.document(id: item.documentID)
         
-        let mutableDoc = doc.toMutable()
+        let mutableDoc = doc?.toMutable() ?? MutableDocument(id: item.documentID)
         try update(doc: mutableDoc, updatedProperties: item.updatedProperties, removedProperties: item.removedProperties)
         do {
             try collection.save(document: mutableDoc)
@@ -33,12 +32,7 @@ struct DocumentUpdater {
                     var parser = KeyPathParser(input: keyPath)
                     guard let components = try parser.parse(), !components.isEmpty
                     else {
-                        throw TestServerError.badRequest
-                    }
-                    // Ensure first component is not an array index
-                    switch components.first! {
-                    case .index: throw TestServerError.badRequest
-                    default: break
+                        throw TestServerError.badRequest("KeyPath '\(keyPath)' is invalid.")
                     }
                     
                     let parentProperty = try getParentProperty(mutableDoc: doc, keyPathComponents: components)
@@ -52,12 +46,7 @@ struct DocumentUpdater {
                 var parser = KeyPathParser(input: keyPath)
                 guard let components = try parser.parse(), !components.isEmpty
                 else {
-                    throw TestServerError.badRequest
-                }
-                
-                switch components.first! {
-                case .index: throw TestServerError.badRequest
-                default: break
+                    throw TestServerError.badRequest("KeyPath '\(keyPath)' is invalid.")
                 }
                 
                 let parentProperty = try getParentProperty(mutableDoc: doc, keyPathComponents: components)
@@ -105,12 +94,12 @@ struct DocumentUpdater {
                 if(nextIsArray) {
                     guard let arr = current.array(at: index)
                     // If arr doesn't exist, this component was probably a scalar
-                    else { throw TestServerError.badRequest }
+                    else { throw TestServerError.badRequest("Scalar cannot be indexed: \(current)") }
                     current = arr
                 } else {
                     guard let dict = current.dictionary(at: index)
                     // If dict doesn't exist, this component was probably a scalar
-                    else { throw TestServerError.badRequest }
+                    else { throw TestServerError.badRequest("Scalar cannot be indexed: \(current)") }
                     current = dict
                 }
 
@@ -127,12 +116,12 @@ struct DocumentUpdater {
                 if(nextIsArray) {
                     guard let arr = current.array(forKey: name)
                     // If arr doesn't exist, this component was probably a scalar
-                    else { throw TestServerError.badRequest }
+                    else { throw TestServerError.badRequest("Scalar cannot have child properties, value: \(current)") }
                     current = arr
                 } else {
                     guard let dict = current.dictionary(forKey: name)
                     // If dict doesn't exist, this component was probably a scalar
-                    else { throw TestServerError.badRequest }
+                    else { throw TestServerError.badRequest("Scalar cannot have child properties, value: \(current)") }
                     current = dict
                 }
             }
