@@ -46,6 +46,7 @@ else
     curl -O http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-c/${VERSION}/${BLD_NUM}/${ZIP_FILENAME}
 fi
 unzip ${ZIP_FILENAME}
+rm ${ZIP_FILENAME}
 cp -r CouchbaseLite.xcframework "${FRAMEWORKS_DIR}"
 popd > /dev/null
 
