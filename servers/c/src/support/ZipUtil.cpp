@@ -1,6 +1,8 @@
 #include "ZipUtil.h"
 
 #include "Defer.h"
+
+#include <cstring>
 #include <fcntl.h>
 #include <filesystem>
 

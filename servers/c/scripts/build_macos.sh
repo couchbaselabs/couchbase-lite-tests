@@ -25,7 +25,6 @@ pushd $DOWNLOAD_DIR > /dev/null
 if [ -z "$BLD_NUM" ]
 then
     ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-macos.zip
-    echo "$ZIP_FILENAME"
     curl -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
 else
     ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-${BLD_NUM}-macos.zip
