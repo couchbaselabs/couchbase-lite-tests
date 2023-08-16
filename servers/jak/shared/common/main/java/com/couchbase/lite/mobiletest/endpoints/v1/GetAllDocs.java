@@ -20,6 +20,7 @@ import androidx.annotation.NonNull;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,12 +48,12 @@ public class GetAllDocs {
     private static final String KEY_ID = "id";
     private static final String KEY_REV = "rev";
 
-    private static final List<String> LEGAL_COLLECTION_KEYS;
+    private static final Set<String> LEGAL_COLLECTION_KEYS;
     static {
-        final List<String> l = new ArrayList<>();
+        final Set<String> l = new HashSet<>();
         l.add(KEY_DATABASE);
         l.add(KEY_COLLECTIONS);
-        LEGAL_COLLECTION_KEYS = Collections.unmodifiableList(l);
+        LEGAL_COLLECTION_KEYS = Collections.unmodifiableSet(l);
     }
 
 

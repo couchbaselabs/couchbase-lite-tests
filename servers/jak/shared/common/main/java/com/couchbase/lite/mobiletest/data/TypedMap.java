@@ -18,7 +18,6 @@ package com.couchbase.lite.mobiletest.data;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -28,8 +27,6 @@ import java.util.Set;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 
 
-// Read only, relatively type safe object store
-// Not thread safe...
 public class TypedMap extends TypedCollection {
     @NonNull
     private final Map<String, Object> data;
@@ -44,14 +41,20 @@ public class TypedMap extends TypedCollection {
         this.data = (Map<String, Object>) data;
     }
 
-    public void validate(Collection<String> expected) {
-        final Set<String> keys = getKeys();
-        keys.removeAll(expected);
-        if (!keys.isEmpty()) { throw new ClientError("Unexpected keys: " + String.join(",", keys)); }
+    @Nullable
+    public Class<?> getType(@NonNull String key) {
+        final Object val = data.get(key);
+        return (val == null) ? null : val.getClass();
     }
 
     @NonNull
     public Set<String> getKeys() { return new HashSet<>(data.keySet()); }
+
+    public void validate(@NonNull Set<String> expected) {
+        final Set<String> keys = getKeys();
+        keys.removeAll(expected);
+        if (!keys.isEmpty()) { throw new ClientError("Unexpected keys: " + String.join(",", keys)); }
+    }
 
     @Nullable
     public Boolean getBoolean(@NonNull String key) { return get(key, Boolean.class); }
@@ -91,20 +94,14 @@ public class TypedMap extends TypedCollection {
         return (val == null) ? null : new TypedMap(val);
     }
 
-    // Bypass the whole typing mechanism
-    @Nullable
-    public Object getObject(@NonNull String key) { return data.get(key); }
-
     @Nullable
     public <T> T get(@NonNull String key, @NonNull Class<T> expectedType) {
         return checkType(expectedType, data.get(key));
     }
 
+    // Bypass the whole typing mechanism
     @Nullable
-    public Class<?> getType(@NonNull String key) {
-        final Object val = data.get(key);
-        return (val == null) ? null : val.getClass();
-    }
+    public Object getObject(@NonNull String key) { return data.get(key); }
 
     public void put(@NonNull String key, @Nullable Object val) { data.put(key, val); }
 }

@@ -46,6 +46,7 @@ import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
+@SuppressWarnings("resource")
 public abstract class TestApp {
     public static final String HEADER_PROTOCOL_VERSION = "CBLTest-API-Version".toLowerCase(Locale.getDefault());
     public static final int LATEST_SUPPORTED_PROTOCOL_VERSION = 1;

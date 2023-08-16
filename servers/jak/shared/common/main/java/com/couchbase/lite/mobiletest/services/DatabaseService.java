@@ -20,10 +20,8 @@ import androidx.annotation.NonNull;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import com.couchbase.lite.Collection;
@@ -51,11 +49,11 @@ public final class DatabaseService {
 
     private static final String KEY_DATASETS = "datasets";
 
-    private static final List<String> LEGAL_DATASET_KEYS;
+    private static final Set<String> LEGAL_DATASET_KEYS;
     static {
-        final List<String> l = new ArrayList<>();
+        final Set<String> l = new HashSet<>();
         l.add(KEY_DATASETS);
-        LEGAL_DATASET_KEYS = Collections.unmodifiableList(l);
+        LEGAL_DATASET_KEYS = Collections.unmodifiableSet(l);
     }
     // Instance methods
 

@@ -8,12 +8,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
+import com.couchbase.lite.Document;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
@@ -38,6 +40,8 @@ public final class TestContext implements AutoCloseable {
     private Map<String, Replicator> openRepls;
     @Nullable
     private Map<String, DocReplListener> openListeners;
+    @Nullable
+    private Map<String, Map<String, Document>> openSnapshots;
 
     TestContext(@NonNull String client) { this.client = client; }
 
@@ -56,7 +60,6 @@ public final class TestContext implements AutoCloseable {
     public String getClient() { return client; }
 
     public void setDbDir(@NonNull File dbDir) {
-        if (dbDir == null) { throw new ServerError("Attempt to set null db dir"); }
         if (this.dbDir != null) { throw new ServerError("Attempt to replace the db dir"); }
         this.dbDir = dbDir;
     }
@@ -66,8 +69,6 @@ public final class TestContext implements AutoCloseable {
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
     public void addDb(@NonNull String name, @NonNull Database db) {
-        if (name == null) { throw new ServerError("Attempt to remember a database with a null name"); }
-        if (db == null) { throw new ServerError("Attempt to remember a null database"); }
         if (openDbs == null) { openDbs = new HashMap<>(); }
         if (openDbs.containsKey(name)) { throw new ClientError("Attempt to replace an open database"); }
         openDbs.put(name, db);
@@ -86,8 +87,6 @@ public final class TestContext implements AutoCloseable {
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
     public void addRepl(@NonNull String id, @NonNull Replicator repl) {
-        if (id == null) { throw new ServerError("Attempt to remember a database with a null id"); }
-        if (repl == null) { throw new ServerError("Attempt to remember a null replicator"); }
         if (openRepls == null) { openRepls = new HashMap<>(); }
         if (openRepls.containsKey(id)) { throw new ClientError("Attempt to replace an existing replicator"); }
         openRepls.put(id, repl);
@@ -96,14 +95,34 @@ public final class TestContext implements AutoCloseable {
     @Nullable
     public Replicator getRepl(@NonNull String name) { return (openRepls == null) ? null : openRepls.get(name); }
 
+    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
     public void addDocReplListener(@NonNull String replId, @NonNull DocReplListener listener) {
         if (openListeners == null) { openListeners = new HashMap<>(); }
+        if (openListeners.containsKey(replId)) { throw new ClientError("Attempt to replace an existing doc listener"); }
         openListeners.put(replId, listener);
     }
 
     @Nullable
     public DocReplListener getReplDocListener(@NonNull String id) {
         return (openListeners == null) ? null : openListeners.get(id);
+    }
+
+    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
+    @NonNull
+    public String createSnapshot() {
+        final String snapshotId = UUID.randomUUID().toString();
+        if (openSnapshots == null) { openSnapshots = new HashMap<>(); }
+        if (openSnapshots.containsKey(snapshotId)) { throw new ClientError("Attempt to replace an existing snapshot"); }
+        openSnapshots.put(snapshotId, new HashMap<>());
+        return snapshotId;
+    }
+
+    public void snapshotDocument(@NonNull String snapshotId, @NonNull String id, @Nullable Document doc) {
+        if (openSnapshots == null) { throw new ServerError("No such snapshot: " + snapshotId); }
+        final Map<String, Document> snapshot = openSnapshots.get(snapshotId);
+        if (snapshot == null) { throw new ServerError("No such snapshot: " + snapshotId); }
+        if (snapshot.containsKey(id)) { throw new ClientError("Attempt to snapshot the same doc twice"); }
+        snapshot.put(id, doc);
     }
 
     private void stopRepls() {
