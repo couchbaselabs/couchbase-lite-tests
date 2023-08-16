@@ -14,8 +14,15 @@ VERSION=${2}
 BLD_NUM=${3}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+ASSETS_DIR="${SCRIPT_DIR}/../assets"
 BUILD_DIR=$SCRIPT_DIR/../build
 DOWNLOAD_DIR=$BUILD_DIR/download
+
+# Copy Assets
+pushd "${ASSETS_DIR}" > /dev/null
+cp -f ../../../dataset/*.cblite2.zip dataset
+cp -f ../../../environment/sg/cert/cert.* cert
+popd
 
 # Download and Unzip CBL:
 rm -rf $DOWNLOAD_DIR 2> /dev/null
