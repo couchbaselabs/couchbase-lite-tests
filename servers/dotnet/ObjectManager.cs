@@ -7,6 +7,7 @@ namespace TestServer
     {
         private readonly Dictionary<string, Database> _activeDatabases = new();
         private readonly Dictionary<string, IDisposable> _activeDisposables = new();
+        private readonly HashSet<object> _keepAlives = new();
         private readonly AutoReaderWriterLock _lock = new AutoReaderWriterLock();
 
         public readonly string FilesDirectory;
@@ -33,6 +34,7 @@ namespace TestServer
             }
 
             _activeDatabases.Clear();
+            _keepAlives.Clear();
         }
 
         public async Task LoadDataset(string name, IEnumerable<string> targetDbNames)
@@ -96,6 +98,11 @@ namespace TestServer
             var key = id ?? Guid.NewGuid().ToString();
             _activeDisposables.Add(key, retVal);
             return (retVal, key);
+        }
+
+        public void KeepAlive(object obj)
+        {
+            _keepAlives.Add(obj);
         }
 
         public T? GetObject<T>(string name) where T : class, IDisposable

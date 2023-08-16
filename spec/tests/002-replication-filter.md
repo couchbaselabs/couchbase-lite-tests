@@ -95,23 +95,23 @@ Test that the replicator will push only the docs that are passed from the push f
 
 ### Steps
 
-1. Reset SG and load `travel` dataset.
-2. Reset local database, and load `travel` dataset.
+1. Reset SG and load `names` dataset.
+2. Reset local database, and load `names` dataset.
 3. Start a replicator: 
     * collections : 
-      * `travel.routes`
+      * `_default._default`
          * pushFilter:  
             * name: `deletedDocumentsOnly`
             * params: `{}`
-    * endpoint: `/travel`
+    * endpoint: `/names`
     * type: push
     * continuous: false
     * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that no docs are replicated.
-6. Update docs in the local database (NEED_API)
-   * Add `route_10000` in `travel.routes`
-   * Remove `route_10` and `route_20` in `travel.routes`
+6. Update docs in the local database
+   * Add `name_10000`
+   * Remove `name_10` and `name_20`
 7. Start the replicator with the same config as the step 3.
 8. Check that only changes passed the push filters are replicated.
 
@@ -123,22 +123,22 @@ Test that the replicator will pull only the docs that are passed from the pull f
 
 ### Steps
 
-1. Reset SG and load `travel` dataset.
-2. Reset local database, and load `travel` dataset.
+1. Reset SG and load `names` dataset.
+2. Reset local database, and load `names` dataset.
 3. Start a replicator: 
     * collections : 
-      * `travel.landmarks`
+      * `_default._default`
          * pullFilter:  
             * name: `deletedDocumentsOnly`
             * params: `{}`
-    * endpoint: `/travel`
+    * endpoint: `/names`
     * type: pull
     * continuous: false
     * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that no docs are replicated.
 6. Update docs on SG
-   * Add `landmark_10000`in `travel.landmarks`
-   * Remove `landmark_10` and `landmark_20` in `travel.landmarks`
+   * Add `name_10000`
+   * Remove `name_10` and `name_20`
 7. Start the replicator with the same config as the step 3.
 8. Check that only changes passed the pull filters are replicated.
