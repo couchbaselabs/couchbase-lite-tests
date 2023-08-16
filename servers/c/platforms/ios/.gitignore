@@ -6,3 +6,6 @@ CouchbaseLite.xcframework/
 
 # Fetched Dependencies
 /vendor/cmake/
+
+# Build
+build_*/
