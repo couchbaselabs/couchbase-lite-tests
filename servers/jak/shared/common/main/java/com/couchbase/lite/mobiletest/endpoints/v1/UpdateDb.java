@@ -18,11 +18,11 @@ package com.couchbase.lite.mobiletest.endpoints.v1;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
@@ -52,23 +52,23 @@ public class UpdateDb {
     private static final String KEY_UPDATE_PROPS = "updatedProperties";
     private static final String KEY_REMOVED_PROPS = "removedProperties";
 
-    private static final List<String> LEGAL_UPDATES_KEYS;
+    private static final Set<String> LEGAL_UPDATES_KEYS;
     static {
-        final List<String> l = new ArrayList<>();
+        final Set<String> l = new HashSet<>();
         l.add(KEY_DATABASE);
         l.add(KEY_UPDATES);
-        LEGAL_UPDATES_KEYS = Collections.unmodifiableList(l);
+        LEGAL_UPDATES_KEYS = Collections.unmodifiableSet(l);
     }
 
-    private static final List<String> LEGAL_UPDATE_KEYS;
+    private static final Set<String> LEGAL_UPDATE_KEYS;
     static {
-        final List<String> l = new ArrayList<>();
+        final Set<String> l = new HashSet<>();
         l.add(KEY_TYPE);
         l.add(KEY_COLLECTION);
         l.add(KEY_DOC_ID);
         l.add(KEY_UPDATE_PROPS);
         l.add(KEY_REMOVED_PROPS);
-        LEGAL_UPDATE_KEYS = Collections.unmodifiableList(l);
+        LEGAL_UPDATE_KEYS = Collections.unmodifiableSet(l);
     }
 
 
@@ -85,7 +85,7 @@ public class UpdateDb {
         if (updates == null) { throw new ClientError("Database update request has no updates"); }
 
         final String dbName = req.getString(KEY_DATABASE);
-        if (dbName == null) { throw new ClientError("All Docs request doesn't specify a database"); }
+        if (dbName == null) { throw new ClientError("Database update request doesn't specify a database"); }
 
         final Database db = dbSvc.getOpenDb(ctxt, dbName);
         final int n = updates.size();

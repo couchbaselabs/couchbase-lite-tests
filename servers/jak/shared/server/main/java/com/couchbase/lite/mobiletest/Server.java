@@ -76,7 +76,7 @@ public class Server extends NanoHTTPD {
             }
 
             final Method method = session.getMethod();
-            if (method == null) { throw new ClientError("Unimplemented method: " + method); }
+            if (method == null) { throw new ServerError("Null HTTP method"); }
 
             final String endpoint = session.getUri();
             if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }

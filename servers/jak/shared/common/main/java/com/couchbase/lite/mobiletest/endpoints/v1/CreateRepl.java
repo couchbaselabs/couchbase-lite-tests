@@ -84,17 +84,17 @@ public class CreateRepl {
     private static final String FILTER_DOC_ID = "documentids";
     private static final String KEY_DOC_IDS = "documentIDs";
 
-    private static final List<String> LEGAL_KEYS;
+    private static final Set<String> LEGAL_KEYS;
     static {
-        final List<String> l = new ArrayList<>();
+        final Set<String> l = new HashSet<>();
         l.add(KEY_CONFIG);
         l.add(KEY_RESET);
-        LEGAL_KEYS = Collections.unmodifiableList(l);
+        LEGAL_KEYS = Collections.unmodifiableSet(l);
     }
 
-    private static final List<String> LEGAL_CONFIG_KEYS;
+    private static final Set<String> LEGAL_CONFIG_KEYS;
     static {
-        final List<String> l = new ArrayList<>();
+        final Set<String> l = new HashSet<>();
         l.add(KEY_DB);
         l.add(KEY_COLLECTIONS);
         l.add(KEY_ENDPOINT);
@@ -103,36 +103,36 @@ public class CreateRepl {
         l.add(KEY_AUTHENTICATOR);
         l.add(KEY_RESET);
         l.add(KEY_ENABLE_DOC_LISTENER);
-        LEGAL_CONFIG_KEYS = Collections.unmodifiableList(l);
+        LEGAL_CONFIG_KEYS = Collections.unmodifiableSet(l);
     }
 
-    private static final List<String> LEGAL_COLLECTION_KEYS;
+    private static final Set<String> LEGAL_COLLECTION_KEYS;
     static {
-        final List<String> l = new ArrayList<>();
+        final Set<String> l = new HashSet<>();
         l.add(KEY_NAMES);
         l.add(KEY_CHANNELS);
         l.add(KEY_DOCUMENT_IDS);
         l.add(KEY_PUSH_FILTER);
-        LEGAL_COLLECTION_KEYS = Collections.unmodifiableList(l);
+        LEGAL_COLLECTION_KEYS = Collections.unmodifiableSet(l);
     }
 
 
-    private static final List<String> LEGAL_BASIC_AUTH_KEYS;
+    private static final Set<String> LEGAL_BASIC_AUTH_KEYS;
     static {
-        final List<String> l = new ArrayList<>();
+        final Set<String> l = new HashSet<>();
         l.add(KEY_AUTH_TYPE);
         l.add(KEY_BASIC_AUTH_USER);
         l.add(KEY_BASIC_AUTH_PASSWORD);
-        LEGAL_BASIC_AUTH_KEYS = Collections.unmodifiableList(l);
+        LEGAL_BASIC_AUTH_KEYS = Collections.unmodifiableSet(l);
     }
 
-    private static final List<String> LEGAL_SESSION_AUTH_KEYS;
+    private static final Set<String> LEGAL_SESSION_AUTH_KEYS;
     static {
-        final List<String> l = new ArrayList<>();
+        final Set<String> l = new HashSet<>();
         l.add(KEY_AUTH_TYPE);
         l.add(KEY_SESSION_AUTH_ID);
         l.add(KEY_SESSION_AUTH_COOKIE);
-        LEGAL_SESSION_AUTH_KEYS = Collections.unmodifiableList(l);
+        LEGAL_SESSION_AUTH_KEYS = Collections.unmodifiableSet(l);
     }
 
     @NonNull

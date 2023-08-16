@@ -37,7 +37,6 @@ import java.util.*
 
 class AndroidTestApp(private val context: Context) : TestApp() {
 
-
     override fun initCBL() {
         CouchbaseLite.init(context, true)
         val logger = Database.log.console
