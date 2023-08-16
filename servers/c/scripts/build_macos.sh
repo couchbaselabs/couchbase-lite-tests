@@ -38,7 +38,7 @@ popd > /dev/null
 # Build
 mkdir -p $BUILD_DIR
 pushd $BUILD_DIR > /dev/null
-cmake -DCMAKE_PREFIX_PATH=$DOWNLOAD_DIR/libcblite-$VERSION -DCMAKE_BUILD_TYPE=Release -DCBL_MACOS_ARCH=x86_64 ..
+cmake -DCMAKE_PREFIX_PATH=$DOWNLOAD_DIR/libcblite-$VERSION -DCMAKE_BUILD_TYPE=Release ..
 make -j8 install
 
 # Copy libcblite to
