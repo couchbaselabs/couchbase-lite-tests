@@ -51,6 +51,12 @@ fi
 
 if [ ${PLATFORM} = "linux" ]
 then
+    OS_ARCH=`uname -m`
+    if [ ${OS_ARCH} = "aarch64" ]
+    then
+        OS_ARCH="arm64"
+    fi
+
     if [ -z "$BLD_NUM" ]
     then
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-linux-${OS_ARCH}.tar.gz
