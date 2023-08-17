@@ -1,4 +1,4 @@
-from typing import Dict, Final, List, cast, Optional
+from typing import Any, Dict, Final, List, cast, Optional
 from cbltest.responses import ErrorResponseBody, TestServerResponse
 from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorDocumentEntry, ReplicatorProgress
 
@@ -122,6 +122,11 @@ class PostSnapshotDocumentsResponse(TestServerResponse):
         super().__init__(status_code, uuid, 1, body, "snapshotDocuments")
         self.__snapshot_id = cast(str, body.get(self.__id_key))
     
+class ValueOrMissing:
+    def __init__(self, value: Optional[Any] = None, exists: bool = False):
+        self.value = value
+        self.exists = exists if value is None else True
+
 class PostVerifyDocumentsResponse(TestServerResponse):
     """
     A POST /verifyDocuments response as specified in version 1 of the 
@@ -150,12 +155,12 @@ class PostVerifyDocumentsResponse(TestServerResponse):
         return self.__description
     
     @property
-    def expected(self) -> Optional[dict]:
+    def expected(self) -> ValueOrMissing:
         """Gets the expected document body if the bodies did not match"""
         return self.__expected
     
     @property
-    def actual(self) -> Optional[dict]:
+    def actual(self) -> ValueOrMissing:
         """Gets the actual document body if the bodies did not match"""
         return self.__actual
     
@@ -166,8 +171,15 @@ class PostVerifyDocumentsResponse(TestServerResponse):
         
         self.__result = _get_typed_required(body, self.__result_key, bool)
         self.__description = _get_typed(body, self.__description_key, str)
-        self.__expected = _get_typed(body, self.__expected_key, dict)
-        self.__actual = _get_typed(body, self.__actual_key, dict)
+        if self.__expected_key not in body:
+            self.__expected = ValueOrMissing()
+        else:
+            self.__expected = ValueOrMissing(body.get(self.__expected_key), True)
+            
+        if self.__actual_key not in body:
+            self.__actual = ValueOrMissing()
+        else:
+            self.__actual = ValueOrMissing(body.get(self.__actual_key), True)
     
 class PostStartReplicatorResponse(TestServerResponse):
     """
