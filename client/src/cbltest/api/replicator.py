@@ -47,7 +47,8 @@ class Replicator:
 
     def __init__(self, database: Database, endpoint: str, replicator_type: ReplicatorType = ReplicatorType.PUSH_AND_PULL,
                  continuous: bool = False, authenticator: Optional[ReplicatorAuthenticator] = None, reset: bool = False,
-                 collections: List[ReplicatorCollectionEntry] = [], enable_document_listener: bool = False):
+                 collections: List[ReplicatorCollectionEntry] = [], enable_document_listener: bool = False,
+                 enable_auto_purge: bool = True):
         assert database._request_factory.version == 1, "This version of the cbl test API requires request API v1"
         self.__database = database
         self.__index = database._index
@@ -73,6 +74,10 @@ class Replicator:
         self.enable_document_listener: bool = enable_document_listener
         """If True, document updates will be present in calls to get_status"""
 
+        self.enable_auto_purge: bool = enable_auto_purge
+        """If True (default) auto purge is enabled for the replicator so documents will be automatically
+        removed when access is lost"""
+
     def add_default_collection(self) -> None:
         """A convenience method for adding the default config for the default collection, if desired"""
         self.collections.append(ReplicatorCollectionEntry())
@@ -90,6 +95,7 @@ class Replicator:
         payload.continuous = self.continuous
         payload.authenticator = self.authenticator
         payload.enableDocumentListener = self.enable_document_listener
+        payload.enableAutoPurge = self.enable_auto_purge
         payload.reset = self.reset
         payload.collections = self.collections
         req = self.__request_factory.create_request(TestServerRequestType.START_REPLICATOR, payload)

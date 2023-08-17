@@ -346,7 +346,8 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
                     "username": "user1",
                     "password": "p@ssw0rd"
                 },
-                "enableDocumentListener": false
+                "enableDocumentListener": false,
+                "enableAutoPurge": true
             },
             "reset": false
         }
@@ -385,6 +386,9 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
         self.enableDocumentListener: bool = False
         """If set to True, calls to getReplicatorStatus will return a list of document events"""
 
+        self.enableAutoPurge: bool = True
+        """If set to True (default), the replicator will automatically purge documents on access loss"""
+
     def to_json(self) -> Any:
         """Serializes the :class:`PostStartReplicatorRequestBody` to a JSON string"""
         raw = {
@@ -392,7 +396,8 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
             "endpoint": self.__endpoint,
             "replicatorType": str(self.replicatorType),
             "continuous": self.continuous,
-            "enableDocumentListener": self.enableDocumentListener
+            "enableDocumentListener": self.enableDocumentListener,
+            "enableAutoPurge": self.enableAutoPurge
         }
 
         if self.collections is not None:
