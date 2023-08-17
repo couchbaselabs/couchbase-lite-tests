@@ -264,7 +264,7 @@ class SyncGateway:
                 raise ValueError(f"Input collection '{c}' has too many dots in create_collection_access_dict")
             
             if spec[0] not in ret_val:
-                scope_dict = {}
+                scope_dict: Dict[str, dict] = {}
                 ret_val[spec[0]] = scope_dict
             else:
                 scope_dict = ret_val[spec[0]]
