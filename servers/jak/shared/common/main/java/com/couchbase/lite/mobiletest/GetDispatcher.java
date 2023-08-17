@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import com.couchbase.lite.mobiletest.errors.ClientError;
-import com.couchbase.lite.mobiletest.tools.ReplyBuilder;
+import com.couchbase.lite.mobiletest.json.ReplyBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 
 

@@ -42,11 +42,11 @@ import com.couchbase.lite.SessionAuthenticator;
 import com.couchbase.lite.URLEndpoint;
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
-import com.couchbase.lite.mobiletest.data.TypedList;
-import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
+import com.couchbase.lite.mobiletest.trees.TypedList;
+import com.couchbase.lite.mobiletest.trees.TypedMap;
 import com.couchbase.lite.mobiletest.util.Log;
 
 

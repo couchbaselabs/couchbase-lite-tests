@@ -23,16 +23,13 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import com.couchbase.lite.Collection;
-import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
-import com.couchbase.lite.Document;
 import com.couchbase.lite.mobiletest.TestContext;
-import com.couchbase.lite.mobiletest.data.TypedList;
-import com.couchbase.lite.mobiletest.data.TypedMap;
-import com.couchbase.lite.mobiletest.errors.CblApiFailure;
+import com.couchbase.lite.mobiletest.changes.Snapshot;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
+import com.couchbase.lite.mobiletest.trees.TypedList;
+import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 
 @SuppressWarnings({"PMD.UnusedPrivateField", "PMD.SingularField"})
@@ -40,7 +37,7 @@ public class SnapshotDocs {
     private static final String KEY_DATABASE = "database";
     private static final String KEY_DOCUMENTS = "documents";
     private static final String KEY_COLLECTION = "collection";
-    private static final String KEY_ID = "id";
+    private static final String KEY_DOC_ID = "id";
 
     private static final Set<String> LEGAL_SNAPSHOT_KEYS;
     static {
@@ -54,7 +51,7 @@ public class SnapshotDocs {
     static {
         final Set<String> l = new HashSet<>();
         l.add(KEY_COLLECTION);
-        l.add(KEY_ID);
+        l.add(KEY_DOC_ID);
         LEGAL_DOC_ID_KEYS = Collections.unmodifiableSet(l);
     }
 
@@ -75,8 +72,8 @@ public class SnapshotDocs {
         if ((docIds == null) || docIds.isEmpty()) { throw new ClientError("Snapshot request specifies no docIds"); }
 
         final Database db = dbSvc.getOpenDb(ctxt, dbName);
+        final Snapshot snapshot = new Snapshot(dbSvc);
 
-        final String snapshotId = ctxt.createSnapshot();
         final int n = docIds.size();
         for (int i = 0; i < n; i++) {
             final TypedMap docId = docIds.getMap(i);
@@ -86,21 +83,14 @@ public class SnapshotDocs {
             final String collFqn = docId.getString(KEY_COLLECTION);
             if (collFqn == null) { throw new ClientError("Null collection name @ " + i); }
 
-            final String id = docId.getString(KEY_ID);
+            final String id = docId.getString(KEY_DOC_ID);
             if (id == null) { throw new ClientError("Null id @ " + i); }
 
-            final Collection collection = dbSvc.getCollection(db, collFqn, ctxt);
-            final Document doc;
-            try { doc = collection.getDocument(id); }
-            catch (CouchbaseLiteException e) {
-                throw new CblApiFailure("Failed getting doc " + id + " from collection " + collection, e);
-            }
-
-            ctxt.snapshotDocument(snapshotId, id, doc);
+            snapshot.snapshotDocument(ctxt, db, collFqn, id);
         }
 
         final Map<String, Object> resp = new HashMap<>();
-        resp.put(KEY_ID, snapshotId);
+        resp.put(KEY_DOC_ID, ctxt.addSnapshot(snapshot));
 
         return resp;
     }

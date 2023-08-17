@@ -19,7 +19,7 @@ import com.couchbase.lite.Document
 import com.couchbase.lite.MutableArray
 import com.couchbase.lite.MutableDictionary
 import com.couchbase.lite.MutableDocument
-import com.couchbase.lite.mobiletest.data.KeypathParser
+import com.couchbase.lite.mobiletest.changes.KeypathParser
 import com.couchbase.lite.mobiletest.errors.ClientError
 import org.junit.Assert
 import org.junit.Test

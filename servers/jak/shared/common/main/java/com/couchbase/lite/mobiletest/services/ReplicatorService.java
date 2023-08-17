@@ -31,7 +31,7 @@ import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.Scope;
 import com.couchbase.lite.mobiletest.TestContext;
-import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 
 public class ReplicatorService {

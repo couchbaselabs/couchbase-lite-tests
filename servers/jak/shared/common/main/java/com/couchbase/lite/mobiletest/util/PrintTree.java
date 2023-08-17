@@ -13,35 +13,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.tools;
+package com.couchbase.lite.mobiletest.util;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.couchbase.lite.mobiletest.data.TreeEach;
-import com.couchbase.lite.mobiletest.util.Log;
+import com.couchbase.lite.mobiletest.trees.TreeEach;
 
 
-public class PrintReq implements TreeEach.MapOp, TreeEach.ListOp {
+public class PrintTree implements TreeEach.MapOp, TreeEach.ListOp {
     private static final String TAG = "REQ";
 
 
     private final String tag;
 
-    public PrintReq(@NonNull String tag) { this.tag = tag; }
+    public PrintTree(@NonNull String tag) { this.tag = tag; }
 
     @Nullable
     @Override
     public TreeEach.MapOp startMap(@NonNull String key) {
         Log.d(TAG, "start map @" + key);
-        return new PrintReq(key);
+        return new PrintTree(key);
     }
 
     @Nullable
     @Override
     public TreeEach.MapOp startMap(int idx) {
         Log.d(TAG, "start map @" + idx);
-        return new PrintReq(String.valueOf(idx));
+        return new PrintTree(String.valueOf(idx));
     }
 
     @Override
@@ -53,14 +52,14 @@ public class PrintReq implements TreeEach.MapOp, TreeEach.ListOp {
     @Override
     public TreeEach.ListOp startList(@NonNull String key) {
         Log.d(TAG, "start list @" + key);
-        return new PrintReq(key);
+        return new PrintTree(key);
     }
 
     @Nullable
     @Override
     public TreeEach.ListOp startList(int idx) {
         Log.d(TAG, "start list @" + idx);
-        return new PrintReq(String.valueOf(idx));
+        return new PrintTree(String.valueOf(idx));
     }
 
     @Override

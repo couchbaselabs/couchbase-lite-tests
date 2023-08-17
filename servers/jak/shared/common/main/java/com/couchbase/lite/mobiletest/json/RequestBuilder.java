@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.tools;
+package com.couchbase.lite.mobiletest.json;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -28,8 +28,8 @@ import java.util.Map;
 import com.squareup.moshi.JsonReader;
 import okio.Okio;
 
-import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 
 public class RequestBuilder {

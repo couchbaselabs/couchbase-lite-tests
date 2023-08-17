@@ -22,7 +22,7 @@ import java.util.Map;
 
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
-import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 
 public class Reset {

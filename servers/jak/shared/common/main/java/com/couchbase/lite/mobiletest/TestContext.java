@@ -15,8 +15,8 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
-import com.couchbase.lite.Document;
 import com.couchbase.lite.Replicator;
+import com.couchbase.lite.mobiletest.changes.Snapshot;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
@@ -41,13 +41,17 @@ public final class TestContext implements AutoCloseable {
     @Nullable
     private Map<String, DocReplListener> openListeners;
     @Nullable
-    private Map<String, Map<String, Document>> openSnapshots;
+    private Map<String, Snapshot> openSnapshots;
 
     TestContext(@NonNull String client) { this.client = client; }
 
     @Override
     public void close() {
+        // belt
         openListeners = null;
+
+        // ... and suspenders...
+        openSnapshots = null;
 
         stopRepls();
 
@@ -107,22 +111,21 @@ public final class TestContext implements AutoCloseable {
         return (openListeners == null) ? null : openListeners.get(id);
     }
 
-    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
     @NonNull
-    public String createSnapshot() {
+    public String addSnapshot(@NonNull Snapshot snapshot) {
         final String snapshotId = UUID.randomUUID().toString();
         if (openSnapshots == null) { openSnapshots = new HashMap<>(); }
-        if (openSnapshots.containsKey(snapshotId)) { throw new ClientError("Attempt to replace an existing snapshot"); }
-        openSnapshots.put(snapshotId, new HashMap<>());
+        openSnapshots.put(snapshotId, snapshot);
         return snapshotId;
     }
 
-    public void snapshotDocument(@NonNull String snapshotId, @NonNull String id, @Nullable Document doc) {
-        if (openSnapshots == null) { throw new ServerError("No such snapshot: " + snapshotId); }
-        final Map<String, Document> snapshot = openSnapshots.get(snapshotId);
-        if (snapshot == null) { throw new ServerError("No such snapshot: " + snapshotId); }
-        if (snapshot.containsKey(id)) { throw new ClientError("Attempt to snapshot the same doc twice"); }
-        snapshot.put(id, doc);
+    @NonNull
+    public Snapshot getSnapshot(@NonNull String id) {
+        if (openSnapshots != null) {
+            final Snapshot snapshot = openSnapshots.get(id);
+            if (snapshot != null) { return snapshot; }
+        }
+        throw new ClientError("No such snapshot: " + id);
     }
 
     private void stopRepls() {

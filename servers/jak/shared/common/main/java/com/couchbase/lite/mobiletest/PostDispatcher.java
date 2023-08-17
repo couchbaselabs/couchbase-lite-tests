@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 
-import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.endpoints.v1.CreateRepl;
 import com.couchbase.lite.mobiletest.endpoints.v1.GetAllDocs;
 import com.couchbase.lite.mobiletest.endpoints.v1.GetReplStatus;
@@ -31,8 +30,9 @@ import com.couchbase.lite.mobiletest.endpoints.v1.SnapshotDocs;
 import com.couchbase.lite.mobiletest.endpoints.v1.UpdateDb;
 import com.couchbase.lite.mobiletest.endpoints.v1.VerifyDocs;
 import com.couchbase.lite.mobiletest.errors.ClientError;
-import com.couchbase.lite.mobiletest.tools.ReplyBuilder;
-import com.couchbase.lite.mobiletest.tools.RequestBuilder;
+import com.couchbase.lite.mobiletest.json.ReplyBuilder;
+import com.couchbase.lite.mobiletest.json.RequestBuilder;
+import com.couchbase.lite.mobiletest.trees.TypedMap;
 import com.couchbase.lite.mobiletest.util.Log;
 
 

@@ -31,11 +31,11 @@ import com.couchbase.lite.Replicator;
 import com.couchbase.lite.ReplicatorProgress;
 import com.couchbase.lite.ReplicatorStatus;
 import com.couchbase.lite.mobiletest.TestContext;
-import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.json.ErrorBuilder;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
-import com.couchbase.lite.mobiletest.tools.ErrorBuilder;
+import com.couchbase.lite.mobiletest.trees.TypedMap;
 import com.couchbase.lite.mobiletest.util.Log;
 
 

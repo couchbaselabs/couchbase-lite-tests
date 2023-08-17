@@ -16,6 +16,7 @@
 package com.couchbase.lite.mobiletest.services;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,14 +29,15 @@ import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.DatabaseConfiguration;
+import com.couchbase.lite.Document;
 import com.couchbase.lite.internal.core.C4Database;
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
-import com.couchbase.lite.mobiletest.data.TypedList;
-import com.couchbase.lite.mobiletest.data.TypedMap;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
+import com.couchbase.lite.mobiletest.trees.TypedList;
+import com.couchbase.lite.mobiletest.trees.TypedMap;
 import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.StringUtils;
@@ -132,6 +134,43 @@ public final class DatabaseService {
 
         return collection;
     }
+
+    @NonNull
+    public Document getDocument(
+        @NonNull Database db,
+        @NonNull String collFqn,
+        @NonNull String docId,
+        @NonNull TestContext ctxt) {
+        final Document doc = getDocOrNull(db, collFqn, docId, ctxt);
+        if (doc == null) { throw new ClientError("Document not found: " + docId); }
+        return doc;
+    }
+
+    @NonNull
+    public Document getDocument(@NonNull Collection collection, @NonNull String docId) {
+        final Document doc = getDocOrNull(collection, docId);
+        if (doc == null) { throw new ClientError("Document not found: " + docId); }
+        return doc;
+    }
+
+    @Nullable
+    public Document getDocOrNull(
+        @NonNull Database db,
+        @NonNull String collFqn,
+        @NonNull String docId,
+        @NonNull TestContext ctxt) {
+        return getDocOrNull(getCollection(db, collFqn, ctxt), docId);
+    }
+
+
+    @Nullable
+    public Document getDocOrNull(@NonNull Collection collection, @NonNull String docId) {
+        try { return collection.getDocument(docId); }
+        catch (CouchbaseLiteException e) {
+            throw new CblApiFailure("Failed getting doc " + docId + " from collection " + collection, e);
+        }
+    }
+
 
     // New stream constructors are supported only in API 26+
     private void installDataset(@NonNull String datasetName, @NonNull String dbName, @NonNull TestContext ctxt) {
