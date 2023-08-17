@@ -4,7 +4,7 @@ from json import dumps
 from typing import Dict, List, cast, Any, Optional
 
 from cbltest.requests import TestServerRequestType, TestServerRequest
-from cbltest.v1.responses import PostGetAllDocumentsResponse, PostGetAllDocumentsEntry, PostSnapshotDocumentsResponse, PostVerifyDocumentsResponse
+from cbltest.v1.responses import PostGetAllDocumentsResponse, PostGetAllDocumentsEntry, PostSnapshotDocumentsResponse, PostVerifyDocumentsResponse, ValueOrMissing
 from cbltest.v1.requests import (DatabaseUpdateEntry, DatabaseUpdateType, PostGetAllDocumentsRequestBody, 
                                  PostUpdateDatabaseRequestBody, SnapshotDocumentEntry, PostSnapshotDocumentsRequestBody,
                                  PostVerifyDocumentsRequestBody)
@@ -37,7 +37,9 @@ class SnapshotUpdater:
 
     def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None, 
                         removed_properties: Optional[List[str]] = None):
-        assert isinstance(new_properties, list), "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
+        if new_properties is not None:
+            assert isinstance(new_properties, list), "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
+        
         self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties))
 
 class DatabaseUpdater:
@@ -89,7 +91,7 @@ class DatabaseUpdater:
 
     def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None, 
                         removed_properties: Optional[List[str]] = None):
-        if not isinstance(new_properties, list):
+        if new_properties is not None and not isinstance(new_properties, list):
             self.__error = "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
             return
     
@@ -152,12 +154,12 @@ class VerifyResult:
         return self.__response.description
     
     @property
-    def expected(self) -> Optional[dict]:
+    def expected(self) -> ValueOrMissing:
         """Gets the expected document body if the bodies did not match"""
         return self.__response.expected
     
     @property
-    def actual(self) -> Optional[dict]:
+    def actual(self) -> ValueOrMissing:
         """Gets the actual document body if the bodies did not match"""
         return self.__response.actual
     
