@@ -35,6 +35,10 @@ info:
 
     Changes
 
+    0.1.9 (08/16/23)
+    * Added ReplicatorConfiguration.enableAutoPurge
+    * Added actual, expected, and document key to verifyDocuments's result
+
     0.1.8 (08/08/23)
     * Fixed missing ReplicationCollection.pullFilter
     * Added spec/replication-filter.md
@@ -383,9 +387,49 @@ paths:
                     type: boolean
                     example: false
                   description:
-                    description: 'Additional info describing the result'
+                    description: |-
+                      Describing about the failed verification result. The information includes the document id, 
+                      and the reason that causes the verification to failed such as 
+                        * Document 'doc-1' in 'scope.collection' was not deleted
+                        * Document 'doc-1' in 'scope.collection' was not purged
+                        * Document 'doc-1' in 'scope.collection' has unexpected properties at key 'address.city'.
+
+                      For the case that the document has unexpected properties, as shown in the example above,
+                      the first unexpected keypath is shown in the reason description. Its actual value, expected 
+                      value, and the entire actual document body will be shown in 'actual', 'expected', 'document' 
+                      key of the verification result object separately.
                     type: string
-                    example: "Document 'scope.collection.doc1' was not deleted."
+                    example: "Document 'doc-1' in 'scope.collection' has unexpected properties at key 'address.city'"
+                  actual:
+                    description: |-
+                      The actual value of the unexpected keypath. If the actual keypath doesn't exist, 
+                      this 'actual' key will be omitted.
+                    oneOf: 
+                      - type: boolean
+                      - type: integer
+                      - type: number
+                      - type: string
+                      - type: object
+                      - type: array
+                    example: "Santa Clara"
+                  expected:
+                    description: |-
+                      The expected value of the unexpected keypath. If the expected keypath doesn't exist, this 'expected'
+                      key will be omitted.
+                    oneOf: 
+                      - type: boolean
+                      - type: integer
+                      - type: number
+                      - type: string
+                      - type: object
+                      - type: array
+                    example: "Santa Monica"
+                  document:
+                    description: |-
+                      The actual document body of the document that has unexpected properties.
+                    type: object
+                    additionalProperties: { }
+                    example: {'name': 'John Doe', 'address': {'city': 'Santa Clara', 'state': 'CA'}}
         '400':
           $ref: '#/components/responses/Error'
         '500':
@@ -534,6 +578,7 @@ components:
           type: string
           example: "wss://localhost:4985/db"
         replicatorType:
+          description: The default is pushAndPull.
           type: string
           enum:
             - pushAndPull
@@ -541,6 +586,7 @@ components:
             - pull
           example: pushAndPull
         continuous:
+          description: The default is false.
           type: boolean
           example: true
         authenticator:
@@ -549,6 +595,10 @@ components:
             - $ref: '#/components/schemas/ReplicatorSessionAuthenticator'
         enableDocumentListener:
           description: 'When enable the document listener, the ReplicatorStatus will include the documents containing a list of DocumentReplication. The default is false.'
+          type: boolean
+          example: false
+        enableAutoPurge:
+          description: The default is true.
           type: boolean
           example: false
     ReplicationCollection:
