@@ -26,6 +26,7 @@ namespace ts::cbl {
         std::optional<ReplicationAuthenticator> authenticator;
         bool enablePinCert{false};
         bool enableDocumemntListener{false};
+        bool enableAutoPurge{true};
     };
 
     struct ReplicationCollection {

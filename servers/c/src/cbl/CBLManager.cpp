@@ -263,6 +263,7 @@ namespace ts::cbl {
         config.replicatorType = params.replicatorType;
         config.continuous = params.continuous;
         config.authenticator = auth;
+        config.disableAutoPurge = !params.enableAutoPurge;
 
         FLSliceResult cert = FLSliceResult_CreateWith(nullptr, 0);
         if (params.endpoint.compare(0, 6, "wss://") == 0 && params.enablePinCert) {
