@@ -184,10 +184,13 @@ internal static partial class HandlerList
 
         public bool enableDocumentListener { get; init; }
 
+        public bool enableAutoPurge { get; init; }
+
         [JsonConstructor]
         public StartReplicatorConfig(string database, string endpoint,
             string replicatorType, bool continuous, IReadOnlyList<StartReplicatorCollection> collections,
-            StartReplicatorAuthenticator? authenticator = null, bool enableDocumentListener = false)
+            StartReplicatorAuthenticator? authenticator = null, bool enableDocumentListener = false,
+            bool enableAutoPurge = true)
         {
             this.database = database;
             this.endpoint = endpoint;
@@ -195,6 +198,7 @@ internal static partial class HandlerList
             this.collections = collections;
             this.authenticator = authenticator;
             this.enableDocumentListener = enableDocumentListener;
+            this.enableAutoPurge = enableAutoPurge;
 
             if (replicatorType.ToLowerInvariant() == "pull") {
                 ReplicatorType = ReplicatorType.Pull;
@@ -291,6 +295,7 @@ internal static partial class HandlerList
         replConfig.Authenticator = deserializedBody.config.authenticator?.CreateAuthenticator();
         replConfig.Continuous = deserializedBody.config.continuous;
         replConfig.ReplicatorType = deserializedBody.config.ReplicatorType;
+        replConfig.EnableAutoPurge = deserializedBody.config.enableAutoPurge;
 
         (var repl, var id) = CBLTestServer.Manager.RegisterObject(() => new Replicator(replConfig));
         if(deserializedBody.config.enableDocumentListener) {
