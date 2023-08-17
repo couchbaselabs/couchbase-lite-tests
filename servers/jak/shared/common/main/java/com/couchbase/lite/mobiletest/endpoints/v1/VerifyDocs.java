@@ -18,29 +18,22 @@ package com.couchbase.lite.mobiletest.endpoints.v1;
 import androidx.annotation.NonNull;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 import com.couchbase.lite.mobiletest.TestContext;
-import com.couchbase.lite.mobiletest.data.TypedMap;
+import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
+import com.couchbase.lite.mobiletest.trees.TypedList;
+import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 
 @SuppressWarnings({"PMD.UnusedPrivateField", "PMD.SingularField"})
-public class VerifyDocs {
+public class VerifyDocs extends UpdateItemEndpoint {
     private static final String KEY_DATABASE = "database";
     private static final String KEY_SNAPSHOT = "snapshot";
     private static final String KEY_CHANGES = "changes";
-    private static final String KEY_TYPE = "type";
-    private static final String KEY_COLLECTION = "description";
-    private static final String KEY_DOC_ID = "documentID";
-    private static final String KEY_UPDATES = "updatedProperties";
-    private static final String KEY_REMOVES = "removedProperties";
-
-    private static final String KEY_RESULT = "result";
-    private static final String KEY_DESCRIPTION = "description";
 
     private static final Set<String> LEGAL_VALIDATE_KEYS;
     static {
@@ -50,28 +43,22 @@ public class VerifyDocs {
         l.add(KEY_CHANGES);
         LEGAL_VALIDATE_KEYS = Collections.unmodifiableSet(l);
     }
-
-    private static final Set<String> LEGAL_UPDATE_KEYS;
-    static {
-        final Set<String> l = new HashSet<>();
-        l.add(KEY_TYPE);
-        l.add(KEY_COLLECTION);
-        l.add(KEY_DOC_ID);
-        l.add(KEY_UPDATES);
-        l.add(KEY_REMOVES);
-        LEGAL_UPDATE_KEYS = Collections.unmodifiableSet(l);
-    }
-
-    @NonNull
-    private final DatabaseService dbSvc;
-
-    public VerifyDocs(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
+    public VerifyDocs(@NonNull DatabaseService dbSvc) { super(dbSvc); }
 
     @NonNull
     public Map<String, Object> verify(@NonNull TypedMap req, @NonNull TestContext ctxt) {
-        final Map<String, Object> resp = new HashMap<>();
-        resp.put(KEY_RESULT, true);
-        resp.put(KEY_DESCRIPTION, "all good");
-        return resp;
+        req.validate(LEGAL_VALIDATE_KEYS);
+
+        final String snapshotId = req.getString(KEY_SNAPSHOT);
+        if (snapshotId == null) { throw new ClientError("Verify documents request doesn't specify a snapshot"); }
+
+        final TypedList changes = req.getList(KEY_CHANGES);
+        if (changes == null) { throw new ClientError("Verify documents request is empty"); }
+
+        final String dbName = req.getString(KEY_DATABASE);
+        if (dbName == null) { throw new ClientError("Verify documents request doesn't specify a database"); }
+
+        return ctxt.getSnapshot(snapshotId).compare(ctxt, dbSvc.getOpenDb(ctxt, dbName), getDelta(changes));
     }
 }
+

@@ -19,8 +19,8 @@ import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.errors.TestError;
-import com.couchbase.lite.mobiletest.tools.ErrorBuilder;
-import com.couchbase.lite.mobiletest.tools.ReplyBuilder;
+import com.couchbase.lite.mobiletest.json.ErrorBuilder;
+import com.couchbase.lite.mobiletest.json.ReplyBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 
 

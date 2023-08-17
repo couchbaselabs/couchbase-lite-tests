@@ -16,41 +16,25 @@
 package com.couchbase.lite.mobiletest.endpoints.v1;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 import com.couchbase.lite.Collection;
-import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
-import com.couchbase.lite.Document;
-import com.couchbase.lite.MutableDocument;
 import com.couchbase.lite.mobiletest.TestContext;
-import com.couchbase.lite.mobiletest.data.KeypathParser;
-import com.couchbase.lite.mobiletest.data.TypedList;
-import com.couchbase.lite.mobiletest.data.TypedMap;
-import com.couchbase.lite.mobiletest.errors.CblApiFailure;
+import com.couchbase.lite.mobiletest.changes.Change;
 import com.couchbase.lite.mobiletest.errors.ClientError;
-import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
+import com.couchbase.lite.mobiletest.trees.TypedList;
+import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 
-public class UpdateDb {
-    private static final String KEY_TYPE = "type";
-    private static final String TYPE_UPDATE = "update";
-    private static final String TYPE_DELETE = "delete";
-    private static final String TYPE_PURGE = "purge";
-
+public class UpdateDb extends UpdateItemEndpoint {
     private static final String KEY_DATABASE = "database";
     private static final String KEY_UPDATES = "updates";
-    private static final String KEY_COLLECTION = "collection";
-    private static final String KEY_DOC_ID = "documentID";
-    private static final String KEY_UPDATE_PROPS = "updatedProperties";
-    private static final String KEY_REMOVED_PROPS = "removedProperties";
 
     private static final Set<String> LEGAL_UPDATES_KEYS;
     static {
@@ -59,113 +43,26 @@ public class UpdateDb {
         l.add(KEY_UPDATES);
         LEGAL_UPDATES_KEYS = Collections.unmodifiableSet(l);
     }
-
-    private static final Set<String> LEGAL_UPDATE_KEYS;
-    static {
-        final Set<String> l = new HashSet<>();
-        l.add(KEY_TYPE);
-        l.add(KEY_COLLECTION);
-        l.add(KEY_DOC_ID);
-        l.add(KEY_UPDATE_PROPS);
-        l.add(KEY_REMOVED_PROPS);
-        LEGAL_UPDATE_KEYS = Collections.unmodifiableSet(l);
-    }
-
-
-    @NonNull
-    private final DatabaseService dbSvc;
-
-    public UpdateDb(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
+    public UpdateDb(@NonNull DatabaseService dbSvc) { super(dbSvc); }
 
     @NonNull
     public Map<String, Object> updateDb(@NonNull TypedMap req, @NonNull TestContext ctxt) {
         req.validate(LEGAL_UPDATES_KEYS);
 
         final TypedList updates = req.getList(KEY_UPDATES);
-        if (updates == null) { throw new ClientError("Database update request has no updates"); }
+        if (updates == null) { throw new ClientError("Database update request is empty"); }
 
         final String dbName = req.getString(KEY_DATABASE);
         if (dbName == null) { throw new ClientError("Database update request doesn't specify a database"); }
 
         final Database db = dbSvc.getOpenDb(ctxt, dbName);
-        final int n = updates.size();
-        for (int i = 0; i < n; i++) {
-            final TypedMap update = updates.getMap(i);
-            if (update == null) { throw new ServerError("Null update request"); }
-            update.validate(LEGAL_UPDATE_KEYS);
-
-            final String collectionName = update.getString(KEY_COLLECTION);
-            if (collectionName == null) { throw new ClientError("Database update request is missing collection name"); }
-
-            final String id = update.getString(KEY_DOC_ID);
-            if (id == null) { throw new ClientError("Database update request is missing a document id"); }
-
-            final Collection collection = dbSvc.getCollection(db, collectionName, ctxt);
-
-            final Document doc;
-            try { doc = collection.getDocument(id); }
-            catch (CouchbaseLiteException e) {
-                throw new CblApiFailure("Failed retrieving document: " + id + " from collection " + collectionName, e);
-            }
-
-            final String updateType = update.getString(KEY_TYPE);
-            if (updateType == null) { throw new ClientError("Update has no type"); }
-            switch (updateType.toLowerCase(Locale.getDefault())) {
-                case TYPE_DELETE:
-                    deleteDocument(doc, collection);
-                    break;
-                case TYPE_PURGE:
-                    purgeDocument(doc, collection);
-                    break;
-                case TYPE_UPDATE:
-                    updateDocument((doc != null) ? doc.toMutable() : new MutableDocument(id), update, collection);
-                    break;
-                default:
-                    throw new ClientError("Unrecognized update type: " + updateType);
+        for (Map.Entry<String, Map<String, Change>> collChanges: getDelta(updates).entrySet()) {
+            final Collection collection = dbSvc.getCollection(db, collChanges.getKey(), ctxt);
+            for (Map.Entry<String, Change> change: collChanges.getValue().entrySet()) {
+                change.getValue().updateDocument(dbSvc, collection);
             }
         }
 
         return Collections.emptyMap();
-    }
-
-    private void deleteDocument(@Nullable Document doc, @NonNull Collection collection) {
-        if (doc == null) { return; }
-        try { collection.delete(doc); }
-        catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed deleting document", e); }
-    }
-
-    private void purgeDocument(@Nullable Document doc, @NonNull Collection collection) {
-        if (doc == null) { return; }
-        try { collection.purge(doc); }
-        catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed purging document", e); }
-    }
-
-    private void updateDocument(@NonNull MutableDocument mDoc, @NonNull TypedMap update, @NonNull Collection coll) {
-        final Map<String, Object> data = mDoc.toMap();
-
-        final KeypathParser parser = new KeypathParser();
-
-        final TypedList changes = update.getList(KEY_UPDATE_PROPS);
-        if (changes != null) {
-            final int m = changes.size();
-            for (int j = 0; j < m; j++) {
-                final TypedMap change = changes.getMap(j);
-                if (change == null) { throw new ServerError("Null update"); }
-                for (String path: change.getKeys()) { parser.parse(path).set(data, change.getObject(path)); }
-            }
-        }
-
-        final TypedList removals = update.getList(KEY_REMOVED_PROPS);
-        if (removals != null) {
-            final int m = removals.size();
-            for (int j = 0; j < m; j++) {
-                final String path = removals.getString(j);
-                if (path == null) { throw new ServerError("Null removal"); }
-                parser.parse(path).delete(data);
-            }
-        }
-
-        try { coll.save(mDoc.setData(data)); }
-        catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed saving updated document", e); }
     }
 }

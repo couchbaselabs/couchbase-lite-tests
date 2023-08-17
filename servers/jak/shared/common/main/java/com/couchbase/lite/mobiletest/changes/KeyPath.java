@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package com.couchbase.lite.mobiletest.data;
+package com.couchbase.lite.mobiletest.changes;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -53,6 +53,17 @@ public class KeyPath {
 
             Property(@NonNull String prop) { super(prop); }
 
+            @Override
+            public boolean exists(@Nullable Object node) {
+                return (node instanceof Map) && ((Map<?, ?>) node).containsKey(elem);
+            }
+
+            @Nullable
+            @Override
+            public Object get(@Nullable Object node) {
+                return (!(node instanceof Map)) ? null : ((Map<?, ?>) node).get(elem);
+            }
+
             @Nullable
             @Override
             public Object next(@Nullable Object node) {
@@ -91,12 +102,29 @@ public class KeyPath {
         public static class Index extends PathElem<Integer> {
             static class ListRef extends Ref<List<Object>, Integer> {
                 ListRef(@NonNull List<Object> objects, @NonNull Integer integer) { super(objects, integer); }
+
                 @Override
                 public void backfill(@NonNull Object val) { p.set(r, val); }
             }
 
 
             Index(@NonNull Integer idx) { super(idx); }
+
+            @Override
+            public boolean exists(@Nullable Object node) {
+                if (!(node instanceof List)) { return false; }
+                final List<?> l = (List<?>) node;
+                return (elem >= 0) && (elem < l.size());
+            }
+
+            @Nullable
+            @Override
+            public Object get(@Nullable Object node) {
+                if (!(node instanceof List)) { return null; }
+                final List<?> l = (List<?>) node;
+                final int n = l.size();
+                return ((elem < 0) || (elem >= n)) ? null : l.get(elem);
+            }
 
             @Nullable
             @Override
@@ -148,6 +176,9 @@ public class KeyPath {
 
         private PathElem(@NonNull T elem) { this.elem = elem; }
 
+        public abstract boolean exists(@Nullable Object node);
+        @Nullable
+        public abstract Object get(@Nullable Object node);
         @Nullable
         public abstract Object next(@Nullable Object node);
         public abstract void set(@Nullable Object node, @Nullable Object val);
@@ -162,10 +193,23 @@ public class KeyPath {
 
     public void addElement(PathElem<?> elem) { path.add(elem); }
 
-    @Nullable
-    public Object get(@NonNull Map<String, Object> root) {
+    public boolean exists(@Nullable Map<String, Object> root) {
+        final int n = path.size() - 1;
         Object val = root;
-        for (PathElem<?> elem: path) { val = elem.next(val); }
+        for (PathElem<?> elem: path.subList(0, n)) {
+            if (val == null) { return false; }
+            val = elem.next(val);
+        }
+        return path.get(n).exists(val);
+    }
+
+    @Nullable
+    public Object get(@Nullable Map<String, Object> root) {
+        Object val = root;
+        for (PathElem<?> elem: path) {
+            if (val == null) { return null; }
+            val = elem.next(val);
+        }
         return val;
     }
 
