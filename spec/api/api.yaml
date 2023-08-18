@@ -249,8 +249,11 @@ paths:
         description: |- 
           The request object containing the replicator configuration and the reset checkpoint flag 
           used when starting the replicator.
-
-          Note: TESTSERVER/400 error returned when no collections set in the specified collection
+          
+          Note: 
+           - If no collections specified, the replicator will be created with the database which means
+             the default collection will be used. 
+           - 400 Error returned when no collections set in the specified collection
         content:
           application/json:
             schema:
