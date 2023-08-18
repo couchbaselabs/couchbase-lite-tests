@@ -35,6 +35,10 @@ info:
 
     Changes
 
+    0.2.1 (08/18/23)
+    * Added note about out-of-scope functions to /verifyDocuments.
+    * Changed wording in /snapshotDocuments description. 
+
     0.2.0 (08/17/23)
     * Change verifyDocuments to verify all documents in snaphot
 
@@ -312,9 +316,11 @@ paths:
         - API
       summary: Snapshot documents for verifying changes
       description: |- 
-        Given a list of document IDs, snapshot the documents by getting and saving the documents in the memory. For the non-existing or deleted documents, the documents will be recorded as null.
+        Given a list of document IDs, snapshot the documents by getting and saving the documents in the memory. 
+        The non-existing or deleted documents will be recorded as null in the snapshot.
         
-        The API will return a UUID of the snapshot, which can be used when calling POST /verifyDocuments requests to verify changes in the local database after finishing replication. 
+        The API will return a UUID of the snapshot, which can be used when calling POST /verifyDocuments to 
+        verify changes against the snapshot, for example, after finishing replication. 
       operationId: snapshotDocuments
       requestBody:
         description: |-
@@ -362,6 +368,13 @@ paths:
         Verify all documents in the snapshot. The request body contains a list of changes to be verified. 
         For the snapped-shot documents that are not in the list of changes, the documents will be 
         verified as unchanged documents.
+
+        Note: 
+        * The documents outside the snapshot will not be verified. To verify expected new documents 
+          can be done by including these new documents (not existing before) to the snapshot and verifying
+          them with UPDATE changes.
+        * Verifying unexpected new documents is out-of-scope. To do that use either POST /getAllDocuments or 
+          document replication listener to verify.
       operationId: verifyDocuments
       requestBody:
         description: Verify document changes from the given document snapshot recorded by using POST /snapshotDocuments.
