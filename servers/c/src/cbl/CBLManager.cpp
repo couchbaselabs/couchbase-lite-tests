@@ -258,8 +258,12 @@ namespace ts::cbl {
         CBLReplicatorConfiguration config{};
         config.context = context.get();
         config.endpoint = endpoint;
-        config.collections = replCols.data();
-        config.collectionCount = replCols.size();
+        if (replCols.size() > 0) {
+            config.collections = replCols.data();
+            config.collectionCount = replCols.size();
+        } else {
+            config.database = db;
+        }
         config.replicatorType = params.replicatorType;
         config.continuous = params.continuous;
         config.authenticator = auth;
