@@ -19,7 +19,7 @@ async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
     log_level = request.config.getoption("--cbl-log-level")
     test_props = request.config.getoption("--test-props")
     output = request.config.getoption("--output")
-    return CBLPyTest(config, log_level, test_props, output)
+    return CBLPyTest(config, log_level, test_props, output, test_server_only=True)
 
 @pytest.fixture(scope="session")
 def dataset_path() -> Path:

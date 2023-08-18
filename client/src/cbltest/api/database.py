@@ -37,6 +37,17 @@ class SnapshotUpdater:
 
     def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None, 
                         removed_properties: Optional[List[str]] = None):
+        """
+        Updates or inserts a document using the given new and/or removed properties
+
+        :param collection: The collection to which the document belongs or will be added to (scope-qualified)
+        :param id: The ID of the document to upsert
+        :param new_properties: A list of dictionaries, each containing keypaths to set and values to use for the set.  
+                               The updates will be applied in the order specified in the list
+        :param removed_properties: A list of keypaths to remove from the document
+
+        .. note:: A keypath is a JSON keypath like $.foo[0].bar ($. is optional)
+        """
         if new_properties is not None:
             assert isinstance(new_properties, list), "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
         
@@ -91,6 +102,17 @@ class DatabaseUpdater:
 
     def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None, 
                         removed_properties: Optional[List[str]] = None):
+        """
+        Updates or inserts a document using the given new and/or removed properties
+
+        :param collection: The collection to which the document belongs or will be added to (scope-qualified)
+        :param id: The ID of the document to upsert
+        :param new_properties: A list of dictionaries, each containing keypaths to set and values to use for the set.  
+                               The updates will be applied in the order specified in the list
+        :param removed_properties: A list of keypaths to remove from the document
+
+        .. note:: A keypath is a JSON keypath like $.foo[0].bar ($. is optional)
+        """
         if new_properties is not None and not isinstance(new_properties, list):
             self.__error = "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
             return
@@ -137,6 +159,7 @@ class AllDocumentsCollection:
 class Snapshot:
     @property
     def id(self) -> str:
+        """Gets the ID of the snapshot that was created"""
         return self.__id
 
     def __init__(self, id: str) -> None:
@@ -155,13 +178,18 @@ class VerifyResult:
     
     @property
     def expected(self) -> ValueOrMissing:
-        """Gets the expected document body if the bodies did not match"""
+        """Gets the expected value of the faulty keypath, if applicable"""
         return self.__response.expected
     
     @property
     def actual(self) -> ValueOrMissing:
-        """Gets the actual document body if the bodies did not match"""
+        """Gets the actual value of the faulty keypath, if applicable"""
         return self.__response.actual
+    
+    @property
+    def document(self) -> Optional[Dict[str, Any]]:
+        """Gets the document body of the document with the faulty keypath, if applicable"""
+        return self.__response.document
     
     def __init__(self, rest_response: PostVerifyDocumentsResponse) -> None:
         self.__response = rest_response

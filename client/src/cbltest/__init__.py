@@ -60,7 +60,7 @@ class CBLPyTest:
         return self.__couchbase_servers
     
     def __init__(self, config_path: str, log_level: LogLevel = LogLevel.VERBOSE, extra_props_path: Optional[str] = None, 
-                 output_path: Optional[str] = None):
+                 output_path: Optional[str] = None, test_server_only: bool = False):
         _assert_not_null(config_path, nameof(config_path))
         self.__config = _parse_config(config_path)
         self.__log_level = LogLevel(log_level)
@@ -84,17 +84,19 @@ class CBLPyTest:
         index = 0
         cert_count = 0 if self.__config.sync_gateway_certs is None else len(self.__config.sync_gateway_certs)
         sgw_certs = cast(list, self.__config.sync_gateway_certs)
-        for sg in self.__config.sync_gateways:
-            secure = index < cert_count and sgw_certs[index] is not None
-            sgw_info = SyncGatewayInfo(sg)
-            self.__sync_gateways.append(SyncGateway(sgw_info.hostname, sgw_info.rbac_user, sgw_info.rbac_password, 
-                                                    sgw_info.port, sgw_info.admin_port, secure))
-            index += 1
+        if not test_server_only:
+            for sg in self.__config.sync_gateways:
+                secure = index < cert_count and sgw_certs[index] is not None
+                sgw_info = SyncGatewayInfo(sg)
+                self.__sync_gateways.append(SyncGateway(sgw_info.hostname, sgw_info.rbac_user, sgw_info.rbac_password, 
+                                                        sgw_info.port, sgw_info.admin_port, secure))
+                index += 1
 
         self.__couchbase_servers: List[CouchbaseServer] = []
-        for cbs in self.__config.couchbase_servers:
-            cbs_info = CouchbaseServerInfo(cbs)
-            self.__couchbase_servers.append(CouchbaseServer(cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password))
+        if not test_server_only:
+            for cbs in self.__config.couchbase_servers:
+                cbs_info = CouchbaseServerInfo(cbs)
+                self.__couchbase_servers.append(CouchbaseServer(cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password))
 
 
     def __str__(self) -> str:
