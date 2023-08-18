@@ -1,4 +1,6 @@
 ﻿using Couchbase.Lite;
+using System;
+using System.Diagnostics;
 using System.Dynamic;
 using System.Linq;
 using System.Net;
@@ -45,68 +47,134 @@ internal static partial class HandlerList
         }
     }
 
-    internal static (bool success, string keyPath, KeyPathValue expected, KeyPathValue actual) IsEqual(string keyPath, object? expected, object? actual)
+    internal readonly struct CompareResult
+    {
+        public bool Success { get; init; } = true;
+
+        public string KeyPath { get; init; } = "";
+
+        public KeyPathValue Expected { get; init; } = new KeyPathValue();
+
+        public KeyPathValue Actual { get; init; } = new KeyPathValue();
+
+        public CompareResult()
+        {
+
+        }
+    }
+
+    internal static CompareResult IsEqual(string keyPath, object? expected, object? actual)
     {
         switch(expected) {
             case null:
-                return (actual == null, keyPath, new KeyPathValue(expected), new KeyPathValue(actual?.ToDocumentObject()));
+                return new CompareResult
+                {
+                    Success = actual == null,
+                    KeyPath = keyPath,
+                    Expected = new KeyPathValue(expected),
+                    Actual = new KeyPathValue(actual?.ToDocumentObject())
+                };
             case IMutableArray arr:
                 return IsEqual(keyPath, arr, actual as IArray);
             case IMutableDictionary dict:
                 return IsEqual(keyPath, dict, actual as IDictionaryObject);
             default:
-                return (expected.Equals(actual), keyPath, new KeyPathValue(expected.ToDocumentObject()), new KeyPathValue(actual.ToDocumentObject()));
+                return new CompareResult
+                {
+                    Success = expected.Equals(actual),
+                    KeyPath = keyPath,
+                    Expected = new KeyPathValue(expected.ToDocumentObject()),
+                    Actual = new KeyPathValue(actual?.ToDocumentObject())
+                };
         }
     }
 
-    internal static (bool success, string keyPath, KeyPathValue expected, KeyPathValue actual) IsEqual(string keyPath, IMutableArray expected, IArray? actual)
+    internal static CompareResult IsEqual(string keyPath, IMutableArray expected, IArray? actual)
     {
-        if(actual == null) {
-            return (false, keyPath, new KeyPathValue(expected.ToList()), new KeyPathValue(actual?.ToList()));
-        }
-
-        if (expected.Count != actual.Count) {
-            return (false, keyPath, new KeyPathValue(expected.ToList()), new KeyPathValue(actual.ToList()));
+        if(actual == null || expected.Count != actual.Count) {
+            return new CompareResult
+            {
+                Success = false,
+                KeyPath = keyPath,
+                Expected = new KeyPathValue(expected.ToList()),
+                Actual = new KeyPathValue(actual?.ToList())
+            };
         }
 
         for(int i = 0; i < expected.Count; i++) {
             var leftVal = expected.GetValue(i);
             var rightVal = actual.GetValue(i);
             var result = IsEqual(keyPath + $"[{i}]", leftVal.ToDocumentObject(), rightVal.ToDocumentObject());
-            if(!result.success) {
+            if(!result.Success) {
                 return result;
             }
         }
 
-        return (true, keyPath, new KeyPathValue(), new KeyPathValue());
+        return new CompareResult();
     }
 
-    internal static (bool success, string keyPath, KeyPathValue expected, KeyPathValue actual) IsEqual(string keyPath, IMutableDictionary expected, IDictionaryObject? actual)
+    internal static CompareResult IsEqual(string keyPath, IMutableDictionary expected, IDictionaryObject? actual)
     {
         if(actual == null) {
-            return (false, keyPath, new KeyPathValue(expected.ToDictionary()), new KeyPathValue());
+            return new CompareResult
+            {
+                Success = false,
+                KeyPath = keyPath,
+                Expected = new KeyPathValue(expected.ToDictionary()),
+                Actual = new KeyPathValue(new KeyPathValue(null))
+            };
         }
 
         foreach(var key in expected.Keys) {
             if(!actual.Contains(key)) {
-                return (false, keyPath + $".{key}", new KeyPathValue(expected.GetValue(key).ToDocumentObject()), new KeyPathValue());
+                return new CompareResult
+                {
+                    Success = false,
+                    KeyPath = keyPath + $".{key}",
+                    Expected = new KeyPathValue(expected.GetValue(key).ToDocumentObject()),
+                    Actual = new KeyPathValue()
+                };
             }
 
             var leftVal = expected.GetValue(key);
             var rightVal = actual.GetValue(key);
             var result = IsEqual(keyPath + $".{key}", leftVal, rightVal);
-            if (!result.success) {
+            if (!result.Success) {
                 return result;
             }
         }
 
         foreach(var key in actual.Keys) {
             if(!expected.Contains(key)) {
-                return (false, keyPath + $".{key}", new KeyPathValue(), new KeyPathValue(actual.GetValue(key).ToDocumentObject()));
+                return new CompareResult
+                {
+                    Success = false,
+                    KeyPath = keyPath + $".{key}",
+                    Expected = new KeyPathValue(),
+                    Actual = new KeyPathValue(actual.GetValue(key).ToDocumentObject())
+                };
             }
         }
 
-        return (true, keyPath, new KeyPathValue(expected), new KeyPathValue(actual));
+        return new CompareResult();
+    }
+
+    public static void HandleCompareFailure(Document existing, CompareResult compareResult, HttpListenerResponse response, int version)
+    {
+        dynamic responseBody = new ExpandoObject();
+        responseBody.result = false;
+        responseBody.description = $"Document '{existing.Id}' in '{existing.Collection!.Scope.Name}.{existing.Collection!.Name}' had unexpected properties at key '{compareResult.KeyPath.Substring(2)}'";
+        if (compareResult.Actual.Exists) {
+            responseBody.actual = compareResult.Actual.Value;
+        }
+
+        if (compareResult.Expected.Exists) {
+            responseBody.expected = compareResult.Expected.Value;
+        }
+
+        responseBody.document = existing.ToDictionary();
+
+        response.WriteBody((object)responseBody, version);
     }
 
     [HttpHandler("verifyDocuments")]
@@ -118,20 +186,25 @@ internal static partial class HandlerList
 
         var db = CBLTestServer.Manager.GetDatabase(verifyBody.database);
         if (db == null) {
+            // Error 1 : The specified database was not found.
             response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{verifyBody.database}'!"), version, HttpStatusCode.BadRequest);
             return;
         }
 
         var snapshot = CBLTestServer.Manager.GetObject<Snapshot>(verifyBody.snapshot);
         if(snapshot == null) {
+            // Error 2 : The specified snapshot was not found.
             response.WriteBody(Router.CreateErrorResponse($"Unable to find snapshot named '{verifyBody.snapshot}'!"), version, HttpStatusCode.BadRequest);
             return;
         }
 
+        var seenKeys = new HashSet<string>();
         foreach(var change in verifyBody.changes) {
             var collSpec = CollectionSpec(change.collection);
             var key = $"{collSpec.scope}.{collSpec.name}.{change.documentID}";
+            seenKeys.Add(key);
             if(!snapshot.ContainsKey(key)) {
+                // Error 3 : The document in the collection didn't exist in the snapshot.
                 response.WriteBody(Router.CreateErrorResponse($"Document '{change.documentID}' in '{change.collection}' does not exist in the snapshot"), version, HttpStatusCode.BadRequest);
                 return;
             }
@@ -139,6 +212,8 @@ internal static partial class HandlerList
             using var existing = db.GetCollection(collSpec.name, collSpec.scope)?.GetDocument(change.documentID);
             if (change.Type == UpdateDatabaseType.Purge || change.Type == UpdateDatabaseType.Delete) {
                 if(existing != null) {
+                    // Case 2 : Document should be deleted but it wasn't.
+                    // Case 3 : Document should be purged but it wasn't.
                     var verb = change.Type == UpdateDatabaseType.Purge ? "purged" : "deleted";
                     response.WriteBody(new { 
                         result = false, 
@@ -151,9 +226,10 @@ internal static partial class HandlerList
             }
 
             if (existing == null) {
+                // Case 1: Document should exist in the collection but it doesn't exist to verify.
                 response.WriteBody(new { 
                     result = false,
-                    description = $"Document '{change.documentID} in '{change.collection}' not found" 
+                    description = $"Document '{change.documentID}' in '{change.collection}' was not found" 
                 }, version);
                 return;
             }
@@ -175,21 +251,51 @@ internal static partial class HandlerList
             }
 
             var compareResult = IsEqual("$", mutableCopy, existing);
-            if(!compareResult.success) {
-                dynamic responseBody = new ExpandoObject();
-                responseBody.result = false;
-                responseBody.description = $"Document '{change.documentID}' in '{change.collection}' had unexpected properties at key '{compareResult.keyPath.Substring(2)}'";
-                if(compareResult.actual.Exists) {
-                    responseBody.actual = compareResult.actual.Value;
-                }
+            if(!compareResult.Success) {
+                // Case 4 : Document has unexpected properties.
+                HandleCompareFailure(existing, compareResult, response, version);
+                return;
+            }
+        }
 
-                if(compareResult.expected.Exists) {
-                    responseBody.expected = compareResult.expected.Value;
-                }
+        foreach (var entry in snapshot) {
+            if (seenKeys.Contains(entry.Key)) {
+                // Already validated in the previous logic
+                continue;
+            }
 
-                responseBody.document = existing.ToDictionary();
+            // If we made it this far, this is an unmodified entry in the snapshot
+            var components = entry.Key.Split('.');
+            if (components.Length != 3) {
+                throw new ApplicationException($"Invalid key in snapshot {entry.Key}");
+            }
 
-                response.WriteBody((object)responseBody, version);
+            var collection = String.Join('.', components.Take(2));
+
+            using var existing = db.GetCollection(components[0], components[1])?.GetDocument(components[2]);
+            if(entry.Value == null && existing != null) {
+                // Case 5 : Document shouldn't exist (null value in the snapshot), but the document does exist.
+                response.WriteBody(new
+                {
+                    result = false,
+                    description = $"Document '{components[2]}' in '{collection}' should not exist"
+                }, version);
+            }
+
+            if(existing == null) {
+                // Case 1: Document should exist in the collection but it doesn't exist to verify.
+                response.WriteBody(new
+                {
+                    result = false,
+                    description = $"Document '{components[2]}' in '{collection}' was not found"
+                }, version);
+                return;
+            }
+
+            var compareResult = IsEqual("$", entry.Value, existing);
+            if (!compareResult.Success) {
+                // Case 4 : Document has unexpected properties.
+                HandleCompareFailure(existing, compareResult, response, version);
                 return;
             }
         }

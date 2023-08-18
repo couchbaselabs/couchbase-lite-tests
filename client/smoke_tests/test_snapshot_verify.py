@@ -195,3 +195,52 @@ class TestSnapshotVerify:
         snapshot_updater.purge_document("_default._default", "name_2")
         with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
             await db.verify_documents(snapshot_updater)
+
+    @pytest.mark.asyncio
+    async def test_verify_wrongly_existing_doc(self, cblpytest: CBLPyTest) -> None:
+        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        snapshot_id = await db.create_snapshot([
+            SnapshotDocumentEntry("_default._default", "foo_1")
+        ])
+
+        snapshot_updater = SnapshotUpdater(snapshot_id)
+        async with db.batch_updater() as b:
+            b.upsert_document("_default._default", "foo_1", [{"contact.email[1]": "foo@bar.com"}])
+
+        verify_result = await db.verify_documents(snapshot_updater)
+        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.description == "Document 'foo_1' in '_default._default' should not exist"
+        assert not verify_result.actual.exists and not verify_result.actual.exists, "The return value should not have expected or actual"
+
+    @pytest.mark.asyncio
+    async def test_verify_wrongly_nonexistent_unmodified(self, cblpytest: CBLPyTest) -> None:
+        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        snapshot_id = await db.create_snapshot([
+            SnapshotDocumentEntry("_default._default", "name_1")
+        ])
+
+        snapshot_updater = SnapshotUpdater(snapshot_id)
+        async with db.batch_updater() as b:
+            b.delete_document("_default._default", "name_1")
+
+        verify_result = await db.verify_documents(snapshot_updater)
+        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.description == "Document 'name_1' in '_default._default' was not found"
+        assert not verify_result.actual.exists and not verify_result.actual.exists, "The return value should not have expected or actual"
+
+    @pytest.mark.asyncio
+    async def test_verify_wrongly_nonexistent_modified(self, cblpytest: CBLPyTest) -> None:
+        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        snapshot_id = await db.create_snapshot([
+            SnapshotDocumentEntry("_default._default", "name_1")
+        ])
+
+        snapshot_updater = SnapshotUpdater(snapshot_id)
+        snapshot_updater.upsert_document("_default._default", "name_1", [{"foo": "bar"}])
+        async with db.batch_updater() as b:
+            b.delete_document("_default._default", "name_1")
+
+        verify_result = await db.verify_documents(snapshot_updater)
+        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.description == "Document 'name_1' in '_default._default' was not found"
+        assert not verify_result.actual.exists and not verify_result.actual.exists, "The return value should not have expected or actual"
