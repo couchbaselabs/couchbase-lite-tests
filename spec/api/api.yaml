@@ -35,6 +35,9 @@ info:
 
     Changes
 
+    0.2.0 (08/17/23)
+    * Change verifyDocuments to verify all documents in snaphot
+
     0.1.9 (08/16/23)
     * Added ReplicatorConfiguration.enableAutoPurge
     * Added actual, expected, and document key to verifyDocuments's result
@@ -353,7 +356,9 @@ paths:
         - API
       summary: Verify document changes from a document snapshot.
       description: |- 
-        Verify document changes from a document snapshot. The request body contains an array of changes to be verified.
+        Verify all documents in the snapshot. The request body contains a list of changes to be verified. 
+        For the snapped-shot documents that are not in the list of changes, the documents will be 
+        verified as unchanged documents.
       operationId: verifyDocuments
       requestBody:
         description: Verify document changes from the given document snapshot recorded by using POST /snapshotDocuments.
@@ -389,15 +394,36 @@ paths:
                   description:
                     description: |-
                       Describing about the failed verification result. The information includes the document id, 
-                      and the reason that causes the verification to failed such as 
-                        * Document 'doc-1' in 'scope.collection' was not deleted
-                        * Document 'doc-1' in 'scope.collection' was not purged
-                        * Document 'doc-1' in 'scope.collection' has unexpected properties at key 'address.city'.
+                      and the reason that causes the verification to failed as follows: 
 
-                      For the case that the document has unexpected properties, as shown in the example above,
-                      the first unexpected keypath is shown in the reason description. Its actual value, expected 
-                      value, and the entire actual document body will be shown in 'actual', 'expected', 'document' 
-                      key of the verification result object separately.
+                      Case 1 : Document should exists in the collection but it doesn't exist to verify.
+                      Reason : Document '<doc-id>' in '<scope.collection>' was not found
+
+                      Case 2 : Document should be deleted but it wasn't.
+                      Reason : Document '<doc-id>' in '<scope.collection>' was not deleted
+
+                      Case 3 : Document should be purged but it wasn't.
+                      Reason : Document '<doc-id>' in '<scope.collection>' was not purged
+
+                      Case 4 : Document has unexpected properties.
+                      Reason : Document '<doc-id> in '<scope.collection>' had unexpected properties at key '<keypath>'
+
+                      Case 5 : Document shouldn't exist (null value in the snapshot), but the document does exist.
+                      Reason : Document '<doc-id> in '<scope.collection>' should not exist.
+
+                      For the Case, The first unexpected keypath is shown in the reason description. 
+                      Its actual value, expected value, and the entire actual document body will be shown in 
+                      'actual', 'expected', 'document' key of the verification result object separately. If 
+                      the value of the 'actual' or 'expected' key is MISSING, the key will be omitted.
+
+                      The following cases are listed as request errors (response status = 400):
+
+                      Error Case 1 : The specified database in the request was not found.
+                      
+                      Error Case 2 : The specified snapshot was not found.
+                      
+                      Error Case 3 : The document in the collection to be verified didn't exist in the snapshot.
+
                     type: string
                     example: "Document 'doc-1' in 'scope.collection' has unexpected properties at key 'address.city'"
                   actual:
