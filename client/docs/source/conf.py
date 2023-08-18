@@ -30,6 +30,7 @@ templates_path = ['_templates']
 
 autoapi_dirs = ['../../src/cbltest']
 autoapi_add_toctree_entry = True
+autodoc_inherit_docstrings = True
 html_theme = 'sphinx_rtd_theme'
 
 def skip_private(app, what, name, obj, skip, options):

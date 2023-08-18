@@ -33,6 +33,9 @@ class TestSnapshotVerify:
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == True, f"The verification failed: {verify_result.description}"
+        assert not verify_result.actual.exists, "Response should not contain 'actual'"
+        assert not verify_result.expected.exists, "Response should not contain 'expected'"
+        assert verify_result.document is None, "Response should not contain 'document'"
 
     @pytest.mark.asyncio
     async def test_verify_good_delete(self, cblpytest: CBLPyTest) -> None:
@@ -47,6 +50,9 @@ class TestSnapshotVerify:
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == True, f"The verification failed: {verify_result.description}"
+        assert not verify_result.actual.exists, "Response should not contain 'actual'"
+        assert not verify_result.expected.exists, "Response should not contain 'expected'"
+        assert verify_result.document is None, "Response should not contain 'document'"
 
     @pytest.mark.asyncio
     async def test_verify_bad_delete(self, cblpytest: CBLPyTest) -> None:
@@ -63,6 +69,9 @@ class TestSnapshotVerify:
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description == "Document 'name_2' in '_default._default' was not deleted"
+        assert not verify_result.actual.exists, "Response should not contain 'actual'"
+        assert not verify_result.expected.exists, "Response should not contain 'expected'"
+        assert verify_result.document is None, "Response should not contain 'document'"
 
     @pytest.mark.asyncio
     async def test_verify_good_purge(self, cblpytest: CBLPyTest) -> None:
@@ -77,6 +86,9 @@ class TestSnapshotVerify:
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == True, f"The verification failed: {verify_result.description}"
+        assert not verify_result.actual.exists, "Response should not contain 'actual'"
+        assert not verify_result.expected.exists, "Response should not contain 'expected'"
+        assert verify_result.document is None, "Response should not contain 'document'"
 
     @pytest.mark.asyncio
     async def test_verify_bad_purge(self, cblpytest: CBLPyTest) -> None:
@@ -93,6 +105,9 @@ class TestSnapshotVerify:
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description == "Document 'name_2' in '_default._default' was not purged"
+        assert not verify_result.actual.exists, "Response should not contain 'actual'"
+        assert not verify_result.expected.exists, "Response should not contain 'expected'"
+        assert verify_result.document is None, "Response should not contain 'document'"
 
     @pytest.mark.asyncio
     async def test_verify_bad_single_dict_update(self, cblpytest: CBLPyTest) -> None:
@@ -109,8 +124,9 @@ class TestSnapshotVerify:
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description == "Document 'name_1' in '_default._default' had unexpected properties at key 'name.first'"
-        assert verify_result.actual.exists and verify_result.actual.value == "Value"
-        assert verify_result.expected.exists and verify_result.expected.value == "bad_value"
+        assert verify_result.actual.exists and verify_result.actual.value == "Value", "Incorrect 'actual' in response"
+        assert verify_result.expected.exists and verify_result.expected.value == "bad_value", "Incorrect 'expected' in response"
+        assert verify_result.document is not None, "Missing document property in response"
 
     @pytest.mark.asyncio
     async def test_verify_bad_single_array_update(self, cblpytest: CBLPyTest) -> None:
@@ -127,8 +143,9 @@ class TestSnapshotVerify:
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description == "Document 'name_1' in '_default._default' had unexpected properties at key 'contact.email[0]'"
-        assert verify_result.actual.exists and verify_result.actual.value == "foo@bar.com"
-        assert verify_result.expected.exists and verify_result.expected.value == "foo@baz.com"
+        assert verify_result.actual.exists and verify_result.actual.value == "foo@bar.com", "Incorrect 'actual' in response"
+        assert verify_result.expected.exists and verify_result.expected.value == "foo@baz.com", "Incorrect 'expected' in response"
+        assert verify_result.document is not None, "Missing document property in response"
 
     @pytest.mark.asyncio
     async def test_verify_bad_array_order_update(self, cblpytest: CBLPyTest) -> None:
@@ -145,8 +162,9 @@ class TestSnapshotVerify:
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description == "Document 'name_1' in '_default._default' had unexpected properties at key 'contact.email[0]'"
-        assert verify_result.actual.exists and verify_result.actual.value == "foo@bar.com"
-        assert verify_result.expected.exists and verify_result.expected.value == "shawna.matheney@nosql-matters.org"
+        assert verify_result.actual.exists and verify_result.actual.value == "foo@bar.com", "Incorrect 'actual' in response"
+        assert verify_result.expected.exists and verify_result.expected.value == "shawna.matheney@nosql-matters.org", "Incorrect 'expected' in response"
+        assert verify_result.document is not None, "Missing document property in response"
 
     @pytest.mark.asyncio
     async def test_verify_nonexistent_property(self, cblpytest: CBLPyTest) -> None:
@@ -164,7 +182,8 @@ class TestSnapshotVerify:
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description == "Document 'name_1' in '_default._default' had unexpected properties at key 'contact.email'"
         assert not verify_result.actual.exists, "'actual' should be missing"
-        assert verify_result.expected.exists and verify_result.expected.value == ["shawna.matheney@nosql-matters.org","foo@bar.com"], "Incorrect value for 'expected'"
+        assert verify_result.expected.exists and verify_result.expected.value == ["shawna.matheney@nosql-matters.org","foo@bar.com"], "Incorrect 'expected' in response"
+        assert verify_result.document is not None, "Missing document property in response"
 
     @pytest.mark.asyncio
     async def test_verify_bad_remove_property(self, cblpytest: CBLPyTest) -> None:
@@ -181,8 +200,9 @@ class TestSnapshotVerify:
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description == "Document 'name_1' in '_default._default' had unexpected properties at key 'contact.email'"
-        assert verify_result.actual.exists and verify_result.actual.value == ["shawna.matheney@nosql-matters.org","foo@bar.com"], "Incorrect value for 'actual'"
+        assert verify_result.actual.exists and verify_result.actual.value == ["shawna.matheney@nosql-matters.org","foo@bar.com"], "Incorrect 'expected' in response"
         assert not verify_result.expected.exists, "'expected' should be missing"
+        assert verify_result.document is not None, "Missing document property in response"
         
     @pytest.mark.asyncio
     async def test_verify_bad_snapshot(self, cblpytest: CBLPyTest) -> None:
@@ -210,7 +230,8 @@ class TestSnapshotVerify:
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description == "Document 'foo_1' in '_default._default' should not exist"
-        assert not verify_result.actual.exists and not verify_result.actual.exists, "The return value should not have expected or actual"
+        assert not verify_result.actual.exists and not verify_result.actual.exists and verify_result.document is None, \
+              "The return value should not have expected, actual, or document"
 
     @pytest.mark.asyncio
     async def test_verify_wrongly_nonexistent_unmodified(self, cblpytest: CBLPyTest) -> None:
@@ -226,7 +247,8 @@ class TestSnapshotVerify:
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description == "Document 'name_1' in '_default._default' was not found"
-        assert not verify_result.actual.exists and not verify_result.actual.exists, "The return value should not have expected or actual"
+        assert not verify_result.actual.exists and not verify_result.actual.exists and verify_result.document is None, \
+            "The return value should not have expected, actual or document"
 
     @pytest.mark.asyncio
     async def test_verify_wrongly_nonexistent_modified(self, cblpytest: CBLPyTest) -> None:
@@ -243,4 +265,5 @@ class TestSnapshotVerify:
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == False, f"The verification passed"
         assert verify_result.description == "Document 'name_1' in '_default._default' was not found"
-        assert not verify_result.actual.exists and not verify_result.actual.exists, "The return value should not have expected or actual"
+        assert not verify_result.actual.exists and not verify_result.actual.exists and verify_result.document is None, \
+            "The return value should not have expected, actual or document"

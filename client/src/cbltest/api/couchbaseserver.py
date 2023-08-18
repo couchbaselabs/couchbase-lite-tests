@@ -22,6 +22,15 @@ class CouchbaseServer:
         self.__cluster.wait_until_ready(timedelta(seconds=10))
 
     def create_collections(self, bucket: str, scope: str, names: List[str]) -> None:
+        """
+        A function that will create a specified set of collections in the specified scope
+        which resides in the specified bucket
+
+        :param bucket: The bucket name in which the scope resides
+        :param scope: The scope in which to create the collections.  It will be created
+                      if it doesn't already exist, unless it is the default scope
+        :param names: The names of the collections to create
+        """
         bucket_obj = self.__cluster.bucket(bucket)
         c = bucket_obj.collections()
         try:

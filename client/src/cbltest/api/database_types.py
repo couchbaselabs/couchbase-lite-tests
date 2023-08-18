@@ -1,7 +1,6 @@
 from typing import Any
 from cbltest.api.jsonserializable import JSONSerializable
 
-
 class SnapshotDocumentEntry(JSONSerializable):
     """
     A class for recording the fully qualified name of a document to be saved in a snapshot.

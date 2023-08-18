@@ -143,6 +143,7 @@ class PostVerifyDocumentsResponse(TestServerResponse):
     __description_key: Final[str] = "description"
     __expected_key: Final[str] = "expected"
     __actual_key: Final[str] = "actual"
+    __document_key: Final[str] = "document"
 
     @property
     def result(self) -> bool:
@@ -156,13 +157,18 @@ class PostVerifyDocumentsResponse(TestServerResponse):
     
     @property
     def expected(self) -> ValueOrMissing:
-        """Gets the expected document body if the bodies did not match"""
+        """Gets the expected value of the faulty keypath, if applicable"""
         return self.__expected
     
     @property
     def actual(self) -> ValueOrMissing:
-        """Gets the actual document body if the bodies did not match"""
+        """Gets the actual value of the faulty keypath, if applicable"""
         return self.__actual
+    
+    @property
+    def document(self) -> Optional[Dict[str, Any]]:
+        """Gets the document body of the document with the faulty keypath, if applicable"""
+        return self.__document
     
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "verifyDocuments")
@@ -180,6 +186,8 @@ class PostVerifyDocumentsResponse(TestServerResponse):
             self.__actual = ValueOrMissing()
         else:
             self.__actual = ValueOrMissing(body.get(self.__actual_key), True)
+
+        self.__document = _get_typed(body, self.__document_key, Dict[str, Any])
     
 class PostStartReplicatorResponse(TestServerResponse):
     """
