@@ -1,0 +1,24 @@
+name: Validate Python Files
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "**"
+
+jobs:
+  mypy:
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: mypy validation
+      working-directory: ${{github.workspace}}
+      shell: bash
+      run: .github/workflows/verify_python.sh
+      
