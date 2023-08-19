@@ -7,9 +7,9 @@ from varname import nameof
 
 from cbltest.httplog import get_next_writer
 from cbltest.assertions import _assert_not_null
-from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
+from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
-from cbltest.jsonhelper import _get_typed, _get_typed_required
+from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_warning
     
 class _CollectionMap(JSONSerializable):
@@ -56,9 +56,16 @@ class PutDatabasePayload(JSONSerializable):
                 self.add_collection(collection_dict, scope, collection)
 
     def scopes(self) -> List[str]:
+        """Gets all the scopes contained in the payload"""
         return list(self.__scopes.keys())
     
     def collections(self, scope: str) -> List[str]:
+        """
+        Gets a list of collections specified for the given scope
+        
+        :param scope: The name of the scope to check
+        """
+
         map = self.__scopes.get(scope)
         if not map:
             raise KeyError(f"No collections present for {scope}")
@@ -92,16 +99,22 @@ class PutDatabasePayload(JSONSerializable):
         return ret_val
     
 class AllDocumentsResponseRow:
+    """
+    A class representing a single entry in an all_docs response from Sync Gateway
+    """
     @property
     def key(self) -> str:
+        """Gets the key of the row"""
         return self.__key
     
     @property
     def id(self) -> str:
+        """Gets the document ID of the row"""
         return self.__id
     
     @property
     def revid(self) -> str:
+        """Gets the revision ID of the row"""
         return self.__revid
     
     def __init__(self, key: str, id: str, revid: str) -> None:
@@ -110,8 +123,12 @@ class AllDocumentsResponseRow:
         self.__revid = revid
     
 class AllDocumentsResponse:
+    """
+    A class representing an all_docs response from Sync Gateway
+    """
     @property 
     def rows(self) -> List[AllDocumentsResponseRow]:
+        """Gets the entries of the response"""
         return self.__rows
     
     def __len__(self) -> int:
@@ -144,14 +161,17 @@ class RemoteDocument(JSONSerializable):
 
     @property
     def id(self) -> str:
+        """Gets the ID of the document"""
         return self.__id
     
     @property
     def revid(self) -> str:
+        """Gets the revision ID of the document"""
         return self.__rev
     
     @property
     def body(self) -> dict:
+        """Gets the body of the document"""
         return self.__body
 
     def __init__(self, body: dict) -> None:
@@ -353,6 +373,14 @@ class SyncGateway:
 
     async def update_documents(self, db_name: str, updates: List[DocumentUpdateEntry],
                                scope: str = "_default", collection: str = "_default") -> None:
+        """
+        Sends a list of documents to be updated on Sync Gateway
+
+        :param db_name: The name of the DB endpoint to update
+        :param updates: A list of updates to perform
+        :param scope: The scope that the updates will be applied to (default '_default')
+        :param collection: The collection that the updates will be applied to (default '_default')
+        """
         body = {
             "docs": list(u.to_json() for u in updates)
         }
@@ -360,11 +388,29 @@ class SyncGateway:
         await self._send_request("post", f"/{db_name}.{scope}.{collection}/_bulk_docs", 
                                         JSONDictionary(body))
         
-    async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "_default", collection: str = "_default") -> None:
+    async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "_default", 
+                              collection: str = "_default") -> None:
+        """
+        Deletes a document from Sync Gateway
+
+        :param doc_id: The document ID to delete
+        :param revid: The revision ID of the existing document
+        :param db_name: The name of the DB endpoint that the document exists in
+        :param scope: The scope that the document exists in (default '_default')
+        :param collection: The collection that the document exists in (default '_default')
+        """
         await self._send_request("delete", f"/{db_name}.{scope}.{collection}/{doc_id}",
                                  params={"rev": revid})
         
     async def purge_document(self, doc_id: str, db_name: str, scope: str = "_default", collection: str = "_default") -> None:
+        """
+        Purges a document from Sync Gateway
+
+        :param doc_id: The document ID to delete
+        :param db_name: The name of the DB endpoint that the document exists in
+        :param scope: The scope that the document exists in (default '_default')
+        :param collection: The collection that the document exists in (default '_default')
+        """
         body = {
             doc_id: ["*"]
         }
@@ -373,6 +419,15 @@ class SyncGateway:
                                  JSONDictionary(body))
         
     async def get_document(self, db_name: str, doc_id: str, scope: str = "_default", collection: str = "_default") -> Optional[RemoteDocument]:
+        """
+        Gets a document from Sync Gateway
+
+        :param db_name: The name of the DB endpoint that the document exists in
+        :param doc_id: The document ID to get
+        :param scope: The scope that the document exists in (default '_default')
+        :param collection: The collection that the document exists in (default '_default')
+        """
+        
         response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
         if not isinstance(response, dict):
             raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")

@@ -206,6 +206,11 @@ class ReplicatorDocumentFlags(Flag):
 
     @classmethod
     def parse(cls, input: str) -> ReplicatorDocumentFlags:
+        """
+        Parses a single string word into a flag value.
+
+        :param input: The string representing the flag (e.g. DELETED), case-insensitive
+        """
         assert isinstance(input, str), f"Non-string input to ReplicatorDocumentFlags {input}"
         upper = input.upper()
         if upper == "NONE":
@@ -221,6 +226,11 @@ class ReplicatorDocumentFlags(Flag):
     
     @classmethod
     def parse_all(cls, input: List[str]) -> ReplicatorDocumentFlags:
+        """
+        Parses and ORs a list of string words representing flags
+
+        :param input: The list of string words each representing a flag (e.g. DELETED), case-insensitive
+        """
         ret_val = ReplicatorDocumentFlags.NONE
         for i in input:
             ret_val |= cls.parse(i)
@@ -288,12 +298,18 @@ class ReplicatorDocumentEntry:
         self.__error: Optional[ErrorResponseBody] = ErrorResponseBody.create(cast(dict, body.get(self.__error_key)))
 
 class WaitForDocumentEventEntry:
+    """
+    A class that represents a single replicator document event to wait for from
+    a replicator's document listener
+    """
     @property
     def collection(self) -> str:
+        """Gets the collection of the document to wait for"""
         return self.__collection
     
     @property
     def id(self) -> str:
+        """Gets the ID of the document to wait for"""
         return self.__id
     
     def __init__(self, collection: str, id: str):
