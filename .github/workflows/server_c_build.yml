@@ -34,6 +34,12 @@ jobs:
       shell: bash
       run: ./scripts/build_macOS.sh enterprise 3.1.1
 
+    - name: Build iOS
+      if: runner.os == 'macOS'
+      working-directory: ${{github.workspace}}/servers/c
+      shell: bash
+      run: ./scripts/build_ios.sh simulator enterprise 3.1.1
+
     - name: Build Linux
       if: runner.os == 'Linux'
       working-directory: ${{github.workspace}}/servers/c

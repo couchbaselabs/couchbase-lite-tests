@@ -161,6 +161,7 @@
 		40348C632A8B0255002DA787 /* zip_crypto_commoncrypto.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348BB52A8B0142002DA787 /* zip_crypto_commoncrypto.c */; };
 		406CE9E62A8C02C8003ACFBB /* IPAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 406CE9E52A8C02C8003ACFBB /* IPAddress.swift */; };
 		406CE9EA2A8C8B65003ACFBB /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 406CE9E92A8C8B65003ACFBB /* assets */; };
+		406CE9ED2A908D15003ACFBB /* StringUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 406CE9EC2A908D15003ACFBB /* StringUtil.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -390,6 +391,8 @@
 		40348BE22A8B0143002DA787 /* compat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = compat.h; path = "vendor/cmake/_deps/libzip-src/lib/compat.h"; sourceTree = SOURCE_ROOT; };
 		406CE9E52A8C02C8003ACFBB /* IPAddress.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IPAddress.swift; sourceTree = "<group>"; };
 		406CE9E92A8C8B65003ACFBB /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../../../assets; sourceTree = "<group>"; };
+		406CE9EB2A9086AF003ACFBB /* StringUtil.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = StringUtil.h; path = ../../../../src/support/StringUtil.h; sourceTree = "<group>"; };
+		406CE9EC2A908D15003ACFBB /* StringUtil.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StringUtil.cpp; path = ../../../../src/support/StringUtil.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -562,6 +565,8 @@
 				40348B1A2A8AFEA7002DA787 /* Log.cpp */,
 				40348B2B2A8AFEA7002DA787 /* Log.h */,
 				40348B322A8AFEA7002DA787 /* Precondition.h */,
+				406CE9EC2A908D15003ACFBB /* StringUtil.cpp */,
+				406CE9EB2A9086AF003ACFBB /* StringUtil.h */,
 				40348B292A8AFEA7002DA787 /* UUID.cpp */,
 				40348B232A8AFEA7002DA787 /* UUID.h */,
 				40348B222A8AFEA7002DA787 /* ZipUtil.cpp */,
@@ -829,6 +834,7 @@
 				40348C432A8B0144002DA787 /* zip_source_pkware_encode.c in Sources */,
 				40348B422A8AFEA7002DA787 /* KeyPath.cpp in Sources */,
 				40348BF32A8B0143002DA787 /* zip_file_error_clear.c in Sources */,
+				406CE9ED2A908D15003ACFBB /* StringUtil.cpp in Sources */,
 				40348C302A8B0144002DA787 /* zip_error_get.c in Sources */,
 				40348BE62A8B0143002DA787 /* zip_source_function.c in Sources */,
 				40348B392A8AFEA7002DA787 /* PostGetDocument.cpp in Sources */,
