@@ -3,6 +3,7 @@
 #include <string>
 
 struct CBLCollection;
+struct CBLDocument;
 
 class CollectionSpec {
 public:
@@ -20,6 +21,8 @@ public:
     }
 
     explicit CollectionSpec(const CBLCollection *collection);
+
+    explicit CollectionSpec(const CBLDocument *doc);
 
     CollectionSpec(const std::string &scope, const std::string &name);
 

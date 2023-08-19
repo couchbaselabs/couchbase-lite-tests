@@ -15,5 +15,7 @@ namespace ts_support::fleece {
 
     void removeProperties(FLMutableDict dict, const std::vector<std::string> &keyPaths);
 
-    FLDict compareDicts(FLDict dict1, FLDict dict2);
+    FLValue valueAtKeyPath(FLDict dict, const std::string &keyPath);
+
+    bool valueIsEquals(FLValue value1, FLValue value2, std::string &outKeyPath);
 }

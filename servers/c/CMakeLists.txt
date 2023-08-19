@@ -46,7 +46,7 @@ set(SOURCE_FILES
         src/support/Error.cpp
         src/support/Log.cpp
         src/support/UUID.cpp
-        src/support/ZipUtil.cpp)
+        src/support/ZipUtil.cpp src/support/StringUtil.h)
 
 add_executable(testserver ${SOURCE_FILES})
 

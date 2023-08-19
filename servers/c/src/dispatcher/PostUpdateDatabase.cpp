@@ -10,7 +10,7 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
         CBLError error{};
         bool commit = false;
         CBLDatabase_BeginTransaction(db, &error);
-        CheckError(error);
+        checkCBLError(error);
         DEFER { CBLDatabase_EndTransaction(db, commit, &error); };
 
         auto updates = GetValue<vector<json>>(body, "updates");
@@ -18,17 +18,17 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
             auto colName = GetValue<string>(update, "collection");
             auto spec = CollectionSpec(colName);
             auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
-            CheckError(error);
+            checkCBLError(error);
             if (!col) {
                 throw RequestError("Collection '" + spec.fullName() + "' Not Found");
             }
             AUTO_RELEASE(col);
-            
+
             auto docID = GetValue<string>(update, "documentID");
             auto type = GetValue<string>(update, "type");
             if (EnumEquals(type, kUpdateDatabaseTypeUpdate)) {
                 CBLDocument *doc = CBLCollection_GetMutableDocument(col, FLS(docID), &error);
-                CheckError(error);
+                checkCBLError(error);
                 if (!doc) {
                     doc = CBLDocument_CreateWithID(FLS(docID));
                 }
@@ -46,17 +46,17 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
                 }
 
                 CBLCollection_SaveDocument(col, doc, &error);
-                CheckError(error);
+                checkCBLError(error);
             } else if (EnumEquals(type, kUpdateDatabaseTypeDelete)) {
                 CBLDocument *doc = CBLCollection_GetMutableDocument(col, FLS(docID), &error);
-                CheckError(error);
+                checkCBLError(error);
                 if (doc) {
                     CBLCollection_DeleteDocument(col, doc, &error);
-                    CheckError(error);
+                    checkCBLError(error);
                 }
             } else if (EnumEquals(type, kUpdateDatabaseTypePurge)) {
                 CBLCollection_PurgeDocumentByID(col, FLS(docID), &error);
-                CheckError(error);
+                checkCBLError(error);
             }
         }
         commit = true;

@@ -17,11 +17,11 @@ int Dispatcher::handlePOSTGetAllDocuments(Request &request) {
             CBLError error{};
             string str = "SELECT meta().id, meta().revisionID FROM " + colName;
             CBLQuery *query = CBLDatabase_CreateQuery(db, kCBLN1QLLanguage, FLS(str), nullptr, &error);
-            CheckError(error);
+            checkCBLError(error);
             AUTO_RELEASE(query);
 
             CBLResultSet *rs = CBLQuery_Execute(query, &error);
-            CheckError(error);
+            checkCBLError(error);
             AUTO_RELEASE(rs);
 
             vector<json> docs;
