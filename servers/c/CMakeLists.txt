@@ -45,8 +45,9 @@ set(SOURCE_FILES
         src/dispatcher/PostVerifyDocuments.cpp
         src/support/Error.cpp
         src/support/Log.cpp
+        src/support/StringUtil.cpp
         src/support/UUID.cpp
-        src/support/ZipUtil.cpp src/support/StringUtil.h)
+        src/support/ZipUtil.cpp)
 
 add_executable(testserver ${SOURCE_FILES})
 

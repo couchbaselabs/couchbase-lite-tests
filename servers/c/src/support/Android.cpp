@@ -2,6 +2,7 @@
 
 #include "Android.h"
 #include "Error.h"
+#include "Precondition.h"
 
 #include "CBLHeader.h"
 #include CBL_HEADER(CouchbaseLite.h)
@@ -10,6 +11,7 @@
 
 using namespace ts::support::android;
 using namespace ts::support::error;
+using namespace ts::support::precond;
 
 static AndroidContext sContext;
 
@@ -26,7 +28,7 @@ void ts::support::android::initAndroidContext(const AndroidContext &context) {
     };
     CBLError err{};
     CBL_Init(init, &err);
-    CheckError(err);
+    checkCBLError(err);
 }
 
 const AndroidContext *ts::support::android::androidContext() {
