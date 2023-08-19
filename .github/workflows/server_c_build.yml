@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest]
+        os: [ubuntu-latest, macOS-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -28,27 +28,20 @@ jobs:
         submodules: recursive
 
 #### BUILD
-
-    - name: Create Build Environment
-      # Create a build directory, as our working directory for all subsequent commands
-      working-directory: ${{github.workspace}}/servers/c
-      run: cmake -E make_directory build
-
-    - name: Download CBL-C (Windows)
-      if: runner.os == 'Windows'
+    - name: Build macOS
+      if: runner.os == 'macOS'
       working-directory: ${{github.workspace}}/servers/c
       shell: bash
-      run: |
-        curl -L https://packages.couchbase.com/releases/couchbase-lite-c/${CBL_VERSION}/couchbase-lite-c-${CBL_EDITION}-${CBL_VERSION}-windows-x86_64.zip --output cbl.zip
-        unzip cbl.zip
+      run: ./scripts/build_macOS.sh enterprise 3.1.1
 
-    - name: Configure CMake (Windows)
+    - name: Build Linux
+      if: runner.os == 'Linux'
+      working-directory: ${{github.workspace}}/servers/c
+      shell: bash
+      run: ./scripts/build_linux.sh enterprise 3.1.1
+
+    - name: Build Windows
       if: runner.os == 'Windows'
-      working-directory: ${{github.workspace}}/servers/c/build
-      run: cmake -A x64 -DCMAKE_PREFIX_PATH=${{github.workspace}}/servers/c/libcblite-${{env.CBL_VERSION}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ..
-
-    - name: Build
-      # Use cmake to build -- this will invoke `make` on Linux/Mac, Visual Studio on Windows.
-      working-directory: ${{github.workspace}}/servers/c/build
-      run: cmake --build . --config ${{env.BUILD_TYPE}}
-      
+      working-directory: ${{github.workspace}}/servers/c
+      shell: pwsh
+      run: ./scripts/build_wins.ps1 enterprise 3.1.1
