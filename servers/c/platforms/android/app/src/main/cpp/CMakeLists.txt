@@ -35,6 +35,7 @@ set(SHARED_SRC
         ${SHARED_SRC_DIR}/support/Error.cpp
         ${SHARED_SRC_DIR}/support/Files.cpp
         ${SHARED_SRC_DIR}/support/Log.cpp
+        ${SHARED_SRC_DIR}/support/StringUtil.cpp
         ${SHARED_SRC_DIR}/support/UUID.cpp
         ${SHARED_SRC_DIR}/support/ZipUtil.cpp)
 
