@@ -15,7 +15,7 @@ int Dispatcher::handlePOSTGetDocument(Request &request) {
 
     CBLError error{};
     auto doc = CBLCollection_GetDocument(col, FLS(docID), &error);
-    CheckError(error);
+    checkCBLError(error);
     AUTO_RELEASE(doc);
 
     if (doc) {
@@ -26,6 +26,6 @@ int Dispatcher::handlePOSTGetDocument(Request &request) {
         auto json = nlohmann::json::parse(STR(jsonSlice));
         return request.respondWithJSON(json);
     } else {
-        throw RequestError(Concat("Document '", colName, ".", docID, "' not found"));
+        throw RequestError(str::concat("Document '", colName, ".", docID, "' not found"));
     }
 }

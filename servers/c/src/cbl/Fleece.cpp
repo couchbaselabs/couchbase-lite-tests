@@ -1,9 +1,10 @@
 #include "Fleece.h"
-#include "Defer.h"
 #include "Define.h"
 #include "KeyPath.h"
 
 #include FLEECE_HEADER(FLExpert.h)
+
+#include <unordered_set>
 
 using namespace std;
 using namespace nlohmann;
@@ -109,45 +110,54 @@ nlohmann::json ts_support::fleece::toJSON(FLValue value) { // NOLINT(misc-no-rec
     }
 }
 
-FLValue getMutableDictValue(FLMutableDict mDict, FLString key) {
-    auto dict = FLMutableDict_GetMutableDict(mDict, key);
-    if (dict) {
-        return (FLValue) dict;
+FLValue getDictValue(FLDict dict, FLString key) {
+    auto mDict = FLDict_AsMutable(dict);
+    if (mDict) {
+        auto dictVal = FLMutableDict_GetMutableDict(mDict, key);
+        if (dictVal) {
+            return (FLValue) dictVal;
+        }
+        auto arrayVal = FLMutableDict_GetMutableArray(mDict, key);
+        if (arrayVal) {
+            return (FLValue) arrayVal;
+        }
     }
-    auto array = FLMutableDict_GetMutableArray(mDict, key);
-    if (array) {
-        return (FLValue) array;
-    }
-    return FLDict_Get(mDict, key);
+    return FLDict_Get(dict, key);
 }
 
-FLValue getMutableArrayValue(FLMutableArray mArray, uint32_t index) {
-    auto dict = FLMutableArray_GetMutableDict(mArray, index);
-    if (dict) {
-        return (FLValue) dict;
-    }
-    auto array = FLMutableArray_GetMutableArray(mArray, index);
-    if (array) {
-        return (FLValue) array;
+FLValue getArrayValue(FLArray array, uint32_t index) {
+    auto mArray = FLArray_AsMutable(array);
+    if (mArray) {
+        auto dictVal = FLMutableArray_GetMutableDict(mArray, index);
+        if (dictVal) {
+            return (FLValue) dictVal;
+        }
+        auto arrayVal = FLMutableArray_GetMutableArray(mArray, index);
+        if (arrayVal) {
+            return (FLValue) arrayVal;
+        }
     }
     return FLArray_Get(mArray, index);
 }
 
-/** Return mutable dict or mutable array as parent.
+/** Return dict or array as parent. If createdParent is true, the root dictionary MUST be a mutable dictionary.
  *  When parent specified in the path is not found:
  *  - If the createParent is true, the parents will be created. For array parent, the array will be resized and padded
  *    with null to cover the specified array index in the key path.
  *  - Otherwise, NULL FLValue will be returned. */
-FLValue getParent(FLMutableDict props, FLSlice keyPath, bool createParent) {
-    auto paths = ts_support::keypath::parseKeyPath(STR(keyPath));
+FLValue getParent(FLDict root, const string &keyPath, bool createParent) {
+    FLValue parent = createParent ? (FLValue) FLDict_AsMutable(root) : (FLValue) root;
+    if (!parent) {
+        throw runtime_error("Invalid root dictionary");
+    }
 
     int i = 0;
-    auto parent = (FLValue) props;
+    auto paths = ts_support::keypath::parseKeyPath(keyPath);
     for (auto &path: paths) {
         if (path.key) { // Dict path
-            FLMutableDict dict = FLDict_AsMutable(FLValue_AsDict(parent));
+            auto dict = FLValue_AsDict(parent);
             if (!dict) {
-                throw logic_error("Mismatch type between key path and value (not dict value) : " + STR(keyPath));
+                throw logic_error("Mismatch type between key path and value (not dict value) : " + keyPath);
             }
 
             // Last path component, return the current dict
@@ -158,30 +168,33 @@ FLValue getParent(FLMutableDict props, FLSlice keyPath, bool createParent) {
 
             // Look ahead and create a new parent for non-existing path:
             auto key = FLS(path.key.value());
-            FLValue nextParent = getMutableDictValue(dict, key);
+            auto nextParent = getDictValue(dict, key);
             if (nextParent == nullptr) {
                 if (!createParent) {
                     parent = kFLNullValue;
                     break;
                 }
 
+                auto mDict = FLDict_AsMutable(dict);
+                assert(mDict);
+
                 if (paths[i + 1].key) {
                     auto newDict = FLMutableDict_New();
-                    FLMutableDict_SetDict(dict, key, newDict);
+                    FLMutableDict_SetDict(mDict, key, newDict);
                     FLMutableDict_Release(newDict);
                     nextParent = (FLValue) newDict;
                 } else {
                     auto newArray = FLMutableArray_New();
-                    FLMutableDict_SetArray(dict, key, newArray);
+                    FLMutableDict_SetArray(mDict, key, newArray);
                     FLMutableArray_Release(newArray);
                     nextParent = (FLValue) newArray;
                 }
             }
             parent = nextParent;
         } else { // Array path
-            FLMutableArray array = FLArray_AsMutable(FLValue_AsArray(parent));
+            auto array = FLValue_AsArray(parent);
             if (!array) {
-                throw logic_error("Mismatch type between key path and value (not array value) : " + STR(keyPath));
+                throw logic_error("Mismatch type between key path and value (not array value) : " + keyPath);
             }
 
             // Resize and pad with null if needed:
@@ -192,7 +205,11 @@ FLValue getParent(FLMutableDict props, FLSlice keyPath, bool createParent) {
                     parent = kFLNullValue;
                     break;
                 }
-                FLMutableArray_Resize(array, index + 1);
+
+                auto mArray = FLArray_AsMutable(array);
+                assert(mArray);
+
+                FLMutableArray_Resize(mArray, index + 1);
             }
 
             // Last path component, return the current array
@@ -202,20 +219,23 @@ FLValue getParent(FLMutableDict props, FLSlice keyPath, bool createParent) {
             }
 
             // Look ahead and create a new parent for non-existing path:
-            FLValue nextParent = getMutableArrayValue(array, index);
+            auto nextParent = getArrayValue(array, index);
             if (nextParent == nullptr || resize) {
                 if (!createParent) {
                     return kFLNullValue;
                 }
 
+                auto mArray = FLArray_AsMutable(array);
+                assert(mArray);
+
                 if (paths[i + 1].key) { // Dict path
                     auto newDict = FLMutableDict_New();
-                    FLMutableArray_SetDict(array, index, newDict);
+                    FLMutableArray_SetDict(mArray, index, newDict);
                     FLMutableDict_Release(newDict);
                     nextParent = (FLValue) newDict;
                 } else {
                     auto newArray = FLMutableArray_New();
-                    FLMutableArray_SetArray(array, index, newArray);
+                    FLMutableArray_SetArray(mArray, index, newArray);
                     FLMutableArray_Release(newArray);
                     nextParent = (FLValue) newArray;
                 }
@@ -228,8 +248,9 @@ FLValue getParent(FLMutableDict props, FLSlice keyPath, bool createParent) {
 }
 
 void updateProperty(FLMutableDict props, FLSlice keyPath, const nlohmann::json &value) {
-    auto paths = ts_support::keypath::parseKeyPath(STR(keyPath));
-    auto parent = getParent(props, keyPath, true);
+    auto keyPathStr = STR(keyPath);
+    auto paths = ts_support::keypath::parseKeyPath(keyPathStr);
+    auto parent = getParent(props, keyPathStr, true);
     if (FLValue_GetType(parent) == kFLDict) {
         FLMutableDict dict = FLDict_AsMutable(FLValue_AsDict(parent));
         auto path = paths.back();
@@ -249,8 +270,11 @@ void updateProperty(FLMutableDict props, FLSlice keyPath, const nlohmann::json &
 }
 
 void removeProperty(FLMutableDict props, FLSlice keyPath) {
-    auto paths = ts_support::keypath::parseKeyPath(STR(keyPath));
-    auto parent = getParent(props, keyPath, false);
+    auto keyPathStr = STR(keyPath);
+    auto paths = ts_support::keypath::parseKeyPath(keyPathStr);
+    auto parent = getParent(props, keyPathStr, false);
+    if (!parent) { return; }
+
     if (FLValue_GetType(parent) == kFLDict) {
         FLMutableDict dict = FLDict_AsMutable(FLValue_AsDict(parent));
         auto path = paths.back();
@@ -279,17 +303,110 @@ void ts_support::fleece::removeProperties(FLMutableDict dict, const vector<strin
     }
 }
 
-FLDict ts_support::fleece::compareDicts(FLDict dict1, FLDict dict2) {
-    auto delta = FLCreateJSONDelta((FLValue) dict1, (FLValue) dict2);
-    if (!delta) {
-        throw logic_error("Create JSON Delta Failed");
+FLValue ts_support::fleece::valueAtKeyPath(FLDict dict, const std::string &keyPath) {
+    auto paths = ts_support::keypath::parseKeyPath(keyPath);
+    auto parent = getParent(dict, keyPath, false);
+    if (!parent) { return nullptr; }
+    if (FLValue_GetType(parent) == kFLDict) {
+        auto path = paths.back();
+        assert(path.key);
+        return FLDict_Get(FLValue_AsDict(parent), FLS(path.key.value()));
+    } else if (FLValue_GetType(parent) == kFLArray) {
+        auto path = paths.back();
+        assert(!path.key);
+        return FLArray_Get(FLValue_AsArray(parent), path.index.value());
     }
-    DEFER { FLSliceResult_Release(delta); };
+    return nullptr;
+}
 
-    FLError error = kFLNoError;
-    auto deltaDict = FLMutableDict_NewFromJSON(FLSliceResult_AsSlice(delta), &error);
-    if (error != kFLNoError) {
-        throw logic_error("Create Delta Dictionary Failed");
+void prependPath(FLString path, std::string &keypath) {
+    if (!keypath.empty() && keypath[0] != '[') {
+        keypath.insert(0, ".");
     }
-    return deltaDict;
+    keypath.insert(0, STR(path));
+}
+
+void prependPath(uint32_t index, std::string &keypath) {
+    if (!keypath.empty() && keypath[0] != '[') {
+        keypath.insert(0, ".");
+    }
+    keypath.insert(0, string("[").append(to_string(index)).append("]"));
+}
+
+bool dictIsEquals(FLDict dict1, FLDict dict2, std::string &keypath) {
+    unordered_set<string> checkedKeys;
+    FLDictIterator iter1;
+    FLDictIterator_Begin(dict1, &iter1);
+    FLValue val1;
+    while (nullptr != (val1 = FLDictIterator_GetValue(&iter1))) {
+        FLString key = FLDictIterator_GetKeyString(&iter1);
+        auto val2 = FLDict_Get(dict2, key);
+        bool isEqual = ts_support::fleece::valueIsEquals(val1, val2, keypath);
+        if (!isEqual) {
+            prependPath(key, keypath);
+            return false;
+        }
+        checkedKeys.insert(STR(key));
+        FLDictIterator_Next(&iter1);
+    }
+
+    if (checkedKeys.size() == FLDict_Count(dict2)) {
+        return true;
+    }
+
+    FLDictIterator iter2;
+    FLDictIterator_Begin(dict2, &iter2);
+    FLValue val2;
+    while (nullptr != (val2 = FLDictIterator_GetValue(&iter2))) {
+        FLString key = FLDictIterator_GetKeyString(&iter2);
+        if (checkedKeys.find(STR(key)) == checkedKeys.end()) {
+            auto anotherVal = FLDict_Get(dict1, key);
+            bool isEqual = ts_support::fleece::valueIsEquals(val2, anotherVal, keypath);
+            if (!isEqual) {
+                prependPath(key, keypath);
+                return false;
+            }
+        }
+        FLDictIterator_Next(&iter2);
+    }
+    return true;
+}
+
+bool arrayIsEquals(FLArray array1, FLArray array2, std::string &keypath) {
+    auto count = FLArray_Count(array1);
+    if (count != FLArray_Count(array2)) {
+        return false;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        auto val1 = FLArray_Get(array1, i);
+        auto val2 = FLArray_Get(array2, i);
+        bool isEqual = ts_support::fleece::valueIsEquals(val2, val1, keypath);
+        if (!isEqual) {
+            prependPath(i, keypath);
+            return false;
+        }
+    }
+    return true;
+}
+
+bool ts_support::fleece::valueIsEquals(FLValue value1, FLValue value2, std::string &keypath) {
+    if (value1 == nullptr) {
+        return value2 == nullptr;
+    }
+
+    auto type = FLValue_GetType(value1);
+    if (type != FLValue_GetType(value2)) {
+        return false;
+    }
+
+    switch (type) {
+        case kFLDict: {
+            return dictIsEquals(FLValue_AsDict(value1), FLValue_AsDict(value2), keypath);
+        }
+        case kFLArray: {
+            return arrayIsEquals(FLValue_AsArray(value1), FLValue_AsArray(value2), keypath);
+        }
+        default:
+            return FLValue_IsEqual(value1, value2);
+    }
 }

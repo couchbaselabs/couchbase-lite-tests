@@ -17,6 +17,7 @@ using namespace std;
 using namespace filesystem;
 
 using namespace ts::support;
+using namespace ts::support::precond;
 using namespace ts::support::error;
 
 #define DB_FILE_EXT ".cblite2"
@@ -122,7 +123,7 @@ namespace ts::cbl {
         if (auto i = _databases.find(name); i != _databases.end()) {
             db = i->second;
         }
-        CheckNotNull(db, "Database '" + name + "' Not Found");
+        checkNotNull(db, "Database '" + name + "' Not Found");
         return db;
     }
 
@@ -130,9 +131,9 @@ namespace ts::cbl {
         CBLError error{};
         auto spec = CollectionSpec(name);
         auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
-        CheckError(error);
+        checkCBLError(error);
         if (mustExist) {
-            CheckNotNull(col, "Collection Not Found");
+            checkNotNull(col, "Collection Not Found");
         }
         return col;
     }
@@ -141,7 +142,7 @@ namespace ts::cbl {
         auto collection = CBLManager::collection(db, collectionName);
         CBLError error{};
         auto doc = CBLCollection_GetDocument(collection, FLS(id), &error);
-        CheckError(error);
+        checkCBLError(error);
         return doc;
     }
 
@@ -186,8 +187,8 @@ namespace ts::cbl {
         for (auto &replColSpec: params.collections) {
             auto spec = CollectionSpec(replColSpec.collection);
             auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
-            CheckError(error);
-            CheckNotNull(col, "Collection " + spec.fullName() + " Not Found");
+            checkCBLError(error);
+            checkNotNull(col, "Collection " + spec.fullName() + " Not Found");
 
             CBLReplicationCollection replCol{};
             replCol.collection = col;
@@ -248,7 +249,7 @@ namespace ts::cbl {
               };
 
         endpoint = CBLEndpoint_CreateWithURL(FLS(params.endpoint), &error);
-        CheckError(error);
+        checkCBLError(error);
 
         if (params.authenticator) {
             auth = CBLAuth_CreatePassword(FLS(params.authenticator->username),
@@ -279,7 +280,7 @@ namespace ts::cbl {
               };
 
         CBLReplicator *repl = CBLReplicator_Create(&config, &error);
-        CheckError(error);
+        checkCBLError(error);
 
         string id = "@replicator::" + to_string(++_replicatorID);
         context->replicatorID = id;
@@ -355,7 +356,7 @@ namespace ts::cbl {
 
     Snapshot *CBLManager::snapshot(const string &id) {
         auto snapshot = _snapShots[id].get();
-        CheckNotNull(snapshot, "Snapshot '" + id + "' Not Found");
+        checkNotNull(snapshot, "Snapshot '" + id + "' Not Found");
         return snapshot;
     }
 
