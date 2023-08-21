@@ -9,8 +9,6 @@ on:
       - "**"
 
 env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
-  BUILD_TYPE: Debug
   CBL_EDITION: enterprise
   CBL_VERSION: 3.1.0
 
@@ -19,35 +17,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v2
-      with:
-        submodules: recursive
 
-#### BUILD
     - name: Build macOS
       if: runner.os == 'macOS'
       working-directory: ${{github.workspace}}/servers/c
       shell: bash
-      run: ./scripts/build_macOS.sh enterprise 3.1.1
+      run: ./scripts/build_macOS.sh ${{env.CBL_EDITION}} ${{env.CBL_VERSION}}
 
     - name: Build iOS
       if: runner.os == 'macOS'
       working-directory: ${{github.workspace}}/servers/c
       shell: bash
-      run: ./scripts/build_ios.sh simulator enterprise 3.1.1
+      run: ./scripts/build_ios.sh simulator ${{env.CBL_EDITION}} ${{env.CBL_VERSION}}
 
     - name: Build Linux
       if: runner.os == 'Linux'
       working-directory: ${{github.workspace}}/servers/c
       shell: bash
-      run: ./scripts/build_linux.sh enterprise 3.1.1
+      run: ./scripts/build_linux.sh ${{env.CBL_EDITION}} ${{env.CBL_VERSION}}
 
     - name: Build Windows
       if: runner.os == 'Windows'
       working-directory: ${{github.workspace}}/servers/c
       shell: pwsh
-      run: ./scripts/build_wins.ps1 enterprise 3.1.1
+      run: ./scripts/build_wins.ps1 ${{env.CBL_EDITION}} ${{env.CBL_VERSION}}
