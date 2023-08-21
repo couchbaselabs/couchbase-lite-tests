@@ -1,17 +1,18 @@
 #!/bin/bash -e
 
 function usage() {
-    echo "Usage: $0 <edition: enterprise | community> <version> [build num]"
+    echo "Usage: $0 <abi: all | x86,armeabi-v7a,x86_64,arm64-v8a> <edition: enterprise | community> <version> [build num]"
     exit 1
 }
 
-if [ "$#" -ne 2 ]; then
+if [ "$#" -ne 3 ]; then
     usage
 fi
 
-EDITION=${1}
-VERSION=${2}
-BLD_NUM=${3}
+ABI=${1}
+EDITION=${2}
+VERSION=${3}
+BLD_NUM=${4}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 ASSETS_DIR="${SCRIPT_DIR}/../assets"
@@ -52,7 +53,14 @@ popd > /dev/null
 pushd "$ANDROID_DIR" > /dev/null
 mv local.properties local.properties.build.bak 2> /dev/null || true
 echo "sdk.dir=${ANDROID_HOME}" > local.properties
-./gradlew assembleRelease
+
+if [ "${ABI}" == "all" ]
+then
+    ./gradlew assembleRelease
+else
+    ./gradlew assembleRelease -PabiFilters=${ABI}
+fi
+
 mv local.properties.build.bak local.properties 2> /dev/null || true
 
 # Copy built artifacts
