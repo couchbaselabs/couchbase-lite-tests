@@ -1,11 +1,22 @@
+from typing import Optional
 from cbltest import CBLPyTest
 from cbltest.api.error import CblTestServerBadResponseError
+from cbltest.globals import CBLPyTestGlobal
 import pytest
 
+from cbltest.api.database import Database
+
 class TestUpdateDatabase:
+    def setup_method(self, method):
+        # If writing a new test do not forget this step or the test server
+        # will not be informed about the currently running test
+        CBLPyTestGlobal.running_test_name = method.__name__
+
+        self.db: Optional[Database] = None
+
     @pytest.mark.asyncio
-    async def test_update(self, cblpytest: CBLPyTest) -> None:
-        bad_attempts = [
+    @pytest.mark.parametrize(
+        "attempt", [
             # Empty
             "", 
             
@@ -39,15 +50,18 @@ class TestUpdateDatabase:
             # name is a dictionary and has no elements
             "name[0]"
         ]
+    )
+    async def test_bad_updates(self, cblpytest: CBLPyTest, attempt: str) -> None:
+        if self.db is None:
+            self.db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
 
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
+            async with self.db.batch_updater() as b:
+                b.upsert_document("_default._default", "name_1", [{attempt: 5}])
 
-        for attempt in bad_attempts:   
-            with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
-                async with db.batch_updater() as b:
-                    b.upsert_document("_default._default", "name_1", [{attempt: 5}])
-
-        good_attempts = [
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "attempt",  [
             # Add a brand new root key (with the optional JSON path $ for bonus points)
             "$.test", 
 
@@ -88,10 +102,12 @@ class TestUpdateDatabase:
             "contact",
             
             # Replace array with scalar
-            "likes"]
-        
-        # Faster to do these as one successful batch updates.  If you want to do 
-        # them one at a time edit this loop to match the previous 'bad_attempts' one
-        async with db.batch_updater() as b:
-            for attempt in good_attempts:  
-                b.upsert_document("_default._default", "name_1", [{attempt: 5}])
+            "likes"
+        ]
+    )
+    async def test_good_updates(self, cblpytest: CBLPyTest, attempt: str) -> None:
+        if self.db is None:
+            self.db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+            
+        async with self.db.batch_updater() as b:
+            b.upsert_document("_default._default", "name_1", [{attempt: 5}])

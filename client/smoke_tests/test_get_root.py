@@ -1,8 +1,13 @@
 from cbltest import CBLPyTest
-from cbltest.api.error import CblTestServerBadResponseError
+from cbltest.globals import CBLPyTestGlobal
 import pytest
 
 class TestGetRoot:
+    def setup_method(self, method):
+        # If writing a new test do not forget this step or the test server
+        # will not be informed about the currently running test
+        CBLPyTestGlobal.running_test_name = method.__name__
+
     @pytest.mark.asyncio
     async def test_root(self, cblpytest: CBLPyTest) -> None:
         info = await cblpytest.test_servers[0].get_info()
