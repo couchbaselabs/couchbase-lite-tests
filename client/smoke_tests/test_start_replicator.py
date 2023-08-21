@@ -4,9 +4,15 @@ from cbltest.api.error_types import ErrorDomain
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import ReplicatorActivityLevel
 from cbltest.api.database import Database
+from cbltest.globals import CBLPyTestGlobal
 import pytest
 
 class TestStartReplicator:
+    def setup_method(self, method):
+        # If writing a new test do not forget this step or the test server
+        # will not be informed about the currently running test
+        CBLPyTestGlobal.running_test_name = method.__name__
+
     @pytest.mark.asyncio
     async def test_invalid_database(self, cblpytest: CBLPyTest) -> None:
         repl = Replicator(Database(cblpytest.request_factory, 0, "fake"),
