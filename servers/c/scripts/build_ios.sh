@@ -64,13 +64,13 @@ rm -rf "${BUILD_BIN_DIR}"
 mkdir -p "${BUILD_BIN_DIR}"
 
 set -o pipefail # Get xcpretty to report failures
-if [ ${BIN_TYPE} != "device" ]
+if [ "${BIN_TYPE}" != "device" ]
 then
     xcodebuild -scheme TestServer -sdk iphonesimulator -configuration Release -derivedDataPath "${BUILD_SIMULATOR_DIR}" | xcpretty
     cp -r "$BUILD_SIMULATOR_DIR/Build/Products/Release-iphonesimulator/TestServer.app" "${BUILD_BIN_DIR}/TestServer-Simulator.app"
 fi
 
-if [ ${BIN_TYPE} != "simulator" ]
+if [ "${BIN_TYPE}" != "simulator" ]
 then
     xcodebuild -scheme TestServer -sdk iphoneos -configuration Release -derivedDataPath "${BUILD_DEVICE_DIR}" -allowProvisioningUpdates | xcpretty  
     cp -r "$BUILD_DEVICE_DIR/Build/Products/Release-iphoneos/TestServer.app" "${BUILD_BIN_DIR}"

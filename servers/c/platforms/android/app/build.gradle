@@ -19,10 +19,21 @@ android {
         versionCode 1
         versionName "1.0"
 
+        ndk {
+            var abis = project.properties["abiFilters"];
+            if (abis != null) {
+                for (String abi : abis.split(',')) {
+                    abiFilters.add(abi);
+                }
+            }
+        }
+
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
         vectorDrawables {
             useSupportLibrary true
         }
+
         externalNativeBuild {
             cmake {
                 cppFlags ''

@@ -1,0 +1,36 @@
+name: C TestServer Build - Android
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "**"
+
+env:
+  CBL_EDITION: enterprise
+  CBL_VERSION: 3.1.0
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Setup Android SDK
+      run: |
+        $ANDROID_SDK_ROOT/tools/bin/sdkmanager --install "ndk;25.1.8937393"
+        $ANDROID_SDK_ROOT/tools/bin/sdkmanager --install "cmake;3.22.1"
+
+    - name: Setup Java SDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'adopt'
+        java-version: 17
+
+    - name: Build android
+      working-directory: ${{github.workspace}}/servers/c
+      shell: bash
+      run: ./scripts/build_android.sh x86_64 ${{env.CBL_EDITION}} ${{env.CBL_VERSION}}
