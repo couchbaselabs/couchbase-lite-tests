@@ -39,21 +39,28 @@ class PutDatabasePayload(JSONSerializable):
     """
     A class containing configuration options for a Sync Gateway database endpoint
     """
-    def __init__(self, dataset_contents: dict):
-        _assert_not_null(dataset_contents, nameof(dataset_contents))
-        dataset_config = _get_typed_required(dataset_contents, "config", dict)
+    @property
+    def bucket(self) -> str:
+        return self.__bucket
 
-        self.bucket = _get_typed_required(dataset_config, "bucket", str)
+    def __init__(self, dataset_or_config: dict):
+        _assert_not_null(dataset_or_config, nameof(dataset_or_config))
+        assert isinstance(dataset_or_config, dict), "Invalid dataset_or_config passed to PutDatabasePayload"
+        self.__config: dict = dataset_or_config
+        if "config" in dataset_or_config:
+            self.__config = _get_typed_required(dataset_or_config, "config", dict)
+
+        self.__bucket = _get_typed_required(self.__config, "bucket", str)
         """The bucket name in the backing Couchbase Server"""
 
         self.__scopes: Dict[str, _CollectionMap] = {}
-        scopes = _get_typed_required(dataset_config, "scopes", dict)
+        scopes = _get_typed_required(self.__config, "scopes", dict)
         for scope in scopes:
             scope_dict = _get_typed_required(scopes, scope, dict)
             collections = _get_typed_required(scope_dict, "collections", dict)
             for collection in collections:
                 collection_dict = _get_typed_required(collections, collection, dict)
-                self.add_collection(collection_dict, scope, collection)
+                self._add_collection(collection_dict, scope, collection)
 
     def scopes(self) -> List[str]:
         """Gets all the scopes contained in the payload"""
@@ -72,7 +79,7 @@ class PutDatabasePayload(JSONSerializable):
         
         return map.collections
 
-    def add_collection(self, payload: dict = {}, scope_name: str = "_default", collection_name: str = "_default") -> None:
+    def _add_collection(self, payload: dict, scope_name: str, collection_name: str) -> None:
         """
         Adds a collection to the configuration of the database (must exist on Couchbase Server).
         The scope name and collection name both default to "_default".
@@ -86,17 +93,7 @@ class PutDatabasePayload(JSONSerializable):
         col_map.add_collection(collection_name, payload)
 
     def to_json(self) -> Any:
-        scopes: dict = {}
-        ret_val = {
-            "scopes": scopes,
-            "bucket": self.bucket,
-            "num_index_replicas": 0
-        }
-
-        for s in self.__scopes:
-            scopes[s] = self.__scopes[s].to_json()
-
-        return ret_val
+        return self.__config
     
 class AllDocumentsResponseRow:
     """
