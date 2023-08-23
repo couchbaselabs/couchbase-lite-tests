@@ -211,8 +211,8 @@ class TestReplicationFilter:
         remote_landmark_1 = await cblpytest.sync_gateways[0].get_document("travel", "landmark_1", "travel", "landmarks")
         assert remote_landmark_1 is not None, "Missing landmark_1 from sync gateway"
 
-        remote_landmark_2001 = await cblpytest.sync_gateways[0].get_document("travel", "landmark_2001", "travel", "landmarks")
-        assert remote_landmark_2001 is not None, "Missing landmark_2001 from sync gateway"
+        remote_landmark_601 = await cblpytest.sync_gateways[0].get_document("travel", "landmark_601", "travel", "landmarks")
+        assert remote_landmark_601 is not None, "Missing landmark_601 from sync gateway"
 
         updates = [
             DocumentUpdateEntry("airport_1000", None, {"answer": 42, "channels": ["United Kingdom"]}),
@@ -225,7 +225,7 @@ class TestReplicationFilter:
 
         await cblpytest.sync_gateways[0].update_documents("travel", updates, "travel", "airports")
         await cblpytest.sync_gateways[0].delete_document("landmark_1", remote_landmark_1.revid, "travel", "travel", "landmarks")
-        await cblpytest.sync_gateways[0].delete_document("landmark_2001", remote_landmark_2001.revid, "travel", "travel", "landmarks")
+        await cblpytest.sync_gateways[0].delete_document("landmark_601", remote_landmark_601.revid, "travel", "travel", "landmarks")
 
         # 7. Start the replicator with the same config as the step 3.
         replicator.clear_document_updates()
@@ -235,7 +235,7 @@ class TestReplicationFilter:
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
         # 8. Check that only changes in the filtered channels are pulled.
-        expected_ids = { "airport_1000", "airport_2000", "airport_1", "airport_17", "landmark_2001" }
+        expected_ids = { "airport_1000", "airport_2000", "airport_1", "airport_17", "landmark_601" }
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
 
     @pytest.mark.asyncio

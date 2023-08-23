@@ -5,7 +5,7 @@
       "_default": {
         "collections": {
           "_default": {
-            "sync": "function(doc,oldDoc,meta){channel(doc.channels);}"
+            "sync": "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
           }
         }
       }
