@@ -83,6 +83,7 @@ public class CreateRepl {
     private static final String FILTER_DELETED = "deleteddocumentsonly";
     private static final String FILTER_DOC_ID = "documentids";
     private static final String KEY_DOC_IDS = "documentIDs";
+    private static final String KEY_ENABLE_AUTOPURGE = "enableAutoPurge";
 
     private static final Set<String> LEGAL_KEYS;
     static {
@@ -101,8 +102,8 @@ public class CreateRepl {
         l.add(KEY_TYPE);
         l.add(KEY_IS_CONTINUOUS);
         l.add(KEY_AUTHENTICATOR);
-        l.add(KEY_RESET);
         l.add(KEY_ENABLE_DOC_LISTENER);
+        l.add(KEY_ENABLE_AUTOPURGE);
         LEGAL_CONFIG_KEYS = Collections.unmodifiableSet(l);
     }
 
@@ -221,6 +222,9 @@ public class CreateRepl {
 
         final Boolean isContinuous = config.getBoolean(KEY_IS_CONTINUOUS);
         if (isContinuous != null) { replConfig.setContinuous(isContinuous); }
+
+        final Boolean enableAutoPurge = config.getBoolean(KEY_ENABLE_AUTOPURGE);
+        if (enableAutoPurge != null) { replConfig.setAutoPurgeEnabled(enableAutoPurge); }
 
         final TypedMap authenticator = config.getMap(KEY_AUTHENTICATOR);
         if (authenticator != null) {

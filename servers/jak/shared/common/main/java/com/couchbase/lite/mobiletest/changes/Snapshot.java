@@ -18,6 +18,8 @@ package com.couchbase.lite.mobiletest.changes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,26 +36,56 @@ import com.couchbase.lite.mobiletest.services.DatabaseService;
 
 
 public class Snapshot {
-    private static final String KEY_RESULT = "result";
-    private static final String KEY_DESCRIPTION = "description";
-    private static final String KEY_EXPECTED = "expected";
-    private static final String KEY_ACTUAL = "actual";
-    private static final String KEY_DOCUMENT = "document";
-
-    private static final class Difference {
-        public final String description;
+    public static final class Difference {
+        @NonNull
+        public final String dbName;
+        @NonNull
+        public final String collFqn;
+        @NonNull
+        public final String docId;
+        @Nullable
+        public final Map<String, Object> content;
+        @Nullable
+        public final String keyPath;
+        @Nullable
         public final Object expected;
+        @Nullable
         public final Object actual;
+        @Nullable
+        public final String type;
+        @NonNull
+        public final String description;
 
+        @SuppressWarnings("PMD.StringToString")
         private Difference(
-            @NonNull String description,
+            @NonNull String dbName,
+            @NonNull String collFqn,
+            @NonNull String docId,
+            @Nullable Map<String, Object> content,
+            @Nullable String keyPath,
             @Nullable Object expected,
-            @Nullable Object actual) {
-            this.description = description;
+            @Nullable Object actual,
+            @Nullable Change change,
+            @NonNull String description) {
+            this.dbName = dbName;
+            this.collFqn = collFqn;
+            this.docId = docId;
+            this.content = (content == null) ? null : Collections.unmodifiableMap(content);
+            this.keyPath = keyPath;
             this.expected = expected;
             this.actual = actual;
+            this.type = (change == null) ? null : change.type.toString();
+            this.description = description;
+        }
+
+        @Override
+        @NonNull
+        public String toString() {
+            return "@" + dbName + "." + collFqn + "." + docId + "$" + keyPath + ": "
+                + type + "(" + expected + " => " + actual + ")" + " " + description;
         }
     }
+
 
     @NonNull
     private final DatabaseService dbSvc;
@@ -74,51 +106,53 @@ public class Snapshot {
     }
 
     @NonNull
-    public Map<String, Object> compare(
+    public List<Difference> compare(
         @NonNull TestContext ctxt,
         @NonNull Database db,
         @NonNull Map<String, Map<String, Change>> delta) {
+        final List<Difference> diffs = new ArrayList<>();
+        final String dbName = db.getName();
+
         final Map<String, Map<String, Document>> actual = clone(ctxt, db).snapshot;
 
-        final Set<String> deltaCollections = new HashSet<>(delta.keySet());
-        deltaCollections.removeAll(snapshot.keySet());
-        if (!deltaCollections.isEmpty()) {
-            throw new ClientError("Attempt to verify collections not in the snapshot: " + deltaCollections);
-        }
-
-        for (Map.Entry<String, Map<String, Document>> expectedColls: snapshot.entrySet()) {
-            final String collFqn = expectedColls.getKey();
-            final Map<String, Document> expectedColl = expectedColls.getValue();
-
-            final Map<String, Change> collDelta = delta.get(collFqn);
-            if (collDelta != null) {
-                final Set<String> deltaDocs = new HashSet<>(collDelta.keySet());
-                deltaDocs.removeAll(expectedColl.keySet());
-                if (!deltaDocs.isEmpty()) {
-                    throw new ClientError(
-                        "Attempt to verify documents not in the snapshot (" + collFqn + "): " + deltaDocs);
-                }
+        // all the collections named in either the snapshot or the delta
+        final Set<String> collections = new HashSet<>(snapshot.keySet());
+        collections.addAll(delta.keySet());
+        for (String collFqn: collections) {
+            if ((!snapshot.containsKey(collFqn)) || (!actual.containsKey(collFqn))) {
+                throw new ClientError("Attempt to verify a collection not in the snapshot: " + collFqn);
             }
+            final Map<String, Document> originalDocs = snapshot.get(collFqn);
+            final Map<String, Document> currentDocs = actual.get(collFqn);
+
+            // if there are no changes in this collection, there are no changes to any doc in this collection
+            Map<String, Change> docDeltas = delta.get(collFqn);
+            if (docDeltas == null) { docDeltas = new HashMap<>(); }
 
             final Collection collection = dbSvc.getCollection(db, collFqn, ctxt);
-            final Map<String, Document> actualCollection = actual.get(collFqn);
-            for (Map.Entry<String, Document> docDesc: expectedColl.entrySet()) {
-                final String docId = docDesc.getKey();
-                Document expectedDoc = docDesc.getValue();
 
-                final Change change = (collDelta == null) ? null : collDelta.get(docId);
-                if (change != null) { expectedDoc = change.applyChange(collection, expectedDoc); }
+            // all the docs named in either the snapshot or the delta
+            final Set<String> docIds = new HashSet<>(originalDocs.keySet());
+            docIds.addAll(docDeltas.keySet());
+            for (String docId: docIds) {
+                if ((!originalDocs.containsKey(docId)) || (!currentDocs.containsKey(docId))) {
+                    throw new ClientError(
+                        "Attempt to verify a document not in the snapshot: " + dbName + "." + collFqn + "." + docId);
+                }
 
-                final Map<String, Object> resp
-                    = compareDocs(change, collFqn, docId, expectedDoc, actualCollection.get(docId));
-                if (resp != null) { return resp; }
+                Document originalDoc = originalDocs.get(docId);
+                final Document currentDoc = currentDocs.get(docId);
+
+                final Change change = docDeltas.get(docId);
+                if (change != null) { originalDoc = change.applyChange(collection, originalDoc); }
+
+                // the originalDoc is now the expected
+                // and currentDoc is the actual
+                compareDoc(dbName, collFqn, docId, originalDoc, currentDoc, change, diffs);
             }
         }
 
-        final Map<String, Object> resp = new HashMap<>();
-        resp.put(KEY_DESCRIPTION, "Success");
-        resp.put(KEY_RESULT, true);
-        return resp;
+        return diffs;
     }
 
     @NonNull
@@ -132,40 +166,64 @@ public class Snapshot {
         return clone;
     }
 
-    @Nullable
-    private Map<String, Object> compareDocs(
-        @Nullable Change change,
+    private void compareDoc(
+        @NonNull String dbName,
         @NonNull String collFqn,
         @NonNull String docId,
         @Nullable Document expected,
-        @Nullable Document actual) {
+        @Nullable Document actual,
+        @Nullable Change change,
+        List<Difference> diffs
+    ) {
         if (expected == null) {
-            if (actual == null) { return null; }
-            final String msg;
-            if (change == null) { msg = "should not exist"; }
-            else if (change.type == Change.ChangeType.PURGE) { msg = "was not purged"; }
-            else { msg = "was not deleted"; }
-            return makeResp(msg, collFqn, docId);
+            if (actual != null) {
+                diffs.add(
+                    new Difference(
+                        dbName,
+                        collFqn,
+                        docId,
+                        null,
+                        null,
+                        null,
+                        docId,
+                        change,
+                        "Document should not exist"));
+            }
+            return;
         }
 
-        if (actual == null) { return makeResp("was not found", collFqn, docId); }
+        if (actual == null) {
+            diffs.add(new Difference(
+                dbName,
+                collFqn,
+                docId,
+                null,
+                null,
+                null,
+                docId,
+                change,
+                "Document was not found"));
+            return;
+        }
 
-        final Difference diff = compareTree(expected.toMap(), actual.toMap(), "");
-        return (diff == null)
-            ? null
-            : makeResp(diff.description, collFqn, docId, diff.expected, diff.actual, actual);
+        // at this point, the two documents should be identical
+        final Map<String, Object> actualContent = actual.toMap();
+        compareDocContent(dbName, collFqn, docId, actualContent, "", expected.toMap(), actualContent, change, diffs);
     }
 
     @SuppressWarnings("unchecked")
-    @Nullable
-    private Difference compareTree(
+    private void compareDocContent(
+        @NonNull String dbName,
+        @NonNull String collFqn,
+        @NonNull String docId,
+        @NonNull Map<String, Object> doc,
+        @NonNull String path,
         @NonNull Map<String, Object> expected,
         @NonNull Map<String, Object> actual,
-        @NonNull String path) {
-
+        @Nullable Change change,
+        @NonNull List<Difference> diffs) {
         final Set<String> allProps = new HashSet<>(actual.keySet());
         allProps.addAll(expected.keySet());
-
         for (String prop: allProps) {
             String propPath = path;
             if (path.length() > 2) { propPath += "."; }
@@ -175,104 +233,171 @@ public class Snapshot {
             final Object actualVal = actual.get(prop);
 
             if (!expected.containsKey(prop)) {
-                return new Difference("had unexpected properties at key '" + propPath + "'", null, actualVal);
+                if (actual.containsKey(prop)) {
+                    diffs.add(new Difference(
+                        dbName,
+                        collFqn,
+                        docId,
+                        doc,
+                        propPath,
+                        expectedVal,
+                        actualVal,
+                        change,
+                        "Missing property"));
+                }
+                continue;
             }
 
             if (!actual.containsKey(prop)) {
-                return new Difference("had unexpected properties at key '" + propPath + "'", expectedVal, null);
+                diffs.add(new Difference(
+                    dbName,
+                    collFqn,
+                    docId,
+                    doc,
+                    propPath,
+                    expectedVal,
+                    actualVal,
+                    change,
+                    "Unexpected property"));
+                continue;
             }
 
             if ((expectedVal instanceof Map) && (actualVal instanceof Map)) {
-                final Difference diff
-                    = compareTree((Map<String, Object>) expectedVal, (Map<String, Object>) actualVal, propPath);
-                if (diff != null) { return diff; }
+                compareDocContent(
+                    dbName,
+                    collFqn,
+                    docId,
+                    doc,
+                    propPath,
+                    (Map<String, Object>) expectedVal,
+                    (Map<String, Object>) actualVal,
+                    change,
+                    diffs);
                 continue;
             }
 
             if ((expectedVal instanceof List) && (actualVal instanceof List)) {
-                final Difference diff = compareTree((List<Object>) expectedVal, (List<Object>) actualVal, propPath);
-                if (diff != null) { return diff; }
+                compareDocContent(
+                    dbName,
+                    collFqn,
+                    docId,
+                    doc,
+                    propPath,
+                    (List<Object>) expectedVal,
+                    (List<Object>) actualVal,
+                    change,
+                    diffs);
                 continue;
             }
 
             if (!Objects.equals(expectedVal, actualVal)) {
-                return new Difference("had unexpected properties at key '" + propPath + "'", expectedVal, actualVal);
+                diffs.add(
+                    new Difference(
+                        dbName,
+                        collFqn,
+                        docId,
+                        doc,
+                        propPath,
+                        expectedVal,
+                        actualVal,
+                        change,
+                        "Property values are not the same"));
             }
         }
-
-        return null;
     }
 
     @SuppressWarnings("unchecked")
-    @Nullable
-    private Difference compareTree(@NonNull List<Object> expected, @NonNull List<Object> actual, @NonNull String path) {
-        final int nActual = actual.size();
+    private void compareDocContent(
+        @NonNull String dbName,
+        @NonNull String collFqn,
+        @NonNull String docId,
+        @NonNull Map<String, Object> doc,
+        @NonNull String path,
+        @NonNull List<Object> expected,
+        @NonNull List<Object> actual,
+        @Nullable Change change,
+        @NonNull List<Difference> diffs) {
         final int nExpected = expected.size();
+        final int nActual = actual.size();
         final int n = Math.max(nExpected, nActual);
         for (int i = 0; i < n; i++) {
-            String propPath = path + "[" + i + "]";
+            final String idxPath = path + "[" + i + "]";
+
+            final Object expectedVal = (i >= nExpected) ? null : expected.get(i);
+            final Object actualVal = (i >= nActual) ? null : actual.get(i);
 
             if (i >= nExpected) {
-                return new Difference(
-                    "had unexpected properties at key '" + propPath + "'",
-                    null,
-                    actual.get(i));
+                diffs.add(
+                    new Difference(
+                        dbName,
+                        collFqn,
+                        docId,
+                        doc,
+                        idxPath,
+                        null,
+                        actualVal,
+                        change,
+                        "Unexpected array value"));
+                continue;
             }
-            final Object expectedVal = expected.get(i);
 
             if (i >= nActual) {
-                return new Difference(
-                    "had unexpected properties at key '" + propPath + "'",
-                    expected.get(i),
-                    null);
+                diffs.add(
+                    new Difference(
+                        dbName,
+                        collFqn,
+                        docId,
+                        doc,
+                        idxPath,
+                        expected,
+                        null,
+                        change,
+                        "Missing array value"));
+                continue;
             }
-            final Object actualVal = actual.get(i);
 
             if ((expectedVal instanceof Map) && (actualVal instanceof Map)) {
-                final Difference diff
-                    = compareTree((Map<String, Object>) expectedVal, (Map<String, Object>) actualVal, propPath);
-                if (diff != null) { return diff; }
+                compareDocContent(
+                    dbName,
+                    collFqn,
+                    docId,
+                    doc,
+                    idxPath,
+                    (Map<String, Object>) expectedVal,
+                    (Map<String, Object>) actualVal,
+                    change,
+                    diffs);
                 continue;
             }
 
             if ((expectedVal instanceof List) && (actualVal instanceof List)) {
-                final Difference diff = compareTree((List<Object>) expectedVal, (List<Object>) actualVal, propPath);
-                if (diff != null) { return diff; }
+                compareDocContent(
+                    dbName,
+                    collFqn,
+                    docId,
+                    doc,
+                    idxPath,
+                    (List<Object>) expectedVal,
+                    (List<Object>) actualVal,
+                    change,
+                    diffs);
                 continue;
             }
 
             if (!Objects.equals(expectedVal, actualVal)) {
-                return new Difference("had unexpected properties at key '" + propPath + "'", expectedVal, actualVal);
+                diffs.add(
+                    new Difference(
+                        dbName,
+                        collFqn,
+                        docId,
+                        doc,
+                        idxPath,
+                        expectedVal,
+                        actualVal,
+                        change,
+                        "Array values are not the same"));
             }
         }
-
-        return null;
-    }
-
-    @NonNull
-    private Map<String, Object> makeResp(
-        @NonNull String msg,
-        @NonNull String collFqn,
-        @Nullable String docId) {
-        final Map<String, Object> resp = new HashMap<>();
-        resp.put(KEY_DESCRIPTION, "Document '" + docId + "' in '" + collFqn + "' " + msg);
-        resp.put(KEY_RESULT, false);
-        return resp;
-    }
-
-    @NonNull
-    private Map<String, Object> makeResp(
-        @NonNull String msg,
-        @NonNull String collFqn,
-        @Nullable String docId,
-        @Nullable Object expected,
-        @Nullable Object actual,
-        @Nullable Document doc) {
-        final Map<String, Object> resp = makeResp(msg, collFqn, docId);
-        if (expected != null) { resp.put(KEY_EXPECTED, expected); }
-        if (actual != null) { resp.put(KEY_ACTUAL, actual); }
-        if (doc != null) { resp.put(KEY_DOCUMENT, doc.toMap()); }
-        return resp;
     }
 }
 

@@ -35,12 +35,8 @@ public final class UpdateChange extends Change {
     @NonNull
     private final List<String> deletions;
 
-    public UpdateChange(
-        @NonNull String collFqn,
-        @NonNull String docId,
-        @NonNull Map<String, Object> updates,
-        @NonNull List<String> deletions) {
-        super(ChangeType.UPDATE, collFqn, docId);
+    public UpdateChange(@NonNull String docId, @NonNull Map<String, Object> updates, @NonNull List<String> deletions) {
+        super(ChangeType.UPDATE, docId);
         this.updates = updates;
         this.deletions = deletions;
     }

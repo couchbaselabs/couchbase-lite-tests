@@ -85,13 +85,13 @@ public abstract class UpdateItemEndpoint {
             final Change ch;
             switch (changeType.toLowerCase(Locale.getDefault())) {
                 case TYPE_DELETE:
-                    ch = new DeleteChange(collFqn, docId);
+                    ch = new DeleteChange(docId);
                     break;
                 case TYPE_PURGE:
-                    ch = new PurgeChange(collFqn, docId);
+                    ch = new PurgeChange(docId);
                     break;
                 case TYPE_UPDATE:
-                    ch = new UpdateChange(collFqn, docId, getUpdates(change), getDeletions(change));
+                    ch = new UpdateChange(docId, getUpdates(change), getDeletions(change));
                     break;
                 default:
                     throw new ClientError("Unrecognized update type: " + changeType);

@@ -18,10 +18,6 @@ package com.couchbase.lite.mobiletest.changes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import com.couchbase.lite.Collection;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.MutableDocument;
@@ -31,25 +27,10 @@ import com.couchbase.lite.mobiletest.services.DatabaseService;
 public abstract class Change {
     public enum ChangeType {UPDATE, DELETE, PURGE}
 
-    @NonNull
-    public static Map<String, Map<String, Change>> sortChanges(@NonNull List<Change> changes) {
-        final Map<String, Map<String, Change>> delta = new HashMap<>();
-        for (Change change: changes) {
-            delta.computeIfAbsent(change.collFqn, k -> new HashMap<>()).put(change.docId, change);
-        }
-        return delta;
-    }
-
-
-    protected final String collFqn;
     protected final String docId;
     protected final ChangeType type;
 
-    protected Change(
-        @NonNull ChangeType type,
-        @NonNull String collFqn,
-        @NonNull String docId) {
-        this.collFqn = collFqn;
+    protected Change(@NonNull ChangeType type, @NonNull String docId) {
         this.docId = docId;
         this.type = type;
     }
@@ -58,6 +39,10 @@ public abstract class Change {
     public abstract MutableDocument applyChange(@NonNull Collection collection, @Nullable Document mDoc);
 
     public abstract void updateDocument(@NonNull DatabaseService dbSvc, @NonNull Collection collection);
+
+    @NonNull
+    @Override
+    public String toString() { return "Change{docId='" + docId + '\'' + ", type=" + type + '}'; }
 }
 
 

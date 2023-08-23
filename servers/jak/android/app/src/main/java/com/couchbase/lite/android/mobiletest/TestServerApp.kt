@@ -16,6 +16,8 @@
 package com.couchbase.lite.android.mobiletest
 
 import android.app.Application
+import android.os.StrictMode
+import android.os.StrictMode.VmPolicy
 import com.couchbase.lite.mobiletest.Server
 import com.couchbase.lite.mobiletest.TestApp
 import org.koin.android.ext.koin.androidContext
@@ -29,6 +31,14 @@ class TestServerApp : Application() {
     @Suppress("USELESS_CAST")
     override fun onCreate() {
         super.onCreate()
+
+        StrictMode.setVmPolicy(
+            VmPolicy.Builder()
+                .detectLeakedClosableObjects()
+                .penaltyLog()
+                .build()
+        )
+
         TestApp.init(AndroidTestApp(this))
 
 
