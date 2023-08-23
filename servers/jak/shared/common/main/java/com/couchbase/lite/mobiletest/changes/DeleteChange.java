@@ -27,9 +27,7 @@ import com.couchbase.lite.mobiletest.services.DatabaseService;
 
 
 public final class DeleteChange extends Change {
-    public DeleteChange(@NonNull String collFqn, @NonNull String docId) {
-        super(ChangeType.DELETE, collFqn, docId);
-    }
+    public DeleteChange(@NonNull String docId) { super(ChangeType.DELETE, docId); }
 
     @Override
     @Nullable
@@ -38,7 +36,7 @@ public final class DeleteChange extends Change {
     @Override
     public void updateDocument(@NonNull DatabaseService dbSvc, @NonNull Collection collection) {
         final Document doc = dbSvc.getDocument(collection, docId);
-        try { collection.purge(doc); }
+        try { collection.delete(doc); }
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed purging document", e); }
     }
 }

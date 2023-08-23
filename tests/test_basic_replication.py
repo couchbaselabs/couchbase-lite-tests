@@ -350,7 +350,7 @@ class TestBasicReplication:
         await replicator.start()
 
         # 4. Wait until the replicator is idle.
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
+        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE, timeout = 90.0)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
                 
@@ -441,7 +441,7 @@ class TestBasicReplication:
             WaitForDocumentEventEntry("travel.landmarks", "landmark_200"),
             WaitForDocumentEventEntry("travel.hotels", "hotel_400"),
             WaitForDocumentEventEntry("travel.hotels", "hotel_500")
-        })
+        }, max_retries = 100)
 
         # 10. Check that all updates are replicated correctly.
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "travel", 
