@@ -9,6 +9,7 @@
 ## Requirements
 
 * CMake 3.23+
+* CMake Project : VSCode C++/CMake plugin or CLion
 * iOS : XCode 14.3+
 * Android : Java 17+ and Android Studio 2022.2.1+
 * Windows : Visual Studio 2017+
@@ -75,7 +76,7 @@ samples below.
 
 #### CMake for macOS, Linux, and Windows
 
-Open the project from this directory which has the CMakeLists.txt file.
+Open the project from this directory which has the CMakeLists.txt file using VSCode with C++/CMake plugin or CLion.
 
 #### iOS
 
