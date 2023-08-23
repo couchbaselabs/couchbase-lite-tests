@@ -176,5 +176,6 @@ class Replicator:
                 return status
             
             await asyncio.sleep(0.5)
+            iteration += 1
 
         raise CblTimeoutError("Timeout waiting for document update events")
