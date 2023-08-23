@@ -1,4 +1,4 @@
-### Supported Platforms
+## Supported Platforms
 
 * macOS
 * Linux
@@ -6,7 +6,7 @@
 * iOS
 * Android 
 
-### Requirements
+## Requirements
 
 * CMake 3.23+
 * iOS : XCode 14.3+
@@ -56,37 +56,26 @@ See the samples below for the usage of the build scripts.
 ### Preparation
 
 The first step before starting to develop the project is to download CBL library and copy all required
-assets (dataset files and SSL certificates) in place. To do that, you can use the prepare script
-depending on the platform you are working on. See the samples below.
+assets (dataset files and SSL certificates) in place. To do that, use the prepare script as the 
+samples below.
 
-Note: This step will be run only once unless there is a change
-to the dataset or you want to use a different CBL library or you want to work on a different platform.
-
-#### Non-Windows (macOS, iOS, Android, Linux)
-
-Run `scripts/dev_prepare.sh` and specify the platform (macos | linux | ios | android), CBL edition, CBL version,
-and the optional CBL build number.
+#### macOS, iOS, Android, Linux
 
 ```
-scripts/dev_prepare.sh macos enterprise 3.1.1
+./scripts/dev_prepare.sh macos enterprise 3.1.1
 ```
-
-Note: For iOS project, the prepare script will also run cmake command to download all other dependencies specified in
-`vendor/CMakeLists.txt`. 
 
 #### Windows
 
-Run `scripts\dev_prepare.ps1` and specify CBL edition, CBL version, and the optional CBL build number.
-
 ```
-scripts\dev_prepare.ps1 enterprise 3.1.1
+./scripts\dev_prepare.ps1 enterprise 3.1.1
 ```
 
 ### Development Projects
 
-#### CMake (macOS, Linux, and Windows)
+#### CMake for macOS, Linux, and Windows
 
-Open the project from the current c server directory that has CMakeLists.txt file.
+Open the project from this directory which has the CMakeLists.txt file.
 
 #### iOS
 
