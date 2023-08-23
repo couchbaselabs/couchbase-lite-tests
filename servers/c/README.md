@@ -9,7 +9,7 @@
 ## Requirements
 
 * CMake 3.23+
-* CMake Project : VSCode C++/CMake plugin or CLion
+* CMake Project : VSCode with C++/CMake plugin or CLion
 * iOS : XCode 14.3+
 * Android : Java 17+ and Android Studio 2022.2.1+
 * Windows : Visual Studio 2017+
