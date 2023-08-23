@@ -19,12 +19,12 @@
 | travel.airlines     | 0           |                     | 
 | travel.routes       | 0           |                     |
 | travel.airports     | 300         | airport_1 ... 300   |
-| travel.landmarks    | 2300        | landmark_1 ... 2300 |
+| travel.landmarks    | 900         | landmark_1 ... 900  |
 | travel.hotels       | 350         | hotel_351 ... 700   |
 
 Note: 
 * Each document has `scope` and `collection` key.
-* Each document in CBL's `travel.hotels` has "image" key which contains a blob.
+* First 20 documents (hotel_1 - 20) in CBL's `travel.hotels` has "image" key which contains a unique blob.
 * Each doucment in this dataset has "channels" property which contain a country value ("United States", "United Kingdom" or "France")
 
 ### SG Config
@@ -39,7 +39,11 @@ Note:
 
 ```js
 function (doc, oldDoc, meta) {
-   channel(doc.channels);
+  if (doc._deleted) {
+    channel(oldDoc.channels)
+  } else {
+    channel(doc.channels)
+  }
 }
 ```
 Note: Same sync function for all collections
@@ -63,18 +67,17 @@ Note: Same sync function for all collections
   "channels": ["United States"],
   "iata": "Q5",
   "icao": "MLA",
-  "id": 1,
   "name": "40-Mile Air",
   "oid": 10,
-  "scope": "travel",
-  "type": "airline"
+  "scope": "travel"
 }
 ```
 
 #### travel.routes
 
 ```JSON
-"_id": "route_1",
+{
+  "_id": "route_1",
   "airline": "Q5",
   "airlineid": "airline_1",
   "channels": ["United States"],
@@ -83,7 +86,6 @@ Note: Same sync function for all collections
   "destinationairport": "HKB",
   "distance": 118.20183585107631,
   "equipment": "CNA",
-  "id": 1,
   "schedule": [
     {
       "day": 0,
@@ -98,8 +100,8 @@ Note: Same sync function for all collections
   ],
   "scope": "travel",
   "sourceairport": "FAI",
-  "stops": 0,
-  "type": "route"
+  "stops": 0
+}
 ```
 
 #### travel.airports
@@ -116,7 +118,6 @@ Note: Same sync function for all collections
   "faa": "BHD",
   "type": "airport",
   "scope": "travel",
-  "id": 1,
   "city": "Belfast",
   "tz": "Europe/London",
   "country": "United Kingdom",
@@ -131,33 +132,30 @@ Note: Same sync function for all collections
 ``` JSON
 {
   "_id": "landmark_1",
-  "directions": null,
-  "phone": "+46 980 402 00",
-  "state": "California",
-  "country": "United States",
-  "channels": ["United States"],
-  "image": null,
-  "tollfree": null,
   "activity": "see",
   "address": "STF Abisko Mountain Station, Sweden",
-  "title": "Abisko",
-  "scope": "travel",
-  "name": "Aurora Sky Station",
-  "geo": {
-    "lat": 37.8013,
-    "lon": -122.3988,
-    "accuracy": "RANGE_INTERPOLATED"
-  },
-  "price": "Sep, Nov 625 SEK, STF member: 525 SEK; Dec-Mar 695 SEK, STF member: 595 SEK",
-  "url": "http://www.auroraskystation.com",
-  "collection": "landmarks",
-  "email": "lapplandsbokning@stfturist.se",
-  "content": "The night visit to the station includes return ticket by chair-lift, guided tour and an aurora watchers overall.",
-  "id": 1,
-  "hours": "In 2013/2014 winter season: Sep 5 - Sep 28 and Nov 1 - Nov 30: Thu-Sat 21:00-1:00;",
+  "channels": [
+    "United States"
+  ],
   "city": "San Francisco",
-  "type": "landmark",
-  "alt": null
+  "collection": "landmarks",
+  "content": "The night visit to the station includes return ticket by chair-lift...",
+  "country": "United States",
+  "directions": null,
+  "email": "lapplandsbokning@stfturist.se",
+  "geo": {
+    "accuracy": "RANGE_INTERPOLATED",
+    "lat": 37.8013,
+    "lon": -122.3988
+  },
+  "hours": "In 2013\\/2014 winter season: Sep 5 - Sep 28 and Nov 1 - Nov 30: Thu-Sat 21:00-1:00;...",
+  "name": "Aurora Sky Station",
+  "phone": "+46 980 402 00",
+  "price": "Sep, Nov 625 SEK, STF member: 525 SEK; Dec-Mar 695 SEK, STF member: 595 SEK",
+  "scope": "travel",
+  "state": "California",
+  "tollfree": null,
+  "url": "http:\\/\\/www.auroraskystation.com"
 }
 ```
 
@@ -167,17 +165,14 @@ Note: Same sync function for all collections
 {
   "_id": "hotel_1",
   "address": "1702 18th Street",
-  "alias": null,
-  "checkin": "1PM",
-  "checkout": "11AM",
+  "channels": [
+    "United States"
+  ],
   "city": "Bakersfield",
   "collection": "hotels",
   "country": "United States",
-  "channels": ["United States"],
   "description": "This boutique hotel offers five unique food and beverage venues.",
-  "directions": null,
   "email": null,
-  "fax": null,
   "free_breakfast": true,
   "free_internet": false,
   "free_parking": false,
@@ -186,25 +181,24 @@ Note: Same sync function for all collections
     "lat": 35.375572,
     "lon": -119.02151
   },
-  "id": 1,
   "image": {
     "@type": "blob",
     "content_type": "image/png",
-    "digest": "sha1-nNc+mije7Cd01tWxb9cxKWXiIP0=",
-    "length": 156632
+    "digest": "sha1-7hYMqN2gjvfVtZ6UcYCFZWLWo98=",
+    "length": 156627
   },
   "name": "The Padre Hotel",
   "pets_ok": true,
   "phone": null,
   "price": null,
   "public_likes": [
-    "Mittie Pollich",
-    "Elizabeth Reilly"
+    "John Doe"
   ],
   "reviews": [
     {
-      "author": "Tania Gerlach III",
-      "content": "Very nice hotel.",
+      "author": "John Doe",
+      "content": "Very nice hotel",
+      "date": "2015-07-08 03:14:11 +0300",
       "ratings": {
         "Cleanliness": 5,
         "Location": 3,
@@ -214,24 +208,10 @@ Note: Same sync function for all collections
         "Sleep Quality": 5,
         "Value": 5
       }
-    },
-    {
-      "author": "Angelica Block",
-      "content": "Very good hotel.",
-      "ratings": {
-        "Location": 4,
-        "Overall": 3,
-        "Rooms": 3,
-        "Service": 3,
-        "Value": 2
-      }
     }
   ],
   "scope": "travel",
   "state": "California",
-  "title": "Bakersfield",
-  "tollfree": null,
-  "type": "hotel",
   "url": "http://www.thepadrehotel.com",
   "vacancy": false
 }
@@ -265,7 +245,11 @@ The 100 name documents in the default collection.
 
 ```js
 function (doc, oldDoc, meta) {
-   channel(doc.channels);
+  if (doc._deleted) {
+    channel(oldDoc.channels)
+  } else {
+    channel(doc.channels)
+  }
 }
 ```
 
@@ -279,34 +263,36 @@ function (doc, oldDoc, meta) {
 
 ```JSON
 {
-    "_id" : "name_1",
-    "name": {
-        "first": "Lue",
-        "last": "Laserna"
+  "_id": "name_1",
+  "name": {
+    "first": "Lue",
+    "last": "Laserna"
+  },
+  "gender": "female",
+  "birthday": "1983-09-18",
+  "contact": {
+    "address": {
+      "street": "19 Deer Loop",
+      "zip": "90732",
+      "city": "San Pedro",
+      "state": "CA"
     },
-    "gender": "female",
-    "birthday": "1983-09-18",
-    "contact": {
-        "address": {
-            "street": "19 Deer Loop",
-            "zip": "90732",
-            "city": "San Pedro",
-            "state": "CA"
-        },
-        "email": [
-            "lue.laserna@nosql-matters.org",
-            "laserna@nosql-matters.org"
-        ],
-        "region": "310",
-        "phone": [
-            "310-8268551",
-            "310-7618427"
-        ]
-    },
-    "likes": ["chatting"],
-    "memberSince": "2011-05-05",
-    "scope": "_default",
-    "collection": "_default"
+    "email": [
+      "lue.laserna@nosql-matters.org",
+      "laserna@nosql-matters.org"
+    ],
+    "region": "310",
+    "phone": [
+      "310-8268551",
+      "310-7618427"
+    ]
+  },
+  "likes": [
+    "chatting"
+  ],
+  "memberSince": "2011-05-05",
+  "scope": "_default",
+  "collection": "_default"
 }
 ```
 
@@ -340,7 +326,11 @@ function (doc, oldDoc, meta) {
 
 ```js
 function (doc, oldDoc, meta) {
-   channel(doc.channels);
+  if (doc._deleted) {
+    channel(oldDoc.channels)
+  } else {
+    channel(doc.channels)
+  }
 }
 ```
 
