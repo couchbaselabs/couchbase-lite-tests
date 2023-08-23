@@ -178,7 +178,6 @@ class RemoteDocument(JSONSerializable):
         self.__body = body.copy()
         self.__id = cast(str, body["_id"])
         self.__rev = cast(str, body["_rev"])
-        del self.__body["id"]
         del self.__body["_rev"]
 
     def to_json(self) -> Any:
