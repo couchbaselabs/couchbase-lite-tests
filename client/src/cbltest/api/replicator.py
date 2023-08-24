@@ -156,11 +156,11 @@ class Replicator:
         replication events to determine if it has reached a certain point or not.  
 
         .. note:: This method can timeout, and the way that works is that it will wait for an idle state 
-        up to 'idle_timeout' amount of time.  If that timeout is reached, the replicator is considered
-        stuck and this method will raise an exception.  If it reaches idle but doesn't find all doc events,
-        it will try to wait again for idle (with the aforementioned timeout) up to 'max_retries' number of times.
-        If the doc events still have not come, then the replicator is considered stuck and this method will raise
-        an exception
+                  up to 'idle_timeout' amount of time.  If that timeout is reached, the replicator is considered
+                  and this method will raise an exception.  If it reaches idle but doesn't find all doc events,
+                  it will try to wait again for idle (with the aforementioned timeout) up to 'max_retries' number of times.
+                  If the doc events still have not come, then the replicator is considered stuck and this method will raise
+                  an exception
 
         :param events: The events to check for on the replicator
         :param max_retries: The max number of retries before giving up (default 5)
