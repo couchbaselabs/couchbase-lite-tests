@@ -1,4 +1,5 @@
 import asyncio
+from datetime import timedelta
 from itertools import islice
 from time import time
 from typing import List, cast, Optional, Set
@@ -120,23 +121,23 @@ class Replicator:
         self.__document_updates.extend(cast_resp.documents)
         return ReplicatorStatus(cast_resp.progress, cast_resp.activity, cast_resp.replicator_error)
     
-    async def wait_for(self, activity: ReplicatorActivityLevel, interval: float = 1.0, 
-                       timeout: float = 30.0) -> ReplicatorStatus:
+    async def wait_for(self, activity: ReplicatorActivityLevel, interval: timedelta = timedelta(seconds=1), 
+                       timeout: timedelta = timedelta(seconds=30)) -> ReplicatorStatus:
         """
         Waits for a given timeout, polling at a set interval, until the Replicator changes to a desired state
 
         :param activity: The activity level to wait for
         :param interval: The polling interval (default 1s)
-        :param timeout: The time limit to wait for the state change
+        :param timeout: The time limit to wait for the state change (default 30s)
         """
-        assert interval > 0.0, "Zero interval makes no sense, try again"
-        assert timeout > 1.0, "Timeout too short, must be at least 1 second"
+        assert interval.total_seconds() > 0.0, "Zero interval makes no sense, try again"
+        assert timeout.total_seconds() >= 1.0, "Timeout too short, must be at least 1 second"
 
         status_matches = False
         start = time()
         while not status_matches:
             elapsed = time() - start
-            if(elapsed > timeout):
+            if(elapsed > timeout.total_seconds()):
                 raise CblTimeoutError("Timeout waiting for replicator status")
             
             next_status = await self.get_status()
@@ -147,20 +148,31 @@ class Replicator:
             
         return next_status
         
-    async def wait_for_doc_events(self, events: Set[WaitForDocumentEventEntry], max_retries: int = 5) -> ReplicatorStatus:
+    async def wait_for_doc_events(self, events: Set[WaitForDocumentEventEntry], max_retries: int = 5,
+                                  ping_interval: timedelta = timedelta(seconds=1),
+                                  idle_timeout: timedelta = timedelta(seconds=30)) -> ReplicatorStatus:
         """
         This function will wait for a continuous replicator to become idle, and then check for document
-        replication events to determine if it has reached a certain point or not.
+        replication events to determine if it has reached a certain point or not.  
+
+        .. note:: This method can timeout, and the way that works is that it will wait for an idle state 
+        up to 'idle_timeout' amount of time.  If that timeout is reached, the replicator is considered
+        stuck and this method will raise an exception.  If it reaches idle but doesn't find all doc events,
+        it will try to wait again for idle (with the aforementioned timeout) up to 'max_retries' number of times.
+        If the doc events still have not come, then the replicator is considered stuck and this method will raise
+        an exception
 
         :param events: The events to check for on the replicator
         :param max_retries: The max number of retries before giving up (default 5)
+        :param ping_interval: The interval to ping for the replicator state (default 1s)
+        :param idle_timeout: The timeout to use when waiting for the next idle state (default 30s)
         """
         assert self.continuous, "wait_for_doc_events not applicable for non-continuous replicator"
         events = events.copy()
         iteration = 0
         processed = 0
         while iteration < max_retries:
-            status = await self.wait_for(ReplicatorActivityLevel.IDLE)
+            status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
             assert status.error is None, \
                 f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
             

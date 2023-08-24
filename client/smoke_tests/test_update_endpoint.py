@@ -7,7 +7,7 @@ import pytest
 from cbltest.api.database import Database
 
 class TestUpdateDatabase:
-    def setup_method(self, method):
+    def setup_method(self, method) -> None:
         # If writing a new test do not forget this step or the test server
         # will not be informed about the currently running test
         CBLPyTestGlobal.running_test_name = method.__name__
