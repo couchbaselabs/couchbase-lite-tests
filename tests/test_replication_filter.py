@@ -1,24 +1,19 @@
 from pathlib import Path
 from typing import List, Set
 from cbltest import CBLPyTest
-from cbltest.globals import CBLPyTestGlobal
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (ReplicatorCollectionEntry, ReplicatorBasicAuthenticator, ReplicatorType, 
                                           ReplicatorActivityLevel, ReplicatorDocumentEntry, ReplicatorFilter)
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.cloud import CouchbaseCloud
+from cbltest.api.cbltestclass import CBLTestClass
 
 from test_replication_filter_data import *
 import pytest
 
 
 
-class TestReplicationFilter:
-    def setup_method(self, method):
-        # If writing a new test do not forget this step or the test server
-        # will not be informed about the currently running test
-        CBLPyTestGlobal.running_test_name = method.__name__
-
+class TestReplicationFilter(CBLTestClass):
     def validate_replicated_doc_ids(self, expected: Set[str], actual: List[ReplicatorDocumentEntry]) -> None:
         for update in actual:
             assert update.document_id in expected, f"Unexpected document update not in filter: {update.document_id}"
