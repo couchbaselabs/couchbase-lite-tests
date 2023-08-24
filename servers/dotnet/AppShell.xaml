@@ -7,7 +7,7 @@
     Shell.FlyoutBehavior="Disabled">
 
     <ShellContent
-        Title="Home"
+        Title="Couchbase Lite Test Server"
         ContentTemplate="{DataTemplate local:MainPage}"
         Route="MainPage" />
 
