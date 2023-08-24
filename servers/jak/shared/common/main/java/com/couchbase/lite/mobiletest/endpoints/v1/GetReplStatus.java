@@ -80,7 +80,16 @@ public class GetReplStatus {
         Log.i(TAG, "Replicator status: " + replStatus);
 
         final Map<String, Object> resp = new HashMap<>();
-        buildStatus(resp, replStatus);
+
+        resp.put(KEY_REPL_ACTIVITY, replStatus.getActivityLevel().toString());
+
+        final CouchbaseLiteException err = replStatus.getError();
+        if (err != null) { resp.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err)).build()); }
+
+        final Map<String, Object> progress = new HashMap<>();
+        final ReplicatorProgress replProgress = replStatus.getProgress();
+        progress.put(KEY_REPL_DOCS_COMPLETE, replProgress.getCompleted() >= replProgress.getTotal());
+        resp.put(KEY_REPL_PROGRESS, progress);
 
         final List<DocumentReplication> docs = replSvc.getReplicatedDocs(ctxt, replId);
         if (docs != null) {
@@ -89,19 +98,6 @@ public class GetReplStatus {
         }
 
         return resp;
-    }
-
-    public void buildStatus(Map<String, Object> resp, @NonNull ReplicatorStatus replStatus) {
-        final Map<String, Object> progress = new HashMap<>();
-        final ReplicatorProgress replProgress = replStatus.getProgress();
-        progress.put(KEY_REPL_DOCS_COMPLETE, replProgress.getCompleted() >= replProgress.getTotal());
-
-        final CouchbaseLiteException err = replStatus.getError();
-        if (err != null) { resp.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err)).build()); }
-
-        resp.put(KEY_REPL_PROGRESS, progress);
-
-        resp.put(KEY_REPL_ACTIVITY, replStatus.getActivityLevel().toString());
     }
 
     @NonNull

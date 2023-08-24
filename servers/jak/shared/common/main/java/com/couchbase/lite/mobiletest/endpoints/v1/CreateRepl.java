@@ -114,6 +114,7 @@ public class CreateRepl {
         l.add(KEY_CHANNELS);
         l.add(KEY_DOCUMENT_IDS);
         l.add(KEY_PUSH_FILTER);
+        l.add(KEY_PULL_FILTER);
         LEGAL_COLLECTION_KEYS = Collections.unmodifiableSet(l);
     }
 
