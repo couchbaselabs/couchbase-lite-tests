@@ -143,7 +143,7 @@ class Replicator:
             next_status = await self.get_status()
             status_matches = next_status.activity == activity
             if not status_matches:
-                await asyncio.sleep(interval)
+                await asyncio.sleep(interval.total_seconds())
 
             
         return next_status
