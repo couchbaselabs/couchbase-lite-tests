@@ -113,7 +113,6 @@ public class VerifyDocs extends UpdateItemEndpoint {
         final List<Map<String, Object>> diffs = new ArrayList<>();
         for (Snapshot.Difference difference: differences) {
             final Map<String, Object> diff = new HashMap<>();
-            diff.put(KEY_DATABASE, difference.dbName);
             diff.put(KEY_COLLECTION, difference.collFqn);
             diff.put(KEY_DOC_ID, difference.docId);
             diff.put(KEY_PATH, difference.keyPath);

@@ -32,13 +32,12 @@ import com.couchbase.lite.Database;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 
 
 public class Snapshot {
     public static final class Difference {
-        @NonNull
-        public final String dbName;
         @NonNull
         public final String collFqn;
         @NonNull
@@ -58,7 +57,6 @@ public class Snapshot {
 
         @SuppressWarnings("PMD.StringToString")
         private Difference(
-            @NonNull String dbName,
             @NonNull String collFqn,
             @NonNull String docId,
             @Nullable Map<String, Object> content,
@@ -67,7 +65,6 @@ public class Snapshot {
             @Nullable Object actual,
             @Nullable Change change,
             @NonNull String description) {
-            this.dbName = dbName;
             this.collFqn = collFqn;
             this.docId = docId;
             this.content = (content == null) ? null : Collections.unmodifiableMap(content);
@@ -81,7 +78,7 @@ public class Snapshot {
         @Override
         @NonNull
         public String toString() {
-            return "@" + dbName + "." + collFqn + "." + docId + "$" + keyPath + ": "
+            return "@" + collFqn + "." + docId + "$" + keyPath + ": "
                 + type + "(" + expected + " => " + actual + ")" + " " + description;
         }
     }
@@ -111,8 +108,6 @@ public class Snapshot {
         @NonNull Database db,
         @NonNull Map<String, Map<String, Change>> delta) {
         final List<Difference> diffs = new ArrayList<>();
-        final String dbName = db.getName();
-
         final Map<String, Map<String, Document>> actual = clone(ctxt, db).snapshot;
 
         // all the collections named in either the snapshot or the delta
@@ -124,6 +119,9 @@ public class Snapshot {
             }
             final Map<String, Document> originalDocs = snapshot.get(collFqn);
             final Map<String, Document> currentDocs = actual.get(collFqn);
+            if ((originalDocs == null) || (currentDocs == null)) {
+                throw new ServerError("Null doc map in snapshot for collection: " + collFqn);
+            }
 
             // if there are no changes in this collection, there are no changes to any doc in this collection
             Map<String, Change> docDeltas = delta.get(collFqn);
@@ -136,8 +134,7 @@ public class Snapshot {
             docIds.addAll(docDeltas.keySet());
             for (String docId: docIds) {
                 if ((!originalDocs.containsKey(docId)) || (!currentDocs.containsKey(docId))) {
-                    throw new ClientError(
-                        "Attempt to verify a document not in the snapshot: " + dbName + "." + collFqn + "." + docId);
+                    throw new ClientError("Attempt to verify a document not in the snapshot: " + collFqn + "." + docId);
                 }
 
                 Document originalDoc = originalDocs.get(docId);
@@ -148,7 +145,7 @@ public class Snapshot {
 
                 // the originalDoc is now the expected
                 // and currentDoc is the actual
-                compareDoc(dbName, collFqn, docId, originalDoc, currentDoc, change, diffs);
+                compareDoc(collFqn, docId, originalDoc, currentDoc, change, diffs);
             }
         }
 
@@ -167,7 +164,6 @@ public class Snapshot {
     }
 
     private void compareDoc(
-        @NonNull String dbName,
         @NonNull String collFqn,
         @NonNull String docId,
         @Nullable Document expected,
@@ -179,7 +175,6 @@ public class Snapshot {
             if (actual != null) {
                 diffs.add(
                     new Difference(
-                        dbName,
                         collFqn,
                         docId,
                         null,
@@ -194,7 +189,6 @@ public class Snapshot {
 
         if (actual == null) {
             diffs.add(new Difference(
-                dbName,
                 collFqn,
                 docId,
                 null,
@@ -208,12 +202,11 @@ public class Snapshot {
 
         // at this point, the two documents should be identical
         final Map<String, Object> actualContent = actual.toMap();
-        compareDocContent(dbName, collFqn, docId, actualContent, "", expected.toMap(), actualContent, change, diffs);
+        compareDocContent(collFqn, docId, actualContent, "", expected.toMap(), actualContent, change, diffs);
     }
 
     @SuppressWarnings("unchecked")
     private void compareDocContent(
-        @NonNull String dbName,
         @NonNull String collFqn,
         @NonNull String docId,
         @NonNull Map<String, Object> doc,
@@ -235,7 +228,6 @@ public class Snapshot {
             if (!expected.containsKey(prop)) {
                 if (actual.containsKey(prop)) {
                     diffs.add(new Difference(
-                        dbName,
                         collFqn,
                         docId,
                         doc,
@@ -250,7 +242,6 @@ public class Snapshot {
 
             if (!actual.containsKey(prop)) {
                 diffs.add(new Difference(
-                    dbName,
                     collFqn,
                     docId,
                     doc,
@@ -264,7 +255,6 @@ public class Snapshot {
 
             if ((expectedVal instanceof Map) && (actualVal instanceof Map)) {
                 compareDocContent(
-                    dbName,
                     collFqn,
                     docId,
                     doc,
@@ -278,7 +268,6 @@ public class Snapshot {
 
             if ((expectedVal instanceof List) && (actualVal instanceof List)) {
                 compareDocContent(
-                    dbName,
                     collFqn,
                     docId,
                     doc,
@@ -293,7 +282,6 @@ public class Snapshot {
             if (!Objects.equals(expectedVal, actualVal)) {
                 diffs.add(
                     new Difference(
-                        dbName,
                         collFqn,
                         docId,
                         doc,
@@ -301,14 +289,13 @@ public class Snapshot {
                         expectedVal,
                         actualVal,
                         change,
-                        "Property values are not the same"));
+                        "Property values are different"));
             }
         }
     }
 
     @SuppressWarnings("unchecked")
     private void compareDocContent(
-        @NonNull String dbName,
         @NonNull String collFqn,
         @NonNull String docId,
         @NonNull Map<String, Object> doc,
@@ -329,7 +316,6 @@ public class Snapshot {
             if (i >= nExpected) {
                 diffs.add(
                     new Difference(
-                        dbName,
                         collFqn,
                         docId,
                         doc,
@@ -344,7 +330,6 @@ public class Snapshot {
             if (i >= nActual) {
                 diffs.add(
                     new Difference(
-                        dbName,
                         collFqn,
                         docId,
                         doc,
@@ -358,7 +343,6 @@ public class Snapshot {
 
             if ((expectedVal instanceof Map) && (actualVal instanceof Map)) {
                 compareDocContent(
-                    dbName,
                     collFqn,
                     docId,
                     doc,
@@ -372,7 +356,6 @@ public class Snapshot {
 
             if ((expectedVal instanceof List) && (actualVal instanceof List)) {
                 compareDocContent(
-                    dbName,
                     collFqn,
                     docId,
                     doc,
@@ -387,7 +370,6 @@ public class Snapshot {
             if (!Objects.equals(expectedVal, actualVal)) {
                 diffs.add(
                     new Difference(
-                        dbName,
                         collFqn,
                         docId,
                         doc,
@@ -395,7 +377,7 @@ public class Snapshot {
                         expectedVal,
                         actualVal,
                         change,
-                        "Array values are not the same"));
+                        "Array values are different"));
             }
         }
     }
