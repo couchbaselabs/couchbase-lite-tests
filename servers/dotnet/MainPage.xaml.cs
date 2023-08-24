@@ -1,9 +1,11 @@
-﻿namespace TestServer;
+﻿using System.Net;
+using System.Net.Sockets;
+using System.Reflection;
+
+namespace TestServer;
 
 public partial class MainPage : ContentPage
 {
-	int count = 0;
-
 	public MainPage()
 	{
 		InitializeComponent();
@@ -12,16 +14,18 @@ public partial class MainPage : ContentPage
 		server.Start();
 	}
 
-	private void OnCounterClicked(object sender, EventArgs e)
-	{
-		count++;
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
 
-		if (count == 1)
-			CounterBtn.Text = $"Clicked {count} time";
-		else
-			CounterBtn.Text = $"Clicked {count} times";
-
-		SemanticScreenReader.Announce(CounterBtn.Text);
-	}
+		_versionLabel.Text = "CBL Version: " + typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+        var host = Dns.GetHostEntry(Dns.GetHostName());
+        var ipAddresses = "Server running at:" + 
+			Environment.NewLine + 
+			String.Join(Environment.NewLine, host.AddressList
+			.Where(x => x.AddressFamily == AddressFamily.InterNetwork)
+			.Select(x => $"http://{x}:8080"));
+		_urlLabel.Text = ipAddresses;
+    }
 }
 
