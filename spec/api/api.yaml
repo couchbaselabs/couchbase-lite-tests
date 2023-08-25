@@ -35,6 +35,12 @@ info:
 
     Changes
 
+    0.2.2 (08/25/23)
+    * Added updatedBlobs option to /updateDatabase.
+    * Added verification logic info including blob verification logic in /verifyDocuments.
+    * Added blob file doesn't exist reason to /verifyDocuments description.
+    * Added new /performMaintenance API
+
     0.2.1 (08/18/23)
     * Added note about out-of-scope functions to /verifyDocuments.
     * Changed wording in /snapshotDocuments description. 
@@ -215,6 +221,21 @@ paths:
         An array of the key paths which refer to ditionary keys or array elements to be removed. If a keypath refer to a non-existent
         property or array element, the remove for the keypath will be no-ops. When removing multiple items in an array, the order of the array indexes 
         should be from high to low to avoid index mutation during the removal.
+
+        updatedBlobs:
+
+        A dictionary whose keys are the key paths into the document to be updated with the blob objects and values are 
+        the blob file names listed in the blob dataset.
+
+        The logic to update blobs is similar to the logic when updating properties. The value at the location specified 
+        by the keypath is replaced with the blob object in the object regardless of its type. When a path in the keypath 
+        refers to a non-existent property, the key is added and  its value set as a dictionary or an array depending on 
+        the type of the path. When a path in the keypath includes an array index that is out of bounds, the array 
+        is padded with nulls until it is exactly large enough to make the specified index legal.
+
+        The blob object is created from the content of the blob file refered by the blob file name, the dictionary value 
+        associated with each key path. If the blob file name refers to non-existing blob file, 400 request error will
+        be returned.
         
       operationId: updateDatabase
       requestBody:
@@ -369,6 +390,17 @@ paths:
         For the snapped-shot documents that are not in the list of changes, the documents will be 
         verified as unchanged documents.
 
+        Verification Logic:
+        1. If the document specified in the delta doesn't exist in the snapshot, the 400 request error will be returned.
+        2. If the document specified in the delta with change type PURGE or DELETE, the corresponding snapshot document 
+           value in the snaphot MUST be null.
+        3. If the document specified in the delta with change type UPDATE, the expected document which is the 
+           corresponding snaphot document applied with the specified delta will be compared with the actual document 
+           which is the current document in the collection. The body of expected and actual document MUST be the same. 
+        4. When checking if the two blob objects are equals, the dictoinary properties of the two blobs MUST be the same.
+           In addition, the actual blob file in the database MUST exist; this can be checked by calling Database's 
+           getBlob(Dictionary blobProperties) which will return null if the specified blob doesn't exist without trying
+           to read the blob data.
         Note: 
         * The documents outside the snapshot will not be verified. To verify expected new documents 
           can be done by including these new documents (not existing before) to the snapshot and verifying
@@ -427,6 +459,9 @@ paths:
                       Case 5 : Document shouldn't exist (null value in the snapshot), but the document does exist.
                       Reason : Document '<doc-id> in '<scope.collection>' should not exist.
 
+                      Case 6 : Blob file doesn't exist in the database.
+                      Reason : Blob file of document '<doc-id> in '<scope.collection>' at key '<keypath>' doesn't exist
+
                       For the Case, The first unexpected keypath is shown in the reason description. 
                       Its actual value, expected value, and the entire actual document body will be shown in 
                       'actual', 'expected', 'document' key of the verification result object separately. If 
@@ -472,6 +507,29 @@ paths:
                     type: object
                     additionalProperties: { }
                     example: {'name': 'John Doe', 'address': {'city': 'Santa Clara', 'state': 'CA'}}
+        '400':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /performMaintenance:
+    post:
+      tags:
+        - API
+      summary: Perform Database Maintenance
+      description: Perform maintenance on the specified database per the specified maintenance type
+      operationId: performMaintenance
+      requestBody:
+        description: |- 
+          The request object specifies the name of the database and the performance type be be performed on.
+          If the database doesn't exist, 400 request error will be returned.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PerformMaintenanceConfiguration'
+        required: true
+      responses:
+        '200':
+          description: Success
         '400':
           $ref: '#/components/responses/Error'
         '500':
@@ -537,12 +595,17 @@ components:
           enum: ['UPDATE', 'DELETE', 'PURGE']
           example: 'UPDATE'
         collection:
+          description: Collection full name
           type: string
           example: 'store.cloths'
         documentID:
+          description: Document ID
           type: string
           example: 'doc1'
         updatedProperties:
+          description: |-
+            An array of dictionaries, each of which contains one or more keys that are key paths into the document 
+            to be updated with the values associated with the keys.
           type: array
           items:
             type: object
@@ -552,10 +615,17 @@ components:
               {'people[3].address': {'street': 'Elm St. ', 'city': 'Sibley'} }
             ]
         removedProperties:
+          description: An array of the key paths which refer to ditionary keys or array elements to be removed.
           type: array
           items:
             type: string
             example: [ 'people[22].address', 'people[3]' ]
+        updatedBlobs:
+          description: A dictionary whose keys are the key paths into the document to be updated with the 
+            blob objects and values are the blob keys in the dataset.
+          type: object
+          additionalProperties: { }
+          example: { 'photo.thumbnail': 's1.jpg' }
     Error:
       type: object
       required: ['domain', 'code']
@@ -571,6 +641,19 @@ components:
         message: 
           type: string
           example: 'This is an error'
+    PerformMaintenanceConfiguration:
+      type: object
+      required: ['database', 'maintenanceType']
+      properties:
+        database:
+          description: Database name
+          type: string
+          example: 'db1'
+        maintenanceType:
+          description: Maintenance type
+          type: string
+          enum: ['compact', 'integrityCheck', 'optimize', 'fullOptimize']
+          example: 'compact'
     Replicator:
       type: object
       required: ['id']
