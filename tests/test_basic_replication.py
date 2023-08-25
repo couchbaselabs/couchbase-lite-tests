@@ -14,16 +14,16 @@ from cbltest.api.cbltestclass import CBLTestClass
 class TestBasicReplication(CBLTestClass):
     @pytest.mark.asyncio
     async def test_replicate_non_existing_sg_collections(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step("1. Reset SG and load `names` dataset")
+        self.mark_test_step("Reset SG and load `names` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "names")
 
-        self.mark_test_step("2. Reset local database, and load `travel` dataset")
+        self.mark_test_step("Reset local database, and load `travel` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
         self.mark_test_step("""
-            3. Start a replicator
+            Start a replicator
             * endpoint: `/names`
             * collections : `travel.airlines`
             * type: push
@@ -35,26 +35,26 @@ class TestBasicReplication(CBLTestClass):
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is stopped")
+        self.mark_test_step("Wait until the replicator is stopped")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         
-        self.mark_test_step("5. Check that the replicator's error is CBL/10404")
+        self.mark_test_step("Check that the replicator's error is CBL/10404")
         assert status.error is not None \
             and status.error.code == 10404 \
             and ErrorDomain.equal(status.error.domain, ErrorDomain.CBL)
 
     @pytest.mark.asyncio
     async def test_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step("1. Reset SG and load `travel` dataset.")
+        self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "travel")
 
-        self.mark_test_step("2. Reset local database, and load `travel` dataset.")
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
         self.mark_test_step('''
-            3. Start a replicator: 
+            Start a replicator: 
                 * endpoint: `/travel`
                 * collections : `travel.airlines`, `travel.airports`, `travel.hotels`
                 * type: push
@@ -66,27 +66,27 @@ class TestBasicReplication(CBLTestClass):
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("5. Check that all docs are replicated correctly.")
+        self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "travel", 
                                  ["travel.airlines", "travel.airports", "travel.hotels"])
 
     @pytest.mark.asyncio
     async def test_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
-        self.mark_test_step("1. Reset SG and load `travel` dataset.")
+        self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "travel")
 
-        self.mark_test_step("2. Reset local database, and load `travel` dataset.")
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
         self.mark_test_step('''
-            3. Start a replicator: 
+            Start a replicator: 
                 * endpoint: `/travel`
                 * collections : `travel.routes`, `travel.landmarks`, `travel.hotels`
                 * type: pull
@@ -98,27 +98,27 @@ class TestBasicReplication(CBLTestClass):
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
-        self.mark_test_step("5. Check that all docs are replicated correctly.")
+        self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "travel", 
                                  ["travel.routes", "travel.landmarks", "travel.hotels"])
 
     @pytest.mark.asyncio
     async def test_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
-        self.mark_test_step("1. Reset SG and load `travel` dataset.")
+        self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "travel")
 
-        self.mark_test_step("2. Reset local database, and load `travel` dataset.")
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
         self.mark_test_step('''
-            3. Start a replicator: 
+            Start a replicator: 
                 * endpoint: `/travel`
                 * collections : `travel.airlines`, `travel.airports`, `travel.hotels`, `travel.landmarks`, `travel.routes`
                 * type: push-and-pull
@@ -130,27 +130,27 @@ class TestBasicReplication(CBLTestClass):
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
-        self.mark_test_step("5. Check that all docs are replicated correctly.")
+        self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "travel", 
                                  ["travel.airlines", "travel.airports", "travel.hotels", "travel.landmarks", "travel.routes"])
         
     @pytest.mark.asyncio
     async def test_continuous_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step("1. Reset SG and load `travel` dataset.")
+        self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "travel")
 
-        self.mark_test_step("2. Reset local database, and load `travel` dataset.")
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
         self.mark_test_step('''
-            3. Start a replicator: 
+            Start a replicator: 
                 * endpoint: `/travel`
                 * collections : `travel.airlines`, `travel.airports`, `travel.hotels`
                 * type: push
@@ -168,20 +168,20 @@ class TestBasicReplication(CBLTestClass):
                                 authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is idle.")
+        self.mark_test_step("Wait until the replicator is idle.")
         status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
                 
-        self.mark_test_step("5. Check that all docs are replicated correctly.")
+        self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "travel", 
                                         ["travel.airlines", "travel.airports", "travel.hotels"])
         
-        self.mark_test_step("6. Clear current document replication events.")
+        self.mark_test_step("Clear current document replication events.")
         replicator.clear_document_updates()
 
         self.mark_test_step('''
-            7. Update documents in the local database.
+            Update documents in the local database.
                 * Add 2 airports in travel.airports.
                 * Update 2 new airlines in travel.airlines.
                 * Remove 2 hotels in travel.hotels.
@@ -196,7 +196,7 @@ class TestBasicReplication(CBLTestClass):
             b.delete_document("travel.hotels", "hotel_1")
             b.delete_document("travel.hotels", "hotel_2")
 
-        self.mark_test_step("8. Wait until receiving all document replication events")
+        self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_doc_events({
             WaitForDocumentEventEntry("travel.airports", "test_airport_1"),
             WaitForDocumentEventEntry("travel.airports", "test_airport_2"),
@@ -206,22 +206,22 @@ class TestBasicReplication(CBLTestClass):
             WaitForDocumentEventEntry("travel.hotels", "hotel_2")
         })
         
-        self.mark_test_step("9. Check that all updates are replicated correctly.")
+        self.mark_test_step("Check that all updates are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "travel", 
                                 ["travel.airlines", "travel.airports", "travel.hotels"])
 
     @pytest.mark.asyncio
     async def test_continuous_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
-        self.mark_test_step("1. Reset SG and load `travel` dataset.")
+        self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "travel")
 
-        self.mark_test_step("2. Reset local database, and load `travel` dataset.")
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
         self.mark_test_step('''
-            3. Start a replicator: 
+            Start a replicator: 
                 * endpoint: `/travel`
                 * collections : `travel.routes`, `travel.landmarks`, `travel.hotels`
                 * type: pull
@@ -239,20 +239,20 @@ class TestBasicReplication(CBLTestClass):
                                 authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is idle.")
+        self.mark_test_step("Wait until the replicator is idle.")
         status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("5. Check that all docs are replicated correctly.")
+        self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "travel", 
                                         ["travel.routes", "travel.landmarks", "travel.hotels"])
         
-        self.mark_test_step("6. Clear current document replication events.")
+        self.mark_test_step("Clear current document replication events.")
         replicator.clear_document_updates()
 
         self.mark_test_step('''
-            7. Update documents on SG.
+            Update documents on SG.
                 * Add 2 routes in `travel.routes`.
                 * Update 2 landmarks in `travel.landmarks`.
                 * Remove 2 hotels in `travel.hotels`.
@@ -302,7 +302,7 @@ class TestBasicReplication(CBLTestClass):
             if doc.id == "hotel_400" or doc.id == "hotel_500":
                 await cblpytest.sync_gateways[0].delete_document(doc.id, doc.revid, "travel", "travel", "hotels")
 
-        self.mark_test_step("8. Wait until receiving all document replication events")
+        self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_doc_events({
             WaitForDocumentEventEntry("travel.routes", "test_route_1"),
             WaitForDocumentEventEntry("travel.routes", "test_route_2"),
@@ -312,22 +312,22 @@ class TestBasicReplication(CBLTestClass):
             WaitForDocumentEventEntry("travel.hotels", "hotel_500")
         })
 
-        self.mark_test_step("9. Check that all updates are replicated correctly.")
+        self.mark_test_step("Check that all updates are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "travel", 
                                        ["travel.routes", "travel.landmarks", "travel.hotels"])
 
     @pytest.mark.asyncio
     async def test_continuous_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step("1. Reset SG and load `travel` dataset.")
+        self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "travel")
 
-        self.mark_test_step("2. Reset local database, and load `travel` dataset.")
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
         self.mark_test_step('''
-            3. Start a replicator: 
+            Start a replicator: 
                 * endpoint: `/travel`
                 * collections : `travel.airlines`, `travel.airports`, `travel.hotels`, `travel.landmarks`, `travel.routes`
                 * type: push-and-pull
@@ -347,21 +347,21 @@ class TestBasicReplication(CBLTestClass):
                                 authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is idle.")
+        self.mark_test_step("Wait until the replicator is idle.")
         status = await replicator.wait_for(ReplicatorActivityLevel.IDLE, timeout = timedelta(seconds=90.0))
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
                 
-        self.mark_test_step("5. Check that all docs are replicated correctly.")
+        self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "travel", 
                                        ["travel.airlines", "travel.airports", "travel.hotels", 
                                         "travel.landmarks", "travel.routes"])
         
-        self.mark_test_step("6. Clear current document replication events.")
+        self.mark_test_step("Clear current document replication events.")
         replicator.clear_document_updates()
 
         self.mark_test_step('''
-            7. Update documents in the local database.
+            Update documents in the local database.
                 * Add 2 airports in travel.airports.
                 * Update 2 new airlines in travel.airlines.
                 * Remove 2 hotels in travel.hotels.
@@ -375,7 +375,7 @@ class TestBasicReplication(CBLTestClass):
             b.delete_document("travel.hotels", "hotel_2")
         
         self.mark_test_step('''
-            8. Update documents on SG.
+            Update documents on SG.
                 * Add 2 routes in `travel.routes`.
                 * Update 2 landmarks in `travel.landmarks`.
                 * Remove 2 hotels in `travel.hotels`.
@@ -425,7 +425,7 @@ class TestBasicReplication(CBLTestClass):
             if doc.id == "hotel_400" or doc.id == "hotel_500":
                 await cblpytest.sync_gateways[0].delete_document(doc.id, doc.revid, "travel", "travel", "hotels")
 
-        self.mark_test_step("9. Wait until receiving all document replication events")
+        self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_doc_events({
             WaitForDocumentEventEntry("travel.airports", "test_airport_1"),
             WaitForDocumentEventEntry("travel.airports", "test_airport_2"),
@@ -441,23 +441,23 @@ class TestBasicReplication(CBLTestClass):
             WaitForDocumentEventEntry("travel.hotels", "hotel_500")
         }, max_retries = 100)
 
-        self.mark_test_step("10. Check that all updates are replicated correctly.")
+        self.mark_test_step("Check that all updates are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "travel", 
                                        ["travel.airlines", "travel.airports", "travel.hotels", 
                                         "travel.landmarks", "travel.routes"])
 
     @pytest.mark.asyncio
     async def test_default_collection_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step("1. Reset SG and load `names` dataset.")
+        self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "names")
 
-        self.mark_test_step("2. Reset local database, and load `names` dataset.")
+        self.mark_test_step("Reset local database, and load `names` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"])
         db = dbs[0]
 
         self.mark_test_step('''
-            3. Start a replicator: 
+            Start a replicator: 
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: push
@@ -468,26 +468,26 @@ class TestBasicReplication(CBLTestClass):
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("5. Check that all docs are replicated correctly.")
+        self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "names", ["_default._default"])
 
     @pytest.mark.asyncio
     async def test_default_collection_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
-        self.mark_test_step("1. Reset SG and load `names` dataset.")
+        self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "names")
 
-        self.mark_test_step("2. Reset local database, and load `names` dataset.")
+        self.mark_test_step("Reset local database, and load `names` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"])
         db = dbs[0]
 
         self.mark_test_step('''
-            3. Start a replicator:
+            Start a replicator:
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: pull
@@ -498,26 +498,26 @@ class TestBasicReplication(CBLTestClass):
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("5. Check that all docs are replicated correctly.")
+        self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "names", ["_default._default"])
 
     @pytest.mark.asyncio
     async def test_default_collection_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
-        self.mark_test_step("1. Reset SG and load `names` dataset.")
+        self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "names")
 
-        self.mark_test_step("2. Reset local database, and load `names` dataset.")
+        self.mark_test_step("Reset local database, and load `names` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"])
         db = dbs[0]
 
         self.mark_test_step('''
-            3. Start a replicator:
+            Start a replicator:
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: push-and-pull
@@ -528,27 +528,27 @@ class TestBasicReplication(CBLTestClass):
         ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("5. Check that all docs are replicated correctly.")
+        self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "names", ["_default._default"])
 
     @pytest.mark.skip(reason="CBL-4805")
     @pytest.mark.asyncio
     async def test_reset_checkpoint_push(self, cblpytest: CBLPyTest, dataset_path: Path):
-        self.mark_test_step("1. Reset SG and load `travel` dataset.")
+        self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "travel")
 
-        self.mark_test_step("2. Reset local database, and load `travel` dataset.")
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
         self.mark_test_step('''
-            3. Start a replicator:
+            Start a replicator:
                 * endpoint: `/travel`
                 * collections : `travel.airlines`
                 * type: push
@@ -561,33 +561,33 @@ class TestBasicReplication(CBLTestClass):
                                 authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
-        self.mark_test_step("5. Check that all docs are replicated correctly.")
+        self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "travel", 
                                  ["travel.airlines"])
         
-        self.mark_test_step("6. Purge an airline doc from `travel.airlines` on SG.")
+        self.mark_test_step("Purge an airline doc from `travel.airlines` on SG.")
         sg_purged_doc_id = "airline_10"
         await cblpytest.sync_gateways[0].purge_document(sg_purged_doc_id, "travel", "travel", "airlines")
 
-        self.mark_test_step("7. Start the replicator with the same config as the step 3.")
+        self.mark_test_step("Start the replicator with the same config as the step 3.")
         await replicator.start()
 
-        self.mark_test_step("8. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
           
-        self.mark_test_step("9. Check that the purged airline doc doesn't exist on SG.")
+        self.mark_test_step("Check that the purged airline doc doesn't exist on SG.")
         sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airlines")
         for doc in sg_all_docs.rows:
             assert doc.id != sg_purged_doc_id, f"Unexpected purged document found in SG: {doc.id}"
 
-        self.mark_test_step("10. Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.")
+        self.mark_test_step("Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.")
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), 
                                 collections=[ReplicatorCollectionEntry(["travel.airlines"])], 
                                 replicator_type=ReplicatorType.PUSH, 
@@ -595,12 +595,12 @@ class TestBasicReplication(CBLTestClass):
                                 reset=True)
         await replicator.start()
 
-        self.mark_test_step("11. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
-        self.mark_test_step("12. Check that the purged airline doc is pushed back to SG")
+        self.mark_test_step("Check that the purged airline doc is pushed back to SG")
         sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airlines")
         found_doc = False
         for doc in sg_all_docs.rows:
@@ -611,16 +611,16 @@ class TestBasicReplication(CBLTestClass):
 
     @pytest.mark.asyncio
     async def test_reset_checkpoint_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
-        self.mark_test_step("1. Reset SG and load `travel` dataset.")
+        self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "travel")
 
-        self.mark_test_step("2. Reset local database, and load `travel` dataset.")
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
         db = dbs[0]
 
         self.mark_test_step('''
-            3. Start a replicator:
+            Start a replicator:
                 * endpoint: `/travel`
                 * collections : `travel.airports`
                 * type: pull
@@ -633,35 +633,35 @@ class TestBasicReplication(CBLTestClass):
                                     authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("4. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
             
         
-        self.mark_test_step("5. Check that all docs are replicated correctly.")
+        self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "travel", 
                                        ["travel.airports"])
         
-        self.mark_test_step("6. Purge an airport doc from `travel.airports` in the local database.")
+        self.mark_test_step("Purge an airport doc from `travel.airports` in the local database.")
         lite_purged_doc_id = "airport_20"
         async with db.batch_updater() as b:
             b.purge_document("travel.airports", lite_purged_doc_id)
 
-        self.mark_test_step("7. Start the replicator with the same config as the step 3.")
+        self.mark_test_step("Start the replicator with the same config as the step 3.")
         await replicator.start()
 
-        self.mark_test_step("8. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
-        self.mark_test_step("9. Check that the purged airport doc doesn't exist in CBL database.")
+        self.mark_test_step("Check that the purged airport doc doesn't exist in CBL database.")
         lite_all_docs = await db.get_all_documents("travel.airports")
         for doc in lite_all_docs["travel.airports"]:
             assert doc.id != lite_purged_doc_id, f"Unexpected purged document found in local database: {doc.id}"
         
-        self.mark_test_step("10. Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.")
+        self.mark_test_step("Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.")
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), 
                                 collections=[ReplicatorCollectionEntry(["travel.airports"])], 
                                 replicator_type=ReplicatorType.PULL, 
@@ -669,12 +669,12 @@ class TestBasicReplication(CBLTestClass):
                                 reset=True)
         await replicator.start()
 
-        self.mark_test_step("11. Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
-        self.mark_test_step("12. Check that the purged airport doc is pulled back in CBL database.")
+        self.mark_test_step("Check that the purged airport doc is pulled back in CBL database.")
         lite_all_docs = await db.get_all_documents("travel.airports")
         found_doc = False
         for doc in lite_all_docs["travel.airports"]:
