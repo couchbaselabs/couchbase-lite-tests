@@ -16,7 +16,9 @@ namespace TestServer.Handlers
 {
     internal static partial class HandlerList
     {
+#if !HEADLESS
         private static readonly IServiceProvider ServiceProvider = Application.Current!.MainPage!.Handler!.MauiContext!.Services;
+#endif
 
         private static (string scope, string name) CollectionSpec(string inputName)
         {

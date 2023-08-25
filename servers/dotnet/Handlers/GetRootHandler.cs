@@ -17,7 +17,11 @@ internal static partial class HandlerList
             version = typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
             apiVersion = resolvedVersion,
             cbl = "couchbase-lite-net",
-            device = ServiceProvider.GetRequiredService<IDeviceInformation>()
+#if HEADLESS
+            device = new DeviceInformation()
+#else
+            device = ServiceProvider.GetRequiredService<IDeviceInformation>() 
+#endif
         };
 
         response.WriteBody(responseBody, resolvedVersion);
