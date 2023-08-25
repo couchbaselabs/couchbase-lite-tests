@@ -353,3 +353,191 @@ function (doc, oldDoc, meta) {
   "owner": "user1"
 }
 ```
+## 4. todo
+
+### CBL Dataset
+
+| Collections         | #Docs       |
+| :------------------ | ----------- |
+| _default.lists      | 0           |
+| _default.tasks      | 0           |
+| _default.users      | 0           |
+
+### SG Dataset
+
+| Collections         | #Docs       | Doc ID           |
+| :------------------ | ----------- | -----------------|
+| _default.lists      | 0           |                  |
+| _default.tasks      | 0           |                  |
+| _default.users      | 0           |                  |
+
+### SG Config
+
+ | Config      | Value             |
+ | ----------- | ------------------|
+ | Database    | posts             |
+ | Port        | 4984 / 4985       |
+ | Collections | _default.lists    |
+ | Collections | _default.tasks    |
+ | Collections | _default.users    |
+
+#### Sync Function
+
+##### _default.lists
+
+```js
+function (doc, oldDoc, meta) {
+    var owner = doc._deleted
+        ? oldDoc.owner
+        : doc.owner;
+    requireUser(owner);
+    var listChannel = 'lists.' + owner + '.' + doc._id;
+    var contributorRole = 'role:' + listChannel + '.contributor';
+    role(owner, contributorRole);
+    access(contributorRole, listChannel);
+    channel(listChannel)
+}
+```
+
+##### _default.tasks
+
+```js
+function (doc, oldDoc, meta) {
+    var listId = doc._deleted
+        ? oldDoc.taskList.id
+        : doc.taskList.id;
+    var listOwner = doc._deleted
+        ? oldDoc.taskList.owner
+        : doc.taskList.owner;
+    var listChannel = 'lists.' + listOwner + '.' + listId;
+    var contributorRoleName = listChannel + '.contributor';
+    var contributorRole = 'role:' + contributorRoleName;
+    requireRole(contributorRoleName);
+    var tasksChannel = listChannel + '.tasks';
+    access(contributorRole, tasksChannel);
+    channel(tasksChannel)
+}
+```
+
+##### _default.users
+
+```js
+function (doc, oldDoc, meta) {
+    var listId = doc._deleted
+        ? oldDoc.taskList.id
+        : doc.taskList.id;
+    var listOwner = doc._deleted
+        ? oldDoc.taskList.owner
+        : doc.taskList.owner;
+    requireUser(listOwner);
+    var listChannel = 'lists.' + listOwner + '.' + listId;
+    var contributorRole = 'role:' + listChannel + '.contributor';
+    if (!doc._deleted) {
+        var username = doc._deleted
+            ? oldDoc.username
+            : doc.username;
+        role(username, contributorRole)
+    }
+    var usersChannel = listChannel + '.users';
+    access(listOwner, usersChannel);
+    channel(usersChannel)
+}
+```
+
+#### Roles
+
+CBG-2490 : SG doesn't support dynamic cross collection access grant via sync function, 
+to implement sharing feature with access-grant-user doc, granting the access to a static role that has 
+access to the list and its tasks is used as a workaround. 
+
+Before creating a new list in the test, a contributor for the list needs to be created first 
+by using SG Admin API as the following cURL command example.
+
+```
+curl --location --request POST 'http://<sg-address>:4985/todo/_role/' \
+--user "<user>:<password>" \
+--header 'Content-Type: application/json' \
+--data "{
+    \"name\": \"lists.<task-list-owner>.<task-list-doc-id>.contributor\",
+    \"collection_access\": {
+        \"_default\": {
+            \"lists\": {\"admin_channels\": []},
+            \"tasks\": {\"admin_channels\": []},
+            \"users\": {\"admin_channels\": []}
+        }
+    }
+}"
+```
+
+#### Users
+
+| Username | Password  | admin_channels       |
+| :------- | --------- |--------------------- |
+| user1    | pass      | [] (All collections) |
+| user2    | pass      | [] (All collections) |
+| user3    | pass      | [] (All collections) |
+
+### Docs
+
+##### _default.lists
+
+| Key      | Type   | Required |Description                       | 
+| :------- | ------ | -------- |--------------------------------- |
+| _id      | string | Yes      | Document ID in <UUID> format        |
+| name     | string | Yes      | List name                         |
+| owner    | string | Yes      | User ID of the owner of the list  |
+
+###### Sample
+
+```JSON
+{
+  "_id": "f2662f3b-828e-4746-bfd1-30ca8506e665",
+  "name": "List 1",
+  "owner": "user1"
+}
+```
+##### _default.tasks
+
+| Key      | Type   | Required | Description                       | 
+| :------- | ------ | -------- | --------------------------------- |
+| _id      | string | Yes      | Document ID in <UUID> format      |
+| name     | string | Yes      | Task name                         |
+| image    | blob   | No       | Optional image                    |
+| complete | bool   | Yes      | Complete Status                   |
+| list     | dict   | Yes      | Contains two required keys : 'id', doc id of the list and 'owner', owner of the list |
+
+```JSON
+{
+  "_id": "9077616a-452b-4e7e-a56a-33d1605ff732",
+  "name": "Task1",
+  "complete": true,
+  "image": {
+    "@type": "blob",
+    "content_type": "image/jpeg",
+    "digest": "sha1-7hYMqN2gjvfVtZ6UcYCFZWLWo98=",
+    "length": 156627
+  },
+  "list" : {
+    "id": "f2662f3b-828e-4746-bfd1-30ca8506e665",
+    "owner" : "user1"  
+  }
+}
+```
+##### _default.users
+
+| Key      | Type   | Required | Description                       | 
+| :------- | ------ | -------- | --------------------------------- |
+| _id      | string | Yes      | Document ID in <list-doc-id>.<username> format. The username is the username to share the list |
+| username | string | Yes      | Username to share the list        |
+| list     | dict   | Yes      | Contains two required keys : 'id', doc id of the list and 'owner', owner of the list |
+
+```JSON
+{
+  "_id": "f2662f3b-828e-4746-bfd1-30ca8506e665.user2",
+  "username": "user2",
+  "list" : {
+    "id": "f2662f3b-828e-4746-bfd1-30ca8506e665",
+    "owner" : "user1"  
+  }
+}
+```
