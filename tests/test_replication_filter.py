@@ -291,16 +291,16 @@ class TestReplicationFilter(CBLTestClass):
         def repl_filter(x):
             return (x.error == None) or ((x.error.domain == "CouchbaseLite") and (x.error.code == 10403))
 
-        # 1. Reset SG and load `names` dataset.
+        self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "names")
 
-        # 2. Reset local database, and load `names` dataset.
+        self.mark_test_step("Reset local database, and load `names` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"])
         db = dbs[0]
 
-        '''
-        3. Start a replicator:
+        self.mark_test_step('''
+        Start a replicator:
             * collections :
             * `_default._default`
                 * pullFilter:
@@ -310,28 +310,28 @@ class TestReplicationFilter(CBLTestClass):
             * type: pull
             * continuous: false
             * credentials: user1/pass
-        '''
+        ''')
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"),
                                 replicator_type=ReplicatorType.PULL, collections=[
                 ReplicatorCollectionEntry(["_default._default"], pull_filter=ReplicatorFilter("deletedDocumentsOnly"))
             ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"), enable_document_listener=True)
         await replicator.start()
 
-        # 4. Wait until the replicator is stopped.
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Pull replication failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        # 5. Check that no docs are replicated.
+        self.mark_test_step("Check that no docs are replicated.")
         successful_replications1 = list(filter(repl_filter, replicator.document_updates))
         assert len(successful_replications1) == 0, \
             f"{len(successful_replications1)} documents were replicated even though they should have been filtered"
 
-        '''
-        6. Update docs on SG
+        self.mark_test_step('''
+        Update docs on SG
             * Add `name_10000`
             * Remove `name_10` and `name_20`
-        '''
+        ''')
         updates = [DocumentUpdateEntry("name_1000", None, {"answer": 42})]
 
         remote_name_10 = await cblpytest.sync_gateways[0].get_document("names", "name_105")
@@ -344,13 +344,13 @@ class TestReplicationFilter(CBLTestClass):
         await cblpytest.sync_gateways[0].delete_document("name_105", remote_name_10.revid, "names")
         await cblpytest.sync_gateways[0].delete_document("name_193", remote_name_20.revid, "names")
 
-        # 7. Start a replicator with the same config as in step 3.
+        self.mark_test_step("Start a replicator with the same config as in step 3.")
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Pull replication failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        # 8. Check that only changes passed the push filters are replicated.
+        self.mark_test_step("Check that only changes passed the push filters are replicated.")
         expected_ids = {"name_105", "name_193"}
         successful_replications2 = list(filter(repl_filter, replicator.document_updates))
         self.validate_replicated_doc_ids(expected_ids, successful_replications2)
