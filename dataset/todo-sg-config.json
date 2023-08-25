@@ -1,0 +1,71 @@
+{
+  "config": {
+    "bucket": "todo",
+    "scopes": {
+      "_default": {
+        "collections": {
+          "lists": {
+            "sync": "function foo(doc,oldDoc,meta){var owner=doc._deleted?oldDoc.owner:doc.owner;requireUser(owner);var listChannel='lists.'+owner+'.'+doc._id;var contributorRole='role:'+listChannel+'.contributor';role(owner,contributorRole);access(contributorRole,listChannel);channel(listChannel)}"
+          },
+          "tasks": {
+            "sync": "function foo(doc,oldDoc,meta){var listId=doc._deleted?oldDoc.taskList.id:doc.taskList.id;var listOwner=doc._deleted?oldDoc.taskList.owner:doc.taskList.owner;var listChannel='lists.'+listOwner+'.'+listId;var contributorRoleName=listChannel+'.contributor';var contributorRole='role:'+contributorRoleName;requireRole(contributorRoleName);var tasksChannel=listChannel+'.tasks';access(contributorRole,tasksChannel);channel(tasksChannel)}"
+          },
+          "users": {
+            "sync": "function foo(doc,oldDoc,meta){var listId=doc._deleted?oldDoc.taskList.id:doc.taskList.id;var listOwner=doc._deleted?oldDoc.taskList.owner:doc.taskList.owner;requireUser(listOwner);var listChannel='lists.'+listOwner+'.'+listId;var contributorRole='role:'+listChannel+'.contributor';if(!doc._deleted){var username=doc._deleted?oldDoc.username:doc.username;role(username,contributorRole)}var usersChannel=listChannel+'.users';access(listOwner,usersChannel);channel(usersChannel)}"
+          }
+        }
+      }
+    },
+    "num_index_replicas": 0
+  },
+  "users": {
+    "user1": {
+      "password": "pass",
+      "collection_access": {
+        "_default": {
+          "lists": {
+            "admin_channels": []
+          },
+          "tasks": {
+            "admin_channels": []
+          },
+          "users": {
+            "admin_channels": []
+          }
+        }
+      }
+    },
+    "user2": {
+      "password": "pass",
+      "collection_access": {
+        "_default": {
+          "lists": {
+            "admin_channels": []
+          },
+          "tasks": {
+            "admin_channels": []
+          },
+          "users": {
+            "admin_channels": []
+          }
+        }
+      }
+    },
+    "user3": {
+      "password": "pass",
+      "collection_access": {
+        "_default": {
+          "lists": {
+            "admin_channels": []
+          },
+          "tasks": {
+            "admin_channels": []
+          },
+          "users": {
+            "admin_channels": []
+          }
+        }
+      }
+    }
+  }
+}
