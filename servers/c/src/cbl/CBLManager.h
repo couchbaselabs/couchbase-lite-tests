@@ -83,6 +83,9 @@ namespace ts::cbl {
         std::string _databaseDir;
         std::string _assetDir;
 
+        /** Map of dataset name and extracted dataset path */
+        std::unordered_map<std::string, std::string> _extDatasetPaths;
+
         /** Map of database id and database */
         std::unordered_map<std::string, CBLDatabase *> _databases;
 

@@ -83,13 +83,15 @@ namespace ts::cbl {
         string fromDbPath;
         auto dbAssetPath = path(_assetDir).append(ASSET_DATASET_DIR);
         auto zipFilePath = path(dbAssetPath).append(name + DB_FILE_ZIP_EXT);
-
-        auto p = zipFilePath.string();
-
         if (filesystem::exists(zipFilePath)) {
-            auto extDirPath = path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
-            zip::extractZip(zipFilePath.string(), extDirPath.string());
-            fromDbPath = extDirPath.append(name + DB_FILE_EXT).string();
+            if (auto it = _extDatasetPaths.find(name); it != _extDatasetPaths.end()) {
+                fromDbPath = it->second;
+            } else {
+                auto extDirPath = path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
+                zip::extractZip(zipFilePath.string(), extDirPath.string());
+                fromDbPath = extDirPath.append(name + DB_FILE_EXT).string();
+                _extDatasetPaths[name] = fromDbPath;
+            }
         } else {
             fromDbPath = dbAssetPath.append(name + DB_FILE_EXT).string();
         }
@@ -120,8 +122,8 @@ namespace ts::cbl {
 
     CBLDatabase *CBLManager::databaseUnlocked(const string &name) {
         CBLDatabase *db = nullptr;
-        if (auto i = _databases.find(name); i != _databases.end()) {
-            db = i->second;
+        if (auto it = _databases.find(name); it != _databases.end()) {
+            db = it->second;
         }
         checkNotNull(db, "Database '" + name + "' Not Found");
         return db;
@@ -259,7 +261,7 @@ namespace ts::cbl {
         CBLReplicatorConfiguration config{};
         config.context = context.get();
         config.endpoint = endpoint;
-        if (replCols.size() > 0) {
+        if (!replCols.empty()) {
             config.collections = replCols.data();
             config.collectionCount = replCols.size();
         } else {
