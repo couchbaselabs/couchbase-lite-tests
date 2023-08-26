@@ -1,13 +1,13 @@
-from json import load
+from json import dumps, load
 from pathlib import Path
-from typing import cast
+from typing import List, Optional, cast
 from varname import nameof
 
 from cbltest.assertions import _assert_not_null
-from cbltest.api.error import CblSyncGatewayBadResponseError
+from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.syncgateway import PutDatabasePayload, SyncGateway
 from cbltest.api.couchbaseserver import CouchbaseServer
-from cbltest.jsonhelper import _get_typed_required
+from cbltest.jsonhelper import _get_typed_required, _get_typed
 
 class CouchbaseCloud:
     """
@@ -22,17 +22,20 @@ class CouchbaseCloud:
         for scope in db_payload.scopes():
             self.__couchbase_server.create_collections(db_payload.bucket, scope, db_payload.collections(scope))
 
-    async def configure_dataset(self, dataset_path: Path, dataset_name: str) -> None:
+    async def configure_dataset(self, dataset_path: Path, dataset_name: str, sg_config_options: Optional[List[str]]) -> None:
         """
         Creates a database, ensuring that it is in an empty state when finished
 
         :param dataset_path: The path to the folder containing the configuration data
         :param dataset_name: The name of the dataset configuration to use
+        :param sg_config_options: A list of options to apply to the base SG config
         
         .. note:: The expected format is a file named <database_name>-sg-config.json
                   containing a config and users key, for use with the PUT /<db> and
                   PUT /<db>/<user> endpoints and a file named <database_name>-sg.json
-                  containing the actual data to populate.
+                  containing the actual data to populate.  Any config options that can
+                  be passed to sg_config_options will be in a key called "config-options"
+                  in <database_name>-sg-config.json
         """
         _assert_not_null(dataset_path, nameof(dataset_path))
         _assert_not_null(dataset_name, nameof(dataset_name))
@@ -51,6 +54,17 @@ class CouchbaseCloud:
                 raise ValueError(f"Badly formatted {dataset_name}-sg-config.json (not an object)")
             
         users = _get_typed_required(dataset_config, "users", dict)
+        if sg_config_options is not None:
+            nested_config = _get_typed_required(dataset_config, "config", dict)
+            valid_options = _get_typed_required(dataset_config, "config-options", dict)
+
+            for option in sg_config_options:
+                if option not in valid_options:
+                    raise CblTestError(f"{option} is not a valid option for {dataset_name} (valid options are {dumps(list(str(k) for k in valid_options.keys()))})")
+                
+                addition = _get_typed_required(valid_options, option, dict)
+                for k in addition:
+                    nested_config[k] = addition[k]
         
         db_payload: PutDatabasePayload = PutDatabasePayload(dataset_config)
         try:

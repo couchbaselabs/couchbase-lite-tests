@@ -24,6 +24,14 @@
     },
     "num_index_replicas": 0
   },
+  "config-options": {
+    "delta-sync": {
+      "delta_sync": { 
+        "enabled": true,
+        "rev_max_age_seconds": 86400
+      }
+    }
+  },
   "users": {
     "user1": {
       "password": "pass",
