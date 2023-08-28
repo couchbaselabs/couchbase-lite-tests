@@ -34,7 +34,7 @@ class CouchbaseCloud:
                   containing a config and users key, for use with the PUT /<db> and
                   PUT /<db>/<user> endpoints and a file named <database_name>-sg.json
                   containing the actual data to populate.  Any config options that can
-                  be passed to sg_config_options will be in a key called "config-options"
+                  be passed to sg_config_options will be in a key called "config_options"
                   in <database_name>-sg-config.json
         """
         _assert_not_null(dataset_path, nameof(dataset_path))
@@ -56,7 +56,7 @@ class CouchbaseCloud:
         users = _get_typed_required(dataset_config, "users", dict)
         if sg_config_options is not None:
             nested_config = _get_typed_required(dataset_config, "config", dict)
-            valid_options = _get_typed_required(dataset_config, "config-options", dict)
+            valid_options = _get_typed_required(dataset_config, "config_options", dict)
 
             for option in sg_config_options:
                 if option not in valid_options:
