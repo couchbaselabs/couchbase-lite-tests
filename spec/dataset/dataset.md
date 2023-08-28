@@ -48,6 +48,12 @@ function (doc, oldDoc, meta) {
 ```
 Note: Same sync function for all collections
 
+#### Options
+
+ | Name              | Description           |
+ | ----------------- | --------------------- |
+ | delta_sync        | For enable delta sync |
+
 #### Users
 
 | Username | Password  | admin_channels          |
