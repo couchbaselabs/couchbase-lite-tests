@@ -22,13 +22,13 @@ class CouchbaseCloud:
         for scope in db_payload.scopes():
             self.__couchbase_server.create_collections(db_payload.bucket, scope, db_payload.collections(scope))
 
-    async def configure_dataset(self, dataset_path: Path, dataset_name: str, sg_config_options: Optional[List[str]]) -> None:
+    async def configure_dataset(self, dataset_path: Path, dataset_name: str, sg_config_options: Optional[List[str]] = None) -> None:
         """
         Creates a database, ensuring that it is in an empty state when finished
 
         :param dataset_path: The path to the folder containing the configuration data
         :param dataset_name: The name of the dataset configuration to use
-        :param sg_config_options: A list of options to apply to the base SG config
+        :param sg_config_options: An optional list of options to apply to the base SG config
         
         .. note:: The expected format is a file named <database_name>-sg-config.json
                   containing a config and users key, for use with the PUT /<db> and
