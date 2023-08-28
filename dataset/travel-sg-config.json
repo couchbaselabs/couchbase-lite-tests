@@ -24,7 +24,7 @@
     },
     "num_index_replicas": 0
   },
-  "config-options": {
+  "config_options": {
     "delta-sync": {
       "delta_sync": { 
         "enabled": true,
