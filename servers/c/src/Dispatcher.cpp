@@ -31,6 +31,7 @@ namespace ts {
         addRule({"POST", "/getReplicatorStatus", HANDLER(handlePOSTGetReplicatorStatus)});
         addRule({"POST", "/snapshotDocuments", HANDLER(handlePOSTSnapshotDocuments)});
         addRule({"POST", "/verifyDocuments", HANDLER(handlePOSTVerifyDocuments)});
+        addRule({"POST", "/performMaintenance", HANDLER(handlePOSTPerformMaintenance)});
 
         // For testing:
         addRule({"POST", "/test/getDocument", HANDLER(handlePOSTGetDocument)});

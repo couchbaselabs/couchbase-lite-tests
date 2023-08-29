@@ -34,6 +34,7 @@ namespace ts {
         [[nodiscard]] Handler findHandler(const Request &request) const;
 
         // Handler Functions:
+
         int handleGETRoot(Request &request);
 
         int handlePOSTReset(Request &request);
@@ -49,6 +50,8 @@ namespace ts {
         int handlePOSTSnapshotDocuments(Request &request);
 
         int handlePOSTVerifyDocuments(Request &request);
+
+        int handlePOSTPerformMaintenance(Request &request);
 
         // Handler Functions for Testing:
         int handlePOSTGetDocument(Request &request);
