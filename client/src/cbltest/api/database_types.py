@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any
 from cbltest.api.jsonserializable import JSONSerializable
 
@@ -15,3 +16,21 @@ class SnapshotDocumentEntry(JSONSerializable):
 
     def to_json(self) -> Any:
         return {"collection": self.collection, "id": self.id}
+    
+class MaintenanceType(Enum):
+    """An enum representing a type of maintenance operation on a database"""
+
+    COMPACT = "compact"
+    """Compacts the database and removes unused blobs to reduce the disk footprint"""
+
+    INTEGRITY_CHECK = "integrityCheck"
+    """Runs a diagnostic check on the database to check for any low level corruption errors"""
+
+    OPTIMIZE = "optimize"
+    """Quickly update db statistics to help optimize queries"""
+
+    FULL_OPTIMIZE = "fullOptimize"
+    """Full update of db statistics; takes longer than Optimize"""
+
+    def __str__(self) -> str:
+        return self.value
