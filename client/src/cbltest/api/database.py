@@ -3,14 +3,15 @@ from json import dumps
 
 from typing import Dict, List, cast, Any, Optional
 
-from cbltest.requests import TestServerRequestType, TestServerRequest
+from cbltest.requests import TestServerRequestType
 from cbltest.v1.responses import PostGetAllDocumentsResponse, PostGetAllDocumentsEntry, PostSnapshotDocumentsResponse, PostVerifyDocumentsResponse, ValueOrMissing
 from cbltest.v1.requests import (DatabaseUpdateEntry, DatabaseUpdateType, PostGetAllDocumentsRequestBody, 
                                  PostUpdateDatabaseRequestBody, SnapshotDocumentEntry, PostSnapshotDocumentsRequestBody,
-                                 PostVerifyDocumentsRequestBody)
+                                 PostVerifyDocumentsRequestBody, PostPerformMaintenanceRequestBody)
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory
 from cbltest.api.error import CblTestError
+from cbltest.api.database_types import MaintenanceType
 
 class SnapshotUpdater:
     def __init__(self, id: str):
@@ -263,3 +264,13 @@ class Database:
         req = self.__request_factory.create_request(TestServerRequestType.VERIFY_DOCS, payload)
         resp = await self.__request_factory.send_request(self.__index, req)
         return VerifyResult(cast(PostVerifyDocumentsResponse, resp))
+    
+    async def perform_maintenance(self, type: MaintenanceType) -> None:
+        """
+        Performs the given maintenance operation on the database
+
+        :param type: The type of maintenance to perform
+        """
+        payload = PostPerformMaintenanceRequestBody(self.__name, str(type))
+        req = self.__request_factory.create_request(TestServerRequestType.PERFORM_MAINTENANCE, payload)
+        await self.__request_factory.send_request(self.__index, req)

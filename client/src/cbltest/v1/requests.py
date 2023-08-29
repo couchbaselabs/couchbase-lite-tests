@@ -438,6 +438,36 @@ class PostGetReplicatorStatusRequestBody(TestServerRequestBody):
         """Serializes the :class:`PostGetReplicatorStatusRequestBody` to a JSON string"""
         return {"id": self.__id}
     
+class PostPerformMaintenanceRequestBody(TestServerRequestBody):
+    """
+    The body of a POST /performMaintenance request as specified in version 1 of the 
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+
+    Example Body::
+
+        {
+            "database": "db1",
+            "maintenanceType": "compact"
+        }
+    """
+
+    @property
+    def database(self) -> str:
+        """Returns the database that this operation will be performed on"""
+        return self.__db
+    
+    @property
+    def type(self) -> str:
+        """Returns the type of maintenance to perform"""
+        return self.__type
+    
+    def __init__(self, db: str, type: str):
+        super().__init__(1)
+        self.__db = db
+        self.__type = type
+
+    def to_json(self) -> Any:
+        return {"database": self.__db, "maintenanceType": self.__type}
 
 # Below this point are all of the concrete test server request types
 # Remember the note from the top of this file about the actual type of the payload
@@ -496,3 +526,11 @@ class PostGetReplicatorStatusRequest(TestServerRequest):
     """
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
         super().__init__(1, uuid, "getReplicatorStatus", PostGetReplicatorStatusRequestBody, payload=payload)
+
+class PostPerformMaintenanceRequest(TestServerRequest):
+    """
+    A POST /performMaintenance request as specified in version 1 of the 
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+    """
+    def __init__(self, uuid: UUID, payload: TestServerRequestBody):
+        super().__init__(1, uuid, "performMaintenance", PostPerformMaintenanceRequestBody, payload=payload)

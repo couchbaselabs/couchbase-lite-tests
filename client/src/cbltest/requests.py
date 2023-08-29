@@ -28,6 +28,7 @@ class TestServerRequestType(Enum):
     REPLICATOR_STATUS = "PostGetReplicatorStatusRequest"
     SNAPSHOT_DOCS = "PostSnapshotDocumentsRequest"
     VERIFY_DOCS = "PostVerifyDocumentsRequest"
+    PERFORM_MAINTENANCE = "PostPerformMaintenanceRequest"
 
     def __str__(self) -> str:
         return self.value

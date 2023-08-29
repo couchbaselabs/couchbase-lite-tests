@@ -282,3 +282,11 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
         self.__replicator_error = ErrorResponseBody.create(body.get(self.__replicator_error_key))
         docs = _get_typed(body, self.__documents_key, list)
         self.__documents = [ReplicatorDocumentEntry(d) for d in docs] if docs is not None else []
+
+class PostPerformMaintenanceResponse(TestServerResponse):
+    """
+    A POST /performMaintenance response as specified in version 1 of the 
+    [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
+    """
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "performMaintenance")
