@@ -1,6 +1,11 @@
 import os
 from pathlib import Path
 from cbltest import CBLPyTest
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry import trace
 import asyncio
 
 import pytest
@@ -19,6 +24,17 @@ async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
     log_level = request.config.getoption("--cbl-log-level")
     test_props = request.config.getoption("--test-props")
     output = request.config.getoption("--output")
+    otel_endpoint = request.config.getoption("--otel-endpoint")
+    if otel_endpoint is not None:
+        resource = Resource(attributes={
+            SERVICE_NAME: "Python Test Client"
+        })
+        
+        provider = TracerProvider(resource=resource)
+        processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=f"http://{otel_endpoint}:4317", timeout=5))
+        provider.add_span_processor(processor)
+        trace.set_tracer_provider(provider)
+
     return CBLPyTest(config, log_level, test_props, output)
 
 @pytest.fixture(scope="session")
@@ -34,3 +50,4 @@ def pytest_addoption(parser) -> None:
                     default="warning")
     parser.addoption("--test-props", metavar="PATH", help="The path to read extra test properties from")
     parser.addoption("--output", metavar="PATH", help="The path to write Greenboard results to")
+    parser.addoption("--otel-endpoint", metavar="HOST", help="The IP address or host name running OTEL collector")

@@ -6,7 +6,7 @@ exporters:
   logging:
     loglevel: debug
   zipkin:
-    endpoint: http://192.168.117.4:9411/api/v2/spans
+    endpoint: http://zipkin:9411/api/v2/spans
 processors:
   batch:
 service:

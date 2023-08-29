@@ -1,3 +1,5 @@
 pytest
 pytest-asyncio
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc
 ../client
