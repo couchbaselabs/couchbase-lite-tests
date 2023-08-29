@@ -1,5 +1,7 @@
 from datetime import timedelta
 from typing import List
+from opentelemetry.trace import get_tracer
+
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions
 from couchbase.auth import PasswordAuthenticator
@@ -8,18 +10,22 @@ from couchbase.management.collections import CollectionSpec
 from couchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException, ScopeAlreadyExistsException
 from couchbase.exceptions import CollectionAlreadyExistsException
 
+from cbltest.version import VERSION
+
 class CouchbaseServer:
     """
     A class that interacts with a Couchbase Server cluster
     """
     def __init__(self, url: str, username: str, password: str):
-        if "://" not in url:
-            url = f"couchbase://{url}"
-            
-        auth = PasswordAuthenticator(username, password)
-        opts = ClusterOptions(auth)
-        self.__cluster = Cluster(url, opts)
-        self.__cluster.wait_until_ready(timedelta(seconds=10))
+        self.__tracer = get_tracer(__name__, VERSION)
+        with self.__tracer.start_as_current_span("connect_to_couchbase_server"):
+            if "://" not in url:
+                url = f"couchbase://{url}"
+                
+            auth = PasswordAuthenticator(username, password)
+            opts = ClusterOptions(auth)
+            self.__cluster = Cluster(url, opts)
+            self.__cluster.wait_until_ready(timedelta(seconds=10))
 
     def create_collections(self, bucket: str, scope: str, names: List[str]) -> None:
         """
@@ -31,20 +37,21 @@ class CouchbaseServer:
                       if it doesn't already exist, unless it is the default scope
         :param names: The names of the collections to create
         """
-        bucket_obj = self.__cluster.bucket(bucket)
-        c = bucket_obj.collections()
-        try:
-            if scope != "_default":
-                c.create_scope(scope)
-        except ScopeAlreadyExistsException:
-            pass
-
-        for name in names:
+        with self.__tracer.start_as_current_span("create_collections"):
+            bucket_obj = self.__cluster.bucket(bucket)
+            c = bucket_obj.collections()
             try:
-                if name != "_default":
-                    c.create_collection(CollectionSpec(name, scope))
-            except CollectionAlreadyExistsException:
+                if scope != "_default":
+                    c.create_scope(scope)
+            except ScopeAlreadyExistsException:
                 pass
+
+            for name in names:
+                try:
+                    if name != "_default":
+                        c.create_collection(CollectionSpec(name, scope))
+                except CollectionAlreadyExistsException:
+                    pass
 
     def create_bucket(self, name: str):
         """
@@ -52,12 +59,13 @@ class CouchbaseServer:
 
         :param name: The name of the bucket to create
         """
-        mgr = self.__cluster.buckets()
-        settings = CreateBucketSettings(name=name, flush_enabled=True, ram_quota_mb=512)
-        try:
-            mgr.create_bucket(settings)
-        except BucketAlreadyExistsException:
-            pass
+        with self.__tracer.start_as_current_span("create_bucket"):
+            mgr = self.__cluster.buckets()
+            settings = CreateBucketSettings(name=name, flush_enabled=True, ram_quota_mb=512)
+            try:
+                mgr.create_bucket(settings)
+            except BucketAlreadyExistsException:
+                pass
 
     def drop_bucket(self, name: str):
         """
@@ -65,8 +73,9 @@ class CouchbaseServer:
 
         :param name: The name of the bucket to drop
         """
-        try:
-            mgr = self.__cluster.buckets()
-            mgr.drop_bucket(name)
-        except BucketDoesNotExistException:
-            pass
+        with self.__tracer.start_as_current_span("drop_bucket"):
+            try:
+                mgr = self.__cluster.buckets()
+                mgr.drop_bucket(name)
+            except BucketDoesNotExistException:
+                pass
