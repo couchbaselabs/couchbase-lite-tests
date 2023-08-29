@@ -278,6 +278,11 @@ class ReplicatorDocumentEntry:
         return self.__is_push
     
     @property
+    def direction(self) -> ReplicatorType:
+        """Gets the direction of the replicator, based on is_push"""
+        return ReplicatorType.PUSH if self.__is_push else ReplicatorType.PULL
+    
+    @property
     def flags(self) -> ReplicatorDocumentFlags:
         """Gets the flags that were set on the document when it was replicated"""
         return self.__flags
@@ -312,21 +317,36 @@ class WaitForDocumentEventEntry:
         """Gets the ID of the document to wait for"""
         return self.__id
     
-    def __init__(self, collection: str, id: str):
+    @property
+    def direction(self) -> ReplicatorType:
+        """Gets the direction of the event to wait for.  Events that otherwise match
+        (e.g. have the same document ID) will be ignored"""
+        return self.__direction
+    
+    @property
+    def flags(self) -> ReplicatorDocumentFlags:
+        """Gets the flags of the event to wait for.  Events that otherwise match
+        (e.g. have the same document ID) will be ignored"""
+        return self.__flags
+    
+    def __init__(self, collection: str, id: str, direction: ReplicatorType, flags: ReplicatorDocumentFlags):
         assert isinstance(collection, str), "WaitForDocumentEventEntry: collection not a string"
         assert isinstance(id, str), "WaitForDocumentEventEntry: id not a string"
         self.__collection = collection
         self.__id = id
+        self.__direction = direction
+        self.__flags = flags
 
     def __hash__(self) -> int:
-        return hash(f"{self.__collection}{self.__id}")
+        return hash(f"{self.__collection}{self.__id}") ^ hash(self.__direction) ^ hash (self.__flags)
     
     def __eq__(self, obj: Any) -> bool:
         if not isinstance(obj, WaitForDocumentEventEntry):
             return False
         
         other = cast(WaitForDocumentEventEntry, obj)
-        return other.collection == self.collection and other.id == self.id
+        return self.__collection == other.__collection and self.__id == other.__id and \
+            self.__direction == other.__direction and self.__flags == other.__flags
     
 class ReplicatorStatus:
     """

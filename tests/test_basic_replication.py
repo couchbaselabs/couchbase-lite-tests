@@ -5,7 +5,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry, ReplicatorActivityLevel, WaitForDocumentEventEntry 
-from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
+from cbltest.api.replicator_types import ReplicatorBasicAuthenticator, ReplicatorDocumentFlags
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.error_types import ErrorDomain
 from cbltest.api.test_functions import compare_local_and_remote
@@ -198,12 +198,12 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_doc_events({
-            WaitForDocumentEventEntry("travel.airports", "test_airport_1"),
-            WaitForDocumentEventEntry("travel.airports", "test_airport_2"),
-            WaitForDocumentEventEntry("travel.airlines", "airline_1"),
-            WaitForDocumentEventEntry("travel.airlines", "airline_2"),
-            WaitForDocumentEventEntry("travel.hotels", "hotel_1"),
-            WaitForDocumentEventEntry("travel.hotels", "hotel_2")
+            WaitForDocumentEventEntry("travel.airports", "test_airport_1", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.airports", "test_airport_2", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.airlines", "airline_1", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.airlines", "airline_2", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.hotels", "hotel_1", ReplicatorType.PUSH, ReplicatorDocumentFlags.DELETED),
+            WaitForDocumentEventEntry("travel.hotels", "hotel_2", ReplicatorType.PUSH, ReplicatorDocumentFlags.DELETED)
         })
         
         self.mark_test_step("Check that all updates are replicated correctly.")
@@ -304,12 +304,12 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_doc_events({
-            WaitForDocumentEventEntry("travel.routes", "test_route_1"),
-            WaitForDocumentEventEntry("travel.routes", "test_route_2"),
-            WaitForDocumentEventEntry("travel.landmarks", "landmark_100"),
-            WaitForDocumentEventEntry("travel.landmarks", "landmark_200"),
-            WaitForDocumentEventEntry("travel.hotels", "hotel_400"),
-            WaitForDocumentEventEntry("travel.hotels", "hotel_500")
+            WaitForDocumentEventEntry("travel.routes", "test_route_1", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.routes", "test_route_2", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.landmarks", "landmark_100", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.landmarks", "landmark_200", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.hotels", "hotel_400", ReplicatorType.PULL, ReplicatorDocumentFlags.DELETED),
+            WaitForDocumentEventEntry("travel.hotels", "hotel_500", ReplicatorType.PULL, ReplicatorDocumentFlags.DELETED)
         })
 
         self.mark_test_step("Check that all updates are replicated correctly.")
@@ -427,18 +427,18 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_doc_events({
-            WaitForDocumentEventEntry("travel.airports", "test_airport_1"),
-            WaitForDocumentEventEntry("travel.airports", "test_airport_2"),
-            WaitForDocumentEventEntry("travel.airlines", "airline_1"),
-            WaitForDocumentEventEntry("travel.airlines", "airline_2"),
-            WaitForDocumentEventEntry("travel.hotels", "hotel_1"),
-            WaitForDocumentEventEntry("travel.hotels", "hotel_2"),
-            WaitForDocumentEventEntry("travel.routes", "test_route_1"),
-            WaitForDocumentEventEntry("travel.routes", "test_route_2"),
-            WaitForDocumentEventEntry("travel.landmarks", "landmark_100"),
-            WaitForDocumentEventEntry("travel.landmarks", "landmark_200"),
-            WaitForDocumentEventEntry("travel.hotels", "hotel_400"),
-            WaitForDocumentEventEntry("travel.hotels", "hotel_500")
+            WaitForDocumentEventEntry("travel.airports", "test_airport_1", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.airports", "test_airport_2", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.airlines", "airline_1", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.airlines", "airline_2", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.hotels", "hotel_1", ReplicatorType.PUSH, ReplicatorDocumentFlags.DELETED),
+            WaitForDocumentEventEntry("travel.hotels", "hotel_2", ReplicatorType.PUSH, ReplicatorDocumentFlags.DELETED),
+            WaitForDocumentEventEntry("travel.routes", "test_route_1", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.routes", "test_route_2", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.landmarks", "landmark_100", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.landmarks", "landmark_200", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
+            WaitForDocumentEventEntry("travel.hotels", "hotel_400", ReplicatorType.PULL, ReplicatorDocumentFlags.DELETED),
+            WaitForDocumentEventEntry("travel.hotels", "hotel_500", ReplicatorType.PULL, ReplicatorDocumentFlags.DELETED)
         }, max_retries = 100)
 
         self.mark_test_step("Check that all updates are replicated correctly.")
