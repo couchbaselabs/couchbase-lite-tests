@@ -36,14 +36,26 @@ struct VerifyResult {
     }
 };
 
-bool
-verifyProperties(const string &docID, const string &colName, FLDict props, FLDict expectedProps, VerifyResult &result) {
+bool verifyProperties(CBLDatabase *db, const string &docID, const string &colName,
+                      FLDict props, FLDict expectedProps, VerifyResult &result) {
+    bool isBlobNotFound;
     string errKeyPath;
     auto isEquals = ts_support::fleece::valueIsEquals((FLValue) props, (FLValue) expectedProps, errKeyPath);
+
+    if (isEquals && FLDict_IsBlob(props) && !CBLManager::blobExists(db, props)) {
+        isEquals = false;
+        isBlobNotFound = true;
+    }
+
     if (!isEquals) {
         result.ok = false;
-        auto reason = concat("had unexpected properties at key '", errKeyPath, "'");
-        result.description = ErrorDesc(docID, colName, reason);
+        if (isBlobNotFound) {
+            auto reason = concat("non-existing blob at key '", errKeyPath, "'");
+            result.description = ErrorDesc(docID, colName, reason);
+        } else {
+            auto reason = concat("had unexpected properties at key '", errKeyPath, "'");
+            result.description = ErrorDesc(docID, colName, reason);
+        }
 
         auto actual = ts_support::fleece::valueAtKeyPath(props, errKeyPath);
         auto expected = ts_support::fleece::valueAtKeyPath(expectedProps, errKeyPath);
@@ -72,6 +84,13 @@ int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
 
     auto snapshotID = GetValue<string>(body, "snapshot");
     auto snapshot = _cblManager->snapshot(snapshotID);
+
+    vector<CBLBlob *> retainedBlobs;
+    DEFER {
+              for (auto blob: retainedBlobs) {
+                  CBLBlob_Release(blob);
+              }
+          };
 
     // Verify changes:
     unordered_set<string> verifiedSnapShotDocs;
@@ -103,18 +122,14 @@ int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
             AUTO_RELEASE(expectedDoc);
 
             auto expectedProps = CBLDocument_MutableProperties(expectedDoc);
-            if (change.contains("updatedProperties")) {
-                auto updateItems = GetValue<vector<unordered_map<string, json>>>(change, "updatedProperties");
-                ts_support::fleece::updateProperties(expectedProps, updateItems);
-            }
-
-            if (change.contains("removedProperties")) {
-                auto keyPaths = GetValue<vector<string>>(change, "removedProperties");
-                ts_support::fleece::removeProperties(expectedProps, keyPaths);
-            }
-
+            ts_support::fleece::applyDeltaUpdates(expectedProps, change, [&](const string &name) -> CBLBlob * {
+                auto blob = _cblManager->blob(name, "image/jpeg", db);
+                retainedBlobs.push_back(blob);
+                return blob;
+            });
+            
             auto props = CBLDocument_Properties(curDoc);
-            if (!verifyProperties(docID, colName, props, expectedProps, verifyResult)) {
+            if (!verifyProperties(db, docID, colName, props, expectedProps, verifyResult)) {
                 break;
             }
         } else if (type == UpdateDatabaseType::del) {
@@ -137,7 +152,7 @@ int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
     // Verify unchanged docs:
     if (verifyResult.ok) {
         auto allSnapDocs = snapshot->allDocuments();
-        for (auto snapDocPair: allSnapDocs) {
+        for (const auto &snapDocPair: allSnapDocs) {
             auto docKey = snapDocPair.first;
             auto docKeyComps = Snapshot::documentKeyComponents(snapDocPair.first);
             auto colName = docKeyComps.first;
@@ -154,7 +169,7 @@ int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
                     }
                     auto props = CBLDocument_Properties(curDoc);
                     auto expectedProps = CBLDocument_Properties(snapDoc);
-                    if (!verifyProperties(docID, colName, props, expectedProps, verifyResult)) {
+                    if (!verifyProperties(db, docID, colName, props, expectedProps, verifyResult)) {
                         break;
                     }
                 }

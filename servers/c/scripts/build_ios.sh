@@ -29,6 +29,7 @@ BUILD_DEVICE_DIR="${IOS_DIR}/build_device"
 # Copy Assets
 pushd "${ASSETS_DIR}" > /dev/null
 cp -f ../../../dataset/*.cblite2.zip dataset
+cp -rf ../../../dataset/blobs dataset
 cp -f ../../../environment/sg/cert/cert.* cert
 popd
 
