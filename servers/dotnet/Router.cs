@@ -8,9 +8,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using TestServer.Handlers;
 
-using HandlerAction = System.Action<int,
+using HandlerAction = System.Func<int,
     System.Text.Json.JsonDocument,
-    System.Net.HttpListenerResponse>;
+    System.Net.HttpListenerResponse,
+    System.Threading.Tasks.Task>;
 
 namespace TestServer.Handlers
 {
@@ -97,7 +98,7 @@ namespace TestServer
             foreach(var method in typeof(HandlerList).GetMethods()
                 .Where(x => x.GetCustomAttribute(typeof(HttpHandlerAttribute)) != null)) {
                 var key = method.GetCustomAttribute<HttpHandlerAttribute>()!.Path;
-                var invocation = new HandlerAction((args, body, response) => method.Invoke(null, new object[] { args, body, response }));
+                var invocation = new HandlerAction((args, body, response) => (Task)method.Invoke(null, new object[] { args, body, response })!);
                 RouteMap.Add(key, invocation);
             }
         }
@@ -187,7 +188,7 @@ namespace TestServer
             }
 
             try {
-                action(version, bodyObj, response);
+                await action(version, bodyObj, response).ConfigureAwait(false);
             } catch (TargetInvocationException ex) {
                 switch(ex.InnerException) {
                     case null:

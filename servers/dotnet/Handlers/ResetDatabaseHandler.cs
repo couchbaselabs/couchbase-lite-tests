@@ -9,7 +9,7 @@ namespace TestServer.Handlers;
 internal static partial class HandlerList
 {
     [HttpHandler("reset")]
-    public static void ResetDatabaseHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static async Task ResetDatabaseHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryGetProperty("datasets", out var datasets) || datasets.ValueKind != JsonValueKind.Object) {
             response.WriteBody("Missing or invalid key 'datasets' in JSON body", version, HttpStatusCode.BadRequest);
@@ -36,7 +36,9 @@ internal static partial class HandlerList
             tasks.Add(CBLTestServer.Manager.LoadDataset(datasetName, dataset.Value.EnumerateArray().Select(x => x.GetString()!)));
         }
 
-        if (!Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(5))) {
+        try {
+            await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        } catch(TimeoutException) {
             throw new ApplicationException("Timed out waiting for datasets to load");
         }
 

@@ -36,10 +36,12 @@ internal static partial class HandlerList
 
         public IReadOnlyList<string>? removedProperties { get; init; }
 
+        public IReadOnlyDictionary<string, string>? updatedBlobs { get; init; }
+
         [JsonConstructor]
         public UpdateDatabaseEntry(string type, string collection, string documentID,
             IReadOnlyList<IReadOnlyDictionary<string, object>>? updatedProperties = null,
-            IReadOnlyList<string>? removedProperties = null)
+            IReadOnlyList<string>? removedProperties = null, IReadOnlyDictionary<string, string>? updatedBlobs = null)
         {
             if(type.ToUpperInvariant() == "UPDATE") {
                 Type = UpdateDatabaseType.Update;
@@ -56,6 +58,7 @@ internal static partial class HandlerList
             this.collection = collection;
             this.updatedProperties = updatedProperties;
             this.removedProperties = removedProperties;
+            this.updatedBlobs = updatedBlobs;
         }
     }
 
@@ -100,7 +103,7 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("updateDatabase")]
-    public static void UpdateDatabaseHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static async Task UpdateDatabaseHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryDeserialize<UpdateDatabaseBody>(response, version, out var updateBody)) {
             return;
@@ -110,6 +113,14 @@ internal static partial class HandlerList
         if(db == null) {
             response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{updateBody.database}'"), version, HttpStatusCode.BadRequest);
             return;
+        }
+
+        var blobUpdate = new Dictionary<string, object>();
+        foreach(var update in updateBody.updates.Where(x => x.updatedBlobs != null && x.updatedBlobs.Any())) {
+            foreach(var b in update.updatedBlobs!) {
+                var nextBlob = await CBLTestServer.Manager.LoadBlob(b.Value).ConfigureAwait(false);
+                blobUpdate[b.Key] = new Blob("image/jpeg", nextBlob);
+            }
         }
 
         try {
@@ -144,6 +155,10 @@ internal static partial class HandlerList
                                 RemoveDictionaryProperties(doc, entry.removedProperties);
                             }
 
+                            if (blobUpdate.Any()) {
+                                UpdateDictionaryProperties(doc, new List<IReadOnlyDictionary<string, object>> { blobUpdate });
+                            }
+
                             collection.Save(doc);
                             break;
                         }
@@ -157,6 +172,10 @@ internal static partial class HandlerList
                 code = 1,
                 message = e.Message
             }, version, HttpStatusCode.BadRequest);
+        } finally {
+            foreach(var blob in blobUpdate.Values) {
+                ((Blob)blob).ContentStream?.Dispose();
+            }
         }
 
         response.WriteEmptyBody(version);

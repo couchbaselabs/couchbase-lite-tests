@@ -111,3 +111,13 @@ class TestUpdateDatabase:
             
         async with self.db.batch_updater() as b:
             b.upsert_document("_default._default", "name_1", [{attempt: 5}])
+
+    @pytest.mark.asyncio
+    async def test_nonexistent_blob(self, cblpytest: CBLPyTest) -> None:
+        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+
+        with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
+            async with db.batch_updater() as b:
+                b.upsert_document("_default._default", "name_1", new_blobs={
+                    "foo": "bar.png"
+                })

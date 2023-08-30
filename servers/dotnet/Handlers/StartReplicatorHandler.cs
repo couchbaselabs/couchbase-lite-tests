@@ -227,16 +227,16 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("startReplicator")]
-    public static void StartReplicatorHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task StartReplicatorHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryDeserialize<StartReplicatorBody>(response, version, out var deserializedBody)) {
-            return;
+            return Task.CompletedTask;
         }
 
         var db = CBLTestServer.Manager.GetDatabase(deserializedBody.config.database);
         if (db == null) {
             response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{deserializedBody.config.database}'!"), version, HttpStatusCode.BadRequest);
-            return;
+            return Task.CompletedTask;
         }
 
         ReplicatorConfiguration replConfig;
@@ -250,7 +250,7 @@ internal static partial class HandlerList
                     var coll = db.GetCollection(spec.name, spec.scope);
                     if (coll == null) {
                         response.WriteBody(Router.CreateErrorResponse($"Unable to find collection '{name}'"), version, HttpStatusCode.BadRequest);
-                        return;
+                        return Task.CompletedTask;
                     }
 
                     collections.Add(coll);
@@ -306,5 +306,6 @@ internal static partial class HandlerList
         repl.Start(deserializedBody.reset);
 
         response.WriteBody(new { id }, version);
+        return Task.CompletedTask;
     }
 }

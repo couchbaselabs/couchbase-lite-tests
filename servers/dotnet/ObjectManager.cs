@@ -87,6 +87,18 @@ namespace TestServer
             Database.Delete(name, FilesDirectory);
         }
 
+        public async Task<Stream> LoadBlob(string name)
+        {
+            Stream asset;
+            try {
+                asset = await FileSystem.OpenAppPackageFileAsync($"blobs/{name}");
+            } catch (Exception ex) {
+                throw new ApplicationException($"Unable to open dataset '{name}'", ex);
+            }
+
+            return asset;
+        }
+
         public Database? GetDatabase(string name)
         {
             return _activeDatabases.TryGetValue(name, out var db) ? db : null;

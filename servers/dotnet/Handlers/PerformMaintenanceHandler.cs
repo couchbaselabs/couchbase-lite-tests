@@ -13,22 +13,22 @@ namespace TestServer.Handlers
     {
         
         [HttpHandler("performMaintenance")]
-        public static void PerformMaintenanceHandler(int version, JsonDocument body, HttpListenerResponse response)
+        public static Task PerformMaintenanceHandler(int version, JsonDocument body, HttpListenerResponse response)
         {
             if (!body.RootElement.TryGetProperty("database", out var database) || database.ValueKind != JsonValueKind.String) {
                 response.WriteBody(Router.CreateErrorResponse("'database' property not found or invalid"), version, HttpStatusCode.BadRequest);
-                return;
+                return Task.CompletedTask;
             }
 
             if (!body.RootElement.TryGetProperty("maintenanceType", out var maintenanceStr) || maintenanceStr.ValueKind != JsonValueKind.String) {
                 response.WriteBody(Router.CreateErrorResponse("'maintenanceType' property not found or invalid"), version, HttpStatusCode.BadRequest);
-                return;
+                return Task.CompletedTask;
             }
 
 
             if (!Enum.TryParse<MaintenanceType>(maintenanceStr.GetString(), true, out var maintenanceType)) {
                 response.WriteBody(Router.CreateErrorResponse($"'maintenanceType' value unknown: {maintenanceStr}"), version, HttpStatusCode.BadRequest);
-                return;
+                return Task.CompletedTask;
             }
 
             var dbName = database.GetString()!;
@@ -42,11 +42,12 @@ namespace TestServer.Handlers
                 };
 
                 response.WriteBody(errorObject, version, HttpStatusCode.BadRequest);
-                return;
+                return Task.CompletedTask;
             }
 
             dbObject.PerformMaintenance(maintenanceType);
             response.WriteEmptyBody(version);
+            return Task.CompletedTask;
         }
     }
 }

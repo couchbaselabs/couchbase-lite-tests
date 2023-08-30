@@ -11,16 +11,16 @@ internal readonly record struct AllDocumentsResponse(string id, string rev);
 internal static partial class HandlerList
 {
     [HttpHandler("getAllDocuments")]
-    public static void AllDocumentsHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task AllDocumentsHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryGetProperty("database", out var database) || database.ValueKind != JsonValueKind.String) {
             response.WriteBody(Router.CreateErrorResponse("'database' property not found or invalid"), version, HttpStatusCode.BadRequest);
-            return;
+            return Task.CompletedTask;
         }
 
         if(!body.RootElement.TryGetProperty("collections", out var collections) || collections.ValueKind != JsonValueKind.Array) {
             response.WriteBody(Router.CreateErrorResponse("'collections' property not found or invalid"), version, HttpStatusCode.BadRequest);
-            return;
+            return Task.CompletedTask;
         }
 
         var dbName = database.GetString()!;
@@ -34,7 +34,7 @@ internal static partial class HandlerList
             };
 
             response.WriteBody(errorObject, version, HttpStatusCode.BadRequest);
-            return;
+            return Task.CompletedTask;
         }
 
 
@@ -49,5 +49,6 @@ internal static partial class HandlerList
         }
 
         response.WriteBody(retVal, version);
+        return Task.CompletedTask;
     }
 }

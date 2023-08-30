@@ -63,7 +63,34 @@ internal static partial class HandlerList
         }
     }
 
-    internal static CompareResult IsEqual(string keyPath, object? expected, object? actual)
+    internal static CompareResult IsEqual(Database db, string keyPath, Blob expected, object? actual)
+    {
+        var _ = expected.Content; // HACK: Force load the properties of the blob
+        if (actual is not Blob otherBlob || otherBlob.Content == null) {
+            return new CompareResult
+            {
+                Success = false,
+                KeyPath = keyPath,
+                Expected = new KeyPathValue(expected.ToDocumentObject()),
+                Actual = new KeyPathValue(actual?.ToDocumentObject())
+            };
+        }
+
+        var blobsEqual = expected.Equals(actual);
+        if (!blobsEqual) {
+            return new CompareResult
+            {
+                Success = false,
+                KeyPath = keyPath,
+                Expected = new KeyPathValue(expected.ToDocumentObject()),
+                Actual = new KeyPathValue(actual?.ToDocumentObject())
+            };
+        }
+
+        return new CompareResult { Success = true };
+    }
+
+    internal static CompareResult IsEqual(Database db, string keyPath, object? expected, object? actual)
     {
         switch(expected) {
             case null:
@@ -71,13 +98,15 @@ internal static partial class HandlerList
                 {
                     Success = actual == null,
                     KeyPath = keyPath,
-                    Expected = new KeyPathValue(expected),
+                    Expected = new KeyPathValue(expected.ToDocumentObject()),
                     Actual = new KeyPathValue(actual?.ToDocumentObject())
                 };
+            case Blob blob:
+                return IsEqual(db, keyPath, blob, actual);
             case IMutableArray arr:
-                return IsEqual(keyPath, arr, actual as IArray);
+                return IsEqual(db, keyPath, arr, actual as IArray);
             case IMutableDictionary dict:
-                return IsEqual(keyPath, dict, actual as IDictionaryObject);
+                return IsEqual(db, keyPath, dict, actual as IDictionaryObject);
             default:
                 return new CompareResult
                 {
@@ -89,7 +118,7 @@ internal static partial class HandlerList
         }
     }
 
-    internal static CompareResult IsEqual(string keyPath, IMutableArray expected, IArray? actual)
+    internal static CompareResult IsEqual(Database db, string keyPath, IMutableArray expected, IArray? actual)
     {
         if(actual == null || expected.Count != actual.Count) {
             return new CompareResult
@@ -104,7 +133,7 @@ internal static partial class HandlerList
         for(int i = 0; i < expected.Count; i++) {
             var leftVal = expected.GetValue(i);
             var rightVal = actual.GetValue(i);
-            var result = IsEqual(keyPath + $"[{i}]", leftVal.ToDocumentObject(), rightVal.ToDocumentObject());
+            var result = IsEqual(db, keyPath + $"[{i}]", leftVal.ToDocumentObject(), rightVal.ToDocumentObject());
             if(!result.Success) {
                 return result;
             }
@@ -113,7 +142,7 @@ internal static partial class HandlerList
         return new CompareResult();
     }
 
-    internal static CompareResult IsEqual(string keyPath, IMutableDictionary expected, IDictionaryObject? actual)
+    internal static CompareResult IsEqual(Database db, string keyPath, IMutableDictionary expected, IDictionaryObject? actual)
     {
         if(actual == null) {
             return new CompareResult
@@ -138,7 +167,7 @@ internal static partial class HandlerList
 
             var leftVal = expected.GetValue(key);
             var rightVal = actual.GetValue(key);
-            var result = IsEqual(keyPath + $".{key}", leftVal, rightVal);
+            var result = IsEqual(db, keyPath + $".{key}", leftVal, rightVal);
             if (!result.Success) {
                 return result;
             }
@@ -166,6 +195,9 @@ internal static partial class HandlerList
         responseBody.description = $"Document '{existing.Id}' in '{existing.Collection!.Scope.Name}.{existing.Collection!.Name}' had unexpected properties at key '{compareResult.KeyPath.Substring(2)}'";
         if (compareResult.Actual.Exists) {
             responseBody.actual = compareResult.Actual.Value;
+            if(compareResult.Actual.Value is Blob b && b.Content == null) {
+                responseBody.actual = "Blob data missing from DB";
+            }
         }
 
         if (compareResult.Expected.Exists) {
@@ -174,11 +206,15 @@ internal static partial class HandlerList
 
         responseBody.document = existing.ToDictionary();
 
-        response.WriteBody((object)responseBody, version);
+        try {
+            response.WriteBody((object)responseBody, version);
+        } catch(Exception ex) {
+            Console.WriteLine(ex);
+        }
     }
 
     [HttpHandler("verifyDocuments")]
-    public static void VerifyDocumentsHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static async Task VerifyDocumentsHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
         if (!body.RootElement.TryDeserialize<VerifyDocumentsBody>(response, version, out var verifyBody)) {
             return;
@@ -250,7 +286,14 @@ internal static partial class HandlerList
                 }
             }
 
-            var compareResult = IsEqual("$", mutableCopy, existing);
+            if(change.updatedBlobs != null) {
+                foreach(var entry in change.updatedBlobs) {
+                    var blob = await CBLTestServer.Manager.LoadBlob(entry.Value).ConfigureAwait(false);
+                    KeyPathParser.Update(mutableCopy, entry.Key, new Blob("image/jpeg", blob));
+                }
+            }
+
+            var compareResult = IsEqual(db, "$", mutableCopy, existing);
             if(!compareResult.Success) {
                 // Case 4 : Document has unexpected properties.
                 HandleCompareFailure(existing, compareResult, response, version);
@@ -292,7 +335,7 @@ internal static partial class HandlerList
                 return;
             }
 
-            var compareResult = IsEqual("$", entry.Value, existing);
+            var compareResult = IsEqual(db, "$", entry.Value, existing);
             if (!compareResult.Success) {
                 // Case 4 : Document has unexpected properties.
                 HandleCompareFailure(existing, compareResult, response, version);

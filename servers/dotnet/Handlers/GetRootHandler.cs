@@ -9,7 +9,7 @@ namespace TestServer.Handlers;
 internal static partial class HandlerList
 {
     [HttpHandler("")]
-    public static void GetRootHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task GetRootHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
         var resolvedVersion = version != 0 ? version : CBLTestServer.MaxApiVersion;
         var responseBody = new
@@ -25,5 +25,6 @@ internal static partial class HandlerList
         };
 
         response.WriteBody(responseBody, resolvedVersion);
+        return Task.CompletedTask;
     }
 }
