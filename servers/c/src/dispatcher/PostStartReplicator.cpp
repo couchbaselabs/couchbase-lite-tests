@@ -1,9 +1,36 @@
 #include "Dispatcher+Common.h"
 
+namespace ts {
+    static auto ReplicatorEnum = StringEnum<CBLReplicatorType>(
+        {
+            "pushAndPull",
+            "push",
+            "pull"
+        },
+        {
+            kCBLReplicatorTypePushAndPull,
+            kCBLReplicatorTypePush,
+            kCBLReplicatorTypePull
+        }
+    );
+
+    enum class AuthType {
+        basic, session
+    };
+
+    static auto AuthTypeEnum = StringEnum<AuthType>(
+        {
+            "basic",
+            "session"
+        },
+        {
+            AuthType::basic,
+            AuthType::session
+        }
+    );
+}
+
 int Dispatcher::handlePOSTStartReplicator(Request &request) {
-    static constexpr const char *kReplicatorTypePush = "push";
-    static constexpr const char *kReplicatorTypePull = "pull";
-    static constexpr const char *kReplicatorTypePushAndPull = "pushAndPull";
     static constexpr const char *kAuthTypeBasic = "BASIC";
 
     json body = request.jsonBody();
@@ -18,15 +45,7 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
 
     if (config.contains("replicatorType")) {
         auto replicatorType = GetValue<string>(config, "replicatorType");
-        if (EnumEquals(replicatorType, kReplicatorTypePush)) {
-            params.replicatorType = kCBLReplicatorTypePush;
-        } else if (EnumEquals(replicatorType, kReplicatorTypePull)) {
-            params.replicatorType = kCBLReplicatorTypePull;
-        } else if (EnumEquals(replicatorType, kReplicatorTypePushAndPull)) {
-            params.replicatorType = kCBLReplicatorTypePushAndPull;
-        } else {
-            throw RequestError("Invalid replicator type");
-        }
+        params.replicatorType = ReplicatorEnum.value(replicatorType);
     }
 
     if (config.contains("continuous")) {
@@ -36,12 +55,15 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
     if (config.contains("authenticator")) {
         json authObject = config["authenticator"];
         CheckIsObject(authObject, "authenticator");
-        auto authType = GetValue<string>(authObject, "type");
-        if (EnumEquals(authType, kAuthTypeBasic)) {
+        auto authTypeValue = GetValue<string>(authObject, "type");
+        auto authType = AuthTypeEnum.value(authTypeValue);
+        if (authType == AuthType::basic) {
             ReplicationAuthenticator auth;
             auth.username = GetValue<string>(authObject, "username");
             auth.password = GetValue<string>(authObject, "password");
             params.authenticator = auth;
+        } else {
+            throw RequestError("Not support session authenticator");
         }
     }
 
@@ -54,11 +76,8 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
         vector<string> names;
         if (colObject.contains("names")) {
             names = GetValue<vector<string>>(colObject, "names");
-        } else {
-            // TODO: Remove this when python client makes changes to use names
-            auto name = GetValue<string>(colObject, "collection");
-            names.push_back(name);
         }
+
         if (names.empty()) {
             throw RequestError("No collections specified");
         }

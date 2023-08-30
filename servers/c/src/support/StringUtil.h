@@ -29,7 +29,7 @@ namespace ts::support::str {
             _enumValues = enums;
         }
 
-        E enumValue(const std::string &value) {
+        E value(const std::string &value) {
             auto val = tolower(value);
             auto it = std::find(_values.begin(), _values.end(), val);
             if (it == _values.end()) {

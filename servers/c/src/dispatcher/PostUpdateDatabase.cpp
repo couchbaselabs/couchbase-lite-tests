@@ -25,8 +25,10 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
             AUTO_RELEASE(col);
 
             auto docID = GetValue<string>(update, "documentID");
-            auto type = GetValue<string>(update, "type");
-            if (EnumEquals(type, kUpdateDatabaseTypeUpdate)) {
+            auto typeValue = GetValue<string>(update, "type");
+            auto type = UpdateDatabaseTypeEnum.value(typeValue);
+            
+            if (type == UpdateDatabaseType::update) {
                 CBLDocument *doc = CBLCollection_GetMutableDocument(col, FLS(docID), &error);
                 checkCBLError(error);
                 if (!doc) {
@@ -47,16 +49,18 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
 
                 CBLCollection_SaveDocument(col, doc, &error);
                 checkCBLError(error);
-            } else if (EnumEquals(type, kUpdateDatabaseTypeDelete)) {
+            } else if (type == UpdateDatabaseType::del) {
                 CBLDocument *doc = CBLCollection_GetMutableDocument(col, FLS(docID), &error);
                 checkCBLError(error);
                 if (doc) {
                     CBLCollection_DeleteDocument(col, doc, &error);
                     checkCBLError(error);
                 }
-            } else if (EnumEquals(type, kUpdateDatabaseTypePurge)) {
+            } else if (type == UpdateDatabaseType::purge) {
                 CBLCollection_PurgeDocumentByID(col, FLS(docID), &error);
                 checkCBLError(error);
+            } else {
+                throw RequestError(concat("Invalid update type : ", typeValue));
             }
         }
         commit = true;
