@@ -1,6 +1,7 @@
 #include "Fleece.h"
 #include "Define.h"
 #include "KeyPath.h"
+#include "JSON.h"
 
 #include FLEECE_HEADER(FLExpert.h)
 
@@ -8,6 +9,7 @@
 
 using namespace std;
 using namespace nlohmann;
+using namespace ts::support::json_util;
 
 void setSlotValue(FLSlot slot, const json &value) { // NOLINT(misc-no-recursion)
     switch (value.type()) {
@@ -289,7 +291,7 @@ void removeProperty(FLMutableDict props, FLSlice keyPath) {
     }
 }
 
-void ts_support::fleece::updateProperties(FLMutableDict dict, const vector<unordered_map<string, json>> &updates) {
+void updateProperties(FLMutableDict dict, const vector<unordered_map<string, json>> &updates) {
     for (auto &keyPaths: updates) {
         for (auto &keyPath: keyPaths) {
             updateProperty(dict, FLS(keyPath.first), keyPath.second);
@@ -297,9 +299,65 @@ void ts_support::fleece::updateProperties(FLMutableDict dict, const vector<unord
     }
 }
 
-void ts_support::fleece::removeProperties(FLMutableDict dict, const vector<string> &keyPaths) {
+void updateBlobProperty(FLMutableDict props, FLSlice keyPath, CBLBlob *blob) {
+    if (!blob) {
+        throw runtime_error("Blob for updating blob is null.");
+    }
+
+    auto keyPathStr = STR(keyPath);
+    auto paths = ts_support::keypath::parseKeyPath(keyPathStr);
+    auto parent = getParent(props, keyPathStr, true);
+    if (FLValue_GetType(parent) == kFLDict) {
+        FLMutableDict dict = FLDict_AsMutable(FLValue_AsDict(parent));
+        auto path = paths.back();
+        assert(path.key);
+        auto key = FLS(path.key.value());
+        auto slot = FLMutableDict_Set(dict, key);
+        FLSlot_SetBlob(slot, blob);
+    } else if (FLValue_GetType(parent) == kFLArray) {
+        FLMutableArray array = FLArray_AsMutable(FLValue_AsArray(parent));
+        auto path = paths.back();
+        assert(!path.key);
+        auto slot = FLMutableArray_Set(array, path.index.value());
+        FLSlot_SetBlob(slot, blob);
+    } else {
+        throw runtime_error("Unexpected parent value found when updating blob");
+    }
+}
+
+void updateBlobs(FLMutableDict dict, const unordered_map<std::string, CBLBlob *> &updates) {
+    for (auto &update: updates) {
+        updateBlobProperty(dict, FLS(update.first), update.second);
+    }
+}
+
+void removeProperties(FLMutableDict dict, const vector<string> &keyPaths) {
     for (auto &keyPath: keyPaths) {
         removeProperty(dict, FLS(keyPath));
+    }
+}
+
+void ts_support::fleece::applyDeltaUpdates(FLMutableDict dict, const json &delta, BlobAccessor blobAccessor) {
+    if (delta.contains("removedProperties")) {
+        auto keyPaths = GetValue<vector < string>>
+        (delta, "removedProperties");
+        removeProperties(dict, keyPaths);
+    }
+
+    if (delta.contains("updatedProperties")) {
+        auto updateItems = GetValue<vector < unordered_map < string, json>>>(delta, "updatedProperties");
+        updateProperties(dict, updateItems);
+    }
+
+    if (delta.contains("updatedBlobs")) {
+        auto updates = GetValue<unordered_map < string, string>>
+        (delta, "updatedBlobs");
+        unordered_map < string, CBLBlob * > blobs;
+        for (auto &update: updates) {
+            auto blob = blobAccessor(update.second);
+            blobs[update.first] = blob;
+        }
+        updateBlobs(dict, blobs);
     }
 }
 
@@ -389,6 +447,11 @@ bool arrayIsEquals(FLArray array1, FLArray array2, std::string &keypath) {
     return true;
 }
 
+bool blobIsEquals(FLDict dict1, FLDict dict2) {
+    string ignored;
+    return dictIsEquals(dict1, dict2, ignored);
+}
+
 bool ts_support::fleece::valueIsEquals(FLValue value1, FLValue value2, std::string &keypath) {
     if (value1 == nullptr) {
         return value2 == nullptr;
@@ -401,7 +464,12 @@ bool ts_support::fleece::valueIsEquals(FLValue value1, FLValue value2, std::stri
 
     switch (type) {
         case kFLDict: {
-            return dictIsEquals(FLValue_AsDict(value1), FLValue_AsDict(value2), keypath);
+            auto dict1 = FLValue_AsDict(value1);
+            auto dict2 = FLValue_AsDict(value2);
+            if (FLDict_IsBlob(dict1) || FLDict_IsBlob(dict2)) {
+                return blobIsEquals(dict1, dict2);
+            }
+            return dictIsEquals(dict1, dict2, keypath);
         }
         case kFLArray: {
             return arrayIsEquals(FLValue_AsArray(value1), FLValue_AsArray(value2), keypath);

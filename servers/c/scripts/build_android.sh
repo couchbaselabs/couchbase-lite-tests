@@ -26,6 +26,7 @@ ANDROID_CPP_DIR="${ANDROID_DIR}/app/src/main/cpp"
 # Copy Assets
 pushd "${ASSETS_DIR}" > /dev/null
 cp -f ../../../dataset/*.cblite2.zip dataset
+cp -rf ../../../dataset/blobs dataset
 cp -f ../../../environment/sg/cert/cert.* cert
 popd
 

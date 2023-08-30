@@ -24,6 +24,7 @@ using namespace ts::support::error;
 #define DB_FILE_ZIP_EXT ".cblite2.zip"
 #define DB_FILE_ZIP_EXTRACTED_DIR "extracted"
 #define ASSET_DATASET_DIR "dataset"
+#define ASSET_BLOBS_DIR "dataset/blobs"
 #define ASSET_CERT_FILE "cert/cert.pem"
 
 namespace ts::cbl {
@@ -148,14 +149,48 @@ namespace ts::cbl {
         return doc;
     }
 
+    /// Blob
+
+    bool CBLManager::blobExists(const CBLDatabase *db, FLDict blobDict) {
+        CBLError error{};
+        auto blob = CBLDatabase_GetBlob(const_cast<CBLDatabase *>(db), blobDict, &error);
+        DEFER { CBLBlob_Release(blob); };
+        checkCBLError(error);
+        return (blob != nullptr);
+    }
+
+    CBLBlob *CBLManager::blob(const string &name, const string &contentType, CBLDatabase *db) {
+        auto blobPath = path(_assetDir).append(ASSET_BLOBS_DIR).append(name);
+        ifstream ifs(blobPath.string(), ios::in | ios::binary);
+        if (!ifs.is_open()) {
+            throw logic_error("Blob '" + name + "' not found in dataset");
+        }
+        DEFER { ifs.close(); };
+        ifs.exceptions(ifstream::badbit);
+
+        CBLError error{};
+        auto ws = CBLBlobWriter_Create(db, &error);\
+        checkCBLError(error);
+
+        const size_t bufferSize = 4096;
+        char buffer[bufferSize];
+        while (!ifs.eof()) {
+            ifs.read(buffer, bufferSize);
+            if (!CBLBlobWriter_Write(ws, buffer, ifs.gcount(), &error)) {
+                CBLBlobWriter_Close(ws);
+                checkCBLError(error);
+            }
+        }
+        return CBLBlob_CreateWithStream(FLS(contentType), ws);
+    }
+
     /// Replicator
 
     FLSliceResult CBLManager::getServerCert() {
         auto certPath = path(_assetDir).append(ASSET_CERT_FILE);
         ifstream ifs(certPath.string(), ios::in | ios::binary);
-        DEFER {
-                  ifs.close();
-              };
+        DEFER { ifs.close(); };
+
         ifs.exceptions(ifstream::failbit | ifstream::badbit);
         ifs.seekg(0, ios::end);
 
@@ -218,7 +253,7 @@ namespace ts::cbl {
             if (pushFilter) {
                 auto filter = ReplicationFilter::make_filter(pushFilter.value());
                 if (!filter) {
-                    throw RequestError("Cannot find push filter named " + pushFilter->name);
+                    throw logic_error("Cannot find push filter named " + pushFilter->name);
                 }
                 context->filters[replColSpec.collection] = unique_ptr<ReplicationFilter>(filter);
                 replCol.pushFilter = [](void *ctx, CBLDocument *doc, CBLDocumentFlags flags) -> bool {
@@ -232,7 +267,7 @@ namespace ts::cbl {
             if (pullFilter) {
                 auto filter = ReplicationFilter::make_filter(pullFilter.value());
                 if (!filter) {
-                    throw RequestError("Cannot find pull filter named " + pullFilter->name);
+                    throw logic_error("Cannot find pull filter named " + pullFilter->name);
                 }
                 context->filters[replColSpec.collection] = unique_ptr<ReplicationFilter>(filter);
                 replCol.pullFilter = [](void *ctx, CBLDocument *doc, CBLDocumentFlags flags) -> bool {
@@ -277,9 +312,7 @@ namespace ts::cbl {
             cert = getServerCert();
             config.pinnedServerCertificate = FLSliceResult_AsSlice(cert);
         }
-        DEFER {
-                  FLSliceResult_Release(cert);
-              };
+        DEFER { FLSliceResult_Release(cert); };
 
         CBLReplicator *repl = CBLReplicator_Create(&config, &error);
         checkCBLError(error);
@@ -350,6 +383,7 @@ namespace ts::cbl {
     /// Snapshot
 
     Snapshot *CBLManager::createSnapshot() {
+        lock_guard<mutex> lock(_mutex);
         auto s = new Snapshot();
         unique_ptr<Snapshot> snapshot{s};
         _snapShots[s->id()] = std::move(snapshot);
@@ -357,12 +391,14 @@ namespace ts::cbl {
     }
 
     Snapshot *CBLManager::snapshot(const string &id) {
+        lock_guard<mutex> lock(_mutex);
         auto snapshot = _snapShots[id].get();
         checkNotNull(snapshot, "Snapshot '" + id + "' Not Found");
         return snapshot;
     }
 
     void CBLManager::deleteSnapshot(const string &id) {
+        lock_guard<mutex> lock(_mutex);
         _snapShots.erase(id);
     }
 }

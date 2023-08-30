@@ -21,6 +21,7 @@ DOWNLOAD_DIR=$BUILD_DIR/download
 # Copy Assets
 pushd "${ASSETS_DIR}" > /dev/null
 cp -f ../../../dataset/*.cblite2.zip dataset
+cp -rf ../../../dataset/blobs dataset
 cp -f ../../../environment/sg/cert/cert.* cert
 popd
 

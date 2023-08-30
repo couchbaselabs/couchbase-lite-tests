@@ -11,6 +11,7 @@ $LIB_DIR="$PSScriptRoot\..\lib"
 # Copy Assets
 Push-Location $ASSETS_DIR
 Copy-Item -ErrorAction Ignore $PSScriptRoot\..\..\..\dataset\*.cblite2.zip dataset
+Copy-Item -ErrorAction Ignore $PSScriptRoot\..\..\..\dataset\blobs dataset -Recurse
 Copy-Item -ErrorAction Ignore $PSScriptRoot\..\..\..\environment\sg\cert\cert.* cert
 Pop-Location
 
