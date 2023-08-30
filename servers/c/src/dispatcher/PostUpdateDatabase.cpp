@@ -13,6 +13,13 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
         checkCBLError(error);
         DEFER { CBLDatabase_EndTransaction(db, commit, &error); };
 
+        vector<CBLBlob *> retainedBlobs;
+        DEFER {
+                  for (auto blob: retainedBlobs) {
+                      CBLBlob_Release(blob);
+                  }
+              };
+
         auto updates = GetValue<vector<json>>(body, "updates");
         for (auto &update: updates) {
             auto colName = GetValue<string>(update, "collection");
@@ -27,7 +34,7 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
             auto docID = GetValue<string>(update, "documentID");
             auto typeValue = GetValue<string>(update, "type");
             auto type = UpdateDatabaseTypeEnum.value(typeValue);
-            
+
             if (type == UpdateDatabaseType::update) {
                 CBLDocument *doc = CBLCollection_GetMutableDocument(col, FLS(docID), &error);
                 checkCBLError(error);
@@ -37,16 +44,12 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
                 AUTO_RELEASE(doc);
 
                 auto props = CBLDocument_MutableProperties(doc);
-                if (update.contains("updatedProperties")) {
-                    auto updateItems = GetValue<vector<unordered_map<string, json>>>(update, "updatedProperties");
-                    ts_support::fleece::updateProperties(props, updateItems);
-                }
-
-                if (update.contains("removedProperties")) {
-                    auto keyPaths = GetValue<vector<string>>(update, "removedProperties");
-                    ts_support::fleece::removeProperties(props, keyPaths);
-                }
-
+                ts_support::fleece::applyDeltaUpdates(props, update, [&](const string &name) -> CBLBlob * {
+                    auto blob = _cblManager->blob(name, "image/jpeg", db);
+                    retainedBlobs.push_back(blob);
+                    return blob;
+                });
+                
                 CBLCollection_SaveDocument(col, doc, &error);
                 checkCBLError(error);
             } else if (type == UpdateDatabaseType::del) {
