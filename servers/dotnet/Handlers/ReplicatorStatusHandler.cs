@@ -36,16 +36,16 @@ internal static partial class HandlerList
         IReadOnlyList<DocumentReplicationEvent> documents, ErrorReturnBody? error = null);
 
     [HttpHandler("getReplicatorStatus")]
-    public static void ReplicatorStatusHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task ReplicatorStatusHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryDeserialize<ReplicatorStatusBody>(response, version, out var replicatorStatusBody)) {
-            return;
+            return Task.CompletedTask;
         }
 
         var replicator = CBLTestServer.Manager.GetObject<Replicator>(replicatorStatusBody.id);
         if(replicator == null) {
             response.WriteBody(Router.CreateErrorResponse($"Unable to find replicator with id '{replicatorStatusBody.id}'"), version, HttpStatusCode.BadRequest);
-            return;
+            return Task.CompletedTask;
         }
 
         var activity = replicator.Status.Activity.ToString().ToUpperInvariant();
@@ -70,5 +70,6 @@ internal static partial class HandlerList
 
         var retVal = new ReplicatorStatusReturnBody(activity, new ReplicatorProgressReturnBody(complete), docs, error);
         response.WriteBody(retVal, version);
+        return Task.CompletedTask;
     }
 }

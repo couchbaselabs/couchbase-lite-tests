@@ -7,11 +7,19 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using TestServer.Utilities;
 
 namespace TestServer
 {
     internal static class HttpListenerResponseExtensions
     {
+        private static readonly JsonSerializerOptions Options = new JsonSerializerOptions();
+
+        static HttpListenerResponseExtensions()
+        {
+            Options.Converters.Add(new BlobConverter());
+        }
+
         public static void AddHeaders(this HttpListenerResponse response, int version)
         {
             response.AddHeader("CBLTest-API-Version", version.ToString());
@@ -24,7 +32,7 @@ namespace TestServer
                 throw new InvalidOperationException("Cannot write to a response with a null OutputStream");
             }
             
-            var body = JsonSerializer.SerializeToUtf8Bytes(bodyObj);
+            var body = JsonSerializer.SerializeToUtf8Bytes(bodyObj, Options);
             try {
                 response.ContentType = "application/json";
                 response.ContentLength64 = body.LongLength;

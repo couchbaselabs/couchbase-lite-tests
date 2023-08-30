@@ -117,7 +117,8 @@ class DatabaseUpdateEntry(JSONSerializable):
     """
     
     def __init__(self, type: DatabaseUpdateType, collection: str, document_id: str,
-                 updated_properties: Optional[List[Dict[str, Any]]] = None, removed_properties: Optional[List[str]] = None) -> None:
+                 updated_properties: Optional[List[Dict[str, Any]]] = None, removed_properties: Optional[List[str]] = None,
+                 new_blobs: Optional[Dict[str,str]] = None) -> None:
         self.type: DatabaseUpdateEntry = cast(DatabaseUpdateEntry, _assert_not_null(type, nameof(type)))
         """The type of update to be performed"""
 
@@ -141,6 +142,12 @@ class DatabaseUpdateEntry(JSONSerializable):
         It has no meaning if `type` is not `UPDATE`
         """
 
+        self.new_blobs: Optional[Dict[str, str]] = new_blobs
+        """
+        The keypaths to add blobs to, with the values being the name of the blob to add
+        according to the blob dataset
+        """
+
     def is_valid(self) -> bool:
         """
         Returns `True` if this update is valid, or `False` if it is not.  An update is
@@ -152,6 +159,9 @@ class DatabaseUpdateEntry(JSONSerializable):
         
         if self.updated_properties is not None:
             return len(self.updated_properties) > 0
+        
+        if self.new_blobs is not None:
+            return len(self.new_blobs) > 0
         
         return len(self.removed_properties) > 0 if self.removed_properties is not None else False
     
@@ -173,6 +183,9 @@ class DatabaseUpdateEntry(JSONSerializable):
 
         if self.removed_properties is not None and len(self.removed_properties) > 0:
             raw["removedProperties"] = self.removed_properties
+
+        if self.new_blobs is not None and len(self.new_blobs) > 0:
+            raw["updatedBlobs"] = self.new_blobs
 
         return raw
     

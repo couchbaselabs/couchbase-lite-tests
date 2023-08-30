@@ -37,7 +37,7 @@ class SnapshotUpdater:
         self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id))
 
     def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None, 
-                        removed_properties: Optional[List[str]] = None):
+                        removed_properties: Optional[List[str]] = None, new_blobs: Optional[Dict[str, str]] = None):
         """
         Updates or inserts a document using the given new and/or removed properties
 
@@ -46,13 +46,15 @@ class SnapshotUpdater:
         :param new_properties: A list of dictionaries, each containing keypaths to set and values to use for the set.  
                                The updates will be applied in the order specified in the list
         :param removed_properties: A list of keypaths to remove from the document
+        :param new_blobs: A dictionary containing keypaths to add blobs to, valued as a valid blob name according
+                          to the blobs dataset
 
         .. note:: A keypath is a JSON keypath like $.foo[0].bar ($. is optional)
         """
         if new_properties is not None:
             assert isinstance(new_properties, list), "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
         
-        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties))
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties, new_blobs))
 
 class DatabaseUpdater:
     """
@@ -102,7 +104,7 @@ class DatabaseUpdater:
         self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id))
 
     def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None, 
-                        removed_properties: Optional[List[str]] = None):
+                        removed_properties: Optional[List[str]] = None, new_blobs: Optional[Dict[str,str]] = None):
         """
         Updates or inserts a document using the given new and/or removed properties
 
@@ -111,6 +113,8 @@ class DatabaseUpdater:
         :param new_properties: A list of dictionaries, each containing keypaths to set and values to use for the set.  
                                The updates will be applied in the order specified in the list
         :param removed_properties: A list of keypaths to remove from the document
+        :param new_blobs: A dictionary containing keypaths to add blobs to, valued as a valid blob name according
+                          to the blobs dataset
 
         .. note:: A keypath is a JSON keypath like $.foo[0].bar ($. is optional)
         """
@@ -118,7 +122,7 @@ class DatabaseUpdater:
             self.__error = "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
             return
     
-        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties))
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties, new_blobs))
 
 class AllDocumentsEntry:
     """

@@ -14,9 +14,10 @@ class TestSnapshotVerify:
 
     def upsert_multiple(self, instances: List[Union[SnapshotUpdater, DatabaseUpdater]], collection: str, document: str, 
                         new_properties: Optional[List[Dict[str, Any]]] = None, 
-                        removed_properties: Optional[List[str]] = None) -> None:
+                        removed_properties: Optional[List[str]] = None,
+                        new_blobs: Optional[Dict[str,str]] = None) -> None:
         for instance in instances:
-            instance.upsert_document(collection, document, new_properties, removed_properties)
+            instance.upsert_document(collection, document, new_properties, removed_properties, new_blobs)
 
     def delete_multiple(self, instances: List[Union[SnapshotUpdater, DatabaseUpdater]], collection: str, document: str) -> None:
         for instance in instances:
@@ -273,3 +274,43 @@ class TestSnapshotVerify:
         assert verify_result.description is not None, "Response should contain a description"
         assert not verify_result.actual.exists and not verify_result.actual.exists and verify_result.document is None, \
             "The return value should not have expected, actual or document"
+        
+    @pytest.mark.asyncio
+    async def test_verify_blob_update(self, cblpytest: CBLPyTest) -> None:
+        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        snapshot_id = await db.create_snapshot([
+            SnapshotDocumentEntry("_default._default", "name_1")
+        ])
+
+        snapshot_updater = SnapshotUpdater(snapshot_id)
+        async with db.batch_updater() as b:
+            self.upsert_multiple([b, snapshot_updater], "_default._default", "name_1", new_blobs={
+                "picture": "s1.jpg"
+            })
+
+        verify_result = await db.verify_documents(snapshot_updater)
+        assert verify_result.result == True, f"The verification failed: {verify_result.description}"
+        assert not verify_result.actual.exists, "Response should not contain 'actual'"
+        assert not verify_result.expected.exists, "Response should not contain 'expected'"
+        assert verify_result.document is None, "Response should not contain 'document'"
+
+    @pytest.mark.asyncio
+    async def test_verify_bad_blob_update(self, cblpytest: CBLPyTest) -> None:
+        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        snapshot_id = await db.create_snapshot([
+            SnapshotDocumentEntry("_default._default", "name_1")
+        ])
+
+        snapshot_updater = SnapshotUpdater(snapshot_id)
+        async with db.batch_updater() as b:
+            b.upsert_document("_default._default", "name_1", new_blobs={
+                "picture": "s1.jpg"
+            })
+
+        snapshot_updater.upsert_document("_default._default", "name_1", new_blobs={
+                "picture": "s2.jpg"
+            })
+        
+        verify_result = await db.verify_documents(snapshot_updater)
+        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.document is not None, "Response should contain 'document'"

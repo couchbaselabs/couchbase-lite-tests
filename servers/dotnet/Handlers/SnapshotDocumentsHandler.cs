@@ -50,16 +50,16 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("snapshotDocuments")]
-    public static void SnapshotDocumentsHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task SnapshotDocumentsHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
         if (!body.RootElement.TryDeserialize<SnapshotDocumentBody>(response, version, out var snapshotBody)) {
-            return;
+            return Task.CompletedTask;
         }
 
         var db = CBLTestServer.Manager.GetDatabase(snapshotBody.database);
         if (db == null) {
             response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{snapshotBody.database}'!"), version, HttpStatusCode.BadRequest);
-            return;
+            return Task.CompletedTask;
         }
 
         var (snapshot, id) = CBLTestServer.Manager.RegisterObject(() => new Snapshot());
@@ -70,5 +70,6 @@ internal static partial class HandlerList
         }
 
         response.WriteBody(new { id }, version);
+        return Task.CompletedTask;
     }
 }
