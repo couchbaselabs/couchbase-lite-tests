@@ -25,7 +25,7 @@ int Dispatcher::handlePOSTPerformMaintenance(Request &request) {
     auto db = _cblManager->database(dbName);
 
     auto typeValue = GetValue<string>(body, "maintenanceType");
-    auto maintenanceType = MaintenanceTypes.enumValue(typeValue);
+    auto maintenanceType = MaintenanceTypes.value(typeValue);
 
     CBLError error{};
     CBLDatabase_PerformMaintenance(db, maintenanceType, &error);

@@ -37,10 +37,21 @@ static inline void CheckBody(const json &body) {
     }
 }
 
-static inline bool EnumEquals(const string &enum1, const string &enum2) {
-    return strcasecmp(enum1.c_str(), enum2.c_str()) == 0;
-}
+namespace ts {
+    enum class UpdateDatabaseType {
+        update, del, purge
+    };
 
-static constexpr const char *kUpdateDatabaseTypeUpdate = "UPDATE";
-static constexpr const char *kUpdateDatabaseTypeDelete = "DELETE";
-static constexpr const char *kUpdateDatabaseTypePurge = "PURGE";
+    static auto UpdateDatabaseTypeEnum = StringEnum<UpdateDatabaseType>(
+        {
+            "update",
+            "delete",
+            "purge"
+        },
+        {
+            UpdateDatabaseType::update,
+            UpdateDatabaseType::del,
+            UpdateDatabaseType::purge
+        }
+    );
+}

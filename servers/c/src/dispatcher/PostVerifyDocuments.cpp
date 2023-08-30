@@ -80,15 +80,17 @@ int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
         auto colName = GetValue<string>(change, "collection");
         auto docID = GetValue<string>(change, "documentID");
 
-        auto type = GetValue<string>(change, "type");
-        bool mustExistInSnapShot = !EnumEquals(type, kUpdateDatabaseTypeUpdate);
+        auto typeValue = GetValue<string>(change, "type");
+        auto type = UpdateDatabaseTypeEnum.value(typeValue);
+
+        bool mustExistInSnapShot = type != UpdateDatabaseType::update;
         auto snapshotDoc = snapshot->document(colName, docID, mustExistInSnapShot);
         verifiedSnapShotDocs.insert(Snapshot::documentKey(colName, docID));
 
         auto curDoc = CBLManager::document(db, colName, docID);
         AUTO_RELEASE(curDoc);
 
-        if (EnumEquals(type, kUpdateDatabaseTypeUpdate)) {
+        if (type == UpdateDatabaseType::update) {
             if (!curDoc) {
                 verifyResult.ok = false;
                 verifyResult.description = ErrorDesc(docID, colName, "was not found");
@@ -115,20 +117,20 @@ int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
             if (!verifyProperties(docID, colName, props, expectedProps, verifyResult)) {
                 break;
             }
-        } else if (EnumEquals(type, kUpdateDatabaseTypeDelete)) {
+        } else if (type == UpdateDatabaseType::del) {
             if (curDoc) {
                 verifyResult.ok = false;
                 verifyResult.description = ErrorDesc(docID, colName, "was not deleted");
                 break;
             }
-        } else if (EnumEquals(type, kUpdateDatabaseTypePurge)) {
+        } else if (type == UpdateDatabaseType::purge) {
             if (curDoc) {
                 verifyResult.ok = false;
                 verifyResult.description = ErrorDesc(docID, colName, "was not purged");
                 break;
             }
         } else {
-            throw RequestError(concat("Invalid verification type : ", type));
+            throw RequestError(concat("Invalid update type : ", typeValue));
         }
     }
 
