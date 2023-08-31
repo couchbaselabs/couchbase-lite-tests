@@ -42,7 +42,7 @@ def dataset_path() -> Path:
     script_path = os.path.abspath(os.path.dirname(__file__))
     return Path(script_path, "..", "dataset")
 
-def pytest_runtest_setup(item: pytest.FixtureRequest) -> None:
+def pytest_runtest_setup(item: pytest.Function) -> None:
     specified_cbse = item.config.getoption("--cbse")
     if specified_cbse is None:
         return
