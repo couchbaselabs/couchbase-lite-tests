@@ -35,6 +35,10 @@ info:
 
     Changes
 
+    0.2.3 (08/30/23)
+    * Updated blob verification logic.
+    * Added rules for determining blob's content_type.
+
     0.2.2 (08/25/23)
     * Added updatedBlobs option to /updateDatabase.
     * Added verification logic info including blob verification logic in /verifyDocuments.
@@ -235,8 +239,13 @@ paths:
 
         The blob object is created from the content of the blob file refered by the blob file name, the dictionary value 
         associated with each key path. If the blob file name refers to non-existing blob file, 400 request error will
-        be returned.
+        be returned. 
         
+        The content_type of the blob used when creating a blob object can be detected from the blob file name's extension
+        as the following rules:
+          * "image/jpeg" for the .jpg
+          * "application/octet-stream" for others
+
       operationId: updateDatabase
       requestBody:
         description: |-
@@ -397,10 +406,17 @@ paths:
         3. If the document specified in the delta with change type UPDATE, the expected document which is the 
            corresponding snaphot document applied with the specified delta will be compared with the actual document 
            which is the current document in the collection. The body of expected and actual document MUST be the same. 
-        4. When checking if the two blob objects are equals, the dictoinary properties of the two blobs MUST be the same.
-           In addition, the actual blob file in the database MUST exist; this can be checked by calling Database's 
-           getBlob(Dictionary blobProperties) which will return null if the specified blob doesn't exist without trying
-           to read the blob data.
+        4. When checking if the two blob objects (actual and expected) are equals, the platform blob's equals() method 
+           will be used. If the two blob objects are equals, in addition, the blob content of the two blobs will be
+           compared. When reading the content of the actual blob, if the blob file is unexpectedly missing from 
+           the database, there could be a runtime exception thrown, please make sure to catch the exception and 
+           mark the verification result as failed with the appropriate description (See the case 6 in the response). 
+           For the actual / expected value of the blob, use the blob's properties.
+
+           For that platform such as Swift that cannot catch the runtime exception to check that the blob is missing
+           when getting the blob's content, use Database's getBlob(Dictionary blobProperties) which will throw
+           CouchbaseLiteException when blob doesn't exist to get the same blob object for getting the blob content.
+
         Note: 
         * The documents outside the snapshot will not be verified. To verify expected new documents 
           can be done by including these new documents (not existing before) to the snapshot and verifying
@@ -457,10 +473,10 @@ paths:
                       Reason : Document '<doc-id> in '<scope.collection>' had unexpected properties at key '<keypath>'
 
                       Case 5 : Document shouldn't exist (null value in the snapshot), but the document does exist.
-                      Reason : Document '<doc-id> in '<scope.collection>' should not exist.
+                      Reason : Document '<doc-id> in '<scope.collection>' should not exist
 
                       Case 6 : Blob file doesn't exist in the database.
-                      Reason : Blob file of document '<doc-id> in '<scope.collection>' at key '<keypath>' doesn't exist
+                      Reason : Document '<doc-id> in '<scope.collection>' had non-existing blob at key '<keypath>'
 
                       For the Case, The first unexpected keypath is shown in the reason description. 
                       Its actual value, expected value, and the entire actual document body will be shown in 
