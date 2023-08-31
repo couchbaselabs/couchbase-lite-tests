@@ -25,7 +25,7 @@
     "num_index_replicas": 0
   },
   "config_options": {
-    "delta-sync": {
+    "delta_sync": {
       "delta_sync": { 
         "enabled": true,
         "rev_max_age_seconds": 86400
