@@ -83,7 +83,7 @@ class TestReplicationBlob(CBLTestClass):
                                        ["travel.hotels"])
         
         self.mark_test_step("Update hotel_1 on SG again without changing the image key.")
-        hotels_updates: List[DocumentUpdateEntry] = []
+        hotels_updates = []
         hotels_updates.append(DocumentUpdateEntry("hotel_1", "2-9a718e02f5e5aa1aa90bdbb25072d258", body={
             "_attachments": {
                 "blob_/image": {
