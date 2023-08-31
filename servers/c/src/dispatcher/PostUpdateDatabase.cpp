@@ -45,11 +45,11 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
 
                 auto props = CBLDocument_MutableProperties(doc);
                 ts_support::fleece::applyDeltaUpdates(props, update, [&](const string &name) -> CBLBlob * {
-                    auto blob = _cblManager->blob(name, "image/jpeg", db);
+                    auto blob = _cblManager->blob(name, db);
                     retainedBlobs.push_back(blob);
                     return blob;
                 });
-                
+
                 CBLCollection_SaveDocument(col, doc, &error);
                 checkCBLError(error);
             } else if (type == UpdateDatabaseType::del) {

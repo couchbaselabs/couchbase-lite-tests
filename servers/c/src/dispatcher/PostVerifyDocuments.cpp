@@ -38,15 +38,16 @@ struct VerifyResult {
 
 bool verifyProperties(CBLDatabase *db, const string &docID, const string &colName,
                       FLDict props, FLDict expectedProps, VerifyResult &result) {
-    bool isBlobNotFound;
+    bool isBlobNotFound = false;
+    ts_support::fleece::BlobValidator blobValidator = [&](FLDict blob) -> bool {
+        bool exists = CBLManager::blobExists(db, blob);
+        isBlobNotFound = !exists;
+        return exists;
+    };
+
     string errKeyPath;
-    auto isEquals = ts_support::fleece::valueIsEquals((FLValue) props, (FLValue) expectedProps, errKeyPath);
-
-    if (isEquals && FLDict_IsBlob(props) && !CBLManager::blobExists(db, props)) {
-        isEquals = false;
-        isBlobNotFound = true;
-    }
-
+    auto isEquals = ts_support::fleece::valueIsEquals((FLValue) props, (FLValue) expectedProps,
+                                                      errKeyPath, blobValidator);
     if (!isEquals) {
         result.ok = false;
         if (isBlobNotFound) {
@@ -123,11 +124,11 @@ int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
 
             auto expectedProps = CBLDocument_MutableProperties(expectedDoc);
             ts_support::fleece::applyDeltaUpdates(expectedProps, change, [&](const string &name) -> CBLBlob * {
-                auto blob = _cblManager->blob(name, "image/jpeg", db);
+                auto blob = _cblManager->blob(name, db);
                 retainedBlobs.push_back(blob);
                 return blob;
             });
-            
+
             auto props = CBLDocument_Properties(curDoc);
             if (!verifyProperties(db, docID, colName, props, expectedProps, verifyResult)) {
                 break;
