@@ -30,12 +30,25 @@ import Vapor
 //          $ref: '#/components/schemas/Error'
 
 extension ContentTypes {
-    struct DocumentReplication : Content {
+    struct DocumentReplication : Content, CustomStringConvertible {
         let collection: String
         let documentID: String
         let isPush: Bool
         let flags: [DocumentReplicationFlags]
         let error: TestServerError?
+        
+        var description: String {
+            var result = ""
+            
+            result += "DocumentReplication:\n"
+            result += "\tcollection: \(collection)\n"
+            result += "\tdocumentID: \(documentID)\n"
+            result += "\tisPush: \(isPush.description)\n"
+            result += "\tflags: \(flags)"
+            result += "\terror: \(error.debugDescription)"
+            
+            return result
+        }
     }
     enum DocumentReplicationFlags : String, Codable {
         case deleted = "deleted"
