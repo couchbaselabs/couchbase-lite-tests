@@ -13,9 +13,11 @@ namespace ts_support::fleece {
 
     using BlobAccessor = std::function<CBLBlob *(const std::string &name)>;
 
-    void applyDeltaUpdates(FLMutableDict dict, const nlohmann::json &delta, BlobAccessor blobAccessor);
+    void applyDeltaUpdates(FLMutableDict dict, const nlohmann::json &delta, const BlobAccessor &blobAccessor);
 
     FLValue valueAtKeyPath(FLDict dict, const std::string &keyPath);
 
-    bool valueIsEquals(FLValue value1, FLValue value2, std::string &outKeyPath);
+    using BlobValidator = std::function<bool(FLDict blob)>;
+
+    bool valueIsEquals(FLValue value1, FLValue value2, std::string &outKeyPath, const BlobValidator &blobValidator);
 }

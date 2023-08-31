@@ -31,7 +31,7 @@ namespace ts::cbl {
         void reset();
 
         void loadDataset(const std::string &name, const std::string &targetDatabaseName);
-        
+
         /**
          * Get the loaded database. The database instance is managed by the CBLManager.
          * Do not release the database instance unless the object is additionally retained. */
@@ -49,7 +49,7 @@ namespace ts::cbl {
         /** Get a blob object from the data set. The database object is required
          * for creating a blob writer stream which will write into the database's
          * blob store when the document that the blob is set to is saved. */
-        CBLBlob *blob(const std::string &name, const std::string &contentType, CBLDatabase *db);
+        CBLBlob *blob(const std::string &name, CBLDatabase *db);
 
         /// Replicator
 

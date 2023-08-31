@@ -6,6 +6,7 @@
 #include "Define.h"
 #include "Error.h"
 #include "Precondition.h"
+#include "StringUtil.h"
 #include "ZipUtil.h"
 
 // lib
@@ -159,7 +160,16 @@ namespace ts::cbl {
         return (blob != nullptr);
     }
 
-    CBLBlob *CBLManager::blob(const string &name, const string &contentType, CBLDatabase *db) {
+    std::string blobContentType(const string &name) {
+        auto comps = str::split(name, '.');
+        auto ext = comps.back();
+        if (ext == "jpg") {
+            return "image/jpeg";
+        }
+        return "application/octet-stream";
+    }
+
+    CBLBlob *CBLManager::blob(const string &name, CBLDatabase *db) {
         auto blobPath = path(_assetDir).append(ASSET_BLOBS_DIR).append(name);
         ifstream ifs(blobPath.string(), ios::in | ios::binary);
         if (!ifs.is_open()) {
@@ -181,6 +191,8 @@ namespace ts::cbl {
                 checkCBLError(error);
             }
         }
+        
+        auto contentType = blobContentType(name);
         return CBLBlob_CreateWithStream(FLS(contentType), ws);
     }
 

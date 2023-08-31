@@ -9,6 +9,7 @@
 
 using namespace std;
 using namespace nlohmann;
+using namespace ts_support::fleece;
 using namespace ts::support::json_util;
 
 void setSlotValue(FLSlot slot, const json &value) { // NOLINT(misc-no-recursion)
@@ -337,22 +338,20 @@ void removeProperties(FLMutableDict dict, const vector<string> &keyPaths) {
     }
 }
 
-void ts_support::fleece::applyDeltaUpdates(FLMutableDict dict, const json &delta, BlobAccessor blobAccessor) {
+void ts_support::fleece::applyDeltaUpdates(FLMutableDict dict, const json &delta, const BlobAccessor &blobAccessor) {
     if (delta.contains("removedProperties")) {
-        auto keyPaths = GetValue<vector < string>>
-        (delta, "removedProperties");
+        auto keyPaths = GetValue<vector<string>>(delta, "removedProperties");
         removeProperties(dict, keyPaths);
     }
 
     if (delta.contains("updatedProperties")) {
-        auto updateItems = GetValue<vector < unordered_map < string, json>>>(delta, "updatedProperties");
+        auto updateItems = GetValue<vector<unordered_map<string, json>>>(delta, "updatedProperties");
         updateProperties(dict, updateItems);
     }
 
     if (delta.contains("updatedBlobs")) {
-        auto updates = GetValue<unordered_map < string, string>>
-        (delta, "updatedBlobs");
-        unordered_map < string, CBLBlob * > blobs;
+        auto updates = GetValue<unordered_map<string, string>>(delta, "updatedBlobs");
+        unordered_map<string, CBLBlob *> blobs;
         for (auto &update: updates) {
             auto blob = blobAccessor(update.second);
             blobs[update.first] = blob;
@@ -391,7 +390,7 @@ void prependPath(uint32_t index, std::string &keypath) {
     keypath.insert(0, string("[").append(to_string(index)).append("]"));
 }
 
-bool dictIsEquals(FLDict dict1, FLDict dict2, std::string &keypath) {
+bool dictIsEquals(FLDict dict1, FLDict dict2, std::string &keypath, const BlobValidator &blobValidator) {
     unordered_set<string> checkedKeys;
     FLDictIterator iter1;
     FLDictIterator_Begin(dict1, &iter1);
@@ -399,7 +398,7 @@ bool dictIsEquals(FLDict dict1, FLDict dict2, std::string &keypath) {
     while (nullptr != (val1 = FLDictIterator_GetValue(&iter1))) {
         FLString key = FLDictIterator_GetKeyString(&iter1);
         auto val2 = FLDict_Get(dict2, key);
-        bool isEqual = ts_support::fleece::valueIsEquals(val1, val2, keypath);
+        bool isEqual = ts_support::fleece::valueIsEquals(val1, val2, keypath, blobValidator);
         if (!isEqual) {
             prependPath(key, keypath);
             return false;
@@ -419,7 +418,7 @@ bool dictIsEquals(FLDict dict1, FLDict dict2, std::string &keypath) {
         FLString key = FLDictIterator_GetKeyString(&iter2);
         if (checkedKeys.find(STR(key)) == checkedKeys.end()) {
             auto anotherVal = FLDict_Get(dict1, key);
-            bool isEqual = ts_support::fleece::valueIsEquals(val2, anotherVal, keypath);
+            bool isEqual = ts_support::fleece::valueIsEquals(val2, anotherVal, keypath, blobValidator);
             if (!isEqual) {
                 prependPath(key, keypath);
                 return false;
@@ -430,7 +429,7 @@ bool dictIsEquals(FLDict dict1, FLDict dict2, std::string &keypath) {
     return true;
 }
 
-bool arrayIsEquals(FLArray array1, FLArray array2, std::string &keypath) {
+bool arrayIsEquals(FLArray array1, FLArray array2, std::string &keypath, const BlobValidator &blobValidator) {
     auto count = FLArray_Count(array1);
     if (count != FLArray_Count(array2)) {
         return false;
@@ -438,7 +437,7 @@ bool arrayIsEquals(FLArray array1, FLArray array2, std::string &keypath) {
     for (uint32_t i = 0; i < count; i++) {
         auto val1 = FLArray_Get(array1, i);
         auto val2 = FLArray_Get(array2, i);
-        bool isEqual = ts_support::fleece::valueIsEquals(val2, val1, keypath);
+        bool isEqual = ts_support::fleece::valueIsEquals(val2, val1, keypath, blobValidator);
         if (!isEqual) {
             prependPath(i, keypath);
             return false;
@@ -449,10 +448,11 @@ bool arrayIsEquals(FLArray array1, FLArray array2, std::string &keypath) {
 
 bool blobIsEquals(FLDict dict1, FLDict dict2) {
     string ignored;
-    return dictIsEquals(dict1, dict2, ignored);
+    return dictIsEquals(dict1, dict2, ignored, [](FLDict blob) -> bool { return true; });
 }
 
-bool ts_support::fleece::valueIsEquals(FLValue value1, FLValue value2, std::string &keypath) {
+bool
+ts_support::fleece::valueIsEquals(FLValue value1, FLValue value2, string &keypath, const BlobValidator &blobValidator) {
     if (value1 == nullptr) {
         return value2 == nullptr;
     }
@@ -467,12 +467,12 @@ bool ts_support::fleece::valueIsEquals(FLValue value1, FLValue value2, std::stri
             auto dict1 = FLValue_AsDict(value1);
             auto dict2 = FLValue_AsDict(value2);
             if (FLDict_IsBlob(dict1) || FLDict_IsBlob(dict2)) {
-                return blobIsEquals(dict1, dict2);
+                return blobIsEquals(dict1, dict2) && blobValidator(dict1);
             }
-            return dictIsEquals(dict1, dict2, keypath);
+            return dictIsEquals(dict1, dict2, keypath, blobValidator);
         }
         case kFLArray: {
-            return arrayIsEquals(FLValue_AsArray(value1), FLValue_AsArray(value2), keypath);
+            return arrayIsEquals(FLValue_AsArray(value1), FLValue_AsArray(value2), keypath, blobValidator);
         }
         default:
             return FLValue_IsEqual(value1, value2);
