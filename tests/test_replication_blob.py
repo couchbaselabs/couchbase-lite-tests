@@ -12,6 +12,7 @@ from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.api.cbltestclass import CBLTestClass
 
 class TestReplicationBlob(CBLTestClass):
+    @pytest.mark.cbse(14681)
     @pytest.mark.skip(reason="CBL-4839 / CBSE-14861")
     @pytest.mark.asyncio
     async def test_pull_non_blob_changes_with_delta_sync_and_compact(self, cblpytest: CBLPyTest, dataset_path: Path):

@@ -42,6 +42,15 @@ def dataset_path() -> Path:
     script_path = os.path.abspath(os.path.dirname(__file__))
     return Path(script_path, "..", "dataset")
 
+def pytest_runtest_setup(item: pytest.FixtureRequest) -> None:
+    specified_cbse = item.config.getoption("--cbse")
+    if specified_cbse is None:
+        return
+    
+    cbse_nums = [mark.args[0] for mark in item.iter_markers(name="cbse")]
+    if not cbse_nums or int(specified_cbse) not in cbse_nums:
+        pytest.skip(f"Unrelated to CBSE-{specified_cbse}")
+
 def pytest_addoption(parser) -> None:
     parser.addoption("--config", metavar="PATH", help="The path to the JSON configuration for CBLPyTest", required=True)
     parser.addoption("--cbl-log-level", metavar="LEVEL", 
@@ -51,3 +60,4 @@ def pytest_addoption(parser) -> None:
     parser.addoption("--test-props", metavar="PATH", help="The path to read extra test properties from")
     parser.addoption("--output", metavar="PATH", help="The path to write Greenboard results to")
     parser.addoption("--otel-endpoint", metavar="HOST", help="The IP address or host name running OTEL collector")
+    parser.addoption("--cbse", metavar="ticket_num", help="If specified, only run the test(s) for a specific CBSE ticket")
