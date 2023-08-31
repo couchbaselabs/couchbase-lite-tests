@@ -76,6 +76,14 @@ internal static partial class HandlerList
         }
     }
 
+    private static readonly IReadOnlyDictionary<string, string> BlobTypeMap = new Dictionary<string, string>
+    {
+        ["jpg"] = "image/jpeg"
+    };
+
+    private static string BlobType(string filename) => 
+        BlobTypeMap.TryGetValue(filename.Split(".").Last(), out var type) ? type : "application/octet-stream";
+
     private static Collection GetCollection(Database db, string name)
     {
         var collSpec = CollectionSpec(name);
@@ -119,7 +127,7 @@ internal static partial class HandlerList
         foreach(var update in updateBody.updates.Where(x => x.updatedBlobs != null && x.updatedBlobs.Any())) {
             foreach(var b in update.updatedBlobs!) {
                 var nextBlob = await CBLTestServer.Manager.LoadBlob(b.Value).ConfigureAwait(false);
-                blobUpdate[b.Key] = new Blob("image/jpeg", nextBlob);
+                blobUpdate[b.Key] = new Blob(BlobType(b.Value), nextBlob);
             }
         }
 

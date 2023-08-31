@@ -196,7 +196,7 @@ internal static partial class HandlerList
         if (compareResult.Actual.Exists) {
             responseBody.actual = compareResult.Actual.Value;
             if(compareResult.Actual.Value is Blob b && b.Content == null) {
-                responseBody.actual = "Blob data missing from DB";
+                responseBody.description = $"Document '{existing.Id}' in '{existing.Collection!.Scope.Name}.{existing.Collection!.Name}' had non-existent blob at key '{compareResult.KeyPath.Substring(2)}'"; ;
             }
         }
 
@@ -289,7 +289,7 @@ internal static partial class HandlerList
             if(change.updatedBlobs != null) {
                 foreach(var entry in change.updatedBlobs) {
                     var blob = await CBLTestServer.Manager.LoadBlob(entry.Value).ConfigureAwait(false);
-                    KeyPathParser.Update(mutableCopy, entry.Key, new Blob("image/jpeg", blob));
+                    KeyPathParser.Update(mutableCopy, entry.Key, new Blob(BlobType(entry.Value), blob));
                 }
             }
 
