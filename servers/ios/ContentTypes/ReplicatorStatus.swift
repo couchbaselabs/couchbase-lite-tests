@@ -15,7 +15,7 @@ extension ContentTypes {
         case IDLE = "IDLE"
         case BUSY = "BUSY"
     }
-    struct ReplicatorStatus : Content {
+    struct ReplicatorStatus : Content, CustomStringConvertible {
         struct Progress : Codable {
             let completed: Bool
         }
@@ -23,5 +23,18 @@ extension ContentTypes {
         let progress: Progress
         let documents: [DocumentReplication]?
         let error: TestServerError?
+        
+        var description: String {
+            var result = ""
+            
+            result += "ReplicatorStatus: \n"
+            result += "\tactivity: \(activity.rawValue)\n"
+            result += "\tprogress: completed: \(progress.completed.description)\n"
+            result += "\tdocuments: \(documents.debugDescription)\n"
+            
+            result += "\terror: \(error.debugDescription)"
+            
+            return result
+        }
     }
 }

@@ -9,7 +9,11 @@ import Foundation
 import Vapor
 
 class HeadersMiddleware : AsyncMiddleware {
-    func respond(to request: Vapor.Request, chainingTo next: Vapor.AsyncResponder) async throws -> Vapor.Response {        
+    func respond(to request: Vapor.Request, chainingTo next: Vapor.AsyncResponder) async throws -> Vapor.Response {
+        
+        TestServer.logger.log(level: .info, "Received request: \(request.route?.description ?? "ERR")")
+        TestServer.logger.log(level: .debug, "\(request.description)")
+        
         let isGetRoot = request.route?.description == "GET /"
         
         var version = 0
@@ -20,6 +24,7 @@ class HeadersMiddleware : AsyncMiddleware {
         } catch(let error as TestServerError) {
             // This middleware sits before the error middleware, so we have to create this
             // error ourselves
+            TestServer.logger.log(level: .error, "Failed to verify request headers, responding with error: \(error)")
             let response = ErrorResponseFactory.CreateErrorResponse(request, error)
             return withResponseHeaders(response, version: version)
         }
@@ -27,6 +32,8 @@ class HeadersMiddleware : AsyncMiddleware {
         request.headers.contentType = .json
         
         let response = try await next.respond(to: request)
+        
+        TestServer.logger.log(level: .debug, "Responding with response: \n\(response)")
         
         return withResponseHeaders(response, version: version)
     }

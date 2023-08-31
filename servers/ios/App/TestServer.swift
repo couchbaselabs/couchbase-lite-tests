@@ -5,11 +5,13 @@
 //  Created by Callum Birks on 01/08/2023.
 //
 
+import os
 import Vapor
 
 class TestServer : ObservableObject {
     var app : Vapor.Application
     let dbConnection : DatabaseManager
+    public static let logger : os.Logger = os.Logger()
     
     public static let maxAPIVersion = 1
     public static let serverID = UUID()
@@ -38,11 +40,10 @@ class TestServer : ObservableObject {
     }
     
     private func configure(_ app: Application, _ port: Int) {
-        // uncomment to serve files from /Public folder
-        // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
-        
         app.http.server.configuration.hostname = "0.0.0.0"
         app.http.server.configuration.port = port
+        
+        TestServer.logger.log(level: .info, "Configuring HTTP server with hostname: 0.0.0.0 and port: \(port)")
         
         // Use custom error middleware
         app.middleware = .init()
@@ -61,6 +62,8 @@ class TestServer : ObservableObject {
         app.post("verifyDocuments", use: Handlers.verifyDocuments)
         app.post("startReplicator", use: Handlers.startReplicator)
         app.post("getReplicatorStatus", use: Handlers.getReplicatorStatus)
+        
+        TestServer.logger.log(level: .debug, "Server configured with the following routes: \n\(app.routes.description)")
     }
 }
 

@@ -22,6 +22,36 @@ extension ContentTypes {
         let authenticator: ReplicatorAuthenticator
         let enableDocumentListener: Bool
         
+        public var description: String {
+            var result: String = "ReplicatorConfiguration\n"
+            result += "\tdatabase: \(database)\n"
+            result += "\tendpoint: \(endpoint)\n"
+            result += "\tcollections:\n"
+            
+            for replColl in collections {
+                result += "\t\t\(replColl.names.description)\n"
+                if let channels = replColl.channels {
+                    result += "\t\tchannels: \(channels.description)\n"
+                }
+                if let docIDs = replColl.documentIDs {
+                    result += "\t\tdocumentIDs: \(docIDs.description)\n"
+                }
+                if let pushFilter = replColl.pushFilter {
+                    result += "\t\tpushFilter: \(pushFilter.name)\n"
+                }
+                if let pullFilter = replColl.pullFilter {
+                    result += "\t\tpullFilter: \(pullFilter.name)\n"
+                }
+            }
+            
+            result += "\treplicatorType: \(replicatorType.rawValue)\n"
+            result += "\tcontinuous: \(continuous.description)\n"
+            result += "\tauthenticatorType: \(authenticator.type.rawValue)\n"
+            result += "\tenableDocumentListener: \(enableDocumentListener.description)\n"
+            
+            return result
+        }
+        
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             database = try container.decode(String.self, forKey: .database)
