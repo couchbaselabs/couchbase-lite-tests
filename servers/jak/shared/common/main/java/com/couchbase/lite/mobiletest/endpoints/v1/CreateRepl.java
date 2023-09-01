@@ -57,7 +57,7 @@ public class CreateRepl {
 
     private static final String KEY_RESET = "reset";
     private static final String KEY_CONFIG = "config";
-    private static final String KEY_DB = "database";
+    private static final String KEY_DATABASE = "database";
     private static final String KEY_COLLECTIONS = "collections";
     private static final String KEY_ENDPOINT = "endpoint";
     private static final String KEY_TYPE = "replicatorType";
@@ -96,7 +96,7 @@ public class CreateRepl {
     private static final Set<String> LEGAL_CONFIG_KEYS;
     static {
         final Set<String> l = new HashSet<>();
-        l.add(KEY_DB);
+        l.add(KEY_DATABASE);
         l.add(KEY_COLLECTIONS);
         l.add(KEY_ENDPOINT);
         l.add(KEY_TYPE);
@@ -187,7 +187,7 @@ public class CreateRepl {
             throw new ClientError("Replicator configuration contains an unparsable endpoint: " + uri, e);
         }
 
-        final String dbName = config.getString(KEY_DB);
+        final String dbName = config.getString(KEY_DATABASE);
         if (dbName == null) { throw new ClientError("Replicator configuration doesn't specify a database"); }
 
         final TypedList collections = config.getList(KEY_COLLECTIONS);
