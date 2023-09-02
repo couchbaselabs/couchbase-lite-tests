@@ -64,7 +64,8 @@ class AndroidTestApp(private val context: Context) : TestApp() {
 
     override fun getFilesDir() = context.filesDir!!
 
-    override fun getAsset(name: String) = context.assets.open(name)
+    @Throws(IOException::class)
+    override fun getAsset(name: String)= context.assets.open(name)
 
     override fun encodeBase64(hashBytes: ByteArray) = Base64.encodeToString(hashBytes, Base64.NO_WRAP)!!
 

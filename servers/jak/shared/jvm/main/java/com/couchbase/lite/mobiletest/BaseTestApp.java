@@ -1,9 +1,9 @@
 package com.couchbase.lite.mobiletest;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.KeyStore;
@@ -72,9 +72,13 @@ public abstract class BaseTestApp extends TestApp {
     @Override
     public byte[] decodeBase64(@NonNull String encodedBytes) { return Base64.getDecoder().decode(encodedBytes); }
 
-    @Nullable
+    @NonNull
     @Override
-    public InputStream getAsset(@NonNull String name) { return TestApp.class.getResourceAsStream("/" + name); }
+    public InputStream getAsset(@NonNull String name) throws IOException {
+        final InputStream is = TestApp.class.getResourceAsStream("/" + name);
+        if (is == null) { throw new FileNotFoundException("No such resource: " + name); }
+        return is;
+    }
 
     @NonNull
     @Override
