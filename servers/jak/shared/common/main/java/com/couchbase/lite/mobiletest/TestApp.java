@@ -103,8 +103,8 @@ public abstract class TestApp {
     @NonNull
     public abstract byte[] decodeBase64(@NonNull String encodedBytes);
 
-    @Nullable
-    public abstract InputStream getAsset(@NonNull String name);
+    @NonNull
+    public abstract InputStream getAsset(@NonNull String name) throws IOException;
 
     @NonNull
     public abstract File getFilesDir();

@@ -18,27 +18,42 @@ package com.couchbase.lite.mobiletest.changes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import com.couchbase.lite.Blob;
 import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.MutableDocument;
+import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
+import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 
 
 public final class UpdateChange extends Change {
+    private static final String EXT_JPEG = ".jpg";
+    private static final String MIME_JPEG = "image/jpeg";
+    private static final String MIME_OCTET = "application/octet-stream";
+
+    @NonNull
+    private final List<String> deletions;
     @NonNull
     private final Map<String, Object> updates;
     @NonNull
-    private final List<String> deletions;
+    private final Map<String, String> blobs;
 
-    public UpdateChange(@NonNull String docId, @NonNull Map<String, Object> updates, @NonNull List<String> deletions) {
+    public UpdateChange(
+        @NonNull String docId,
+        @NonNull List<String> deletions,
+        @NonNull Map<String, Object> updates,
+        @NonNull Map<String, String> blobs) {
         super(ChangeType.UPDATE, docId);
-        this.updates = updates;
         this.deletions = deletions;
+        this.updates = updates;
+        this.blobs = blobs;
     }
 
 
@@ -50,11 +65,24 @@ public final class UpdateChange extends Change {
         final MutableDocument mDoc = (doc != null) ? doc.toMutable() : new MutableDocument(docId);
         final Map<String, Object> data = mDoc.toMap();
 
+        for (String deletion: deletions) { parser.parse(deletion).delete(data); }
+
         for (Map.Entry<String, Object> change: updates.entrySet()) {
             parser.parse(change.getKey()).set(data, change.getValue());
         }
 
-        for (String deletion: deletions) { parser.parse(deletion).delete(data); }
+        if (!blobs.isEmpty()) {
+            final TestApp app = TestApp.getApp();
+            for (Map.Entry<String, String> blob: blobs.entrySet()) {
+                final String content = blob.getValue();
+                try {
+                    parser.parse(blob.getKey()).set(
+                        data,
+                        new Blob(content.endsWith(EXT_JPEG) ? MIME_JPEG : MIME_OCTET, app.getAsset(content)));
+                }
+                catch (IOException e) { throw new ClientError("No such blob content: " + content, e); }
+            }
+        }
 
         return mDoc.setData(data);
     }

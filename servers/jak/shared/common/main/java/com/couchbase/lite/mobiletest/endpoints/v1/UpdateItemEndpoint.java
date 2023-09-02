@@ -38,8 +38,9 @@ import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 
 public abstract class UpdateItemEndpoint {
-    protected static final String KEY_UPDATE_PROPS = "updatedProperties";
     protected static final String KEY_REMOVED_PROPS = "removedProperties";
+    protected static final String KEY_UPDATE_PROPS = "updatedProperties";
+    protected static final String KEY_UPDATE_BLOBS = "updatedBlobs";
 
     private static final String KEY_COLLECTION = "collection";
     private static final String KEY_DOC_ID = "documentID";
@@ -54,8 +55,9 @@ public abstract class UpdateItemEndpoint {
         l.add(KEY_TYPE);
         l.add(KEY_COLLECTION);
         l.add(KEY_DOC_ID);
-        l.add(KEY_UPDATE_PROPS);
         l.add(KEY_REMOVED_PROPS);
+        l.add(KEY_UPDATE_PROPS);
+        l.add(KEY_UPDATE_BLOBS);
         LEGAL_UPDATE_KEYS = Collections.unmodifiableSet(l);
     }
 
@@ -66,6 +68,7 @@ public abstract class UpdateItemEndpoint {
 
     @NonNull
     public Map<String, Map<String, Change>> getDelta(@NonNull TypedList updates) {
+        // Collection FQN -> DocId -> Change
         final Map<String, Map<String, Change>> delta = new HashMap<>();
         final int n = updates.size();
         for (int i = 0; i < n; i++) {
@@ -91,7 +94,7 @@ public abstract class UpdateItemEndpoint {
                     ch = new PurgeChange(docId);
                     break;
                 case TYPE_UPDATE:
-                    ch = new UpdateChange(docId, getUpdates(change), getDeletions(change));
+                    ch = new UpdateChange(docId, getDeletions(change), getUpdates(change), getBlobs(change));
                     break;
                 default:
                     throw new ClientError("Unrecognized update type: " + changeType);
@@ -101,6 +104,21 @@ public abstract class UpdateItemEndpoint {
         }
 
         return delta;
+    }
+
+    @NonNull
+    private List<String> getDeletions(@NonNull TypedMap update) {
+        final List<String> parsedDeletions = new ArrayList<>();
+        final TypedList deletions = update.getList(KEY_REMOVED_PROPS);
+        if (deletions != null) {
+            final int m = deletions.size();
+            for (int j = 0; j < m; j++) {
+                final String path = deletions.getString(j);
+                if (path == null) { throw new ServerError("Null removal"); }
+                parsedDeletions.add(path);
+            }
+        }
+        return parsedDeletions;
     }
 
     @NonNull
@@ -119,17 +137,12 @@ public abstract class UpdateItemEndpoint {
     }
 
     @NonNull
-    private List<String> getDeletions(@NonNull TypedMap update) {
-        final List<String> parsedDeletions = new ArrayList<>();
-        final TypedList deletions = update.getList(KEY_REMOVED_PROPS);
-        if (deletions != null) {
-            final int m = deletions.size();
-            for (int j = 0; j < m; j++) {
-                final String path = deletions.getString(j);
-                if (path == null) { throw new ServerError("Null removal"); }
-                parsedDeletions.add(path);
-            }
+    private Map<String, String> getBlobs(@NonNull TypedMap update) {
+        final Map<String, String> parsedBlobs = new HashMap<>();
+        final TypedMap blobs = update.getMap(KEY_UPDATE_BLOBS);
+        if (blobs != null) {
+            for (String path: blobs.getKeys()) { parsedBlobs.put(path, blobs.getString(path)); }
         }
-        return parsedDeletions;
+        return parsedBlobs;
     }
 }

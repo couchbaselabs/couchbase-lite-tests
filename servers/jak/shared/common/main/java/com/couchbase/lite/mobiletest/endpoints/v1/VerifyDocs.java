@@ -85,42 +85,32 @@ public class VerifyDocs extends UpdateItemEndpoint {
             return resp;
         }
 
-        return dumbDownResponse(diffs.get(0));
-        //return makeResponse(diffs);
+        return makeSimpleResponse(diffs.get(0));
     }
 
     @NonNull
-    private Map<String, Object> dumbDownResponse(@NonNull Snapshot.Difference diff) {
+    private Map<String, Object> makeSimpleResponse(@NonNull Snapshot.Difference diff) {
+        final Map<String, Object> resp = new HashMap<>();
+        addOneDiff(diff, resp);
+
         final StringBuilder desc = new StringBuilder("Document '");
         desc.append(diff.docId).append("' in '").append(diff.collFqn);
         if (diff.keyPath != null) { desc.append(" at key path ").append(diff.keyPath); }
         desc.append(": ").append(diff.description);
-
-        final Map<String, Object> resp = new HashMap<>();
-        if (diff.content != null) { resp.put(KEY_DOCUMENT, diff.content); }
         resp.put(KEY_DESCRIPTION, desc.toString());
-        resp.put(KEY_EXPECTED, diff.expected);
-        resp.put(KEY_ACTUAL, diff.actual);
 
         resp.put(KEY_RESULT, false);
 
         return resp;
     }
 
-    @SuppressWarnings("PMD.UnusedPrivateMethod")
+    @SuppressWarnings({"unused", "PMD.UnusedPrivateMethod"})
     @NonNull
     private Map<String, Object> makeResponse(@NonNull List<Snapshot.Difference> differences) {
         final List<Map<String, Object>> diffs = new ArrayList<>();
         for (Snapshot.Difference difference: differences) {
             final Map<String, Object> diff = new HashMap<>();
-            diff.put(KEY_COLLECTION, difference.collFqn);
-            diff.put(KEY_DOC_ID, difference.docId);
-            diff.put(KEY_PATH, difference.keyPath);
-            diff.put(KEY_CHANGE_TYPE, difference.type);
-            diff.put(KEY_EXPECTED, difference.expected);
-            diff.put(KEY_ACTUAL, difference.actual);
-            diff.put(KEY_DESCRIPTION, difference.description);
-            diff.put(KEY_DOCUMENT, difference.content);
+            addOneDiff(difference, diff);
             diffs.add(diff);
         }
 
@@ -129,6 +119,18 @@ public class VerifyDocs extends UpdateItemEndpoint {
         resp.put(KEY_RESULT, false);
 
         return resp;
+    }
+
+    @SuppressWarnings("PMD.UnusedPrivateMethod")
+    private void addOneDiff(@NonNull Snapshot.Difference difference, Map<String, Object> diffs) {
+        diffs.put(KEY_COLLECTION, difference.collFqn);
+        diffs.put(KEY_DOC_ID, difference.docId);
+        diffs.put(KEY_PATH, difference.keyPath);
+        diffs.put(KEY_CHANGE_TYPE, difference.type);
+        diffs.put(KEY_EXPECTED, difference.expected);
+        diffs.put(KEY_ACTUAL, difference.actual);
+        diffs.put(KEY_DESCRIPTION, difference.description);
+        diffs.put(KEY_DOCUMENT, difference.content);
     }
 }
 

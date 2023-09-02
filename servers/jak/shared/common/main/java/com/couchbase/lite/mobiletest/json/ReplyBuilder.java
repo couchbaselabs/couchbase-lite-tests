@@ -26,6 +26,7 @@ import java.util.Map;
 import com.squareup.moshi.JsonWriter;
 import okio.Buffer;
 
+import com.couchbase.lite.Blob;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 
 
@@ -80,6 +81,12 @@ public class ReplyBuilder {
             writer.value((String) value);
             return;
         }
+        if (value instanceof Blob) {
+            final Map<String, Object> blob = ((Blob) value).getProperties();
+            blob.put("@type", "blob");
+            serializeMap(blob, writer);
+            return;
+        }
         if (value instanceof List) {
             serializeList((List<?>) value, writer);
             return;
@@ -89,7 +96,7 @@ public class ReplyBuilder {
             return;
         }
 
-        throw new ServerError("Value not a serializable type: " + value);
+        throw new ServerError("Value not a serializable type: " + value + " (" + value.getClass().getCanonicalName());
     }
 }
 
