@@ -1,3 +1,5 @@
 *_log
 *.log
 .idea
+local_config.json
+
