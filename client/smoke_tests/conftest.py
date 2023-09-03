@@ -24,7 +24,7 @@ async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
 @pytest.fixture(scope="session")
 def dataset_path() -> Path:
     script_path = os.path.abspath(os.path.dirname(__file__))
-    return Path(script_path, "..", "dataset")
+    return Path(script_path, "..", "dataset/sgw")
 
 def pytest_addoption(parser) -> None:
     parser.addoption("--config", metavar="PATH", help="The path to the JSON configuration for CBLPyTest", required=True)
