@@ -2,6 +2,7 @@ from __future__ import annotations
 from json import dumps
 
 from typing import Dict, List, cast, Any, Optional
+from opentelemetry.trace import get_tracer
 
 from cbltest.requests import TestServerRequestType
 from cbltest.v1.responses import PostGetAllDocumentsResponse, PostGetAllDocumentsEntry, PostSnapshotDocumentsResponse, PostVerifyDocumentsResponse, ValueOrMissing
@@ -12,6 +13,7 @@ from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory
 from cbltest.api.error import CblTestError
 from cbltest.api.database_types import MaintenanceType
+from cbltest.version import VERSION
 
 class SnapshotUpdater:
     def __init__(self, id: str):
@@ -67,23 +69,25 @@ class DatabaseUpdater:
         self.__request_factory = request_factory
         self.__index = index
         self.__error: Optional[str] = None
+        self.__tracer = get_tracer(__name__, VERSION)
 
     async def __aenter__(self):
         self._updates.clear()
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        if self.__error is not None:
-            raise CblTestError(self.__error)
-        
-        payload = PostUpdateDatabaseRequestBody(self._db_name, self._updates)
-        request = self.__request_factory.create_request(TestServerRequestType.UPDATE_DB, payload)
-        resp = await self.__request_factory.send_request(self.__index, request)
-        if resp.error is not None:
-            cbl_error("Failed to update database (see trace log for details)")
-            cbl_trace(resp.error.message)
+        with self.__tracer.start_as_current_span("update_database"):
+            if self.__error is not None:
+                raise CblTestError(self.__error)
+            
+            payload = PostUpdateDatabaseRequestBody(self._db_name, self._updates)
+            request = self.__request_factory.create_request(TestServerRequestType.UPDATE_DB, payload)
+            resp = await self.__request_factory.send_request(self.__index, request)
+            if resp.error is not None:
+                cbl_error("Failed to update database (see trace log for details)")
+                cbl_trace(resp.error.message)
 
-        return self
+            return self
 
     def delete_document(self, collection: str, id: str):
         """
@@ -222,6 +226,7 @@ class Database:
         self.__name = name
         self.__index = index
         self.__request_factory = factory
+        self.__tracer = get_tracer(__name__, VERSION)
 
     def batch_updater(self) -> DatabaseUpdater:
         """
@@ -235,15 +240,17 @@ class Database:
 
         :param collections: A variadic list of collection names
         """
-        payload = PostGetAllDocumentsRequestBody(self.__name, *collections)
-        req = self.__request_factory.create_request(TestServerRequestType.ALL_DOC_IDS, payload)
-        resp = await self.__request_factory.send_request(self.__index, req)
-        cast_resp = cast(PostGetAllDocumentsResponse, resp)
-        ret_val: Dict[str, List[AllDocumentsEntry]] = {}
-        for c in cast_resp.collection_keys:
-            ret_val[c] = list(AllDocumentsEntry(d) for d in cast_resp.documents_for_collection(c))
+        with self.__tracer.start_as_current_span("get_all_documents", attributes={"cbl.database.name": self.__name,
+                                                                                  "cbl.collection.names": collections}):
+            payload = PostGetAllDocumentsRequestBody(self.__name, *collections)
+            req = self.__request_factory.create_request(TestServerRequestType.ALL_DOC_IDS, payload)
+            resp = await self.__request_factory.send_request(self.__index, req)
+            cast_resp = cast(PostGetAllDocumentsResponse, resp)
+            ret_val: Dict[str, List[AllDocumentsEntry]] = {}
+            for c in cast_resp.collection_keys:
+                ret_val[c] = list(AllDocumentsEntry(d) for d in cast_resp.documents_for_collection(c))
 
-        return ret_val
+            return ret_val
     
     async def create_snapshot(self, documents: List[SnapshotDocumentEntry]) -> str:
         """
@@ -251,10 +258,11 @@ class Database:
 
         :param documents: A list of documents to include in the snapshot
         """
-        payload = PostSnapshotDocumentsRequestBody(self.__name, documents)
-        req = self.__request_factory.create_request(TestServerRequestType.SNAPSHOT_DOCS, payload)
-        resp = await self.__request_factory.send_request(self.__index, req)
-        return cast(PostSnapshotDocumentsResponse, resp).snapshot_id
+        with self.__tracer.start_as_current_span("create_snapshot"):
+            payload = PostSnapshotDocumentsRequestBody(self.__name, documents)
+            req = self.__request_factory.create_request(TestServerRequestType.SNAPSHOT_DOCS, payload)
+            resp = await self.__request_factory.send_request(self.__index, req)
+            return cast(PostSnapshotDocumentsResponse, resp).snapshot_id
     
     async def verify_documents(self, updater: SnapshotUpdater) -> VerifyResult:
         """
@@ -264,10 +272,11 @@ class Database:
         :param snapshot: The snapshot ID to use as a base
         :param changes: The changes to apply to the snapshot first
         """
-        payload = PostVerifyDocumentsRequestBody(self.__name, updater._id, updater._updates)
-        req = self.__request_factory.create_request(TestServerRequestType.VERIFY_DOCS, payload)
-        resp = await self.__request_factory.send_request(self.__index, req)
-        return VerifyResult(cast(PostVerifyDocumentsResponse, resp))
+        with self.__tracer.start_as_current_span("verify_documents"):
+            payload = PostVerifyDocumentsRequestBody(self.__name, updater._id, updater._updates)
+            req = self.__request_factory.create_request(TestServerRequestType.VERIFY_DOCS, payload)
+            resp = await self.__request_factory.send_request(self.__index, req)
+            return VerifyResult(cast(PostVerifyDocumentsResponse, resp))
     
     async def perform_maintenance(self, type: MaintenanceType) -> None:
         """
@@ -275,6 +284,7 @@ class Database:
 
         :param type: The type of maintenance to perform
         """
-        payload = PostPerformMaintenanceRequestBody(self.__name, str(type))
-        req = self.__request_factory.create_request(TestServerRequestType.PERFORM_MAINTENANCE, payload)
-        await self.__request_factory.send_request(self.__index, req)
+        with self.__tracer.start_as_current_span("perform_maintenance"):
+            payload = PostPerformMaintenanceRequestBody(self.__name, str(type))
+            req = self.__request_factory.create_request(TestServerRequestType.PERFORM_MAINTENANCE, payload)
+            await self.__request_factory.send_request(self.__index, req)

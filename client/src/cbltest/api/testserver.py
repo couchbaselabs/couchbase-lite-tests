@@ -1,11 +1,11 @@
-from typing import List, Optional, cast
+from typing import List, cast
+from opentelemetry.trace import get_tracer
 
-from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.v1.requests import PostResetRequestBody
 from cbltest.responses import GetRootResponse
-from cbltest.api.error import CblTestError
 from cbltest.api.database import Database
+from cbltest.version import VERSION
 
 class TestServer:
     """
@@ -21,14 +21,16 @@ class TestServer:
         self.__index = index
         self.__url = url
         self.__request_factory = request_factory
+        self.__tracer = get_tracer(__name__, VERSION)
 
     async def get_info(self) -> GetRootResponse:
         """
         Retrieves the information about the running test server
         """
-        request = self.__request_factory.create_request(TestServerRequestType.ROOT)
-        resp = await self.__request_factory.send_request(self.__index, request)
-        return cast(GetRootResponse, resp)
+        with self.__tracer.start_as_current_span("get_info"):
+            request = self.__request_factory.create_request(TestServerRequestType.ROOT)
+            resp = await self.__request_factory.send_request(self.__index, request)
+            return cast(GetRootResponse, resp)
 
     async def create_and_reset_db(self, dataset: str, db_names: List[str]) -> List[Database]:
         """
@@ -37,12 +39,13 @@ class TestServer:
         :param dataset: The name of the dataset to use for creating the databases
         :param db_names: A list of database names, each of which will become a database with the dataset data
         """
-        payload = PostResetRequestBody()
-        payload.add_dataset(dataset, db_names)
-        request = self.__request_factory.create_request(TestServerRequestType.RESET, payload)
-        await self.__request_factory.send_request(self.__index, request)
-        ret_val: List[Database] = []
-        for db_name in db_names:
-            ret_val.append(Database(self.__request_factory, self.__index, db_name))
+        with self.__tracer.start_as_current_span("create_and_reset_db"):
+            payload = PostResetRequestBody()
+            payload.add_dataset(dataset, db_names)
+            request = self.__request_factory.create_request(TestServerRequestType.RESET, payload)
+            await self.__request_factory.send_request(self.__index, request)
+            ret_val: List[Database] = []
+            for db_name in db_names:
+                ret_val.append(Database(self.__request_factory, self.__index, db_name))
 
-        return ret_val
+            return ret_val

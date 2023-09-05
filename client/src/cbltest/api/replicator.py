@@ -3,6 +3,7 @@ from datetime import timedelta
 from itertools import islice
 from time import time
 from typing import List, cast, Optional, Set
+from opentelemetry.trace import get_tracer
 
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.v1.responses import PostGetReplicatorStatusResponse, PostStartReplicatorResponse
@@ -10,6 +11,7 @@ from cbltest.v1.requests import PostGetReplicatorStatusRequestBody, PostStartRep
 from cbltest.requests import TestServerRequestType
 from cbltest.api.error import CblTestError, CblTimeoutError
 from cbltest.api.database import Database
+from cbltest.version import VERSION
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel, ReplicatorAuthenticator, ReplicatorCollectionEntry, 
     ReplicatorType, ReplicatorStatus, ReplicatorDocumentEntry, WaitForDocumentEventEntry)
@@ -57,6 +59,7 @@ class Replicator:
         self.__endpoint = endpoint
         self.__id: str = ""
         self.__document_updates: List[ReplicatorDocumentEntry] = []
+        self.__tracer = get_tracer(__name__, VERSION)
         self.replicator_type: ReplicatorType = replicator_type
         """The direction of the replicator"""
 
@@ -91,35 +94,37 @@ class Replicator:
         """
         Sends a replicatorStart request to the remote server
         """
-        payload = PostStartReplicatorRequestBody(self.__database.name, self.__endpoint)
-        payload.replicatorType = self.replicator_type
-        payload.continuous = self.continuous
-        payload.authenticator = self.authenticator
-        payload.enableDocumentListener = self.enable_document_listener
-        payload.enableAutoPurge = self.enable_auto_purge
-        payload.reset = self.reset
-        payload.collections = self.collections
-        req = self.__request_factory.create_request(TestServerRequestType.START_REPLICATOR, payload)
-        resp = await self.__request_factory.send_request(self.__index, req)
-        if resp.error is not None:
-            cbl_error("Failed to start replicator (see trace log for details)")
-            cbl_trace(resp.error.message)
-            return None
-        
-        cast_resp = cast(PostStartReplicatorResponse, resp)
-        self.__id = cast_resp.replicator_id
+        with self.__tracer.start_as_current_span("start_replicator"):
+            payload = PostStartReplicatorRequestBody(self.__database.name, self.__endpoint)
+            payload.replicatorType = self.replicator_type
+            payload.continuous = self.continuous
+            payload.authenticator = self.authenticator
+            payload.enableDocumentListener = self.enable_document_listener
+            payload.enableAutoPurge = self.enable_auto_purge
+            payload.reset = self.reset
+            payload.collections = self.collections
+            req = self.__request_factory.create_request(TestServerRequestType.START_REPLICATOR, payload)
+            resp = await self.__request_factory.send_request(self.__index, req)
+            if resp.error is not None:
+                cbl_error("Failed to start replicator (see trace log for details)")
+                cbl_trace(resp.error.message)
+                return None
+            
+            cast_resp = cast(PostStartReplicatorResponse, resp)
+            self.__id = cast_resp.replicator_id
 
     async def get_status(self) -> ReplicatorStatus:
         """Sends a getReplicatorStatus message to the server and returns the results"""
-        if not self.is_started:
-            raise CblTestError("Replicator start call has not completed!")
-        
-        payload = PostGetReplicatorStatusRequestBody(self.__id)
-        req = self.__request_factory.create_request(TestServerRequestType.REPLICATOR_STATUS, payload)
-        resp = await self.__request_factory.send_request(self.__index, req)
-        cast_resp = cast(PostGetReplicatorStatusResponse, resp)
-        self.__document_updates.extend(cast_resp.documents)
-        return ReplicatorStatus(cast_resp.progress, cast_resp.activity, cast_resp.replicator_error)
+        with self.__tracer.start_as_current_span("get_status"):
+            if not self.is_started:
+                raise CblTestError("Replicator start call has not completed!")
+            
+            payload = PostGetReplicatorStatusRequestBody(self.__id)
+            req = self.__request_factory.create_request(TestServerRequestType.REPLICATOR_STATUS, payload)
+            resp = await self.__request_factory.send_request(self.__index, req)
+            cast_resp = cast(PostGetReplicatorStatusResponse, resp)
+            self.__document_updates.extend(cast_resp.documents)
+            return ReplicatorStatus(cast_resp.progress, cast_resp.activity, cast_resp.replicator_error)
     
     async def wait_for(self, activity: ReplicatorActivityLevel, interval: timedelta = timedelta(seconds=1), 
                        timeout: timedelta = timedelta(seconds=30)) -> ReplicatorStatus:
@@ -130,23 +135,24 @@ class Replicator:
         :param interval: The polling interval (default 1s)
         :param timeout: The time limit to wait for the state change (default 30s)
         """
-        assert interval.total_seconds() > 0.0, "Zero interval makes no sense, try again"
-        assert timeout.total_seconds() >= 1.0, "Timeout too short, must be at least 1 second"
+        with self.__tracer.start_as_current_span("wait_for"):
+            assert interval.total_seconds() > 0.0, "Zero interval makes no sense, try again"
+            assert timeout.total_seconds() >= 1.0, "Timeout too short, must be at least 1 second"
 
-        status_matches = False
-        start = time()
-        while not status_matches:
-            elapsed = time() - start
-            if(elapsed > timeout.total_seconds()):
-                raise CblTimeoutError("Timeout waiting for replicator status")
-            
-            next_status = await self.get_status()
-            status_matches = next_status.activity == activity
-            if not status_matches:
-                await asyncio.sleep(interval.total_seconds())
+            status_matches = False
+            start = time()
+            while not status_matches:
+                elapsed = time() - start
+                if(elapsed > timeout.total_seconds()):
+                    raise CblTimeoutError("Timeout waiting for replicator status")
+                
+                next_status = await self.get_status()
+                status_matches = next_status.activity == activity
+                if not status_matches:
+                    await asyncio.sleep(interval.total_seconds())
 
-            
-        return next_status
+                
+            return next_status
         
     async def wait_for_doc_events(self, events: Set[WaitForDocumentEventEntry], max_retries: int = 5,
                                   ping_interval: timedelta = timedelta(seconds=1),
@@ -167,27 +173,28 @@ class Replicator:
         :param ping_interval: The interval to ping for the replicator state (default 1s)
         :param idle_timeout: The timeout to use when waiting for the next idle state (default 30s)
         """
-        assert self.continuous, "wait_for_doc_events not applicable for non-continuous replicator"
-        events = events.copy()
-        iteration = 0
-        processed = 0
-        while iteration < max_retries:
-            status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
-            assert status.error is None, \
-                f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-            
-            # Skip the ones we previously looked at to save time
-            for event in islice(self.document_updates, processed, None):
-                entry = WaitForDocumentEventEntry(event.collection, event.document_id, event.direction, event.flags)
-                if entry in events:
-                    events.remove(entry)
+        with self.__tracer.start_as_current_span("wait_for_doc_events"):
+            assert self.continuous, "wait_for_doc_events not applicable for non-continuous replicator"
+            events = events.copy()
+            iteration = 0
+            processed = 0
+            while iteration < max_retries:
+                status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
+                assert status.error is None, \
+                    f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+                
+                # Skip the ones we previously looked at to save time
+                for event in islice(self.document_updates, processed, None):
+                    entry = WaitForDocumentEventEntry(event.collection, event.document_id, event.direction, event.flags)
+                    if entry in events:
+                        events.remove(entry)
 
-                processed += 1
+                    processed += 1
 
-            if len(events) == 0:
-                return status
-            
-            await asyncio.sleep(0.5)
-            iteration += 1
+                if len(events) == 0:
+                    return status
+                
+                await asyncio.sleep(0.5)
+                iteration += 1
 
-        raise CblTimeoutError("Timeout waiting for document update events")
+            raise CblTimeoutError("Timeout waiting for document update events")

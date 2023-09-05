@@ -37,7 +37,7 @@ class CouchbaseServer:
                       if it doesn't already exist, unless it is the default scope
         :param names: The names of the collections to create
         """
-        with self.__tracer.start_as_current_span("create_collections"):
+        with self.__tracer.start_as_current_span("Create Scope", attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket}) as current_span:
             bucket_obj = self.__cluster.bucket(bucket)
             c = bucket_obj.collections()
             try:
@@ -47,11 +47,12 @@ class CouchbaseServer:
                 pass
 
             for name in names:
-                try:
-                    if name != "_default":
-                        c.create_collection(CollectionSpec(name, scope))
-                except CollectionAlreadyExistsException:
-                    pass
+                with self.__tracer.start_as_current_span("Create Collection", attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket, "cbl.collection.name": name}):
+                    try:
+                        if name != "_default":
+                            c.create_collection(CollectionSpec(name, scope))
+                    except CollectionAlreadyExistsException:
+                        pass
 
     def create_bucket(self, name: str):
         """
@@ -59,7 +60,7 @@ class CouchbaseServer:
 
         :param name: The name of the bucket to create
         """
-        with self.__tracer.start_as_current_span("create_bucket"):
+        with self.__tracer.start_as_current_span("create_bucket", attributes={"cbl.bucket.name": name}):
             mgr = self.__cluster.buckets()
             settings = CreateBucketSettings(name=name, flush_enabled=True, ram_quota_mb=512)
             try:
@@ -73,7 +74,7 @@ class CouchbaseServer:
 
         :param name: The name of the bucket to drop
         """
-        with self.__tracer.start_as_current_span("drop_bucket"):
+        with self.__tracer.start_as_current_span("drop_bucket", attributes={"cbl.bucket.name": name}):
             try:
                 mgr = self.__cluster.buckets()
                 mgr.drop_bucket(name)
