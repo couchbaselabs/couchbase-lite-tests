@@ -55,7 +55,7 @@ async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
 @pytest.fixture(scope="session")
 def dataset_path() -> Path:
     script_path = os.path.abspath(os.path.dirname(__file__))
-    return Path(script_path, "..", "dataset/sgw")
+    return Path(script_path, "..", "dataset/sg")
 
 def pytest_runtest_setup(item: pytest.Function) -> None:
     specified_cbse = item.config.getoption("--cbse")
