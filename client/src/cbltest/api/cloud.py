@@ -22,9 +22,8 @@ class CouchbaseCloud:
         self.__tracer = get_tracer(__name__, VERSION)
 
     def _create_collections(self, db_payload: PutDatabasePayload) -> None:
-        with self.__tracer.start_as_current_span("create_collections"):
-            for scope in db_payload.scopes():
-                self.__couchbase_server.create_collections(db_payload.bucket, scope, db_payload.collections(scope))
+        for scope in db_payload.scopes():
+            self.__couchbase_server.create_collections(db_payload.bucket, scope, db_payload.collections(scope))
 
     async def configure_dataset(self, dataset_path: Path, dataset_name: str, sg_config_options: Optional[List[str]] = None) -> None:
         """
@@ -41,7 +40,7 @@ class CouchbaseCloud:
                   be passed to sg_config_options will be in a key called "config_options"
                   in <database_name>-sg-config.json
         """
-        with self.__tracer.start_as_current_span("configure_dataset"):
+        with self.__tracer.start_as_current_span("configure_dataset", attributes={"cbl.dataset.name": dataset_name}) as current_span:
             _assert_not_null(dataset_path, nameof(dataset_path))
             _assert_not_null(dataset_name, nameof(dataset_name))
 
@@ -80,6 +79,7 @@ class CouchbaseCloud:
                 if e.code != 412:
                     raise
 
+                current_span.add_event("Handle HTTP 412")
                 await self.__sync_gateway.delete_database(dataset_name)
                 self.__couchbase_server.drop_bucket(db_payload.bucket)
                 self.__couchbase_server.create_bucket(db_payload.bucket)

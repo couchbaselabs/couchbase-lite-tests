@@ -1,8 +1,10 @@
 from typing import List, Optional
+from opentelemetry.trace import get_tracer
 from cbltest.api.syncgateway import SyncGateway, AllDocumentsResponseRow
 from cbltest.api.database import Database
 from cbltest.api.replicator_types import ReplicatorType
 from cbltest.api.database import AllDocumentsEntry
+from cbltest.version import VERSION
 
 class DocsCompareResult:
     """
@@ -28,6 +30,7 @@ class DocsCompareResult:
         self.__success = success
         self.__message = message
 
+_test_function_tracer = get_tracer("test_functions", VERSION)
 def compare_doc_results(local: List[AllDocumentsEntry], remote: List[AllDocumentsResponseRow],
                             mode: ReplicatorType) -> DocsCompareResult:
         """
@@ -41,37 +44,38 @@ def compare_doc_results(local: List[AllDocumentsEntry], remote: List[AllDocument
         :param remote: The list of documents from the remote side (Sync Gateway)
         :param mode: The mode of replication that was run.
         """
-        if mode == ReplicatorType.PUSH_AND_PULL and len(local) != len(remote):
-            return DocsCompareResult(False, f"Local count {len(local)} did not match remote count {len(remote)}")
-        
-        local_dict = {}
-        remote_dict = {}
-
-        for local_entry in local:
-            local_dict[local_entry.id] = local_entry.rev
-
-        for remote_entry in remote:
-            remote_dict[remote_entry.id] = remote_entry.revid
-
-        if mode == ReplicatorType.PUSH:
-            source = local_dict
-            dest = remote_dict
-            source_name = "local"
-            dest_name = "remote"
-        else:
-            source = remote_dict
-            dest = local_dict
-            source_name = "remote"
-            dest_name = "local"
-
-        for id in source:
-            if id not in dest:
-                return DocsCompareResult(False, f"Doc '{id}' present in {source_name} but not {dest_name}")
+        with _test_function_tracer.start_as_current_span("compare_doc_results"):
+            if mode == ReplicatorType.PUSH_AND_PULL and len(local) != len(remote):
+                return DocsCompareResult(False, f"Local count {len(local)} did not match remote count {len(remote)}")
             
-            if source[id] != dest[id]:
-                return DocsCompareResult(False, f"Doc '{id}' mismatched revid ({source_name}: {source[id]}, {dest_name}: {dest[id]})")
-            
-        return DocsCompareResult(True)
+            local_dict = {}
+            remote_dict = {}
+
+            for local_entry in local:
+                local_dict[local_entry.id] = local_entry.rev
+
+            for remote_entry in remote:
+                remote_dict[remote_entry.id] = remote_entry.revid
+
+            if mode == ReplicatorType.PUSH:
+                source = local_dict
+                dest = remote_dict
+                source_name = "local"
+                dest_name = "remote"
+            else:
+                source = remote_dict
+                dest = local_dict
+                source_name = "remote"
+                dest_name = "local"
+
+            for id in source:
+                if id not in dest:
+                    return DocsCompareResult(False, f"Doc '{id}' present in {source_name} but not {dest_name}")
+                
+                if source[id] != dest[id]:
+                    return DocsCompareResult(False, f"Doc '{id}' mismatched revid ({source_name}: {source[id]}, {dest_name}: {dest[id]})")
+                
+            return DocsCompareResult(True)
 
 async def compare_local_and_remote(local: Database, remote: SyncGateway, mode: ReplicatorType, bucket: str, collections: List[str]) -> None:
     """
@@ -79,11 +83,12 @@ async def compare_local_and_remote(local: Database, remote: SyncGateway, mode: R
     :func:`compare_doc_results()<cbltest.api.test_functions.compare_doc_results>` function
     for each collection
     """
-    lite_all_docs = await local.get_all_documents(*collections)
+    with _test_function_tracer.start_as_current_span("compare_local_and_remote"):
+        lite_all_docs = await local.get_all_documents(*collections)
 
-    for collection in collections:
-        split = collection.split(".")
-        assert len(split) == 2, f"Invalid collection name in compare_local_and_remote: {collection}"
-        sg_all_docs = await remote.get_all_documents(bucket, split[0], split[1])
-        compare_result = compare_doc_results(lite_all_docs[collection], sg_all_docs.rows, mode)
-        assert compare_result.success, f"{compare_result.message} ({collection})"
+        for collection in collections:
+            split = collection.split(".")
+            assert len(split) == 2, f"Invalid collection name in compare_local_and_remote: {collection}"
+            sg_all_docs = await remote.get_all_documents(bucket, split[0], split[1])
+            compare_result = compare_doc_results(lite_all_docs[collection], sg_all_docs.rows, mode)
+            assert compare_result.success, f"{compare_result.message} ({collection})"

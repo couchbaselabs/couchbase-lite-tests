@@ -205,7 +205,7 @@ class SyncGateway:
 
     async def _send_request(self, method: str, path: str, payload: Optional[JSONSerializable] = None,
                             params: Optional[Dict[str, str]] = None) -> Any:
-        with self.__tracer.start_as_current_span(f"send_request_{path}"):
+        with self.__tracer.start_as_current_span(f"send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = None if payload is None else payload.serialize()
             writer = get_next_writer()
@@ -239,12 +239,13 @@ class SyncGateway:
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
         """
-        with self.__tracer.start_as_current_span("put_database"):
+        with self.__tracer.start_as_current_span("put_database", attributes={"cbl.database.name": db_name}) as current_span:
             try:
                 await self._send_request("put", f"/{db_name}", payload)
             except CblSyncGatewayBadResponseError as e:
                 if e.code == 500:
                     cbl_warning("Sync gateway returned 500 from PUT database call, retrying...")
+                    current_span.add_event("SGW returned 500, retry")
                     await self.put_database(db_name, payload)
                 else:
                     raise
@@ -259,7 +260,7 @@ class SyncGateway:
 
         :param db_name: The name of the Database to delete
         """
-        with self.__tracer.start_as_current_span("delete_database"):
+        with self.__tracer.start_as_current_span("delete_database", attributes={"cbl.database.name": db_name}):
             await self._send_request("delete", f"/{db_name}")
 
     def create_collection_access_dict(self, input: Dict[str, List[str]]) -> dict:
@@ -309,7 +310,7 @@ class SyncGateway:
             be formatted in the way Sync Gateway expects it, so if you are unsure use
             :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
         """
-        with self.__tracer.start_as_current_span("add_user"):
+        with self.__tracer.start_as_current_span("add_user", attributes={"cbl.user.name": name}):
             body = {
                 "name": name,
                 "password": password,
@@ -337,7 +338,7 @@ class SyncGateway:
         :param db_name: The name of the database to populate
         :param path: The path of the JSON file to use as input
         """
-        with self.__tracer.start_as_current_span("load_dataset"):
+        with self.__tracer.start_as_current_span("load_dataset", attributes={"cbl.database.name": db_name, "cbl.dataset.path": str(path)}):
             last_scope: str = ""
             last_coll: str = ""
             collected: List[dict] = []
@@ -372,7 +373,9 @@ class SyncGateway:
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
         """
-        with self.__tracer.start_as_current_span("get_all_documents"):
+        with self.__tracer.start_as_current_span("get_all_documents", attributes={"cbl.database.name": db_name, 
+                                                                                  "cbl.scope.name": scope, 
+                                                                                  "cbl.collection.name": collection}):
             resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_all_docs")
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
@@ -387,7 +390,9 @@ class SyncGateway:
         :param scope: The scope that the updates will be applied to (default '_default')
         :param collection: The collection that the updates will be applied to (default '_default')
         """
-        with self.__tracer.start_as_current_span("update_documents"):
+        with self.__tracer.start_as_current_span("update_documents", attributes={"cbl.database.name": db_name,
+                                                                                 "cbl.scope.name": scope,
+                                                                                 "cbl.collection.name": collection}):
             body = {
                 "docs": list(u.to_json() for u in updates)
             }
@@ -406,7 +411,10 @@ class SyncGateway:
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
         """
-        with self.__tracer.start_as_current_span("delete_document"):
+        with self.__tracer.start_as_current_span("delete_document", attributes={"cbl.database.name": db_name,
+                                                                                 "cbl.scope.name": scope,
+                                                                                 "cbl.collection.name": collection,
+                                                                                 "cbl.document.id": doc_id}):
             await self._send_request("delete", f"/{db_name}.{scope}.{collection}/{doc_id}",
                                     params={"rev": revid})
         
@@ -419,7 +427,10 @@ class SyncGateway:
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
         """
-        with self.__tracer.start_as_current_span("purge_document"):
+        with self.__tracer.start_as_current_span("purge_document", attributes={"cbl.database.name": db_name,
+                                                                                 "cbl.scope.name": scope,
+                                                                                 "cbl.collection.name": collection,
+                                                                                 "cbl.document.id": doc_id}):
             body = {
                 doc_id: ["*"]
             }
@@ -436,7 +447,10 @@ class SyncGateway:
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
         """
-        with self.__tracer.start_as_current_span("get_document"):
+        with self.__tracer.start_as_current_span("get_document", attributes={"cbl.database.name": db_name,
+                                                                                 "cbl.scope.name": scope,
+                                                                                 "cbl.collection.name": collection,
+                                                                                 "cbl.document.id": doc_id}):
             response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
