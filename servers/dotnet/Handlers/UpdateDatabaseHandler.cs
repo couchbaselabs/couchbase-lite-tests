@@ -155,12 +155,12 @@ internal static partial class HandlerList
                         }
                         case UpdateDatabaseType.Update: {
                             using var doc = collection.GetDocument(entry.documentID)?.ToMutable() ?? new MutableDocument(entry.documentID);
-                            if (entry.updatedProperties != null) {
-                                UpdateDictionaryProperties(doc, entry.updatedProperties);
-                            }
-
                             if (entry.removedProperties != null) {
                                 RemoveDictionaryProperties(doc, entry.removedProperties);
+                            }
+
+                            if (entry.updatedProperties != null) {
+                                UpdateDictionaryProperties(doc, entry.updatedProperties);
                             }
 
                             if (blobUpdate.Any()) {
