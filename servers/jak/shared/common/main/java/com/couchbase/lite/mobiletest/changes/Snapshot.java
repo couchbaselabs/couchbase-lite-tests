@@ -27,16 +27,20 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import com.couchbase.lite.Blob;
 import com.couchbase.lite.Collection;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
+import com.couchbase.lite.mobiletest.json.ReplyBuilder;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 
 
 public class Snapshot {
+    private static final String KEY_DIGEST = "digest";
+
     public static final class Difference {
         @NonNull
         public final String collFqn;
@@ -253,6 +257,27 @@ public class Snapshot {
                 continue;
             }
 
+            if ((expectedVal instanceof Blob) && (actualVal instanceof Blob)) {
+                final Map<String, Object> expectedBlob = getBlobProperties((Blob) expectedVal);
+                final Map<String, Object> actualBlob = getBlobProperties((Blob) actualVal);
+
+                if ((expectedBlob.get(KEY_DIGEST) == null) || (actualBlob.get(KEY_DIGEST) == null)) {
+                    expectedBlob.remove(KEY_DIGEST);
+                    actualBlob.remove(KEY_DIGEST);
+                }
+
+                compareDocContent(
+                    collFqn,
+                    docId,
+                    doc,
+                    propPath,
+                    expectedBlob,
+                    actualBlob,
+                    change,
+                    diffs);
+                continue;
+            }
+
             if ((expectedVal instanceof Map) && (actualVal instanceof Map)) {
                 compareDocContent(
                     collFqn,
@@ -341,6 +366,27 @@ public class Snapshot {
                 continue;
             }
 
+            if ((expectedVal instanceof Blob) && (actualVal instanceof Blob)) {
+                final Map<String, Object> expectedBlob = getBlobProperties((Blob) expectedVal);
+                final Map<String, Object> actualBlob = getBlobProperties((Blob) actualVal);
+
+                if ((expectedBlob.get(KEY_DIGEST) == null) || (actualBlob.get(KEY_DIGEST) == null)) {
+                    expectedBlob.remove(KEY_DIGEST);
+                    actualBlob.remove(KEY_DIGEST);
+                }
+
+                compareDocContent(
+                    collFqn,
+                    docId,
+                    doc,
+                    idxPath,
+                    expectedBlob,
+                    actualBlob,
+                    change,
+                    diffs);
+                continue;
+            }
+
             if ((expectedVal instanceof Map) && (actualVal instanceof Map)) {
                 compareDocContent(
                     collFqn,
@@ -381,5 +427,15 @@ public class Snapshot {
             }
         }
     }
-}
 
+    @NonNull
+    private static Map<String, Object> getBlobProperties(@NonNull Blob blob) {
+        // force the length for a stream-based blob
+        if (blob.length() <= 0) { blob.getContent(); }
+
+        Map<String, Object> props = blob.getProperties();
+        props.put(ReplyBuilder.KEY_TYPE, ReplyBuilder.TYPE_BLOB);
+
+        return props;
+    }
+}
