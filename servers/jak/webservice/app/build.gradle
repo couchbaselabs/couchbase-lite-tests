@@ -21,6 +21,7 @@ ext {
     SPOTBUGS_VERSION = '4.7.3'
     TOMCAT_VERSION = '9.0.1'
 
+    ASSETS_DIR = "${ROOT_DIR}/../../dataset/server"
     SHARED_DIR = "${ROOT_DIR}/shared"
     ETC_DIR = "${ROOT_DIR}/etc"
 
@@ -48,7 +49,10 @@ java {
                 "${SHARED_DIR}/common/main/java",
                 "${SHARED_DIR}/jvm/main/java"
             ]
-            resources.srcDirs = ["${SHARED_DIR}/assets"]
+            resources.srcDirs = [
+               ASSETS_DIR,
+               "${SHARED_DIR}/assets"
+            ]
         }
         test {
             java.srcDirs = [

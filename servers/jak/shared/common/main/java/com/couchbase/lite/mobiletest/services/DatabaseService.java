@@ -48,6 +48,7 @@ public final class DatabaseService {
 
     private static final String ZIP_EXTENSION = ".zip";
     private static final String DB_EXTENSION = C4Database.DB_EXTENSION;
+    private static final String DB_DIR = "dbs/";
 
     private static final String KEY_DATASETS = "datasets";
 
@@ -188,8 +189,8 @@ public final class DatabaseService {
         }
         if (!unzipDir.mkdirs()) { throw new ServerError("Failed creating unzip tmp directory"); }
 
-        try (InputStream in = TestApp.getApp().getAsset(dbFullName + ZIP_EXTENSION)) {
-            if (in == null) { throw new ServerError("Can't open resource " + dbFullName + ZIP_EXTENSION); }
+        try (InputStream in = TestApp.getApp().getAsset(DB_DIR + dbFullName + ZIP_EXTENSION)) {
+            if (in == null) { throw new ServerError("Can't open resource " + DB_DIR + dbFullName + ZIP_EXTENSION); }
             fileUtils.unzip(in, unzipDir);
         }
         catch (IOException e) { throw new ServerError("Failed unzipping dataset: " + datasetName, e); }

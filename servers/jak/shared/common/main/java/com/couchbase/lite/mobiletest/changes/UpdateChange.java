@@ -36,6 +36,7 @@ import com.couchbase.lite.mobiletest.services.DatabaseService;
 public final class UpdateChange extends Change {
     private static final String EXT_JPEG = ".jpg";
     private static final String MIME_JPEG = "image/jpeg";
+    private static final String DIR_BLOB = "blobs/";
     private static final String MIME_OCTET = "application/octet-stream";
 
     @NonNull
@@ -78,7 +79,9 @@ public final class UpdateChange extends Change {
                 try {
                     parser.parse(blob.getKey()).set(
                         data,
-                        new Blob(content.endsWith(EXT_JPEG) ? MIME_JPEG : MIME_OCTET, app.getAsset(content)));
+                        new Blob(
+                            content.endsWith(EXT_JPEG) ? MIME_JPEG : MIME_OCTET,
+                            app.getAsset(DIR_BLOB + content)));
                 }
                 catch (IOException e) { throw new ClientError("No such blob content: " + content, e); }
             }
