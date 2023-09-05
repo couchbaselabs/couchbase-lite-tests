@@ -134,7 +134,7 @@ public abstract class TestApp {
         final CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
 
         final List<Certificate> certsList = new ArrayList<>();
-        try (InputStream cert = getAsset("client-ca.der")) {
+        try (InputStream cert = getAsset("client.p12")) {
             certsList.add(certFactory.generateCertificate(cert));
         }
 

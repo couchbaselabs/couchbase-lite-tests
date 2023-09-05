@@ -83,7 +83,7 @@ public final class UpdateChange extends Change {
                             content.endsWith(EXT_JPEG) ? MIME_JPEG : MIME_OCTET,
                             app.getAsset(DIR_BLOB + content)));
                 }
-                catch (IOException e) { throw new ClientError("No such blob content: " + content, e); }
+                catch (IOException e) { throw new ClientError("No such blob content: " + DIR_BLOB + content, e); }
             }
         }
 

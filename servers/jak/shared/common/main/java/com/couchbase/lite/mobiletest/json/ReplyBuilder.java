@@ -31,6 +31,9 @@ import com.couchbase.lite.mobiletest.errors.ServerError;
 
 
 public class ReplyBuilder {
+    public static final String KEY_TYPE = "@type";
+    public static final String TYPE_BLOB = "blob";
+
     private final Map<String, Object> reply;
 
     public ReplyBuilder(@Nullable Map<String, Object> reply) { this.reply = reply; }
@@ -83,7 +86,7 @@ public class ReplyBuilder {
         }
         if (value instanceof Blob) {
             final Map<String, Object> blob = ((Blob) value).getProperties();
-            blob.put("@type", "blob");
+            blob.put(KEY_TYPE, TYPE_BLOB);
             serializeMap(blob, writer);
             return;
         }
