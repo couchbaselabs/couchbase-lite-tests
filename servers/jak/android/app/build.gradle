@@ -16,6 +16,7 @@ ext {
     COUCHBASE_LITE_VERSION = System.getProperty('version', "3.2.0-SNAPSHOT")
     SPOTBUGS_VERSION = '4.7.3'
 
+    ASSETS_DIR = "${ROOT_DIR}/../../dataset/server"
     SHARED_DIR = "${ROOT_DIR}/shared"
     ETC_DIR = "${ROOT_DIR}/etc"
 
@@ -81,6 +82,7 @@ android {
                 "${SHARED_DIR}/server/main/java"
             ]
             assets.srcDirs = [
+                ASSETS_DIR,
                 "${SHARED_DIR}/assets"
             ]
         }
