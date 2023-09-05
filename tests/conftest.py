@@ -25,6 +25,8 @@ def span_generation(request: pytest.FixtureRequest):
 
         with tracer.start_as_current_span(test_name) as current_span:
             yield current_span
+    else:
+        yield None
 
 @pytest.fixture(scope="session")
 def event_loop():
