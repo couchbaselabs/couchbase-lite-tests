@@ -24,8 +24,8 @@ using namespace ts::support::error;
 #define DB_FILE_EXT ".cblite2"
 #define DB_FILE_ZIP_EXT ".cblite2.zip"
 #define DB_FILE_ZIP_EXTRACTED_DIR "extracted"
-#define ASSET_DATASET_DIR "dataset"
-#define ASSET_BLOBS_DIR "dataset/blobs"
+#define ASSET_DBS_DIR "dbs"
+#define ASSET_BLOBS_DIR "blobs"
 #define ASSET_CERT_FILE "cert/cert.pem"
 
 namespace ts::cbl {
@@ -83,7 +83,7 @@ namespace ts::cbl {
         }
 
         string fromDbPath;
-        auto dbAssetPath = path(_assetDir).append(ASSET_DATASET_DIR);
+        auto dbAssetPath = path(_assetDir).append(ASSET_DBS_DIR);
         auto zipFilePath = path(dbAssetPath).append(name + DB_FILE_ZIP_EXT);
         if (filesystem::exists(zipFilePath)) {
             if (auto it = _extDatasetPaths.find(name); it != _extDatasetPaths.end()) {
@@ -191,7 +191,7 @@ namespace ts::cbl {
                 checkCBLError(error);
             }
         }
-        
+
         auto contentType = blobContentType(name);
         return CBLBlob_CreateWithStream(FLS(contentType), ws);
     }

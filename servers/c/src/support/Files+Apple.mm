@@ -32,7 +32,6 @@ namespace ts::support {
             CFAutorelease(path);
             char pathBuf[1000];
             CFStringGetCString(path, pathBuf, sizeof(pathBuf), kCFStringEncodingUTF8);
-            strlcat(pathBuf, "/assets", sizeof(pathBuf));
             return pathBuf;
         } else {
             return "assets";

@@ -107,6 +107,8 @@ if(MSVC)
 endif()
 
 file(COPY assets DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(GLOB DATASET "../../dataset/server/*")
+file(COPY ${DATASET} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/assets)
 
 install(
         TARGETS testserver

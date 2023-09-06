@@ -135,8 +135,10 @@
 		40348C602A8B0144002DA787 /* zip_source_window.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348BDF2A8B0143002DA787 /* zip_source_window.c */; };
 		40348C612A8B0144002DA787 /* zip_source_write.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348BE02A8B0143002DA787 /* zip_source_write.c */; };
 		40348C632A8B0255002DA787 /* zip_crypto_commoncrypto.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348BB52A8B0142002DA787 /* zip_crypto_commoncrypto.c */; };
+		404682242AA82AF10068D5E7 /* blobs in Resources */ = {isa = PBXBuildFile; fileRef = 404682222AA82AF10068D5E7 /* blobs */; };
+		404682252AA82AF10068D5E7 /* dbs in Resources */ = {isa = PBXBuildFile; fileRef = 404682232AA82AF10068D5E7 /* dbs */; };
+		404682292AA82B130068D5E7 /* cert in Resources */ = {isa = PBXBuildFile; fileRef = 404682282AA82B130068D5E7 /* cert */; };
 		406CE9E62A8C02C8003ACFBB /* IPAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 406CE9E52A8C02C8003ACFBB /* IPAddress.swift */; };
-		406CE9EA2A8C8B65003ACFBB /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 406CE9E92A8C8B65003ACFBB /* assets */; };
 		4076E7222A9EAD04003DD799 /* Request.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E6E32A9EAD04003DD799 /* Request.cpp */; };
 		4076E7232A9EAD04003DD799 /* GetRoot.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E6E52A9EAD04003DD799 /* GetRoot.cpp */; };
 		4076E7242A9EAD04003DD799 /* PostGetReplicatorStatus.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E6E62A9EAD04003DD799 /* PostGetReplicatorStatus.cpp */; };
@@ -337,8 +339,10 @@
 		40348BE02A8B0143002DA787 /* zip_source_write.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_source_write.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_source_write.c"; sourceTree = SOURCE_ROOT; };
 		40348BE12A8B0143002DA787 /* zip_crypto_gnutls.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_crypto_gnutls.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_crypto_gnutls.c"; sourceTree = SOURCE_ROOT; };
 		40348BE22A8B0143002DA787 /* compat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = compat.h; path = "vendor/cmake/_deps/libzip-src/lib/compat.h"; sourceTree = SOURCE_ROOT; };
+		404682222AA82AF10068D5E7 /* blobs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = blobs; path = ../../../../../dataset/server/blobs; sourceTree = "<group>"; };
+		404682232AA82AF10068D5E7 /* dbs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = dbs; path = ../../../../../dataset/server/dbs; sourceTree = "<group>"; };
+		404682282AA82B130068D5E7 /* cert */ = {isa = PBXFileReference; lastKnownFileType = folder; name = cert; path = ../../../assets/cert; sourceTree = "<group>"; };
 		406CE9E52A8C02C8003ACFBB /* IPAddress.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IPAddress.swift; sourceTree = "<group>"; };
-		406CE9E92A8C8B65003ACFBB /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../../../assets; sourceTree = "<group>"; };
 		4076E6E22A9EAD04003DD799 /* TestServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestServer.h; sourceTree = "<group>"; };
 		4076E6E32A9EAD04003DD799 /* Request.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Request.cpp; sourceTree = "<group>"; };
 		4076E6E52A9EAD04003DD799 /* GetRoot.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GetRoot.cpp; sourceTree = "<group>"; };
@@ -429,7 +433,7 @@
 				406CE9E42A8C02C8003ACFBB /* support */,
 				40348A932A8AFCA1002DA787 /* bridge */,
 				40348A8A2A8AFBEB002DA787 /* vendor */,
-				406CE9E92A8C8B65003ACFBB /* assets */,
+				4046821F2AA82AAF0068D5E7 /* assets */,
 				40348A6E2A8AF842002DA787 /* AppDelegate.swift */,
 				40348A702A8AF842002DA787 /* SceneDelegate.swift */,
 				40348A722A8AF842002DA787 /* ViewController.swift */,
@@ -634,6 +638,16 @@
 			name = libzip;
 			sourceTree = "<group>";
 		};
+		4046821F2AA82AAF0068D5E7 /* assets */ = {
+			isa = PBXGroup;
+			children = (
+				404682282AA82B130068D5E7 /* cert */,
+				404682222AA82AF10068D5E7 /* blobs */,
+				404682232AA82AF10068D5E7 /* dbs */,
+			);
+			name = assets;
+			sourceTree = "<group>";
+		};
 		406CE9E42A8C02C8003ACFBB /* support */ = {
 			isa = PBXGroup;
 			children = (
@@ -793,8 +807,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				406CE9EA2A8C8B65003ACFBB /* assets in Resources */,
+				404682252AA82AF10068D5E7 /* dbs in Resources */,
 				40348A7B2A8AF843002DA787 /* LaunchScreen.storyboard in Resources */,
+				404682292AA82B130068D5E7 /* cert in Resources */,
+				404682242AA82AF10068D5E7 /* blobs in Resources */,
 				40348A782A8AF843002DA787 /* Assets.xcassets in Resources */,
 				40348A892A8AFA8C002DA787 /* Project.xcconfig in Resources */,
 				40348A762A8AF842002DA787 /* Main.storyboard in Resources */,
