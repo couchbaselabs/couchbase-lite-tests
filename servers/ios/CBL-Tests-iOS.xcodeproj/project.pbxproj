@@ -111,6 +111,8 @@
 		EAF9CC352A83D86B00BCEC1A /* HeadersMiddleware.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF9CC342A83D86B00BCEC1A /* HeadersMiddleware.swift */; };
 		EAF9CC382A83EA3E00BCEC1A /* UpdateRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF9CC372A83EA3E00BCEC1A /* UpdateRequest.swift */; };
 		EAF9CC3A2A83F23A00BCEC1A /* AnyCodable.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF9CC392A83F23A00BCEC1A /* AnyCodable.swift */; };
+		EAFED0582AA8D1DE0050B0CE /* todo.cblite2.zip in Resources */ = {isa = PBXBuildFile; fileRef = EAFED0572AA8D1DE0050B0CE /* todo.cblite2.zip */; };
+		EAFED0592AA8D1DE0050B0CE /* todo.cblite2.zip in Resources */ = {isa = PBXBuildFile; fileRef = EAFED0572AA8D1DE0050B0CE /* todo.cblite2.zip */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -162,12 +164,13 @@
 		EAF9CC282A829E6800BCEC1A /* DocumentUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentUpdater.swift; sourceTree = "<group>"; };
 		EAF9CC2A2A82A16700BCEC1A /* GetAllDocuments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetAllDocuments.swift; sourceTree = "<group>"; };
 		EAF9CC2C2A82A1E400BCEC1A /* CollectionDocuments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionDocuments.swift; sourceTree = "<group>"; };
-		EAF9CC2E2A83D21700BCEC1A /* travel.cblite2.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = travel.cblite2.zip; path = ../../dataset/travel.cblite2.zip; sourceTree = "<group>"; };
-		EAF9CC2F2A83D21700BCEC1A /* posts.cblite2.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = posts.cblite2.zip; path = ../../dataset/posts.cblite2.zip; sourceTree = "<group>"; };
-		EAF9CC302A83D21700BCEC1A /* names.cblite2.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = names.cblite2.zip; path = ../../dataset/names.cblite2.zip; sourceTree = "<group>"; };
+		EAF9CC2E2A83D21700BCEC1A /* travel.cblite2.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = travel.cblite2.zip; path = ../../dataset/server/dbs/travel.cblite2.zip; sourceTree = "<group>"; };
+		EAF9CC2F2A83D21700BCEC1A /* posts.cblite2.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = posts.cblite2.zip; path = ../../dataset/server/dbs/posts.cblite2.zip; sourceTree = "<group>"; };
+		EAF9CC302A83D21700BCEC1A /* names.cblite2.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = names.cblite2.zip; path = ../../dataset/server/dbs/names.cblite2.zip; sourceTree = "<group>"; };
 		EAF9CC342A83D86B00BCEC1A /* HeadersMiddleware.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeadersMiddleware.swift; sourceTree = "<group>"; };
 		EAF9CC372A83EA3E00BCEC1A /* UpdateRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateRequest.swift; sourceTree = "<group>"; };
 		EAF9CC392A83F23A00BCEC1A /* AnyCodable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnyCodable.swift; sourceTree = "<group>"; };
+		EAFED0572AA8D1DE0050B0CE /* todo.cblite2.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = todo.cblite2.zip; path = ../../dataset/server/dbs/todo.cblite2.zip; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -197,13 +200,13 @@
 		EA19C6742A793C3700197481 = {
 			isa = PBXGroup;
 			children = (
-				EAEE5E042A86B57400CF266E /* Frameworks */,
 				EA9479062A7942F6000C584A /* App */,
 				EA19C6842A793C3800197481 /* Assets.xcassets */,
 				EA19C6802A793C3700197481 /* CBL_Tests_iOSApp.swift */,
 				EA3D1A6C2A866D930059EE0E /* CBLVersion.swift */,
 				EAE658C32A7A7FC300C26657 /* ContentTypes */,
 				EA19C6822A793C3700197481 /* ContentView.swift */,
+				EAEE5E042A86B57400CF266E /* Frameworks */,
 				EA3D1A692A8668C40059EE0E /* GetCBLVersion.sh */,
 				EAE658B82A7A73C200C26657 /* Handlers */,
 				EAF9CC362A83D9C500BCEC1A /* Middleware */,
@@ -212,6 +215,7 @@
 				EA19C6862A793C3800197481 /* Preview Content */,
 				EA19C67E2A793C3700197481 /* Products */,
 				EAE658B02A7955A500C26657 /* README.md */,
+				EAFED0572AA8D1DE0050B0CE /* todo.cblite2.zip */,
 				EAF9CC2E2A83D21700BCEC1A /* travel.cblite2.zip */,
 				EAF9CC212A826A6300BCEC1A /* Utilities */,
 			);
@@ -412,6 +416,7 @@
 			files = (
 				EAF9CC312A83D21700BCEC1A /* travel.cblite2.zip in Resources */,
 				EAF9CC322A83D21700BCEC1A /* posts.cblite2.zip in Resources */,
+				EAFED0582AA8D1DE0050B0CE /* todo.cblite2.zip in Resources */,
 				EAF9CC332A83D21700BCEC1A /* names.cblite2.zip in Resources */,
 				EA19C6882A793C3800197481 /* Preview Assets.xcassets in Resources */,
 				EA19C6852A793C3800197481 /* Assets.xcassets in Resources */,
@@ -424,6 +429,7 @@
 			files = (
 				EAEE5DF52A86B4EF00CF266E /* travel.cblite2.zip in Resources */,
 				EAEE5DF62A86B4EF00CF266E /* posts.cblite2.zip in Resources */,
+				EAFED0592AA8D1DE0050B0CE /* todo.cblite2.zip in Resources */,
 				EAEE5DF72A86B4EF00CF266E /* names.cblite2.zip in Resources */,
 				EAEE5DF82A86B4EF00CF266E /* Preview Assets.xcassets in Resources */,
 				EAEE5DF92A86B4EF00CF266E /* Assets.xcassets in Resources */,
