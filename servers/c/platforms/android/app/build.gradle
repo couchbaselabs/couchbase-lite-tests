@@ -44,7 +44,7 @@ android {
 
     signingConfigs {
         config {
-            storeFile file('sign/key.jks')
+            storeFile file('android-key')
             storePassword 'couchbase'
             keyAlias 'testserver'
             keyPassword 'couchbase'
