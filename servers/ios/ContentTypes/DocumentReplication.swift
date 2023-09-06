@@ -44,7 +44,7 @@ extension ContentTypes {
             result += "\tcollection: \(collection)\n"
             result += "\tdocumentID: \(documentID)\n"
             result += "\tisPush: \(isPush.description)\n"
-            result += "\tflags: \(flags)"
+            result += "\tflags: \(flags)\n"
             result += "\terror: \(error.debugDescription)"
             
             return result
