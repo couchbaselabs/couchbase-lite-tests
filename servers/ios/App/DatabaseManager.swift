@@ -362,6 +362,7 @@ class DatabaseManager {
         }
         
         do {
+            TestServer.logger.log(level: .debug, "Attempting to copy dataset from \(datasetURL.relativePath)")
             try Database.copy(fromPath: datasetURL.relativePath, toDatabase: dbName, withConfig: nil)
             TestServer.logger.log(level: .debug, "Dataset '\(name)' successfully copied to DB '\(dbName)'")
         } catch(let error as NSError) {

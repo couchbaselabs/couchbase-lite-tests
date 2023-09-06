@@ -11,8 +11,7 @@ import Vapor
 class HeadersMiddleware : AsyncMiddleware {
     func respond(to request: Vapor.Request, chainingTo next: Vapor.AsyncResponder) async throws -> Vapor.Response {
         
-        TestServer.logger.log(level: .info, "Received request: \(request.route?.description ?? "ERR")")
-        TestServer.logger.log(level: .debug, "\(request.description)")
+        TestServer.logger.log(level: .debug, "Received request: \(request.description)")
         
         let isGetRoot = request.route?.description == "GET /"
         
@@ -33,9 +32,11 @@ class HeadersMiddleware : AsyncMiddleware {
         
         let response = try await next.respond(to: request)
         
-        TestServer.logger.log(level: .debug, "Responding with response: \n\(response)")
+        let responseWithHeaders = withResponseHeaders(response, version: version)
         
-        return withResponseHeaders(response, version: version)
+        TestServer.logger.log(level: .debug, "Responding with response: \n\(responseWithHeaders)")
+        
+        return responseWithHeaders
     }
     
     func withResponseHeaders(_ response: Response, version: Int) -> Response {

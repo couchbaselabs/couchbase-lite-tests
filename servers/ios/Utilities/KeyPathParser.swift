@@ -19,10 +19,11 @@ struct KeyPathParser {
     
     init(input: String) {
         self.input = input
+        TestServer.logger.log(level: .debug, "Parsing KeyPath '\(input)'")
         self.index = input.startIndex
     }
     
-    public mutating func parse() throws -> [KeyPathComponent]? {
+    public mutating func parse() throws -> [KeyPathComponent] {
         var components: [KeyPathComponent] = []
         
         // Skip optional "$."
@@ -36,6 +37,7 @@ struct KeyPathParser {
         if let component = try parseProperty(first: true) {
             components.append(component)
         } else {
+            TestServer.logger.log(level: .error, "Error parsing KeyPath, First KeyPath component should be a property.")
             throw TestServerError.badRequest("First KeyPath component should be a property.")
         }
         
@@ -46,15 +48,20 @@ struct KeyPathParser {
         
         // We can't parse any more valid components, but we haven't reached the end of the keypath string
         if(index != input.endIndex) {
-            throw TestServerError.badRequest("KeyPath '\(input)' is invalid.")
+            TestServer.logger.log(level: .error, "Error parsing KeyPath, KeyPath is invalid.")
+            throw TestServerError.badRequest("KeyPath is invalid.")
         }
         
+        TestServer.logger.log(level: .debug, "Parsed KeyPath components: \(components)")
         return components
     }
     
     private mutating func parseProperty(first: Bool = false) throws -> KeyPathComponent? {
         if(!first) {
-            guard expect(".") else { throw TestServerError.badRequest("KeyPath '\(input)' is invalid.") }
+            guard expect(".") else {
+                TestServer.logger.log(level: .error, "Error parsing KeyPath, invalid property name in KeyPath.")
+                throw TestServerError.badRequest("Invalid property name in KeyPath.")
+            }
         }
         
         var property = ""
@@ -71,7 +78,8 @@ struct KeyPathParser {
         
         guard !property.isEmpty
         else {
-            throw TestServerError.badRequest("KeyPath '\(input)' is invalid.")
+            TestServer.logger.log(level: .error, "Error parsing KeyPath, invalid property name in KeyPath")
+            throw TestServerError.badRequest("Invalid property name in KeyPath")
         }
         
         return .property(property)
@@ -87,7 +95,8 @@ struct KeyPathParser {
         
         for char in digitsStr {
             if(!char.isNumber) {
-                throw TestServerError.badRequest("KeyPath '\(input)' contains invalid array index.")
+                TestServer.logger.log(level: .error, "Error parsing KeyPath, KeyPath contains invalid array index.")
+                throw TestServerError.badRequest("KeyPath contains invalid array index.")
             }
         }
         
@@ -95,7 +104,8 @@ struct KeyPathParser {
         
         guard !digitsStr.isEmpty, let digits = Int(digitsStr)
         else {
-            throw TestServerError.badRequest("KeyPath '\(input)' contains invalid array index.")
+            TestServer.logger.log(level: .error, "Error parsing KeyPath, KeyPath contains invalid array index.")
+            throw TestServerError.badRequest("KeyPath contains invalid array index.")
         }
         
         return .index(digits)
