@@ -15,7 +15,6 @@ VERSION=${3}
 BLD_NUM=${4}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-ASSETS_DIR="${SCRIPT_DIR}/../assets"
 DOWNLOAD_DIR="${SCRIPT_DIR}/../download"
 LIB_DIR="${SCRIPT_DIR}/../lib"
 
@@ -23,14 +22,9 @@ IOS_FRAMEWORKS_DIR="${SCRIPT_DIR}/../platforms/ios/Frameworks"
 IOS_VENDOR_DIR="${SCRIPT_DIR}/../platforms/ios/vendor"
 ANDROID_CPP_DIR="${SCRIPT_DIR}/../platforms/android/app/src/main/cpp"
 
-# Copy Assets
-pushd "${ASSETS_DIR}" > /dev/null
-cp -f ../../../dataset/*.cblite2.zip dataset
-cp -rf ../../../dataset/blobs dataset
-cp -f ../../../environment/sg/cert/cert.* cert
-popd
+# Download CBL:
 
-# Download and Unzip CBL:
+
 rm -rf "${DOWNLOAD_DIR}" 2> /dev/null
 mkdir -p "${DOWNLOAD_DIR}"
 pushd "${DOWNLOAD_DIR}" > /dev/null

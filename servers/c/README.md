@@ -54,22 +54,20 @@ See the samples below for the usage of the build scripts.
 
 ## Development
 
-### Preparation
+### Download Couchbase Lite
 
-The first step before starting to develop the project is to download CBL library and copy all required
-assets (dataset files and SSL certificates) in place. To do that, use the prepare script as the 
-samples below.
+The first step before starting to develop the project is to download CBL library.
 
 #### macOS, iOS, Android, Linux
 
 ```
-./scripts/dev_prepare.sh macos enterprise 3.1.1
+./scripts/download_cbl.sh macos enterprise 3.1.1
 ```
 
 #### Windows
 
 ```
-./scripts\dev_prepare.ps1 enterprise 3.1.1
+.\scripts\download_cbl.ps1 enterprise 3.1.1
 ```
 
 ### Development Projects
