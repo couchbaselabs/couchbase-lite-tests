@@ -16,7 +16,7 @@
 		<ApplicationTitle>testserver</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.companyname.testserver</ApplicationId>
+		<ApplicationId>com.couchbase.dotnet.testserver</ApplicationId>
 		<ApplicationIdGuid>bf1b9964-631c-4489-91fa-a04e7f3f3765</ApplicationIdGuid>
 
 		<!-- Versions -->
@@ -37,6 +37,7 @@
 		<AppxSymbolPackageEnabled>True</AppxSymbolPackageEnabled>
         <PublisherName>borrrden</PublisherName>
 		<GenerateTestArtifacts>True</GenerateTestArtifacts>
+		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
 	</PropertyGroup>
 
 	<ItemGroup>
