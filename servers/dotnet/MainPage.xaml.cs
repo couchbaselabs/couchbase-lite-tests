@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Reflection;
 
@@ -14,18 +15,39 @@ public partial class MainPage : ContentPage
 		server.Start();
 	}
 
+    private static bool IsInterfaceValid(NetworkInterface ni)
+    {
+        if (ni.OperationalStatus != OperationalStatus.Up) {
+            return false;
+        }
+
+        if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback || ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel
+            || ni.Description.IndexOf("Loopback", StringComparison.OrdinalIgnoreCase) >= 0) {
+            return false;
+        }
+
+        if (ni.Description.IndexOf("virtual", StringComparison.OrdinalIgnoreCase) >= 0) {
+            return false;
+        }
+
+        return true;
+    }
+
     protected override void OnAppearing()
     {
         base.OnAppearing();
 
-		_versionLabel.Text = "CBL Version: " + typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
-        var host = Dns.GetHostEntry(Dns.GetHostName());
-        var ipAddresses = "Server running at:" + 
-			Environment.NewLine + 
-			String.Join(Environment.NewLine, host.AddressList
-			.Where(x => x.AddressFamily == AddressFamily.InterNetwork)
-			.Select(x => $"http://{x}:8080"));
-		_urlLabel.Text = ipAddresses;
+        _versionLabel.Text = "CBL Version: " + typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+
+        var validIPs = NetworkInterface.GetAllNetworkInterfaces().Where(IsInterfaceValid)
+                    .SelectMany(x => x.GetIPProperties().UnicastAddresses)
+                    .Where(x => x.Address.AddressFamily == AddressFamily.InterNetwork && x.Address.GetAddressBytes()[0] != 169);
+
+        var ipAddresses = "Server running at:" +
+            Environment.NewLine +
+            String.Join(Environment.NewLine, validIPs
+            .Select(x => $"http://{x.Address}:8080"));
+        _urlLabel.Text = ipAddresses;
     }
 }
 
