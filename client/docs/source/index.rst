@@ -9,4 +9,6 @@ Contents
 .. toctree::
     :maxdepth: 2
     
+    concepts
+    usage
     autoapi/index

@@ -1,0 +1,42 @@
+@startuml Architecture
+!theme amiga
+
+package pytest [
+    This is a python program designed
+    to run tests.  See <color:gray>https://pytest.org</color>
+]
+
+package tests [
+    These tests are written 
+    by the consumers of the TDK
+]
+
+package TDK [
+    This is the main deliverable of this
+    project, which contains methods
+    and functionality to interact
+    with the various components of
+    the E2E environment
+]
+
+cloud Cloud
+entity Device
+
+package TestServer [
+    The secondary deliverable of this
+    project.  These are servers written
+    in various programming languages
+    that expose a common API to control
+    Couchbase Lite functionality
+]
+
+component cbs as "Couchbase Server"
+component sgw as "Sync Gateway"
+
+pytest --> tests : " executes"
+tests -right-> TDK : " use"
+TDK -up-> Cloud : " interacts with"
+TDK -right-> Device : " interacts with"
+Device -up-> TestServer : " contains"
+Cloud -up-> sgw : " contains"
+Cloud -up-> cbs : " contains"
