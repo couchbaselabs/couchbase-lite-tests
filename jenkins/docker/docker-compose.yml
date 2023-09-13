@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    restart: unless-stopped
+    group_add:
+      - ${DOCKERGID:-999}
+    ports:
+      - "50000:50000"
+    volumes:
+      - ${JENKINS_HOME:-/var/jenkins_home}:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ${JENKINS_HOME:-/var/jenkins_home}:/var/jenkins_home
+      - ./nginx/conf.d:/etc/nginx/conf.d
