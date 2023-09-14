@@ -76,7 +76,7 @@ echo "Couchbase Server up!" | tee /dev/fd/3
 
 echo "Set up the cluster"
 couchbase_cli_check cluster-init -c localhost --cluster-name couchbase-lite-test --cluster-username Administrator \
-  --cluster-password password --services data,index,query,fts --cluster-ramsize 2048 --cluster-index-ramsize 2048 \
+  --cluster-password password --services data,index,query,fts --cluster-ramsize 2048 --cluster-index-ramsize 768 \
   --cluster-fts-ramsize 256 --index-storage-setting default
 echo
 
