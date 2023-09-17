@@ -44,26 +44,33 @@ ssh-keygen -t ed25519
 ```
 By default, `id_ed25519` (Private Key) and `id_ed25519.pub` (Public Key) file will be generated at /home/jenkins/.ssh directory.
 
-3.2. Update `authorized_keys` file in the `agent` container with the public key from `id_ed25519.pub` generated in step 3.1.   
+3.2. Update .env file with `JENKINS_AGENT_SSH_PUBKEY` key and the value from `id_ed25519.pub` file generated in step 3.1.   
 
 ```
-docker exec -it agent /bin/bash
-cd /home/jenkins/.ssh
-echo "<ssh-public-key-from-step-3.1>" > authorized_keys 
+echo 'JENKINS_AGENT_SSH_PUBKEY="<ssh-public-key-from-step-3.1>"' >> .env
 ```
-3.3 Test the ssh key setup by ssh to the `agent` container from the `jenkins` container.
+
+3.3. Restart the docker containers to update `authorized_keys` file with the ssh public key in the `agent` container.
 
 ```
-docker exec -it agent /bin/bash
+docker compose down
+docker compose up -d
+```
+
+3.4. Test the ssh key setup by ssh to the `agent` container from the `jenkins` container.
+
+```
+docker exec -it jenkins /bin/bash
 ssh jenkins@<agent ip address> -p 2200
 ```
-3.4 Go the Jenkins Web Portal, create a new credential with `SSH User Name with Private Key`.
+
+3.5. Go the Jenkins Web Portal, create a new credential with `SSH User Name with Private Key`.
 
 * Label : jenkins-ssh-key
 * Username : jenkins
 * Private key : < ssh-private-key-id_ed25519-from-step-3.1 >
 
-3.5. Create a new permanent node on Jenkins Web Portal
+3.6. Create a new permanent node on Jenkins Web Portal
 
 * Remote root directory : /home/jenkins
 * Launch Method : Launch agent via ssh with username `jenkins`, credential `jenkins-ssh-key`, and Non Verifying Verification Strategy
