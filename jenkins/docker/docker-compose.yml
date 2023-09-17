@@ -22,7 +22,8 @@ services:
       - ${JENKINS_HOME:-/var/jenkins_home}:/var/jenkins_home
       - ./nginx/conf.d:/etc/nginx/conf.d
   agent:
-    image: jenkins/ssh-agent
+    build:
+      context: ./agent
     container_name: agent
     restart: unless-stopped
     ports:
