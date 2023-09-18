@@ -32,6 +32,8 @@
 		EA3D1A712A86794A0059EE0E /* StartReplicatorRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A702A86794A0059EE0E /* StartReplicatorRequest.swift */; };
 		EA3D1A732A8682690059EE0E /* GetReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A722A8682690059EE0E /* GetReplicatorStatus.swift */; };
 		EA3D1A762A86A2490059EE0E /* ReplicationFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A752A86A2490059EE0E /* ReplicationFilter.swift */; };
+		EA4841B32AB8622600CF0C01 /* blobs in Resources */ = {isa = PBXBuildFile; fileRef = EA4841B22AB8622600CF0C01 /* blobs */; };
+		EA4841B42AB8622600CF0C01 /* blobs in Resources */ = {isa = PBXBuildFile; fileRef = EA4841B22AB8622600CF0C01 /* blobs */; };
 		EA79A99D2A7940C900530ADE /* Vapor in Frameworks */ = {isa = PBXBuildFile; productRef = EA79A99C2A7940C900530ADE /* Vapor */; };
 		EA94790E2A7943CD000C584A /* TestServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA94790D2A7943CD000C584A /* TestServer.swift */; };
 		EAE658B22A795B0700C26657 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE658B12A795B0700C26657 /* DatabaseManager.swift */; };
@@ -142,6 +144,7 @@
 		EA3D1A702A86794A0059EE0E /* StartReplicatorRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartReplicatorRequest.swift; sourceTree = "<group>"; };
 		EA3D1A722A8682690059EE0E /* GetReplicatorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetReplicatorStatus.swift; sourceTree = "<group>"; };
 		EA3D1A752A86A2490059EE0E /* ReplicationFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationFilter.swift; sourceTree = "<group>"; };
+		EA4841B22AB8622600CF0C01 /* blobs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = blobs; path = ../../dataset/server/blobs; sourceTree = "<group>"; };
 		EA94790D2A7943CD000C584A /* TestServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestServer.swift; sourceTree = "<group>"; };
 		EAE658B02A7955A500C26657 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		EAE658B12A795B0700C26657 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
@@ -200,6 +203,7 @@
 		EA19C6742A793C3700197481 = {
 			isa = PBXGroup;
 			children = (
+				EA4841B22AB8622600CF0C01 /* blobs */,
 				EA9479062A7942F6000C584A /* App */,
 				EA19C6842A793C3800197481 /* Assets.xcassets */,
 				EA19C6802A793C3700197481 /* CBL_Tests_iOSApp.swift */,
@@ -417,6 +421,7 @@
 				EAF9CC312A83D21700BCEC1A /* travel.cblite2.zip in Resources */,
 				EAF9CC322A83D21700BCEC1A /* posts.cblite2.zip in Resources */,
 				EAFED0582AA8D1DE0050B0CE /* todo.cblite2.zip in Resources */,
+				EA4841B32AB8622600CF0C01 /* blobs in Resources */,
 				EAF9CC332A83D21700BCEC1A /* names.cblite2.zip in Resources */,
 				EA19C6882A793C3800197481 /* Preview Assets.xcassets in Resources */,
 				EA19C6852A793C3800197481 /* Assets.xcassets in Resources */,
@@ -430,6 +435,7 @@
 				EAEE5DF52A86B4EF00CF266E /* travel.cblite2.zip in Resources */,
 				EAEE5DF62A86B4EF00CF266E /* posts.cblite2.zip in Resources */,
 				EAFED0592AA8D1DE0050B0CE /* todo.cblite2.zip in Resources */,
+				EA4841B42AB8622600CF0C01 /* blobs in Resources */,
 				EAEE5DF72A86B4EF00CF266E /* names.cblite2.zip in Resources */,
 				EAEE5DF82A86B4EF00CF266E /* Preview Assets.xcassets in Resources */,
 				EAEE5DF92A86B4EF00CF266E /* Assets.xcassets in Resources */,
