@@ -69,5 +69,6 @@ extension ContentTypes {
         let documentID: String
         let updatedProperties: Array<Dictionary<String, AnyCodable>>?
         let removedProperties: Array<String>?
+        let updatedBlobs: Dictionary<String, String>?
     }
 }
