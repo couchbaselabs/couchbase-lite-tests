@@ -41,9 +41,17 @@ struct DocComparison : Content {
         case let (left as String, right as String): return left == right
         case let (left as Array<Any>, right as Array<Any>): return isEqual(left, right)
         case let (left as Dictionary<String, Any>, right as Dictionary<String, Any>): return isEqual(left, right)
+        case let (left as Blob, right as Blob): return isEqual(left, right)
         default:
             return false
         }
+    }
+    
+    private static func isEqual(_ left: Blob, _ right: Blob) -> Bool {
+        guard left == right
+        else { return false }
+        
+        return left.content == right.content
     }
     
     private static func isEqual(_ left: Dictionary<String, Any>, _ right: Dictionary<String, Any>) -> Bool {

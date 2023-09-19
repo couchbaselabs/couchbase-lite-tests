@@ -73,7 +73,7 @@ extension Snapshot {
             let snapshotDoc = snapshot[snapshotKey]!
             let mutableSnapshotDoc = snapshotDoc?.toMutable() ?? MutableDocument(id: change.documentID)
             
-            try DocumentUpdater.update(doc: mutableSnapshotDoc, updatedProperties: change.updatedProperties, removedProperties: change.removedProperties)
+            try DocumentUpdater.update(doc: mutableSnapshotDoc, updatedProperties: change.updatedProperties, removedProperties: change.removedProperties, updatedBlobs: change.updatedBlobs)
             
             let compareResult = try DocComparison.isEqual(mutableSnapshotDoc, existingDoc!)
             if(!compareResult.success) {

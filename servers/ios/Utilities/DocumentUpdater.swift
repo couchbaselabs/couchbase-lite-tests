@@ -21,7 +21,7 @@ struct DocumentUpdater {
         
         let mutableDoc = doc?.toMutable() ?? MutableDocument(id: item.documentID)
         
-        try update(doc: mutableDoc, updatedProperties: item.updatedProperties, removedProperties: item.removedProperties)
+        try update(doc: mutableDoc, updatedProperties: item.updatedProperties, removedProperties: item.removedProperties, updatedBlobs: item.updatedBlobs)
         do {
             try collection.save(document: mutableDoc)
         } catch(let error as NSError) {
@@ -30,8 +30,22 @@ struct DocumentUpdater {
     }
     
     // This function does not save the updated doc, the caller must do that if desired
-    public static func update(doc: MutableDocument, updatedProperties: Array<Dictionary<String, AnyCodable>>? = nil, removedProperties: Array<String>? = nil) throws {
+    public static func update(doc: MutableDocument, updatedProperties: Array<Dictionary<String, AnyCodable>>?, removedProperties: Array<String>?, updatedBlobs: Dictionary<String, String>?) throws {
         TestServer.logger.log(level: .debug, "Processing update for document '\(doc.id)'")
+        
+        if let removedProperties = removedProperties {
+            TestServer.logger.log(level: .debug, "Removing properties of document '\(doc.id)'")
+            for keyPath in removedProperties {
+                var parser = KeyPathParser(input: keyPath)
+                
+                let components = try parser.parse()
+                
+                let parentProperty = try getParentProperty(mutableDoc: doc, keyPathComponents: components)
+                
+                TestServer.logger.log(level: .debug, "Removing property of document '\(doc.id)' at keypath '\(keyPath)'")
+                remove(parentProperty: parentProperty, propertyKey: components.last!)
+            }
+        }
         
         if let updatedProperties = updatedProperties {
             TestServer.logger.log(level: .debug, "Updating properties of document '\(doc.id)'")
@@ -42,20 +56,23 @@ struct DocumentUpdater {
                     let components = try parser.parse()
                     
                     let parentProperty = try getParentProperty(mutableDoc: doc, keyPathComponents: components)
-                    update(parentProperty: parentProperty, propertyKey: components.last!, value: value)
+                    
+                    TestServer.logger.log(level: .debug, "Updating property of document '\(doc.id)' at keypath '\(keyPath)'")
+                    updateProperty(parentProperty: parentProperty, propertyKey: components.last!, value: value)
                 }
             }
         }
         
-        if let removedProperties = removedProperties {
-            for keyPath in removedProperties {
+        if let updatedBlobs = updatedBlobs {
+            TestServer.logger.log(level: .debug, "Updating blobs of document '\(doc.id)'")
+            for (keyPath, filename) in updatedBlobs {
                 var parser = KeyPathParser(input: keyPath)
-                
                 let components = try parser.parse()
-                
                 let parentProperty = try getParentProperty(mutableDoc: doc, keyPathComponents: components)
+                let blob = try createBlob(filename: filename)
                 
-                remove(parentProperty: parentProperty, propertyKey: components.last!)
+                TestServer.logger.log(level: .debug, "Updating property of document '\(doc.id)' at keypath '\(keyPath)' with blob '\(filename)'")
+                updateProperty(parentProperty: parentProperty, propertyKey: components.last!, blob: blob)
             }
         }
         
@@ -148,13 +165,54 @@ struct DocumentUpdater {
         return current
     }
     
-    private static func update(parentProperty: MutableObjectProtocol, propertyKey: KeyPathComponent, value: AnyCodable) {
+    private static func createBlob(filename: String) throws -> Blob {
+        let filenameComponents = filename.components(separatedBy: ".")
+        
+        guard filenameComponents.count == 2
+        else {
+            TestServer.logger.log(level: .error, "Invalid filename given for blob")
+            throw TestServerError.badRequest("Invalid blob filename '\(filename)'.")
+        }
+        
+        let fileExtension = filenameComponents.last!
+        
+        guard let blobURL = Bundle.main.url(forResource: filenameComponents.first!, withExtension: fileExtension)
+        else {
+            TestServer.logger.log(level: .error, "No blob found at given filename")
+            throw TestServerError.badRequest("Blob '\(filename)' not found.")
+        }
+        
+        let contentType: String = {
+            switch fileExtension {
+            case "jpeg", "jpg": return "image/jpeg"
+            default: return "application/octet-stream"
+            }
+        }()
+        
+        do {
+            return try Blob(contentType: contentType, fileURL: blobURL)
+        } catch(let error as NSError) {
+            throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
+        }
+    }
+    
+    private static func updateProperty(parentProperty: MutableObjectProtocol, propertyKey: KeyPathComponent, value: AnyCodable) {
         switch propertyKey {
         case .index(let index):
             backfillArray(array: parentProperty, uptoInclusive: index)
             parentProperty.setValue(value.value, at: index)
         case .property(let name):
             parentProperty.setValue(value.value, forKey: name)
+        }
+    }
+    
+    private static func updateProperty(parentProperty: MutableObjectProtocol, propertyKey: KeyPathComponent, blob: Blob) {
+        switch propertyKey {
+        case .index(let index):
+            backfillArray(array: parentProperty, uptoInclusive: index)
+            parentProperty.setValue(blob, at: index)
+        case .property(let name):
+            parentProperty.setValue(blob, forKey: name)
         }
     }
     
