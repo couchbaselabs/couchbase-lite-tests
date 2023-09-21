@@ -5,7 +5,7 @@ function usage() {
     exit 1
 }
 
-if [ "$#" -ne 2 ]; then
+if [ "$#" -lt 2 ]; then
     usage
 fi
 
@@ -20,9 +20,9 @@ LIB_DIR="${SCRIPT_DIR}/../lib"
 # Download CBL:
 if [ -z "$BLD_NUM" ]
 then
-    ${SCRIPT_DIR}/download_cbl.sh macos ${EDITION} ${VERSION}
+    "${SCRIPT_DIR}"/download_cbl.sh macos ${EDITION} ${VERSION}
 else
-    ${SCRIPT_DIR}/download_cbl.sh macos ${EDITION} ${VERSION} ${BLD_NUM}
+    "${SCRIPT_DIR}"/download_cbl.sh macos ${EDITION} ${VERSION} ${BLD_NUM}
 fi
 
 # Build
