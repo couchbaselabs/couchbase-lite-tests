@@ -103,7 +103,7 @@ public class Snapshot {
         @NonNull String docId) {
         final Map<String, Document> collSnapshot = snapshot.computeIfAbsent(collFqn, k -> new HashMap<>());
         if (collSnapshot.containsKey(docId)) { throw new ClientError("Attempt to snapshot doc twice: " + docId); }
-        collSnapshot.put(docId, dbSvc.getDocOrNull(db, collFqn, docId, ctxt));
+        collSnapshot.put(docId, dbSvc.getDocOrNull(ctxt, db, collFqn, docId));
     }
 
     @NonNull
@@ -131,7 +131,7 @@ public class Snapshot {
             Map<String, Change> docDeltas = delta.get(collFqn);
             if (docDeltas == null) { docDeltas = new HashMap<>(); }
 
-            final Collection collection = dbSvc.getCollection(db, collFqn, ctxt);
+            final Collection collection = dbSvc.getCollection(ctxt, db, collFqn);
 
             // all the docs named in either the snapshot or the delta
             final Set<String> docIds = new HashSet<>(originalDocs.keySet());
@@ -209,7 +209,7 @@ public class Snapshot {
         compareDocContent(collFqn, docId, actualContent, "", expected.toMap(), actualContent, change, diffs);
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "PMD.ExcessiveMethodLength"})
     private void compareDocContent(
         @NonNull String collFqn,
         @NonNull String docId,
@@ -319,7 +319,7 @@ public class Snapshot {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "PMD.ExcessiveMethodLength", "PMD.NPathComplexity"})
     private void compareDocContent(
         @NonNull String collFqn,
         @NonNull String docId,
@@ -429,11 +429,11 @@ public class Snapshot {
     }
 
     @NonNull
-    private static Map<String, Object> getBlobProperties(@NonNull Blob blob) {
+    private Map<String, Object> getBlobProperties(@NonNull Blob blob) {
         // force the length for a stream-based blob
         if (blob.length() <= 0) { blob.getContent(); }
 
-        Map<String, Object> props = blob.getProperties();
+        final Map<String, Object> props = blob.getProperties();
         props.put(ReplyBuilder.KEY_TYPE, ReplyBuilder.TYPE_BLOB);
 
         return props;

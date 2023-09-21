@@ -63,7 +63,7 @@ public class VerifyDocs extends UpdateItemEndpoint {
     public VerifyDocs(@NonNull DatabaseService dbSvc) { super(dbSvc); }
 
     @NonNull
-    public Map<String, Object> verify(@NonNull TypedMap req, @NonNull TestContext ctxt) {
+    public Map<String, Object> verify(@NonNull TestContext ctxt, @NonNull TypedMap req) {
         req.validate(LEGAL_VALIDATE_KEYS);
 
         final String snapshotId = req.getString(KEY_SNAPSHOT);

@@ -22,16 +22,11 @@ import com.couchbase.lite.mobiletest.errors.ServerError;
 
 
 abstract class TypedCollection {
-    private final boolean strict;
-
-    TypedCollection(boolean strict) { this.strict = strict; }
-
     @Nullable
     protected final <T> T checkType(@NonNull Class<T> expectedType, @Nullable Object val) {
         if (val == null) { return null; }
         final Class<?> actualType = val.getClass();
         if (expectedType.isAssignableFrom(actualType)) { return expectedType.cast(val); }
-        if (!strict) { return null; }
         throw new ServerError("Cannot convert " + actualType + " to " + expectedType);
     }
 }

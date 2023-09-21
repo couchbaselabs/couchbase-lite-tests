@@ -62,7 +62,7 @@ public class SnapshotDocs {
     public SnapshotDocs(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
 
     @NonNull
-    public Map<String, Object> snapshot(@NonNull TypedMap req, @NonNull TestContext ctxt) {
+    public Map<String, Object> snapshot(@NonNull TestContext ctxt, @NonNull TypedMap req) {
         req.validate(LEGAL_SNAPSHOT_KEYS);
 
         final String dbName = req.getString(KEY_DATABASE);

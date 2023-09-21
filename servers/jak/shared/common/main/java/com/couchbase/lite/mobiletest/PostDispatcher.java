@@ -43,21 +43,21 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
     @FunctionalInterface
     interface Endpoint {
         @NonNull
-        Map<String, Object> run(@NonNull TypedMap req, @NonNull TestContext ctxt);
+        Map<String, Object> run(@NonNull TestContext ctxt, @NonNull TypedMap req);
     }
 
     public PostDispatcher(@NonNull TestApp app) {
         super(app);
 
         // build the dispatch table
-        addEndpoint(1, "/reset", (r, m) -> new Reset(app).reset(r, m));
-        addEndpoint(1, "/getAllDocuments", (r, m) -> new GetAllDocs(app.getDbSvc()).getAllDocs(r, m));
-        addEndpoint(1, "/updateDatabase", (r, m) -> new UpdateDb(app.getDbSvc()).updateDb(r, m));
-        addEndpoint(1, "/startReplicator", (r, m) -> new CreateRepl(app.getDbSvc(), app.getReplSvc()).createRepl(r, m));
-        addEndpoint(1, "/getReplicatorStatus", (r, m) -> new GetReplStatus(app.getReplSvc()).getReplStatus(r, m));
-        addEndpoint(1, "/snapshotDocuments", (r, m) -> new SnapshotDocs(app.getDbSvc()).snapshot(r, m));
-        addEndpoint(1, "/verifyDocuments", (r, m) -> new VerifyDocs(app.getDbSvc()).verify(r, m));
-        addEndpoint(1, "/performMaintenance", (r, m) -> new PerformMaintenance(app.getDbSvc()).doMaintenance(r, m));
+        addEndpoint(1, "/reset", (c, r) -> new Reset(app).reset(c, r));
+        addEndpoint(1, "/getAllDocuments", (c, r) -> new GetAllDocs(app.getDbSvc()).getAllDocs(c, r));
+        addEndpoint(1, "/updateDatabase", (c, r) -> new UpdateDb(app.getDbSvc()).updateDb(c, r));
+        addEndpoint(1, "/startReplicator", (c, r) -> new CreateRepl(app.getDbSvc(), app.getReplSvc()).createRepl(c, r));
+        addEndpoint(1, "/getReplicatorStatus", (c, r) -> new GetReplStatus(app.getReplSvc()).getReplStatus(c, r));
+        addEndpoint(1, "/snapshotDocuments", (c, r) -> new SnapshotDocs(app.getDbSvc()).snapshot(c, r));
+        addEndpoint(1, "/verifyDocuments", (c, r) -> new VerifyDocs(app.getDbSvc()).verify(c, r));
+        addEndpoint(1, "/performMaintenance", (c, r) -> new PerformMaintenance(app.getDbSvc()).doMaintenance(c, r));
     }
 
     // This method returns a Reply.  Be sure to close it!
@@ -79,7 +79,7 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
         }
 
         final Map<String, Object> result
-            = endpoint.run(new RequestBuilder(req).buildRequest(), TestApp.getApp().getTestContext(client));
+            = endpoint.run(TestApp.getApp().getTestContext(client), new RequestBuilder(req).buildRequest());
 
         Log.w(TAG, "Request succeeded");
         return new Reply(new ReplyBuilder(result).buildReply());

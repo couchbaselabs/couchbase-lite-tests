@@ -149,14 +149,14 @@ public class CreateRepl {
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @NonNull
-    public Map<String, Object> createRepl(@NonNull TypedMap req, @NonNull TestContext ctxt) {
+    public Map<String, Object> createRepl(@NonNull TestContext ctxt, @NonNull TypedMap req) {
         req.validate(LEGAL_KEYS);
 
         final TypedMap config = req.getMap(KEY_CONFIG);
         if (config == null) { throw new ClientError("No replicator configuration specified"); }
         config.validate(LEGAL_CONFIG_KEYS);
 
-        final ReplicatorConfiguration replConfig = buildConfig(config, ctxt);
+        final ReplicatorConfiguration replConfig = buildConfig(ctxt, config);
         final Replicator repl = new Replicator(replConfig);
         final String replId = replSvc.addRepl(ctxt, repl);
 
@@ -177,7 +177,7 @@ public class CreateRepl {
 
     @SuppressWarnings({"deprecation", "PMD.NPathComplexity"})
     @NonNull
-    public ReplicatorConfiguration buildConfig(@NonNull TypedMap config, @NonNull TestContext ctxt) {
+    public ReplicatorConfiguration buildConfig(@NonNull TestContext ctxt, @NonNull TypedMap config) {
         final String uri = config.getString(KEY_ENDPOINT);
         if (uri == null) { throw new ClientError("Replicator configuration doesn't specify an endpoint"); }
 
@@ -263,7 +263,7 @@ public class CreateRepl {
             if (collectionFqns == null) { throw new ClientError("no collections specified"); }
 
             replConfig.addCollections(
-                dbSvc.getCollections(db, collectionFqns, ctxt),
+                dbSvc.getCollections(ctxt, db, collectionFqns),
                 buildCollectionConfig(replCollection));
         }
     }

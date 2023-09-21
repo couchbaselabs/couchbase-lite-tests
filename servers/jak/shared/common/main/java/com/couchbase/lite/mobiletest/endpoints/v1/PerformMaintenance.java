@@ -67,7 +67,7 @@ public class PerformMaintenance {
     public PerformMaintenance(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
 
     @NonNull
-    public final Map<String, Object> doMaintenance(@NonNull TypedMap req, @NonNull TestContext ctxt) {
+    public final Map<String, Object> doMaintenance(@NonNull TestContext ctxt, @NonNull TypedMap req) {
         req.validate(LEGAL_MANTENANCE_KEYS);
 
         final String dbName = req.getString(KEY_DATABASE);

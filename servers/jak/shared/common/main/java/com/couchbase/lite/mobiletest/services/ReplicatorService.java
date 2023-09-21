@@ -63,7 +63,7 @@ public class ReplicatorService {
     }
 
 
-    public void init(@NonNull TypedMap ignore1, @NonNull TestContext ignore2) {
+    public void init(@NonNull TestContext ignore1, @NonNull TypedMap ignore2) {
         // nothing to do here...
     }
 
@@ -85,7 +85,7 @@ public class ReplicatorService {
 
     @Nullable
     public List<DocumentReplication> getReplicatedDocs(@NonNull TestContext ctxt, @NonNull String replId) {
-        final DocReplListener listener = ctxt.getReplDocListener(replId);
+        final DocReplListener listener = ctxt.getDocReplListener(replId);
         return (listener == null) ? null : listener.getReplicatedDocs();
     }
 

@@ -58,20 +58,30 @@ public final class DatabaseService {
         l.add(KEY_DATASETS);
         LEGAL_DATASET_KEYS = Collections.unmodifiableSet(l);
     }
-    // Instance methods
+
+    // Utility methods
+
+    @NonNull
+    public static String getCollectionFQN(@NonNull Collection collection) {
+        return collection.getScope() + "." + collection.getName();
+    }
+
+    @NonNull
+    public static String getCollectionFQN(@NonNull Database db, @NonNull String collectionFqn) {
+        return db.getName() + "." + collectionFqn;
+    }
 
 
-    public void init(TypedMap req, TestContext ctxt) {
-        final TestApp app = TestApp.getApp();
+    public void init(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+        req.validate(LEGAL_DATASET_KEYS);
 
         final String testDir = "tests_" + StringUtils.randomString(6);
-        final File dbDir = new File(app.getFilesDir(), testDir);
+        final File dbDir = new File(TestApp.getApp().getFilesDir(), testDir);
         if (!dbDir.mkdirs() || !dbDir.canWrite()) {
-            throw new ServerError("Could not create db dir on init: " + dbDir);
+            throw new ServerError("Could not create db directory in init: " + dbDir);
         }
         ctxt.setDbDir(dbDir);
 
-        req.validate(LEGAL_DATASET_KEYS);
         final TypedMap datasets = req.getMap(KEY_DATASETS);
         if (datasets == null) { throw new ClientError("Missing dataset specification in init"); }
         for (String dataset: datasets.getKeys()) {
@@ -84,7 +94,7 @@ public final class DatabaseService {
                 if (dbName == null) {
                     throw new ClientError("Empty target databases in dataset " + dataset + " in init");
                 }
-                installDataset(dataset, dbName, ctxt);
+                installDataset(ctxt, dataset, dbName);
             }
         }
     }
@@ -96,33 +106,35 @@ public final class DatabaseService {
         return db;
     }
 
-    public void closeDb(@NonNull String name, @NonNull TestContext ctxt) {
-        if (closeDbInternal(name, ctxt)) { return; }
+    public void closeDb(@NonNull TestContext ctxt, @NonNull String name) {
+        if (closeDbInternal(ctxt, name)) { return; }
         Log.w(TAG, "Attempt to close a database that is not open: " + name);
     }
 
     @NonNull
     public Set<Collection> getCollections(
+        @NonNull TestContext ctxt,
         @NonNull Database db,
-        @NonNull TypedList collFqns,
-        @NonNull TestContext ctxt) {
+        @NonNull TypedList collFqns) {
         final Set<Collection> collections = new HashSet<>();
         for (int j = 0; j < collFqns.size(); j++) {
             final String collFqn = collFqns.getString(j);
             if (collFqn == null) { throw new ClientError("Empty collection name (" + j + ")"); }
-            collections.add(getCollection(db, collFqn, ctxt));
+            collections.add(getCollection(ctxt, db, collFqn));
         }
         return collections;
     }
 
     @NonNull
-    public Collection getCollection(@NonNull Database db, @NonNull String collFqn, @NonNull TestContext ctxt) {
+    public Collection getCollection(@NonNull TestContext ctxt, @NonNull Database db, @NonNull String collFqn) {
         final String[] collName = collFqn.split("\\.");
         if ((collName.length != 2) || collName[0].isEmpty() || collName[1].isEmpty()) {
             throw new ClientError("Cannot parse collection name: " + collFqn);
         }
 
-        final Collection collection;
+        Collection collection = ctxt.getOpenCollection(getCollectionFQN(db, collFqn));
+        if (collection != null) { return collection; }
+
         try { collection = db.getCollection(collName[1], collName[0]); }
         catch (CouchbaseLiteException e) {
             throw new CblApiFailure("Failed retrieving collection: " + collFqn + " from db " + db.getName(), e);
@@ -138,11 +150,11 @@ public final class DatabaseService {
 
     @NonNull
     public Document getDocument(
+        @NonNull TestContext ctxt,
         @NonNull Database db,
         @NonNull String collFqn,
-        @NonNull String docId,
-        @NonNull TestContext ctxt) {
-        final Document doc = getDocOrNull(db, collFqn, docId, ctxt);
+        @NonNull String docId) {
+        final Document doc = getDocOrNull(ctxt, db, collFqn, docId);
         if (doc == null) { throw new ClientError("Document not found: " + docId); }
         return doc;
     }
@@ -156,11 +168,11 @@ public final class DatabaseService {
 
     @Nullable
     public Document getDocOrNull(
+        @NonNull TestContext ctxt,
         @NonNull Database db,
         @NonNull String collFqn,
-        @NonNull String docId,
-        @NonNull TestContext ctxt) {
-        return getDocOrNull(getCollection(db, collFqn, ctxt), docId);
+        @NonNull String docId) {
+        return getDocOrNull(getCollection(ctxt, db, collFqn), docId);
     }
 
 
@@ -174,7 +186,7 @@ public final class DatabaseService {
 
 
     // New stream constructors are supported only in API 26+
-    private void installDataset(@NonNull String datasetName, @NonNull String dbName, @NonNull TestContext ctxt) {
+    private void installDataset(@NonNull TestContext ctxt, @NonNull String datasetName, @NonNull String dbName) {
         final File dbDir = ctxt.getDbDir();
         if (dbDir == null) { throw new ServerError("Cannot find test directory on install dataset"); }
 
@@ -205,10 +217,10 @@ public final class DatabaseService {
             throw new CblApiFailure("Failed copying dataset: " + datasetName + " to " + dbName, e);
         }
 
-        openDb(dbName, ctxt);
+        openDb(ctxt, dbName);
     }
 
-    private void openDb(@NonNull String name, @NonNull TestContext ctxt) {
+    private void openDb(@NonNull TestContext ctxt, @NonNull String name) {
         Database db = ctxt.getDb(name);
         if (db != null) { return; }
 
@@ -223,7 +235,7 @@ public final class DatabaseService {
         Log.i(TAG, "Created database: " + name);
     }
 
-    private boolean closeDbInternal(@NonNull String name, @NonNull TestContext ctxt) {
+    private boolean closeDbInternal(@NonNull TestContext ctxt, @NonNull String name) {
         final Database db = ctxt.removeDb(name);
         if (db != null) {
             try {
