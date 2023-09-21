@@ -5,7 +5,7 @@ function usage() {
     exit 1
 }
 
-if [ "$#" -ne 3 ]; then
+if [ "$#" -lt 3 ]; then
     usage
 fi
 

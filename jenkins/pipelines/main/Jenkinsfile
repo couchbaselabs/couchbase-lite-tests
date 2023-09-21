@@ -1,0 +1,110 @@
+pipeline {
+    agent { label 'mob-e2e-docker-01' }
+    parameters {
+        choice(name: 'CBL_PLATFORM', choices: ['all', 'c'], description: 'CBL Platform')
+        string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'CBL Version')
+        string(name: 'CBL_BUILD', defaultValue: '0', description: 'CBL Build Number, Use 0 for the latest successful build')
+        booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force Triggering Test Job(s)') 
+    }
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+    }
+    triggers {
+        cron('@daily')
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    if (params.CBL_PLATFORM == "all") {
+                        currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD} (#${currentBuild.number})"
+                    } else {
+                        currentBuild.displayName = "${CBL_PLATFORM}-${params.CBL_VERSION}-${params.CBL_BUILD} (#${currentBuild.number})"
+                    }
+                }
+            }
+        }
+        stage('Trigger E2E Tests') {
+            matrix {   
+                when { 
+                    anyOf {
+                        expression { params.CBL_PLATFORM == 'all' }
+                        expression { params.CBL_PLATFORM == env.CBL_PLATFORM}
+                    }
+                }
+                axes {
+                    axis {
+                        name 'CBL_PLATFORM'
+                        values 'c'
+                    }
+                }
+                stages {
+                    stage('Lookup Build and Trigger Test') {
+                        steps {
+                            script {
+                                def platform = env.CBL_PLATFORM
+                                def version = params.CBL_VERSION
+                                def buildNo = params.CBL_BUILD
+                                def force = params.FORCE_TRIGGER
+
+                                // Lookup latest successful build when CBL_BUILD param is zero:
+                                if (buildNo == "0") {
+                                    try {
+                                        buildNo = sh script: "jenkins/pipelines/main/latest_successful_build.sh ${platform} ${version}", returnStdout: true
+                                    } catch (Exception e) {
+                                        error "Cannot get latest build number : ${e} for ${platform} v${version}"
+                                    }
+                                }
+
+                                echo "PLATFORM: ${platform}"
+                                echo "VERSION: ${version}"
+                                echo "BUILD: ${buildNo}"
+                                echo "FORCE: ${force}"
+
+                                // Check if the test has been trigger for the CBL build:
+                                def triggerTestJob = true
+                                def buildInfo = [:]
+                                def buildInfoFile = "/var/agent_home/${env.JOB_NAME}/${platform}.json"
+                                echo "Build Info File: ${buildInfoFile}"
+
+                                if (!force && fileExists(buildInfoFile)) {
+                                    try {
+                                        buildInfo = readJSON file: buildInfoFile, returnPojo: true
+                                        if (buildInfo[version] == build) {
+                                            triggerTestJob = false
+                                        }
+                                    } catch (Exception e) {
+                                        echo "WARN : Cannot read ${platform}.json with error: ${e}"
+                                    }
+                                }
+
+                                // Trigger Test Job:
+                                if (triggerTestJob) {
+                                    def jobName = "stagging-e2e-test-${platform}"
+                                    echo "Triggering '${jobName}' job for ${platform} v${version}-${buildNo}"
+
+                                    build job: jobName, parameters: [
+                                        string(name: "CBL_VERSION", value: version),
+                                        string(name: "CBL_BUILD", value: buildNo)
+                                    ], wait: false
+
+                                    // Save CBL build info:
+                                    buildInfo[version] = buildNo
+                                    try {
+                                      writeJSON file: buildInfoFile, json: buildInfo
+                                    } catch (Exception e) {
+                                      error "Cannot save ${platform}.json with error: ${e}"
+                                    }
+                                } else {
+                                    echo "SKIP: ${platform} v${version}-${buildNo}"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
