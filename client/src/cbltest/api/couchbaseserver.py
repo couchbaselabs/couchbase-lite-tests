@@ -86,7 +86,7 @@ class CouchbaseServer:
             mgr = self.__cluster.buckets()
             settings = CreateBucketSettings(name=name, flush_enabled=True, ram_quota_mb=512)
             try:
-                mgr.create_bucket(settings, options=CreateBucketOptions(timedelta(seconds=10)))
+                mgr.create_bucket(settings)
             except BucketAlreadyExistsException:
                 pass
 
