@@ -9,11 +9,13 @@ plugins {
 }
 
 ext {
-    BUILD_RELEASE = file("${ROOT_DIR}/version.txt").text.trim()
-    BUILD_NUMBER = (project.hasProperty("buildNumber") && buildNumber) ? buildNumber : "SNAPSHOT"
-    BUILD_VERSION = "${BUILD_RELEASE}-${BUILD_NUMBER}"
+    SERVER_VERSION = file("${ROOT_DIR}/version.txt").text.trim()
+    SERVER_BUILD  = "${getBuildId()}"
 
-    COUCHBASE_LITE_VERSION = System.getProperty('version', "3.2.0-SNAPSHOT")
+    CBL_VERSION = file("${ROOT_DIR}/cbl-version.txt").text.trim()
+    CBL_BUILD_NUMBER = (project.hasProperty("buildNumber") && buildNumber) ? buildNumber : "SNAPSHOT"
+    COUCHBASE_LITE_VERSION = "${CBL_VERSION}-${CBL_BUILD_NUMBER}"
+
     SPOTBUGS_VERSION = '4.7.3'
 
     ASSETS_DIR = "${ROOT_DIR}/../../dataset/server"
@@ -47,10 +49,13 @@ android {
     defaultConfig {
         minSdkVersion ANDROID_MIN_SDK
         targetSdkVersion ANDROID_TARGET_SDK
-        versionCode 30200
-        versionName BUILD_VERSION
+
+        versionName SERVER_VERSION
+        versionCode getVersionCode(SERVER_VERSION)
 
         multiDexEnabled true
+
+        buildConfigField "String", "SERVER_VERSION", "\"${SERVER_VERSION}@${SERVER_BUILD}\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -103,7 +108,7 @@ android {
 repositories {
     if (USE_LOCAL_MAVEN) { mavenLocal() }
     else {
-        maven { url 'https://proget.sc.couchbase.com/maven2/cimaven/' }
+        maven { url 'https://proget.sc.couchbase.com/maven2/internalmaven' }
     }
 
     // Home of NanoHTTP
@@ -129,12 +134,6 @@ dependencies {
 
     implementation 'org.nanohttpd:nanohttpd:2.3.2-SNAPSHOT'
 
-    // !! If you change this, be sure also to change the SystemInfo entry
-    // for build version < 3.0.0-160, use package name:
-    // implementation "com.couchbase.lite:couchbase-lite-android-ee:${COUCHBASE_LITE_VERSION}"
-    // for build version > 3.0.0-160 but < 3.0.0-177, use package name:
-    // implementation "com.couchbase.lite:couchbase-lite-kt-android-ee:${COUCHBASE_LITE_VERSION}"
-    // for build version > 3.0.0-177, use package name:
     implementation ("com.couchbase.lite:couchbase-lite-android-ee-ktx:${COUCHBASE_LITE_VERSION}") { changing = true }
 
     testImplementation 'junit:junit:4.13.2'
@@ -254,4 +253,29 @@ spotbugs { toolVersion = SPOTBUGS_VERSION }
 }
 
 task smokeTest(dependsOn: ['clean', 'compileDebugSources', 'checkstyle', 'lint', 'pmd', 'spotbugsHtml'])
+
+
+// ----------------------------------------------------------------
+// Extensions
+// ----------------------------------------------------------------
+def getVersionCode(version) {
+    int code = 0
+    for (v in version.split("\\.")) { code = (code * 10) + v.toInteger() }
+    return code
+}
+
+def getBuildId() {
+    def hostname = "rogue"
+    try { hostname = "hostname".execute().text.trim() }
+    catch (Exception ignore) { }
+
+    return "${getCommit().substring(0, 10)} on ${hostname}"
+}
+
+def getCommit() {
+    def commit = "unofficial"
+    try { commit = "git rev-parse HEAD".execute().text.trim() }
+    catch (Exception ignore) { }
+    return commit
+}
 

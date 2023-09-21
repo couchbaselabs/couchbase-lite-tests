@@ -4,9 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -20,6 +18,7 @@ import com.couchbase.lite.mobiletest.changes.Snapshot;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
+import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.DocReplListener;
 import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
@@ -35,7 +34,7 @@ public final class TestContext implements AutoCloseable {
     @Nullable
     private Map<String, Database> openDbs;
     @Nullable
-    private List<Collection> openCollections;
+    private Map<String, Collection> openCollections;
     @Nullable
     private Map<String, Replicator> openRepls;
     @Nullable
@@ -84,9 +83,14 @@ public final class TestContext implements AutoCloseable {
     @Nullable
     public Database removeDb(@NonNull String name) { return (openDbs == null) ? null : openDbs.remove(name); }
 
+    @Nullable
+    public Collection getOpenCollection(@NonNull String collName) {
+        return (openCollections == null) ? null : openCollections.get(collName);
+    }
+
     public void addOpenCollection(@NonNull Collection collection) {
-        if (openCollections == null) { openCollections = new ArrayList<>(); }
-        openCollections.add(collection);
+        if (openCollections == null) { openCollections = new HashMap<>(); }
+        openCollections.put(DatabaseService.getCollectionFQN(collection), collection);
     }
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
@@ -107,7 +111,7 @@ public final class TestContext implements AutoCloseable {
     }
 
     @Nullable
-    public DocReplListener getReplDocListener(@NonNull String id) {
+    public DocReplListener getDocReplListener(@NonNull String id) {
         return (openListeners == null) ? null : openListeners.get(id);
     }
 
@@ -138,10 +142,10 @@ public final class TestContext implements AutoCloseable {
     }
 
     private void closeCollections() {
-        final List<Collection> openColls = this.openCollections;
+        final Map<String, Collection> openColls = openCollections;
         this.openCollections = null;
         if (openColls == null) { return; }
-        for (Collection collection: openColls) { collection.close(); }
+        for (Collection collection: openColls.values()) { collection.close(); }
     }
 
     private void deleteDbs() {

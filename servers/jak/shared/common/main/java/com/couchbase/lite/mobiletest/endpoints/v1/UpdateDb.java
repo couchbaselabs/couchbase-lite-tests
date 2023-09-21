@@ -46,7 +46,7 @@ public class UpdateDb extends UpdateItemEndpoint {
     public UpdateDb(@NonNull DatabaseService dbSvc) { super(dbSvc); }
 
     @NonNull
-    public Map<String, Object> updateDb(@NonNull TypedMap req, @NonNull TestContext ctxt) {
+    public Map<String, Object> updateDb(@NonNull TestContext ctxt, @NonNull TypedMap req) {
         req.validate(LEGAL_UPDATES_KEYS);
 
         final TypedList updates = req.getList(KEY_UPDATES);
@@ -57,7 +57,7 @@ public class UpdateDb extends UpdateItemEndpoint {
 
         final Database db = dbSvc.getOpenDb(ctxt, dbName);
         for (Map.Entry<String, Map<String, Change>> collChanges: getDelta(updates).entrySet()) {
-            final Collection collection = dbSvc.getCollection(db, collChanges.getKey(), ctxt);
+            final Collection collection = dbSvc.getCollection(ctxt, db, collChanges.getKey());
             for (Map.Entry<String, Change> change: collChanges.getValue().entrySet()) {
                 change.getValue().updateDocument(dbSvc, collection);
             }

@@ -69,7 +69,7 @@ public class GetReplStatus {
     public GetReplStatus(@NonNull ReplicatorService replSvc) { this.replSvc = replSvc; }
 
     @NonNull
-    public Map<String, Object> getReplStatus(@NonNull TypedMap req, @NonNull TestContext ctxt) {
+    public Map<String, Object> getReplStatus(@NonNull TestContext ctxt, @NonNull TypedMap req) {
         final String replId = req.getString(KEY_REPL_ID);
         if (replId == null) { throw new ClientError("Replicator id not specified"); }
 

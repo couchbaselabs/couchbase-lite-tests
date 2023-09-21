@@ -63,21 +63,22 @@ public class GetAllDocs {
     public GetAllDocs(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
 
     @NonNull
-    public Map<String, Object> getAllDocs(@NonNull TypedMap req, @NonNull TestContext ctxt) {
+    public Map<String, Object> getAllDocs(@NonNull TestContext ctxt, @NonNull TypedMap req) {
         req.validate(LEGAL_COLLECTION_KEYS);
-
-        final TypedList collectionFqns = req.getList(KEY_COLLECTIONS);
-        if (collectionFqns == null) { throw new ClientError("no collections specified"); }
 
         final String dbName = req.getString(KEY_DATABASE);
         if (dbName == null) { throw new ClientError("All Docs request doesn't specify a database"); }
 
-        return getAllDocs(dbSvc.getCollections(dbSvc.getOpenDb(ctxt, dbName), collectionFqns, ctxt));
+        final TypedList collectionFqns = req.getList(KEY_COLLECTIONS);
+        if (collectionFqns == null) { throw new ClientError("All Docs request doesn't specify collections"); }
+
+        return getAllDocs(dbSvc.getCollections(ctxt, dbSvc.getOpenDb(ctxt, dbName), collectionFqns));
     }
 
     @NonNull
     private Map<String, Object> getAllDocs(@NonNull Set<Collection> collections) {
         final Map<String, Object> colls = new HashMap<>();
+
         for (Collection collection: collections) {
             final String collectionName = collection.getScope().getName() + "." + collection.getName();
 

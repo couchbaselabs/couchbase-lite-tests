@@ -33,13 +33,8 @@ public class TypedMap extends TypedCollection {
 
     public TypedMap() { this(new HashMap<>()); }
 
-    public TypedMap(@NonNull Map<?, ?> data) { this(data, true); }
-
     @SuppressWarnings("unchecked")
-    public TypedMap(@NonNull Map<?, ?> data, boolean strict) {
-        super(strict);
-        this.data = (Map<String, Object>) data;
-    }
+    public TypedMap(@NonNull Map<?, ?> data) { this.data = (Map<String, Object>) data; }
 
     @Nullable
     public Class<?> getType(@NonNull String key) {

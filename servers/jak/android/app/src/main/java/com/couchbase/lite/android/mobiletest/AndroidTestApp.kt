@@ -58,7 +58,7 @@ class AndroidTestApp(private val context: Context) : TestApp() {
                 KEY_DEVICE_SYS_API to Build.VERSION.SDK_INT
             ),
             KEY_ADDITIONAL_INFO
-                    to "Android Test Server ${BuildConfig.VERSION_NAME} using ${CBLVersion.getVersionInfo()}"
+                    to "Android Test Server ${BuildConfig.SERVER_VERSION} using ${CBLVersion.getVersionInfo()}"
         )
     }
 

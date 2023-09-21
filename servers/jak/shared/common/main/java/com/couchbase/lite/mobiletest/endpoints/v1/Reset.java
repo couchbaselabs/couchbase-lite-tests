@@ -32,7 +32,7 @@ public class Reset {
     public Reset(@NonNull TestApp app) { this.app = app; }
 
     @NonNull
-    public final Map<String, Object> reset(@NonNull TypedMap req, @NonNull TestContext ctxt) {
+    public final Map<String, Object> reset(@NonNull TestContext ctxt, @NonNull TypedMap req) {
         final String client = ctxt.getClient();
 
         app.clearReplSvc();
@@ -40,8 +40,8 @@ public class Reset {
         ctxt.close();
 
         final TestContext newCtxt = app.resetContext(client);
-        app.getDbSvc().init(req, newCtxt);
-        app.getReplSvc().init(req, newCtxt);
+        app.getDbSvc().init(newCtxt, req);
+        app.getReplSvc().init(newCtxt, req);
 
         return Collections.emptyMap();
     }
