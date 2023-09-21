@@ -5,7 +5,7 @@ from opentelemetry.trace import get_tracer
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions
 from couchbase.auth import PasswordAuthenticator
-from couchbase.management.buckets import CreateBucketSettings
+from couchbase.management.buckets import CreateBucketSettings, CreateBucketOptions
 from couchbase.management.collections import CollectionSpec
 from couchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException, ScopeAlreadyExistsException
 from couchbase.exceptions import CollectionAlreadyExistsException
@@ -64,7 +64,7 @@ class CouchbaseServer:
             mgr = self.__cluster.buckets()
             settings = CreateBucketSettings(name=name, flush_enabled=True, ram_quota_mb=512)
             try:
-                mgr.create_bucket(settings)
+                mgr.create_bucket(settings, options=CreateBucketOptions(timedelta(seconds=10)))
             except BucketAlreadyExistsException:
                 pass
 
