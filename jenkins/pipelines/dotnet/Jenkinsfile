@@ -21,7 +21,7 @@ pipeline {
         stage('Windows') {
             agent { label 'mob-e2e-win-01' }
             steps {
-                powershell "jenkins/pipelines/dotnet/windows_console_test.ps1 -Edition ${params.CBL_EDITION} -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD}"
+                powershell "jenkins/pipelines/dotnet/winui_test.ps1 -Edition ${params.CBL_EDITION} -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD}"
             }
             post { 
                 always { 
