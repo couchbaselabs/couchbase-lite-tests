@@ -82,7 +82,7 @@ pipeline {
 
                                 // Trigger Test Job:
                                 if (triggerTestJob) {
-                                    def jobName = "stagging-e2e-test-${platform}"
+                                    def jobName = "staging-e2e-test-${platform}"
                                     echo "Triggering '${jobName}' job for ${platform} v${version}-${buildNo}"
 
                                     build job: jobName, parameters: [
