@@ -24,7 +24,7 @@ then
     BUILD_NO=`curl -s https://raw.githubusercontent.com/couchbase/build-manifests/master/couchbase-lite-ios/${VERSION}/${VERSION}.xml |  xmllint --xpath "//manifest/project/annotation[3]/@value" - | cut -f 2 -d "=" | cut -f 2 -d "\""`
 elif [ "${PLATFORM}" == "net" ]
 then
-    BUILD_NO=`curl -s "http://mobile.nuget.couchbase.com/nuget/Internal/FindPackagesById()?id='Couchbase.Lite.Enterprise'" | sed -e 's/xmlns="[^"]*"//g' | sed -e 's/[m|d]://g' | xmllint --xpath '//feed/entry[*]/properties/Version/text()' - | sort -r | grep "^${VERSION}-" -m 1 | awk -F'-' '{print $2}'`
+    BUILD_NO=`curl -s "https://proget.sc.couchbase.com/nuget/Internal/FindPackagesById()?id='Couchbase.Lite.Enterprise'" | sed -e 's/xmlns="[^"]*"//g' | sed -e 's/[m|d]://g' | xmllint --xpath '//feed/entry[*]/properties/Version/text()' - | sort -r | grep "^${VERSION}-" -m 1 | awk -F'-' '{print $2}'`
 elif [ "${PLATFORM}" == "c" ]
 then
     BUILD_NO=`curl -s http://dbapi.build.couchbase.com:8000/v1/products/couchbase-lite-c/releases/${VERSION}/versions/${VERSION}/builds?filter=last_complete | cut -f 2 -d ":" | cut -f 2 -d "\""`
