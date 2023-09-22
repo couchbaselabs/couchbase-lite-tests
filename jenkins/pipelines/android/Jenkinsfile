@@ -23,7 +23,7 @@ pipeline {
                 echo "Run Android Tests"
                 sh '''
                     #export ANDROID_SERIAL=14151JEC204776
-                    jenkins/pipelines/android/run_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                    jenkins/pipelines/android/android_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
                 '''
             }
             post {
@@ -31,7 +31,7 @@ pipeline {
                     echo "Teardown Android Tests"
                     sh '''
                         #export ANDROID_SERIAL=14151JEC204776
-                        jenkins/pipelines/android/teardown.sh
+                        jenkins/pipelines/android/android_teardown.sh
                     '''
                 }
             }
