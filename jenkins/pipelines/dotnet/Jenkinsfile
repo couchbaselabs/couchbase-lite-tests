@@ -21,11 +21,11 @@ pipeline {
         stage('Windows') {
             agent { label 'mob-e2e-win-01' }
             steps {
-                powershell "jenkins\\pipelines\\dotnet\\winui_test.ps1 -Edition ${params.CBL_EDITION} -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD}"
+                pwsh "jenkins\\pipelines\\dotnet\\winui_test.ps1 -Edition ${params.CBL_EDITION} -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD}"
             }
             post { 
                 always { 
-                    powershell 'jenkins\\pipelines\\dotnet\\windows_teardown.ps1'
+                    pwsh 'jenkins\\pipelines\\dotnet\\windows_teardown.ps1'
                 }
             }
         }
