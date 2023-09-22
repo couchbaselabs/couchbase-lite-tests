@@ -24,5 +24,5 @@ package com.couchbase.lite.mobiletest;
 public final class TestServerInfo {
     private TestServerInfo() {}
 
-    public static final String VERSION_NAME = "@VERSION@";
+    public static final String SERVER_VERSION = "@VERSION@";
 }

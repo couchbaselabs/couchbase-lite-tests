@@ -39,7 +39,6 @@ import com.couchbase.lite.Database;
 import com.couchbase.lite.LogDomain;
 import com.couchbase.lite.LogLevel;
 import com.couchbase.lite.TLSIdentity;
-import com.couchbase.lite.internal.core.CBLVersion;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
@@ -84,15 +83,16 @@ public abstract class TestApp {
     }
 
 
+    protected final String platform;
+
     private final Map<String, TestContext> testContexts = new HashMap<>();
 
     private final AtomicReference<DatabaseService> dbSvc = new AtomicReference<>();
     private final AtomicReference<ReplicatorService> replSvc = new AtomicReference<>();
 
-    protected abstract void initCBL();
+    protected TestApp(@NonNull String platform) { this.platform = platform; }
 
-    @NonNull
-    public abstract String getPlatform();
+    protected abstract void initCBL();
 
     @NonNull
     public abstract Map<String, Object> getSystemInfo();
@@ -123,11 +123,6 @@ public abstract class TestApp {
 
     @NonNull
     public final String getAppId() { return APP_ID.get(); }
-
-    @NonNull
-    public final String getAppVersion() {
-        return "Test Server (" + getPlatform() + ") :: " + CBLVersion.getVersionInfo();
-    }
 
     @NonNull
     public final List<Certificate> getAuthenticatorCertsList() throws CertificateException, IOException {
