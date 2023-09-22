@@ -1,0 +1,147 @@
+pipeline {
+    agent none
+    parameters {
+        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
+        string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
+        string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
+    }
+    options { timeout(time: 30, unit: 'MINUTES') }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    currentBuild.displayName = "android-${CBL_EDITION}-${params.CBL_VERSION}-${params.CBL_BUILD} #${currentBuildNumber}"
+                }
+            }
+        }
+        stage('Build') {
+            agent { label 'mob-e2e-mac-01' }
+            steps {
+                echo "Build Desktop Java Test Server"
+                sh '''
+                    jenkins/pipelines/java/desktop/build_server.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                '''
+
+                echo "Build Web Services  Java Test Server"
+                sh '''      
+                    jenkins/pipelines/java/ws/build_server.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                '''
+            }
+            post {
+                always {
+                }
+            }
+        }
+        stage('Run Tests') {
+            parallel {
+                stage('OSX Tests') {
+                    agent { label 'mob-e2e-win-01' }
+                    stages {
+                        stage('OSX Desktop Tests') {
+                            steps {
+                                sh '''
+                                    jenkins/pipelines/java/desktop/osx_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                '''
+                            }
+                            post {
+                                always {
+                                    echo "Teardown OSX Java Desktop Tests"
+                                    sh '''
+                                        jenkins/pipelines/java/desktop/osx_teardown.sh
+                                    '''
+                                }
+                            }
+                        }
+                        stage('OSX Web Services Tests') {
+                            steps {
+                                sh '''
+                                    jenkins/pipelines/java/ws/osx_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                '''
+                            }
+                            post {
+                                always {
+                                    echo "Teardown OSX Java Desktop Tests"
+                                    sh '''
+                                        jenkins/pipelines/java/ws/osx_teardown.sh
+                                    '''
+                                }
+                            }
+                        }
+                    }
+                }
+                stage('Windows Tests') {
+                    agent { label 'mob-e2e-win-01' }
+                    stages {
+                        stage('Windows Desktop Tests') {
+                            steps {
+                                sh '''
+                                    jenkins/pipelines/java/desktop/win_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                '''
+                            }
+                            post {
+                                always { 
+                                    echo "Teardown Windows Java Desktop Tests"
+                                    sh '''
+                                        jenkins/pipeline/java/desktop/win_teardown.sh
+                                    '''
+                                }
+                            }
+                        }
+                        stage('Windows Web Services Tests') {
+                            steps {
+                                sh '''
+                                    jenkins/pipelines/java/ws/win_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                '''
+                            }
+                            post {
+                                always { 
+                                    echo "Teardown Windows Java Desktop Tests"
+                                    sh '''
+                                        jenkins/pipelines/java/ws/win_teardown.sh
+                                    '''
+                                }
+                            }
+                        }
+                    }
+                }
+                stage('Linux Tests') {
+                    agent { label 'mob-e2e-linux-02' }
+                    stages {
+                        stage('Linux Desktop Tests') {
+                            steps {
+                                sh '''
+                                    jenkins/pipelines/java/desktop/linux_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                '''
+                            }
+                            post {
+                                always { 
+                                    echo "Teardown Linux Java Desktop Tests"
+                                    sh '''
+                                        jenkins/pipelines/java/desktop/linux_teardown.sh
+                                    '''
+                                }
+                            }
+                        }
+                        stage('Linux Web Services Tests') {
+                            steps {
+                                sh '''
+                                    jenkins/pipelines/java/ws/linux_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                '''
+                            }
+                            post {
+                                always { 
+                                    echo "Teardown Linux Java Desktop Tests"
+                                    sh '''
+                                        jenkins/pipelines/java/ws/linux_teardown.sh
+                                    '''
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
