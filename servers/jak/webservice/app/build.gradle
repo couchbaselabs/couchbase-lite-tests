@@ -11,13 +11,15 @@ plugins {
     id 'com.github.spotbugs'
 }
 
-
 ext {
-    BUILD_RELEASE = file("${ROOT_DIR}/version.txt").text.trim()
-    BUILD_NUMBER = (project.hasProperty("buildNumber") && buildNumber) ? buildNumber : "SNAPSHOT"
-    BUILD_VERSION = "${BUILD_RELEASE}-${BUILD_NUMBER}"
+    SERVER_VERSION = file("${ROOT_DIR}/version.txt").text.trim()
+    SERVER_BUILD  = "${getBuildId()}"
+    SERVER_ID = "${SERVER_VERSION}@${SERVER_BUILD}"
 
-    COUCHBASE_LITE_VERSION = System.getProperty('version', "3.2.0-SNAPSHOT")
+    CBL_VERSION = file("${ROOT_DIR}/cbl-version.txt").text.trim()
+    CBL_BUILD_NUMBER = (project.hasProperty("buildNumber") && buildNumber) ? buildNumber : "SNAPSHOT"
+    COUCHBASE_LITE_VERSION = "${CBL_VERSION}-${CBL_BUILD_NUMBER}"
+
     SPOTBUGS_VERSION = '4.7.3'
     TOMCAT_VERSION = '9.0.1'
 
@@ -35,7 +37,7 @@ def VERBOSE = project.hasProperty("verbose")
 def USE_LOCAL_MAVEN = project.hasProperty("useLocalMaven")
 
 group 'com.couchbase.lite.mobiletest'
-version = BUILD_VERSION
+version = SERVER_VERSION
 
 java {
     sourceCompatibility = "1.8"
@@ -79,8 +81,8 @@ def COUCHBASE_LITE_LIB = 'couchbase-lite-java-ee'
 if (USE_LOCAL_MAVEN) { COUCHBASE_LITE_LIB += "-macos" }
 
 dependencies {
-    compileOnly "com.github.spotbugs:spotbugs-annotations:${SPOTBUGS_VERSION}"
     compileOnly 'androidx.annotation:annotation:1.5.0'
+    compileOnly "com.github.spotbugs:spotbugs-annotations:${SPOTBUGS_VERSION}"
 
     providedCompile "javax.servlet:javax.servlet-api:4.0.1"
 
@@ -100,7 +102,7 @@ dependencies {
 task generateServerInfo(type: Copy) {
     outputs.upToDateWhen { false }
     from("${SHARED_DIR}/jvm/templates/TestServerInfo.java") {
-        filter(ReplaceTokens, tokens: [VERSION: BUILD_VERSION.toString()])
+        filter(ReplaceTokens, tokens: [VERSION: SERVER_ID.toString()])
     }
     into "${buildDir}/generated/sources/java/com/couchbase/lite/mobiletest"
 }
@@ -244,4 +246,26 @@ test {
 
 task smokeTest(dependsOn: ['clean', 'compileJava', 'checkstyle', 'pmd', 'spotbugsHtml', 'testClasses'])
 
+// ----------------------------------------------------------------
+// Extensions
+// ----------------------------------------------------------------
+def getVersionCode(version) {
+    int code = 0
+    for (v in version.split("\\.")) { code = (code * 10) + v.toInteger() }
+    return code
+}
 
+def getBuildId() {
+    def hostname = "rogue"
+    try { hostname = "hostname".execute().text.trim() }
+    catch (Exception ignore) { }
+
+    return "${getCommit().substring(0, 10)} on ${hostname}"
+}
+
+def getCommit() {
+    def commit = "unofficial"
+    try { commit = "git rev-parse HEAD".execute().text.trim() }
+    catch (Exception ignore) { }
+    return commit
+}

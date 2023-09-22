@@ -29,7 +29,8 @@ import com.couchbase.lite.mobiletest.errors.ServerError;
 public abstract class BaseTestApp extends TestApp {
     private final File directory;
 
-    public BaseTestApp() {
+    public BaseTestApp(@NonNull String platform) {
+        super(platform);
         directory = new File(System.getProperty("java.io.tmpdir"), "TestServerTemp");
         if (!(directory.exists() || directory.mkdirs())) {
             throw new ServerError("Cannot create tmp directory: " + directory);
@@ -48,7 +49,7 @@ public abstract class BaseTestApp extends TestApp {
         content.put(KEY_CBL, "couchbase-lite-java-ee");
         content.put(
             KEY_ADDITIONAL_INFO,
-            "Java Test Server " + TestServerInfo.VERSION_NAME + " using " + CBLVersion.getVersionInfo());
+            platform + " Test Server " + TestServerInfo.SERVER_VERSION + " using " + CBLVersion.getVersionInfo());
 
         final Map<String, Object> device = new HashMap<>();
         device.put(KEY_DEVICE_MODEL, System.getProperty("os.arch"));

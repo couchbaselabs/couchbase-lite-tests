@@ -35,7 +35,7 @@ import java.security.cert.CertificateException
 import java.util.*
 
 
-class AndroidTestApp(private val context: Context) : TestApp() {
+class AndroidTestApp(private val context: Context) : TestApp("Android") {
 
     override fun initCBL() {
         CouchbaseLite.init(context, true)
@@ -44,28 +44,26 @@ class AndroidTestApp(private val context: Context) : TestApp() {
         logger.level = LogLevel.DEBUG
     }
 
-    override fun getPlatform() = "android"
-
     override fun getSystemInfo(): Map<String, Any> {
         return mapOf(
             KEY_SERVER_VERSION to com.couchbase.lite.BuildConfig.VERSION_NAME,
             KEY_API to LATEST_SUPPORTED_PROTOCOL_VERSION,
             KEY_CBL to "couchbase-lite-android-ee-ktx",
+            KEY_ADDITIONAL_INFO
+                    to "${platform} Test Server ${BuildConfig.SERVER_VERSION} using ${CBLVersion.getVersionInfo()}",
             KEY_DEVICE to mapOf(
                 KEY_DEVICE_MODEL to Build.PRODUCT,
                 KEY_DEVICE_SYS_NAME to "android",
                 KEY_DEVICE_SYS_VERSION to Build.VERSION.RELEASE,
                 KEY_DEVICE_SYS_API to Build.VERSION.SDK_INT
-            ),
-            KEY_ADDITIONAL_INFO
-                    to "Android Test Server ${BuildConfig.SERVER_VERSION} using ${CBLVersion.getVersionInfo()}"
+            )
         )
     }
 
     override fun getFilesDir() = context.filesDir!!
 
     @Throws(IOException::class)
-    override fun getAsset(name: String)= context.assets.open(name)
+    override fun getAsset(name: String) = context.assets.open(name)
 
     override fun encodeBase64(hashBytes: ByteArray) = Base64.encodeToString(hashBytes, Base64.NO_WRAP)!!
 
