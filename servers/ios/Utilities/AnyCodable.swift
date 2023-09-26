@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CouchbaseLiteSwift
 
 struct AnyCodable: Codable {
     let value: Any
@@ -26,6 +27,9 @@ struct AnyCodable: Codable {
             self.value = try value.map { try AnyCodable($0) }
         case let value as [String : Any]:
             self.value = try value.mapValues { try AnyCodable($0) }
+            // Blob gets encoded as blob properties
+        case let value as CouchbaseLiteSwift.Blob:
+            self.value = try value.properties.mapValues { try AnyCodable($0) }
         default:
             throw TestServerError(domain: .TESTSERVER, code: 500, message: "Internal error parsing value type")
         }
