@@ -34,6 +34,10 @@
 		EA3D1A762A86A2490059EE0E /* ReplicationFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3D1A752A86A2490059EE0E /* ReplicationFilter.swift */; };
 		EA4841B32AB8622600CF0C01 /* blobs in Resources */ = {isa = PBXBuildFile; fileRef = EA4841B22AB8622600CF0C01 /* blobs */; };
 		EA4841B42AB8622600CF0C01 /* blobs in Resources */ = {isa = PBXBuildFile; fileRef = EA4841B22AB8622600CF0C01 /* blobs */; };
+		EA4841B62AB9CF2B00CF0C01 /* PerformMaintenanceConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA4841B52AB9CF2B00CF0C01 /* PerformMaintenanceConfiguration.swift */; };
+		EA4841B72AB9CF2B00CF0C01 /* PerformMaintenanceConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA4841B52AB9CF2B00CF0C01 /* PerformMaintenanceConfiguration.swift */; };
+		EA4841B92AB9D55D00CF0C01 /* PerformMaintenance.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA4841B82AB9D55D00CF0C01 /* PerformMaintenance.swift */; };
+		EA4841BA2AB9D55D00CF0C01 /* PerformMaintenance.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA4841B82AB9D55D00CF0C01 /* PerformMaintenance.swift */; };
 		EA79A99D2A7940C900530ADE /* Vapor in Frameworks */ = {isa = PBXBuildFile; productRef = EA79A99C2A7940C900530ADE /* Vapor */; };
 		EA94790E2A7943CD000C584A /* TestServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA94790D2A7943CD000C584A /* TestServer.swift */; };
 		EAE658B22A795B0700C26657 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE658B12A795B0700C26657 /* DatabaseManager.swift */; };
@@ -145,6 +149,8 @@
 		EA3D1A722A8682690059EE0E /* GetReplicatorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetReplicatorStatus.swift; sourceTree = "<group>"; };
 		EA3D1A752A86A2490059EE0E /* ReplicationFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationFilter.swift; sourceTree = "<group>"; };
 		EA4841B22AB8622600CF0C01 /* blobs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = blobs; path = ../../dataset/server/blobs; sourceTree = "<group>"; };
+		EA4841B52AB9CF2B00CF0C01 /* PerformMaintenanceConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformMaintenanceConfiguration.swift; sourceTree = "<group>"; };
+		EA4841B82AB9D55D00CF0C01 /* PerformMaintenance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformMaintenance.swift; sourceTree = "<group>"; };
 		EA94790D2A7943CD000C584A /* TestServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestServer.swift; sourceTree = "<group>"; };
 		EAE658B02A7955A500C26657 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		EAE658B12A795B0700C26657 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
@@ -263,6 +269,7 @@
 				EA3D1A552A854E3B0059EE0E /* VerifyDocuments.swift */,
 				EA3D1A6E2A8676960059EE0E /* StartReplicator.swift */,
 				EA3D1A722A8682690059EE0E /* GetReplicatorStatus.swift */,
+				EA4841B82AB9D55D00CF0C01 /* PerformMaintenance.swift */,
 			);
 			path = Handlers;
 			sourceTree = "<group>";
@@ -291,6 +298,7 @@
 				EA3D1A632A8662FF0059EE0E /* ReplicatorStatus.swift */,
 				EA3D1A652A8663A50059EE0E /* ServerInfo.swift */,
 				EA3D1A702A86794A0059EE0E /* StartReplicatorRequest.swift */,
+				EA4841B52AB9CF2B00CF0C01 /* PerformMaintenanceConfiguration.swift */,
 			);
 			path = ContentTypes;
 			sourceTree = "<group>";
@@ -489,11 +497,13 @@
 				EA3D1A5A2A865D4D0059EE0E /* Replicator.swift in Sources */,
 				EAE658B22A795B0700C26657 /* DatabaseManager.swift in Sources */,
 				EAF9CC232A826A6D00BCEC1A /* KeyPathParser.swift in Sources */,
+				EA4841B92AB9D55D00CF0C01 /* PerformMaintenance.swift in Sources */,
 				EA3D1A6D2A866D930059EE0E /* CBLVersion.swift in Sources */,
 				EA19C6832A793C3700197481 /* ContentView.swift in Sources */,
 				EA3D1A602A8661D90059EE0E /* ReplicationCollection.swift in Sources */,
 				EAF9CC382A83EA3E00BCEC1A /* UpdateRequest.swift in Sources */,
 				EA94790E2A7943CD000C584A /* TestServer.swift in Sources */,
+				EA4841B62AB9CF2B00CF0C01 /* PerformMaintenanceConfiguration.swift in Sources */,
 				EAF9CC3A2A83F23A00BCEC1A /* AnyCodable.swift in Sources */,
 				EA3D1A662A8663A50059EE0E /* ServerInfo.swift in Sources */,
 				EAE658D12A7A947400C26657 /* ErrorMiddleware.swift in Sources */,
@@ -540,11 +550,13 @@
 				EAEE5DC42A86B4EF00CF266E /* Replicator.swift in Sources */,
 				EAEE5DC52A86B4EF00CF266E /* DatabaseManager.swift in Sources */,
 				EAEE5DC62A86B4EF00CF266E /* KeyPathParser.swift in Sources */,
+				EA4841BA2AB9D55D00CF0C01 /* PerformMaintenance.swift in Sources */,
 				EAEE5DC72A86B4EF00CF266E /* CBLVersion.swift in Sources */,
 				EAEE5DC82A86B4EF00CF266E /* ContentView.swift in Sources */,
 				EAEE5DC92A86B4EF00CF266E /* ReplicationCollection.swift in Sources */,
 				EAEE5DCA2A86B4EF00CF266E /* UpdateRequest.swift in Sources */,
 				EAEE5DCB2A86B4EF00CF266E /* TestServer.swift in Sources */,
+				EA4841B72AB9CF2B00CF0C01 /* PerformMaintenanceConfiguration.swift in Sources */,
 				EAEE5DCC2A86B4EF00CF266E /* AnyCodable.swift in Sources */,
 				EAEE5DCD2A86B4EF00CF266E /* ServerInfo.swift in Sources */,
 				EAEE5DCE2A86B4EF00CF266E /* ErrorMiddleware.swift in Sources */,

@@ -62,6 +62,7 @@ class TestServer : ObservableObject {
         app.post("verifyDocuments", use: Handlers.verifyDocuments)
         app.post("startReplicator", use: Handlers.startReplicator)
         app.post("getReplicatorStatus", use: Handlers.getReplicatorStatus)
+        app.post("performMaintenance", use: Handlers.performMaintenance)
         
         TestServer.logger.log(level: .debug, "Server configured with the following routes: \n\(app.routes.description)")
     }

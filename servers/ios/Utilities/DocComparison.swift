@@ -48,7 +48,13 @@ struct DocComparison : Content {
     }
     
     private static func isEqual(_ left: Blob, _ right: Blob) -> Bool {
+        // Compare blob properties
         guard left == right
+        else { return false }
+        
+        // Both blobs content nil is unexpected behaviour
+        // It might indicate missing blob files
+        guard left.content != nil || right.content != nil
         else { return false }
         
         return left.content == right.content

@@ -269,6 +269,28 @@ class DatabaseManager {
         }
     }
     
+    public func performMaintenance(type: MaintenanceType, onDB dbName: String) throws {
+        guard let db = databases[dbName]
+        else { throw TestServerError.cblDBNotOpen }
+        
+        do {
+            try db.performMaintenance(type: type)
+        } catch(let error as NSError) {
+            throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
+        }
+    }
+    
+    public func blobFileExists(forBlob blob: Blob, inDB dbName: String) throws -> Bool {
+        guard let db = databases[dbName]
+        else { throw TestServerError.cblDBNotOpen }
+        
+        do {
+            return try db.getBlob(properties: blob.properties) != nil
+        } catch(let error as NSError) {
+            throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
+        }
+    }
+    
     public func closeDatabase(withName dbName: String) throws {
         TestServer.logger.log(level: .debug, "Closing database '\(dbName)'")
         guard let database = databases[dbName]
