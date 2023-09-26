@@ -45,7 +45,7 @@ extension Snapshot {
             let snapshotKey = "\(change.collection).\(change.documentID)"
             
             guard snapshot.keys.contains(snapshotKey)
-            else { throw TestServerError.badRequest("Snapshot '\(snapshotID)' does not contain document '\(change.collection).\(change.documentID)'") }
+            else { throw TestServerError.badRequest("Snapshot '\(snapshotID)' does not contain key '\(change.collection).\(change.documentID)'") }
             
             guard let collection = try dbManager.collection(change.collection, inDB: dbName)
             else { throw TestServerError.badRequest("Cannot find collection '\(change.collection)' in db '\(dbName)'") }
@@ -58,26 +58,34 @@ extension Snapshot {
                 throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
             }
             
-            if(change.type == .PURGE || change.type == .DELETE) {
+            if(change.type == .DELETE) {
                 if(existingDoc != nil) {
-                    return ContentTypes.VerifyResponse(result: false, description: "Deleted or purged document \(snapshotKey) still exists!")
+                    return ContentTypes.VerifyResponse(result: false, description: DocComparison.FailDescriptions.case2(docID: change.documentID, qualifiedCollection: change.collection))
+                }
+                continue
+            } else if(change.type == .PURGE) {
+                if(existingDoc != nil) {
+                    return ContentTypes.VerifyResponse(result: false, description: DocComparison.FailDescriptions.case3(docID: change.documentID, qualifiedCollection: change.collection))
                 }
                 continue
             }
             
-            if(existingDoc == nil) {
-                return ContentTypes.VerifyResponse(result: false, description: "Document \(snapshotKey) not found to verify!")
+            guard let existingDoc = existingDoc
+            else {
+                return ContentTypes.VerifyResponse(result: false, description: DocComparison.FailDescriptions.case1(docID: change.documentID, qualifiedCollection: change.collection))
             }
             
             // We can force-unwrap here because we earlier checked that snapshot has snapshotKey
-            let snapshotDoc = snapshot[snapshotKey]!
-            let mutableSnapshotDoc = snapshotDoc?.toMutable() ?? MutableDocument(id: change.documentID)
+            guard let snapshotDoc = snapshot[snapshotKey]!
+            else { return ContentTypes.VerifyResponse(result: false, description: DocComparison.FailDescriptions.case5(docID: change.documentID, qualifiedCollection: change.collection)) }
+            
+            let mutableSnapshotDoc = snapshotDoc.toMutable()
             
             try DocumentUpdater.update(doc: mutableSnapshotDoc, updatedProperties: change.updatedProperties, removedProperties: change.removedProperties, updatedBlobs: change.updatedBlobs)
             
-            let compareResult = try DocComparison.isEqual(mutableSnapshotDoc, existingDoc!)
-            if(!compareResult.success) {
-                return ContentTypes.VerifyResponse(result: false, description: "Contents for document \(snapshotKey) did not match!", expected: compareResult.expected, actual: compareResult.actual)
+            let compareResult = try DocComparison.isEqual(mutableSnapshotDoc, existingDoc, docID: change.documentID, qualifiedCollection: change.collection)
+            if(!compareResult.result) {
+                return compareResult
             }
         }
         
