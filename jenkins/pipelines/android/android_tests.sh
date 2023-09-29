@@ -36,7 +36,7 @@ echo "$VERSION" > cbl-version.txt
 echo "Build Test Server"
 cd android
 adb uninstall com.couchbase.lite.android.mobiletest 2 >& 1 > /dev/null || true
-gw installRelease -PbuildNumber="${BUILD_NUMBER}"
+./gradlew installRelease -PbuildNumber="${BUILD_NUMBER}"
 
 echo "Start the Test Server"
 adb shell am start -a android.intent.action.MAIN -n com.couchbase.lite.android.mobiletest/.MainActivity
@@ -56,11 +56,10 @@ echo '}' >> config.android.json
 cat config.android.json
 
 echo "Running tests on device $ANDROID_SERIAL at $ANDROID_IP"
-python3 -m venv venv
+python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
 
 echo "Run tests"
 adb shell input keyevent KEYCODE_WAKEUP
 pytest -v --no-header -W ignore::DeprecationWarning --config config.android.json
-
