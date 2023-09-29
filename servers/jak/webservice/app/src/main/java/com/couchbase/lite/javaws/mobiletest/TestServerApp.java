@@ -79,6 +79,7 @@ public class TestServerApp extends HttpServlet {
             if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }
 
             final String client = req.getHeader(TestApp.HEADER_CLIENT);
+            final String contentType = req.getHeader(TestApp.HEADER_CONTENT_TYPE);
             Log.i(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
             Reply reply = null;
             try {
@@ -87,7 +88,8 @@ public class TestServerApp extends HttpServlet {
                         reply = getDispatcher.handleRequest(client, version, endpoint);
                         break;
                     case POST:
-                        reply = postDispatcher.handleRequest(client, version, endpoint, req.getInputStream());
+                        reply = postDispatcher
+                            .handleRequest(client, version, endpoint, contentType, req.getInputStream());
                         break;
                     default:
                         throw new ClientError("Unimplemented method: " + method);
