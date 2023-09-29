@@ -72,7 +72,8 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
         if (version < 0) { throw new ClientError("No protocol version specified"); }
         if (client == null) { throw new ClientError("No client specified"); }
         if (!TestApp.CONTENT_TYPE_JSON.equalsIgnoreCase(contentType)) {
-            throw new ClientError("Content type should be '" + TestApp.CONTENT_TYPE_JSON + " but is " + contentType);
+            //throw new ClientError("Content type should be '" + TestApp.CONTENT_TYPE_JSON + " but is " + contentType);
+            Log.w(TAG, "Content type should be '" + TestApp.CONTENT_TYPE_JSON + " but is " + contentType);
         }
 
         final Endpoint endpoint = getEndpoint(version, path);
