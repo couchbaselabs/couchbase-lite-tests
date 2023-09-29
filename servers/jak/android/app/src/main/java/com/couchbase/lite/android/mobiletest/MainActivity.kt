@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
 
-        viewBinding.server.text = TestApp.getApp().appVersion
+        viewBinding.server.text = BuildConfig.SERVER_VERSION
         try {
             val uri = model.startServer()
             viewBinding.status.text = getString(R.string.running, uri?.toString() ?: "unknown")

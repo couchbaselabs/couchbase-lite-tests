@@ -82,6 +82,7 @@ public class Server extends NanoHTTPD {
             if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }
 
             final String client = headers.get(TestApp.HEADER_CLIENT);
+            final String contentType = headers.get(TestApp.HEADER_CONTENT_TYPE);
 
             Log.i(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
             switch (method) {
@@ -89,7 +90,12 @@ public class Server extends NanoHTTPD {
                     reply = getDispatcher.handleRequest(client, version, endpoint);
                     break;
                 case POST:
-                    reply = postDispatcher.handleRequest(client, version, endpoint, session.getInputStream());
+                    reply = postDispatcher.handleRequest(
+                        client,
+                        version,
+                        endpoint,
+                        contentType,
+                        session.getInputStream());
                     break;
                 default:
                     throw new ClientError("Unimplemented method: " + method);
