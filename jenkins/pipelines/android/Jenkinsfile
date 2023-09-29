@@ -21,10 +21,10 @@ pipeline {
             steps {
                 // Run tests:
                 echo "Run Android Tests"
-                sh '''
+                sh """
                     #export ANDROID_SERIAL=14151JEC204776
                     jenkins/pipelines/android/android_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
-                '''
+                """
             }
             post {
                 always {
