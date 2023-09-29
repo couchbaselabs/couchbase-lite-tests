@@ -12,7 +12,7 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
-                    currentBuild.displayName = "android-${CBL_EDITION}-${params.CBL_VERSION}-${params.CBL_BUILD} #${currentBuildNumber}"
+                    currentBuild.displayName = "android-${CBL_EDITION}-${params.CBL_VERSION}-${params.CBL_BUILD} (#${currentBuild.number})"
                 }
             }
         }
