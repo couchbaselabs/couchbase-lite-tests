@@ -30,9 +30,11 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.couchbase.lite.Database;
@@ -47,13 +49,16 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 
 @SuppressWarnings("resource")
 public abstract class TestApp {
+    public static final String HEADER_CLIENT = "CBLTest-Client-ID".toLowerCase(Locale.getDefault());
+    public static final String HEADER_SERVER = "CBLTest-Server-ID".toLowerCase(Locale.getDefault());
+
+    public static final String HEADER_CONTENT_TYPE = "ContentType".toLowerCase(Locale.getDefault());
+    public static final String CONTENT_TYPE_JSON = "application/json";
+
     public static final String HEADER_PROTOCOL_VERSION = "CBLTest-API-Version".toLowerCase(Locale.getDefault());
     public static final int LATEST_SUPPORTED_PROTOCOL_VERSION = 1;
-    public static final List<Integer> KNOWN_VERSIONS
-        = Collections.unmodifiableList(Arrays.asList(LATEST_SUPPORTED_PROTOCOL_VERSION));
-
-    public static final String HEADER_CLIENT = "CBLTest-Client-ID".toLowerCase(Locale.getDefault());
-    public static final String HEADER_SERVER = "CBLTest-Server-ID";
+    public static final Set<Integer> KNOWN_VERSIONS
+        = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(LATEST_SUPPORTED_PROTOCOL_VERSION)));
 
     public static final String KEY_SERVER_VERSION = "version";
     public static final String KEY_API = "apiVersion";
