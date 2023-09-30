@@ -1,7 +1,7 @@
 pipeline {
     agent { label 'mob-e2e-docker-01' }
     parameters {
-        choice(name: 'CBL_PLATFORM', choices: ['all', 'c'], description: 'CBL Platform')
+        choice(name: 'CBL_PLATFORM', choices: ['all', 'c', 'android'], description: 'CBL Platform')
         string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'CBL Version')
         string(name: 'CBL_BUILD', defaultValue: '0', description: 'CBL Build Number, Use 0 for the latest successful build')
         booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force Triggering Test Job(s)') 
@@ -37,7 +37,7 @@ pipeline {
                 axes {
                     axis {
                         name 'CBL_PLATFORM'
-                        values 'c'
+                        values 'c', 'android'
                     }
                 }
                 stages {
