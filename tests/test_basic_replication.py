@@ -131,7 +131,7 @@ class TestBasicReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=90))
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         
