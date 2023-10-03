@@ -40,14 +40,14 @@ the availability of the test servers.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as 
-      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": true,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": true,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `l1.jpg` blob.
 8. Create a list and a task in `db2`:
    * Create SG role named `lists.user1.db2-list1.contributor`.
    * Create a list document in `_default.lists` as
       * { "_id": "db2-list1", "name": "db2 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db2-list1-task1", "name": "db2 list1 task1", "complete": true,  "image": null, "list" : { "id" : "db2-list1", "owner" : "user1" } }
+      * { "_id": "db2-list1-task1", "name": "db2 list1 task1", "complete": true,  "image": null, taskList" : { "id" : "db2-list1", "owner" : "user1" } }
       * Set the `image` key with the `l2.jpg` blob.
 9. Wait and check the pull document replication events in `db1`:
    * `_default.lists`.`db2-list1`
@@ -95,7 +95,7 @@ the availability of the test servers.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `l5.jpg` blob.
 7. Wait and check the pull document replication events in `db2`:
    * `_default.lists`.`db1-list1`
@@ -148,7 +148,7 @@ the availability of the test servers.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `l1.jpg` blob.
 6. Wait and check the pull document replication events in `db2`
    * `_default.lists`.`db1-list1`
@@ -193,10 +193,10 @@ the availability of the test servers.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `l5.jpg` blob.
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db1-list1-task2", "name": "db1 list1 task2", "complete": true,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task2", "name": "db1 list1 task2", "complete": true,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
 6. Wait and check the pull document replication events in `db2`
    * `_default.lists`.`db1-list1`
    * `_default.tasks`.`db1-list1-task1`
@@ -246,14 +246,14 @@ the availability of the test servers.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `l1.jpg` blob.
 6. Create a list and a task in `db2`:
    * Create SG role named `lists.user2.db2-list1.contributor`.
    * Create a list document in `_default.lists` as
       * { "_id": "db2-list1", "name": "db2 list1", "owner": "user2" }
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db2-list1-task1", "name": "db2 list1 task1", "complete": true,  "image": null, "list" : { "id" : "db2-list1", "owner" : "user2" } }
+      * { "_id": "db2-list1-task1", "name": "db2 list1 task1", "complete": true,  "image": null, "taskList" : { "id" : "db2-list1", "owner" : "user2" } }
       * Set the `image` key with the `l2.jpg` blob.
 7. Wait for 10 seconds which should be enough for the two replicators to finish replicating.
 8. Check that no document replication events are in `db1`.
@@ -293,10 +293,10 @@ the availability of the test servers.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `l1.jpg` blob.
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db1-list1-task2", "name": "db1 list1 task2", "complete": true,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task2", "name": "db1 list1 task2", "complete": true,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
 6. Wait for 10 seconds which should be enough for the two replicators to finish replicating.
 7. Check that no document replication events are in `db2`.
 8. Snapshot documents in `db2`:
@@ -304,7 +304,7 @@ the availability of the test servers.
    * `_default.tasks`.`db1-list1-task1`
    * `_default.tasks`.`db1-list1-task2`
 9. Creating a user document in the `_default.users` to share the `_default.lists`.`db1-list1` list in `db1` as
-   * { "_id": "db1-list1-user2", "username": "user2", "list" : { "id" : "db1-list1", "owner" : "user1" } }
+   * { "_id": "db1-list1-user2", "username": "user2", "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
 10. Wait and check the pull document replication events in `db2`.
    * `_default.lists`.`db1-list1`
    * `_default.tasks`.`db1-list1-task1`
@@ -342,10 +342,10 @@ the availability of the test servers.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `l1.jpg` blob.
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db1-list1-task2", "name": "db1 list1 task2", "complete": false,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task2", "name": "db1 list1 task2", "complete": false,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `s1.jpg` blob.
 6. Wait for 10 seconds which should be enough for the two replicators to finish replicating.
 7. Check that no document replication events are in `db2`.
@@ -354,7 +354,7 @@ the availability of the test servers.
    * `_default.tasks`.`db1-list1-task1`
    * `_default.tasks`.`db1-list1-task2`
 9. Creating a user document in the `_default.users` to share the `_default.lists`.`db1-list1` list in `db1` as
-   * { "_id": "db1-list1-user2", "username": "user2", "list" : { "id" : "db1-list1", "owner" : "user1" } }
+   * { "_id": "db1-list1-user2", "username": "user2", "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
 10. Wait and check the pull document replication events in `db2`.
    * `_default.lists`.`db1-list1`
    * `_default.tasks`.`db1-list1-task1`
@@ -406,10 +406,10 @@ the availability of the test servers.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `l1.jpg` blob.
    * Create a task document in `_default.tasks` as  
-      * { "_id": "db1-list1-task2", "name": "db1 list1 task2", "complete": true,  "image": null, "list" : { "id" : "db1-list1", "owner" : "user1" } }
+      * { "_id": "db1-list1-task2", "name": "db1 list1 task2", "complete": true,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `s1.jpg` blob.
 6. Wait for 10 seconds which should be enough for the two replicators to finish replicating.
 7. Check that no document replication events are in `db2`.
@@ -418,7 +418,7 @@ the availability of the test servers.
    * `_default.tasks`.`db1-list1-task1`
    * `_default.tasks`.`db1-list1-task2`
 9. Creating a user document in the `_default.users` to share the `_default.lists`.`db1-list1` list in `db1` as
-   * { "_id": "db1-list1-user2", "username": "user2", "list" : { "id" : "db1-list1", "owner" : "user1" } }
+   * { "_id": "db1-list1-user2", "username": "user2", "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
 10. Wait and check the pull document replication events in `db2`.
    * `_default.lists`.`db1-list1`
    * `_default.tasks`.`db1-list1-task1`
