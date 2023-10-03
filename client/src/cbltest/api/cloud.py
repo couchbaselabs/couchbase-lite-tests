@@ -4,6 +4,7 @@ from typing import List, Optional, cast
 from varname import nameof
 from opentelemetry.trace import get_tracer
 
+from cbltest.api.database import Database
 from cbltest.assertions import _assert_not_null
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.syncgateway import PutDatabasePayload, SyncGateway
@@ -24,6 +25,9 @@ class CouchbaseCloud:
     def _create_collections(self, db_payload: PutDatabasePayload) -> None:
         for scope in db_payload.scopes():
             self.__couchbase_server.create_collections(db_payload.bucket, scope, db_payload.collections(scope))
+
+    async def create_role(self, db_name: str, role: str, collection_access: dict) -> None:
+        await self.__sync_gateway.add_role(db_name, role, collection_access)
 
     async def configure_dataset(self, dataset_path: Path, dataset_name: str, sg_config_options: Optional[List[str]] = None) -> None:
         """

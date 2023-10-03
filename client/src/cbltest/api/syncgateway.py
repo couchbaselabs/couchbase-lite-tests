@@ -2,27 +2,29 @@ from json import dumps, loads
 from pathlib import Path
 from typing import Dict, List, cast, Any, Optional
 from urllib.parse import urljoin
-from aiohttp import ClientSession, BasicAuth
-from varname import nameof
-from opentelemetry.trace import get_tracer
 
-from cbltest.httplog import get_next_writer
-from cbltest.assertions import _assert_not_null
+from aiohttp import ClientSession, BasicAuth
+from opentelemetry.trace import get_tracer
+from varname import nameof
+
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
+from cbltest.assertions import _assert_not_null
+from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_warning
 from cbltest.version import VERSION
-    
+
+
 class _CollectionMap(JSONSerializable):
     @property
     def scope_name(self) -> str:
         return self.__scope_name
-    
+
     @property
     def collections(self) -> List[str]:
         return list(self.__collections.keys())
-    
+
     def __init__(self, scope_name: str) -> None:
         _assert_not_null(scope_name, nameof(scope_name))
         self.__scope_name = scope_name
@@ -31,16 +33,18 @@ class _CollectionMap(JSONSerializable):
     def add_collection(self, collection_name: str, payload: dict) -> None:
         if collection_name in self.__collections:
             raise ValueError(f"{collection_name} already exists in this map")
-        
+
         self.__collections[collection_name] = payload
 
     def to_json(self) -> Any:
         return {"collections": self.__collections}
 
+
 class PutDatabasePayload(JSONSerializable):
     """
     A class containing configuration options for a Sync Gateway database endpoint
     """
+
     @property
     def bucket(self) -> str:
         return self.__bucket
@@ -67,7 +71,7 @@ class PutDatabasePayload(JSONSerializable):
     def scopes(self) -> List[str]:
         """Gets all the scopes contained in the payload"""
         return list(self.__scopes.keys())
-    
+
     def collections(self, scope: str) -> List[str]:
         """
         Gets a list of collections specified for the given scope
@@ -78,7 +82,7 @@ class PutDatabasePayload(JSONSerializable):
         map = self.__scopes.get(scope)
         if not map:
             raise KeyError(f"No collections present for {scope}")
-        
+
         return map.collections
 
     def _add_collection(self, payload: dict, scope_name: str, collection_name: str) -> None:
@@ -96,54 +100,60 @@ class PutDatabasePayload(JSONSerializable):
 
     def to_json(self) -> Any:
         return self.__config
-    
+
+
 class AllDocumentsResponseRow:
     """
     A class representing a single entry in an all_docs response from Sync Gateway
     """
+
     @property
     def key(self) -> str:
         """Gets the key of the row"""
         return self.__key
-    
+
     @property
     def id(self) -> str:
         """Gets the document ID of the row"""
         return self.__id
-    
+
     @property
     def revid(self) -> str:
         """Gets the revision ID of the row"""
         return self.__revid
-    
+
     def __init__(self, key: str, id: str, revid: str) -> None:
         self.__key = key
         self.__id = id
         self.__revid = revid
-    
+
+
 class AllDocumentsResponse:
     """
     A class representing an all_docs response from Sync Gateway
     """
-    @property 
+
+    @property
     def rows(self) -> List[AllDocumentsResponseRow]:
         """Gets the entries of the response"""
         return self.__rows
-    
+
     def __len__(self) -> int:
         return self.__len
-    
+
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
         self.__rows: List[AllDocumentsResponseRow] = []
         for row in input["rows"]:
             self.__rows.append(AllDocumentsResponseRow(row["key"], row["id"], row["value"]["rev"]))
 
+
 class DocumentUpdateEntry(JSONSerializable):
     """
     A class that represents an update to a document. 
     For creating a new document, set revid to None.
     """
+
     def __init__(self, id: str, revid: Optional[str], body: dict):
         self.__body = body.copy()
         self.__body["_id"] = id
@@ -152,7 +162,8 @@ class DocumentUpdateEntry(JSONSerializable):
 
     def to_json(self) -> Any:
         return self.__body
-    
+
+
 class RemoteDocument(JSONSerializable):
     """
     A class that represents the results of a document retrieved from Sync Gateway
@@ -162,12 +173,12 @@ class RemoteDocument(JSONSerializable):
     def id(self) -> str:
         """Gets the ID of the document"""
         return self.__id
-    
+
     @property
     def revid(self) -> str:
         """Gets the revision ID of the document"""
         return self.__rev
-    
+
     @property
     def body(self) -> dict:
         """Gets the body of the document"""
@@ -176,7 +187,7 @@ class RemoteDocument(JSONSerializable):
     def __init__(self, body: dict) -> None:
         if "error" in body:
             raise ValueError("Trying to create remote document from error response")
-        
+
         self.__body = body.copy()
         self.__id = cast(str, body["_id"])
         self.__rev = cast(str, body["_rev"])
@@ -189,12 +200,13 @@ class RemoteDocument(JSONSerializable):
         ret_val["_rev"] = self.__rev
         return ret_val
 
-    
+
 class SyncGateway:
     """
     A class for interacting with a given Sync Gateway instance
     """
-    def __init__(self, url: str, username: str, password: str, port: int = 4984, admin_port: int = 4985, 
+
+    def __init__(self, url: str, username: str, password: str, port: int = 4984, admin_port: int = 4985,
                  secure: bool = False):
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
@@ -205,11 +217,13 @@ class SyncGateway:
 
     async def _send_request(self, method: str, path: str, payload: Optional[JSONSerializable] = None,
                             params: Optional[Dict[str, str]] = None) -> Any:
-        with self.__tracer.start_as_current_span(f"send_request", attributes={"http.method": method, "http.path": path}):
+        with self.__tracer.start_as_current_span(f"send_request",
+                                                 attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = None if payload is None else payload.serialize()
             writer = get_next_writer()
-            writer.write_begin(f"Sync Gateway [{self.__admin_url}] -> {method.upper()} {path}", data if data is not None else "")
+            writer.write_begin(f"Sync Gateway [{self.__admin_url}] -> {method.upper()} {path}",
+                               data if data is not None else "")
             resp = await self.__admin_session.request(method, path, data=data, headers=headers, params=params)
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
@@ -220,9 +234,9 @@ class SyncGateway:
             writer.write_end(f"Sync Gateway [{self.__admin_url}] <- {method.upper()} {path} {resp.status}", data)
             if not resp.ok:
                 raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}")
-            
+
             return ret_val
-        
+
     def replication_url(self, db_name: str):
         """
         Gets the replicator URL (ws://xxx) for a given db
@@ -239,7 +253,8 @@ class SyncGateway:
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
         """
-        with self.__tracer.start_as_current_span("put_database", attributes={"cbl.database.name": db_name}) as current_span:
+        with self.__tracer.start_as_current_span("put_database",
+                                                 attributes={"cbl.database.name": db_name}) as current_span:
             try:
                 await self._send_request("put", f"/{db_name}", payload)
             except CblSyncGatewayBadResponseError as e:
@@ -275,18 +290,18 @@ class SyncGateway:
         for c in input:
             if not isinstance(c, str):
                 raise ValueError("Non-string key found in input dictionary to create_collection_access_dict")
-            
+
             channels = input[c]
             if not isinstance(channels, list):
                 raise ValueError(f"Non-list found for value of collection {c} in create_collection_access_dict")
-            
+
             if "." not in c:
                 raise ValueError(f"Input collection '{c}' in create_collection_access_dict needs to be fully qualified")
-            
+
             spec = c.split(".")
             if len(spec) != 2:
                 raise ValueError(f"Input collection '{c}' has too many dots in create_collection_access_dict")
-            
+
             if spec[0] not in ret_val:
                 scope_dict: Dict[str, dict] = {}
                 ret_val[spec[0]] = scope_dict
@@ -319,6 +334,43 @@ class SyncGateway:
 
             await self._send_request("put", f"/{db_name}/_user/{name}", JSONDictionary(body))
 
+    async def add_role(self, db_name: str, role: str, collection_access: dict) -> None:
+        """
+        Adds the specified role to a Sync Gateway database with the specified collection access
+
+        :param db_name: The name of the Database to add the user to
+        :param role: The role to add
+        :param password: The password for the user that will be added
+        :param collection_access: The collections to which role members will have access.
+            This needs to be formatted in the way Sync Gateway expects it:
+            "<scope1>": {
+                "<collection1>: {"admin_channels" : ["<channel1>", ... ] }
+                .
+                .
+                .
+            }
+            "<scope2>": {
+                ...
+            }
+            .
+            .
+            .
+        """
+        with self.__tracer.start_as_current_span("add_role", attributes={"cbl.role.name": role}):
+            body = {
+                "name": role,
+                "collection_access": collection_access
+            }
+
+            try:
+                await self._send_request("post", f"/{db_name}/_role/", JSONDictionary(body))
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 409:
+                    pass
+                else:
+                    raise
+
+
     def _analyze_dataset_response(self, response: list) -> None:
         assert isinstance(response, list), "Invalid bulk docs response (not a list)"
         typed_response = cast(list, response)
@@ -326,7 +378,8 @@ class SyncGateway:
             info = cast(dict, r)
             assert isinstance(info, dict), "Invalid item inside bulk docs response list (not an object)"
             if "error" in info:
-                raise CblSyncGatewayBadResponseError(info["status"], f"At least one bulk docs insert failed ({info['error']})")
+                raise CblSyncGatewayBadResponseError(info["status"],
+                                                     f"At least one bulk docs insert failed ({info['error']})")
 
     async def load_dataset(self, db_name: str, path: Path) -> None:
         """
@@ -338,7 +391,8 @@ class SyncGateway:
         :param db_name: The name of the database to populate
         :param path: The path of the JSON file to use as input
         """
-        with self.__tracer.start_as_current_span("load_dataset", attributes={"cbl.database.name": db_name, "cbl.dataset.path": str(path)}):
+        with self.__tracer.start_as_current_span("load_dataset", attributes={"cbl.database.name": db_name,
+                                                                             "cbl.dataset.path": str(path)}):
             last_scope: str = ""
             last_coll: str = ""
             collected: List[dict] = []
@@ -350,8 +404,8 @@ class SyncGateway:
                     scope = cast(str, json["scope"])
                     collection = cast(str, json["collection"])
                     if last_scope != scope or last_coll != collection or len(collected) > 500:
-                        if last_scope and last_coll:
-                            resp = await self._send_request("post", f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs", 
+                        if last_scope and last_coll and collected:
+                            resp = await self._send_request("post", f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
                                                             JSONDictionary({"docs": collected}))
                             self._analyze_dataset_response(resp)
                             collected.clear()
@@ -361,11 +415,13 @@ class SyncGateway:
                     collected.append(json)
                     json_line = fin.readline()
 
-            resp = await self._send_request("post", f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs", 
+            if collected:
+                resp = await self._send_request("post", f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
                                             JSONDictionary({"docs": collected}))
-            self._analyze_dataset_response(cast(list, resp))
+                self._analyze_dataset_response(cast(list, resp))
 
-    async def get_all_documents(self, db_name: str, scope: str = "_default", collection: str = "_default") -> AllDocumentsResponse:
+    async def get_all_documents(self, db_name: str, scope: str = "_default",
+                                collection: str = "_default") -> AllDocumentsResponse:
         """
         Gets all the documents in the given collection from Sync Gateway (id and revid)
         
@@ -373,8 +429,8 @@ class SyncGateway:
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
         """
-        with self.__tracer.start_as_current_span("get_all_documents", attributes={"cbl.database.name": db_name, 
-                                                                                  "cbl.scope.name": scope, 
+        with self.__tracer.start_as_current_span("get_all_documents", attributes={"cbl.database.name": db_name,
+                                                                                  "cbl.scope.name": scope,
                                                                                   "cbl.collection.name": collection}):
             resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_all_docs")
             assert isinstance(resp, dict)
@@ -397,10 +453,10 @@ class SyncGateway:
                 "docs": list(u.to_json() for u in updates)
             }
 
-            await self._send_request("post", f"/{db_name}.{scope}.{collection}/_bulk_docs", 
-                                            JSONDictionary(body))
-        
-    async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "_default", 
+            await self._send_request("post", f"/{db_name}.{scope}.{collection}/_bulk_docs",
+                                     JSONDictionary(body))
+
+    async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "_default",
                               collection: str = "_default") -> None:
         """
         Deletes a document from Sync Gateway
@@ -412,13 +468,14 @@ class SyncGateway:
         :param collection: The collection that the document exists in (default '_default')
         """
         with self.__tracer.start_as_current_span("delete_document", attributes={"cbl.database.name": db_name,
-                                                                                 "cbl.scope.name": scope,
-                                                                                 "cbl.collection.name": collection,
-                                                                                 "cbl.document.id": doc_id}):
+                                                                                "cbl.scope.name": scope,
+                                                                                "cbl.collection.name": collection,
+                                                                                "cbl.document.id": doc_id}):
             await self._send_request("delete", f"/{db_name}.{scope}.{collection}/{doc_id}",
-                                    params={"rev": revid})
-        
-    async def purge_document(self, doc_id: str, db_name: str, scope: str = "_default", collection: str = "_default") -> None:
+                                     params={"rev": revid})
+
+    async def purge_document(self, doc_id: str, db_name: str, scope: str = "_default",
+                             collection: str = "_default") -> None:
         """
         Purges a document from Sync Gateway
 
@@ -428,17 +485,18 @@ class SyncGateway:
         :param collection: The collection that the document exists in (default '_default')
         """
         with self.__tracer.start_as_current_span("purge_document", attributes={"cbl.database.name": db_name,
-                                                                                 "cbl.scope.name": scope,
-                                                                                 "cbl.collection.name": collection,
-                                                                                 "cbl.document.id": doc_id}):
+                                                                               "cbl.scope.name": scope,
+                                                                               "cbl.collection.name": collection,
+                                                                               "cbl.document.id": doc_id}):
             body = {
                 doc_id: ["*"]
             }
-            
-            await self._send_request("post", f"/{db_name}.{scope}.{collection}/_purge", 
-                                    JSONDictionary(body))
-        
-    async def get_document(self, db_name: str, doc_id: str, scope: str = "_default", collection: str = "_default") -> Optional[RemoteDocument]:
+
+            await self._send_request("post", f"/{db_name}.{scope}.{collection}/_purge",
+                                     JSONDictionary(body))
+
+    async def get_document(self, db_name: str, doc_id: str, scope: str = "_default", collection: str = "_default") -> \
+    Optional[RemoteDocument]:
         """
         Gets a document from Sync Gateway
 
@@ -448,18 +506,19 @@ class SyncGateway:
         :param collection: The collection that the document exists in (default '_default')
         """
         with self.__tracer.start_as_current_span("get_document", attributes={"cbl.database.name": db_name,
-                                                                                 "cbl.scope.name": scope,
-                                                                                 "cbl.collection.name": collection,
-                                                                                 "cbl.document.id": doc_id}):
+                                                                             "cbl.scope.name": scope,
+                                                                             "cbl.collection.name": collection,
+                                                                             "cbl.document.id": doc_id}):
             response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
-            
+
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 if cast_resp["reason"] == "missing" or cast_resp["reason"] == "deleted":
                     return None
-                
-                raise CblSyncGatewayBadResponseError(500, f"Get doc from sync gateway had error '{cast_resp['reason']}'")
-            
+
+                raise CblSyncGatewayBadResponseError(500,
+                                                     f"Get doc from sync gateway had error '{cast_resp['reason']}'")
+
             return RemoteDocument(cast_resp)

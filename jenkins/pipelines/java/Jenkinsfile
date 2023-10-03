@@ -25,7 +25,7 @@ pipeline {
                 '''
 
                 echo "Build Web Services  Java Test Server"
-                sh '''      
+                sh '''
                     jenkins/pipelines/java/ws/build_server.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
                 '''
             }
@@ -81,7 +81,7 @@ pipeline {
                                 '''
                             }
                             post {
-                                always { 
+                                always {
                                     echo "Teardown Windows Java Desktop Tests"
                                     sh '''
                                         jenkins/pipeline/java/desktop/win_teardown.sh
@@ -96,7 +96,7 @@ pipeline {
                                 '''
                             }
                             post {
-                                always { 
+                                always {
                                     echo "Teardown Windows Java Desktop Tests"
                                     sh '''
                                         jenkins/pipelines/java/ws/win_teardown.sh
@@ -116,7 +116,7 @@ pipeline {
                                 '''
                             }
                             post {
-                                always { 
+                                always {
                                     echo "Teardown Linux Java Desktop Tests"
                                     sh '''
                                         jenkins/pipelines/java/desktop/linux_teardown.sh
@@ -131,7 +131,7 @@ pipeline {
                                 '''
                             }
                             post {
-                                always { 
+                                always {
                                     echo "Teardown Linux Java Desktop Tests"
                                     sh '''
                                         jenkins/pipelines/java/ws/linux_teardown.sh
