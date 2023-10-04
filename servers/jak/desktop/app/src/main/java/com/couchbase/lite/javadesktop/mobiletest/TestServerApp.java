@@ -1,7 +1,10 @@
 package com.couchbase.lite.javadesktop.mobiletest;
 
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.InetAddress;
+import java.net.URI;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
@@ -32,11 +35,17 @@ public class TestServerApp implements Daemon {
     public static void main(String[] args) {
         startApp();
 
-        System.out.print("Hit Enter to stop >>> ");
-        try { System.in.read(); }
-        catch (IOException err) { Log.w(TAG, "Exception waiting for CLI input", err); }
-
-        stopApp();
+        if ((args.length > 0) && ("server".equals(args[0]))) {
+            Runtime.getRuntime().addShutdownHook(new Thread(TestServerApp::stopApp));
+            waitForStop();
+        }
+        else {
+            // Here if running interactively
+            System.out.print("Hit Enter to stop >>> ");
+            try { System.in.read(); }
+            catch (IOException err) { Log.w(TAG, "Exception waiting for CLI input", err); }
+            stopApp();
+        }
     }
 
     /**
@@ -45,21 +54,14 @@ public class TestServerApp implements Daemon {
      *
      * @param args Arguments from prunsrv command line
      **/
-    @SuppressFBWarnings("UW_UNCOND_WAIT")
     @SuppressWarnings("PMD.MissingBreakInSwitch")
     public static void windowsService(String[] args) {
         switch (args[0].trim().toLowerCase(Locale.getDefault())) {
             case "":
             case "start":
                 startApp();
-                Server server;
-                while ((server = SERVER.get()) != null) {
-                    synchronized (server) {
-                        try { server.wait(); }
-                        catch (InterruptedException ignore) { }
-                    }
-                }
-                return;
+                waitForStop();
+                break;
 
             default:
                 stopApp();
@@ -68,15 +70,56 @@ public class TestServerApp implements Daemon {
 
     private static void startApp() {
         final TestServerApp app = new TestServerApp();
-
         if (!APP.compareAndSet(null, app)) { throw new ServerError("Attempt to restart app"); }
 
         app.initApp();
+
         app.start();
     }
 
-    @SuppressFBWarnings("NN_NAKED_NOTIFY")
+    @SuppressFBWarnings("UW_UNCOND_WAIT")
+    private static void waitForStop() {
+        Server server;
+        while ((server = SERVER.get()) != null) {
+            synchronized (server) {
+                try { server.wait(); }
+                catch (InterruptedException ignore) { }
+            }
+        }
+    }
+
     private static void stopApp() {
+        final TestServerApp app = APP.get();
+        if (app != null) { app.stop(); }
+    }
+
+
+    @Override
+    public void init(DaemonContext context) { initApp(); }
+
+    @SuppressFBWarnings("DM_DEFAULT_ENCODING")
+    @Override
+    public void start() {
+        final Server server = new Server();
+        if (!SERVER.compareAndSet(null, server)) { throw new ServerError("Attempt to restart server"); }
+
+        final List<InetAddress> addrs = NetUtils.getLocalAddresses();
+        if (addrs == null) { throw new ServerError("Cannot get server address"); }
+
+        final URI serverUri = NetUtils.makeUri("http", addrs.get(0), server.myPort, "");
+        if (serverUri == null) { throw new ServerError("Cannot get server URI"); }
+
+        try (PrintWriter writer = new PrintWriter(new FileWriter("server.url"))) { writer.println(serverUri); }
+        catch (IOException e) { throw new ServerError("Failed to write server URI to file", e); }
+
+        try { server.start(); }
+        catch (IOException e) { throw new ServerError("Failed to start server", e); }
+        Log.i(TAG, "Java Desktop Test Server running at " + serverUri);
+    }
+
+    @SuppressFBWarnings("NN_NAKED_NOTIFY")
+    @Override
+    public void stop() {
         Log.i(TAG, "Stopping Java Desktop Test Server.");
         final Server server = SERVER.getAndSet(null);
         if (server != null) {
@@ -86,31 +129,11 @@ public class TestServerApp implements Daemon {
         APP.set(null);
     }
 
-
-    @Override
-    public void init(DaemonContext context) { initApp(); }
-
-    @Override
-    public void start() {
-        final Server server = new Server();
-        if (!SERVER.compareAndSet(null, server)) { throw new ServerError("Attempt to restart server"); }
-
-        final String id = TestApp.getApp().getAppId();
-        final List<InetAddress> addrs = NetUtils.getLocalAddresses();
-        Log.i(
-            TAG,
-            "Java Desktop Test Server " + id + " running at "
-                + NetUtils.makeUri("http", (addrs != null) ? addrs.get(0) : null, server.myPort, ""));
-    }
-
-    @Override
-    public void stop() { stopApp(); }
-
     @Override
     public void destroy() { Log.i(TAG, "TestServer service is destroyed."); }
 
     private void initApp() {
         TestApp.init(new JavaDesktopTestApp());
-        Log.i(TAG, "Java Desktop Test Server initialized.");
+        Log.i(TAG, "Java Desktop Test Server " + TestApp.getApp().getAppId());
     }
 }

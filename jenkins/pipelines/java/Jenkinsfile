@@ -16,34 +16,20 @@ pipeline {
                 }
             }
         }
-        stage('Build') {
-            agent { label 'mob-e2e-mac-01' }
-            steps {
-                echo "Build Desktop Java Test Server"
-                sh '''
-                    jenkins/pipelines/java/desktop/build_server.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
-                '''
-
-                echo "Build Web Services  Java Test Server"
-                sh '''
-                    jenkins/pipelines/java/ws/build_server.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
-                '''
-            }
-            post {
-                always {
-                }
-            }
-        }
         stage('Run Tests') {
             parallel {
                 stage('OSX Tests') {
                     agent { label 'mob-e2e-win-01' }
                     stages {
+                        // Note that there is no fundamental reason that the Desktop and Web Services
+                        // builds couldn't run in parallel.  We'd need to figure out how to set
+                        // up the environment server and sg at alternate ports, probably, and we'd
+                        // need hardware that can support the load.
                         stage('OSX Desktop Tests') {
                             steps {
-                                sh '''
+                                sh """
                                     jenkins/pipelines/java/desktop/osx_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
-                                '''
+                                """
                             }
                             post {
                                 always {
@@ -56,9 +42,9 @@ pipeline {
                         }
                         stage('OSX Web Services Tests') {
                             steps {
-                                sh '''
+                                sh """
                                     jenkins/pipelines/java/ws/osx_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
-                                '''
+                                """
                             }
                             post {
                                 always {
@@ -76,30 +62,30 @@ pipeline {
                     stages {
                         stage('Windows Desktop Tests') {
                             steps {
-                                sh '''
-                                    jenkins/pipelines/java/desktop/win_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
-                                '''
+                                powershell """
+                                    jenkins/pipelines/java/desktop/win_tests.ps1 ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                """
                             }
                             post {
                                 always {
                                     echo "Teardown Windows Java Desktop Tests"
-                                    sh '''
-                                        jenkins/pipeline/java/desktop/win_teardown.sh
+                                    powershell '''
+                                        jenkins/pipeline/java/desktop/win_teardown.ps1
                                     '''
                                 }
                             }
                         }
                         stage('Windows Web Services Tests') {
                             steps {
-                                sh '''
-                                    jenkins/pipelines/java/ws/win_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
-                                '''
+                                powershell """
+                                    jenkins/pipelines/java/ws/win_tests.ps1 ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                """
                             }
                             post {
                                 always {
                                     echo "Teardown Windows Java Desktop Tests"
-                                    sh '''
-                                        jenkins/pipelines/java/ws/win_teardown.sh
+                                    powershell '''
+                                        jenkins/pipelines/java/ws/win_teardown.ps1
                                     '''
                                 }
                             }
@@ -111,9 +97,9 @@ pipeline {
                     stages {
                         stage('Linux Desktop Tests') {
                             steps {
-                                sh '''
+                                sh """
                                     jenkins/pipelines/java/desktop/linux_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
-                                '''
+                                """
                             }
                             post {
                                 always {
@@ -126,9 +112,9 @@ pipeline {
                         }
                         stage('Linux Web Services Tests') {
                             steps {
-                                sh '''
+                                sh """
                                     jenkins/pipelines/java/ws/linux_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
-                                '''
+                                """
                             }
                             post {
                                 always {
