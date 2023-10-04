@@ -159,20 +159,23 @@ int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
             auto colName = docKeyComps.first;
             auto docID = docKeyComps.second;
 
+            if (verifiedSnapShotDocs.find(docKey) != verifiedSnapShotDocs.end()) {
+                // Already verified changes
+                continue;
+            }
+
             auto snapDoc = snapDocPair.second;
             if (snapDoc) {
-                if (verifiedSnapShotDocs.find(docKey) == verifiedSnapShotDocs.end()) {
-                    auto curDoc = CBLManager::document(db, colName, docID);
-                    if (!curDoc) {
-                        verifyResult.ok = false;
-                        verifyResult.description = ErrorDesc(docID, colName, "was not found");
-                        break;
-                    }
-                    auto props = CBLDocument_Properties(curDoc);
-                    auto expectedProps = CBLDocument_Properties(snapDoc);
-                    if (!verifyProperties(db, docID, colName, props, expectedProps, verifyResult)) {
-                        break;
-                    }
+                auto curDoc = CBLManager::document(db, colName, docID);
+                if (!curDoc) {
+                    verifyResult.ok = false;
+                    verifyResult.description = ErrorDesc(docID, colName, "was not found");
+                    break;
+                }
+                auto props = CBLDocument_Properties(curDoc);
+                auto expectedProps = CBLDocument_Properties(snapDoc);
+                if (!verifyProperties(db, docID, colName, props, expectedProps, verifyResult)) {
+                    break;
                 }
             } else {
                 auto curDoc = CBLManager::document(db, colName, docID);
