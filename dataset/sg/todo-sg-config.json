@@ -11,7 +11,7 @@
             "sync": "function foo(doc,oldDoc,meta){var listId=doc._deleted?oldDoc.taskList.id:doc.taskList.id;var listOwner=doc._deleted?oldDoc.taskList.owner:doc.taskList.owner;var listChannel='lists.'+listOwner+'.'+listId;var contributorRoleName=listChannel+'.contributor';var contributorRole='role:'+contributorRoleName;requireRole(contributorRoleName);var tasksChannel=listChannel+'.tasks';access(contributorRole,tasksChannel);channel(tasksChannel)}"
           },
           "users": {
-            "sync": "function foo(doc,oldDoc,meta){var listId=doc._deleted?oldDoc.taskList._id:doc.taskList._id;var listOwner=doc._deleted?oldDoc.taskList.owner:doc.taskList.owner;requireUser(listOwner);var listChannel='lists.'+listOwner+'.'+listId;var contributorRole='role:'+listChannel+'.contributor';if(!doc._deleted){var username=doc._deleted?oldDoc.username:doc.username;role(username,contributorRole)}var usersChannel=listChannel+'.users';access(listOwner,usersChannel);channel(usersChannel)}"
+            "sync": "function foo(doc,oldDoc,meta){var listId=doc._deleted?oldDoc.taskList.id:doc.taskList.id;var listOwner=doc._deleted?oldDoc.taskList.owner:doc.taskList.owner;requireUser(listOwner);var listChannel='lists.'+listOwner+'.'+listId;var contributorRole='role:'+listChannel+'.contributor';if(!doc._deleted){var username=doc._deleted?oldDoc.username:doc.username;role(username,contributorRole)}var usersChannel=listChannel+'.users';access(listOwner,usersChannel);channel(usersChannel)}"
           }
         }
       }
