@@ -57,19 +57,17 @@ public final class NetUtils {
         return Scope.LOCAL;
     }
 
-    @SuppressWarnings("PMD.AvoidReassigningParameters")
+    @SuppressWarnings({"PMD.AvoidReassigningParameters", "PMD.AvoidUsingHardCodedIP"})
     @Nullable
-    public static URI makeUri(
-        @Nullable String scheme,
-        @Nullable InetAddress inetAddress,
-        int port,
-        @Nullable String path) {
+    public static URI makeUri(@Nullable String scheme, @Nullable InetAddress addr, int port, @Nullable String path) {
         if (scheme == null) { scheme = "http"; }
-        final String addr = (inetAddress == null) ? "unknown" : asString(inetAddress);
+        String addrStr = asString(addr);
+        if (addrStr == null) { addrStr = "0.0.0.0"; }
         if (port < 0) { port = 8080; }
-        final String uri = scheme + "://" + addr + port + "/" + path;
-        try { return new URI(uri); }
-        catch (URISyntaxException e) { Log.w(TAG, "Cannot parse URI: " + uri); }
+        try { return new URI(scheme, null, addrStr, port, path, null, null); }
+        catch (URISyntaxException e) {
+            Log.w(TAG, "Cannot parse URI: " + scheme + "//:" + addrStr + ":" + port + "/" + path);
+        }
         return null;
     }
 
@@ -115,10 +113,10 @@ public final class NetUtils {
     }
 
     @Nullable
-    public static String asString(@NonNull InetAddress inetAddress) {
+    public static String asString(@Nullable InetAddress inetAddress) {
+        if (inetAddress == null) { return null; }
         String addr = inetAddress.getHostAddress();
-        if (addr == null) { return null; }
-        if (inetAddress instanceof Inet4Address) { return addr; }
+        if ((addr == null) || (inetAddress instanceof Inet4Address)) { return addr; }
         final int p = addr.indexOf('%');
         if (p >= 0) {
             try { addr = addr.substring(0, p) + "%25" + URLEncoder.encode(addr.substring(p + 1), "UTF-8"); }

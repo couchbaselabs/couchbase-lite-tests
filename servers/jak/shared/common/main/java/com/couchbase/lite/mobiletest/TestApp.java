@@ -74,9 +74,7 @@ public abstract class TestApp {
     private static final AtomicReference<String> APP_ID = new AtomicReference<>();
 
     public static void init(@NonNull TestApp app) {
-        if (!APP.compareAndSet(null, app)) {
-            throw new ServerError("Attempt to re-initialize the Test App");
-        }
+        if (!APP.compareAndSet(null, app)) { throw new ServerError("Attempt to re-initialize the Test App"); }
         app.init();
     }
 
