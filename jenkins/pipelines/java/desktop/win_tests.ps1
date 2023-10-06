@@ -10,37 +10,43 @@ param (
 )
 
 # Force the Couchbase Lite Java-ktx version
-Push-Location servers/jak
+Push-Location servers\jak
 "$VERSION" | Out-File cbl-version.txt
 
 Write-Host "Build Java Desktop Test Server"
 Set-Location desktop
-Start-Process '.\gradlew.bat --no-daemon jar -PbuildNumber="${BUILD_NUMBER}"' -Wait
+& .\gradlew.bat --no-daemon jar -PbuildNumber="${BUILD_NUMBER}"
 
 Write-Host "Start the Test Server"
-Start-Process 'java -jar ./app/build/libs/CBLTestServer-Java-Desktop-3.2.0-SNAPSHOT.jar' > log.txt
+if (Test-Path -Path .\server.pid){
+    $serverId = Get-Content .\server.pid
+    Stop-Process -Id $serverId
+}
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue server.log, server.url, server.pid
+$app = Start-Process java -ArgumentList "-jar .\app\build\libs\CBLTestServer-Java-Desktop-${VERSION}-${BUILD_NUMBER}.jar server" -PassThru -NoNewWindow -RedirectStandardOutput server.log  -RedirectStandardError server.err
+$app.Id | Out-File server.pid
 Pop-Location
 
-Write-Host "Start Server/SGW"
+Write-Host "Start Server & SG"
 Push-Location environment
-Start-Process '.\start_environment.py' -Wait
+& .\start_environment.py
 
 Pop-Location
-Copy-Item "jenkins\pipelines\java\config.desktop_java.json" -Destination tests
+Copy-Item .\jenkins\pipelines\java\desktop\config.desktop_java.json -Destination tests
 
 Write-Host "Configure tests"
-$SERVER_IP = & "perl -ne'next unless /IP\s+Address:\s+(\d{1,3}(\.\d{1,3}){3})/; print qq{$1}' < servers/jak/desktop/log.txt"
+$serverUrl = Get-Content .\servers\jak\desktop\server.url
 Push-Location tests
-Add-Content config.desktop_java.json '    "test-servers": ["http://'"$SERVER_IP"':8080"]'
+Add-Content config.desktop_java.json "    `"test-servers`": [`"$serverUrl`"]"
 Add-Content config.desktop_java.json '}'
 Get-Content config.desktop_java.json
 
 Write-Host "Running tests on desktop test server at $SERVER_IP"
-Start-Process 'python3.10 -m venv venv'  -Wait
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-. .\venv\bin\Activate.ps1
+& python3.10 -m venv venv
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+./venv/Scripts/activate.ps1
 pip install -r requirements.txt
 
 Write-Host "Run tests"
-Start-Process '.\pytest -v --no-header -W ignore::DeprecationWarning --config config.desktop_java.json' -Wait
+& pytest -v --no-header -W ignore::DeprecationWarning --config config.desktop_java.json
 
