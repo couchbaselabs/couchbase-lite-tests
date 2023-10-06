@@ -32,7 +32,7 @@ nohup java -jar ./app/build/libs/CBLTestServer-Java-Desktop-${VERSION}-${BUILD_N
 echo $! > server.pid
 popd > /dev/null
 
-echo "Start Server/SGW"
+echo "Start Server & SG"
 pushd environment > /dev/null
 ./start_environment.py
 
