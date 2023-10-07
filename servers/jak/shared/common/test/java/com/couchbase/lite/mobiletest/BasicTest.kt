@@ -36,8 +36,8 @@ class BasicTest : BaseTest() {
                 .fromJson(ctxt.content.source().buffer()) as? Map<String, Any>
         }
 
-        Assert.assertTrue(
-            """Java Web Service Test Server \d+\.\d+\.\d+@[abcdef\d]+.+using CouchbaseLite""".toRegex()
+         Assert.assertTrue(
+            """Test Server \d+\.\d+\.\d+@[abcdef\d]+ on .+ using CouchbaseLite""".toRegex()
                 .containsMatchIn(resp?.get("additionalInfo") as? String ?: "")
         )
     }
