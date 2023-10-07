@@ -64,6 +64,9 @@ public class Server extends NanoHTTPD {
         Response resp;
         Reply reply = null;
         try {
+            final Method method = session.getMethod();
+            if (method == null) { throw new ServerError("Null HTTP method"); }
+
             final Map<String, String> headers = session.getHeaders();
 
             final String versionStr = headers.get(TestApp.HEADER_PROTOCOL_VERSION);
@@ -74,9 +77,6 @@ public class Server extends NanoHTTPD {
                 }
                 catch (NumberFormatException ignore) { }
             }
-
-            final Method method = session.getMethod();
-            if (method == null) { throw new ServerError("Null HTTP method"); }
 
             final String endpoint = session.getUri();
             if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }
