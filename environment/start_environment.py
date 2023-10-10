@@ -12,10 +12,17 @@ def start_environment():
     sg_count = 0
     output = subprocess.check_output(["docker", "compose", "ps", "--format", "json"]).decode().splitlines()
     for line in output:
-        json = loads(line)
-        if "cbl-test-sg" in json["Name"]:
-            sg_count += 1
-            print(f"Found SG #{sg_count}: {json['Name']}")
+        json = loads(line)        
+        processes = []
+        if isinstance(json, list):
+            processes = json
+        else:
+            processes.append(json)
+
+        for process in processes:
+            if "cbl-test-sg" in process["Name"]:
+                sg_count += 1
+                print(f"Found SG #{sg_count}: {process['Name']}")
 
     found = True
     seen = set()
