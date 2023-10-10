@@ -11,8 +11,12 @@ def start_environment():
 
     sg_count = 0
     output = subprocess.check_output(["docker", "compose", "ps", "--format", "json"]).decode().splitlines()
+    # Docker compose v2.21+ changes to return a seprate JSON dict per line for each process instead of
+    # a single array of all processes in one line. To support new and old version of docker compose,
+    # read JSON object line-by-line and wrap the JSON dict in an array to consolidate the logic detecting
+    # cbl-test-sg processes.
     for line in output:
-        json = loads(line)        
+        json = loads(line)
         processes = []
         if isinstance(json, list):
             processes = json
