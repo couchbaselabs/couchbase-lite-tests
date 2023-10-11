@@ -72,11 +72,11 @@ pipeline {
                                 if (!force && fileExists(buildInfoFile)) {
                                     try {
                                         buildInfo = readJSON file: buildInfoFile, returnPojo: true
-                                        if (buildInfo[version] == build) {
-                                            triggerTestJob = false
-                                        }
                                     } catch (Exception e) {
-                                        echo "WARN : Cannot read ${platform}.json with error: ${e}"
+                                        echo "WARN : Error when reading  ${platform}.json : ${e}"
+                                    }
+                                    if (buildInfo[version] == buildNo) {
+                                        triggerTestJob = false
                                     }
                                 }
 
