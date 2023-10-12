@@ -18,34 +18,51 @@ pipeline {
                 }
             }
         }
-        stage('macOS') {
-            agent { label 'mob-e2e-mac-01' }
-            steps {
-                sh "jenkins/pipelines/c/macos_test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}"
-            }
-            post { 
-                always { 
-                    sh 'jenkins/pipelines/c/macos_teardown.sh'
+        stage('Run Tests') {
+            parallel {
+                stage('macOS') {
+                    agent { label 'mob-e2e-mac-01' }
+                    steps {
+                        echo "Run macOS Test"
+                        sh "jenkins/pipelines/c/macos_test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}"
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown macOS Test"
+                            sh 'jenkins/pipelines/c/macos_teardown.sh'
+                        }
+                    }
                 }
-            }
-        }
-        stage('iOS') {
-            agent { label 'mob-e2e-mac-01' }
-            environment { 
-                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
-            }
-            steps {
-                // Unlock keychain:
-                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-
-                // Run tests:
-                echo "Run iOS Test"
-                sh "jenkins/pipelines/c/ios_test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}"
-            }
-            post { 
-                always { 
-                    echo "Teardown iOS Test"
-                    sh 'jenkins/pipelines/c/ios_teardown.sh'
+                stage('iOS') {
+                    agent { label 'mob-e2e-mac-01' }
+                    environment { 
+                        KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
+                    }
+                    steps {
+                        // Unlock keychain:
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        echo "Run iOS Test"
+                        sh "jenkins/pipelines/c/ios_test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}"
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown iOS Test"
+                            sh 'jenkins/pipelines/c/ios_teardown.sh'
+                        }
+                    }
+                }
+                stage('linux') {
+                    agent { label 'mob-e2e-deb-02' }
+                    steps {
+                        echo "Run linux Test"
+                        sh "jenkins/pipelines/c/linux_test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}"
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown linux Test"
+                            sh 'jenkins/pipelines/c/linux_teardown.sh'
+                        }
+                    }
                 }
             }
         }
