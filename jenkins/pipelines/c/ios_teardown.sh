@@ -9,5 +9,6 @@ fi
 
 echo "Shutdown Environment"
 pushd environment > /dev/null
+docker compose logs cbl-test-sg > cbl-test-sg.log
 docker compose down
 popd > /dev/null

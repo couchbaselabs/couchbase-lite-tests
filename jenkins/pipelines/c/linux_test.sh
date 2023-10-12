@@ -6,7 +6,7 @@ BLD_NUM=${3}
 
 echo "Build Test Server"
 pushd servers/c > /dev/null
-./scripts/build_macos.sh ${EDITION} ${VERSION} ${BLD_NUM}
+./scripts/build_linux.sh ${EDITION} ${VERSION} ${BLD_NUM}
 
 echo "Run Test Server"
 pushd build/out/bin > /dev/null
