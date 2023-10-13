@@ -1,21 +1,18 @@
 from datetime import timedelta
-import time
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, cast
+from typing import List
 from opentelemetry.trace import get_tracer
 
 from couchbase.bucket import Bucket
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions
 from couchbase.auth import PasswordAuthenticator
-from couchbase.management.buckets import CreateBucketSettings, CreateBucketOptions
+from couchbase.management.buckets import CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
 from couchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException, ScopeAlreadyExistsException
 from couchbase.exceptions import CollectionAlreadyExistsException
 
+from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
-from cbltest.api.error import CblTimeoutError
-
-T = TypeVar("T")
 
 class CouchbaseServer:
     """
@@ -32,23 +29,6 @@ class CouchbaseServer:
             self.__cluster = Cluster(url, opts)
             self.__cluster.wait_until_ready(timedelta(seconds=10))
 
-    @staticmethod
-    def _try_n_times(num_times: int,
-                    seconds_between : Union[int, float],
-                    func : Callable,
-                    ret_type : Type[T],
-                    *args : Any,
-                    **kwargs : Dict[str, Any]
-                    ) -> T:
-        for _ in range(num_times):
-            try:
-                return cast(T, func(*args, **kwargs))
-            except Exception:
-                print(f'trying {func} failed, sleeping for {seconds_between} seconds...')
-                time.sleep(seconds_between)
-
-        raise CblTimeoutError(f"Failed to call {func} after {num_times} attempts!")
-
     def create_collections(self, bucket: str, scope: str, names: List[str]) -> None:
         """
         A function that will create a specified set of collections in the specified scope
@@ -60,7 +40,7 @@ class CouchbaseServer:
         :param names: The names of the collections to create
         """
         with self.__tracer.start_as_current_span("Create Scope", attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket}) as current_span:
-            bucket_obj = CouchbaseServer._try_n_times(10, 1, self.__cluster.bucket, Bucket, bucket)
+            bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, Bucket, bucket)
             c = bucket_obj.collections()
             try:
                 if scope != "_default":
@@ -102,3 +82,8 @@ class CouchbaseServer:
                 mgr.drop_bucket(name)
             except BucketDoesNotExistException:
                 pass
+
+    def indexes_count(self, bucket: str) -> int:
+        index_mgr = self.__cluster.query_indexes()
+        indexes = list(index_mgr.get_all_indexes(bucket))
+        return len(indexes)
