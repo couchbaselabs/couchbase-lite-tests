@@ -190,8 +190,7 @@ public final class DatabaseService {
         final File dbDir = ctxt.getDbDir();
         if (dbDir == null) { throw new ServerError("Cannot find test directory on install dataset"); }
 
-        final String dbFullName = datasetName + DB_EXTENSION;
-        if (new File(dbDir, dbFullName).exists()) { throw new ClientError("Database already exists: " + dbName); }
+        if (Database.exists(datasetName, dbDir)) { throw new ClientError("Database already exists: " + dbName); }
 
         final FileUtils fileUtils = new FileUtils();
 
@@ -201,8 +200,8 @@ public final class DatabaseService {
         }
         if (!unzipDir.mkdirs()) { throw new ServerError("Failed creating unzip tmp directory"); }
 
+        final String dbFullName = datasetName + DB_EXTENSION;
         try (InputStream in = TestApp.getApp().getAsset(DB_DIR + dbFullName + ZIP_EXTENSION)) {
-            if (in == null) { throw new ServerError("Can't open resource " + DB_DIR + dbFullName + ZIP_EXTENSION); }
             fileUtils.unzip(in, unzipDir);
         }
         catch (IOException e) { throw new ServerError("Failed unzipping dataset: " + datasetName, e); }
