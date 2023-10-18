@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from typing import Any
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
@@ -69,7 +69,7 @@ class TestFest(CBLTestClass):
             SnapshotDocumentEntry("_default.tasks", "db1-list1-task1")
         ])
 
-        collection_access = {
+        collection_access: dict[str, Any] = {
             "_default": {
                 "lists": {"admin_channels": []},
                 "tasks": {"admin_channels": []},
@@ -180,7 +180,7 @@ class TestFest(CBLTestClass):
             SnapshotDocumentEntry("_default.tasks", "db1-list1-task1")
         ])
 
-        collection_access = {
+        collection_access: dict[str, Any] = {
             "_default": {
                 "lists": {"admin_channels": []},
                 "tasks": {"admin_channels": []},
