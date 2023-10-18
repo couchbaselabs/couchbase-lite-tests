@@ -9,7 +9,7 @@ param (
     [string]$buildNumber
 )
 
-# Force the Couchbase Lite Java-ktx version
+# Force the Couchbase Lite Java version
 Push-Location servers\jak
 "$VERSION" | Out-File cbl-version.txt
 
