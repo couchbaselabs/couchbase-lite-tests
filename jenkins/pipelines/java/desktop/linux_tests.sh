@@ -17,7 +17,7 @@ if [ -z "$VERSION" ]; then usage; fi
 BUILD_NUMBER="$3"
 if [ -z "$BUILD_NUMBER" ]; then usage; fi
 
-# Force the Couchbase Lite Java-ktx version
+# Force the Couchbase Lite Java version
 pushd servers/jak > /dev/null
 echo "$VERSION" > cbl-version.txt
 
@@ -53,3 +53,4 @@ pip install -r requirements.txt
 
 echo "Run tests"
 pytest -v --no-header -W ignore::DeprecationWarning --config config.desktop_java.json
+
