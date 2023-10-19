@@ -17,7 +17,8 @@ Write-Host "Build and start the Java Webservice Test Server"
 Set-Location webservice
 & .\gradlew.bat --no-daemon appStop
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue .\server.log, .\app\server.url
-Start-Process .\gradlew.bat -ArgumentList "--no-daemon jettyStart -PbuildNumber=${buildNumber}" -RedirectStandardOutput server.log -RedirectStandardError server.err -NoNewWindow
+$temp = New-TemporaryFile
+Start-Process .\gradlew.bat -ArgumentList "--no-daemon jettyStart -PbuildNumber=${buildNumber}" -RedirectStandardInput $temp -RedirectStandardOutput server.log -RedirectStandardError server.err -NoNewWindow
 Pop-Location
 
 Write-Host "Start Server & SG"
