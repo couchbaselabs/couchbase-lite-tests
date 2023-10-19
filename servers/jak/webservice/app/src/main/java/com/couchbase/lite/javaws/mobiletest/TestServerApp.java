@@ -116,12 +116,12 @@ public class TestServerApp extends HttpServlet {
 
                 resp.setHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));
                 resp.setHeader(TestApp.HEADER_SERVER, TestApp.getApp().getAppId());
+                resp.setHeader("Content-Type", "application/json");
+                resp.setHeader("Content-Length", String.valueOf(reply.getSize()));
+
                 buildResponse(reply, resp);
 
                 resp.setStatus(HttpServletResponse.SC_OK);
-
-                resp.setHeader("Content-Type", "application/json");
-                resp.setHeader("Content-Length", String.valueOf(reply.getSize()));
             }
             finally {
                 if (reply != null) { reply.close(); }

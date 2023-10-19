@@ -3,10 +3,7 @@
 
 echo "Shutdown Test Server"
 Push-Location servers\jak\desktop
-if (Test-Path -Path .\server.pid){
-    $serverId = Get-Content .\server.pid
-    Stop-Process -Id $serverId
-}
+& .\gradlew.bat --no-daemon appStop
 Pop-Location
 
 echo "Shutdown Environment"
