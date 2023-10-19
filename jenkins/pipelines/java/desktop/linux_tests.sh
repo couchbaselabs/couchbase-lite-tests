@@ -37,14 +37,14 @@ pushd environment > /dev/null
 ./start_environment.py
 
 popd > /dev/null
-cp -f "jenkins/pipelines/java/desktop/config.desktop_java.json" tests
+cp -f "jenkins/pipelines/java/desktop/config_java_desktop.json" tests
 
 echo "Configure tests"
 SERVER_URL=`cat servers/jak/desktop/server.url`
 pushd tests > /dev/null
-echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config.desktop_java.json
-echo '}' >> config.desktop_java.json
-cat config.desktop_java.json
+echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config_java_desktop.json
+echo '}' >> config_java_desktop.json
+cat config_java_desktop.json
 
 echo "Running tests on desktop test server at $SERVER_IP"
 python3.10 -m venv venv
@@ -52,5 +52,5 @@ python3.10 -m venv venv
 pip install -r requirements.txt
 
 echo "Run tests"
-pytest -v --no-header -W ignore::DeprecationWarning --config config.desktop_java.json
+pytest -v --no-header -W ignore::DeprecationWarning --config config_java_desktop.json
 

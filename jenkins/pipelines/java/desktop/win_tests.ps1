@@ -32,14 +32,14 @@ Push-Location environment
 & .\start_environment.py
 
 Pop-Location
-Copy-Item .\jenkins\pipelines\java\desktop\config.desktop_java.json -Destination tests
+Copy-Item .\jenkins\pipelines\java\desktop\config_java_desktop.json -Destination tests
 
 Write-Host "Configure tests"
 $serverUrl = Get-Content .\servers\jak\desktop\server.url
 Push-Location tests
-Add-Content config.desktop_java.json "    `"test-servers`": [`"$serverUrl`"]"
-Add-Content config.desktop_java.json '}'
-Get-Content config.desktop_java.json
+Add-Content config_java_desktop.json "    `"test-servers`": [`"$serverUrl`"]"
+Add-Content config_java_desktop.json '}'
+Get-Content config_java_desktop.json
 
 Write-Host "Running tests on desktop test server at $SERVER_IP"
 & python3.10 -m venv venv
@@ -48,5 +48,5 @@ Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 pip install -r requirements.txt
 
 Write-Host "Run tests"
-& pytest -v --no-header -W ignore::DeprecationWarning --config config.desktop_java.json
+& pytest -v --no-header -W ignore::DeprecationWarning --config config_java_desktop.json
 
