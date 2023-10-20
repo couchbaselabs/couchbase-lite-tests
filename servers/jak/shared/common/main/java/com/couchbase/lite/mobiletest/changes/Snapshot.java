@@ -184,12 +184,14 @@ public class Snapshot {
                         null,
                         null,
                         null,
-                        docId,
+                        actual.toMap(),
                         change,
                         "Document should not exist"));
             }
             return;
         }
+
+        final Map<String, Object> expectedContent = expected.toMap();
 
         if (actual == null) {
             diffs.add(new Difference(
@@ -197,8 +199,8 @@ public class Snapshot {
                 docId,
                 null,
                 null,
+                expectedContent,
                 null,
-                docId,
                 change,
                 "Document was not found"));
             return;
@@ -206,7 +208,7 @@ public class Snapshot {
 
         // at this point, the two documents should be identical
         final Map<String, Object> actualContent = actual.toMap();
-        compareDocContent(collFqn, docId, actualContent, "", expected.toMap(), actualContent, change, diffs);
+        compareDocContent(collFqn, docId, actualContent, "", expectedContent, actualContent, change, diffs);
     }
 
     @SuppressWarnings({"unchecked", "PMD.ExcessiveMethodLength"})
