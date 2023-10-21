@@ -13,7 +13,8 @@ the availability of the test servers.
 
 1. Reset SG and load `todo` dataset.
 2. Reset local database, and load `todo` dataset into database `db1` and `db2`.
-3. Start a replicator:
+3 Create SG role named `lists.user1.db1-list1.contributor`.
+4. Start a replicator:
    * endpoint: `/todo`
    * database: `db1`
    * collections : `_default.lists`, `_default.tasks`, `_default.users`
@@ -21,7 +22,7 @@ the availability of the test servers.
    * continuous: true
    * enableDocumentListener: true
    * credentials: user1/pass
-4. Start a replicator:
+5. Start a replicator:
    * endpoint: `/todo`
    * database: `db2`
    * collections : `_default.lists`, `_default.tasks`, `_default.users`
@@ -29,34 +30,33 @@ the availability of the test servers.
    * continuous: true
    * enableDocumentListener: true
    * credentials: user1/pass
-5. Snapshot documents in `db1`:
+6. Snapshot documents in `db1`:
    * `_default.lists`.`db2-list1`
    * `_default.tasks`.`db2-list1-task1`
-6. Snapshot documents in `db2`
+7. Snapshot documents in `db2`
    * `_default.lists`.`db1-list1`
    * `_default.tasks`.`db1-list1-task1`
-7. Create a list and a task in `db1`:
-   * Create SG role named `lists.user1.db1-list1.contributor`.
+8. Create a list and a task in `db1`:
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as 
       * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": true,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `l1.jpg` blob.
-8. Create a list and a task in `db2`:
+9. Create a list and a task in `db2`:
    * Create SG role named `lists.user1.db2-list1.contributor`.
    * Create a list document in `_default.lists` as
       * { "_id": "db2-list1", "name": "db2 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
       * { "_id": "db2-list1-task1", "name": "db2 list1 task1", "complete": true,  "image": null, taskList" : { "id" : "db2-list1", "owner" : "user1" } }
       * Set the `image` key with the `l2.jpg` blob.
-9. Wait and check the pull document replication events in `db1`:
+10. Wait and check the pull document replication events in `db1`:
    * `_default.lists`.`db2-list1`
    * `_default.tasks`.`db2-list1-task1`
-10. Wait and check the pull document replication events in `db2`:
+11. Wait and check the pull document replication events in `db2`:
    * `_default.lists`.`db1-list1`
    * `_default.tasks`.`db1-list1-task1`
-11. Verify the snapshot from step 5 by checking the content of the snapshot documents.
-12. Verify the snapshot from step 6 by checking the content of the snapshot documents.
+12. Verify the snapshot from step 5 by checking the content of the snapshot documents.
+13. Verify the snapshot from step 6 by checking the content of the snapshot documents.
 
 ## test_update_task
 
@@ -71,7 +71,8 @@ the availability of the test servers.
 
 1. Reset SG and load `todo` dataset.
 2. Reset local database, and load `todo` dataset into database `db1` and `db2`.
-3. Start a replicator:
+3 Create SG role named `lists.user1.db1-list1.contributor`.
+4. Start a replicator:
    * endpoint: `/todo`
    * database: `db1`
    * collections : `_default.lists`, `_default.tasks`, `_default.users`
@@ -79,7 +80,7 @@ the availability of the test servers.
    * continuous: true
    * enableDocumentListener: true
    * credentials: user1/pass
-4. Start a replicator:
+5. Start a replicator:
    * endpoint: `/todo`
    * database: `db2`
    * collections : `_default.lists`, `_default.tasks`, `_default.users`
@@ -91,7 +92,6 @@ the availability of the test servers.
    * `_default.lists`.`db1-list1`
    * `_default.tasks`.`db1-list1-task1`
 6. Create a list and a task in `db1`:
-   * Create SG role named `lists.user1.db1-list1.contributor`.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
@@ -127,7 +127,8 @@ the availability of the test servers.
 
 1. Reset SG and load `todo` dataset.
 2. Reset local database, and load `todo` dataset into database `db1` and `db2`.
-3. Start a replicator:
+3 Create SG role named `lists.user1.db1-list1.contributor`.
+4. Start a replicator:
    * endpoint: `/todo`
    * database: `db1`
    * collections : `_default.lists`, `_default.tasks`, `_default.users`
@@ -135,7 +136,7 @@ the availability of the test servers.
    * continuous: true
    * enableDocumentListener: true
    * credentials: user1/pass
-4. Start a replicator:
+5. Start a replicator:
    * endpoint: `/todo`
    * database: `db2`
    * collections : `_default.lists`, `_default.tasks`, `_default.users`
@@ -144,20 +145,25 @@ the availability of the test servers.
    * enableDocumentListener: true
    * credentials: user1/pass
 5. Create a list and a task in `db1`:
-   * Create SG role named `lists.user1.db1-list1.contributor`.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
       * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
       * Set the `image` key with the `l1.jpg` blob.
-6. Wait and check the pull document replication events in `db2`
+6: Snapshot docs in `db1`
+   * `_default.lists`.`db1-list1`
+   * `_default.tasks`.`db1-list1-task1`
+7. Wait and check the pull document replication events in `db2`
    * `_default.lists`.`db1-list1`
    * `_default.tasks`.`db1-list1-task1` 
-7. Delete the `_default.tasks`.`db1-list1-task1` task in `db1`
-8. Wait and check the pull deleted document replication event in `db2`
+8: Snapshot docs in `dbr21`
+   * `_default.lists`.`db1-list1`
+   * `_default.tasks`.`db1-list1-task1`
+9. Delete the `_default.tasks`.`db1-list1-task1` task in `db1`
+10. Wait and check the pull deleted document replication event in `db2`
    * `_default.tasks`.`db1-list1-task1` (Deleted)
-9. Check that `_default.tasks`.`db1-list1-task1` was deleted from `db1`.
-10. Check that `_default.tasks`.`db1-list1-task1` was deleted from `db2`.
+11. Check that `_default.tasks`.`db1-list1-task1` was deleted from `db1`.
+12. Check that `_default.tasks`.`db1-list1-task1` was deleted from `db2`.
 
 ## test_delete_list
 
@@ -172,7 +178,8 @@ the availability of the test servers.
 
 1. Reset SG and load `todo` dataset.
 2. Reset local database, and load `todo` dataset into database `db1` and `db2`.
-3. Start a replicator:
+3 Create SG role named `lists.user1.db1-list1.contributor`.
+4. Start a replicator:
    * endpoint: `/todo`
    * database: `db1`
    * collections : `_default.lists`, `_default.tasks`, `_default.users`
@@ -180,7 +187,7 @@ the availability of the test servers.
    * continuous: true
    * enableDocumentListener: true
    * credentials: user1/pass
-4. Start a replicator:
+5. Start a replicator:
    * endpoint: `/todo`
    * database: `db2`
    * collections : `_default.lists`, `_default.tasks`, `_default.users`
@@ -189,7 +196,6 @@ the availability of the test servers.
    * enableDocumentListener: true
    * credentials: user1/pass
 5. Create a list and two tasks in `db1`:
-   * Create SG role named `lists.user1.db1-list1.contributor`.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
@@ -197,20 +203,28 @@ the availability of the test servers.
       * Set the `image` key with the `l5.jpg` blob.
    * Create a task document in `_default.tasks` as  
       * { "_id": "db1-list1-task2", "name": "db1 list1 task2", "complete": true,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
-6. Wait and check the pull document replication events in `db2`
+6: Snapshot docs in `db1`
    * `_default.lists`.`db1-list1`
    * `_default.tasks`.`db1-list1-task1`
    * `_default.tasks`.`db1-list1-task2`
-7. Delete the list and its tasks from `db1`.
+7. Wait and check the pull document replication events in `db2`
+   * `_default.lists`.`db1-list1`
+   * `_default.tasks`.`db1-list1-task1`
+   * `_default.tasks`.`db1-list1-task2`
+8: Snapshot docs in `db2`
+   * `_default.lists`.`db1-list1`
+   * `_default.tasks`.`db1-list1-task1`
+   * `_default.tasks`.`db1-list1-task2`
+9. Delete the list and its tasks from `db1`.
    * Delete `_default.lists`.`db1-list1`
    * Delete `_default.tasks`.`db1-list1-task1`
    * Delete `_default.tasks`.`db1-list1-task2`
-8. Wait and check the pull document replication events in `db2`.
+10. Wait and check the pull document replication events in `db2`.
    * `_default.lists`.`db1-list1` (deleted)
    * `_default.tasks`.`db1-list1-task1` (deleted)
    * `_default.tasks`.`db1-list1-task2` (deleted)
-9. Check that the list and two tasks are deleted from `db1`.
-10. Check that the list and two tasks are deleted from `db2`.
+11. Check that the list and two tasks are deleted from `db1`.
+12. Check that the list and two tasks are deleted from `db2`.
 
 ## test_create_tasks_two_users
 
