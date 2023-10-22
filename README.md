@@ -39,6 +39,7 @@ The system consists of 4 components:
    cd environment
    ./start_environment.py
    ```
+   * To shutdown the environment, run `docker compose down`.
    
 2. Build and run the test server of the platform that you want to test.
    * [C](https://github.com/couchbaselabs/couchbase-lite-tests/tree/main/servers/c)
