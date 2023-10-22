@@ -9,50 +9,73 @@
 ## Requirements
 
 * CMake 3.23+
-* CMake Project : VSCode with C++/CMake plugin or CLion
-* iOS : XCode 14.3+
+* Apple : XCode 14.3+
 * Android : Java 17+ and Android Studio 2022.2.1+
 * Windows : Visual Studio 2017+
 
-## Build
+## Build and Run Test Server
 
-From this directory, use the build script for the platform in the `scripts` directory to build and assemble the 
-built artifacts. The built artifacts including the TestServer binary or application and the asset folder 
-for non-app platforms (macOs, linux, and Windows) will be located at `build/out/bin` directory. 
+1. Login to Couchbase VPN. This is required to download CBL binary built by the CI system.
 
-See the samples below for the usage of the build scripts.
+2. Find you the latest successful build number. Skip this if you have already known a specific build to test.
+
+   ```
+   ./jenkins/pipelines/main/latest_successful_build.sh c 3.2.0
+   ```
+
+3. Build and Run
+
+   From this directory (`servers/c`), use the platform build script in the `scripts` directory to build and assemble the built artifacts.
+   The build script requires CBL version number and optional build number. Without specifying the build number, the script will download
+   the public release CBL binary. The built artifacts including the TestServer binary or application and the asset folder will be located at
+   `build/out/bin` directory.
 
 ### macOS
 
 ```
-./scripts/build_macos.sh enterprise 3.1.1
+./scripts/build_macos.sh enterprise 3.2.0 28
+cd build/out/bin
+./testserver
 ```
 
 ### linux
 
 ```
-./scripts/build_linux.sh enterprise 3.1.1
-```
-
-### Windows
-
-```
-.\scripts\build_wins.ps1 enterprise 3.1.1
+./scripts/build_linux.sh enterprise 3.2.0 28
+cd build/out/bin
+./testserver
 ```
 
 ### iOS
 
 ```
-./scripts/build_ios.sh all enterprise 3.1.1
+./scripts/build_ios.sh all enterprise 3.2.0 28
+cd build/out/bin
+ios kill com.couchbase.CBLTestServer
+ios install --path=TestServer.app
+ios launch com.couchbase.CBLTestServer
 ```
 
-### Android
+* The above uses [go-ios](https://github.com/danielpaulus/go-ios) to install and run the TestServer app. 
+* go-ios doesn't support XCode 15 and iOS 17 at the moment. For XCode 15 and iOS 17, use xcrun command.
+  
+  ```
+  xcrun devicectl device install app --device <device uuid|ecid|udid|name> ./TestServer.app
+  xcrun devicectl device process launch --device <device uuid|ecid|udid|name> com.couchbase.CBLTestServer
+  ```
+  
+* To run on the test server on the device, use xcrun simctl command.
+  ```
+  xcrun simctl install booted ./TestServer.app
+  ```
 
-```
-./scripts/build_android.sh all enterprise 3.1.1
-```
+Android and Windows instruction are in progress.
 
 ## Development
+
+### Tools
+
+* VSCode with C++/CMake plugin or Jetbrains CLion
 
 ### Download Couchbase Lite
 
