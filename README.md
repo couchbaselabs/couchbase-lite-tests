@@ -18,58 +18,57 @@ The system consists of 4 components:
 * client - A python framework that configures the environment, runs tests and reports their results
 * dataset - A collection datasets used in tests.  Each dataset appears in two formats, as a cblite2 db, and as raw JSON
 * environment - The docker compose script that creates and runs the environment
+* jenkins - The jenkins pipelines and the docker compose for running the Jenkins server.
 * servers - A test server for each CBL platform.  Servers run on their platform and accept instructions from the client to run tests
 * spec - Documentation:  The specification for this system.
 * tests - The python codelets that are run in the client to configure an environment and then instruct connected servers to run a test in that environment.
 
 ## Running tests
 
-You will need more than one terminal window.
+### Requirements
 
-In the first, from the `environment` folder, start the environment:
+1. [Docker](https://www.docker.com/get-started)
+2. [Python 3.7 - 3.10](https://www.python.org/downloads)
+3. [OpenSSL 1.1 for CBS Python SDK](https://docs.couchbase.com/python-sdk/current/hello-world/start-using-sdk.html)
 
-'docker compose up'
+### Steps
 
-Wait until the Sync Gateway is up and stable.  Leave that window to monitor the
-SGW log.
+1. Open a terminal window and start the environment by running the `./start_environment.py` script in the environment folder.
+   The script will start CBS and SG in the docker container in the background and wait until SG is successfully started before exiting.
+   ```
+   cd environment
+   ./start_environment.py
+   ```
+   
+2. Build and run the test server of the platform that you want to test.
+   * [C](https://github.com/couchbaselabs/couchbase-lite-tests/tree/main/servers/c)
+   * Android
+   * .Net
+   * iOS
+     
+3. From the tests directory, set up a python virtual environment:
+   ```
+   cd tests
+   python3 -m venv venv
+   . venv/bin/activate
+   pip install -r requirements.txt
+   ```
+   * You may need to use `python<version>` command e.g. `python3.10` if you already have `python3` for the other version.
+   * You only need to create the python venv once. To reactivate run `. venv/bin/activate`, and to deactivate run `deactivate`.
+   * When you update the repo or the Python TDK code, run `pip install ../client` to update the TDK.
 
-From a new window, start a server.  This will probably entail building a server
-application for your favorite device, installing it, and running it.  Once it is
-running it should tell you its URL.  You will need this in a moment.
+4. Edit the file `config.example.json` with the URL of your Test server started in the Step 2.
+   ```
+   "test-servers": ["http://192.168.100.104:8080"]
+   ```
+5. Run the pytest tests as examples below.
+   ```
+   # Run one test file:
+   pytest --config config.example.json test_basic_replication.py
 
-Next, from the tests directory, set up a python environment:
+   # Run all tests:
+   pytest --config config.example.json
 
-```
-python3 -m venv venv
-. venv/bin/activate
-pip install -r requirements.txt
-```
-If you've already don't this once (you've created the venv and installed the requirements in it)
-you don't need to do it again.  Just activate it with `. venv/bin/activate`.
-
-Tests run inside the test client framework.  You will have to install the client
-to run the tests.  The easiest way to do this is to install the test client
-image from Proget.
-
-```
-pip install cbltest --extra-index-url https://proget.sc.couchbase.com/pypi/mobile-python/simple
-```
-
-This should work fine, as long as you aren't changing the client code (if you
-are, there are instructions on how to build the test client from source, in
-`test/README.md`)
-
-Edit the file `config.example.json` so that the value of the key "test-servers"
-is a JSON array containing the URL of your server (started above).  E.g.:
-
-```
-"test-servers": ["http://192.168.100.104:8080"]
-```
-
-You should now be able to run all of the tests in one of the test files
-(test\_basic_replication.py in this example) like this:
-
-```
-pytest --config config.example.json test_basic_replication.py
-```
-
+   # Run all with detail and without deprecation warning:
+   pytest -v --no-header -W ignore::DeprecationWarning --config config.example.json
+   ```
