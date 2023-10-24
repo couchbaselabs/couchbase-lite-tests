@@ -1,13 +1,16 @@
 from __future__ import annotations
+
 from abc import abstractmethod
 from enum import Enum, Flag, auto
 from typing import Any, Dict, Final, List, cast, Optional
+
 from varname import nameof
 
-from cbltest.assertions import _assert_not_null
-from cbltest.responses import ErrorResponseBody
 from cbltest.api.jsonserializable import JSONSerializable
-from cbltest.jsonhelper import _get_typed, _get_typed_required
+from cbltest.assertions import _assert_not_null
+from cbltest.jsonhelper import _get_typed_required
+from cbltest.responses import ErrorResponseBody
+
 
 class ReplicatorFilter(JSONSerializable):
     """
@@ -19,7 +22,7 @@ class ReplicatorFilter(JSONSerializable):
     def name(self) -> str:
         """Gets the name of the filter"""
         return self.__name
-    
+
     def __init__(self, name: str, parameters: Optional[dict] = None):
         self.__name = name
         self.parameters = parameters
@@ -32,13 +35,15 @@ class ReplicatorFilter(JSONSerializable):
 
         return ret_val
 
+
 class ReplicatorCollectionEntry(JSONSerializable):
     @property
     def names(self) -> List[str]:
         """Gets the name of the collection that the options will be applied to"""
         return self.__names
-    
-    def __init__(self, names: List[str] = ["_default"], channels: Optional[List[str]] = None, document_ids: Optional[List[str]] = None,
+
+    def __init__(self, names: List[str] = ["_default"], channels: Optional[List[str]] = None,
+                 document_ids: Optional[List[str]] = None,
                  push_filter: Optional[ReplicatorFilter] = None, pull_filter: Optional[ReplicatorFilter] = None):
         _assert_not_null(names, nameof(names))
         assert len(names) > 0, "Must specify at least one name in the names array for ReplicatorCollectionEntry"
@@ -75,6 +80,7 @@ class ReplicatorCollectionEntry(JSONSerializable):
 
         return ret_val
 
+
 class ReplicatorType(Enum):
     """An enum representing the direction of a replication"""
 
@@ -89,7 +95,8 @@ class ReplicatorType(Enum):
 
     def __str__(self) -> str:
         return self.value
-    
+
+
 class ReplicatorAuthenticator(JSONSerializable):
     """
     The base class for replicator authenticators
@@ -106,7 +113,8 @@ class ReplicatorAuthenticator(JSONSerializable):
     @abstractmethod
     def to_json(self) -> Any:
         pass
-    
+
+
 class ReplicatorBasicAuthenticator(ReplicatorAuthenticator):
     """A class holding information to perform HTTP Basic authentication"""
 
@@ -114,11 +122,11 @@ class ReplicatorBasicAuthenticator(ReplicatorAuthenticator):
     def username(self) -> str:
         """Gets the username that will be used for auth"""
         return self.__username
-    
+
     def password(self) -> str:
         """Gets the password that will be used for auth"""
         return self.__password
-    
+
     def __init__(self, username: str, password: str) -> None:
         super().__init__("BASIC")
         self.__username = username
@@ -131,20 +139,21 @@ class ReplicatorBasicAuthenticator(ReplicatorAuthenticator):
             "username": self.__username,
             "password": self.__password
         }
-    
+
+
 class ReplicatorSessionAuthenticator(ReplicatorAuthenticator):
     """A class holding information to authenticate via session cookie"""
 
-    @property 
+    @property
     def session_id(self) -> str:
         """Gets the session ID that will be used for auth"""
         return self.__session_id
-    
+
     @property
     def cookie_name(self) -> str:
         """Gets the cookie name that will be used for auth"""
         return self.__cookie_name
-    
+
     def __init__(self, session_id: str, cookie_name: str = "SyncGatewaySession") -> None:
         super().__init__("SESSION")
         self.__session_id = session_id
@@ -156,7 +165,8 @@ class ReplicatorSessionAuthenticator(ReplicatorAuthenticator):
             "sessionID": self.__session_id,
             "cookieName": self.__cookie_name
         }
-    
+
+
 class ReplicatorActivityLevel(Enum):
     """An enum representing the activity level of a replicator"""
 
@@ -179,6 +189,7 @@ class ReplicatorActivityLevel(Enum):
     def __str__(self) -> str:
         return self.value
 
+
 class ReplicatorProgress:
     """A class representing the progress of a replicator in terms of units and documents complete"""
 
@@ -188,11 +199,13 @@ class ReplicatorProgress:
     def completed(self) -> bool:
         """Gets the number of units completed so far"""
         return self.__completed
-    
+
     def __init__(self, body: dict) -> None:
         assert isinstance(body, dict), "Invalid replicator progress value received (not an object)"
         self.__completed = cast(bool, body.get(self.__completed_key))
-        assert isinstance(self.__completed, bool), "Invalid replicator progress value received ('completed' not a boolean)"
+        assert isinstance(self.__completed,
+                          bool), "Invalid replicator progress value received ('completed' not a boolean)"
+
 
 class ReplicatorDocumentFlags(Flag):
     NONE = 0
@@ -215,15 +228,15 @@ class ReplicatorDocumentFlags(Flag):
         upper = input.upper()
         if upper == "NONE":
             return ReplicatorDocumentFlags.NONE
-        
+
         if upper == "DELETED":
             return ReplicatorDocumentFlags.DELETED
-        
+
         if upper == "ACCESSREMOVED":
             return ReplicatorDocumentFlags.ACCESS_REMOVED
-        
+
         raise ValueError(f"Unrecognized input ReplicatorDocumentFlags {input}")
-    
+
     @classmethod
     def parse_all(cls, input: List[str]) -> ReplicatorDocumentFlags:
         """
@@ -240,7 +253,7 @@ class ReplicatorDocumentFlags(Flag):
     def __str__(self) -> str:
         if self == ReplicatorDocumentFlags.NONE:
             return "NONE"
-        
+
         flags = []
         # https://github.com/python/mypy/issues/9642
         # Need to cast self to not be Literal type
@@ -252,6 +265,7 @@ class ReplicatorDocumentFlags(Flag):
             flags.append("ACCESSREMOVED")
 
         return "|".join(flags)
+
 
 class ReplicatorDocumentEntry:
     """A class representing the status of a replicated document"""
@@ -266,27 +280,27 @@ class ReplicatorDocumentEntry:
     def collection(self) -> str:
         """Gets the collection that the document belongs to"""
         return self.__collection
-    
+
     @property
     def document_id(self) -> str:
         """Gets the ID of the document"""
         return self.__document_id
-    
+
     @property
     def is_push(self) -> bool:
         """Gets whether the document was pushed or pulled"""
         return self.__is_push
-    
+
     @property
     def direction(self) -> ReplicatorType:
         """Gets the direction of the replicator, based on is_push"""
         return ReplicatorType.PUSH if self.__is_push else ReplicatorType.PULL
-    
+
     @property
     def flags(self) -> ReplicatorDocumentFlags:
         """Gets the flags that were set on the document when it was replicated"""
         return self.__flags
-    
+
     @property
     def error(self) -> Optional[ErrorResponseBody]:
         """Gets the error that prevented the document from being replicated, if any"""
@@ -302,34 +316,36 @@ class ReplicatorDocumentEntry:
         self.__flags = ReplicatorDocumentFlags.parse_all(_get_typed_required(body, self.__flags_key, List[str]))
         self.__error: Optional[ErrorResponseBody] = ErrorResponseBody.create(cast(dict, body.get(self.__error_key)))
 
+
 class WaitForDocumentEventEntry:
     """
     A class that represents a single replicator document event to wait for from
     a replicator's document listener
     """
+
     @property
     def collection(self) -> str:
         """Gets the collection of the document to wait for"""
         return self.__collection
-    
+
     @property
     def id(self) -> str:
         """Gets the ID of the document to wait for"""
         return self.__id
-    
+
     @property
     def direction(self) -> ReplicatorType:
         """Gets the direction of the event to wait for.  Events that otherwise match
         (e.g. have the same document ID) will be ignored"""
         return self.__direction
-    
+
     @property
     def flags(self) -> ReplicatorDocumentFlags:
         """Gets the flags of the event to wait for.  Events that otherwise match
         (e.g. have the same document ID) will be ignored"""
         return self.__flags
-    
-    def __init__(self, collection: str, id: str, direction: ReplicatorType, flags: ReplicatorDocumentFlags):
+
+    def __init__(self, collection: str, id: str, direction: ReplicatorType, flags: Optional[ReplicatorDocumentFlags]):
         assert isinstance(collection, str), "WaitForDocumentEventEntry: collection not a string"
         assert isinstance(id, str), "WaitForDocumentEventEntry: id not a string"
         self.__collection = collection
@@ -338,36 +354,46 @@ class WaitForDocumentEventEntry:
         self.__flags = flags
 
     def __hash__(self) -> int:
-        return hash(f"{self.__collection}{self.__id}") ^ hash(self.__direction) ^ hash (self.__flags)
-    
+        return hash(f"{self.__collection}{self.__id}")
+
     def __eq__(self, obj: Any) -> bool:
         if not isinstance(obj, WaitForDocumentEventEntry):
             return False
-        
+
         other = cast(WaitForDocumentEventEntry, obj)
-        return self.__collection == other.__collection and self.__id == other.__id and \
-            self.__direction == other.__direction and self.__flags == other.__flags
-    
+        return self.__collection == other.__collection and self.__id == other.__id and (
+                self.__direction == other.__direction or
+                self.__direction == ReplicatorType.PUSH_AND_PULL or
+                other.__direction == ReplicatorType.PUSH_AND_PULL
+        ) and (
+                self.__flags == other.__flags or
+                self.__flags == None or
+                other.__flags == None
+        )
+
+
 class ReplicatorStatus:
     """
     A class representing the current status (activity, progress, error, etc) of a Replicator
     """
+
     @property
     def progress(self) -> ReplicatorProgress:
         """Gets the progress numbers for the Replicator"""
         return self.__progress
-    
+
     @property
     def activity(self) -> ReplicatorActivityLevel:
         """Gets the activity level for the Replicator"""
         return self.__activity
-    
+
     @property
     def error(self) -> Optional[ErrorResponseBody]:
         """Gets the error for the Replicator, if any"""
         return self.__error
-    
-    def __init__(self, progress: ReplicatorProgress, activity: ReplicatorActivityLevel, error: Optional[ErrorResponseBody]):
+
+    def __init__(self, progress: ReplicatorProgress, activity: ReplicatorActivityLevel,
+                 error: Optional[ErrorResponseBody]):
         self.__progress = progress
         self.__activity = activity
         self.__error = error
