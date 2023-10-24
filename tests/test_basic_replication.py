@@ -197,7 +197,7 @@ class TestBasicReplication(CBLTestClass):
             b.delete_document("travel.hotels", "hotel_2")
 
         self.mark_test_step("Wait until receiving all document replication events")
-        await replicator.wait_for_doc_events({
+        await replicator.wait_for_all_doc_events({
             WaitForDocumentEventEntry("travel.airports", "test_airport_1", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
             WaitForDocumentEventEntry("travel.airports", "test_airport_2", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
             WaitForDocumentEventEntry("travel.airlines", "airline_1", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
@@ -303,7 +303,7 @@ class TestBasicReplication(CBLTestClass):
                 await cblpytest.sync_gateways[0].delete_document(doc.id, doc.revid, "travel", "travel", "hotels")
 
         self.mark_test_step("Wait until receiving all document replication events")
-        await replicator.wait_for_doc_events({
+        await replicator.wait_for_all_doc_events({
             WaitForDocumentEventEntry("travel.routes", "test_route_1", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
             WaitForDocumentEventEntry("travel.routes", "test_route_2", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
             WaitForDocumentEventEntry("travel.landmarks", "landmark_100", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
@@ -426,7 +426,7 @@ class TestBasicReplication(CBLTestClass):
                 await cblpytest.sync_gateways[0].delete_document(doc.id, doc.revid, "travel", "travel", "hotels")
 
         self.mark_test_step("Wait until receiving all document replication events")
-        await replicator.wait_for_doc_events({
+        await replicator.wait_for_all_doc_events({
             WaitForDocumentEventEntry("travel.airports", "test_airport_1", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
             WaitForDocumentEventEntry("travel.airports", "test_airport_2", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
             WaitForDocumentEventEntry("travel.airlines", "airline_1", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),

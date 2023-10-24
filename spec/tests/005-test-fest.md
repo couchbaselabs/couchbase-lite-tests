@@ -13,7 +13,7 @@ the availability of the test servers.
 
 1. Reset SG and load `todo` dataset.
 2. Reset local database, and load `todo` dataset into database `db1` and `db2`.
-3 Create SG role named `lists.user1.db1-list1.contributor`.
+3. Create SG role named `lists.user1.db1-list1.contributor`.
 4. Start a replicator:
    * endpoint: `/todo`
    * database: `db1`
@@ -71,7 +71,7 @@ the availability of the test servers.
 
 1. Reset SG and load `todo` dataset.
 2. Reset local database, and load `todo` dataset into database `db1` and `db2`.
-3 Create SG role named `lists.user1.db1-list1.contributor`.
+3. Create SG role named `lists.user1.db1-list1.contributor`.
 4. Start a replicator:
    * endpoint: `/todo`
    * database: `db1`
@@ -127,7 +127,7 @@ the availability of the test servers.
 
 1. Reset SG and load `todo` dataset.
 2. Reset local database, and load `todo` dataset into database `db1` and `db2`.
-3 Create SG role named `lists.user1.db1-list1.contributor`.
+3. Create SG role named `lists.user1.db1-list1.contributor`.
 4. Start a replicator:
    * endpoint: `/todo`
    * database: `db1`
@@ -178,7 +178,7 @@ the availability of the test servers.
 
 1. Reset SG and load `todo` dataset.
 2. Reset local database, and load `todo` dataset into database `db1` and `db2`.
-3 Create SG role named `lists.user1.db1-list1.contributor`.
+3. Create SG role named `lists.user1.db1-list1.contributor`.
 4. Start a replicator:
    * endpoint: `/todo`
    * database: `db1`
@@ -239,7 +239,8 @@ the availability of the test servers.
 
 1. Reset SG and load `todo` dataset.
 2. Reset local database, and load `todo` dataset into database `db1` and `db2`.
-3. Start a replicator:
+3. Create SG role named `lists.user1.db1-list1.contributor`.
+4. Start a replicator:
    * endpoint: `/todo`
    * database: `db1`
    * collections : `_default.lists`, `_default.tasks`, `_default.users`
@@ -247,7 +248,7 @@ the availability of the test servers.
    * continuous: true
    * enableDocumentListener: true
    * credentials: user1/pass
-4. Start a replicator:
+5. Start a replicator:
    * endpoint: `/todo`
    * database: `db2`
    * collections : `_default.lists`, `_default.tasks`, `_default.users`
@@ -256,7 +257,6 @@ the availability of the test servers.
    * enableDocumentListener: true
    * credentials: user2/pass
 5. Create a list and a task in `db1`:
-   * Create SG role named `lists.user1.db1-list1.contributor`.
    * Create a list document in `_default.lists` as
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
