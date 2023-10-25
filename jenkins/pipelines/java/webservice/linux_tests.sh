@@ -21,6 +21,13 @@ if [ -z "$BUILD_NUMBER" ]; then usage; fi
 pushd servers/jak > /dev/null
 echo "$VERSION" > cbl-version.txt
 
+echo "Download the support libraries"
+rm -rf supportlib
+mkdir supportlib
+curl "${LATESTBUILDS}/${VERSION}/${BUILD_NUMBER}/couchbase-lite-java-linux-supportlibs-${VERSION}-${BUILD_NUMBER}.zip" -o support.zip
+unzip -d supportlib support.zip
+export LD_LIBRARY_PATH="`pwd`/supportlib:${LD_LIBRARY_PATH}"
+
 echo "Build and start the Java Webservice Test Server"
 cd webservice
 ./gradlew appStop || true
