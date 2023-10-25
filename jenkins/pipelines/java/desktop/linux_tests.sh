@@ -1,6 +1,8 @@
 #!/bin/bash
 # Build the Java Desktop test server, deploy it, and run the tests
 
+LATESTBUILDS="https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-java"
+
 function usage() {
     echo "Usage: $0 <edition> <version> <build num>"
     exit 1
@@ -24,6 +26,13 @@ echo "$VERSION" > cbl-version.txt
 echo "Build Java Desktop Test Server"
 cd desktop
 ./gradlew jar -PbuildNumber="${BUILD_NUMBER}"
+
+echo "Download the support libraries"
+rm -rf supportlib
+mkdir supportlib
+curl "${LATESTBUILDS}/${VERSION}/${BUILD_NUMBER}/couchbase-lite-java-linux-supportlibs-${VERSION}-${BUILD_NUMBER}.zip" -o support.zip
+unzip -d supportlib support.zip
+export LD_LIBRARY_PATH="`pwd`/supportlib:${LD_LIBRARY_PATH}"
 
 echo "Start the Test Server"
 if [ -f "server.pid" ]; then kill `cat server.pid`; fi
