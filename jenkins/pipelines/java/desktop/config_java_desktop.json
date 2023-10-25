@@ -1,5 +1,5 @@
 {
     "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
-    "sync-gateways": [{"hostname": "10.100.150.142"}],
-    "couchbase-servers": [{"hostname": "10.100.150.142"}],
+    "sync-gateways": [{"hostname": "localhost"}],
+    "couchbase-servers": [{"hostname": "localhost"}],
     "api-version": 1,
