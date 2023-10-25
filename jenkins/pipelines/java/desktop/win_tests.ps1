@@ -11,11 +11,11 @@ param (
 
 # Force the Couchbase Lite Java version
 Push-Location servers\jak
-"$VERSION" | Out-File cbl-version.txt
+"$version" | Out-File cbl-version.txt
 
 Write-Host "Build Java Desktop Test Server"
 Set-Location desktop
-& .\gradlew.bat --no-daemon jar -PbuildNumber="${BUILD_NUMBER}"
+& .\gradlew.bat --no-daemon jar -PbuildNumber="${buildNumber}"
 
 Write-Host "Start the Test Server"
 if (Test-Path -Path .\server.pid){
@@ -23,7 +23,7 @@ if (Test-Path -Path .\server.pid){
     Stop-Process -Id $serverId
 }
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue server.log, server.url, server.pid
-$app = Start-Process java -ArgumentList "-jar .\app\build\libs\CBLTestServer-Java-Desktop-${VERSION}-${BUILD_NUMBER}.jar server" -PassThru -NoNewWindow -RedirectStandardOutput server.log  -RedirectStandardError server.err
+$app = Start-Process java -ArgumentList "-jar .\app\build\libs\CBLTestServer-Java-Desktop-${version}-${buildNumber}.jar server" -PassThru -NoNewWindow -RedirectStandardOutput server.log  -RedirectStandardError server.err
 $app.Id | Out-File server.pid
 Pop-Location
 

@@ -18,7 +18,7 @@ then
     BUILD_NO=`curl -s https://raw.githubusercontent.com/couchbase/build-manifests/master/couchbase-lite-android/${VERSION}/${VERSION}.xml |  xmllint --xpath "//manifest/project/annotation[3]/@value" - | cut -f 2 -d "=" | cut -f 2 -d "\""`
 elif [ "${PLATFORM}" == "java" ]
 then
-    `curl -s http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-ios/${VERSION}/lastSuccessful.xml | xmllint --xpath "//manifest/project/annotation[3]/@value" - | cut -f 2 -d "=" | cut -f 2 -d "\""`
+    BUILD_NO=`curl -s http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-java/${VERSION}/lastSuccessful.xml | xmllint --xpath "//manifest/project/annotation[3]/@value" - | cut -f 2 -d "=" | cut -f 2 -d "\""`
 elif [ "${PLATFORM}" == "ios" ]
 then
     BUILD_NO=`curl -s https://raw.githubusercontent.com/couchbase/build-manifests/master/couchbase-lite-ios/${VERSION}/${VERSION}.xml |  xmllint --xpath "//manifest/project/annotation[3]/@value" - | cut -f 2 -d "=" | cut -f 2 -d "\""`

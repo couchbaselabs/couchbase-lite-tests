@@ -12,14 +12,14 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
-                    currentBuild.displayName = "android-${CBL_EDITION}-${params.CBL_VERSION}-${params.CBL_BUILD} #${currentBuildNumber}"
+                    currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD}-${CBL_EDITION} (#${currentBuild.number})"
                 }
             }
         }
         stage('Run Tests') {
             parallel {
                 stage('OSX Tests') {
-                    agent { label 'mob-e2e-win-01' }
+                    agent { label 'mob-e2e-mac-01' }
                     stages {
                         // Note that there is no fundamental reason that the Desktop and Web Services
                         // builds couldn't run in parallel.  We'd need to figure out how to set
@@ -62,14 +62,14 @@ pipeline {
                     stages {
                         stage('Windows Desktop Tests') {
                             steps {
-                                powershell """
+                                pwsh """
                                     jenkins/pipelines/java/desktop/win_tests.ps1 ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
                                 """
                             }
                             post {
                                 always {
                                     echo "Teardown Windows Java Desktop Tests"
-                                    powershell '''
+                                    pwsh '''
                                         jenkins/pipeline/java/desktop/win_teardown.ps1
                                     '''
                                 }
@@ -93,7 +93,7 @@ pipeline {
                     }
                 }
                 stage('Linux Tests') {
-                    agent { label 'mob-e2e-linux-02' }
+                    agent { label 'mob-e2e-deb-02' }
                     stages {
                         stage('Linux Desktop Tests') {
                             steps {
