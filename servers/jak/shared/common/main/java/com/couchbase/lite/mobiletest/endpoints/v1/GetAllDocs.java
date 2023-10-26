@@ -82,25 +82,23 @@ public class GetAllDocs {
         for (Collection collection: collections) {
             final String collectionName = collection.getScope().getName() + "." + collection.getName();
 
-            final List<Result> results;
+            final List<Map<String, String>> docs = new ArrayList<>();
             try (ResultSet rs = QueryBuilder.select(
                     SelectResult.expression(Meta.id).as(KEY_ID),
                     SelectResult.expression(Meta.revisionID).as(KEY_REV))
                 .from(DataSource.collection(collection))
                 .execute()) {
-                results = rs.allResults();
+                for (Result result: rs.allResults()) {
+                    final Map<String, String> doc = new HashMap<>();
+                    doc.put(KEY_ID, result.getString(KEY_ID));
+                    doc.put(KEY_REV, result.getString(KEY_REV));
+                    docs.add(doc);
+                }
             }
             catch (CouchbaseLiteException err) {
                 throw new CblApiFailure("Failed querying docs for collection: " + collectionName, err);
             }
 
-            final List<Map<String, String>> docs = new ArrayList<>();
-            for (Result result: results) {
-                final Map<String, String> doc = new HashMap<>();
-                doc.put(KEY_ID, result.getString(KEY_ID));
-                doc.put(KEY_REV, result.getString(KEY_REV));
-                docs.add(doc);
-            }
 
             colls.put(collectionName, docs);
         }
