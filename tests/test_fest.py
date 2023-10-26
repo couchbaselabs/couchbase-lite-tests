@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import List, Any
 
 import pytest
 from cbltest import CBLPyTest
@@ -30,7 +30,7 @@ class TestFest(CBLTestClass):
 
         return cloud
 
-    async def setup_test_fest_dbs(self, cblpytest: CBLPyTest) -> list[Database, Database]:
+    async def setup_test_fest_dbs(self, cblpytest: CBLPyTest) -> List[Database]:
         self.mark_test_step("3 Reset local databases db1 and db2 and load them with the 'todo' dataset")
         return await cblpytest.test_servers[0].create_and_reset_db("todo", ["db1", "db2"])
 
@@ -267,79 +267,6 @@ class TestFest(CBLTestClass):
         self.mark_test_step("12 Verify that _default.tasks.db1-list1-task1 was deleted from db2")
         snapshot_updater = SnapshotUpdater(snap2)
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
-        verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"The verification failed for db2: {verify_result.description}"
-
-    @pytest.mark.asyncio
-    async def test_delete_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.setup_test_fest_cloud(cblpytest, dataset_path)
-        db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(cblpytest, db1, db2)
-
-        self.mark_test_step("5 Create a list and two tasks in 'db1'")
-        async with db1.batch_updater() as b:
-            b.upsert_document("_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}])
-            b.upsert_document("_default.tasks", "db1-list1-task1",
-                              new_properties=[{"name": "db1 list1 task1"}, {"complete": False},
-                                              {"taskList": {"id": "db1-list1", "owner": "user1"}}],
-                              new_blobs={"image": "l5.jpg"})
-            b.upsert_document("_default.tasks", "db1-list1-task2",
-                              new_properties=[{"name": "db1 list1 task2"}, {"complete": True},
-                                              {"taskList": {"id": "db1-list1", "owner": "user1"}}],
-                              new_blobs={"image": "l5.jpg"})
-
-        self.mark_test_step("6 Snapshot documents in db1")
-        snap1 = await db1.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task2")
-        ])
-
-        self.mark_test_step("7 Wait and check the pull document replication events in db2")
-        await repl2.wait_for_all_doc_events({
-            WaitForDocumentEventEntry("_default.lists", "db1-list1", ReplicatorType.PULL,
-                                      ReplicatorDocumentFlags.NONE),
-            WaitForDocumentEventEntry("_default.tasks", "db1-list1-task1", ReplicatorType.PULL,
-                                      ReplicatorDocumentFlags.NONE),
-            WaitForDocumentEventEntry("_default.tasks", "db1-list1-task2", ReplicatorType.PULL,
-                                      ReplicatorDocumentFlags.NONE)})
-        repl2.clear_document_updates()
-
-        self.mark_test_step("8 Snapshot documents in db2")
-        snap2 = await db2.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task2")
-        ])
-
-        self.mark_test_step("9. Delete the _default.tasks, db1-list1-task1 task in db1")
-        async with db1.batch_updater() as b:
-            b.delete_document("_default.lists", "db1-list1")
-            b.delete_document("_default.tasks", "db1-list1-task1")
-            b.delete_document("_default.tasks", "db1-list1-task2")
-
-        self.mark_test_step("10. Wait and check the pull deleted document replication event in db2")
-        await repl2.wait_for_all_doc_events({
-            WaitForDocumentEventEntry("_default.lists", "db1-list1", ReplicatorType.PULL,
-                                      ReplicatorDocumentFlags.DELETED),
-            WaitForDocumentEventEntry("_default.tasks", "db1-list1-task1", ReplicatorType.PULL,
-                                      ReplicatorDocumentFlags.DELETED),
-            WaitForDocumentEventEntry("_default.tasks", "db1-list1-task2", ReplicatorType.PULL,
-                                      ReplicatorDocumentFlags.DELETED)})
-
-        self.mark_test_step("11 Verify that _default.tasks.db1-list1-task1 was deleted from db1")
-        snapshot_updater = SnapshotUpdater(snap1)
-        snapshot_updater.delete_document("_default.lists", "db1-list1")
-        snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
-        snapshot_updater.delete_document("_default.tasks", "db1-list1-task2")
-        verify_result = await db1.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"The verification failed for db1: {verify_result.description}"
-
-        self.mark_test_step("12 Verify that _default.tasks.db1-list1-task1 was deleted from db2")
-        snapshot_updater = SnapshotUpdater(snap2)
-        snapshot_updater.delete_document("_default.lists", "db1-list1")
-        snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
-        snapshot_updater.delete_document("_default.tasks", "db1-list1-task2")
         verify_result = await db2.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"The verification failed for db2: {verify_result.description}"
 

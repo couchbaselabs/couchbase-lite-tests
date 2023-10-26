@@ -29,6 +29,7 @@ import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.DataSource;
 import com.couchbase.lite.Meta;
+import com.couchbase.lite.Query;
 import com.couchbase.lite.QueryBuilder;
 import com.couchbase.lite.Result;
 import com.couchbase.lite.ResultSet;
@@ -80,14 +81,15 @@ public class GetAllDocs {
         final Map<String, Object> colls = new HashMap<>();
 
         for (Collection collection: collections) {
-            final String collectionName = collection.getScope().getName() + "." + collection.getName();
+            final String collectionName = DatabaseService.getCollectionFQN(collection);
 
-            final List<Map<String, String>> docs = new ArrayList<>();
-            try (ResultSet rs = QueryBuilder.select(
+            final Query query = QueryBuilder.select(
                     SelectResult.expression(Meta.id).as(KEY_ID),
                     SelectResult.expression(Meta.revisionID).as(KEY_REV))
-                .from(DataSource.collection(collection))
-                .execute()) {
+                .from(DataSource.collection(collection));
+
+            final List<Map<String, String>> docs = new ArrayList<>();
+            try (ResultSet rs = query.execute()) {
                 for (Result result: rs.allResults()) {
                     final Map<String, String> doc = new HashMap<>();
                     doc.put(KEY_ID, result.getString(KEY_ID));
@@ -98,7 +100,6 @@ public class GetAllDocs {
             catch (CouchbaseLiteException err) {
                 throw new CblApiFailure("Failed querying docs for collection: " + collectionName, err);
             }
-
 
             colls.put(collectionName, docs);
         }
