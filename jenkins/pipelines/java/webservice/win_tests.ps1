@@ -30,6 +30,7 @@ Copy-Item .\jenkins\pipelines\java\webservice\config_java_webservice.json -Desti
 
 Write-Host "Configure tests"
 $serverUrl = Get-Content .\servers\jak\webservice\app\server.url
+if ([string]::IsNullOrWhiteSpace($serverUrl) { exit 5 }
 Push-Location tests
 Add-Content config.desktop_java.json "    `"test-servers`": [`"$serverUrl`"]"
 Add-Content config.desktop_java.json '}'

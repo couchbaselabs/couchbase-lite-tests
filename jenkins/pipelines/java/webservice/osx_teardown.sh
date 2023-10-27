@@ -3,7 +3,7 @@
 
 echo "Kill the test server"
 pushd servers/jak/webservice > /dev/null
-./gradlew appStop || true
+./gradlew appStop > /dev/null 2>&1 || true
 rm -rf server.url server.pid
 popd > /dev/null
 

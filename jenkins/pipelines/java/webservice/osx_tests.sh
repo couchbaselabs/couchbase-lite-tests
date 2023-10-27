@@ -23,7 +23,7 @@ echo "$VERSION" > cbl-version.txt
 
 echo "Build and start the Java Webservice Test Server"
 cd webservice
-./gradlew appStop || true
+./gradlew appStop > /dev/null 2>&1 || true
 rm -rf server.log app/server.url
 nohup ./gradlew jettyStart -PbuildNumber="${BUILD_NUMBER}" < /dev/null > server.log 2>&1 &
 popd > /dev/null
@@ -37,6 +37,7 @@ cp -f "jenkins/pipelines/java/webservice/config_java_webservice.json" tests
 
 echo "Configure tests"
 SERVER_URL=`cat servers/jak/webservice/app/server.url`
+if [[ -z "$SERVER_URL" ]]; then exit 5; fi
 pushd tests > /dev/null
 echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config_java_webservice.json
 echo '}' >> config_java_webservice.json
