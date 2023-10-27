@@ -8,6 +8,7 @@
     <servlet>
         <servlet-name>testServer</servlet-name>
         <servlet-class>com.couchbase.lite.javaws.mobiletest.TestServerApp</servlet-class>
+        <load-on-startup>0</load-on-startup>
     </servlet>
 
     <servlet-mapping>

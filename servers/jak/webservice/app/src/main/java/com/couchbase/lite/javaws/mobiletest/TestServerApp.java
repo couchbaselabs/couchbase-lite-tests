@@ -31,7 +31,7 @@ import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.NetUtils;
 
 
-@WebServlet(name = "TestServerApp", urlPatterns = {"/"}, loadOnStartup = 1)
+@WebServlet(name = "TestServerApp", urlPatterns = {"/"}, loadOnStartup = 0)
 public class TestServerApp extends HttpServlet {
     private static final String TAG = "MAIN";
 
@@ -58,7 +58,10 @@ public class TestServerApp extends HttpServlet {
         final URI serverUri = NetUtils.makeUri("http", addrs.get(0), 8080, "");
         if (serverUri == null) { throw new ServerError("Cannot get server URI"); }
 
-        try (PrintWriter writer = new PrintWriter(new FileWriter("server.url"))) { writer.println(serverUri); }
+        try (PrintWriter writer = new PrintWriter(new FileWriter("server.url"))) {
+            writer.println(serverUri);
+            writer.flush();
+        }
         catch (IOException e) { throw new ServerError("Failed to write server URI to file", e); }
     }
 
