@@ -4,6 +4,7 @@
 echo "Shutdown Test Server"
 Push-Location servers\jak\desktop
 & .\gradlew.bat --no-daemon appStop
+Remove-Item app\server.url
 Pop-Location
 
 echo "Shutdown Environment"
