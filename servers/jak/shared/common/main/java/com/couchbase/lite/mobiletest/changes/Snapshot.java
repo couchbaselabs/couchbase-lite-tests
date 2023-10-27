@@ -43,7 +43,7 @@ public class Snapshot {
 
     public static final class Difference {
         @NonNull
-        public final String collFqn;
+        public final String collectionName;
         @NonNull
         public final String docId;
         @Nullable
@@ -61,7 +61,7 @@ public class Snapshot {
 
         @SuppressWarnings("PMD.StringToString")
         private Difference(
-            @NonNull String collFqn,
+            @NonNull String collName,
             @NonNull String docId,
             @Nullable Map<String, Object> content,
             @Nullable String keyPath,
@@ -69,7 +69,7 @@ public class Snapshot {
             @Nullable Object actual,
             @Nullable Change change,
             @NonNull String description) {
-            this.collFqn = collFqn;
+            this.collectionName = collName;
             this.docId = docId;
             this.content = (content == null) ? null : Collections.unmodifiableMap(content);
             this.keyPath = keyPath;
@@ -82,7 +82,7 @@ public class Snapshot {
         @Override
         @NonNull
         public String toString() {
-            return "@" + collFqn + "." + docId + "$" + keyPath + ": "
+            return "@" + collectionName + "." + docId + "$" + keyPath + ": "
                 + type + "(" + expected + " => " + actual + ")" + " " + description;
         }
     }
@@ -99,11 +99,11 @@ public class Snapshot {
     public void snapshotDocument(
         @NonNull TestContext ctxt,
         @NonNull Database db,
-        @NonNull String collFqn,
+        @NonNull String collName,
         @NonNull String docId) {
-        final Map<String, Document> collSnapshot = snapshot.computeIfAbsent(collFqn, k -> new HashMap<>());
+        final Map<String, Document> collSnapshot = snapshot.computeIfAbsent(collName, k -> new HashMap<>());
         if (collSnapshot.containsKey(docId)) { throw new ClientError("Attempt to snapshot doc twice: " + docId); }
-        collSnapshot.put(docId, dbSvc.getDocOrNull(ctxt, db, collFqn, docId));
+        collSnapshot.put(docId, dbSvc.getDocOrNull(ctxt, db, collName, docId));
     }
 
     @NonNull
@@ -117,28 +117,29 @@ public class Snapshot {
         // all the collections named in either the snapshot or the delta
         final Set<String> collections = new HashSet<>(snapshot.keySet());
         collections.addAll(delta.keySet());
-        for (String collFqn: collections) {
-            if ((!snapshot.containsKey(collFqn)) || (!actual.containsKey(collFqn))) {
-                throw new ClientError("Attempt to verify a collection not in the snapshot: " + collFqn);
+        for (String collName: collections) {
+            if ((!snapshot.containsKey(collName)) || (!actual.containsKey(collName))) {
+                throw new ClientError("Attempt to verify a collection not in the snapshot: " + collName);
             }
-            final Map<String, Document> originalDocs = snapshot.get(collFqn);
-            final Map<String, Document> currentDocs = actual.get(collFqn);
+            final Map<String, Document> originalDocs = snapshot.get(collName);
+            final Map<String, Document> currentDocs = actual.get(collName);
             if ((originalDocs == null) || (currentDocs == null)) {
-                throw new ServerError("Null doc map in snapshot for collection: " + collFqn);
+                throw new ServerError("Null doc map in snapshot for collection: " + collName);
             }
 
             // if there are no changes in this collection, there are no changes to any doc in this collection
-            Map<String, Change> docDeltas = delta.get(collFqn);
+            Map<String, Change> docDeltas = delta.get(collName);
             if (docDeltas == null) { docDeltas = new HashMap<>(); }
 
-            final Collection collection = dbSvc.getCollection(ctxt, db, collFqn);
+            final Collection collection = dbSvc.getCollection(ctxt, db, collName);
 
             // all the docs named in either the snapshot or the delta
             final Set<String> docIds = new HashSet<>(originalDocs.keySet());
             docIds.addAll(docDeltas.keySet());
             for (String docId: docIds) {
                 if ((!originalDocs.containsKey(docId)) || (!currentDocs.containsKey(docId))) {
-                    throw new ClientError("Attempt to verify a document not in the snapshot: " + collFqn + "." + docId);
+                    throw new ClientError(
+                        "Attempt to verify a document not in the snapshot: " + collName + "." + docId);
                 }
 
                 Document originalDoc = originalDocs.get(docId);
@@ -149,7 +150,7 @@ public class Snapshot {
 
                 // the originalDoc is now the expected
                 // and currentDoc is the actual
-                compareDoc(collFqn, docId, originalDoc, currentDoc, change, diffs);
+                compareDoc(collName, docId, originalDoc, currentDoc, change, diffs);
             }
         }
 
@@ -168,7 +169,7 @@ public class Snapshot {
     }
 
     private void compareDoc(
-        @NonNull String collFqn,
+        @NonNull String collName,
         @NonNull String docId,
         @Nullable Document expected,
         @Nullable Document actual,
@@ -179,7 +180,7 @@ public class Snapshot {
             if (actual != null) {
                 diffs.add(
                     new Difference(
-                        collFqn,
+                        collName,
                         docId,
                         null,
                         null,
@@ -195,7 +196,7 @@ public class Snapshot {
 
         if (actual == null) {
             diffs.add(new Difference(
-                collFqn,
+                collName,
                 docId,
                 null,
                 null,
@@ -208,12 +209,12 @@ public class Snapshot {
 
         // at this point, the two documents should be identical
         final Map<String, Object> actualContent = actual.toMap();
-        compareDocContent(collFqn, docId, actualContent, "", expectedContent, actualContent, change, diffs);
+        compareDocContent(collName, docId, actualContent, "", expectedContent, actualContent, change, diffs);
     }
 
     @SuppressWarnings({"unchecked", "PMD.ExcessiveMethodLength"})
     private void compareDocContent(
-        @NonNull String collFqn,
+        @NonNull String collName,
         @NonNull String docId,
         @NonNull Map<String, Object> doc,
         @NonNull String path,
@@ -234,7 +235,7 @@ public class Snapshot {
             if (!expected.containsKey(prop)) {
                 if (actual.containsKey(prop)) {
                     diffs.add(new Difference(
-                        collFqn,
+                        collName,
                         docId,
                         doc,
                         propPath,
@@ -248,7 +249,7 @@ public class Snapshot {
 
             if (!actual.containsKey(prop)) {
                 diffs.add(new Difference(
-                    collFqn,
+                    collName,
                     docId,
                     doc,
                     propPath,
@@ -269,7 +270,7 @@ public class Snapshot {
                 }
 
                 compareDocContent(
-                    collFqn,
+                    collName,
                     docId,
                     doc,
                     propPath,
@@ -282,7 +283,7 @@ public class Snapshot {
 
             if ((expectedVal instanceof Map) && (actualVal instanceof Map)) {
                 compareDocContent(
-                    collFqn,
+                    collName,
                     docId,
                     doc,
                     propPath,
@@ -295,7 +296,7 @@ public class Snapshot {
 
             if ((expectedVal instanceof List) && (actualVal instanceof List)) {
                 compareDocContent(
-                    collFqn,
+                    collName,
                     docId,
                     doc,
                     propPath,
@@ -309,7 +310,7 @@ public class Snapshot {
             if (!Objects.equals(expectedVal, actualVal)) {
                 diffs.add(
                     new Difference(
-                        collFqn,
+                        collName,
                         docId,
                         doc,
                         propPath,
@@ -323,7 +324,7 @@ public class Snapshot {
 
     @SuppressWarnings({"unchecked", "PMD.ExcessiveMethodLength", "PMD.NPathComplexity"})
     private void compareDocContent(
-        @NonNull String collFqn,
+        @NonNull String collName,
         @NonNull String docId,
         @NonNull Map<String, Object> doc,
         @NonNull String path,
@@ -343,7 +344,7 @@ public class Snapshot {
             if (i >= nExpected) {
                 diffs.add(
                     new Difference(
-                        collFqn,
+                        collName,
                         docId,
                         doc,
                         idxPath,
@@ -357,7 +358,7 @@ public class Snapshot {
             if (i >= nActual) {
                 diffs.add(
                     new Difference(
-                        collFqn,
+                        collName,
                         docId,
                         doc,
                         idxPath,
@@ -378,7 +379,7 @@ public class Snapshot {
                 }
 
                 compareDocContent(
-                    collFqn,
+                    collName,
                     docId,
                     doc,
                     idxPath,
@@ -391,7 +392,7 @@ public class Snapshot {
 
             if ((expectedVal instanceof Map) && (actualVal instanceof Map)) {
                 compareDocContent(
-                    collFqn,
+                    collName,
                     docId,
                     doc,
                     idxPath,
@@ -404,7 +405,7 @@ public class Snapshot {
 
             if ((expectedVal instanceof List) && (actualVal instanceof List)) {
                 compareDocContent(
-                    collFqn,
+                    collName,
                     docId,
                     doc,
                     idxPath,
@@ -418,7 +419,7 @@ public class Snapshot {
             if (!Objects.equals(expectedVal, actualVal)) {
                 diffs.add(
                     new Difference(
-                        collFqn,
+                        collName,
                         docId,
                         doc,
                         idxPath,

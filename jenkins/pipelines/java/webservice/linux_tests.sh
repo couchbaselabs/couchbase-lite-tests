@@ -39,18 +39,28 @@ echo "Start Server & SG"
 pushd environment > /dev/null
 ./start_environment.py
 
+echo "Wait for the Test Server..."
 popd > /dev/null
-cp -f "jenkins/pipelines/java/webservice/config_java_webservice.json" tests
+n=0
+SERVER_URL=`cat servers/jak/webservice/app/server.url`
+while [[ -z "$SERVER_URL" ]]; do
+    if [[ $n -gt 10 ]]; then
+        echo "Cannot get server URL: Aborting"
+        exit 5
+    fi
+    sleep 2
+    SERVER_URL=`cat servers/jak/webservice/app/server.url`
+    n=$(( n + 1 ))   
+done
 
 echo "Configure tests"
-SERVER_URL=`cat servers/jak/webservice/app/server.url`
-if [[ -z "$SERVER_URL" ]]; then exit 5; fi
+cp -f "jenkins/pipelines/java/webservice/config_java_webservice.json" tests
 pushd tests > /dev/null
 echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config_java_webservice.json
 echo '}' >> config_java_webservice.json
 cat config_java_webservice.json
 
-echo "Running tests on webservice test server at $SERVER_IP"
+echo "Running tests on webservice test server at $SERVER_URL"
 python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt

@@ -34,14 +34,19 @@ Push-Location environment
 Pop-Location
 Copy-Item .\jenkins\pipelines\java\desktop\config_java_desktop.json -Destination tests
 
-Write-Host "Configure tests"
 $serverUrl = Get-Content .\servers\jak\desktop\server.url
+if ([string]::IsNullOrWhiteSpace($serverUrl) {
+    Write-Host "Cannot get server URL: Aborting"
+    exit 5
+}
+
+Write-Host "Configure tests"
 Push-Location tests
 Add-Content config_java_desktop.json "    `"test-servers`": [`"$serverUrl`"]"
 Add-Content config_java_desktop.json '}'
 Get-Content config_java_desktop.json
 
-Write-Host "Running tests on desktop test server at $SERVER_IP"
+Write-Host "Running tests on desktop test server at $serverUrl"
 & python3.10 -m venv venv
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 ./venv/Scripts/activate.ps1

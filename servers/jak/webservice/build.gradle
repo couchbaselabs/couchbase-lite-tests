@@ -27,7 +27,7 @@ buildscript {
 
     dependencies {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$KOTLIN_VERSION"
-        classpath("org.gretty:gretty:4.1.0")
+        classpath("org.gretty:gretty:4.1.1")
         classpath 'com.github.spotbugs.snom:spotbugs-gradle-plugin:5.0.14'
     }
 }

@@ -21,7 +21,6 @@ import androidx.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -37,7 +36,6 @@ import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.trees.TypedList;
-import com.couchbase.lite.mobiletest.trees.TypedMap;
 import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.StringUtils;
@@ -50,16 +48,35 @@ public final class DatabaseService {
     private static final String DB_EXTENSION = C4Database.DB_EXTENSION;
     private static final String DB_DIR = "dbs/";
 
-    private static final String KEY_DATASETS = "datasets";
+    // Utility methods
 
-    private static final Set<String> LEGAL_DATASET_KEYS;
-    static {
-        final Set<String> l = new HashSet<>();
-        l.add(KEY_DATASETS);
-        LEGAL_DATASET_KEYS = Collections.unmodifiableSet(l);
+    @NonNull
+    public static String[] parseCollectionFullName(@NonNull String collName) {
+        final String[] collScopeAndName = collName.split("\\.");
+        if ((collScopeAndName.length != 2)
+            || StringUtils.isEmpty(collScopeAndName[0])
+            || StringUtils.isEmpty(collScopeAndName[1])) {
+            throw new ClientError("Cannot parse collection name: " + collName);
+        }
+        return collScopeAndName;
     }
 
-    // Utility methods
+    @NonNull
+    public static String getCollectionFullName(@NonNull Collection collection) {
+        return collection.getScope().getName() + "." + collection.getName();
+    }
+
+    @NonNull
+    public static String[] parseCollectionFQN(@NonNull String collFQN) {
+        final String[] collDbScopeAndName = collFQN.split("\\.");
+        if ((collDbScopeAndName.length != 3)
+            || StringUtils.isEmpty(collDbScopeAndName[0])
+            || StringUtils.isEmpty(collDbScopeAndName[1])
+            || StringUtils.isEmpty(collDbScopeAndName[2])) {
+            throw new ClientError("Cannot parse collection fqn: " + collFQN);
+        }
+        return collDbScopeAndName;
+    }
 
     @NonNull
     public static String getCollectionFQN(@NonNull Collection collection) {
@@ -67,36 +84,20 @@ public final class DatabaseService {
     }
 
     @NonNull
-    public static String getCollectionFQN(@NonNull Database db, @NonNull String collectionFqn) {
-        return db.getName() + "." + collectionFqn;
+    public static String getCollectionFQN(@NonNull Database db, @NonNull String collectionName) {
+        return db.getName() + "." + collectionName;
     }
 
 
-    public void init(@NonNull TestContext ctxt, @NonNull TypedMap req) {
-        req.validate(LEGAL_DATASET_KEYS);
+    // Instance members
 
+    public void init(@NonNull TestContext ctxt) {
         final String testDir = "tests_" + StringUtils.randomString(6);
         final File dbDir = new File(TestApp.getApp().getFilesDir(), testDir);
         if (!dbDir.mkdirs() || !dbDir.canWrite()) {
             throw new ServerError("Could not create db directory in init: " + dbDir);
         }
         ctxt.setDbDir(dbDir);
-
-        final TypedMap datasets = req.getMap(KEY_DATASETS);
-        if (datasets == null) { throw new ClientError("Missing dataset specification in init"); }
-        for (String dataset: datasets.getKeys()) {
-            final TypedList databases = datasets.getList(dataset);
-            if (databases == null) {
-                throw new ClientError("Missing target databases in dataset " + dataset + " in init");
-            }
-            for (int i = 0; i < databases.size(); i++) {
-                final String dbName = databases.getString(i);
-                if (dbName == null) {
-                    throw new ClientError("Empty target databases in dataset " + dataset + " in init");
-                }
-                installDataset(ctxt, dataset, dbName);
-            }
-        }
     }
 
     @NonNull
@@ -115,32 +116,28 @@ public final class DatabaseService {
     public Set<Collection> getCollections(
         @NonNull TestContext ctxt,
         @NonNull Database db,
-        @NonNull TypedList collFqns) {
+        @NonNull TypedList collectionNames) {
         final Set<Collection> collections = new HashSet<>();
-        for (int j = 0; j < collFqns.size(); j++) {
-            final String collFqn = collFqns.getString(j);
-            if (collFqn == null) { throw new ClientError("Empty collection name (" + j + ")"); }
-            collections.add(getCollection(ctxt, db, collFqn));
+        for (int j = 0; j < collectionNames.size(); j++) {
+            final String collectionName = collectionNames.getString(j);
+            if (collectionName == null) { throw new ClientError("Empty collection name (" + j + ")"); }
+            collections.add(getCollection(ctxt, db, collectionName));
         }
         return collections;
     }
 
     @NonNull
-    public Collection getCollection(@NonNull TestContext ctxt, @NonNull Database db, @NonNull String collFqn) {
-        final String[] collName = collFqn.split("\\.");
-        if ((collName.length != 2) || collName[0].isEmpty() || collName[1].isEmpty()) {
-            throw new ClientError("Cannot parse collection name: " + collFqn);
-        }
-
-        Collection collection = ctxt.getOpenCollection(getCollectionFQN(db, collFqn));
+    public Collection getCollection(@NonNull TestContext ctxt, @NonNull Database db, @NonNull String collName) {
+        Collection collection = ctxt.getOpenCollection(getCollectionFQN(db, collName));
         if (collection != null) { return collection; }
 
-        try { collection = db.getCollection(collName[1], collName[0]); }
+        final String[] collScopeAndName = parseCollectionFullName(collName);
+        try { collection = db.getCollection(collScopeAndName[1], collScopeAndName[0]); }
         catch (CouchbaseLiteException e) {
-            throw new CblApiFailure("Failed retrieving collection: " + collFqn + " from db " + db.getName(), e);
+            throw new CblApiFailure("Failed retrieving collection: " + collName + " from db " + db.getName(), e);
         }
         if (collection == null) {
-            throw new ClientError("Database " + db.getName() + " does not contain collection " + collFqn);
+            throw new ClientError("Database " + db.getName() + " does not contain collection " + collName);
         }
 
         ctxt.addOpenCollection(collection);
@@ -152,9 +149,9 @@ public final class DatabaseService {
     public Document getDocument(
         @NonNull TestContext ctxt,
         @NonNull Database db,
-        @NonNull String collFqn,
+        @NonNull String collName,
         @NonNull String docId) {
-        final Document doc = getDocOrNull(ctxt, db, collFqn, docId);
+        final Document doc = getDocOrNull(ctxt, db, collName, docId);
         if (doc == null) { throw new ClientError("Document not found: " + docId); }
         return doc;
     }
@@ -170,9 +167,9 @@ public final class DatabaseService {
     public Document getDocOrNull(
         @NonNull TestContext ctxt,
         @NonNull Database db,
-        @NonNull String collFqn,
+        @NonNull String collName,
         @NonNull String docId) {
-        return getDocOrNull(getCollection(ctxt, db, collFqn), docId);
+        return getDocOrNull(getCollection(ctxt, db, collName), docId);
     }
 
 
@@ -186,7 +183,7 @@ public final class DatabaseService {
 
 
     // New stream constructors are supported only in API 26+
-    private void installDataset(@NonNull TestContext ctxt, @NonNull String datasetName, @NonNull String dbName) {
+    public void installDataset(@NonNull TestContext ctxt, @NonNull String datasetName, @NonNull String dbName) {
         final File dbDir = ctxt.getDbDir();
         if (dbDir == null) { throw new ServerError("Cannot find test directory on install dataset"); }
 

@@ -25,18 +25,28 @@ Write-Host "Start Server & SG"
 Push-Location environment
 & .\start_environment.py
 
+Write-Host "Wait for the Test Server..."
 Pop-Location
-Copy-Item .\jenkins\pipelines\java\webservice\config_java_webservice.json -Destination tests
+$n = 0
+$serverUrl = Get-Content .\servers\jak\webservice\app\server.url
+while ([string]::IsNullOrWhiteSpace($serverUrl) {
+    if ($n -gt 10) {
+        Write-Host "Cannot get server URL: Aborting"
+        exit 5
+    }
+    Start-Seep -Seconds 2
+    $serverUrl = Get-Content .\servers\jak\webservice\app\server.url
+    $n++
+}
 
 Write-Host "Configure tests"
-$serverUrl = Get-Content .\servers\jak\webservice\app\server.url
-if ([string]::IsNullOrWhiteSpace($serverUrl) { exit 5 }
+Copy-Item .\jenkins\pipelines\java\webservice\config_java_webservice.json -Destination tests
 Push-Location tests
 Add-Content config.desktop_java.json "    `"test-servers`": [`"$serverUrl`"]"
 Add-Content config.desktop_java.json '}'
 Get-Content config.desktop_java.json
 
-Write-Host "Running tests on desktop test server at $SERVER_IP"
+Write-Host "Running tests on desktop test server at $SERVER_URL"
 & python3.10 -m venv venv
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 ./venv/Scripts/activate.ps1

@@ -80,13 +80,13 @@ public class SnapshotDocs {
             if (docId == null) { throw new ClientError("Null docId @ " + i); }
             docId.validate(LEGAL_DOC_ID_KEYS);
 
-            final String collFqn = docId.getString(KEY_COLLECTION);
-            if (collFqn == null) { throw new ClientError("Null collection name @ " + i); }
+            final String collName = docId.getString(KEY_COLLECTION);
+            if (collName == null) { throw new ClientError("Null collection name @ " + i); }
 
             final String id = docId.getString(KEY_DOC_ID);
             if (id == null) { throw new ClientError("Null id @ " + i); }
 
-            snapshot.snapshotDocument(ctxt, db, collFqn, id);
+            snapshot.snapshotDocument(ctxt, db, collName, id);
         }
 
         final Map<String, Object> resp = new HashMap<>();
