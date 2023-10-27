@@ -68,7 +68,7 @@ public abstract class UpdateItemEndpoint {
 
     @NonNull
     public Map<String, Map<String, Change>> getDelta(@NonNull TypedList updates) {
-        // Collection FQN -> DocId -> Change
+        // Collection Name -> DocId -> Change
         final Map<String, Map<String, Change>> delta = new HashMap<>();
         final int n = updates.size();
         for (int i = 0; i < n; i++) {
@@ -76,8 +76,8 @@ public abstract class UpdateItemEndpoint {
             if (change == null) { throw new ServerError("Change is empty"); }
             change.validate(LEGAL_UPDATE_KEYS);
 
-            final String collFqn = change.getString(KEY_COLLECTION);
-            if (collFqn == null) { throw new ClientError("Verify docs request is missing collection name"); }
+            final String collName = change.getString(KEY_COLLECTION);
+            if (collName == null) { throw new ClientError("Verify docs request is missing collection name"); }
 
             final String docId = change.getString(KEY_DOC_ID);
             if (docId == null) { throw new ClientError("Verify docs request is missing a document id"); }
@@ -100,7 +100,7 @@ public abstract class UpdateItemEndpoint {
                     throw new ClientError("Unrecognized update type: " + changeType);
             }
 
-            delta.computeIfAbsent(collFqn, k -> new HashMap<>()).put(docId, ch);
+            delta.computeIfAbsent(collName, k -> new HashMap<>()).put(docId, ch);
         }
 
         return delta;

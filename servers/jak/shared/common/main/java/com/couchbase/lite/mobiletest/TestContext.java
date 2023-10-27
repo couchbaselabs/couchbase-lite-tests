@@ -84,8 +84,8 @@ public final class TestContext implements AutoCloseable {
     public Database removeDb(@NonNull String name) { return (openDbs == null) ? null : openDbs.remove(name); }
 
     @Nullable
-    public Collection getOpenCollection(@NonNull String collName) {
-        return (openCollections == null) ? null : openCollections.get(collName);
+    public Collection getOpenCollection(@NonNull String collFqn) {
+        return (openCollections == null) ? null : openCollections.get(collFqn);
     }
 
     public void addOpenCollection(@NonNull Collection collection) {

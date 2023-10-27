@@ -94,7 +94,7 @@ public class VerifyDocs extends UpdateItemEndpoint {
         addOneDiff(diff, resp);
 
         final StringBuilder desc = new StringBuilder("Document '");
-        desc.append(diff.docId).append("' in '").append(diff.collFqn);
+        desc.append(diff.docId).append("' in '").append(diff.collectionName);
         if (diff.keyPath != null) { desc.append(" at key path ").append(diff.keyPath); }
         desc.append(": ").append(diff.description);
         resp.put(KEY_DESCRIPTION, desc.toString());
@@ -123,7 +123,7 @@ public class VerifyDocs extends UpdateItemEndpoint {
 
     @SuppressWarnings("PMD.UnusedPrivateMethod")
     private void addOneDiff(@NonNull Snapshot.Difference difference, Map<String, Object> diffs) {
-        diffs.put(KEY_COLLECTION, difference.collFqn);
+        diffs.put(KEY_COLLECTION, difference.collectionName);
         diffs.put(KEY_DOC_ID, difference.docId);
         diffs.put(KEY_PATH, difference.keyPath);
         diffs.put(KEY_CHANGE_TYPE, difference.type);

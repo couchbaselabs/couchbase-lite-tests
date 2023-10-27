@@ -31,7 +31,6 @@ import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.Scope;
 import com.couchbase.lite.mobiletest.TestContext;
-import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 
 public class ReplicatorService {
@@ -63,7 +62,7 @@ public class ReplicatorService {
     }
 
 
-    public void init(@NonNull TestContext ignore1, @NonNull TypedMap ignore2) {
+    public void init(@NonNull TestContext ignore1) {
         // nothing to do here...
     }
 

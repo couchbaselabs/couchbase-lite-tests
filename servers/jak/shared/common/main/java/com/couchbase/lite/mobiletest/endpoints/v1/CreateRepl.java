@@ -259,11 +259,11 @@ public class CreateRepl {
             if (replCollection == null) { throw new ClientError("Replication collection spec is null: " + i); }
             replCollection.validate(LEGAL_COLLECTION_KEYS);
 
-            final TypedList collectionFqns = replCollection.getList(KEY_NAMES);
-            if (collectionFqns == null) { throw new ClientError("no collections specified"); }
+            final TypedList collectionNames = replCollection.getList(KEY_NAMES);
+            if (collectionNames == null) { throw new ClientError("no collections specified"); }
 
             replConfig.addCollections(
-                dbSvc.getCollections(ctxt, db, collectionFqns),
+                dbSvc.getCollections(ctxt, db, collectionNames),
                 buildCollectionConfig(replCollection));
         }
     }

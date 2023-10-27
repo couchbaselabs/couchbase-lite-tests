@@ -48,14 +48,19 @@ pushd environment > /dev/null
 popd > /dev/null
 cp -f "jenkins/pipelines/java/desktop/config_java_desktop.json" tests
 
-echo "Configure tests"
 SERVER_URL=`cat servers/jak/desktop/server.url`
+if [[ -z "$SERVER_URL" ]]; then
+    echo "Cannot get server URL: Aborting"
+    exit 5
+fi
+
+echo "Configure tests"
 pushd tests > /dev/null
 echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config_java_desktop.json
 echo '}' >> config_java_desktop.json
 cat config_java_desktop.json
 
-echo "Running tests on desktop test server at $SERVER_IP"
+echo "Running tests on desktop test server at $SERVER_URL"
 python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt

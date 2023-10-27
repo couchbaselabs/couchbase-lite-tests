@@ -70,10 +70,10 @@ public class GetAllDocs {
         final String dbName = req.getString(KEY_DATABASE);
         if (dbName == null) { throw new ClientError("All Docs request doesn't specify a database"); }
 
-        final TypedList collectionFqns = req.getList(KEY_COLLECTIONS);
-        if (collectionFqns == null) { throw new ClientError("All Docs request doesn't specify collections"); }
+        final TypedList collectionNames = req.getList(KEY_COLLECTIONS);
+        if (collectionNames == null) { throw new ClientError("All Docs request doesn't specify collections"); }
 
-        return getAllDocs(dbSvc.getCollections(ctxt, dbSvc.getOpenDb(ctxt, dbName), collectionFqns));
+        return getAllDocs(dbSvc.getCollections(ctxt, dbSvc.getOpenDb(ctxt, dbName), collectionNames));
     }
 
     @NonNull
@@ -81,7 +81,7 @@ public class GetAllDocs {
         final Map<String, Object> colls = new HashMap<>();
 
         for (Collection collection: collections) {
-            final String collectionName = DatabaseService.getCollectionFQN(collection);
+            final String collName = DatabaseService.getCollectionFullName(collection);
 
             final Query query = QueryBuilder.select(
                     SelectResult.expression(Meta.id).as(KEY_ID),
@@ -98,10 +98,10 @@ public class GetAllDocs {
                 }
             }
             catch (CouchbaseLiteException err) {
-                throw new CblApiFailure("Failed querying docs for collection: " + collectionName, err);
+                throw new CblApiFailure("Failed querying docs for collection: " + collName, err);
             }
 
-            colls.put(collectionName, docs);
+            colls.put(collName, docs);
         }
 
         return colls;
