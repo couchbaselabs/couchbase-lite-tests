@@ -35,7 +35,7 @@ Pop-Location
 Copy-Item .\jenkins\pipelines\java\desktop\config_java_desktop.json -Destination tests
 
 $serverUrl = Get-Content .\servers\jak\desktop\server.url
-if ([string]::IsNullOrWhiteSpace($serverUrl) {
+if ([string]::IsNullOrWhiteSpace($serverUrl)) {
     Write-Host "Cannot get server URL: Aborting"
     exit 5
 }
@@ -54,4 +54,15 @@ pip install -r requirements.txt
 
 Write-Host "Run tests"
 & pytest -v --no-header -W ignore::DeprecationWarning --config config_java_desktop.json
+deactivate
+Pop-Location
+
+# Shutdown the test server process, otherwise the script will not exit when calling from Jenkins pipeline
+Push-Location servers\jak\desktop
+if (Test-Path -Path .\server.pid){
+    $serverId = Get-Content .\server.pid
+    Stop-Process -Id $serverId -Force
+    Remove-Item server.pid
+}
+Pop-Location
 
