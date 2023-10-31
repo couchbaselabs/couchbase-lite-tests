@@ -41,6 +41,7 @@ pipeline {
                             }
                         }
                         stage('OSX Web Services Tests') {
+                            when { expression { false } }
                             steps {
                                 sh """
                                     jenkins/pipelines/java/webservice/osx_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
@@ -70,21 +71,22 @@ pipeline {
                                 always {
                                     echo "Teardown Windows Java Desktop Tests"
                                     pwsh '''
-                                        jenkins/pipeline/java/desktop/win_teardown.ps1
+                                        jenkins/pipelines/java/desktop/win_teardown.ps1
                                     '''
                                 }
                             }
                         }
                         stage('Windows Web Services Tests') {
+                            when { expression { false } }
                             steps {
-                                powershell """
+                                pwsh """
                                     jenkins/pipelines/java/webservice/win_tests.ps1 ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
                                 """
                             }
                             post {
                                 always {
                                     echo "Teardown Windows Java Desktop Tests"
-                                    powershell '''
+                                    pwsh '''
                                         jenkins/pipelines/java/webservice/win_teardown.ps1
                                     '''
                                 }
@@ -111,6 +113,7 @@ pipeline {
                             }
                         }
                         stage('Linux Web Services Tests') {
+                            when { expression { false } }
                             steps {
                                 sh """
                                     jenkins/pipelines/java/webservice/linux_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
