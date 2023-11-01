@@ -108,6 +108,7 @@ class TestServerRequest:
         
         data: str | None = None
         if self.__payload is not None:
+            headers["Content-Type"] = "application/json"
             data = self.__payload.serialize() 
 
         if session is not None:
