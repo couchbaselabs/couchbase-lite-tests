@@ -10,6 +10,7 @@ Push-Location $PSScriptRoot\..\..\..\servers\dotnet
 $nugetPackageVersion = "$Version-b$($Build.PadLeft(4, '0'))"
 Write-Host "Using NuGet package version $nugetPackageVersion"
 dotnet add .\testserver.csproj package couchbase.lite.enterprise --version $nugetPackageVersion
+dotnet build .\testserver.csproj --framework net7.0-windows10.0.19041.0
 
 Write-Host "Run TestServer..."
 scripts\run_winui.ps1
