@@ -358,8 +358,8 @@ class DatabaseManager {
     
     private static func loadDataset(withName name: String, dbName: String) throws {
         TestServer.logger.log(level: .debug, "Loading dataset '\(name)' into DB '\(dbName)'")
-        
-        guard let datasetZipURL = Bundle.main.url(forResource: name, withExtension: "cblite2.zip")
+        let res = ("dbs" as NSString).appendingPathComponent(name)
+        guard let datasetZipURL = Bundle.main.url(forResource: res, withExtension: "cblite2.zip")
         else {
             TestServer.logger.log(level: .error, "Failed to load dataset, dataset '\(name)' does not exist.")
             throw TestServerError(domain: .TESTSERVER, code: 400, message: "Dataset does not exist")

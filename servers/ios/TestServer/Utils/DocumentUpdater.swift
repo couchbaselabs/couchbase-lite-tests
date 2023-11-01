@@ -175,8 +175,8 @@ struct DocumentUpdater {
         }
         
         let fileExtension = filenameComponents.last!
-        
-        guard let blobURL = Bundle.main.url(forResource: filenameComponents.first!, withExtension: fileExtension)
+        let res = ("blobs" as NSString).appendingPathComponent(filenameComponents.first!)
+        guard let blobURL = Bundle.main.url(forResource: res, withExtension: fileExtension)
         else {
             TestServer.logger.log(level: .error, "No blob found at given filename")
             throw TestServerError.badRequest("Blob '\(filename)' not found.")
