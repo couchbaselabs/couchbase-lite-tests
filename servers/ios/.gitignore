@@ -8,3 +8,6 @@ Package.resolved
 .env
 IDEWorkspaceChecks.plist
 project.xcworkspace
+
+Frameworks/CouchbaseLiteSwift.xcframework
+TestServer/Server/CBLVersion.swift

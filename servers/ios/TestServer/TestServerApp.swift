@@ -1,17 +1,18 @@
 //
-//  CBL_Tests_iOSApp.swift
-//  CBL-Tests-iOS
+//  TestServerApp.swift
+//  TestServer
 //
 //  Created by Callum Birks on 01/08/2023.
 //
 
+
 import SwiftUI
 
 @main
-struct CBL_Tests_iOSApp: App {
+struct TestServerApp: App {
     let testServer: TestServer
     
-    init() {        
+    init() {
         DatabaseManager.InitializeShared()
         if let databaseManager = DatabaseManager.shared {
             testServer = TestServer(port: 8080, dbManager: databaseManager)
