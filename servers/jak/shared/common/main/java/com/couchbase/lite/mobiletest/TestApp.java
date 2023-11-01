@@ -52,7 +52,7 @@ public abstract class TestApp {
     public static final String HEADER_CLIENT = "CBLTest-Client-ID".toLowerCase(Locale.getDefault());
     public static final String HEADER_SERVER = "CBLTest-Server-ID".toLowerCase(Locale.getDefault());
 
-    public static final String HEADER_CONTENT_TYPE = "ContentType".toLowerCase(Locale.getDefault());
+    public static final String HEADER_CONTENT_TYPE = "Content-Type".toLowerCase(Locale.getDefault());
     public static final String CONTENT_TYPE_JSON = "application/json";
 
     public static final String HEADER_PROTOCOL_VERSION = "CBLTest-API-Version".toLowerCase(Locale.getDefault());
