@@ -1,9 +1,9 @@
 #!/bin/bash -e
 
 echo "Shutdown Test Server"
-if [ -d "servers/c/build/out/bin" ]; then
-    pushd servers/c/build/out/bin > /dev/null
-    ios kill com.couchbase.CBLTestServer || true
+if [ -d "servers/ios/build" ]; then
+    pushd servers/ios/build > /dev/null
+    ios kill com.couchbase.CBLTestServer-iOS || true
     popd > /dev/null
 fi
 
