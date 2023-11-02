@@ -12,6 +12,10 @@ CBL_BUILD=`defaults read ${CBL_INFO_PLIST_FILE} CFBundleVersion`
 # Delete existing CBLVersion.swift
 rm -f "${CBL_VERSION_OUTPUT_FILE}"
 
+if [ -z "${CBL_VERSION}" ]; then
+    exit 1
+fi
+
 # Write a new CBLVersion.swift
 echo "struct CBLVersion {" > "${CBL_VERSION_OUTPUT_FILE}"
 echo "    static let version = \"${CBL_VERSION}\"" >> "${CBL_VERSION_OUTPUT_FILE}"
