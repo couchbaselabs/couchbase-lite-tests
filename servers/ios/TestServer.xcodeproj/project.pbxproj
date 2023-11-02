@@ -60,7 +60,7 @@
 		40BDA8F32AF20AAB008DB256 /* ReplicatorAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8DD2AF20AAB008DB256 /* ReplicatorAuthenticator.swift */; };
 		40BDA8F42AF20AAB008DB256 /* DatabaseUpdateItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8DE2AF20AAB008DB256 /* DatabaseUpdateItem.swift */; };
 		40BDA8F52AF20AAB008DB256 /* ReplicationCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8DF2AF20AAB008DB256 /* ReplicationCollection.swift */; };
-		40BDA8FA2AF2174D008DB256 /* CBLVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8F92AF2174D008DB256 /* CBLVersion.swift */; };
+		EACC964D2AF3F8B500999C70 /* CBLVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EACC964C2AF3F8B500999C70 /* CBLVersion.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -129,7 +129,7 @@
 		40BDA8DD2AF20AAB008DB256 /* ReplicatorAuthenticator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplicatorAuthenticator.swift; sourceTree = "<group>"; };
 		40BDA8DE2AF20AAB008DB256 /* DatabaseUpdateItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DatabaseUpdateItem.swift; sourceTree = "<group>"; };
 		40BDA8DF2AF20AAB008DB256 /* ReplicationCollection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplicationCollection.swift; sourceTree = "<group>"; };
-		40BDA8F92AF2174D008DB256 /* CBLVersion.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CBLVersion.swift; sourceTree = "<group>"; };
+		EACC964C2AF3F8B500999C70 /* CBLVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBLVersion.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -192,7 +192,7 @@
 			isa = PBXGroup;
 			children = (
 				40BDA7622AF1C0AF008DB256 /* TestServer.swift */,
-				40BDA8F92AF2174D008DB256 /* CBLVersion.swift */,
+				EACC964C2AF3F8B500999C70 /* CBLVersion.swift */,
 			);
 			path = Server;
 			sourceTree = "<group>";
@@ -416,7 +416,7 @@
 				40BDA8F02AF20AAB008DB256 /* Replicator.swift in Sources */,
 				40BDA8E82AF20AAB008DB256 /* DocumentReplication.swift in Sources */,
 				40BDA8E72AF20AAB008DB256 /* CollectionDocuments.swift in Sources */,
-				40BDA8FA2AF2174D008DB256 /* CBLVersion.swift in Sources */,
+				EACC964D2AF3F8B500999C70 /* CBLVersion.swift in Sources */,
 				40BDA8E92AF20AAB008DB256 /* PerformMaintenanceConfiguration.swift in Sources */,
 				40BDA8022AF1C13B008DB256 /* PerformMaintenance.swift in Sources */,
 				40BDA8032AF1C13B008DB256 /* GetReplicatorStatus.swift in Sources */,
@@ -571,6 +571,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"TestServer/Preview Content\"";
 				DEVELOPMENT_TEAM = N2Q372V7W2;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -601,6 +602,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"TestServer/Preview Content\"";
 				DEVELOPMENT_TEAM = N2Q372V7W2;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
