@@ -28,7 +28,9 @@ pushd tests
 python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-cp "${WORKSPACE}/jenkins/pipelines/c/config.ios.json" .
-pytest -v --no-header -W ignore::DeprecationWarning --config config.ios.json
+
+rm -f "${WORKSPACE}/jenkins/pipelines/c/config.c-ios.json"
+cp "${WORKSPACE}/jenkins/pipelines/c/config.c-ios.json" .
+pytest -v --no-header -W ignore::DeprecationWarning --config config.c-ios.json
 deactivate
 popd
