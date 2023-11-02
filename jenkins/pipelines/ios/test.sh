@@ -9,11 +9,10 @@ pushd servers/ios > /dev/null
 ./scripts/build.sh device ${EDITION} ${VERSION} ${BLD_NUM}
 
 echo "Run Test Server"
-pushd build/out/bin > /dev/null
+pushd build > /dev/null
 ios kill com.couchbase.CBLTestServer-iOS || true
 ios install --path=TestServer-iOS.app
 ios launch com.couchbase.CBLTestServer-iOS
-
 popd > /dev/null
 
 popd > /dev/null
