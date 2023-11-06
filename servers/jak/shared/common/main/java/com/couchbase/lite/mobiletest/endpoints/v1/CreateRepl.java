@@ -80,8 +80,9 @@ public class CreateRepl {
     private static final String KEY_PUSH_FILTER = "pushFilter";
     private static final String KEY_PULL_FILTER = "pullFilter";
     private static final String KEY_NAME = "name";
-    private static final String FILTER_DELETED = "deleteddocumentsonly";
-    private static final String FILTER_DOC_ID = "documentids";
+    private static final String KEY_PARAMS = "params";
+    private static final String FILTER_DELETED = "deletedDocumentsOnly";
+    private static final String FILTER_DOC_ID = "documentIDs";
     private static final String KEY_DOC_IDS = "documentIDs";
     private static final String KEY_ENABLE_AUTOPURGE = "enableAutoPurge";
 
@@ -327,18 +328,20 @@ public class CreateRepl {
     private ReplicationFilter buildReplicatorFilter(@NonNull TypedMap spec) {
         final String name = spec.getString(KEY_NAME);
         if (name == null) { throw new ClientError("Filter doesn't specify a name"); }
-        switch (name.toLowerCase(Locale.getDefault())) {
+        switch (name) {
             case FILTER_DOC_ID:
-                return buildDocIdFilter(spec);
+                 return buildDocIdFilter(spec.getMap(KEY_PARAMS));
             case FILTER_DELETED:
                 return replSvc.getDeletedDocFilter();
             default:
-                throw new ClientError("Unrecognized filter name");
+                throw new ClientError("Unrecognized filter name: " + name);
         }
     }
 
     @NonNull
-    private ReplicationFilter buildDocIdFilter(@NonNull TypedMap spec) {
+    private ReplicationFilter buildDocIdFilter(@Nullable TypedMap spec) {
+        if (spec == null) { throw new ClientError("DocId filter specifies no doc ids"); }
+
         final TypedMap documentIds = spec.getMap(KEY_DOC_IDS);
         if (documentIds == null) { throw new ClientError("DocId filter specifies no doc ids"); }
 

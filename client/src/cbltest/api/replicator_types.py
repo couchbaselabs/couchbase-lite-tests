@@ -7,7 +7,7 @@ from typing import Any, Dict, Final, List, cast, Optional
 from varname import nameof
 
 from cbltest.api.jsonserializable import JSONSerializable
-from cbltest.assertions import _assert_not_null
+from cbltest.assertions import _assert_not_empty
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.responses import ErrorResponseBody
 
@@ -42,11 +42,13 @@ class ReplicatorCollectionEntry(JSONSerializable):
         """Gets the name of the collection that the options will be applied to"""
         return self.__names
 
-    def __init__(self, names: List[str] = ["_default"], channels: Optional[List[str]] = None,
+    def __init__(self, names: List[str] = None, channels: Optional[List[str]] = None,
                  document_ids: Optional[List[str]] = None,
                  push_filter: Optional[ReplicatorFilter] = None, pull_filter: Optional[ReplicatorFilter] = None):
-        _assert_not_null(names, nameof(names))
-        assert len(names) > 0, "Must specify at least one name in the names array for ReplicatorCollectionEntry"
+        if names == None:
+            names = ["_default"]
+
+        _assert_not_empty(names, nameof(names))
 
         self.__names = names
         self.channels = channels
