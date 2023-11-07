@@ -42,15 +42,15 @@ class ReplicatorCollectionEntry(JSONSerializable):
         """Gets the name of the collection that the options will be applied to"""
         return self.__names
 
-    def __init__(self, names: List[str] = None, channels: Optional[List[str]] = None,
+    def __init__(self, names: Optional[List[str]] = None, channels: Optional[List[str]] = None,
                  document_ids: Optional[List[str]] = None,
                  push_filter: Optional[ReplicatorFilter] = None, pull_filter: Optional[ReplicatorFilter] = None):
         if names == None:
-            names = ["_default"]
+            self.__names = ["_default"]
+        else:
+            _assert_not_empty(names, nameof(names))
+            self.__names = names
 
-        _assert_not_empty(names, nameof(names))
-
-        self.__names = names
         self.channels = channels
         """A list of channels to use when replicating with this collection"""
 
@@ -342,7 +342,7 @@ class WaitForDocumentEventEntry:
         return self.__direction
 
     @property
-    def flags(self) -> ReplicatorDocumentFlags:
+    def flags(self) -> Optional[ReplicatorDocumentFlags]:
         """Gets the flags of the event to wait for.  Events that otherwise match
         (e.g. have the same document ID) will be ignored"""
         return self.__flags
