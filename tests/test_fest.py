@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Any
+from typing import Optional, List, Any
 
 import pytest
 from cbltest import CBLPyTest
@@ -14,7 +14,7 @@ from cbltest.api.replicator_types import ReplicatorBasicAuthenticator, WaitForDo
 
 class TestFest(CBLTestClass):
     async def setup_test_fest_cloud(self, cblpytest: CBLPyTest, dataset_path: Path,
-                                    roles: List[str] = None) -> CouchbaseCloud:
+                                    roles: Optional[List[str]] = None) -> CouchbaseCloud:
         self.mark_test_step("Reset SG and load todo dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "todo")

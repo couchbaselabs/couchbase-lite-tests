@@ -28,6 +28,7 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.trees.TypedMap;
+import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 public class Reset {
@@ -61,23 +62,30 @@ public class Reset {
 
         req.validate(LEGAL_DATASET_KEYS);
         final TypedMap datasets = req.getMap(KEY_DATASETS);
-        if (datasets == null) { throw new ClientError("Missing dataset specification in init"); }
+        if (datasets != null) { installDatasets(ctxt, dbSvc, datasets); }
 
-        for (String dataset: datasets.getKeys()) {
+        return Collections.emptyMap();
+    }
+
+    private static void installDatasets(
+        @NonNull TestContext ctxt,
+        @NonNull DatabaseService dbSvc,
+        @NonNull TypedMap datasets) {
+        final Set<String> datasetNames = datasets.getKeys();
+        if (datasetNames.size() <= 0) { throw new ClientError("No datasets specified in init"); }
+        for (String dataset: datasetNames) {
             final TypedList databases = datasets.getList(dataset);
-            if (databases == null) {
-                throw new ClientError("Missing target databases in dataset " + dataset + " in init");
+            if ((databases == null) || (databases.size() <= 0)) {
+                throw new ClientError("No target databases for in dataset " + dataset + " in init");
             }
             for (int i = 0; i < databases.size(); i++) {
                 final String dbName = databases.getString(i);
-                if (dbName == null) {
-                    throw new ClientError("Empty target databases in dataset " + dataset + " in init");
+                if (StringUtils.isEmpty(dbName)) {
+                    throw new ClientError("Empty target database name in dataset " + dataset + " in init");
                 }
                 dbSvc.installDataset(ctxt, dataset, dbName);
             }
         }
-
-        return Collections.emptyMap();
     }
 }
 

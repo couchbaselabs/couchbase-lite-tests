@@ -54,7 +54,7 @@ class Replicator:
     def __init__(self, database: Database, endpoint: str,
                  replicator_type: ReplicatorType = ReplicatorType.PUSH_AND_PULL,
                  continuous: bool = False, authenticator: Optional[ReplicatorAuthenticator] = None, reset: bool = False,
-                 collections: List[ReplicatorCollectionEntry] = None, enable_document_listener: bool = False,
+                 collections: Optional[List[ReplicatorCollectionEntry]] = None, enable_document_listener: bool = False,
                  enable_auto_purge: bool = True):
         assert database._request_factory.version == 1, "This version of the cbl test API requires request API v1"
         self.__database = database
