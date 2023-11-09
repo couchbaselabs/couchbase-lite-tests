@@ -1,21 +1,24 @@
 from typing import List, cast
+
 from opentelemetry.trace import get_tracer
 
-from cbltest.requests import RequestFactory, TestServerRequestType
-from cbltest.v1.requests import PostResetRequestBody
-from cbltest.responses import GetRootResponse
 from cbltest.api.database import Database
+from cbltest.requests import RequestFactory, TestServerRequestType
+from cbltest.responses import GetRootResponse
+from cbltest.v1.requests import PostResetRequestBody
 from cbltest.version import VERSION
+
 
 class TestServer:
     """
     A class for interacting with a Couchbase Lite test server
     """
+
     @property
     def url(self) -> str:
         """Gets the URL of the test server being communicated with"""
         return self.__url
-    
+
     def __init__(self, request_factory: RequestFactory, index: int, url: str):
         assert request_factory.version == 1, "This version of the CBLTest API requires request API v1"
         self.__index = index
@@ -49,3 +52,11 @@ class TestServer:
                 ret_val.append(Database(self.__request_factory, self.__index, db_name))
 
             return ret_val
+
+    async def cleanup(self) -> None:
+        """
+        Resets the test server
+       """
+        with self.__tracer.start_as_current_span("create_and_reset_db"):
+            request = self.__request_factory.create_request(TestServerRequestType.RESET, PostResetRequestBody())
+            await self.__request_factory.send_request(self.__index, request)

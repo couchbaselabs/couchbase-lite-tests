@@ -189,7 +189,14 @@ class Replicator:
 
                 # Skip the ones we previously looked at to save time
                 for event in islice(self.document_updates, processed, None):
-                    entry = WaitForDocumentEventEntry(event.collection, event.document_id, event.direction, event.flags)
+                    error = event.error
+                    entry = WaitForDocumentEventEntry(
+                        event.collection,
+                        event.document_id,
+                        event.direction,
+                        event.flags,
+                        error.domain if error is not None else None,
+                        error.code if error is not None else None)
                     if entry in events:
                         events.remove(entry)
 

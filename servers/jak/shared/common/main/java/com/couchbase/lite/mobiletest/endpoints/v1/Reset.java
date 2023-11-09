@@ -62,17 +62,19 @@ public class Reset {
 
         req.validate(LEGAL_DATASET_KEYS);
         final TypedMap datasets = req.getMap(KEY_DATASETS);
-        if (datasets != null) { installDatasets(ctxt, dbSvc, datasets); }
+        if (datasets == null) { throw new ClientError("No datasets specified in init"); }
+        installDatasets(ctxt, dbSvc, datasets);
 
         return Collections.emptyMap();
     }
 
-    private static void installDatasets(
+    private void installDatasets(
         @NonNull TestContext ctxt,
         @NonNull DatabaseService dbSvc,
         @NonNull TypedMap datasets) {
         final Set<String> datasetNames = datasets.getKeys();
-        if (datasetNames.size() <= 0) { throw new ClientError("No datasets specified in init"); }
+        if (datasetNames.size() <= 0) { return; }
+
         for (String dataset: datasetNames) {
             final TypedList databases = datasets.getList(dataset);
             if ((databases == null) || (databases.size() <= 0)) {

@@ -45,7 +45,7 @@ class ReplicatorCollectionEntry(JSONSerializable):
     def __init__(self, names: Optional[List[str]] = None, channels: Optional[List[str]] = None,
                  document_ids: Optional[List[str]] = None,
                  push_filter: Optional[ReplicatorFilter] = None, pull_filter: Optional[ReplicatorFilter] = None):
-        if names == None:
+        if names is None:
             self.__names = ["_default"]
         else:
             _assert_not_empty(names, nameof(names))
@@ -347,13 +347,16 @@ class WaitForDocumentEventEntry:
         (e.g. have the same document ID) will be ignored"""
         return self.__flags
 
-    def __init__(self, collection: str, id: str, direction: ReplicatorType, flags: Optional[ReplicatorDocumentFlags]):
+    def __init__(self, collection: str, id: str, direction: ReplicatorType, flags: Optional[ReplicatorDocumentFlags],
+                 err_domain: Optional[str] = None, err_code: Optional[int] = None):
         assert isinstance(collection, str), "WaitForDocumentEventEntry: collection not a string"
         assert isinstance(id, str), "WaitForDocumentEventEntry: id not a string"
         self.__collection = collection
         self.__id = id
         self.__direction = direction
         self.__flags = flags
+        self.__err_domain = err_domain
+        self.__err_code = err_code
 
     def __hash__(self) -> int:
         return hash(f"{self.__collection}{self.__id}")
@@ -361,17 +364,21 @@ class WaitForDocumentEventEntry:
     def __eq__(self, obj: Any) -> bool:
         if not isinstance(obj, WaitForDocumentEventEntry):
             return False
-
         other = cast(WaitForDocumentEventEntry, obj)
-        return self.__collection == other.__collection and self.__id == other.__id and (
+
+        return (self.__collection == other.__collection and self.__id == other.__id) and (
+                self.__err_domain == other.__err_domain) and (
+                self.__err_code == other.__err_code) and (
                 self.__direction == other.__direction or
                 self.__direction == ReplicatorType.PUSH_AND_PULL or
-                other.__direction == ReplicatorType.PUSH_AND_PULL
-        ) and (
+                other.__direction == ReplicatorType.PUSH_AND_PULL) and (
                 self.__flags == other.__flags or
-                self.__flags == None or
-                other.__flags == None
+                self.__flags is None or
+                other.__flags is None
         )
+
+    def __str__(self) -> str:
+        return f"WaitForDocumentEventEntry({self.__collection}.{self.__id} {self.__direction} ({self.__flags}) [{self.__err_domain}, {self.__err_code}])"
 
 
 class ReplicatorStatus:
