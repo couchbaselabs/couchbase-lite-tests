@@ -43,6 +43,8 @@ class TestBasicReplication(CBLTestClass):
             and status.error.code == 10404 \
             and ErrorDomain.equal(status.error.domain, ErrorDomain.CBL)
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
@@ -74,6 +76,8 @@ class TestBasicReplication(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "travel", 
                                  ["travel.airlines", "travel.airports", "travel.hotels"])
+
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio
     async def test_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
@@ -107,6 +111,8 @@ class TestBasicReplication(CBLTestClass):
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "travel", 
                                  ["travel.routes", "travel.landmarks", "travel.hotels"])
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `travel` dataset.")
@@ -138,7 +144,9 @@ class TestBasicReplication(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "travel", 
                                  ["travel.airlines", "travel.airports", "travel.hotels", "travel.landmarks", "travel.routes"])
-        
+
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_continuous_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
@@ -209,6 +217,8 @@ class TestBasicReplication(CBLTestClass):
         self.mark_test_step("Check that all updates are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "travel", 
                                 ["travel.airlines", "travel.airports", "travel.hotels"])
+
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio
     async def test_continuous_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
@@ -315,6 +325,8 @@ class TestBasicReplication(CBLTestClass):
         self.mark_test_step("Check that all updates are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "travel", 
                                        ["travel.routes", "travel.landmarks", "travel.hotels"])
+
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio
     async def test_continuous_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -446,6 +458,8 @@ class TestBasicReplication(CBLTestClass):
                                        ["travel.airlines", "travel.airports", "travel.hotels", 
                                         "travel.landmarks", "travel.routes"])
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_default_collection_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
@@ -475,6 +489,8 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "names", ["_default._default"])
+
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio
     async def test_default_collection_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
@@ -506,6 +522,8 @@ class TestBasicReplication(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "names", ["_default._default"])
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_default_collection_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `names` dataset.")
@@ -535,6 +553,8 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "names", ["_default._default"])
+
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.skip(reason="CBL-4805")
     @pytest.mark.asyncio
@@ -609,6 +629,8 @@ class TestBasicReplication(CBLTestClass):
                 break
         assert found_doc, f"{sg_purged_doc_id} was not pushed back to SG after reset checkpoint"
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_reset_checkpoint_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `travel` dataset.")
@@ -682,3 +704,5 @@ class TestBasicReplication(CBLTestClass):
                 found_doc = True
                 break
         assert found_doc, f"{lite_purged_doc_id} was not pulled back to local database after reset checkpoint"
+
+        await cblpytest.test_servers[0].cleanup()
