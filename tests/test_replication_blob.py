@@ -131,4 +131,5 @@ class TestReplicationBlob(CBLTestClass):
         snapshot_updater.upsert_document("travel.hotels", "hotel_1", removed_properties=["description"])
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result == True, f"The verification failed: {verify_result.description}"
-        
+
+        await cblpytest.test_servers[0].cleanup()

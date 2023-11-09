@@ -17,11 +17,11 @@ class TestReplicationAutoPurge(CBLTestClass):
     @pytest.mark.asyncio
     async def test_remove_docs_from_channel_with_auto_purge_enabled(self, cblpytest: CBLPyTest,
                                                                     dataset_path: Path) -> None:
-        self.mark_test_step("Reset SG and load `posts` dataset.")
+        self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step("Reset local database, and load `posts` dataset.")
+        self.mark_test_step("Reset local database and load `posts` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("posts", ["db1"])
         db = dbs[0]
 
@@ -37,17 +37,19 @@ class TestReplicationAutoPurge(CBLTestClass):
         ''')
         replicator = Replicator(db,
                                 cblpytest.sync_gateways[0].replication_url("posts"),
-                                replicator_type=ReplicatorType.PULL,
                                 collections=[ReplicatorCollectionEntry(["_default.posts"])],
+                                replicator_type=ReplicatorType.PULL,
+                                continuous=False,
+                                enable_auto_purge=True,
                                 authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator is stopped")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("Check that the docs that the user has access to are all pulled.")
+        self.mark_test_step("Verify that the all the docs to which the user has access were pulled")
         lite_all_docs = await db.get_all_documents("_default.posts")
         n_docs = len(lite_all_docs["_default.posts"])
         assert n_docs == 5, f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
@@ -75,17 +77,17 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         await cblpytest.sync_gateways[0].update_documents("posts", updates, collection="posts")
 
-        self.mark_test_step("Start the replicator with the same config as the step 3.")
+        self.mark_test_step("Start another replicator with the same config as above")
         replicator.enable_document_listener = True
         await replicator.start()
 
-        self.mark_test_step("Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator stops")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
         self.mark_test_step('''
-            Check local documents:
+            Check the local documents:
                 * `post_1` was purged.
                 * `post_2` and `post_3` were updated with the new channels.
                 * `post_4` was deleted.
@@ -115,13 +117,15 @@ class TestReplicationAutoPurge(CBLTestClass):
             else:
                 assert False, f"Stray document update present in list ({update.document_id})"
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_revoke_access_with_auto_purge_enabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step("Reset SG and load `posts` dataset.")
+        self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step("Reset local database, and load `posts` dataset.")
+        self.mark_test_step("Reset local database and load `posts` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("posts", ["db1"])
         db = dbs[0]
 
@@ -129,7 +133,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             Start a replicator:
                 * endpoint: `/posts`
                 * collections:
-                * `_default_.posts`
+                    * `_default_.posts`
                 * type: pull
                 * continuous: false
                 * autoPurge: true
@@ -137,17 +141,19 @@ class TestReplicationAutoPurge(CBLTestClass):
         ''')
         replicator = Replicator(db,
                                 cblpytest.sync_gateways[0].replication_url("posts"),
-                                replicator_type=ReplicatorType.PULL,
                                 collections=[ReplicatorCollectionEntry(["_default.posts"])],
+                                replicator_type=ReplicatorType.PULL,
+                                continuous=False,
+                                enable_auto_purge=True,
                                 authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await replicator.start()
 
-        self.mark_test_step("Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator stops")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("Check that the docs that the user has access to are all pulled.")
+        self.mark_test_step("Verify that the docs to which the user has access, are all pulled")
         lite_all_docs = await db.get_all_documents("_default.posts")
         assert len(lite_all_docs["_default.posts"]) == 5, "Incorrect number of initial documents replicated"
         expected_docs = {"post_1", "post_2", "post_3", "post_4", "post_5"}
@@ -155,18 +161,18 @@ class TestReplicationAutoPurge(CBLTestClass):
             assert doc.id in expected_docs, f"Unexpected document found after initial replication: {doc.id}"
 
         self.mark_test_step('''
-            Update user access to channels on SG:
+            Update user1's access to channels on SG:
                 * Remove access to `group2` channel.
         ''')
         collection_access_dict = cblpytest.sync_gateways[0].create_collection_access_dict(
             {"_default.posts": ["group1"]})
         await cblpytest.sync_gateways[0].add_user("posts", "user1", "pass", collection_access_dict)
 
-        self.mark_test_step("Start the replicator with the same config as the step 3.")
+        self.mark_test_step("Start another replicator with the same config as above")
         replicator.enable_document_listener = True
         await replicator.start()
 
-        self.mark_test_step("Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator stops")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
@@ -194,18 +200,18 @@ class TestReplicationAutoPurge(CBLTestClass):
                 f"Invalid flags on document update (expected ACCESS_REMOVED): {update.flags}"
 
         self.mark_test_step('''
-            Update user access to channels on SG:
+            Restore user1's access to channels on SG:
                 * Add user access to `group2` channel back again.
         ''')
         collection_access_dict = cblpytest.sync_gateways[0].create_collection_access_dict(
             {"_default.posts": ["group1", "group2"]})
         await cblpytest.sync_gateways[0].add_user("posts", "user1", "pass", collection_access_dict)
 
-        self.mark_test_step("Start the replicator with the same config as the step 3.")
+        self.mark_test_step("Start another replicator with the same config as above")
         replicator.clear_document_updates()
         await replicator.start()
 
-        self.mark_test_step("Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator stops")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
@@ -232,14 +238,16 @@ class TestReplicationAutoPurge(CBLTestClass):
             assert update.flags == ReplicatorDocumentFlags.NONE, \
                 f"Invalid flags on document update (expected NONE): {update.flags}"
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
-    async def test_remove_docs_from_channel_with_auto_purge_diabled(self, cblpytest: CBLPyTest,
-                                                                    dataset_path: Path) -> None:
-        self.mark_test_step("Reset SG and load `posts` dataset.")
+    async def test_remove_docs_from_channel_with_auto_purge_disabled(self, cblpytest: CBLPyTest,
+                                                                     dataset_path: Path) -> None:
+        self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step("Reset local database, and load `posts` dataset.")
+        self.mark_test_step("Reset local database and load `posts` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("posts", ["db1"])
         db = dbs[0]
 
@@ -253,21 +261,21 @@ class TestReplicationAutoPurge(CBLTestClass):
                 * autoPurge: false
                 * credentials: user1/pass
         ''')
-        replicator = Replicator(db,
-                                cblpytest.sync_gateways[0].replication_url("posts"),
-                                collections=[ReplicatorCollectionEntry(["_default.posts"])],
-                                replicator_type=ReplicatorType.PULL,
-                                continuous=False,
-                                enable_auto_purge=False,
-                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
-        await replicator.start()
+        repl1 = Replicator(db,
+                           cblpytest.sync_gateways[0].replication_url("posts"),
+                           collections=[ReplicatorCollectionEntry(["_default.posts"])],
+                           replicator_type=ReplicatorType.PULL,
+                           continuous=False,
+                           enable_auto_purge=False,
+                           authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+        await repl1.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        status = await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+            f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("Check that the docs to which the user has access, are all pulled.")
+        self.mark_test_step("Verify that the all the docs to which the user has access were pulled.")
         lite_all_docs = await db.get_all_documents("_default.posts")
         n_docs = len(lite_all_docs["_default.posts"])
         assert n_docs == 5, f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
@@ -301,12 +309,22 @@ class TestReplicationAutoPurge(CBLTestClass):
         await cblpytest.sync_gateways[0].update_documents("posts", updates, collection="posts")
 
         self.mark_test_step("Start a continuous replicator with a config similar to the one above")
-        replicator.enable_document_listener = True
-        replicator.continuous = True
-        await replicator.start()
+        repl2 = Replicator(db,
+                           cblpytest.sync_gateways[0].replication_url("posts"),
+                           collections=[ReplicatorCollectionEntry(["_default.posts"])],
+                           replicator_type=ReplicatorType.PULL,
+                           continuous=True,
+                           enable_auto_purge=False,
+                           authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                           enable_document_listener=True)
+        await repl2.start()
 
-        self.mark_test_step("Check document replications")
-        await replicator.wait_for_all_doc_events({
+        self.mark_test_step('''
+            Check document replications:
+               * `post_1` has access-removed flag set.
+               * `post_2` and `post_3` have no flags set.
+        ''')
+        await repl2.wait_for_all_doc_events({
             WaitForDocumentEventEntry("_default.posts", "post_1", ReplicatorType.PULL,
                                       ReplicatorDocumentFlags.ACCESS_REMOVED),
             WaitForDocumentEventEntry("_default.posts", "post_2", ReplicatorType.PULL,
@@ -314,7 +332,16 @@ class TestReplicationAutoPurge(CBLTestClass):
             WaitForDocumentEventEntry("_default.posts", "post_3", ReplicatorType.PULL,
                                       ReplicatorDocumentFlags.NONE)})
 
-        self.mark_test_step("Check the local docs")
+        self.mark_test_step('''
+            Check the local docs
+               * there are 5 documents in the database
+               * `post_1`, `post_2` and `post_3` are updated with new channels.
+               * `post_4` and `post_5` are unchanged
+        ''')
+        lite_all_docs = await db.get_all_documents("_default.posts")
+        n_docs = len(lite_all_docs["_default.posts"])
+        assert n_docs == 5, f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
+
         snapshot_updater = SnapshotUpdater(snap)
         snapshot_updater.upsert_document("_default.posts", "post_2",
                                          new_properties=[{"channels": ["group1"]}],
@@ -325,21 +352,15 @@ class TestReplicationAutoPurge(CBLTestClass):
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Local docs are not as expected: {verify_result.description}"
 
-        lite_all_docs = await db.get_all_documents("_default.posts")
-        n = len(lite_all_docs["_default.posts"])
-        assert n == 5, f"Wrong number of docs in db: {n}"
-
-        # Stop the continuous repliator
         await cblpytest.test_servers[0].cleanup()
 
-#    @pytest.mark.skip(reason="failing")
     @pytest.mark.asyncio
     async def test_revoke_access_with_auto_purge_disabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step("Reset SG and load `posts` dataset.")
+        self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step("Reset local database, and load `posts` dataset.")
+        self.mark_test_step("Reset local database and load `posts` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("posts", ["db1"])
         db = dbs[0]
 
@@ -362,12 +383,12 @@ class TestReplicationAutoPurge(CBLTestClass):
                            authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await repl1.start()
 
-        self.mark_test_step("Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator stops")
         status = await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("Check that the docs that the user has access to are all pulled.")
+        self.mark_test_step("Verify that the all the docs to which the user has access were pulled.")
         lite_all_docs = await db.get_all_documents("_default.posts")
         assert len(lite_all_docs["_default.posts"]) == 5, "Incorrect number of initial documents replicated"
         expected_docs = {"post_1", "post_2", "post_3", "post_4", "post_5"}
@@ -375,7 +396,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             assert doc.id in expected_docs, f"Unexpected document found after initial replication: {doc.id}"
 
         self.mark_test_step('''
-            Update user access to channels on SG:
+            Update user1's access to channels on SG:
                 * Remove access to `group2` channel.
         ''')
         collection_access_dict = cblpytest.sync_gateways[0].create_collection_access_dict(
@@ -387,7 +408,6 @@ class TestReplicationAutoPurge(CBLTestClass):
                  * endpoint: `/posts`
                  * collections:
                      * `_default_.posts`
-                    * pullFilter: name: documentIDs params: {"documentIDs": {"_default.posts": ["post_4"]}} }
                  * type: pull
                  * continuous: true
                  * autoPurge: false
@@ -395,7 +415,7 @@ class TestReplicationAutoPurge(CBLTestClass):
          ''')
         repl2 = Replicator(db,
                            cblpytest.sync_gateways[0].replication_url("posts"),
-                           collections=[ReplicatorCollectionEntry(["_default.posts"] )],
+                           collections=[ReplicatorCollectionEntry(["_default.posts"])],
                            replicator_type=ReplicatorType.PULL,
                            continuous=True,
                            enable_auto_purge=False,
@@ -403,7 +423,10 @@ class TestReplicationAutoPurge(CBLTestClass):
                            enable_document_listener=True)
         await repl2.start()
 
-        self.mark_test_step("Check document replications")
+        self.mark_test_step('''
+            Check document replications
+                * `post_4` and `post_5` have access-removed flag set
+        ''')
         await repl2.wait_for_all_doc_events({
             WaitForDocumentEventEntry("_default.posts", "post_4", ReplicatorType.PULL,
                                       ReplicatorDocumentFlags.ACCESS_REMOVED),
@@ -421,17 +444,15 @@ class TestReplicationAutoPurge(CBLTestClass):
         for doc in lite_all_docs["_default.posts"]:
             assert doc.id in expected_docs, f"Unexpected document found after initial replication: {doc.id}"
 
-        # Stop the continuous repliator
         await cblpytest.test_servers[0].cleanup()
-
 
     @pytest.mark.asyncio
     async def test_filter_removed_access_documents(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step("Reset SG and load `posts` dataset.")
+        self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step("Reset local database, and load `posts` dataset.")
+        self.mark_test_step("Reset local database and load `posts` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("posts", ["db1"])
         db = dbs[0]
 
@@ -454,20 +475,20 @@ class TestReplicationAutoPurge(CBLTestClass):
                            authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
         await repl1.start()
 
-        self.mark_test_step("Wait until the replicator is stopped.")
+        self.mark_test_step("Wait until the replicator stops")
         status = await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("Check that the docs that the user has access to are all pulled.")
+        self.mark_test_step("Verify that the all the docs to which the user has access were pulled")
         lite_all_docs = await db.get_all_documents("_default.posts")
         assert len(lite_all_docs["_default.posts"]) == 5, "Incorrect number of initial documents replicated"
         expected_docs = {"post_1", "post_2", "post_3", "post_4", "post_5"}
         rev_ids = {}
         for doc in lite_all_docs["_default.posts"]:
-            id = doc.id
-            assert id in expected_docs, f"Unexpected document found after initial replication: {id}"
-            rev_ids[id] = doc.rev
+            doc_id = doc.id
+            assert doc_id in expected_docs, f"Unexpected document found after initial replication: {doc_id}"
+            rev_ids[doc_id] = doc.rev
 
         self.mark_test_step("Snapshot the database")
         snap = await db.create_snapshot([
@@ -483,9 +504,9 @@ class TestReplicationAutoPurge(CBLTestClass):
                 * Update post_1 with channels = [] (ACCESS-REMOVED)
                 * Update post_2 with channels = [] (ACCESS-REMOVED)
         ''')
-        channel_access_dict: List[DocumentUpdateEntry] = []
-        channel_access_dict.append(DocumentUpdateEntry("post_1", rev_ids["post_1"], body={"channels": []}))
-        channel_access_dict.append(DocumentUpdateEntry("post_2", rev_ids["post_2"], body={"channels": []}))
+        channel_access_dict: List[DocumentUpdateEntry] = [
+            DocumentUpdateEntry("post_1", rev_ids["post_1"], body={"channels": []}),
+            DocumentUpdateEntry("post_2", rev_ids["post_2"], body={"channels": []})]
         await cblpytest.sync_gateways[0].update_documents("posts", channel_access_dict, "_default", "posts")
 
         self.mark_test_step('''
@@ -514,18 +535,30 @@ class TestReplicationAutoPurge(CBLTestClass):
                            enable_document_listener=True)
         await repl2.start()
 
-        self.mark_test_step("Check document replications")
+        self.mark_test_step('''
+            Check document replications
+               * `post_1` has access-removed flag set with no error.
+               * `post_2` has access-removed flag set with WebSocket/403 ("CBL, 10403) error.
+        ''')
         await repl2.wait_for_all_doc_events({
-            WaitForDocumentEventEntry("_default.posts", "post_2", ReplicatorType.PULL,
-                                      ReplicatorDocumentFlags.ACCESS_REMOVED, "CBL", 10403),
             WaitForDocumentEventEntry("_default.posts", "post_1", ReplicatorType.PULL,
-                                      ReplicatorDocumentFlags.ACCESS_REMOVED)})
+                                      ReplicatorDocumentFlags.ACCESS_REMOVED),
+            WaitForDocumentEventEntry("_default.posts", "post_2", ReplicatorType.PULL,
+                                      ReplicatorDocumentFlags.ACCESS_REMOVED, "CBL", 10403)})
 
-        self.mark_test_step("Check the local docs")
+        self.mark_test_step('''
+            Check the local docs
+               * there are 4 documents in the database
+               * `post_1` was purged.
+               * `post_2`, `post_3`, `post_4` and `post_5` still exists.
+       ''')
+        lite_all_docs = await db.get_all_documents("_default.posts")
+        n_docs = len(lite_all_docs["_default.posts"])
+        assert n_docs == 4, f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
+
         snapshot_updater = SnapshotUpdater(snap)
         snapshot_updater.delete_document("_default.posts", "post_1")
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Local docs are not as expected: {verify_result.description}"
 
-        # Stop the continuous repliator
         await cblpytest.test_servers[0].cleanup()

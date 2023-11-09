@@ -78,6 +78,7 @@ class TestReplicationFilter(CBLTestClass):
         expected_ids = { "airline_1000", "airline_10", "route_10"}
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
 
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio
     async def test_pull_document_ids_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -145,6 +146,8 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Check that only changes for docs in the specified documentIDs filters are replicated.")
         expected_ids = { "airport_1000", "airport_10", "landmark_10"}
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
+
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio
     async def test_pull_channels_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -230,6 +233,8 @@ class TestReplicationFilter(CBLTestClass):
         expected_ids = { "airport_1000", "airport_2000", "airport_1", "airport_17", "landmark_601" }
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_custom_push_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
@@ -285,6 +290,8 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Check that only changes passed the push filters are replicated.")
         expected_ids = { "name_10", "name_20" }
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
+
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio
     async def test_custom_pull_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -354,3 +361,5 @@ class TestReplicationFilter(CBLTestClass):
         expected_ids = {"name_105", "name_193"}
         successful_replications2 = list(filter(repl_filter, replicator.document_updates))
         self.validate_replicated_doc_ids(expected_ids, successful_replications2)
+
+        await cblpytest.test_servers[0].cleanup()

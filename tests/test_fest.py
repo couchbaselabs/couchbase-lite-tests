@@ -148,6 +148,8 @@ class TestFest(CBLTestClass):
         verify_result = await db2.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_update_task(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.setup_test_fest_cloud(cblpytest, dataset_path)
@@ -215,6 +217,8 @@ class TestFest(CBLTestClass):
         verify_result = await db1.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_delete_task(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.setup_test_fest_cloud(cblpytest, dataset_path)
@@ -273,6 +277,8 @@ class TestFest(CBLTestClass):
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
         verify_result = await db2.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio
     async def test_delete_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -351,6 +357,8 @@ class TestFest(CBLTestClass):
         verify_result = await db2.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_create_tasks_two_users(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.setup_test_fest_cloud(cblpytest, dataset_path, ["lists.user1.db1-list1.contributor",
@@ -417,6 +425,8 @@ class TestFest(CBLTestClass):
         self.mark_test_step("Verify that db2 has not changed")
         verify_result = await db2.verify_documents(SnapshotUpdater(snap2))
         assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio
     async def test_share_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -486,6 +496,8 @@ class TestFest(CBLTestClass):
                                                          {"taskList": {"id": "db1-list1", "owner": "user1"}}])
         verify_result = await db2.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio
     async def test_update_shared_tasks(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -583,6 +595,8 @@ class TestFest(CBLTestClass):
         verify_result = await db1.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio
     async def test_unshare_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.setup_test_fest_cloud(cblpytest, dataset_path, ["lists.user1.db1-list1.contributor"])
@@ -676,3 +690,5 @@ class TestFest(CBLTestClass):
         snapshot_updater.purge_document("_default.tasks", "db1-list1-task2")
         verify_result = await db2.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+
+        await cblpytest.test_servers[0].cleanup()
