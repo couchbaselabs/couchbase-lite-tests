@@ -67,6 +67,12 @@ public final class DatabaseService {
     }
 
     @NonNull
+    public static String getDocumentFullName(@NonNull Document document) {
+        final Collection collection = document.getCollection();
+        return ((collection == null) ? "???" : getCollectionFullName(collection)) + "." + document.getId();
+    }
+
+    @NonNull
     public static String[] parseCollectionFQN(@NonNull String collFQN) {
         final String[] collDbScopeAndName = collFQN.split("\\.");
         if ((collDbScopeAndName.length != 3)
@@ -86,6 +92,12 @@ public final class DatabaseService {
     @NonNull
     public static String getCollectionFQN(@NonNull Database db, @NonNull String collectionName) {
         return db.getName() + "." + collectionName;
+    }
+
+    @NonNull
+    public static String getDocumentFQN(@NonNull Document document) {
+        final Collection collection = document.getCollection();
+        return ((collection == null) ? "???" : getCollectionFQN(collection)) + "." + document.getId();
     }
 
 

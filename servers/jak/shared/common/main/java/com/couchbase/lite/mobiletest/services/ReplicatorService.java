@@ -23,14 +23,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import com.couchbase.lite.Collection;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.DocumentFlag;
 import com.couchbase.lite.DocumentReplication;
 import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
-import com.couchbase.lite.Scope;
 import com.couchbase.lite.mobiletest.TestContext;
+import com.couchbase.lite.mobiletest.util.Log;
 
 
 public class ReplicatorService {
@@ -42,8 +41,6 @@ public class ReplicatorService {
     }
 
     static class DocIdFilter implements ReplicationFilter {
-        public static final String DOT = ".";
-
         @NonNull
         private final Set<String> permittedDocs;
 
@@ -51,13 +48,7 @@ public class ReplicatorService {
 
         @Override
         public boolean filtered(@NonNull Document document, @NonNull EnumSet<DocumentFlag> ignore) {
-            final Collection collection = document.getCollection();
-            return permittedDocs.contains(
-                ((collection == null) ? Scope.DEFAULT_NAME : collection.getScope().getName())
-                    + DOT
-                    + ((collection == null) ? Collection.DEFAULT_NAME : collection.getName())
-                    + DOT
-                    + document.getId());
+            return permittedDocs.contains(DatabaseService.getDocumentFullName(document));
         }
     }
 
