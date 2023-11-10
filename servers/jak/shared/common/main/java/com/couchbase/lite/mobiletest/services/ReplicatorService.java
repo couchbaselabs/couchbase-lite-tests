@@ -29,7 +29,6 @@ import com.couchbase.lite.DocumentReplication;
 import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.mobiletest.TestContext;
-import com.couchbase.lite.mobiletest.util.Log;
 
 
 public class ReplicatorService {

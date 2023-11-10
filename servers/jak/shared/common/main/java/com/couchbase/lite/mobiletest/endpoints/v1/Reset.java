@@ -73,7 +73,7 @@ public class Reset {
         @NonNull DatabaseService dbSvc,
         @NonNull TypedMap datasets) {
         final Set<String> datasetNames = datasets.getKeys();
-        if (datasetNames.size() <= 0) { return; }
+        if (datasetNames.isEmpty()) { return; }
 
         for (String dataset: datasetNames) {
             final TypedList databases = datasets.getList(dataset);
