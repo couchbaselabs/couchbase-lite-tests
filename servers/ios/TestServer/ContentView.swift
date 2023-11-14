@@ -19,6 +19,7 @@ struct ContentView: View {
     }
 }
 
-#Preview {
-    ContentView()
-}
+// Disable directive Preview as it is not recongized by XCode 14:
+//#Preview {
+//    ContentView()
+//}
