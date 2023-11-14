@@ -46,8 +46,11 @@ fi
 
 if [ "${BIN_TYPE}" != "simulator" ]
 then
-    xcodebuild -scheme TestServer -sdk iphoneos -configuration Release -derivedDataPath "${BUILD_DEVICE_DIR}" -allowProvisioningUpdates | xcpretty  
+    xcodebuild -scheme TestServer -sdk iphoneos -configuration Release -derivedDataPath "${BUILD_DEVICE_DIR}" -allowProvisioningUpdates | xcpretty
     cp -r "${BUILD_DEVICE_DIR}/Build/Products/Release-iphoneos/TestServer-iOS.app" "${BUILD_OUT_DIR}"
 fi
+
+rm -rf "${BUILD_SIMULATOR_DIR}"
+rm -rf "${BUILD_DEVICE_DIR}"
 
 popd > /dev/null
