@@ -30,6 +30,6 @@ pip install -r requirements.txt
 
 rm -f "config.ios.json" || true
 cp "${WORKSPACE}/jenkins/pipelines/ios/config.ios.json" .
-pytest -v --no-header -W ignore::DeprecationWarning --config config.ios.json test_basic_replication.py -k test_replicate
+pytest -v --no-header -W ignore::DeprecationWarning --config config.ios.json
 deactivate
 popd
