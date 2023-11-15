@@ -312,6 +312,12 @@ class DatabaseManager {
     
     public func reset(dbName: String, dataset: String? = nil) throws {
         TestServer.logger.log(level: .debug, "Resetting DB \(dbName)\(dataset != nil ? " with dataset \(dataset!)" : "")")
+        
+        // For the first time called, reset the temp directory for extracting the dataset
+        if databases.isEmpty {
+            try DatabaseManager.resetExtractedDatasetDir()
+        }
+        
         // If database is open, close
         if databases[dbName] != nil {
             try closeDatabase(withName: dbName)
@@ -368,15 +374,16 @@ class DatabaseManager {
         TestServer.logger.log(level: .debug, "Found dataset at \(datasetZipURL.absoluteString)")
         
         // datasetZipURL is "../x.cblite2.zip", datasetURL is "../x.cblite2"
-        let datasetURL = datasetZipURL.deletingPathExtension()
         let fm = FileManager()
         
         // If the dataset has not been unzipped previously
-        if(!fm.fileExists(atPath: datasetURL.relativePath)) {
+        let extDir = DatabaseManager.extractedDatasetDir()
+        let dbFileName = datasetZipURL.deletingPathExtension().lastPathComponent
+        let extDatasetPath = (extDir as NSString).appendingPathComponent(dbFileName)
+        if(!fm.fileExists(atPath: extDatasetPath)) {
             TestServer.logger.log(level: .debug, "Unzipping dataset \(datasetZipURL.lastPathComponent)")
             // Unzip dataset archive
-            guard SSZipArchive.unzipFile(atPath: datasetZipURL.relativePath,
-                                         toDestination: datasetZipURL.deletingLastPathComponent().relativePath)
+            guard SSZipArchive.unzipFile(atPath: datasetZipURL.relativePath, toDestination: extDir)
             else {
                 TestServer.logger.log(level: .error, "Error while unzipping dataset at \(datasetZipURL.absoluteString)")
                 throw TestServerError(domain: .CBL, code: CBLError.cantOpenFile, message: "Couldn't unzip dataset archive.")
@@ -384,12 +391,31 @@ class DatabaseManager {
         }
         
         do {
-            TestServer.logger.log(level: .debug, "Attempting to copy dataset from \(datasetURL.relativePath)")
-            try Database.copy(fromPath: datasetURL.relativePath, toDatabase: dbName, withConfig: nil)
+            TestServer.logger.log(level: .debug, "Attempting to copy dataset from \(extDatasetPath)")
+            try Database.copy(fromPath: extDatasetPath, toDatabase: dbName, withConfig: nil)
             TestServer.logger.log(level: .debug, "Dataset '\(name)' successfully copied to DB '\(dbName)'")
         } catch(let error as NSError) {
             TestServer.logger.log(level: .error, "Failed to copy dataset due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
+    
+    private static func extractedDatasetDir() -> String {
+        return (NSTemporaryDirectory() as NSString).appendingPathComponent("TestServer-iOS-Dataset");
+    }
+    
+    private static func resetExtractedDatasetDir() throws {
+        let dir = extractedDatasetDir()
+        if FileManager.default.fileExists(atPath: dir) {
+            try! FileManager.default.removeItem(atPath: dir)
+        }
+        
+        do {
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        } catch(let error as NSError) {
+            TestServer.logger.log(level: .error, "Failed to create temp directory for extracting dataset zip files: \(error)")
+            throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
+        }
+    }
 }
+	
