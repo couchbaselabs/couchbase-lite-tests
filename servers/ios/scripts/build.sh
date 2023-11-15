@@ -39,14 +39,14 @@ mkdir -p "${BUILD_OUT_DIR}"
 set -o pipefail # Get xcpretty to report failures
 if [ "${BIN_TYPE}" != "device" ]
 then
-    xcodebuild -scheme TestServer -sdk iphonesimulator -configuration Release -derivedDataPath "${BUILD_SIMULATOR_DIR}" | xcpretty
+    xcodebuild -scheme TestServer -sdk iphonesimulator -configuration Release -derivedDataPath "${BUILD_SIMULATOR_DIR}"
     cp -r "${BUILD_SIMULATOR_DIR}/Build/Products/Release-iphonesimulator/TestServer-iOS.app" "${BUILD_OUT_DIR}/TestServer-iOS-Simulator.app"
     echo ""
 fi
 
 if [ "${BIN_TYPE}" != "simulator" ]
 then
-    xcodebuild -scheme TestServer -sdk iphoneos -configuration Release -derivedDataPath "${BUILD_DEVICE_DIR}" -allowProvisioningUpdates | xcpretty
+    xcodebuild -scheme TestServer -sdk iphoneos -configuration Release -derivedDataPath "${BUILD_DEVICE_DIR}" -allowProvisioningUpdates
     cp -r "${BUILD_DEVICE_DIR}/Build/Products/Release-iphoneos/TestServer-iOS.app" "${BUILD_OUT_DIR}"
 fi
 
