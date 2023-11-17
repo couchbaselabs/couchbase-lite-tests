@@ -49,7 +49,7 @@ pipeline {
                             }
                             post {
                                 always {
-                                    echo "Teardown OSX Java Desktop Tests"
+                                    echo "Teardown OSX Web Services Tests"
                                     sh '''
                                         jenkins/pipelines/java/webservice/osx_teardown.sh
                                     '''
@@ -85,7 +85,7 @@ pipeline {
                             }
                             post {
                                 always {
-                                    echo "Teardown Windows Java Desktop Tests"
+                                    echo "Teardown Windows Web Services Tests"
                                     pwsh '''
                                         jenkins/pipelines/java/webservice/win_teardown.ps1
                                     '''
@@ -121,7 +121,7 @@ pipeline {
                             }
                             post {
                                 always {
-                                    echo "Teardown Linux Java Desktop Tests"
+                                    echo "Teardown Linux Web Services Tests"
                                     sh '''
                                         jenkins/pipelines/java/webservice/linux_teardown.sh
                                     '''
