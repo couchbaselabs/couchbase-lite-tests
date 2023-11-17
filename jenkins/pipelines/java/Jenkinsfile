@@ -5,7 +5,7 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
     }
-    options { timeout(time: 30, unit: 'MINUTES') }
+    options { timeout(time: 60, unit: 'MINUTES') }
     stages {
         stage('Init') {
             steps {
