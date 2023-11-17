@@ -41,7 +41,7 @@ pipeline {
                             }
                         }
                         stage('OSX Web Services Tests') {
-                            when { expression { false } }
+                            when { expression { true } }
                             steps {
                                 sh """
                                     jenkins/pipelines/java/webservice/osx_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
