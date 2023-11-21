@@ -25,6 +25,7 @@ import java.util.Map;
 import com.couchbase.lite.mobiletest.endpoints.v1.CreateRepl;
 import com.couchbase.lite.mobiletest.endpoints.v1.GetAllDocs;
 import com.couchbase.lite.mobiletest.endpoints.v1.GetReplStatus;
+import com.couchbase.lite.mobiletest.endpoints.v1.Logger;
 import com.couchbase.lite.mobiletest.endpoints.v1.PerformMaintenance;
 import com.couchbase.lite.mobiletest.endpoints.v1.Reset;
 import com.couchbase.lite.mobiletest.endpoints.v1.SnapshotDocs;
@@ -51,6 +52,7 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
 
         // build the dispatch table
         addEndpoint(1, "/reset", (c, r) -> new Reset(app).reset(c, r));
+        addEndpoint(1, "/log", (c, r) -> new Logger().log(r));
         addEndpoint(1, "/getAllDocuments", (c, r) -> new GetAllDocs(app.getDbSvc()).getAllDocs(c, r));
         addEndpoint(1, "/updateDatabase", (c, r) -> new UpdateDb(app.getDbSvc()).updateDb(c, r));
         addEndpoint(1, "/startReplicator", (c, r) -> new CreateRepl(app.getDbSvc(), app.getReplSvc()).createRepl(c, r));
