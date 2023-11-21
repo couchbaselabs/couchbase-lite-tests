@@ -61,8 +61,10 @@ public class SnapshotDocs {
 
     public SnapshotDocs(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
 
+    @SuppressWarnings("PMD.PrematureDeclaration")
     @NonNull
-    public Map<String, Object> snapshot(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+    public Map<String, Object> snapshot(@NonNull TestContext context, @NonNull TypedMap req) {
+        final TestContext ctxt = TestContext.validateContext(context);
         req.validate(LEGAL_SNAPSHOT_KEYS);
 
         final String dbName = req.getString(KEY_DATABASE);

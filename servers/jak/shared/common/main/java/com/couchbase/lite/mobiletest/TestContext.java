@@ -24,11 +24,19 @@ import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
-public final class TestContext implements AutoCloseable {
+public final class TestContext {
     private static final String TAG = "CONTEXT";
 
     @NonNull
+    public static TestContext validateContext(@Nullable TestContext ctxt) {
+        if (ctxt == null) { throw new ClientError("No context for test"); }
+        return ctxt;
+    }
+
+    @NonNull
     private final String client;
+    @NonNull
+    private final String name;
     @Nullable
     private File dbDir;
     @Nullable
@@ -42,9 +50,11 @@ public final class TestContext implements AutoCloseable {
     @Nullable
     private Map<String, Snapshot> openSnapshots;
 
-    TestContext(@NonNull String client) { this.client = client; }
+    TestContext(@NonNull String client, @NonNull String name) {
+        this.client = client;
+        this.name = name;
+    }
 
-    @Override
     public void close() {
         // belt
         openListeners = null;
@@ -61,6 +71,9 @@ public final class TestContext implements AutoCloseable {
 
     @NonNull
     public String getClient() { return client; }
+
+    @NonNull
+    public String getName() { return name; }
 
     public void setDbDir(@NonNull File dbDir) {
         if (this.dbDir != null) { throw new ServerError("Attempt to replace the db dir"); }

@@ -66,8 +66,10 @@ public class PerformMaintenance {
 
     public PerformMaintenance(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
 
+    @SuppressWarnings("PMD.PrematureDeclaration")
     @NonNull
-    public final Map<String, Object> doMaintenance(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+    public final Map<String, Object> doMaintenance(@NonNull TestContext context, @NonNull TypedMap req) {
+        final TestContext ctxt = TestContext.validateContext(context);
         req.validate(LEGAL_MANTENANCE_KEYS);
 
         final String dbName = req.getString(KEY_DATABASE);

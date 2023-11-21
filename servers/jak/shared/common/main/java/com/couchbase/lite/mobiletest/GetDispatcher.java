@@ -32,7 +32,7 @@ public final class GetDispatcher extends BaseDispatcher<GetDispatcher.Endpoint> 
     @FunctionalInterface
     interface Endpoint {
         @NonNull
-        Map<String, Object> run(@NonNull TestContext ctxt);
+        Map<String, Object> run(@Nullable TestContext ctxt);
     }
 
     public GetDispatcher(@NonNull TestApp app) {

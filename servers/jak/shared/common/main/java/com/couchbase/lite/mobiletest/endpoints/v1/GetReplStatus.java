@@ -18,10 +18,13 @@ package com.couchbase.lite.mobiletest.endpoints.v1;
 import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.DocumentFlag;
@@ -55,7 +58,12 @@ public class GetReplStatus {
     private static final String KEY_REPL_ERROR = "error";
 
     private static final EnumMap<DocumentFlag, String> DOC_FLAGS;
+    private static final Set<String> LEGAL_REPL_STATUS_KEYS;
     static {
+        final Set<String> l = new HashSet<>();
+        l.add(KEY_REPL_ID);
+        LEGAL_REPL_STATUS_KEYS = Collections.unmodifiableSet(l);
+
         final EnumMap<DocumentFlag, String> m = new EnumMap<>(DocumentFlag.class);
         m.put(DocumentFlag.DELETED, "DELETED");
         m.put(DocumentFlag.ACCESS_REMOVED, "ACCESSREMOVED");
@@ -68,8 +76,12 @@ public class GetReplStatus {
 
     public GetReplStatus(@NonNull ReplicatorService replSvc) { this.replSvc = replSvc; }
 
+    @SuppressWarnings("PMD.PrematureDeclaration")
     @NonNull
-    public Map<String, Object> getReplStatus(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+    public Map<String, Object> getReplStatus(@NonNull TestContext context, @NonNull TypedMap req) {
+        final TestContext ctxt = TestContext.validateContext(context);
+        req.validate(LEGAL_REPL_STATUS_KEYS);
+
         final String replId = req.getString(KEY_REPL_ID);
         if (replId == null) { throw new ClientError("Replicator id not specified"); }
 

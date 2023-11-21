@@ -149,8 +149,10 @@ public class CreateRepl {
     }
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
+    @SuppressWarnings("PMD.PrematureDeclaration")
     @NonNull
-    public Map<String, Object> createRepl(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+    public Map<String, Object> createRepl(@NonNull TestContext context, @NonNull TypedMap req) {
+        final TestContext ctxt = TestContext.validateContext(context);
         req.validate(LEGAL_KEYS);
 
         final TypedMap config = req.getMap(KEY_CONFIG);

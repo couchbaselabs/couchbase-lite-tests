@@ -45,8 +45,10 @@ public class UpdateDb extends UpdateItemEndpoint {
     }
     public UpdateDb(@NonNull DatabaseService dbSvc) { super(dbSvc); }
 
+    @SuppressWarnings("PMD.PrematureDeclaration")
     @NonNull
-    public Map<String, Object> updateDb(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+    public Map<String, Object> updateDb(@NonNull TestContext context, @NonNull TypedMap req) {
+        final TestContext ctxt = TestContext.validateContext(context);
         req.validate(LEGAL_UPDATES_KEYS);
 
         final TypedList updates = req.getList(KEY_UPDATES);

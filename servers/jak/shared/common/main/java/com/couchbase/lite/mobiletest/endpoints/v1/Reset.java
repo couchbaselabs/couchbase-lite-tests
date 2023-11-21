@@ -16,6 +16,7 @@
 package com.couchbase.lite.mobiletest.endpoints.v1;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -25,20 +26,26 @@ import java.util.Set;
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.trees.TypedMap;
+import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 public class Reset {
+    public static final String KEY_CLIENT = "client";
+    private static final String KEY_TEST_NAME = "name";
     private static final String KEY_DATASETS = "datasets";
 
-    private static final Set<String> LEGAL_DATASET_KEYS;
+    private static final Set<String> LEGAL_START_TEST_KEYS;
     static {
         final Set<String> l = new HashSet<>();
+        l.add(KEY_CLIENT);
+        l.add(KEY_TEST_NAME);
         l.add(KEY_DATASETS);
-        LEGAL_DATASET_KEYS = Collections.unmodifiableSet(l);
+        LEGAL_START_TEST_KEYS = Collections.unmodifiableSet(l);
     }
 
 
@@ -48,24 +55,75 @@ public class Reset {
     public Reset(@NonNull TestApp app) { this.app = app; }
 
     @NonNull
-    public final Map<String, Object> reset(@NonNull TestContext oldCtxt, @NonNull TypedMap req) {
-        final String client = oldCtxt.getClient();
+    public Map<String, Object> startTest(@Nullable TestContext context, @NonNull TypedMap req) {
+        if (context != null) { throw new ClientError("Previous test was not ended: " + context.getName()); }
+        req.validate(LEGAL_START_TEST_KEYS);
 
-        app.clearReplSvc();
-        app.clearDbSvc();
-        oldCtxt.close();
+        final String client = req.getString(KEY_CLIENT);
+        if (client == null) { throw new ServerError("No client supplied for startTest"); }
 
-        final TestContext ctxt = app.resetContext(client);
+        final String testName = req.getString(KEY_TEST_NAME);
+        if (testName == null) { throw new ClientError("No name supplied for startTest"); }
+
+        final TypedMap datasets = req.getMap(KEY_DATASETS);
+        if (datasets == null) { throw new ClientError("No datasets specified in init"); }
+
+        setup(client, testName, datasets);
+
+        return Collections.emptyMap();
+    }
+
+    @NonNull
+    public Map<String, Object> endTest(@Nullable TestContext context, @NonNull TypedMap req) {
+        final TestContext ctxt = TestContext.validateContext(context);
+        req.validate(Collections.emptySet());
+
+        cleanup(ctxt, ctxt.getName());
+
+        return Collections.emptyMap();
+    }
+
+    @NonNull
+    public final Map<String, Object> reset(@Nullable TestContext ctxt, @NonNull TypedMap req) {
+        req.validate(LEGAL_START_TEST_KEYS);
+
+        final String client;
+        if (ctxt == null) {
+            client = req.getString(KEY_CLIENT);
+            if (client == null) { throw new ServerError("Client is null"); }
+        }
+        else {
+            client = ctxt.getClient();
+            cleanup(ctxt, ctxt.getName());
+        }
+
+        String testName = req.getString(KEY_TEST_NAME);
+        if (testName == null) { testName = "UNNAMED"; }
+        setup(client, testName, req.getMap(KEY_DATASETS));
+
+        return Collections.emptyMap();
+    }
+
+    private void setup(@NonNull String client, @NonNull String testName, @Nullable TypedMap datasets) {
+        Log.i("RESET", ">>>>> BEGIN TEST: " + testName);
+
+        final TestContext ctxt = app.createTestContext(client, testName);
+
         final DatabaseService dbSvc = app.getDbSvc();
         dbSvc.init(ctxt);
         app.getReplSvc().init(ctxt);
 
-        req.validate(LEGAL_DATASET_KEYS);
-        final TypedMap datasets = req.getMap(KEY_DATASETS);
-        if (datasets == null) { throw new ClientError("No datasets specified in init"); }
-        installDatasets(ctxt, dbSvc, datasets);
+        if (datasets != null) { installDatasets(ctxt, dbSvc, datasets); }
+    }
 
-        return Collections.emptyMap();
+    private void cleanup(@NonNull TestContext ctxt, @NonNull String testName) {
+        app.clearReplSvc();
+        app.clearDbSvc();
+        ctxt.close();
+
+        app.deleteTestContext(ctxt.getClient());
+
+        Log.i("RESET", "<<<<< END TEST: " + testName);
     }
 
     private void installDatasets(
