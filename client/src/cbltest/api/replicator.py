@@ -43,7 +43,7 @@ class Replicator:
         """
         Gets the list of document updates received from the server and caches them.
         
-        .. note:: These entries will persist indefinitely until 
+        ... note:: These entries will persist indefinitely until
             :func:`clear_document_entries()<cbltest.api.replicator.Replicator.clear_document_entries>`
             is called
 
@@ -157,6 +157,52 @@ class Replicator:
 
             return next_status
 
+    async def wait_for_doc_events(self, events: Set[WaitForDocumentEventEntry],
+                                  interval: timedelta = timedelta(seconds=0.5)) -> bool:
+        """
+        This function will wait until it has seen all the events in 'events'
+        or the replicator stops.
+        If
+
+        :param events: The events to check for on the replicator
+        :param interval: The interval at which to ping for the replicator state (default is half a second)
+        """
+        with ((self.__tracer.start_as_current_span("wait_for_doc_events"))):
+            assert interval.total_seconds() > 0.0, "Zero interval makes no sense, try again"
+            assert not self.continuous, "wait_for_doc_events not applicable for a continuous replicator"
+            assert self.enable_document_listener, "Can't wait for documents unless the listener is enabled"
+
+            events = events.copy()
+            processed = 0
+
+            while True:
+                status = await self.get_status()
+                repl_err = status.error
+                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+
+                # Skip the ones we previously looked at to save time
+                for event in islice(self.document_updates, processed, None):
+                    doc_err = event.error
+                    entry = WaitForDocumentEventEntry(
+                        event.collection,
+                        event.document_id,
+                        event.direction,
+                        event.flags,
+                        doc_err.domain if doc_err is not None else None,
+                        doc_err.code if doc_err is not None else None)
+                    if entry in events:
+                        events.remove(entry)
+
+                    processed += 1
+
+                if len(events) == 0:
+                    return status
+
+                if status.activity == ReplicatorActivityLevel.STOPPED:
+                    raise CblTimeoutError("Replicator stopped without seeing expected events")
+
+                await asyncio.sleep(interval.total_seconds())
+
     async def wait_for_all_doc_events(self, events: Set[WaitForDocumentEventEntry], max_retries: int = 5,
                                       ping_interval: timedelta = timedelta(seconds=1),
                                       idle_timeout: timedelta = timedelta(seconds=30)) -> ReplicatorStatus:
@@ -164,7 +210,7 @@ class Replicator:
         This function will wait for a continuous replicator to become idle and then check for document
         replication events.  It will return when it has seen all the events in 'events'
 
-        .. note:: This method can time out.  It will wait for up to 'idle_timeout' seconds for the replicator
+        ... note:: This method can time out.  It will wait for up to 'idle_timeout' seconds for the replicator
                   to become idle.  If the timeout is reached it will raise an exception.
                   If the replicator becomes idle before all the expected doc events have been seen
                   it will try to wait again for idle (with the aforementioned timeout).  It will repeat this process
@@ -177,26 +223,28 @@ class Replicator:
         :param idle_timeout: The timeout to use when waiting for the next idle state (default 30s)
         """
         with self.__tracer.start_as_current_span("wait_for_all_doc_events"):
-            assert self.continuous, "wait_for_all_doc_events not applicable for non-continuous replicator"
+            assert self.continuous, "wait_for_all_doc_events not applicable for a non-continuous replicator"
+            assert self.enable_document_listener, "Can't wait for documents unless the listener is enabled"
+
             events = events.copy()
             processed = 0
 
             iteration = 0
             while iteration < max_retries:
                 status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
-                assert status.error is None, \
-                    f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+                repl_err = status.error
+                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
 
                 # Skip the ones we previously looked at to save time
                 for event in islice(self.document_updates, processed, None):
-                    error = event.error
+                    doc_err = event.error
                     entry = WaitForDocumentEventEntry(
                         event.collection,
                         event.document_id,
                         event.direction,
                         event.flags,
-                        error.domain if error is not None else None,
-                        error.code if error is not None else None)
+                        doc_err.domain if doc_err is not None else None,
+                        doc_err.code if doc_err is not None else None)
                     if entry in events:
                         events.remove(entry)
 
@@ -219,7 +267,7 @@ class Replicator:
         until it sees one of the events in 'events'.  It will return the first event it sees, or None
         after it has polled the replicator 'max_retries' times without seeing any of the expected events.
 
-        .. note:: This method can time out.  If during any of its polls the replicator fails to go idle
+        ... note:: This method can time out.  If during any of its polls the replicator fails to go idle
                   for more than 'max_timeout' seconds, this method will raise a CblTimeoutError
 
         :param events: The events to check for on the replicator
@@ -228,15 +276,17 @@ class Replicator:
         :param idle_timeout: The timeout to use when waiting for the next idle state (default 10s)
         """
         with self.__tracer.start_as_current_span("wait_for_any_doc_events"):
-            assert self.continuous, "wait_for_any_doc_events not applicable for non-continuous replicator"
+            assert self.continuous, "wait_for_any_doc_events not applicable for a non-continuous replicator"
+            assert self.enable_document_listener, "Can't wait for documents unless the listener is enabled"
+
             events = events.copy()
             processed = 0
 
             iteration = 0
             while iteration < max_retries:
                 status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
-                assert status.error is None, \
-                    f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+                repl_err = status.error
+                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
 
                 # Skip the ones we looked at, previously, to save time
                 for event in islice(self.document_updates, processed, None):
