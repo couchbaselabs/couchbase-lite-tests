@@ -47,7 +47,7 @@ import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
-@SuppressWarnings("resource")
+@SuppressWarnings("ConstantLocale")
 public abstract class TestApp {
     public static final String HEADER_CLIENT = "CBLTest-Client-ID".toLowerCase(Locale.getDefault());
     public static final String HEADER_SERVER = "CBLTest-Server-ID".toLowerCase(Locale.getDefault());
@@ -140,21 +140,16 @@ public abstract class TestApp {
     }
 
     @NonNull
-    public final TestContext getTestContext(@NonNull String client) {
-        TestContext ctxt = testContexts.get(client);
-        if (ctxt != null) { return ctxt; }
-
-        ctxt = new TestContext(client);
+    public final TestContext createTestContext(@NonNull String client, @NonNull String name) {
+        final TestContext ctxt = new TestContext(client, name);
         testContexts.put(client, ctxt);
-
         return ctxt;
     }
 
-    @NonNull
-    public final TestContext resetContext(@NonNull String client) {
-        testContexts.remove(client);
-        return getTestContext(client);
-    }
+    @Nullable
+    public final TestContext getTestContext(@NonNull String client) { return testContexts.get(client); }
+
+    public final void deleteTestContext(@NonNull String client) { testContexts.remove(client); }
 
     @NonNull
     public final DatabaseService getDbSvc() {

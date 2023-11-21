@@ -16,6 +16,7 @@
 package com.couchbase.lite.mobiletest.endpoints.v1;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -63,8 +64,10 @@ public class GetAllDocs {
 
     public GetAllDocs(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
 
+    @SuppressWarnings("PMD.PrematureDeclaration")
     @NonNull
-    public Map<String, Object> getAllDocs(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+    public Map<String, Object> getAllDocs(@Nullable TestContext context, @NonNull TypedMap req) {
+        final TestContext ctxt = TestContext.validateContext(context);
         req.validate(LEGAL_COLLECTION_KEYS);
 
         final String dbName = req.getString(KEY_DATABASE);

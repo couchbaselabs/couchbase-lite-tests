@@ -43,7 +43,7 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
     @FunctionalInterface
     interface Endpoint {
         @NonNull
-        Map<String, Object> run(@NonNull TestContext ctxt, @NonNull TypedMap req);
+        Map<String, Object> run(@Nullable TestContext ctxt, @NonNull TypedMap req);
     }
 
     public PostDispatcher(@NonNull TestApp app) {
@@ -51,6 +51,8 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
 
         // build the dispatch table
         addEndpoint(1, "/reset", (c, r) -> new Reset(app).reset(c, r));
+        addEndpoint(1, "/startTest", (c, r) -> new Reset(app).startTest(c, r));
+        addEndpoint(1, "/endTest", (c, r) -> new Reset(app).endTest(c, r));
         addEndpoint(1, "/getAllDocuments", (c, r) -> new GetAllDocs(app.getDbSvc()).getAllDocs(c, r));
         addEndpoint(1, "/updateDatabase", (c, r) -> new UpdateDb(app.getDbSvc()).updateDb(c, r));
         addEndpoint(1, "/startReplicator", (c, r) -> new CreateRepl(app.getDbSvc(), app.getReplSvc()).createRepl(c, r));
@@ -67,7 +69,7 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
         int version,
         @NonNull String path,
         @Nullable String contentType,
-        @NonNull InputStream req
+        @NonNull InputStream request
     ) throws IOException {
         if (version < 0) { throw new ClientError("No protocol version specified"); }
         if (client == null) { throw new ClientError("No client specified"); }
@@ -82,8 +84,11 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
             throw new ClientError(msg);
         }
 
-        final Map<String, Object> result
-            = endpoint.run(TestApp.getApp().getTestContext(client), new RequestBuilder(req).buildRequest());
+        final TypedMap req = new RequestBuilder(request).buildRequest();
+        final TestContext ctxt = TestApp.getApp().getTestContext(client);
+        if (ctxt == null) { req.put(Reset.KEY_CLIENT, client); }
+
+        final Map<String, Object> result = endpoint.run(ctxt, req);
 
         Log.w(TAG, "Request succeeded");
         return new Reply(new ReplyBuilder(result).buildReply());

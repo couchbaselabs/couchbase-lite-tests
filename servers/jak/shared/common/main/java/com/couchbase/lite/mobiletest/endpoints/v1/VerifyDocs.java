@@ -62,8 +62,10 @@ public class VerifyDocs extends UpdateItemEndpoint {
     }
     public VerifyDocs(@NonNull DatabaseService dbSvc) { super(dbSvc); }
 
+    @SuppressWarnings("PMD.PrematureDeclaration")
     @NonNull
-    public Map<String, Object> verify(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+    public Map<String, Object> verify(@NonNull TestContext context, @NonNull TypedMap req) {
+        final TestContext ctxt = TestContext.validateContext(context);
         req.validate(LEGAL_VALIDATE_KEYS);
 
         final String snapshotId = req.getString(KEY_SNAPSHOT);
