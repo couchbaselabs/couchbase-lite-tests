@@ -62,14 +62,9 @@ public final class DatabaseService {
     }
 
     @NonNull
-    public static String getCollectionFullName(@NonNull Collection collection) {
-        return collection.getScope().getName() + "." + collection.getName();
-    }
-
-    @NonNull
     public static String getDocumentFullName(@NonNull Document document) {
         final Collection collection = document.getCollection();
-        return ((collection == null) ? "???" : getCollectionFullName(collection)) + "." + document.getId();
+        return ((collection == null) ? "???" : collection.getFullName()) + "." + document.getId();
     }
 
     @NonNull
@@ -86,12 +81,12 @@ public final class DatabaseService {
 
     @NonNull
     public static String getCollectionFQN(@NonNull Collection collection) {
-        return collection.getScope() + "." + collection.getName();
+        return collection.getDatabase().getName() + "." + collection.getFullName();
     }
 
     @NonNull
-    public static String getCollectionFQN(@NonNull Database db, @NonNull String collectionName) {
-        return db.getName() + "." + collectionName;
+    public static String getCollectionFQN(@NonNull Database db, @NonNull String collectionFullName) {
+        return db.getName() + "." + collectionFullName;
     }
 
     @NonNull

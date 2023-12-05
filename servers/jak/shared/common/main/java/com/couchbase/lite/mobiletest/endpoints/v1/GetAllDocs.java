@@ -81,7 +81,7 @@ public class GetAllDocs {
         final Map<String, Object> colls = new HashMap<>();
 
         for (Collection collection: collections) {
-            final String collName = DatabaseService.getCollectionFullName(collection);
+            final String collName = collection.getFullName();
 
             final Query query = QueryBuilder.select(
                     SelectResult.expression(Meta.id).as(KEY_ID),
