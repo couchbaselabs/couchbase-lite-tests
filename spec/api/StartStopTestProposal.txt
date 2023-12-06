@@ -1,0 +1,51 @@
+# Start/Stop Test Endpoint design
+
+## Goals
+The motivations for dividing the /reset endpoint into two endpoints: /startTest
+and /stopTest are:
+
+- Currently the /reset endpoint is used to *start* a test.  Because tests are not
+explicitly stopped, a suite that ends by starting one or more continuous replicators
+can leave those replicators running indefintely.
+
+- We anticipate the need of identifying the beginning and end of a test, in the
+logs we collect from the time of the test.  The suggested mechanism is canonical
+messages logged just before a test begins and just after it ends.  This will allow even
+mechanical extraction of the logs that pertain to a specific test.
+
+## Proposal
+As a solution to both these issues I proposded that we refactor the single /reset
+into two endpoints: /startTest and /stopTest.
+
+I did an implementation of this and it was a little bit tricky.  In the Java
+implementation tests have a context.  The context object holds and data that must
+be persistent across the whole test (datasets, replicators, snapshots, etc.).
+
+The java implementation has, to this point, assumed that there is *always* an active
+context.  Changing to the {start, stop}Test architecture requires dealing with the
+state, between stop and start, during which there is no context and requests on most
+other endpoints must be illegal.
+
+## Counter Proposal
+Jim Borden suggested a radically simpler way of achieving the specified goals:
+
+- allow the /reset endpoint to take no arguments.  This is, in fact, as specified.
+/reset with no arguments can be used to end a test and stop any spawned tasks.
+
+- add a new endpoint /log, which takes a single JSON request parameter "message".
+The value of the message key is logged, immediately, at log level info.  The
+client code can use this endpoint to mark the beginnings and ends of tests.
+
+It should be possible to enhance the base test to call /reset at the end of every test
+and to call the /log endpoint at the beginning and end of every test.
+
+## Analysis
+The original proposal seems to me to be a substantial architectural improvement.
+It does a much better job of modeling reality.  On the other hand, it is no better
+than the counter proposal at meeting the stated goals.
+Whereas the original proposal took me nearly a day to implement, the counter proposal
+took less than an hour.
+I think it is expedient to go with the new /log endpoint.
+We should also look into modifying the client base test to do the appropriate logging
+and the final reset, automatically.
+
