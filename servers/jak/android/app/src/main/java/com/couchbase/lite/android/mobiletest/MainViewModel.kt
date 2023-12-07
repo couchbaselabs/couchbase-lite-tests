@@ -30,10 +30,10 @@ class MainViewModel(private val server: Server) : ViewModel() {
         try {
             server.start()
             val uri = server.url()
-            Log.i(TAG, "Server launched at $uri")
+            Log.p(TAG, "Server launched at $uri")
             return uri
         } catch (e: IOException) {
-            Log.e(TAG, "Failed starting server", e)
+            Log.err(TAG, "Failed starting server", e)
             throw e
         }
     }

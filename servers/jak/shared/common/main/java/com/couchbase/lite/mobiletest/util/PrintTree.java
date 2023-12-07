@@ -32,109 +32,109 @@ public class PrintTree implements TreeEach.MapOp, TreeEach.ListOp {
     @Nullable
     @Override
     public TreeEach.MapOp startMap(@NonNull String key) {
-        Log.d(TAG, "start map @" + key);
+        Log.p(TAG, "start map @" + key);
         return new PrintTree(key);
     }
 
     @Nullable
     @Override
     public TreeEach.MapOp startMap(int idx) {
-        Log.d(TAG, "start map @" + idx);
+        Log.p(TAG, "start map @" + idx);
         return new PrintTree(String.valueOf(idx));
     }
 
     @Override
     public void endMap() {
-        Log.d(TAG, "end object @" + tag);
+        Log.p(TAG, "end object @" + tag);
     }
 
     @Nullable
     @Override
     public TreeEach.ListOp startList(@NonNull String key) {
-        Log.d(TAG, "start list @" + key);
+        Log.p(TAG, "start list @" + key);
         return new PrintTree(key);
     }
 
     @Nullable
     @Override
     public TreeEach.ListOp startList(int idx) {
-        Log.d(TAG, "start list @" + idx);
+        Log.p(TAG, "start list @" + idx);
         return new PrintTree(String.valueOf(idx));
     }
 
     @Override
     public void endList() {
-        Log.d(TAG, "end list @" + tag);
+        Log.p(TAG, "end list @" + tag);
     }
 
     @Override
     public void strVal(@NonNull String key, @NonNull String str) {
-        Log.d(TAG, "string @" + key + ": " + str);
+        Log.p(TAG, "string @" + key + ": " + str);
     }
 
     @Override
     public void strVal(int idx, @NonNull String str) {
-        Log.d(TAG, "string @" + idx + ": " + str);
+        Log.p(TAG, "string @" + idx + ": " + str);
     }
 
     @Override
     public void numVal(@NonNull String key, @NonNull Double num) {
-        Log.d(TAG, "double @" + key + ": " + num);
+        Log.p(TAG, "double @" + key + ": " + num);
     }
 
     @Override
     public void numVal(int idx, @NonNull Double num) {
-        Log.d(TAG, "double @" + idx + ": " + num);
+        Log.p(TAG, "double @" + idx + ": " + num);
     }
 
     @Override
     public void numVal(@NonNull String key, @NonNull Float num) {
-        Log.d(TAG, "float @" + key + ": " + num);
+        Log.p(TAG, "float @" + key + ": " + num);
     }
 
     @Override
     public void numVal(int idx, @NonNull Float num) {
-        Log.d(TAG, "float @" + idx + ": " + num);
+        Log.p(TAG, "float @" + idx + ": " + num);
     }
 
     @Override
     public void numVal(@NonNull String key, @NonNull Long num) {
-        Log.d(TAG, "long @" + key + ": " + num);
+        Log.p(TAG, "long @" + key + ": " + num);
     }
 
     @Override
     public void numVal(int idx, @NonNull Long num) {
-        Log.d(TAG, "long @" + idx + ": " + num);
+        Log.p(TAG, "long @" + idx + ": " + num);
     }
 
     @Override
     public void numVal(@NonNull String key, @NonNull Integer num) {
-        Log.d(TAG, "integer @" + key + ": " + num);
+        Log.p(TAG, "integer @" + key + ": " + num);
     }
 
     @Override
     public void numVal(int idx, @NonNull Integer num) {
-        Log.d(TAG, "integer @" + idx + ": " + num);
+        Log.p(TAG, "integer @" + idx + ": " + num);
     }
 
     @Override
     public void boolVal(@NonNull String key, @NonNull Boolean bool) {
-        Log.d(TAG, "bool @" + key + ": " + bool);
+        Log.p(TAG, "bool @" + key + ": " + bool);
     }
 
     @Override
     public void boolVal(int idx, @NonNull Boolean bool) {
-        Log.d(TAG, "bool @" + idx + ": " + bool);
+        Log.p(TAG, "bool @" + idx + ": " + bool);
     }
 
     @Override
     public void nullVal(@NonNull String key) {
-        Log.d(TAG, "null @" + key);
+        Log.p(TAG, "null @" + key);
     }
 
     @Override
     public void nullVal(int idx) {
-        Log.d(TAG, "null @" + idx);
+        Log.p(TAG, "null @" + idx);
     }
 }
 

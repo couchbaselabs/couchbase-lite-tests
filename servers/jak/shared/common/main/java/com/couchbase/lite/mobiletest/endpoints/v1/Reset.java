@@ -28,17 +28,22 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.trees.TypedMap;
+import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 public class Reset {
+    private static final String TAG = "RESET";
+
+    private static final String KEY_TEST_NAME = "test";
     private static final String KEY_DATASETS = "datasets";
 
-    private static final Set<String> LEGAL_DATASET_KEYS;
+    private static final Set<String> LEGAL_RESET_KEYS;
     static {
         final Set<String> l = new HashSet<>();
+        l.add(KEY_TEST_NAME);
         l.add(KEY_DATASETS);
-        LEGAL_DATASET_KEYS = Collections.unmodifiableSet(l);
+        LEGAL_RESET_KEYS = Collections.unmodifiableSet(l);
     }
 
 
@@ -51,6 +56,9 @@ public class Reset {
     public final Map<String, Object> reset(@NonNull TestContext oldCtxt, @NonNull TypedMap req) {
         final String client = oldCtxt.getClient();
 
+        final String endingTest = oldCtxt.getTestName();
+        if (endingTest != null) { Log.p(TAG, "<<<<<<<<<< " + endingTest); }
+
         app.clearReplSvc();
         app.clearDbSvc();
         oldCtxt.close();
@@ -60,7 +68,11 @@ public class Reset {
         dbSvc.init(ctxt);
         app.getReplSvc().init(ctxt);
 
-        req.validate(LEGAL_DATASET_KEYS);
+        req.validate(LEGAL_RESET_KEYS);
+
+        final String startingTest = req.getString(KEY_TEST_NAME);
+        if (startingTest != null) { Log.p(TAG, ">>>>>>>>>> " + endingTest); }
+
         final TypedMap datasets = req.getMap(KEY_DATASETS);
         if (datasets == null) { throw new ClientError("No datasets specified in init"); }
         installDatasets(ctxt, dbSvc, datasets);

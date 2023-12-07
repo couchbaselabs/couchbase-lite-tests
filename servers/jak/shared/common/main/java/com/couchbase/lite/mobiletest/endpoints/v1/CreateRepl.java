@@ -164,12 +164,12 @@ public class CreateRepl {
         final Boolean enableListener = config.getBoolean(KEY_ENABLE_DOC_LISTENER);
         if ((enableListener != null) && enableListener) {
             replSvc.addDocListener(ctxt, replId, repl);
-            Log.i(TAG, "Added doc listener: " + replId);
+            Log.p(TAG, "Added doc listener: " + replId);
         }
 
         final Boolean shouldReset = req.getBoolean(KEY_RESET);
         repl.start((shouldReset != null) && shouldReset);
-        Log.i(TAG, "Started replicator: " + replId);
+        Log.p(TAG, "Started replicator: " + replId);
 
         final Map<String, Object> ret = new HashMap<>();
         ret.put(KEY_REPL_ID, replId);
@@ -245,7 +245,7 @@ public class CreateRepl {
             }
         }
 
-        Log.i(TAG, "Build config: " + replConfig);
+        Log.p(TAG, "Build config: " + replConfig);
         return replConfig;
     }
 

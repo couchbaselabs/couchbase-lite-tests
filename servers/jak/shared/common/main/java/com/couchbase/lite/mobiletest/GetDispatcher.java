@@ -56,13 +56,13 @@ public final class GetDispatcher extends BaseDispatcher<GetDispatcher.Endpoint> 
         final Endpoint endpoint = getEndpoint(version, path);
         if (endpoint == null) {
             final String msg = "Unrecognized get request: " + path + " v" + version;
-            Log.w(TAG, msg);
+            Log.err(TAG, msg);
             throw new ClientError(msg);
         }
 
         final Map<String, Object> result = endpoint.run(TestApp.getApp().getTestContext(client));
 
-        Log.w(TAG, "Request succeeded");
+        Log.p(TAG, "Request succeeded");
         return new Reply(new ReplyBuilder(result).buildReply());
     }
 }

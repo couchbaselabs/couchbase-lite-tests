@@ -40,7 +40,7 @@ public class FileUtils {
     public byte[] readToByteArray(@NonNull InputStream in) {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         try { copyStream(in, out); }
-        catch (IOException err) { Log.w(TAG, "Ignoring exception while copying stream to memory", err); }
+        catch (IOException err) { Log.err(TAG, "Ignoring exception while copying stream to memory", err); }
         return out.toByteArray();
     }
 
@@ -85,7 +85,7 @@ public class FileUtils {
                 finally {
                     try { zos.closeEntry(); } catch (IOException ignore) { }
                 }
-                Log.d(TAG, "Zipped file " + path);
+                Log.p(TAG, "Zipped file " + path);
             }
         }
     }
@@ -105,7 +105,7 @@ public class FileUtils {
             }
             zis.closeEntry();
         }
-        Log.d(TAG, "Unzipped file " + dest);
+        Log.p(TAG, "Unzipped file " + dest);
     }
 
     private void addFilesList(@NonNull File dir, @NonNull List<String> files) {
@@ -126,7 +126,7 @@ public class FileUtils {
         boolean succeeded = true;
         for (File file: contents) {
             if (!deleteRecursive(file)) {
-                Log.d(TAG, "Failed deleting file: " + file);
+                Log.p(TAG, "Failed deleting file: " + file);
                 succeeded = false;
             }
         }
@@ -141,7 +141,7 @@ public class FileUtils {
             try (InputStream in = new FileInputStream(src); OutputStream out = new FileOutputStream(dst)) {
                 copyStream(in, out);
             }
-            Log.d(TAG, "File copied from " + src + " to " + dst);
+            Log.p(TAG, "File copied from " + src + " to " + dst);
             return;
         }
 
@@ -151,7 +151,7 @@ public class FileUtils {
         if (files != null) {
             for (String file: files) { copyFileOrDir(new File(src, file), new File(dst, file)); }
         }
-        Log.d(TAG, "Directory copied from " + src + "  to " + dst);
+        Log.p(TAG, "Directory copied from " + src + "  to " + dst);
     }
 
     private void mkPath(@NonNull File path) throws IOException {

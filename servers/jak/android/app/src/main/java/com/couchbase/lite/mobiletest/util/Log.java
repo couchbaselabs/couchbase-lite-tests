@@ -6,15 +6,9 @@ public final class Log {
 
     private Log() { }
 
-    public static void d(String tag, String msg) { android.util.Log.d(LOG_PREFIX + tag, msg); }
+    public static void p(String tag, String msg) { android.util.Log.i(LOG_PREFIX + tag, msg); }
 
-    public static void i(String tag, String msg) { android.util.Log.i(LOG_PREFIX + tag, msg); }
-
-    public static void w(String tag, String msg) { android.util.Log.w(LOG_PREFIX + tag, msg); }
-
-    public static void w(String tag, String msg, Exception err) { android.util.Log.w(LOG_PREFIX + tag, msg, err); }
-
-    public static void e(String tag, String msg) { android.util.Log.e(LOG_PREFIX + tag, msg); }
-
-    public static void e(String tag, String msg, Exception err) { android.util.Log.e(LOG_PREFIX + tag, msg, err); }
+    // ??? shouldn't this be replaced with a thrown exception?
+    public static void err(String tag, String msg) { err(tag, msg, null); }
+    public static void err(String tag, String msg, Exception err) { android.util.Log.e(LOG_PREFIX + tag, msg, err); }
 }

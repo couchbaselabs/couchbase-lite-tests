@@ -84,7 +84,11 @@ public class Server extends NanoHTTPD {
             final String client = headers.get(TestApp.HEADER_CLIENT);
             final String contentType = headers.get(TestApp.HEADER_CONTENT_TYPE);
 
-            Log.i(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
+            Log.p(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
+            for (Map.Entry<String, String> header: headers.entrySet()) {
+                Log.p(TAG, "  Header " + header.getKey() + ": " + header.getValue());
+            }
+
             switch (method) {
                 case GET:
                     reply = getDispatcher.handleRequest(client, version, endpoint);
@@ -104,15 +108,15 @@ public class Server extends NanoHTTPD {
             resp = new SafeResponse(Status.OK, reply);
         }
         catch (ClientError err) {
-            Log.w(TAG, "Client error", err);
+            Log.err(TAG, "Client error", err);
             resp = handleError(reply, Status.BAD_REQUEST, err);
         }
         catch (ServerError err) {
-            Log.w(TAG, "Server error", err);
+            Log.err(TAG, "Server error", err);
             resp = handleError(reply, Status.INTERNAL_ERROR, err);
         }
         catch (Exception err) {
-            Log.w(TAG, "Internal Server error", err);
+            Log.err(TAG, "Internal Server error", err);
             resp = handleError(reply, Status.INTERNAL_ERROR, new ServerError("Internal server error", err));
         }
 
@@ -129,7 +133,7 @@ public class Server extends NanoHTTPD {
             return new SafeResponse(status, new Reply(new ReplyBuilder(new ErrorBuilder(err).build()).buildReply()));
         }
         catch (Exception e) {
-            Log.w(TAG, "Catastrophic server failure", e);
+            Log.err(TAG, "Catastrophic server failure", e);
             return Response.newFixedLengthResponse(Status.INTERNAL_ERROR, "text/plain", err.toString());
         }
     }

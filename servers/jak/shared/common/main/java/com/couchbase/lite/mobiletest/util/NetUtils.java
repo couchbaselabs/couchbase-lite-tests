@@ -66,7 +66,7 @@ public final class NetUtils {
         if (port < 0) { port = 8080; }
         try { return new URI(scheme, null, addrStr, port, path, null, null); }
         catch (URISyntaxException e) {
-            Log.w(TAG, "Cannot parse URI: " + scheme + "//:" + addrStr + ":" + port + "/" + path);
+            Log.err(TAG, "Cannot parse URI: " + scheme + "//:" + addrStr + ":" + port + "/" + path);
         }
         return null;
     }
@@ -77,7 +77,7 @@ public final class NetUtils {
         final List<NetworkInterface> ifaces;
         try { ifaces = Collections.list(NetworkInterface.getNetworkInterfaces()); }
         catch (SocketException e) {
-            Log.w(TAG, "Failed getting network interfaces", e);
+            Log.err(TAG, "Failed getting network interfaces", e);
             return null;
         }
 
@@ -90,7 +90,7 @@ public final class NetUtils {
                 if (!iface.isUp()) { continue; }
             }
             catch (SocketException e) {
-                Log.w(TAG, "Failed getting up state for interface " + iface, e);
+                Log.err(TAG, "Failed getting up state for interface " + iface, e);
                 continue;
             }
 
