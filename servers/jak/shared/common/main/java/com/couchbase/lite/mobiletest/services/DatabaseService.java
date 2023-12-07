@@ -116,7 +116,7 @@ public final class DatabaseService {
 
     public void closeDb(@NonNull TestContext ctxt, @NonNull String name) {
         if (closeDbInternal(ctxt, name)) { return; }
-        Log.w(TAG, "Attempt to close a database that is not open: " + name);
+        Log.err(TAG, "Attempt to close a database that is not open: " + name);
     }
 
     @NonNull
@@ -235,7 +235,7 @@ public final class DatabaseService {
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed opening database: " + name, e); }
 
         ctxt.addDb(name, db);
-        Log.i(TAG, "Created database: " + name);
+        Log.p(TAG, "Created database: " + name);
     }
 
     private boolean closeDbInternal(@NonNull TestContext ctxt, @NonNull String name) {

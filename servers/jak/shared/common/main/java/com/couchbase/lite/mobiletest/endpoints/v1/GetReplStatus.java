@@ -77,7 +77,7 @@ public class GetReplStatus {
         if (repl == null) { throw new ClientError("No such replicator: " + replId); }
 
         final ReplicatorStatus replStatus = repl.getStatus();
-        Log.i(TAG, "Replicator status: " + replStatus);
+        Log.p(TAG, "Replicator status: " + replStatus);
 
         final Map<String, Object> resp = new HashMap<>();
 

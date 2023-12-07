@@ -30,6 +30,8 @@ public final class TestContext implements AutoCloseable {
     @NonNull
     private final String client;
     @Nullable
+    private String testName;
+    @Nullable
     private File dbDir;
     @Nullable
     private Map<String, Database> openDbs;
@@ -61,6 +63,12 @@ public final class TestContext implements AutoCloseable {
 
     @NonNull
     public String getClient() { return client; }
+
+    public void setTestName(@NonNull String testName) { this.testName = testName; }
+
+    @Nullable
+    public String getTestName() { return testName; }
+
 
     public void setDbDir(@NonNull File dbDir) {
         if (this.dbDir != null) { throw new ServerError("Attempt to replace the db dir"); }
@@ -159,7 +167,7 @@ public final class TestContext implements AutoCloseable {
             for (Map.Entry<String, Database> entry: openDbs.entrySet()) {
                 final Database db = entry.getValue();
                 if (db == null) {
-                    Log.w(TAG, "Attempt to close non-existent database: " + entry.getKey());
+                    Log.err(TAG, "Attempt to close non-existent database: " + entry.getKey());
                     continue;
                 }
 
@@ -172,7 +180,7 @@ public final class TestContext implements AutoCloseable {
         }
 
         if ((dbDir != null) && !new FileUtils().deleteRecursive(dbDir)) {
-            Log.w(TAG, "Failed deleting db dir on reset: " + dbDir);
+            Log.err(TAG, "Failed deleting db dir on reset: " + dbDir);
         }
     }
 }

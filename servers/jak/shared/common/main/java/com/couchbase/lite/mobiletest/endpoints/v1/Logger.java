@@ -43,7 +43,7 @@ public class Logger {
         req.validate(LEGAL_LOG_KEYS);
 
         final String msg = req.getString(KEY_MESSAGE);
-        Log.i("CLIENT", (msg == null) ? "" : msg);
+        Log.p("CLIENT", (msg == null) ? "" : msg);
 
         return Collections.emptyMap();
     }

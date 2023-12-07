@@ -43,7 +43,7 @@ public class BaseDispatcher<T> {
 
     protected void addEndpoint(int version, @NonNull String path, @NonNull T action) {
         final Map<String, T> endpoints = dispatchTable.computeIfAbsent(version, k -> new HashMap<>());
-        if (endpoints.containsKey(path)) { Log.w(TAG, "Replacing endpoint: " + path + " v" + version); }
+        if (endpoints.containsKey(path)) { Log.err(TAG, "Replacing endpoint: " + path + " v" + version); }
         endpoints.put(path, action);
     }
 }

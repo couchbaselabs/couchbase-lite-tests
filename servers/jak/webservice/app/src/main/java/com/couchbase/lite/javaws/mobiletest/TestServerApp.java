@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -50,7 +51,7 @@ public class TestServerApp extends HttpServlet {
         TestApp.init(app);
         getDispatcher = new GetDispatcher(app);
         postDispatcher = new PostDispatcher(app);
-        Log.i(TAG, "Java Web Service Test Server " + TestApp.getApp().getAppId());
+        Log.p(TAG, "Java Web Service Test Server " + TestApp.getApp().getAppId());
 
         final List<InetAddress> addrs = NetUtils.getLocalAddresses();
         if (addrs == null) { throw new ServerError("Cannot get server address"); }
@@ -102,7 +103,11 @@ public class TestServerApp extends HttpServlet {
             final String client = req.getHeader(TestApp.HEADER_CLIENT);
             final String contentType = req.getHeader(TestApp.HEADER_CONTENT_TYPE);
 
-            Log.i(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
+            Log.p(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
+            for (String header: Collections.list(req.getHeaderNames())) {
+                Log.p(TAG, "  Header " + header + ": " + req.getHeader(header));
+            }
+
             Reply reply = null;
             try {
                 switch (method) {
@@ -131,15 +136,15 @@ public class TestServerApp extends HttpServlet {
             }
         }
         catch (ClientError err) {
-            Log.w(TAG, "Client error", err);
+            Log.err(TAG, "Client error", err);
             handleError(HttpServletResponse.SC_BAD_REQUEST, err, resp);
         }
         catch (ServerError err) {
-            Log.w(TAG, "Server error", err);
+            Log.err(TAG, "Server error", err);
             handleError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, err, resp);
         }
         catch (Exception err) {
-            Log.w(TAG, "Internal Server error", err);
+            Log.err(TAG, "Internal Server error", err);
             handleError(
                 HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                 new ServerError("Internal server error", err),
@@ -172,11 +177,11 @@ public class TestServerApp extends HttpServlet {
             resp.setHeader("Content-Length", String.valueOf(reply.getSize()));
         }
         catch (Exception e) {
-            Log.w(TAG, "Catastrophic server failure", e);
+            Log.err(TAG, "Catastrophic server failure", e);
             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             resp.setHeader("Content-Type", "text/plain");
             try { resp.getWriter().println(err.getMessage()); }
-            catch (IOException ioe) { Log.e(TAG, "Failed writing error to response", e); }
+            catch (IOException ioe) { Log.err(TAG, "Failed writing error to response", e); }
         }
     }
 }
