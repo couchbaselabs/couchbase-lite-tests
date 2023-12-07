@@ -3,6 +3,7 @@ from typing import List, cast
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.database import Database
+from cbltest.globals import CBLPyTestGlobal
 from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.responses import GetRootResponse
 from cbltest.v1.requests import PostResetRequestBody
@@ -43,7 +44,7 @@ class TestServer:
         :param db_names: A list of database names, each of which will become a database with the dataset data
         """
         with self.__tracer.start_as_current_span("create_and_reset_db"):
-            payload = PostResetRequestBody()
+            payload = PostResetRequestBody(CBLPyTestGlobal.running_test_name)
             payload.add_dataset(dataset, db_names)
             request = self.__request_factory.create_request(TestServerRequestType.RESET, payload)
             await self.__request_factory.send_request(self.__index, request)
