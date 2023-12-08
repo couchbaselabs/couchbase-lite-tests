@@ -28,15 +28,21 @@ public class Server extends NanoHTTPD {
     private static final int PORT = 8080;
 
     private static class SafeResponse extends Response {
+        private final Status status;
+        private final String reqId;
         private final Reply reply;
 
-        SafeResponse(@NonNull Status status, @NonNull Reply reply) {
+
+        SafeResponse(@NonNull Status status, @Nullable String reqId, @NonNull Reply reply) {
             super(status, "application/json", reply.getContent(), reply.getSize());
+            this.status = status;
+            this.reqId = reqId;
             this.reply = reply;
         }
 
         @Override
         public void send(OutputStream outputStream) {
+            Log.p(TAG, "Response " + reqId + ": " + status);
             try { super.send(outputStream); }
             finally { reply.close(); }
         }
@@ -61,32 +67,32 @@ public class Server extends NanoHTTPD {
     @Override
     public Response handle(@NonNull IHTTPSession session) {
         int version = -1;
+        String reqId = null;
         Response resp;
         Reply reply = null;
         try {
             final Method method = session.getMethod();
-            if (method == null) { throw new ServerError("Null HTTP method"); }
+            final String endpoint = session.getUri();
 
             final Map<String, String> headers = session.getHeaders();
-
+            reqId = headers.get(TestApp.HEADER_REQEST);
             final String versionStr = headers.get(TestApp.HEADER_PROTOCOL_VERSION);
+            final String client = headers.get(TestApp.HEADER_CLIENT);
+
+            Log.p(TAG, "Request " + reqId + " (" + client + "@" + versionStr + "): " + method + " " + endpoint);
+            for (Map.Entry<String, String> header: headers.entrySet()) {
+                Log.p(TAG, "  Header " + header.getKey() + ": " + header.getValue());
+            }
+
+            if (method == null) { throw new ServerError("Null HTTP method"); }
+            if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }
+
             if (versionStr != null) {
                 try {
                     final int v = Integer.parseInt(versionStr);
                     if (TestApp.KNOWN_VERSIONS.contains(v)) { version = v; }
                 }
                 catch (NumberFormatException ignore) { }
-            }
-
-            final String endpoint = session.getUri();
-            if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }
-
-            final String client = headers.get(TestApp.HEADER_CLIENT);
-            final String contentType = headers.get(TestApp.HEADER_CONTENT_TYPE);
-
-            Log.p(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
-            for (Map.Entry<String, String> header: headers.entrySet()) {
-                Log.p(TAG, "  Header " + header.getKey() + ": " + header.getValue());
             }
 
             switch (method) {
@@ -98,26 +104,26 @@ public class Server extends NanoHTTPD {
                         client,
                         version,
                         endpoint,
-                        contentType,
+                        headers.get(TestApp.HEADER_CONTENT_TYPE),
                         session.getInputStream());
                     break;
                 default:
                     throw new ClientError("Unimplemented method: " + method);
             }
 
-            resp = new SafeResponse(Status.OK, reply);
+            resp = new SafeResponse(Status.OK, reqId, reply);
         }
         catch (ClientError err) {
             Log.err(TAG, "Client error", err);
-            resp = handleError(reply, Status.BAD_REQUEST, err);
+            resp = handleError(reply, Status.BAD_REQUEST, reqId, err);
         }
         catch (ServerError err) {
             Log.err(TAG, "Server error", err);
-            resp = handleError(reply, Status.INTERNAL_ERROR, err);
+            resp = handleError(reply, Status.INTERNAL_ERROR, reqId, err);
         }
         catch (Exception err) {
             Log.err(TAG, "Internal Server error", err);
-            resp = handleError(reply, Status.INTERNAL_ERROR, new ServerError("Internal server error", err));
+            resp = handleError(reply, Status.INTERNAL_ERROR, reqId, new ServerError("Internal server error", err));
         }
 
         resp.addHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));
@@ -127,10 +133,17 @@ public class Server extends NanoHTTPD {
     }
 
     @NonNull
-    private Response handleError(@Nullable Reply reply, @NonNull Status status, @NonNull TestError err) {
+    private Response handleError(
+        @Nullable Reply reply,
+        @NonNull Status status,
+        @Nullable String reqId,
+        @NonNull TestError err) {
         if (reply != null) { reply.close(); }
         try {
-            return new SafeResponse(status, new Reply(new ReplyBuilder(new ErrorBuilder(err).build()).buildReply()));
+            return new SafeResponse(
+                status,
+                reqId,
+                new Reply(new ReplyBuilder(new ErrorBuilder(err).build()).buildReply()));
         }
         catch (Exception e) {
             Log.err(TAG, "Catastrophic server failure", e);

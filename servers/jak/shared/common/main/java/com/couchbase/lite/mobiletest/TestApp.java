@@ -49,6 +49,7 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 
 @SuppressWarnings("resource")
 public abstract class TestApp {
+    public static final String HEADER_REQEST = "CBLTest-Request-ID".toLowerCase(Locale.getDefault());
     public static final String HEADER_CLIENT = "CBLTest-Client-ID".toLowerCase(Locale.getDefault());
     public static final String HEADER_SERVER = "CBLTest-Server-ID".toLowerCase(Locale.getDefault());
 

@@ -63,6 +63,9 @@ public class Reset {
         app.clearDbSvc();
         oldCtxt.close();
 
+        final String startingTest = req.getString(KEY_TEST_NAME);
+        Log.setLogger(startingTest);
+
         final TestContext ctxt = app.resetContext(client);
         final DatabaseService dbSvc = app.getDbSvc();
         dbSvc.init(ctxt);
@@ -70,7 +73,6 @@ public class Reset {
 
         req.validate(LEGAL_RESET_KEYS);
 
-        final String startingTest = req.getString(KEY_TEST_NAME);
         if (startingTest != null) { Log.p(TAG, ">>>>>>>>>> " + endingTest); }
 
         final TypedMap datasets = req.getMap(KEY_DATASETS);

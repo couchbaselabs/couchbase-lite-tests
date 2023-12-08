@@ -1,6 +1,7 @@
 package com.couchbase.lite.javaws.mobiletest;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -87,25 +88,28 @@ public class TestServerApp extends HttpServlet {
     @SuppressWarnings({"PMD.PreserveStackTrace", "PMD.NPathComplexity", "PMD.ExceptionAsFlowControl"})
     private void dispatchRequest(Method method, HttpServletRequest req, HttpServletResponse resp) {
         int version = -1;
+        String reqId = null;
         try {
+            final String endpoint = req.getRequestURI();
+
+            reqId = req.getHeader(TestApp.HEADER_REQEST);
             final String versionStr = req.getHeader(TestApp.HEADER_PROTOCOL_VERSION);
+            final String client = req.getHeader(TestApp.HEADER_CLIENT);
+
+            Log.p(TAG, "Request " + reqId + " (" + client + "@" + versionStr + "): " + method + " " + endpoint);
+            for (String header: Collections.list(req.getHeaderNames())) {
+                Log.p(TAG, "  Header " + header + ": " + req.getHeader(header));
+            }
+
+            if (method == null) { throw new ServerError("Null HTTP method"); }
+            if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }
+
             if (versionStr != null) {
                 try {
                     final int v = Integer.parseInt(versionStr);
                     if (TestApp.KNOWN_VERSIONS.contains(v)) { version = v; }
                 }
                 catch (NumberFormatException ignore) { }
-            }
-
-            final String endpoint = req.getRequestURI();
-            if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }
-
-            final String client = req.getHeader(TestApp.HEADER_CLIENT);
-            final String contentType = req.getHeader(TestApp.HEADER_CONTENT_TYPE);
-
-            Log.p(TAG, "Request " + client + "(" + version + "): " + method + " " + endpoint);
-            for (String header: Collections.list(req.getHeaderNames())) {
-                Log.p(TAG, "  Header " + header + ": " + req.getHeader(header));
             }
 
             Reply reply = null;
@@ -115,8 +119,12 @@ public class TestServerApp extends HttpServlet {
                         reply = getDispatcher.handleRequest(client, version, endpoint);
                         break;
                     case POST:
-                        reply = postDispatcher
-                            .handleRequest(client, version, endpoint, contentType, req.getInputStream());
+                        reply = postDispatcher.handleRequest(
+                            client,
+                            version,
+                            endpoint,
+                            req.getHeader(TestApp.HEADER_CONTENT_TYPE),
+                            req.getInputStream());
                         break;
                     default:
                         throw new ClientError("Unimplemented method: " + method);
@@ -129,7 +137,7 @@ public class TestServerApp extends HttpServlet {
 
                 buildResponse(reply, resp);
 
-                resp.setStatus(HttpServletResponse.SC_OK);
+                setResponseStatus(resp, reqId, HttpServletResponse.SC_OK);
             }
             finally {
                 if (reply != null) { reply.close(); }
@@ -137,22 +145,48 @@ public class TestServerApp extends HttpServlet {
         }
         catch (ClientError err) {
             Log.err(TAG, "Client error", err);
-            handleError(HttpServletResponse.SC_BAD_REQUEST, err, resp);
+            handleError(HttpServletResponse.SC_BAD_REQUEST, reqId, err, resp);
         }
         catch (ServerError err) {
             Log.err(TAG, "Server error", err);
-            handleError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, err, resp);
+            handleError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, reqId, err, resp);
         }
         catch (Exception err) {
             Log.err(TAG, "Internal Server error", err);
             handleError(
                 HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                reqId,
                 new ServerError("Internal server error", err),
                 resp);
         }
     }
 
-    private static void buildResponse(@NonNull Reply reply, @NonNull HttpServletResponse resp) throws IOException {
+    private void handleError(
+        int status,
+        @Nullable String reqId,
+        @NonNull TestError err,
+        @NonNull HttpServletResponse resp) {
+        resp.setStatus(status);
+        resp.setHeader("Content-Type", "application/json");
+
+        try (Reply reply = new Reply(new ReplyBuilder(new ErrorBuilder(err).build()).buildReply())) {
+            buildResponse(reply, resp);
+
+            resp.setHeader("Content-Type", "application/json");
+            resp.setHeader("Content-Length", String.valueOf(reply.getSize()));
+
+            setResponseStatus(resp, reqId, status);
+        }
+        catch (Exception e) {
+            Log.err(TAG, "Catastrophic server failure", e);
+            resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            resp.setHeader("Content-Type", "text/plain");
+            try { resp.getWriter().println(err.getMessage()); }
+            catch (IOException ioe) { Log.err(TAG, "Failed writing error to response", e); }
+        }
+    }
+
+    private void buildResponse(@NonNull Reply reply, @NonNull HttpServletResponse resp) throws IOException {
         try (InputStream in = reply.getContent(); OutputStream out = resp.getOutputStream()) {
             final byte[] buf = new byte[1024];
             while (true) {
@@ -164,24 +198,8 @@ public class TestServerApp extends HttpServlet {
         }
     }
 
-    private void handleError(int status, @NonNull TestError err, @NonNull HttpServletResponse resp) {
+    private void setResponseStatus(@NonNull HttpServletResponse resp, @Nullable String reqId, int status) {
         resp.setStatus(status);
-        resp.setHeader("Content-Type", "application/json");
-
-        try (Reply reply = new Reply(new ReplyBuilder(new ErrorBuilder(err).build()).buildReply())) {
-            buildResponse(reply, resp);
-
-            resp.setStatus(status);
-
-            resp.setHeader("Content-Type", "application/json");
-            resp.setHeader("Content-Length", String.valueOf(reply.getSize()));
-        }
-        catch (Exception e) {
-            Log.err(TAG, "Catastrophic server failure", e);
-            resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            resp.setHeader("Content-Type", "text/plain");
-            try { resp.getWriter().println(err.getMessage()); }
-            catch (IOException ioe) { Log.err(TAG, "Failed writing error to response", e); }
-        }
+        Log.p(TAG, "Response " + reqId + ": " + status);
     }
 }

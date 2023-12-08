@@ -18,9 +18,11 @@ import java.util.UUID;
 
 import com.couchbase.lite.CouchbaseLite;
 import com.couchbase.lite.CouchbaseLiteException;
+import com.couchbase.lite.Database;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
 import com.couchbase.lite.mobiletest.errors.ServerError;
+import com.couchbase.lite.mobiletest.util.Log;
 
 
 /**
@@ -38,7 +40,10 @@ public abstract class BaseTestApp extends TestApp {
     }
 
     @Override
-    protected void initCBL() { CouchbaseLite.init(true); }
+    protected void initCBL() {
+        CouchbaseLite.init(true);
+        Database.log.setCustom(new Log.CustomLogger());
+    }
 
     @NonNull
     @Override
