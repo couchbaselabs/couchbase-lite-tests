@@ -102,6 +102,7 @@ class TestServerRequest:
         if self.__version > 0:
             headers["CBLTest-API-Version"] = str(self.__version)
             headers["CBLTest-Client-ID"] = str(self.__uuid)
+            headers["CBLTest-Request-ID"] = str(uuid4())
 
         if self.__test_name is not None:
             headers["CBLTest-Test-Name"] = self.__test_name

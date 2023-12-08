@@ -43,7 +43,7 @@ public class TestServerApp implements Daemon {
             // Here if running interactively
             System.out.print("Hit Enter to stop >>> ");
             try { System.in.read(); }
-            catch (IOException err) { Log.w(TAG, "Exception waiting for CLI input", err); }
+            catch (IOException err) { Log.err(TAG, "Exception waiting for CLI input", err); }
             stopApp();
         }
     }
@@ -114,13 +114,13 @@ public class TestServerApp implements Daemon {
 
         try { server.start(); }
         catch (IOException e) { throw new ServerError("Failed to start server", e); }
-        Log.i(TAG, "Java Desktop Test Server running at " + serverUri);
+        Log.p(TAG, "Java Desktop Test Server running at " + serverUri);
     }
 
     @SuppressFBWarnings("NN_NAKED_NOTIFY")
     @Override
     public void stop() {
-        Log.i(TAG, "Stopping Java Desktop Test Server.");
+        Log.p(TAG, "Stopping Java Desktop Test Server.");
         final Server server = SERVER.getAndSet(null);
         if (server != null) {
             server.stop();
@@ -130,10 +130,10 @@ public class TestServerApp implements Daemon {
     }
 
     @Override
-    public void destroy() { Log.i(TAG, "TestServer service is destroyed."); }
+    public void destroy() { Log.p(TAG, "TestServer service is destroyed."); }
 
     private void initApp() {
         TestApp.init(new JavaDesktopTestApp());
-        Log.i(TAG, "Java Desktop Test Server " + TestApp.getApp().getAppId());
+        Log.p(TAG, "Java Desktop Test Server " + TestApp.getApp().getAppId());
     }
 }
