@@ -1,9 +1,10 @@
 import time
-from typing import Any, Callable, Dict, Type, TypeVar, Union, cast
+from typing import Any, Callable, Dict, TypeVar, Type, Union
 
 from .api.error import CblTimeoutError
 
-T = TypeVar("T")
+T = TypeVar('T')
+
 
 def _try_n_times(num_times: int,
                  seconds_between: Union[int, float],
@@ -16,7 +17,8 @@ def _try_n_times(num_times: int,
         try:
             if i == 0 and wait_before_first_try:
                 time.sleep(seconds_between)
-            return cast(ret_type, func(*args, **kwargs))
+            ret: T = func(*args, **kwargs)
+            return ret
         except Exception as e:
             if i < num_times - 1:
                 print(f"Trying {func.__name__} failed (reason='{e}'), retry in {seconds_between} seconds ...")

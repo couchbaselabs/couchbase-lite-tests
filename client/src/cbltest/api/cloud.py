@@ -1,16 +1,19 @@
 from json import dumps, load
 from pathlib import Path
+from types import NoneType
 from typing import List, Optional, cast
-from varname import nameof
-from opentelemetry.trace import get_tracer
 
-from cbltest.assertions import _assert_not_null
+from opentelemetry.trace import get_tracer
+from varname import nameof
+
+from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.syncgateway import PutDatabasePayload, SyncGateway
-from cbltest.api.couchbaseserver import CouchbaseServer
+from cbltest.assertions import _assert_not_null
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
+
 
 class CouchbaseCloud:
     """
@@ -32,12 +35,13 @@ class CouchbaseCloud:
             raise ValueError(f"{count} indexes remain in '{bucket}' bucket")
 
     def _wait_for_all_indexed_removed(self, bucket: str) -> None:
-        _try_n_times(10, 2, True, self._check_all_indexes_removed, None, bucket)
+        _try_n_times(10, 2, True, self._check_all_indexes_removed, NoneType, bucket)
 
     async def create_role(self, db_name: str, role: str, collection_access: dict) -> None:
         await self.__sync_gateway.add_role(db_name, role, collection_access)
 
-    async def configure_dataset(self, dataset_path: Path, dataset_name: str, sg_config_options: Optional[List[str]] = None) -> None:
+    async def configure_dataset(self, dataset_path: Path, dataset_name: str,
+                                sg_config_options: Optional[List[str]] = None) -> None:
         """
         Creates a database, ensuring that it is in an empty state when finished
 
@@ -52,7 +56,8 @@ class CouchbaseCloud:
                   be passed to sg_config_options will be in a key called "config_options"
                   in <database_name>-sg-config.json
         """
-        with self.__tracer.start_as_current_span("configure_dataset", attributes={"cbl.dataset.name": dataset_name}) as current_span:
+        with self.__tracer.start_as_current_span("configure_dataset",
+                                                 attributes={"cbl.dataset.name": dataset_name}) as current_span:
             _assert_not_null(dataset_path, nameof(dataset_path))
             _assert_not_null(dataset_name, nameof(dataset_name))
 
@@ -60,15 +65,15 @@ class CouchbaseCloud:
             data_filepath = dataset_path / f"{dataset_name}-sg.json"
             if not config_filepath.exists():
                 raise FileNotFoundError(f"Configuration file {dataset_name}-sg-config.json not found!")
-            
+
             if not data_filepath.exists():
                 raise FileNotFoundError(f"Data file {dataset_name}-sg.json not found!")
-            
+
             with open(config_filepath, encoding="utf-8") as fin:
                 dataset_config = cast(dict, load(fin))
                 if not isinstance(dataset_config, dict):
                     raise ValueError(f"Badly formatted {dataset_name}-sg-config.json (not an object)")
-                
+
             users = _get_typed_required(dataset_config, "users", dict)
             if sg_config_options is not None:
                 nested_config = _get_typed_required(dataset_config, "config", dict)
@@ -76,12 +81,13 @@ class CouchbaseCloud:
 
                 for option in sg_config_options:
                     if option not in valid_options:
-                        raise CblTestError(f"{option} is not a valid option for {dataset_name} (valid options are {dumps(list(str(k) for k in valid_options.keys()))})")
-                    
+                        raise CblTestError(
+                            f"{option} is not a valid option for {dataset_name} (valid options are {dumps(list(str(k) for k in valid_options.keys()))})")
+
                     addition = _get_typed_required(valid_options, option, dict)
                     for k in addition:
                         nested_config[k] = addition[k]
-            
+
             db_payload: PutDatabasePayload = PutDatabasePayload(dataset_config)
             try:
                 self.__couchbase_server.create_bucket(db_payload.bucket)
@@ -112,6 +118,7 @@ class CouchbaseCloud:
 
             for user in users:
                 user_dict = _get_typed_required(users, user, dict)
-                await self.__sync_gateway.add_user(dataset_name, user, user_dict["password"], user_dict["collection_access"])
+                await self.__sync_gateway.add_user(dataset_name, user, user_dict["password"],
+                                                   user_dict["collection_access"])
 
             await self.__sync_gateway.load_dataset(dataset_name, data_filepath)
