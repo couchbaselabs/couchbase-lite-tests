@@ -161,8 +161,7 @@ class Replicator:
                                   interval: timedelta = timedelta(seconds=0.5)) -> bool:
         """
         This function will wait until it has seen all the events in 'events'
-        or the replicator stops.
-        If
+        or the replicator stops.  It returns True if all the events were seen, and False otherwise
 
         :param events: The events to check for on the replicator
         :param interval: The interval at which to ping for the replicator state (default is half a second)
@@ -196,10 +195,10 @@ class Replicator:
                     processed += 1
 
                 if len(events) == 0:
-                    return status
+                    return True
 
                 if status.activity == ReplicatorActivityLevel.STOPPED:
-                    raise CblTimeoutError("Replicator stopped without seeing expected events")
+                    return False
 
                 await asyncio.sleep(interval.total_seconds())
 

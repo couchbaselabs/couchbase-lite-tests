@@ -39,16 +39,16 @@ class PostResetRequestBody(TestServerRequestBody):
     """
 
     @property
-    def datasets(self) -> Dict[str, List[str]]:
+    def datasets(self) -> Dict[str, Any]:
         """
         Gets the datasets contained in the :class:`PostResetRequestBody`
         """
         return self.__datasets
 
-    def __init__(self, name: str = None):
+    def __init__(self, name: Optional[str] = None):
         super().__init__(1)
-        self.test_name = name
-        self.__datasets = {}
+        self.__test_name = name
+        self.__datasets: Dict[str, Any] = {}
 
     def add_dataset(self, name: str, result_db_names: List[str]) -> None:
         """
@@ -59,10 +59,10 @@ class PostResetRequestBody(TestServerRequestBody):
         """
         self.__datasets[name] = result_db_names
 
-    def to_json(self) -> Any:
-        json = {"datasets": self.__datasets}
-        if self.test_name:
-            json["test"] = self.test_name
+    def to_json(self) -> Dict[str, Any]:
+        json: Dict[str, Any] = {"datasets": self.__datasets}
+        if self.__test_name:
+            json["test"] = self.__test_name
         return json
 
 
