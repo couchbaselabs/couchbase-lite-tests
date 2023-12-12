@@ -73,7 +73,10 @@ public class Reset {
 
         req.validate(LEGAL_RESET_KEYS);
 
-        if (startingTest != null) { Log.p(TAG, ">>>>>>>>>> " + endingTest); }
+        if (startingTest != null) {
+            Log.p(TAG, ">>>>>>>>>> " + startingTest);
+            ctxt.setTestName(startingTest);
+        }
 
         final TypedMap datasets = req.getMap(KEY_DATASETS);
         if (datasets == null) { throw new ClientError("No datasets specified in init"); }
