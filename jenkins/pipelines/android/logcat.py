@@ -9,7 +9,15 @@ def adb_logcat(adb_path, device_serial):
     test_start = re.compile(">>>>>>>>>> (\\w+)")
     test_name = None
     out_file = None
-    with subprocess.Popen([adb_path, "-s", device_serial, "logcat"], stdout=subprocess.PIPE) as log:
+    
+    cmd = [adb_path]
+    if device_serial:
+        cmd = cmd + ["-s", device_serial]
+    cmd.append("logcat")
+
+    subprocess.run(cmd + ["-b", "main", "-G", "32M"])
+
+    with subprocess.Popen(cmd, stdout=subprocess.PIPE) as log:
         while True:
             line = log.stdout.readline()
             if not line:
@@ -35,15 +43,10 @@ def adb_logcat(adb_path, device_serial):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Logcat')
-    parser.add_argument('-a', '--android', type=int, help='Android HOME')
+    parser.add_argument('-a', '--android', type=str, help='Android HOME')
     parser.add_argument('-s', '--serial', help='Device serial number')
 
     args = parser.parse_args()
-
-    if not args.serial:
-        print("Must supply a a device serial number")
-        parser.print_usage()
-        exit(-1)
 
     adb_path = "adb" if not args.android else f"{args.android}/platform-tools/adb"
 

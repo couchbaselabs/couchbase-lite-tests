@@ -55,6 +55,10 @@ echo '    "test-servers": ["http://'"$ANDROID_IP"':8080"]' >> config.android.jso
 echo '}' >> config.android.json
 cat config.android.json
 
+echo "Start logcat"
+python3.10 jenkins/pipelines/android/logcat.py 
+echo $! > logcat.pid
+
 echo "Running tests on device $ANDROID_SERIAL at $ANDROID_IP"
 python3.10 -m venv venv
 . venv/bin/activate
