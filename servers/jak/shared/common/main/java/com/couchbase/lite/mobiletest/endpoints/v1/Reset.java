@@ -79,8 +79,7 @@ public class Reset {
         }
 
         final TypedMap datasets = req.getMap(KEY_DATASETS);
-        if (datasets == null) { throw new ClientError("No datasets specified in init"); }
-        installDatasets(ctxt, dbSvc, datasets);
+        if (datasets != null) { installDatasets(ctxt, dbSvc, datasets); }
 
         return Collections.emptyMap();
     }
