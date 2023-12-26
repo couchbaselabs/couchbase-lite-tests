@@ -11,8 +11,12 @@ internal static partial class HandlerList
     [HttpHandler("reset")]
     public static async Task ResetDatabaseHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
+        if(!body.RootElement.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String) {
+            // Log the name of the test being started: Console.WriteLine(">>>>>>>>>> " + name);
+        }
+        
         if(!body.RootElement.TryGetProperty("datasets", out var datasets) || datasets.ValueKind != JsonValueKind.Object) {
-            response.WriteBody("Missing or invalid key 'datasets' in JSON body", version, HttpStatusCode.BadRequest);
+            response.WriteEmptyBody(version);
             return;
         }
 
