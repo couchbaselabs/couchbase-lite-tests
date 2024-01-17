@@ -48,11 +48,18 @@ pushd environment > /dev/null
 popd > /dev/null
 cp -f "jenkins/pipelines/java/desktop/config_java_desktop.json" tests
 
-SERVER_URL=`cat servers/jak/desktop/server.url`
-if [[ -z "$SERVER_URL" ]]; then
-    echo "Cannot get server URL: Aborting"
-    exit 5
-fi
+SERVER_FILE="servers/jak/desktop/server.url"
+SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
+n=0
+while [[ -z "$SERVER_URL" ]]; do
+    if [[ $n -gt 30 ]]; then
+        echo "Cannot get server URL: Aborting"
+        exit 5
+    fi
+    ((++n))
+    sleep 1
+    SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
+done
 
 echo "Configure tests"
 pushd tests > /dev/null

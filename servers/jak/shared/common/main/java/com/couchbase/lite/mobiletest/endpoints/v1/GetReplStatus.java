@@ -107,7 +107,7 @@ public class GetReplStatus {
             for (ReplicatedDocument replDoc: replicatedDoc.getDocuments()) {
                 final Map<String, Object> docRepl = new HashMap<>();
 
-                docRepl.put(KEY_REPL_COLLECTION, replDoc.getScope() + "." + replDoc.getCollection());
+                docRepl.put(KEY_REPL_COLLECTION, replDoc.getCollectionScope() + "." + replDoc.getCollectionName());
 
                 docRepl.put(KEY_REPL_DOC_ID, replDoc.getID());
 

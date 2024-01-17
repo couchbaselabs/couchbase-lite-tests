@@ -28,15 +28,27 @@ Push-Location environment
 Write-Host "Wait for the Test Server..."
 Pop-Location
 $n = 0
-$serverUrl = Get-Content .\servers\jak\webservice\app\server.url
-while ([string]::IsNullOrWhiteSpace($serverUrl) {
-    if ($n -gt 10) {
+$serverUrl = ""
+$urlFile = .\servers\jak\webservice\app\server.url
+while ($true) {
+    if ($n -gt 30) {
         Write-Host "Cannot get server URL: Aborting"
         exit 5
     }
-    Start-Seep -Seconds 2
-    $serverUrl = Get-Content .\servers\jak\webservice\app\server.url
     $n++
+
+    Start-Sleep -Seconds 1
+
+    if (!(Test-Path $urlFile -ErrorAction SilentlyContinue)) {
+       continue
+    }
+
+    $serverUrl = Get-Content $urlFile
+    if ([string]::IsNullOrWhiteSpace($serverUrl)) {
+       continue
+    }
+
+    break
 }
 
 Write-Host "Configure tests"

@@ -17,7 +17,6 @@ package com.couchbase.lite.android.mobiletest
 
 import android.app.Application
 import android.os.StrictMode
-import android.os.StrictMode.VmPolicy
 import com.couchbase.lite.mobiletest.Server
 import com.couchbase.lite.mobiletest.TestApp
 import org.koin.android.ext.koin.androidContext
@@ -33,14 +32,13 @@ class TestServerApp : Application() {
         super.onCreate()
 
         StrictMode.setVmPolicy(
-            VmPolicy.Builder()
-                .detectLeakedClosableObjects()
-                .penaltyLog()
-                .build()
+            StrictMode.VmPolicy.Builder().detectAll().penaltyLog().build()
+        )
+        StrictMode.setThreadPolicy(
+            StrictMode.ThreadPolicy.Builder().detectAll().penaltyLog().build()
         )
 
         TestApp.init(AndroidTestApp(this))
-
 
         // Enable Koin dependency injection framework
         GlobalContext.startKoin {
@@ -56,6 +54,5 @@ class TestServerApp : Application() {
                     viewModel { MainViewModel(get()) }
                 })
         }
-
     }
 }
