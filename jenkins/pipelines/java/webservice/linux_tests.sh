@@ -41,16 +41,17 @@ pushd environment > /dev/null
 
 echo "Wait for the Test Server..."
 popd > /dev/null
+SERVER_FILE="servers/jak/webservice/app/server.url"
+SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
 n=0
-SERVER_URL=`cat servers/jak/webservice/app/server.url`
 while [[ -z "$SERVER_URL" ]]; do
-    if [[ $n -gt 10 ]]; then
+    if [[ $n -gt 30 ]]; then
         echo "Cannot get server URL: Aborting"
         exit 5
     fi
-    sleep 2
-    SERVER_URL=`cat servers/jak/webservice/app/server.url`
-    n=$(( n + 1 ))   
+    ((++n))
+    sleep 1
+    SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
 done
 
 echo "Configure tests"

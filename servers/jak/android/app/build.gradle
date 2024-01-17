@@ -98,11 +98,11 @@ android {
             ]
         }
     }
+
     lint {
         abortOnError false
         disable 'UseSparseArrays'
     }
-
 }
 
 repositories {
