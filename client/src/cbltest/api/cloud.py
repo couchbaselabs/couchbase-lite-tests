@@ -1,10 +1,6 @@
 from json import dumps, load
 from pathlib import Path
 from typing import List, Optional, cast
-try:
-    from types import NoneType
-except ImportError:
-    NoneType = type(None)
 
 from opentelemetry.trace import get_tracer
 from varname import nameof
@@ -38,7 +34,7 @@ class CouchbaseCloud:
             raise ValueError(f"{count} indexes remain in '{bucket}' bucket")
 
     def _wait_for_all_indexed_removed(self, bucket: str) -> None:
-        _try_n_times(10, 2, True, self._check_all_indexes_removed, NoneType, bucket)
+        _try_n_times(10, 2, True, self._check_all_indexes_removed, type(None), bucket)
 
     async def create_role(self, db_name: str, role: str, collection_access: dict) -> None:
         await self.__sync_gateway.add_role(db_name, role, collection_access)
