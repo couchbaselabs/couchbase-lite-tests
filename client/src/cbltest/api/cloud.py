@@ -1,7 +1,10 @@
 from json import dumps, load
 from pathlib import Path
-from types import NoneType
 from typing import List, Optional, cast
+try:
+    from types import NoneType
+except ImportError:
+    NoneType = type(None)
 
 from opentelemetry.trace import get_tracer
 from varname import nameof
