@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, List, Any
+from typing import Optional, List, Dict, Tuple, Any
 
 import pytest
 from cbltest import CBLPyTest
@@ -21,7 +21,7 @@ class TestFest(CBLTestClass):
 
         sg_roles = roles if roles is not None else ["lists.user1.db1-list1.contributor"]
         self.mark_test_step(f"Create SG roles: {', '.join(sg_roles)}")
-        collection_access: dict[str, Any] = {
+        collection_access: Dict[str, Any] = {
             "_default": {
                 "lists": {"admin_channels": []},
                 "tasks": {"admin_channels": []},
@@ -37,8 +37,8 @@ class TestFest(CBLTestClass):
         self.mark_test_step("Reset local databases load them with the todo dataset")
         return await cblpytest.test_servers[0].create_and_reset_db("todo", ["db1", "db2"])
 
-    async def setup_test_fest_repls(self, cblpytest: CBLPyTest, dbs: tuple[Database, Database],
-                                    users: tuple[str, str] = ("user1", "user1")) -> tuple[Replicator, Replicator]:
+    async def setup_test_fest_repls(self, cblpytest: CBLPyTest, dbs: Tuple[Database, Database],
+                                    users: Tuple[str, str] = ("user1", "user1")) -> Tuple[Replicator, Replicator]:
         self.mark_test_step(f"""
                 Create a replicator
                     * endpoint: /todo

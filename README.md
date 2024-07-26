@@ -28,7 +28,7 @@ The system consists of 4 components:
 ### Requirements
 
 1. [Docker](https://www.docker.com/get-started)
-2. [Python 3.7 - 3.10](https://www.python.org/downloads)
+2. [Python 3.9+](https://www.python.org/downloads)
 3. [OpenSSL 1.1 for CBS Python SDK](https://docs.couchbase.com/python-sdk/current/hello-world/start-using-sdk.html)
 
 ### Steps
