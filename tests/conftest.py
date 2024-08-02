@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from cbltest import CBLPyTest
 from cbltest.version import VERSION
+from cbltest.greenboarduploader import GreenboardUploader
+from cbltest.logging import cbl_info
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME
@@ -40,7 +42,6 @@ async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
     config = request.config.getoption("--config")
     log_level = request.config.getoption("--cbl-log-level")
     test_props = request.config.getoption("--test-props")
-    output = request.config.getoption("--output")
     otel_endpoint = request.config.getoption("--otel-endpoint")
     if otel_endpoint is not None:
         resource = Resource(attributes={
@@ -52,7 +53,28 @@ async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
         provider.add_span_processor(processor)
         trace.set_tracer_provider(provider)
 
-    return CBLPyTest(config, log_level, test_props, output)
+    return CBLPyTest(config, log_level, test_props)
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
+    if cblpytest.config.greenboard_username is None:
+        yield
+        return
+    
+    if pytestconfig.getoption("--no-result-upload"):
+        cbl_info("Greenboard uploading disabled by flag")
+        yield
+        return
+    
+    uploader = GreenboardUploader(cblpytest.config.greenboard_url, 
+                                                           cblpytest.config.greenboard_username, 
+                                                           cblpytest.config.greenboard_password)
+    pytestconfig.pluginmanager.register(uploader)
+    yield
+    
+    test_server_info = await cblpytest.test_servers[0].get_info()
+    uploader.upload(test_server_info.cbl, test_server_info.library_version)
+    pytestconfig.pluginmanager.unregister(uploader)
 
 @pytest.fixture(scope="session")
 def dataset_path() -> Path:
@@ -68,13 +90,14 @@ def pytest_runtest_setup(item: pytest.Function) -> None:
     if not cbse_nums or int(specified_cbse) not in cbse_nums:
         pytest.skip(f"Unrelated to CBSE-{specified_cbse}")
 
-def pytest_addoption(parser) -> None:
-    parser.addoption("--config", metavar="PATH", help="The path to the JSON configuration for CBLPyTest", required=True)
-    parser.addoption("--cbl-log-level", metavar="LEVEL", 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    group = parser.getgroup("CBL E2E Testing")
+    group.addoption("--config", metavar="PATH", help="The path to the JSON configuration for CBLPyTest", required=True)
+    group.addoption("--cbl-log-level", metavar="LEVEL", 
                     choices=["error", "warning", "info", "verbose", "debug"], 
                     help="The log level output for the test run",
                     default="warning")
-    parser.addoption("--test-props", metavar="PATH", help="The path to read extra test properties from")
-    parser.addoption("--output", metavar="PATH", help="The path to write Greenboard results to")
-    parser.addoption("--otel-endpoint", metavar="HOST", help="The IP address or host name running OTEL collector")
-    parser.addoption("--cbse", metavar="ticket_num", help="If specified, only run the test(s) for a specific CBSE ticket")
+    group.addoption("--test-props", metavar="PATH", help="The path to read extra test properties from")
+    group.addoption("--otel-endpoint", metavar="HOST", help="The IP address or host name running OTEL collector")
+    group.addoption("--cbse", metavar="ticket_num", help="If specified, only run the test(s) for a specific CBSE ticket")
+    group.addoption("--no-result-upload", action="store_true", help="Don't upload results to greenboard")

@@ -102,7 +102,29 @@ class ParsedConfig:
         """The optional list of sync gateway certificates for using TLS"""
         return self.__sync_gateway_certs
     
-    # TODO: Greenboard
+    @property
+    def greenboard_url(self) -> Optional[str]:
+        """The optional URL to greenboard for uploading results"""
+        if self.__greenboard is None:
+            return None
+        
+        return self.__greenboard["hostname"]
+    
+    @property
+    def greenboard_username(self) -> Optional[str]:
+        """The optional URL to greenboard for uploading results"""
+        if self.__greenboard is None:
+            return None
+        
+        return self.__greenboard["username"]
+    
+    @property
+    def greenboard_password(self) -> Optional[str]:
+        """The optional URL to greenboard for uploading results"""
+        if self.__greenboard is None:
+            return None
+        
+        return self.__greenboard["password"]
     
     @property
     def api_version(self) -> int:
@@ -117,8 +139,12 @@ class ParsedConfig:
         self.__sync_gateways = json[self.__sgw_key]
         self.__couchbase_servers = json[self.__cbs_key]
         self.__sync_gateway_certs = _get_string_list(json, self.__sgw_certs_key)
-        self.__greenboard = cast(str, json.get(self.__greenboard_key))
         self.__api_version = _get_int_or_default(json, self.__api_version_key, 1)
+        self.__greenboard = cast(dict, json.get(self.__greenboard_key))
+        if self.__greenboard is not None and ("hostname" not in self.__greenboard or 
+                                              "username" not in self.__greenboard or
+                                              "password" not in self.__greenboard):
+            raise ValueError("Malformed greenboard entry, must have hostname username and password")
 
     def __str__(self) -> str:
         ret_val = "API Version: " + str(self.__api_version) + "\n" + \

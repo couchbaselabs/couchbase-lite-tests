@@ -60,7 +60,7 @@ class CBLPyTest:
         return self.__couchbase_servers
     
     def __init__(self, config_path: str, log_level: LogLevel = LogLevel.VERBOSE, extra_props_path: Optional[str] = None, 
-                 output_path: Optional[str] = None, test_server_only: bool = False):
+                 test_server_only: bool = False):
         _assert_not_null(config_path, nameof(config_path))
         self.__config = _parse_config(config_path)
         self.__log_level = LogLevel(log_level)
@@ -68,10 +68,6 @@ class CBLPyTest:
         self.__extra_props = None
         if extra_props_path is not None:
             self.__extra_props = _parse_extra_props(extra_props_path)
-
-        self.__output_path = None
-        if output_path is not None:
-            self.__output_path = Path(output_path)
 
         self.__request_factory = RequestFactory(self.__config)
         self.__test_servers: List[TestServer] = []
