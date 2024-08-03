@@ -57,7 +57,9 @@ async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
-    if cblpytest.config.greenboard_username is None:
+    if (cblpytest.config.greenboard_username is None or 
+        cblpytest.config.greenboard_password is None or 
+        cblpytest.config.greenboard_url is None):
         yield
         return
     
@@ -67,8 +69,8 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
         return
     
     uploader = GreenboardUploader(cblpytest.config.greenboard_url, 
-                                                           cblpytest.config.greenboard_username, 
-                                                           cblpytest.config.greenboard_password)
+                                  cblpytest.config.greenboard_username, 
+                                  cblpytest.config.greenboard_password)
     pytestconfig.pluginmanager.register(uploader)
     yield
     
