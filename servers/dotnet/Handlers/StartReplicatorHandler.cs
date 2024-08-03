@@ -64,7 +64,11 @@ internal static partial class HandlerList
 
         public void Dispose()
         {
-            _listenerToken.Remove();
+            try {
+                _listenerToken.Remove();
+            } catch(ObjectDisposedException) {
+                // Replicator already disposed, no need to do anything else
+            }
         }
 
         public IEnumerator<DocumentReplicationEvent> GetEnumerator()
