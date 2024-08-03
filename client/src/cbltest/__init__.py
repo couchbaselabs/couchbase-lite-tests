@@ -38,11 +38,6 @@ class CBLPyTest:
         return self.__extra_props
     
     @property
-    def output_path(self) -> Optional[Path]:
-        """Gets the output path for greenboard results"""
-        return self.__output_path
-    
-    @property
     def request_factory(self) -> RequestFactory:
         """Gets the request factory for creating and sending requests to the test server"""
         return self.__request_factory
@@ -101,8 +96,5 @@ class CBLPyTest:
         
         if self.__extra_props is not None:
             ret_val += "\n" + "Extra Properties:" + "\n" + dumps(self.__extra_props)
-
-        if self.__output_path is not None:
-            ret_val += "\n\n" + "Greenboard Output Path: " + str(self.__output_path.absolute())
 
         return ret_val

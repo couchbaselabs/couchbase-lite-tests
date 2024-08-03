@@ -220,10 +220,9 @@ class SyncGateway:
         with self.__tracer.start_as_current_span(f"send_request",
                                                  attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
-            data = None if payload is None else payload.serialize()
+            data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
-            writer.write_begin(f"Sync Gateway [{self.__admin_url}] -> {method.upper()} {path}",
-                               data if data is not None else "")
+            writer.write_begin(f"Sync Gateway [{self.__admin_url}] -> {method.upper()} {path}", data)
             resp = await self.__admin_session.request(method, path, data=data, headers=headers, params=params)
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()

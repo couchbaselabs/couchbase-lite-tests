@@ -152,7 +152,7 @@ class ParsedConfig:
             "Sync Gateways: " + dumps(self.__sync_gateways)  + "\n" + \
             "Couchbase Servers: " + dumps(self.__couchbase_servers) + "\n" + \
             "TLS Enabled: " + ("Yes" if (self.__sync_gateway_certs is not None) else "No") + "\n" + \
-            "Greenboard: " + (self.__greenboard if self.__greenboard is not None else "")
+            "Greenboard: " + (self.__greenboard["url"] if self.__greenboard is not None else "")
          
         return ret_val
 
