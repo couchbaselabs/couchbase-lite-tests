@@ -79,11 +79,6 @@ public class Server extends NanoHTTPD {
             final String versionStr = headers.get(TestApp.HEADER_PROTOCOL_VERSION);
             final String client = headers.get(TestApp.HEADER_CLIENT);
 
-            Log.p(TAG, "Request " + reqId + " (" + client + "@" + versionStr + "): " + method + " " + endpoint);
-            for (Map.Entry<String, String> header: headers.entrySet()) {
-                Log.p(TAG, "  Header " + header.getKey() + ": " + header.getValue());
-            }
-
             if (method == null) { throw new ServerError("Null HTTP method"); }
             if (StringUtils.isEmpty(endpoint)) { throw new ClientError("Empty request"); }
 

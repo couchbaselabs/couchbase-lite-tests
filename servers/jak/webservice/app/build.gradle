@@ -14,7 +14,7 @@ plugins {
 ext {
     SERVER_VERSION = file("${ROOT_DIR}/version.txt").text.trim()
     SERVER_BUILD = "${getBuildId()}"
-    SERVER_ID = "${SERVER_VERSION}@${SERVER_BUILD}"
+    SERVER_ID = "Java Webservice Test Server: ${SERVER_VERSION}@${SERVER_BUILD}"
 
     CBL_VERSION = file("${ROOT_DIR}/cbl-version.txt").text.trim()
     CBL_BUILD_NUMBER = (project.hasProperty("buildNumber") && buildNumber) ? buildNumber : "SNAPSHOT"
