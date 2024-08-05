@@ -51,7 +51,7 @@ public abstract class BaseTestApp extends TestApp {
         final Map<String, Object> content = new HashMap<>();
         content.put(KEY_SERVER_VERSION, CBLVersion.VERSION_NAME);
         content.put(KEY_API, LATEST_SUPPORTED_PROTOCOL_VERSION);
-        content.put(KEY_CBL, "couchbase-lite-java-ee");
+        content.put(KEY_CBL, "couchbase-lite-java");
         content.put(
             KEY_ADDITIONAL_INFO,
             platform + " Test Server " + TestServerInfo.SERVER_VERSION + " using " + CBLVersion.getVersionInfo());
