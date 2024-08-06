@@ -14,6 +14,13 @@ import asyncio
 import pytest
 import pytest_asyncio
 
+# This file can be used as a template if you need to create a new suite of tests
+# I will add comments into each function here to detail what it does
+
+# If you are not going to use OpenTelemetry, this is not needed.  This will
+# Automatically set up an OpenTelemetry span per test run that will show
+# up in the results.  Further granularity than that is the responsibility of
+# the TDK.
 @pytest.fixture(scope="function", autouse=True)
 def span_generation(request: pytest.FixtureRequest):
     otel_endpoint = request.config.getoption("--otel-endpoint")
@@ -30,13 +37,22 @@ def span_generation(request: pytest.FixtureRequest):
     else:
         yield None
 
+# This is important to have in any conftest.py that uses the TDK.
+# The explanation of what this does is a bit chaotic, but the event
+# loop powers asynchronous behavior and by default it doesn't last
+# long enough for the Couchbase Server SDK.  If it gets closed too early 
+# then Couchbase Server SDK operations start failing because of operating
+# on a closed event loop.  This extends the loop to last throughout the
+# entire session.
 @pytest.fixture(scope="session")
 def event_loop():
     loop = asyncio.get_event_loop()
     yield loop
     loop.close()
 
-# Async to avoid DeprecationWarnings about aiohttp client session
+# NOTE: Async to avoid DeprecationWarnings about aiohttp client session
+# This is what actually produces the TDK top level class that can be injected
+# into each test.  
 @pytest_asyncio.fixture(scope="session")
 async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
     config = request.config.getoption("--config")
@@ -44,6 +60,8 @@ async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
     test_props = request.config.getoption("--test-props")
     otel_endpoint = request.config.getoption("--otel-endpoint")
     if otel_endpoint is not None:
+        # This section is all about setting up the OpenTelemetry report
+        # and can be ignored if not using OpenTelemetry.
         resource = Resource(attributes={
             SERVICE_NAME: "Python Test Client"
         })
@@ -55,6 +73,8 @@ async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
 
     return CBLPyTest(config, log_level, test_props)
 
+# This function will set up an object that will track the result
+# of the test run and then upload them to Greenboard.
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     if (cblpytest.config.greenboard_username is None or 
@@ -72,17 +92,29 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
                                   cblpytest.config.greenboard_username, 
                                   cblpytest.config.greenboard_password)
     pytestconfig.pluginmanager.register(uploader)
+
+    # This is a pytest-ism.  You may have noticed it in other tests.  The
+    # way that fixtures work is that you can yield in the middle and what
+    # ends up happening is that all other things happening within the scope
+    # will happen, and then return back to this point.  Since the scope here
+    # is 'session' it basically means "before and after the run"
     yield
     
     test_server_info = await cblpytest.test_servers[0].get_info()
     uploader.upload(test_server_info.cbl, test_server_info.library_version)
     pytestconfig.pluginmanager.unregister(uploader)
 
+# This is used to inject the full path to the dataset folder
+# into tests that need it.
 @pytest.fixture(scope="session")
 def dataset_path() -> Path:
     script_path = os.path.abspath(os.path.dirname(__file__))
     return Path(script_path, "..", "dataset", "sg")
 
+# This is one of the pytest "magic" functions that gets run by virtue
+# of being named this way.  In this case, it is a setup method for
+# each test.  I use it here if the --cbse argument was specified
+# to only run tests that are marked as related to that CBSE.
 def pytest_runtest_setup(item: pytest.Function) -> None:
     specified_cbse = item.config.getoption("--cbse")
     if specified_cbse is None:
@@ -92,6 +124,8 @@ def pytest_runtest_setup(item: pytest.Function) -> None:
     if not cbse_nums or int(specified_cbse) not in cbse_nums:
         pytest.skip(f"Unrelated to CBSE-{specified_cbse}")
 
+# This is another "magic" function that adds command line options to pytest itself
+# in the same manner as countless other python programs do with argparse.
 def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("CBL E2E Testing")
     group.addoption("--config", metavar="PATH", help="The path to the JSON configuration for CBLPyTest", required=True)

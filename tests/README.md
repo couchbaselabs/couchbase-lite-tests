@@ -9,7 +9,7 @@ Standard python stuff:
 * source venv/bin/activate
 * pip install -r requirements.txt
 
-Make sure to use python between v3.7 and 3.10.  NOT 3.11
+Make sure to use python either 3.9 or 3.10.  NOT 3.11
 
 After that there are two ways you can install the test framework into the tests
 folder for consumption.  Either:
@@ -20,9 +20,7 @@ which builds it from "source", or installing it from proget
 
 `pip install cbltest --extra-index-url https://proget.sc.couchbase.com/pypi/mobile-python/simple`
 
-There are three tests in this folder corresponding to the first three
-tests in the 001-basic-replication.md spec. They are not entirely complete
-but do actually test something.  If you want to run all three you will need
+If you want to run the tests in this folder you will need
 to make sure that there is at least 1 GiB of RAM available for the server
 cluster during config since the tests will create 2 512 MiB buckets.
 (The first test uses the `names` bucket and the second two use `travel`).
@@ -39,10 +37,6 @@ folder called http_logs. This will help follow the conversation of the test.
 Also full debug level logging from the framework will be written to the
 testserver.log file.  The console level logging is controlled by the
 `--cbl-log-level` argument to pytest (`--log-level` was already taken).
-
-There are a few more arguments that pytest will understand that are specific to
-this test framework but they are not relevant at the moment (they are in the
-spec).
 
 I learned a lot about the way that python works through this process.  The
 "build" is still a bunch of python source files but setup in such a way so that
