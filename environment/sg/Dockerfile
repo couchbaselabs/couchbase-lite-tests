@@ -2,7 +2,6 @@ FROM ubuntu:22.04
 
 ARG SG_DEB_ARM64
 ARG SG_DEB_AMD64
-ARG SSL
 
 RUN [ -z "$SG_DEB_ARM64" ] && echo "SG_DEB_ARM64 is required" && exit 1 || true
 RUN [ -z "$SG_DEB_AMD64" ] && echo "SG_DEB_AMD64 is required" && exit 1 || true
@@ -34,6 +33,4 @@ RUN dpkg -i ./couchbase-sync-gateway.deb
 EXPOSE 4984
 EXPOSE 4985
 
-ENV SSL=${SSL}
-
-CMD ./start-sgw.sh ${SSL}
+CMD ./start-sgw.sh
