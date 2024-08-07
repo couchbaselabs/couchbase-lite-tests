@@ -1,10 +1,9 @@
 #!/bin/sh
 
-if [ "$#" -lt 1 ]; then
-  echo "Usage: $0 <SSL: true | false>" >&2
+if [ -z $SSL ]; then
+  echo "Missing SSL environment variable, please set it to true or false"
   exit 1
 fi
-SSL=$1
 
 SCRIPT=$(readlink -f "$0")
 ROOT_DIR=$(dirname "${SCRIPT}")

@@ -36,7 +36,7 @@ class TestBasicReplication(CBLTestClass):
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"),
                                 replicator_type=ReplicatorType.PUSH, collections=[
                 ReplicatorCollectionEntry(["travel.airlines"])
-            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"), pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
@@ -70,7 +70,7 @@ class TestBasicReplication(CBLTestClass):
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"),
                                 replicator_type=ReplicatorType.PUSH, collections=[
                 ReplicatorCollectionEntry(["travel.airlines", "travel.airports", "travel.hotels"])
-            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"), pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -105,7 +105,7 @@ class TestBasicReplication(CBLTestClass):
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"),
                                 replicator_type=ReplicatorType.PULL, collections=[
                 ReplicatorCollectionEntry(["travel.routes", "travel.landmarks", "travel.hotels"])
-            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"), pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -141,7 +141,7 @@ class TestBasicReplication(CBLTestClass):
                                 replicator_type=ReplicatorType.PUSH_AND_PULL, collections=[
                 ReplicatorCollectionEntry(
                     ["travel.airlines", "travel.airports", "travel.hotels", "travel.landmarks", "travel.routes"])
-            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"), pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -182,7 +182,8 @@ class TestBasicReplication(CBLTestClass):
                                 replicator_type=ReplicatorType.PUSH,
                                 continuous=True,
                                 enable_document_listener=True,
-                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                                pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle.")
@@ -259,7 +260,8 @@ class TestBasicReplication(CBLTestClass):
                                 replicator_type=ReplicatorType.PULL,
                                 continuous=True,
                                 enable_document_listener=True,
-                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                                pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle.")
@@ -375,7 +377,8 @@ class TestBasicReplication(CBLTestClass):
                                 replicator_type=ReplicatorType.PUSH_AND_PULL,
                                 continuous=True,
                                 enable_document_listener=True,
-                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                                pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle.")
@@ -511,7 +514,7 @@ class TestBasicReplication(CBLTestClass):
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"),
                                 replicator_type=ReplicatorType.PUSH, collections=[
                 ReplicatorCollectionEntry(["_default._default"])
-            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"), pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -545,7 +548,7 @@ class TestBasicReplication(CBLTestClass):
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"),
                                 replicator_type=ReplicatorType.PULL, collections=[
                 ReplicatorCollectionEntry(["_default._default"])
-            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"), pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -579,7 +582,7 @@ class TestBasicReplication(CBLTestClass):
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"),
                                 replicator_type=ReplicatorType.PUSH_AND_PULL, collections=[
                 ReplicatorCollectionEntry(["_default._default"])
-            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+            ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"), pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -615,7 +618,8 @@ class TestBasicReplication(CBLTestClass):
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"),
                                 collections=[ReplicatorCollectionEntry(["travel.airlines"])],
                                 replicator_type=ReplicatorType.PUSH,
-                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                                pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -650,7 +654,8 @@ class TestBasicReplication(CBLTestClass):
                                 collections=[ReplicatorCollectionEntry(["travel.airlines"])],
                                 replicator_type=ReplicatorType.PUSH,
                                 authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-                                reset=True)
+                                reset=True,
+                                pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -690,7 +695,8 @@ class TestBasicReplication(CBLTestClass):
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"),
                                 collections=[ReplicatorCollectionEntry(["travel.airports"])],
                                 replicator_type=ReplicatorType.PULL,
-                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                                pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -726,7 +732,8 @@ class TestBasicReplication(CBLTestClass):
                                 collections=[ReplicatorCollectionEntry(["travel.airports"])],
                                 replicator_type=ReplicatorType.PULL,
                                 authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-                                reset=True)
+                                reset=True,
+                                pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")

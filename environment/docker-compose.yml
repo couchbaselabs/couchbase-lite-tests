@@ -23,7 +23,8 @@ services:
       args:
         - SG_DEB_ARM64=${SG_DEB_ARM64:-https://packages.couchbase.com/releases/couchbase-sync-gateway/3.1.0/couchbase-sync-gateway-enterprise_3.1.0_aarch64.deb}
         - SG_DEB_AMD64=${SG_DEB_AMD64:-https://packages.couchbase.com/releases/couchbase-sync-gateway/3.1.0/couchbase-sync-gateway-enterprise_3.1.0_x86_64.deb}
-        - SSL=${SSL:-false}
+    environment:
+      SSL: true
     ports:
       - "4984:4984"
       - "4985:4985"

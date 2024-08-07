@@ -35,7 +35,8 @@ class TestReplicationBlob(CBLTestClass):
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("travel"), 
                                 collections=[ReplicatorCollectionEntry(["travel.hotels"])],
                                 replicator_type=ReplicatorType.PUSH_AND_PULL,
-                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                                pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
