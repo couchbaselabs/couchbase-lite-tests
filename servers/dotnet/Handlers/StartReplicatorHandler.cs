@@ -2,6 +2,8 @@
 using Couchbase.Lite.Sync;
 using System.Collections;
 using System.Net;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -190,11 +192,13 @@ internal static partial class HandlerList
 
         public bool enableAutoPurge { get; init; }
 
+        public string? pinnedServerCert { get; init; }
+
         [JsonConstructor]
         public StartReplicatorConfig(string database, string endpoint,
             string replicatorType, bool continuous, IReadOnlyList<StartReplicatorCollection> collections,
             StartReplicatorAuthenticator? authenticator = null, bool enableDocumentListener = false,
-            bool enableAutoPurge = true)
+            bool enableAutoPurge = true, string? pinnedServerCert = null)
         {
             this.database = database;
             this.endpoint = endpoint;
@@ -203,6 +207,7 @@ internal static partial class HandlerList
             this.authenticator = authenticator;
             this.enableDocumentListener = enableDocumentListener;
             this.enableAutoPurge = enableAutoPurge;
+            this.pinnedServerCert = pinnedServerCert;
 
             if (replicatorType.ToLowerInvariant() == "pull") {
                 ReplicatorType = ReplicatorType.Pull;
@@ -300,6 +305,9 @@ internal static partial class HandlerList
         replConfig.Continuous = deserializedBody.config.continuous;
         replConfig.ReplicatorType = deserializedBody.config.ReplicatorType;
         replConfig.EnableAutoPurge = deserializedBody.config.enableAutoPurge;
+        if (deserializedBody.config.pinnedServerCert != null) {
+            replConfig.PinnedServerCertificate = new X509Certificate2(Encoding.ASCII.GetBytes(deserializedBody.config.pinnedServerCert));
+        }
 
         (var repl, var id) = CBLTestServer.Manager.RegisterObject(() => new Replicator(replConfig));
         if(deserializedBody.config.enableDocumentListener) {
