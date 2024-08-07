@@ -35,6 +35,9 @@ info:
 
     Changes
 
+    0.2.4 (08/07/24)
+    * Added pinnedServerCert to ReplicatorConfig
+
     0.2.3 (08/30/23)
     * Updated blob verification logic.
     * Added rules for determining blob's content_type.
@@ -742,6 +745,13 @@ components:
           description: The default is true.
           type: boolean
           example: false
+        pinnedServerCert:
+          description: The PEM representation of the TLS certificate that the remote is using
+          type: str
+          example: |
+            -----BEGIN CERTIFICATE-----
+            ...
+            -----END CERTIFICATE-----
     ReplicationCollection:
       type: object
       required: ['names']

@@ -374,7 +374,8 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
                     "password": "p@ssw0rd"
                 },
                 "enableDocumentListener": false,
-                "enableAutoPurge": true
+                "enableAutoPurge": true,
+                "pinnedServerCert": "..."
             },
             "reset": false
         }
@@ -416,6 +417,9 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
         self.enableAutoPurge: bool = True
         """If set to True (default), the replicator will automatically purge documents on access loss"""
 
+        self.pinnedServerCert: Optional[str] = None
+        """The PEM representation of the TLS certificate that the remote is using"""
+
     def to_json(self) -> Any:
         """Serializes the :class:`PostStartReplicatorRequestBody` to a JSON string"""
         raw = {
@@ -424,7 +428,8 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
             "replicatorType": str(self.replicatorType),
             "continuous": self.continuous,
             "enableDocumentListener": self.enableDocumentListener,
-            "enableAutoPurge": self.enableAutoPurge
+            "enableAutoPurge": self.enableAutoPurge,
+            "pinnedServerCert": self.pinnedServerCert
         }
 
         if self.collections is not None:

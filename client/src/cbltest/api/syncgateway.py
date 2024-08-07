@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Dict, List, cast, Any, Optional
 from urllib.parse import urljoin
 
-from aiohttp import ClientSession, BasicAuth
+from aiohttp import ClientSession, BasicAuth, TCPConnector
 from opentelemetry.trace import get_tracer
 from varname import nameof
 
@@ -14,6 +14,8 @@ from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_warning
 from cbltest.version import VERSION
+
+import ssl
 
 
 class _CollectionMap(JSONSerializable):
@@ -210,10 +212,18 @@ class SyncGateway:
                  secure: bool = False):
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
-        self.__admin_session = ClientSession(f"{scheme}{url}:{admin_port}", auth=BasicAuth(username, password, "ascii"))
         self.__admin_url = f"{scheme}{url}:{admin_port}"
         self.__replication_url = f"{ws_scheme}{url}:{port}"
         self.__tracer = get_tracer(__name__, VERSION)
+        self.__secure: bool = secure
+        self.__hostname: str = url
+        self.__admin_port: int = admin_port
+
+        if secure:
+            ssl_context = ssl.create_default_context(cadata=self.tls_cert())
+            self.__admin_session = ClientSession(f"{scheme}{url}:{admin_port}", auth=BasicAuth(username, password, "ascii"), connector=TCPConnector(ssl=ssl_context))
+        else:
+            self.__admin_session = ClientSession(f"{scheme}{url}:{admin_port}", auth=BasicAuth(username, password, "ascii"))
 
     async def _send_request(self, method: str, path: str, payload: Optional[JSONSerializable] = None,
                             params: Optional[Dict[str, str]] = None) -> Any:
@@ -235,10 +245,17 @@ class SyncGateway:
                 raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}")
 
             return ret_val
+        
+    def tls_cert(self) -> Optional[str]:
+        if not self.__secure:
+            cbl_warning("Sync Gateway instance not using TLS, returning empty tls_cert...")
+            return None
+        
+        return ssl.get_server_certificate((self.__hostname, self.__admin_port))
 
     def replication_url(self, db_name: str):
         """
-        Gets the replicator URL (ws://xxx) for a given db
+        Gets the replicator URL (e.g. ws://xxx) for a given db
         
         :param db_name: The DB to replicate with
         """

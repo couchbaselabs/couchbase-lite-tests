@@ -2,7 +2,7 @@ from pathlib import Path
 from json import load, dumps
 from typing import Final, List, cast, Optional
 
-from .jsonhelper import _assert_contains_string_list, _get_int_or_default, _get_string_list, _assert_string_entry, _get_str_or_default
+from .jsonhelper import _assert_contains_string_list, _get_int_or_default, _get_string_list, _assert_string_entry, _get_str_or_default, _get_bool_or_default
 
 class SyncGatewayInfo:
     """The parsed Sync Gateway information from the config file"""
@@ -12,6 +12,7 @@ class SyncGatewayInfo:
     __admin_port_key: Final[str] = "admin_port"
     __rbac_user_key: Final[str] = "rbac_user"
     __rbac_password_key: Final[str] = "rbac_password"
+    __tls_key: Final[str] = "tls"
 
     @property
     def hostname(self) -> str:
@@ -38,12 +39,18 @@ class SyncGatewayInfo:
         """Gets the password to use when connecting to a CBS cluster"""
         return self.__rbac_password
     
+    @property
+    def uses_tls(self) -> bool:
+        """Gets whether or not the Sync Gateway is running with TLS"""
+        return self.__uses_tls
+    
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
         self.__port: int = _get_int_or_default(data, self.__port_key, 4984)
         self.__admin_port: int = _get_int_or_default(data, self.__admin_port_key, 4985)
         self.__rbac_user: str = _get_str_or_default(data, self.__rbac_user_key, "admin")
         self.__rbac_password: str = _get_str_or_default(data, self.__rbac_password_key, "password")
+        self.__uses_tls: bool = _get_bool_or_default(data, self.__tls_key, False)
 
 class CouchbaseServerInfo:
     """The parsed Couchbase Server info from the config file"""
