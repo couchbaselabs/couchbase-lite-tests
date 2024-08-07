@@ -69,6 +69,17 @@ def _get_str_or_default(d: dict, key: str, default: str) -> str:
     
     return cast(str, ret_val)
 
+def _get_bool_or_default(d: dict, key: str, default: bool) -> bool:
+    if key not in d:
+        cbl_warning(f"{key} not present in dictionary, using default {default}!")
+        return default
+    
+    ret_val = d[key]
+    if not isinstance(ret_val, bool):
+        raise ValueError(f"Expecting a string for key {key} but found {ret_val} instead")
+    
+    return cast(bool, ret_val)
+
 def _get_typed(d: dict, key: str, type: Type[T]) ->Optional[T]:
     if key not in d:
         return None

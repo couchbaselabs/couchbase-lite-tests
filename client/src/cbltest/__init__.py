@@ -73,14 +73,11 @@ class CBLPyTest:
 
         self.__sync_gateways: List[SyncGateway] = []
         index = 0
-        cert_count = 0 if self.__config.sync_gateway_certs is None else len(self.__config.sync_gateway_certs)
-        sgw_certs = cast(list, self.__config.sync_gateway_certs)
         if not test_server_only:
             for sg in self.__config.sync_gateways:
-                secure = index < cert_count and sgw_certs[index] is not None
                 sgw_info = SyncGatewayInfo(sg)
                 self.__sync_gateways.append(SyncGateway(sgw_info.hostname, sgw_info.rbac_user, sgw_info.rbac_password, 
-                                                        sgw_info.port, sgw_info.admin_port, secure))
+                                                        sgw_info.port, sgw_info.admin_port, sgw_info.uses_tls))
                 index += 1
 
         self.__couchbase_servers: List[CouchbaseServer] = []

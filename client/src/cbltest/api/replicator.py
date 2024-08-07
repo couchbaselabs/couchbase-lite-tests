@@ -55,7 +55,7 @@ class Replicator:
                  replicator_type: ReplicatorType = ReplicatorType.PUSH_AND_PULL,
                  continuous: bool = False, authenticator: Optional[ReplicatorAuthenticator] = None, reset: bool = False,
                  collections: Optional[List[ReplicatorCollectionEntry]] = None, enable_document_listener: bool = False,
-                 enable_auto_purge: bool = True):
+                 enable_auto_purge: bool = True, pinned_server_cert: Optional[str] = None):
         assert database._request_factory.version == 1, "This version of the cbl test API requires request API v1"
         self.__database = database
         self.__index = database._index
@@ -86,6 +86,9 @@ class Replicator:
         """If True (default) auto purge is enabled for the replicator so documents will be automatically
         removed when access is lost"""
 
+        self.pinned_server_cert: Optional[str] = pinned_server_cert
+        """The PEM representation of the certificate that the remote is using"""
+
     def add_default_collection(self) -> None:
         """A convenience method for adding the default config for the default collection, if desired"""
         self.collections.append(ReplicatorCollectionEntry())
@@ -105,6 +108,7 @@ class Replicator:
             payload.authenticator = self.authenticator
             payload.enableDocumentListener = self.enable_document_listener
             payload.enableAutoPurge = self.enable_auto_purge
+            payload.pinnedServerCert = self.pinned_server_cert
             payload.reset = self.reset
             payload.collections = self.collections
             req = self.__request_factory.create_request(TestServerRequestType.START_REPLICATOR, payload)
