@@ -1,4 +1,6 @@
 ﻿using Couchbase.Lite;
+using Couchbase.Lite.Logging;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
@@ -17,10 +19,6 @@ namespace TestServer.Handlers
 {
     internal static partial class HandlerList
     {
-#if !HEADLESS
-        private static readonly IServiceProvider ServiceProvider = Application.Current!.MainPage!.Handler!.MauiContext!.Services;
-#endif
-
         private static (string scope, string name) CollectionSpec(string inputName)
         {
             var split = inputName.Split('.');
@@ -89,6 +87,9 @@ namespace TestServer
         private static readonly IDictionary<string, HandlerAction> RouteMap =
             new Dictionary<string, HandlerAction>();
 
+        private static readonly Microsoft.Extensions.Logging.ILogger Logger = 
+            MauiProgram.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Router");
+
         #endregion
 
         #region Constructors
@@ -144,10 +145,8 @@ namespace TestServer
         internal static void HandleException(Exception ex, Uri endpoint, int version, HttpListenerResponse response)
         {
             var msg = MultiExceptionString(ex);
-            Debug.WriteLine($"Error in handler for {endpoint}");
-            Debug.WriteLine(msg);
-            Console.WriteLine($"Error in handler for {endpoint}");
-            Console.WriteLine(msg);
+            Logger.LogWarning("Error in handler for {endpoint}", endpoint);
+            Logger.LogWarning("{msg}", msg);
             response.WriteBody(CreateErrorResponse(msg), version, HttpStatusCode.InternalServerError);
         }
 
@@ -178,10 +177,8 @@ namespace TestServer
                 }
             } catch (Exception ex) {
                 var msg = MultiExceptionString(ex);
-                Debug.WriteLine($"Error deserializing POST body for {endpoint}");
-                Debug.WriteLine(msg);
-                Console.WriteLine($"Error deserializing POST body for {endpoint}");
-                Console.WriteLine(msg);
+                Logger.LogError("Error deserializing POST body for {endpoint}", endpoint);
+                Logger.LogError("{msg}", msg);
                 var topEx = new ApplicationException($"Error deserializing POST body for {endpoint}", ex);
                 response.WriteBody(CreateErrorResponse(topEx), version, HttpStatusCode.BadRequest);
                 return;
