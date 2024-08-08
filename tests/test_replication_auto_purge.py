@@ -41,7 +41,8 @@ class TestReplicationAutoPurge(CBLTestClass):
                                 replicator_type=ReplicatorType.PULL,
                                 continuous=False,
                                 enable_auto_purge=True,
-                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                                pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
@@ -145,7 +146,8 @@ class TestReplicationAutoPurge(CBLTestClass):
                                 replicator_type=ReplicatorType.PULL,
                                 continuous=False,
                                 enable_auto_purge=True,
-                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+                                authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                                pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops")
@@ -267,7 +269,8 @@ class TestReplicationAutoPurge(CBLTestClass):
                            replicator_type=ReplicatorType.PULL,
                            continuous=False,
                            enable_auto_purge=False,
-                           authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+                           authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                           pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await repl1.start()
 
         self.mark_test_step("Wait until the replicator stops")
@@ -316,7 +319,8 @@ class TestReplicationAutoPurge(CBLTestClass):
                            continuous=True,
                            enable_auto_purge=False,
                            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-                           enable_document_listener=True)
+                           enable_document_listener=True,
+                           pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await repl2.start()
 
         self.mark_test_step('''
@@ -380,7 +384,8 @@ class TestReplicationAutoPurge(CBLTestClass):
                            replicator_type=ReplicatorType.PULL,
                            continuous=False,
                            enable_auto_purge=False,
-                           authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+                           authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                           pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await repl1.start()
 
         self.mark_test_step("Wait until the replicator stops")
@@ -420,7 +425,8 @@ class TestReplicationAutoPurge(CBLTestClass):
                            continuous=True,
                            enable_auto_purge=False,
                            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-                           enable_document_listener=True)
+                           enable_document_listener=True,
+                           pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await repl2.start()
 
         self.mark_test_step('''
@@ -472,7 +478,8 @@ class TestReplicationAutoPurge(CBLTestClass):
                            replicator_type=ReplicatorType.PULL,
                            continuous=False,
                            enable_auto_purge=True,
-                           authenticator=ReplicatorBasicAuthenticator("user1", "pass"))
+                           authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+                           pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await repl1.start()
 
         self.mark_test_step("Wait until the replicator stops")
@@ -532,7 +539,8 @@ class TestReplicationAutoPurge(CBLTestClass):
                            continuous=True,
                            enable_auto_purge=True,
                            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-                           enable_document_listener=True)
+                           enable_document_listener=True,
+                           pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await repl2.start()
 
         self.mark_test_step('''

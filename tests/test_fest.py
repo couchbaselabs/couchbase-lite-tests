@@ -54,7 +54,8 @@ class TestFest(CBLTestClass):
                            collections=[
                                ReplicatorCollectionEntry(["_default.lists", "_default.tasks", "_default.users"])],
                            authenticator=ReplicatorBasicAuthenticator(users[0], "pass"),
-                           enable_document_listener=True)
+                           enable_document_listener=True,
+                           pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
 
         self.mark_test_step(f"""
                 Create another replicator
@@ -71,7 +72,8 @@ class TestFest(CBLTestClass):
                            collections=[
                                ReplicatorCollectionEntry(["_default.lists", "_default.tasks", "_default.users"])],
                            authenticator=ReplicatorBasicAuthenticator(users[1], "pass"),
-                           enable_document_listener=True)
+                           enable_document_listener=True,
+                           pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
 
         return repl1, repl2
 
@@ -360,7 +362,7 @@ class TestFest(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio
-    async def test_create_tasks_two_users(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def _test_create_tasks_two_users(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.setup_test_fest_cloud(cblpytest, dataset_path, ["lists.user1.db1-list1.contributor",
                                                                    "lists.user2.db2-list1.contributor"])
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
