@@ -1,4 +1,5 @@
-﻿using System.Collections.Specialized;
+﻿using Microsoft.Extensions.Logging;
+using System.Collections.Specialized;
 using System.Net;
 using System.Reflection;
 using System.Text.Json;
@@ -8,11 +9,14 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    private static readonly ILogger ResetLogger =
+        MauiProgram.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("ResetHandler");
+
     [HttpHandler("reset")]
     public static async Task ResetDatabaseHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
-        if(!body.RootElement.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String) {
-            // Log the name of the test being started: Console.WriteLine(">>>>>>>>>> " + name);
+        if(body.RootElement.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String) {
+            ResetLogger.LogInformation(">>>>>>>>>> {name}", name);
         }
         
         if(!body.RootElement.TryGetProperty("datasets", out var datasets) || datasets.ValueKind != JsonValueKind.Object) {

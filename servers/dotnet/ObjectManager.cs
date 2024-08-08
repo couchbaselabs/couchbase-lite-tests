@@ -1,4 +1,5 @@
 ﻿using Couchbase.Lite;
+using Microsoft.Extensions.Logging;
 using System.IO.Compression;
 
 namespace TestServer
@@ -9,6 +10,7 @@ namespace TestServer
         private readonly Dictionary<string, IDisposable> _activeDisposables = new();
         private readonly HashSet<object> _keepAlives = new();
         private readonly AutoReaderWriterLock _lock = new AutoReaderWriterLock();
+        private readonly ILogger<ObjectManager> _logger = MauiProgram.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<ObjectManager>();
 
         public readonly string FilesDirectory;
 
@@ -29,8 +31,12 @@ namespace TestServer
             _activeDisposables.Clear();
 
             foreach (var db in _activeDatabases) {
-                db.Value.Delete();
-                db.Value.Dispose();
+                try {
+                    db.Value.Delete();
+                    db.Value.Dispose();
+                } catch (Exception ex) {
+                    _logger.LogWarning(ex, "Failed to delete/dispose {name}", db.Value.Name);
+                }
             }
 
             _activeDatabases.Clear();

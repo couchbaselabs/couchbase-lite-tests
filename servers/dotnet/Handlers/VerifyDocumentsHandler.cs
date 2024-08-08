@@ -1,4 +1,5 @@
 ﻿using Couchbase.Lite;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
 using System.Dynamic;
@@ -12,6 +13,9 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    private static readonly ILogger VerifyDocumentsLogger =
+        MauiProgram.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("VerifyDocumentsHandler");
+
     internal readonly record struct VerifyDocumentsBody
     {
         public required string database { get; init; }
@@ -209,7 +213,7 @@ internal static partial class HandlerList
         try {
             response.WriteBody((object)responseBody, version);
         } catch(Exception ex) {
-            Console.WriteLine(ex);
+            VerifyDocumentsLogger.LogError(ex, "Error writing body to response");
         }
     }
 

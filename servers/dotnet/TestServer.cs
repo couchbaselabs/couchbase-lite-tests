@@ -1,4 +1,6 @@
-﻿using System.Diagnostics.Metrics;
+﻿using Couchbase.Lite.Logging;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics.Metrics;
 using System.Net;
 
 namespace TestServer
@@ -13,7 +15,7 @@ namespace TestServer
 
         private const ushort Port = 8080;
 
-        private static readonly Stream NullStream = new MemoryStream(new byte[0]);
+        private static readonly Stream NullStream = new MemoryStream(Array.Empty<byte>());
 
         public static readonly ObjectManager Manager = new ObjectManager(Path.Join(FileSystem.AppDataDirectory, "testfiles"));
 
@@ -23,6 +25,8 @@ namespace TestServer
 
         private CancellationTokenSource? _cancelSource;
         private HttpListener? _httpListener;
+        private readonly ILogger<CBLTestServer> _logger 
+            = MauiProgram.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<CBLTestServer>();
 
         #endregion
 
@@ -68,12 +72,12 @@ namespace TestServer
             while (!cancelSource.IsCancellationRequested) {
                 var nextRequest = await httpListener.GetContextAsync().ConfigureAwait(false);
                 if (nextRequest?.Request == null) {
-                    Console.WriteLine("Weird error: null request, skipping...");
+                    _logger.LogWarning("Weird error: null request, skipping...");
                     continue;
                 }
 
                 if (nextRequest.Request?.Url == null) {
-                    Console.WriteLine("Weird error: null url, skipping...");
+                    _logger.LogWarning("Weird error: null url, skipping...");
                     continue;
                 }
 
@@ -89,7 +93,7 @@ namespace TestServer
                 }
                 
                 var _ = Router.Handle(nextRequest.Request.Url, nextRequest.Request.InputStream ?? NullStream, nextRequest.Response, version)
-                    .ContinueWith(t => Console.Error.WriteLine($"Exception caught during router handling: {t.Exception?.InnerException}"),
+                    .ContinueWith(t => _logger.LogWarning("Exception caught during router handling: {e}", t.Exception?.InnerException),
                     TaskContinuationOptions.OnlyOnFaulted);
             }
         }

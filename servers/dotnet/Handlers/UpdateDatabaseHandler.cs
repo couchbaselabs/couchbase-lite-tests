@@ -163,8 +163,10 @@ internal static partial class HandlerList
                                 UpdateDictionaryProperties(doc, entry.updatedProperties);
                             }
 
-                            if (blobUpdate.Any()) {
-                                UpdateDictionaryProperties(doc, new List<IReadOnlyDictionary<string, object>> { blobUpdate });
+                            if (entry.updatedBlobs != null) {
+                                UpdateDictionaryProperties(doc, entry.updatedBlobs
+                                        .Select(x => new Dictionary<string, object> { [x.Key] = blobUpdate[x.Key] })
+                                        .ToList());
                             }
 
                             collection.Save(doc);
