@@ -35,6 +35,9 @@ info:
 
     Changes
 
+    0.3.0 (08/10/24)
+    * Added setupLogging endpoint
+
     0.2.4 (08/07/24)
     * Added pinnedServerCert to ReplicatorConfig
 
@@ -553,6 +556,24 @@ paths:
           $ref: '#/components/responses/Error'
         '500':
           $ref: '#/components/responses/Error'
+  /setupLogging:
+    post:
+      tags:
+        - API
+      summary: Setup logging to LogSlurp server
+      description: Instructs the test server to send all of its logging (either from the server, or from the CBL library) to the specified server
+      operationId: setupLogging
+      requestBody:
+        description: |-
+          The request object specifies the URL, logging ID, and logging tag to use when interfacing with LogSlurp.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SetupLoggingConfiguration'
+      required: true
+    responses:
+      '200':
+        description: Success
 components:
   schemas:
     Collections:
@@ -673,6 +694,22 @@ components:
           type: string
           enum: ['compact', 'integrityCheck', 'optimize', 'fullOptimize']
           example: 'compact'
+    SetupLoggingConfiguration:
+      type: object
+      required: ['url', 'id', 'tag']
+      properties:
+        url:
+          description: The URL of the LogSlurp server
+          type: string
+          example: 'localhost:8180'
+        id:
+          description: The ID to use when connection to the server
+          type: string
+          example: 'c64aae38-7c1c-4604-934a-e267fc39c3c4'
+        tag:
+          description: The tag to identify this particular host
+          type: string
+          example: 'test-server[0]'
     Replicator:
       type: object
       required: ['id']

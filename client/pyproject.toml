@@ -26,6 +26,8 @@ dependencies = [
     "opentelemetry-api",
     "varname",
     "couchbase",
+    "websocket-client",
+    "requests",
     "typing_extensions; python_version < '3.10'"
 ]
 

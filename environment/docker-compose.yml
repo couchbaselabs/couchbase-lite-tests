@@ -30,3 +30,10 @@ services:
       - "4985:4985"
     depends_on: 
       - "cbl-test-cbs"
+
+  cbl-test-logslurp:
+    build:
+      context: ./LogSlurp
+      dockerfile: LogSlurp/Dockerfile
+    ports:
+      - "8180:8180"

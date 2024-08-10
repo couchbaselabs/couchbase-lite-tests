@@ -12,13 +12,13 @@ def event_loop():
     yield loop
     loop.close()
 
-# Async to avoid DeprecationWarnings about aiohttp client session
 @pytest_asyncio.fixture(scope="session")
-async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
+async def cblpytest(request: pytest.FixtureRequest):
     config = request.config.getoption("--config")
     log_level = request.config.getoption("--cbl-log-level")
     test_props = request.config.getoption("--test-props")
-    return CBLPyTest(config, log_level, test_props, test_server_only=True)
+    cblpytest = await CBLPyTest.create(config, log_level, test_props, True)
+    return cblpytest
 
 @pytest.fixture(scope="session")
 def dataset_path() -> Path:
