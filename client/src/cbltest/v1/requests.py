@@ -504,6 +504,44 @@ class PostPerformMaintenanceRequestBody(TestServerRequestBody):
         return {"database": self.__db, "maintenanceType": self.__type}
 
 
+class SetupLoggingRequestBody(TestServerRequestBody):
+    """
+    The body of a POST /setupLogging request as specified in version 1 of the 
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+
+    Example Body::
+
+        {
+            "url": "localhost:8180",
+            "id": "<guid>",
+            "tag": "test-server[0]
+        }
+    """
+
+    @property
+    def url(self) -> str:
+        """Returns the URL of the LogSlurp server"""
+        return self.__url
+    
+    @property
+    def id(self) -> str:
+        """Returns the ID of the log to interact with on the LogSlurp server"""
+        return self.__id
+    
+    @property
+    def tag(self) -> str:
+        """Returns the tag to use to print in log statements from this particular remote"""
+        return self.__tag
+
+    def __init__(self, url: str, id: str, tag: str):
+        super().__init__(1)
+        self.__url = url
+        self.__id = id
+        self.__tag = tag
+
+    def to_json(self) -> Any:
+        return {"url": self.__url, "id": self.__id, "tag": self.__tag}
+
 # Below this point are all of the concrete test server request types
 # Remember the note from the top of this file about the actual type of the payload
 class PostResetRequest(TestServerRequest):
@@ -584,3 +622,12 @@ class PostPerformMaintenanceRequest(TestServerRequest):
 
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
         super().__init__(1, uuid, "performMaintenance", PostPerformMaintenanceRequestBody, payload=payload)
+
+class SetupLoggingRequest(TestServerRequest):
+    """
+    A POST /setupLogging request as specified in version 1 of the 
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+    """
+    
+    def __init__(self, uuid: UUID, payload: SetupLoggingRequestBody):
+        super().__init__(1, uuid, "setupLogging", SetupLoggingRequestBody, payload=payload)

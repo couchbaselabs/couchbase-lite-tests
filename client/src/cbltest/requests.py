@@ -29,6 +29,7 @@ class TestServerRequestType(Enum):
     SNAPSHOT_DOCS = "PostSnapshotDocumentsRequest"
     VERIFY_DOCS = "PostVerifyDocumentsRequest"
     PERFORM_MAINTENANCE = "PostPerformMaintenanceRequest"
+    SETUP_LOGGING = "SetupLoggingRequest"
 
     def __str__(self) -> str:
         return self.value

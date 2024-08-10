@@ -3,4 +3,5 @@
 .idea
 android-config.json
 java-config.json
-
+testserver.log
+session.log

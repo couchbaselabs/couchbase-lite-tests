@@ -290,3 +290,11 @@ class PostPerformMaintenanceResponse(TestServerResponse):
     """
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "performMaintenance")
+
+class SetupLoggingResponse(TestServerResponse):
+    """
+    A POST /setupLogging response as specified in version 1 of the 
+    [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
+    """
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "setupLogging")

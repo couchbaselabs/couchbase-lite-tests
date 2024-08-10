@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, cast
 
 from .requests import RequestFactory
-from .logging import LogLevel, cbl_setLogLevel
+from .logging import LogLevel, cbl_setLogLevel, cbl_log_init
 from .extrapropsparser import _parse_extra_props
 from .configparser import CouchbaseServerInfo, ParsedConfig, SyncGatewayInfo, _parse_config
 from .assertions import _assert_not_null
@@ -53,6 +53,21 @@ class CBLPyTest:
     @property
     def couchbase_servers(self) -> List[CouchbaseServer]:
         return self.__couchbase_servers
+    
+    @staticmethod
+    async def create(config_path: str, log_level: LogLevel = LogLevel.VERBOSE, extra_props_path: Optional[str] = None, 
+                 test_server_only: bool = False):
+        ret_val = CBLPyTest(config_path, log_level, extra_props_path, test_server_only)
+        log_id = cbl_log_init(ret_val.config.logslurp_url)
+        if ret_val.config.logslurp_url is None or log_id is None:
+            return ret_val
+        
+        ts_index = 0
+        for ts in ret_val.test_servers:
+            await ts.setup_logging(ret_val.config.logslurp_url, log_id, f"test-server[{ts_index}]")
+            ts_index += 1
+
+        return ret_val
     
     def __init__(self, config_path: str, log_level: LogLevel = LogLevel.VERBOSE, extra_props_path: Optional[str] = None, 
                  test_server_only: bool = False):

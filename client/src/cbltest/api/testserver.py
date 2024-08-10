@@ -6,7 +6,7 @@ from cbltest.api.database import Database
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.responses import GetRootResponse
-from cbltest.v1.requests import PostResetRequestBody
+from cbltest.v1.requests import PostResetRequestBody, SetupLoggingRequestBody
 from cbltest.version import VERSION
 
 
@@ -53,6 +53,19 @@ class TestServer:
                 ret_val.append(Database(self.__request_factory, self.__index, db_name))
 
             return ret_val
+        
+    async def setup_logging(self, url: str, id: str, tag: str):
+        """
+        Instructs this test server to log to the given LogSlurp instance
+
+        :param url: The URL of the LogSlurp server
+        :param id: The ID of the log to log to
+        :param tag: The tag to use for this test server
+        """
+        with self.__tracer.start_as_current_span("setup_logging"):
+            payload = SetupLoggingRequestBody(url, id, tag)
+            request = self.__request_factory.create_request(TestServerRequestType.SETUP_LOGGING, payload)
+            await self.__request_factory.send_request(self.__index, request)
 
     async def cleanup(self) -> None:
         """

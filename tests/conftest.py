@@ -50,11 +50,8 @@ def event_loop():
     yield loop
     loop.close()
 
-# NOTE: Async to avoid DeprecationWarnings about aiohttp client session
-# This is what actually produces the TDK top level class that can be injected
-# into each test.  
 @pytest_asyncio.fixture(scope="session")
-async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
+async def cblpytest(request: pytest.FixtureRequest):
     config = request.config.getoption("--config")
     log_level = request.config.getoption("--cbl-log-level")
     test_props = request.config.getoption("--test-props")
@@ -70,8 +67,9 @@ async def cblpytest(request: pytest.FixtureRequest) -> CBLPyTest:
         processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=f"http://{otel_endpoint}:4317", timeout=5))
         provider.add_span_processor(processor)
         trace.set_tracer_provider(provider)
-
-    return CBLPyTest(config, log_level, test_props)
+    
+    cblpytest = await CBLPyTest.create(config, log_level, test_props, True)
+    return cblpytest
 
 # This function will set up an object that will track the result
 # of the test run and then upload them to Greenboard.
