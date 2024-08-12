@@ -22,9 +22,9 @@ namespace LogSlurp
 
                 var tag = HttpContext.Request.Headers[LogTagHeader].FirstOrDefault();
                 if (tag == null || tag == String.Empty) {
-                    tag = "";
+                    tag = "{0} ";
                 } else {
-                    tag += ": ";
+                    tag += ": {0} ";
                 }
 
                 var ws = await HttpContext.WebSockets.AcceptWebSocketAsync();
@@ -103,13 +103,14 @@ namespace LogSlurp
             return id;
         }
 
-        private static async Task ReadLogs(WebSocket ws, string id, string? tag)
+        private static async Task ReadLogs(WebSocket ws, string id, string prologueFormat)
         {
             var writer = FileLoggers[id];
             var buffer = new byte[1024 * 4];
             var receiveResult = await ws.ReceiveAsync(buffer, CancellationToken.None);
             while(!receiveResult.CloseStatus.HasValue) {
-                await writer.WriteAsync(tag);
+                var now = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm:ss,fff");
+                await writer.WriteAsync(String.Format(prologueFormat, now));
                 await writer.WriteLineAsync(buffer.Take(receiveResult.Count).Select(x => (char)x).ToArray());
                 receiveResult = await ws.ReceiveAsync(buffer, CancellationToken.None);
             }

@@ -81,7 +81,7 @@ internal sealed class LogSlurpSink : ILogEventSink, IDisposable
 
 internal static class SerilogExtensions 
 {
-    internal const string DefaultSlurpOutputTemplate = "{@t:yyyy-MM-dd HH:mm:ss,fff} [{@l:u3}]: {@m}\n{@x}";
+    internal const string DefaultSlurpOutputTemplate = "[{@l:u3}]: {@m}\n{@x}";
 
     public static LoggerConfiguration LogSlurp(this LoggerSinkConfiguration config, string url, string id, string tag,
         string outputTemplate = DefaultSlurpOutputTemplate)
