@@ -61,7 +61,7 @@ def cbl_log_init(logslurp_url: Optional[str]) -> Optional[str]:
             respJson = cast(dict, resp.json())
             log_id = cast(str, respJson["log_id"])
             logslurp_handler = LogSlurpHandler(logslurp_url, log_id)
-            logslurp_handler.setFormatter(Formatter('%(asctime)s [%(levelname)s]: %(message)s'))
+            logslurp_handler.setFormatter(Formatter('[%(levelname)s]: %(message)s'))
             _cbl_log.addHandler(logslurp_handler)
 
     _cbl_log.info(f"-- Python test client v{VERSION} started --\n")

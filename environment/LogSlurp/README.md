@@ -1,6 +1,19 @@
 # LogSlurp server
 
-This is a server that is meant to be like a slightly improved version of netcat.  It is capable of session scoped logging from multiple sources simultaneously, with facilities to then retrieve the resulting consolidated log.
+This is a server that is meant to be like a slightly improved version of netcat.  It is capable of session scoped logging from multiple sources simultaneously, with facilities to then retrieve the resulting consolidated log.  The server works on a simple concept of creating a logging session, allowing multiple sources to write to the log, and then allowing the combined log to be retrieved.  The steps are as follows:
+
+1. Start a new log session
+2. Open a new log stream specifying the session you want to interact with, and a tag to identify the entity logging
+3. Write log messages to the stream
+4. Close all streams of the session
+5. Finish the log session
+6. Retrieve the log
+
+The server will write messages to the log in the following format:
+
+`{tag}: {timestamp} {message}`
+
+The timestamp is generated on the server, to keep the log timestamp flow consistent, so logging a timestamp in the message on the client side is discouraged.
 
 ## Endpoints
 
@@ -55,12 +68,10 @@ There is also a console application in this repo called [ClientLogger](./ClientL
 
 Example output:
 
-> \>dotnet run<br />
+> \> dotnet run<br />
 Begin typing (type quit to quit)<br />
 hello<br />
-world<br />
 quit<br />
 <br />
 ==== Retrieved ====<br />
-ClientLogger: hello<br />
-ClientLogger: world
+ClientLogger: 2024-08-12 23:33:34,147 hello
