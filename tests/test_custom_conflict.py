@@ -63,7 +63,7 @@ class TestCustomConflict(CBLTestClass):
         existing = await cblpytest.sync_gateways[0].get_document("names", "name_101")
         assert existing is not None, "Missing name_101 on remote"
         newBody = existing.body
-        dict(newBody["name"])["last"] = "Jones"
+        newBody["name"]["last"] = "Jones"
         await cblpytest.sync_gateways[0].update_documents("names", [DocumentUpdateEntry("name_101", existing.revid, newBody)])
 
         self.mark_test_step("""
