@@ -24,12 +24,11 @@ internal readonly record struct SetupLoggingBody
     public required string tag { get; init; }
 }
 
-internal sealed class LogSlurpSink : ILogEventSink, IDisposable
+internal sealed class LogSlurpSink : ILogEventSink
 {
     private ClientWebSocket _ws = new();
     private ManualResetEventSlim _connectWait = new();
     private ManualResetEventSlim _sendWait = new();
-    private bool _disposed = false;
     private readonly ITextFormatter _formatter;
 
     public LogSlurpSink(string url, string id, string tag, ITextFormatter textFormatter)
@@ -43,10 +42,6 @@ internal sealed class LogSlurpSink : ILogEventSink, IDisposable
 
     public void Emit(LogEvent logEvent)
     {
-        if(_disposed) {
-            return;
-        }
-
         if (!_connectWait.Wait(TimeSpan.FromSeconds(5))) {
             throw new TimeoutException("LogSlurpSink hung on connect");
         }
@@ -60,22 +55,6 @@ internal sealed class LogSlurpSink : ILogEventSink, IDisposable
         if (!_sendWait.Wait(TimeSpan.FromSeconds(5))) {
             throw new TimeoutException("LogSlurpSink hung on send");
         }
-    }
-
-    public void Dispose()
-    {
-        if(_disposed) {
-            return;
-        }
-
-        _disposed = true;
-        _connectWait.Dispose();
-
-        _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None)
-            .ContinueWith(t =>
-            {
-                _ws.Dispose();
-            });
     }
 }
 
@@ -95,6 +74,8 @@ internal static partial class HandlerList
     private static readonly Microsoft.Extensions.Logging.ILogger SetupLoggingLogger
         = MauiProgram.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("SetupLoggingHandler");
 
+    private static Serilog.ILogger? Original = null;
+
     [HttpHandler("setupLogging")]
     public static Task SetupLoggingHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
@@ -104,8 +85,12 @@ internal static partial class HandlerList
 
         // A little trick I learned from Serilog.  Instead of trying to mess with the existing
         // configurations, create a new one that logs to the existing one AND the new sink
+        if(Original == null) {
+            Original = Log.Logger;
+        }
+
         Log.Logger = new LoggerConfiguration()
-            .WriteTo.Logger(Log.Logger)
+            .WriteTo.Logger(Original)
             .WriteTo.LogSlurp(setupLoggingBody.url, setupLoggingBody.id, setupLoggingBody.tag)
             .CreateLogger();
 

@@ -85,7 +85,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 0.1.8
+  version: 0.3.0
 tags:
   - name: API
 paths:
@@ -127,7 +127,7 @@ paths:
 
           * **datasets** (Optional) : the datasets which are prebuilt databases to be copied as the specified database names.
             The data structure is a JSON dictionary where the keys are the dataset names and the values are an array of the
-            database names. Without specified, no databases will be created.
+            database names. Without specified, no databases will be created.  The special catalog name 'empty' will create databases with no content inside.
         content:
           application/json:
             schema:
@@ -566,14 +566,14 @@ paths:
       requestBody:
         description: |-
           The request object specifies the URL, logging ID, and logging tag to use when interfacing with LogSlurp.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/SetupLoggingConfiguration'
-      required: true
-    responses:
-      '200':
-        description: Success
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetupLoggingConfiguration'
+        required: true
+      responses:
+        '200':
+          description: Success
 components:
   schemas:
     Collections:
@@ -784,7 +784,7 @@ components:
           example: false
         pinnedServerCert:
           description: The PEM representation of the TLS certificate that the remote is using
-          type: str
+          type: string
           example: |
             -----BEGIN CERTIFICATE-----
             ...
@@ -817,6 +817,11 @@ components:
         pullFilter:
           description: Pull Filter - A filter function called before saving a pulled document
           $ref: '#/components/schemas/ReplicationFilter'
+        conflictResolver:
+          description: One of the predefined conflict resolvers to use during replication
+          type: string
+          example: 'local-wins'
+          enum: ['local-wins', 'remote-wins']
     ReplicationFilter:
       description: |- 
         Replication Function to call before pushing a document or before saving a pulled documents.

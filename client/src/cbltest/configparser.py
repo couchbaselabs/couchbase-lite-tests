@@ -151,8 +151,10 @@ class ParsedConfig:
                                               "username" not in self.__greenboard or
                                               "password" not in self.__greenboard):
             raise ValueError("Malformed greenboard entry, must have hostname username and password")
+            
+        self.__logslurp_url: Optional[str] = None
         if self.__logslurp_key in json:
-            self.__logslurp_url: Optional[str] = cast(str, json[self.__logslurp_key])
+            self.__logslurp_url = cast(str, json[self.__logslurp_key])
 
     def __str__(self) -> str:
         ret_val = "API Version: " + str(self.__api_version) + "\n" + \

@@ -68,7 +68,7 @@ async def cblpytest(request: pytest.FixtureRequest):
         provider.add_span_processor(processor)
         trace.set_tracer_provider(provider)
     
-    cblpytest = await CBLPyTest.create(config, log_level, test_props, True)
+    cblpytest = await CBLPyTest.create(config, log_level, test_props)
     return cblpytest
 
 # This function will set up an object that will track the result

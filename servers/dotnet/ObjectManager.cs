@@ -45,10 +45,37 @@ namespace TestServer
 
         public async Task LoadDataset(string name, IEnumerable<string> targetDbNames)
         {
+            IEnumerable<string> targetsToCreate = default!;
             using (var rl = _lock.GetReadLock()) {
-                if (_activeDatabases.ContainsKey(name)) {
+                targetsToCreate = targetDbNames.Where(x => !_activeDatabases.ContainsKey(x));
+                if (!targetsToCreate.Any()) {
                     return;
                 }
+            }
+
+            void CreateNewDatabases(string datasetName)
+            {
+                foreach (var targetName in targetsToCreate) {
+                    if (Database.Exists(targetName, FilesDirectory)) {
+                        Database.Delete(targetName, FilesDirectory);
+                    }
+
+                    var dbConfig = new DatabaseConfiguration
+                    {
+                        Directory = FilesDirectory
+                    };
+
+                    if (datasetName != "empty") {
+                        Database.Copy(Path.Join(FilesDirectory, $"{name}.cblite2"), targetName, dbConfig);
+                    }
+
+                    _activeDatabases[targetName] = new Database(targetName, dbConfig);
+                }
+            }
+
+            if(name == "empty") {
+                CreateNewDatabases(name);
+                return;
             }
 
             Stream asset;
@@ -73,23 +100,7 @@ namespace TestServer
                 Database.Delete(name, FilesDirectory);
             }
 
-            ZipFile.ExtractToDirectory(destinationZip, FilesDirectory);
-            File.Delete(destinationZip);
-
-            foreach (var targetDbName in targetDbNames) {
-                if (Database.Exists(targetDbName, FilesDirectory)) {
-                    Database.Delete(targetDbName, FilesDirectory);
-                }
-
-                var dbConfig = new DatabaseConfiguration
-                {
-                    Directory = FilesDirectory
-                };
-
-                Database.Copy(Path.Join(FilesDirectory, $"{name}.cblite2"), targetDbName, dbConfig);
-                _activeDatabases[targetDbName] = new Database(targetDbName, dbConfig);
-            }
-
+            CreateNewDatabases(name);
             Database.Delete(name, FilesDirectory);
         }
 

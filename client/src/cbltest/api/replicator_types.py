@@ -44,7 +44,8 @@ class ReplicatorCollectionEntry(JSONSerializable):
 
     def __init__(self, names: Optional[List[str]] = None, channels: Optional[List[str]] = None,
                  document_ids: Optional[List[str]] = None,
-                 push_filter: Optional[ReplicatorFilter] = None, pull_filter: Optional[ReplicatorFilter] = None):
+                 push_filter: Optional[ReplicatorFilter] = None, pull_filter: Optional[ReplicatorFilter] = None,
+                 conflict_resolver: Optional[str] = None):
         if names is None:
             self.__names = ["_default"]
         else:
@@ -63,8 +64,11 @@ class ReplicatorCollectionEntry(JSONSerializable):
         self.pull_filter = pull_filter
         """The pull filter to use for this collection, if any"""
 
+        self.conflict_resolver: Optional[str] = conflict_resolver
+        """The name of the one of the predefined conflict resolvers to use in this replication"""
+
     def to_json(self) -> Any:
-        ret_val = {
+        ret_val: dict[str, Any] = {
             "names": self.__names
         }
 
@@ -79,6 +83,9 @@ class ReplicatorCollectionEntry(JSONSerializable):
 
         if self.pull_filter is not None:
             ret_val["pullFilter"] = self.pull_filter.to_json()
+
+        if self.conflict_resolver is not None:
+            ret_val["conflictResolver"] = self.conflict_resolver
 
         return ret_val
 
