@@ -158,16 +158,30 @@ internal static partial class HandlerList
         public IReadOnlyList<string> documentIDs { get; init; }
         public StartReplicatorFilter? pushFilter { get; init; }
         public StartReplicatorFilter? pullFilter { get; init; }
+        public string? conflictResolver { get; init; }
+        public IConflictResolver? ConflictResolver { get; }
 
         [JsonConstructor]
         public StartReplicatorCollection(IReadOnlyList<string> names, IReadOnlyList<string?>? channels = default,
-             IReadOnlyList<string?>? documentIDs = default, StartReplicatorFilter? pushFilter = null, StartReplicatorFilter? pullFilter = null)
+             IReadOnlyList<string?>? documentIDs = default, StartReplicatorFilter? pushFilter = null, StartReplicatorFilter? pullFilter = null,
+             string? conflictResolver = null)
         {
             this.names = names;
             this.channels = channels.NotNull().ToList() ?? new List<string>();
             this.documentIDs = documentIDs.NotNull().ToList() ?? new List<string>();
             this.pushFilter = pushFilter;
             this.pullFilter = pullFilter;
+            this.conflictResolver = conflictResolver;
+            switch(conflictResolver) {
+                case null:
+                    break;
+                case "local-wins":
+                    ConflictResolver = new LocalWinsConflictResolver();
+                    break;
+                case "remote-wins":
+                    ConflictResolver = new RemoteWinsConflictResolver();
+                    break;
+            }
         }
     }
 
@@ -202,6 +216,7 @@ internal static partial class HandlerList
         {
             this.database = database;
             this.endpoint = endpoint;
+            this.replicatorType = replicatorType;
             this.continuous = continuous;
             this.collections = collections;
             this.authenticator = authenticator;
@@ -294,6 +309,8 @@ internal static partial class HandlerList
                     CBLTestServer.Manager.KeepAlive(filter);
                     collConfig.PullFilter = filter.Execute;
                 }
+
+                collConfig.ConflictResolver = c.ConflictResolver;
 
                 replConfig.AddCollections(collections, collConfig);
             }
