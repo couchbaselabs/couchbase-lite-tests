@@ -7,6 +7,8 @@ from cbltest.api.replicator_types import (ReplicatorCollectionEntry, ReplicatorB
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.database import SnapshotUpdater
+from cbltest.api.database_types import SnapshotDocumentEntry
 
 from test_replication_filter_data import *
 import pytest
@@ -234,6 +236,87 @@ class TestReplicationFilter(CBLTestClass):
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
 
         await cblpytest.test_servers[0].cleanup()
+
+    @pytest.mark.asyncio
+    async def test_replicate_public_channel(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Reset SG and load `names` dataset.")
+        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
+        await cloud.configure_dataset(dataset_path, "names")
+
+        self.mark_test_step("Reset local database, and load `empty` dataset.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db("empty", ["db1"])
+        db = dbs[0]
+        snapshot_id = await db.create_snapshot([SnapshotDocumentEntry("_default._default", "test_public")])
+        snapshot_updater = SnapshotUpdater(snapshot_id)
+
+        self.mark_test_step("""
+            Add a document to SG
+                * id: test_public
+                * channels: `!`
+                * content: `{"hello": "world"}`
+        """)
+        sgw = cblpytest.sync_gateways[0]
+        await sgw.update_documents("names", [DocumentUpdateEntry("test_public", None, 
+                                                                 {"hello": "world", "channels": ["!"]})])
+        snapshot_updater.upsert_document("_default._default", "test_public",
+                                         [
+                                             {"hello": "world"},
+                                             {"channels": ["!"]}
+                                         ])
+
+        self.mark_test_step("""
+            Start a replicator: 
+                * endpoint: `/names`
+                * type: pull
+                * continuous: false
+                * credentials: user2/pass
+        """)
+        replicator = Replicator(db, sgw.replication_url("names"), ReplicatorType.PULL, 
+                          authenticator=ReplicatorBasicAuthenticator("user2", "pass"),
+                          pinned_server_cert=sgw.tls_cert())
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator is stopped.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, \
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        
+        self.mark_test_step("Check that only test_public was pulled")
+        all_docs = await db.get_all_documents("_default._default")
+        assert "_default._default" in all_docs and len(all_docs["_default._default"]) == 1, "Invalid number of documents after pull"
+
+        self.mark_test_step("Verify test_public contents")
+        await db.verify_documents(snapshot_updater)
+
+        self.mark_test_step("""
+            Update test_public locally
+                * body: `{"see you later": "world"}`
+        """)
+        async with db.batch_updater() as b:
+            b.upsert_document("_default._default", "test_public", [{"see you later": "world"}])
+        
+        self.mark_test_step("""
+            Start a replicator: 
+                * endpoint: `/names`
+                * type: push
+                * continuous: false
+                * credentials: user2/pass
+        """)
+        replicator = Replicator(db, sgw.replication_url("names"), ReplicatorType.PUSH, 
+                          authenticator=ReplicatorBasicAuthenticator("user2", "pass"),
+                          pinned_server_cert=sgw.tls_cert())
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator is stopped.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, \
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        
+        self.mark_test_step("Verify that the document on Sync Gateway was updated")
+        sgw_doc = await sgw.get_document("names", "test_public")
+        assert sgw_doc is not None, "test_public missing from SGW"
+        assert "see you later" in sgw_doc.body, "updated key missing from test_public in SGW"
+        assert sgw_doc.body["see you later"] == "world", "incorrect data in updated key from test_public in SGW"
 
     @pytest.mark.asyncio
     async def test_custom_push_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:

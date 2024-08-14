@@ -244,7 +244,7 @@ Test that when the push replicator starts with its checkpoint reset, the push re
 11. Wait until the replicator is stopped.
 12. Check that the purged airline doc is pushed back to SG
 
-## test_reset_checkpoint_pull
+## #12 test_reset_checkpoint_pull
 
 ### Description
 
@@ -268,4 +268,4 @@ Test that when the pull replicator starts with its checkpoint reset, the pull re
 9. Check that the purged airport doc doesn't exist in CBL database.
 10. Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.
 11. Wait until the replicator is stopped.
-12. 12. Check that the purged airport doc is pulled back in CBL database.
+12. Check that the purged airport doc is pulled back in CBL database.

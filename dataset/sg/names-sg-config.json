@@ -22,6 +22,10 @@
           }
         }
       }
+    },
+    "user2": {
+      "password": "pass",
+      "collection_access": {}
     }
   }
 }

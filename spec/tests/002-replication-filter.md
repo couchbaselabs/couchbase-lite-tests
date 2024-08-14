@@ -74,7 +74,7 @@ Test that the replicator will pull only the docs specified in the channels filte
          * channels : `United States`, `France`
       * `travel.landmarks`
          * channels : `France`
-    * endpoint: `/travel
+    * endpoint: `/travel`
     * type: pull
     * continuous: false
     * credentials: user1/pass
@@ -86,6 +86,38 @@ Test that the replicator will pull only the docs specified in the channels filte
    * Remove `landmark_1` channels = ["United States"], `landmark_2001` channels = ["France"] in `travel.landmarks`
 7. Start the replicator with the same config as the step 3.
 8. Check that only changes in the filtered channels are pulled.
+
+## test_replicate_public_channel
+
+### Description
+
+Test that the replicator will pull only the docs specified in the channels filter.
+
+### Steps
+
+1. Reset SG and load `names` dataset.
+2. Reset local database, and load `empty` dataset.
+3. Add a document to SG
+   * id: test_public
+   * channels: `!`
+   * body: `{"hello": "world"}`
+4. Start a replicator: 
+    * endpoint: `/names`
+    * type: pull
+    * continuous: false
+    * credentials: user2/pass
+5. Wait until the replicator is stopped.
+6. Check that only test_public was pulled
+7. Verify test_public contents
+8. Update test_public locally
+   * body: `{"see you later": "world"}`
+9. Start a replicator: 
+    * endpoint: `/names`
+    * type: push
+    * continuous: false
+    * credentials: user2/pass
+10. Wait until the replicator is stopped.
+11. Verify that the document on Sync Gateway was updated
 
 ## test_custom_push_filter
 
