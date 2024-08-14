@@ -1,22 +1,15 @@
-﻿using Microsoft.Extensions.Logging;
-using System.Collections.Specialized;
-using System.Net;
-using System.Reflection;
+﻿using System.Net;
 using System.Text.Json;
-using TestServer.Services;
 
 namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
-    private static readonly ILogger ResetLogger =
-        MauiProgram.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("ResetHandler");
-
     [HttpHandler("reset")]
     public static async Task ResetDatabaseHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
-        if(body.RootElement.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String) {
-            ResetLogger.LogInformation(">>>>>>>>>> {name}", name);
+        if(body.RootElement.TryGetProperty("test", out var name) && name.ValueKind == JsonValueKind.String) {
+            Serilog.Log.Logger.Information(">>>>>>>>>> {name}", name);
         }
         
         if(!body.RootElement.TryGetProperty("datasets", out var datasets) || datasets.ValueKind != JsonValueKind.Object) {
