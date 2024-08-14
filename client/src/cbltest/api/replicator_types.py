@@ -34,6 +34,29 @@ class ReplicatorFilter(JSONSerializable):
             ret_val["params"] = self.parameters
 
         return ret_val
+    
+    
+class ReplicatorConflictResolver(JSONSerializable):
+    """
+    A class representing a conflict resolver to use on a replication.
+    """
+
+    @property
+    def name(self) -> str:
+        """Gets the name of the resolver"""
+        return self.__name
+
+    def __init__(self, name: str, parameters: Optional[dict] = None):
+        self.__name = name
+        self.parameters = parameters
+        """The parameters to be applied to the resolver"""
+
+    def to_json(self) -> Any:
+        ret_val: Dict[str, Any] = {"name": self.name}
+        if self.parameters is not None:
+            ret_val["params"] = self.parameters
+
+        return ret_val
 
 
 class ReplicatorCollectionEntry(JSONSerializable):
@@ -45,7 +68,7 @@ class ReplicatorCollectionEntry(JSONSerializable):
     def __init__(self, names: Optional[List[str]] = None, channels: Optional[List[str]] = None,
                  document_ids: Optional[List[str]] = None,
                  push_filter: Optional[ReplicatorFilter] = None, pull_filter: Optional[ReplicatorFilter] = None,
-                 conflict_resolver: Optional[str] = None):
+                 conflict_resolver: Optional[ReplicatorConflictResolver] = None):
         if names is None:
             self.__names = ["_default"]
         else:
@@ -64,7 +87,7 @@ class ReplicatorCollectionEntry(JSONSerializable):
         self.pull_filter = pull_filter
         """The pull filter to use for this collection, if any"""
 
-        self.conflict_resolver: Optional[str] = conflict_resolver
+        self.conflict_resolver = conflict_resolver
         """The name of the one of the predefined conflict resolvers to use in this replication"""
 
     def to_json(self) -> Any:
@@ -85,7 +108,7 @@ class ReplicatorCollectionEntry(JSONSerializable):
             ret_val["pullFilter"] = self.pull_filter.to_json()
 
         if self.conflict_resolver is not None:
-            ret_val["conflictResolver"] = self.conflict_resolver
+            ret_val["conflictResolver"] = self.conflict_resolver.to_json()
 
         return ret_val
 

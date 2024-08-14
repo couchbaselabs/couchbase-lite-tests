@@ -824,8 +824,7 @@ components:
         conflictResolver:
           description: One of the predefined conflict resolvers to use during replication
           type: string
-          example: 'local-wins'
-          enum: ['local-wins', 'remote-wins']
+          $ref: '#/components/schemas/ConflictResolver'
     ReplicationFilter:
       description: |- 
         Replication Function to call before pushing a document or before saving a pulled documents.
@@ -844,6 +843,22 @@ components:
           type: object
           additionalProperties: { }
           example: { 'documentIDs': ['doc1', 'doc2'] }
+    ConflictResolver:
+      description: |-
+        The conflict resolver to set for this collection of the replication.  Each resolver is predefined
+        and implemented in the test server.
+
+        See: spec/conflict-resolvers.md for the list of predefined conflict resolvers
+      type: object
+      required: ['name']
+      properties:
+        name:
+          type: string
+          example: 'merge'
+        params:
+          type: object
+          additionalProperties: { }
+          example: { 'property': 'region'}
     ReplicatorStatus:
       type: object
       required: ['activity', 'progress']

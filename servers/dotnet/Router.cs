@@ -144,6 +144,11 @@ namespace TestServer
 
         internal static void HandleException(Exception ex, Uri endpoint, int version, HttpListenerResponse response)
         {
+            if(ex is JsonException) {
+                response.WriteBody(CreateErrorResponse(ex.Message), version, HttpStatusCode.BadRequest);
+                return;
+            }
+
             var msg = MultiExceptionString(ex);
             Logger.LogWarning("Error in handler for {endpoint}", endpoint);
             Logger.LogWarning("{msg}", msg);

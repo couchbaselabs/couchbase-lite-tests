@@ -1,11 +1,12 @@
 from pathlib import Path
+from typing import Callable
 
 import pytest
 
 from cbltest import CBLPyTest
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import ReplicatorCollectionEntry, ReplicatorType, \
-    ReplicatorBasicAuthenticator, ReplicatorActivityLevel
+    ReplicatorBasicAuthenticator, ReplicatorActivityLevel, ReplicatorConflictResolver
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.test_functions import compare_local_and_remote
@@ -13,10 +14,9 @@ from cbltest.api.database import SnapshotUpdater
 from cbltest.api.database_types import SnapshotDocumentEntry
 from cbltest.api.syncgateway import DocumentUpdateEntry
 
-
 class TestCustomConflict(CBLTestClass):
-    @pytest.mark.asyncio
-    async def test_custom_conflict_local_wins(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def do_custom_conflict_test(self, cblpytest: CBLPyTest, dataset_path: Path, 
+                                      conflict_resolver: ReplicatorConflictResolver, setup_snapshot: Callable[[SnapshotUpdater], str]):
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "names")
@@ -54,10 +54,9 @@ class TestCustomConflict(CBLTestClass):
         self.mark_test_step("Modify the local name_101 document `name.last` = 'Smith'")
         update_coll = "_default._default"
         update_id = "name_101"
-        update_props = [{"name.last": "Smith"}]
+        verify_description = setup_snapshot(snapshot_updater)
         async with db.batch_updater() as b:
-            b.upsert_document(update_coll, update_id, update_props)
-            snapshot_updater.upsert_document(update_coll, update_id, update_props)
+            b.upsert_document(update_coll, update_id, [{"name.last": "Smith"}])
 
         self.mark_test_step("Modify the remote name_101 document `name.last` = 'Jones'")
         existing = await cblpytest.sync_gateways[0].get_document("names", "name_101")
@@ -66,18 +65,19 @@ class TestCustomConflict(CBLTestClass):
         newBody["name"]["last"] = "Jones"
         await cblpytest.sync_gateways[0].update_documents("names", [DocumentUpdateEntry("name_101", existing.revid, newBody)])
 
-        self.mark_test_step("""
+        resolver_params = f" / {conflict_resolver.parameters}" if conflict_resolver.parameters is not None else ""
+        self.mark_test_step(f"""
             Start a replicator:
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: push/pull
                 * continuous: false
                 * credentials: user1/pass
-                * conflictResolver: 'local-wins'
+                * conflictResolver: '{conflict_resolver.name}'{resolver_params}
         """)
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"),
                                 replicator_type=ReplicatorType.PULL, collections=[
-                ReplicatorCollectionEntry(["_default._default"], conflict_resolver="local-wins")
+                ReplicatorCollectionEntry(["_default._default"], conflict_resolver=conflict_resolver)
             ], authenticator=ReplicatorBasicAuthenticator("user1", "pass"), pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
@@ -86,6 +86,38 @@ class TestCustomConflict(CBLTestClass):
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("Check that the names_101 document `names.last` == 'Smith'")
+        self.mark_test_step(verify_description)
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Conflict resolution resulted in bad data: {verify_result.description}"
+
+    @pytest.mark.asyncio
+    async def test_custom_conflict_local_wins(self, cblpytest: CBLPyTest, dataset_path: Path):
+        def setup_snapshot(updater: SnapshotUpdater):
+            updater.upsert_document("_default._default", "name_101", [{"name.last": "Smith"}])
+            return "Check that the names_101 document `name.last` == 'Smith'"
+        
+        await self.do_custom_conflict_test(cblpytest, dataset_path, ReplicatorConflictResolver("local-wins"), setup_snapshot)
+
+    @pytest.mark.asyncio
+    async def test_custom_conflict_remote_wins(self, cblpytest: CBLPyTest, dataset_path: Path):
+        def setup_snapshot(updater: SnapshotUpdater):
+            updater.upsert_document("_default._default", "name_101", [{"name.last": "Jones"}])
+            return "Check that the names_101 document `name.last` == 'Jones'"
+        
+        await self.do_custom_conflict_test(cblpytest, dataset_path, ReplicatorConflictResolver("remote-wins"), setup_snapshot)
+
+    @pytest.mark.asyncio
+    async def test_custom_conflict_delete(self, cblpytest: CBLPyTest, dataset_path: Path):
+        def setup_snapshot(updater: SnapshotUpdater):
+            updater.delete_document("_default._default", "name_101")
+            return "Check that the names_101 document is deleted"
+        
+        await self.do_custom_conflict_test(cblpytest, dataset_path, ReplicatorConflictResolver("delete"), setup_snapshot)
+
+    @pytest.mark.asyncio
+    async def test_custom_conflict_merge(self, cblpytest: CBLPyTest, dataset_path: Path):
+        def setup_snapshot(updater: SnapshotUpdater):
+            updater.upsert_document("_default._default", "name_101", [{"name": [{"first": "Davis", "last": "Smith"}, {"first": "Davis", "last": "Jones"}]}])
+            return "Check that the names_101 document `name` property contains `[{'first': 'Davis', 'last': 'Smith'},{'first': 'Davis', 'last': 'Jones'}]`"
+        
+        await self.do_custom_conflict_test(cblpytest, dataset_path, ReplicatorConflictResolver("merge", {"property": "name"}), setup_snapshot)

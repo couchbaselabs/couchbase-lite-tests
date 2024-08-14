@@ -141,10 +141,26 @@ internal static partial class HandlerList
     {
         public required string name { get; init; }
 
+        [JsonPropertyName("params")]
         public IReadOnlyDictionary<string, object>? parameters { get; init; }
 
         [JsonConstructor]
         public StartReplicatorFilter(string name, IReadOnlyDictionary<string, object>? parameters = null)
+        {
+            this.name = name;
+            this.parameters = parameters;
+        }
+    }
+
+    internal record class StartReplicatorConflictResolver
+    {
+        public required string name { get; init; }
+
+        [JsonPropertyName("params")]
+        public IReadOnlyDictionary<string, JsonElement>? parameters { get; init; }
+
+        [JsonConstructor]
+        public StartReplicatorConflictResolver(string name, IReadOnlyDictionary<string, JsonElement>? parameters = null)
         {
             this.name = name;
             this.parameters = parameters;
@@ -158,13 +174,13 @@ internal static partial class HandlerList
         public IReadOnlyList<string> documentIDs { get; init; }
         public StartReplicatorFilter? pushFilter { get; init; }
         public StartReplicatorFilter? pullFilter { get; init; }
-        public string? conflictResolver { get; init; }
+        public StartReplicatorConflictResolver? conflictResolver { get; init; }
         public IConflictResolver? ConflictResolver { get; }
 
         [JsonConstructor]
         public StartReplicatorCollection(IReadOnlyList<string> names, IReadOnlyList<string?>? channels = default,
              IReadOnlyList<string?>? documentIDs = default, StartReplicatorFilter? pushFilter = null, StartReplicatorFilter? pullFilter = null,
-             string? conflictResolver = null)
+             StartReplicatorConflictResolver? conflictResolver = null)
         {
             this.names = names;
             this.channels = channels.NotNull().ToList() ?? new List<string>();
@@ -172,7 +188,7 @@ internal static partial class HandlerList
             this.pushFilter = pushFilter;
             this.pullFilter = pullFilter;
             this.conflictResolver = conflictResolver;
-            switch(conflictResolver) {
+            switch(conflictResolver?.name) {
                 case null:
                     break;
                 case "local-wins":
@@ -181,6 +197,14 @@ internal static partial class HandlerList
                 case "remote-wins":
                     ConflictResolver = new RemoteWinsConflictResolver();
                     break;
+                case "delete":
+                    ConflictResolver = new DeleteConflictResolver();
+                    break;
+                case "merge":
+                    ConflictResolver = new MergeConflictResolver(conflictResolver.parameters);
+                    break;
+                default:
+                    throw new JsonException($"Bad conflict resolver choice {conflictResolver}");
             }
         }
     }
