@@ -1,6 +1,7 @@
 ﻿using Couchbase.Lite;
 using Microsoft.Extensions.Logging;
 using System.IO.Compression;
+using System.Text.Json;
 
 namespace TestServer
 {
@@ -100,6 +101,7 @@ namespace TestServer
                 Database.Delete(name, FilesDirectory);
             }
 
+            ZipFile.ExtractToDirectory(destinationZip, FilesDirectory);
             CreateNewDatabases(name);
             Database.Delete(name, FilesDirectory);
         }
@@ -109,8 +111,10 @@ namespace TestServer
             Stream asset;
             try {
                 asset = await FileSystem.OpenAppPackageFileAsync($"blobs/{name}");
+            } catch (FileNotFoundException) {
+                throw new JsonException($"Request for nonexistent blob '{name}'");
             } catch (Exception ex) {
-                throw new ApplicationException($"Unable to open dataset '{name}'", ex);
+                throw new ApplicationException($"Unable to open blob '{name}'", ex);
             }
 
             return asset;
