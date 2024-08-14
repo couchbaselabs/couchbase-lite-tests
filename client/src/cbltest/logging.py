@@ -9,6 +9,10 @@ from websocket import create_connection
 import requests
 
 class LogSlurpHandler(Handler):
+    @property
+    def id(self) -> str:
+        return self.__id
+    
     def __init__(self, url: str, id: str):
         super(LogSlurpHandler, self).__init__()
         self.__url = url

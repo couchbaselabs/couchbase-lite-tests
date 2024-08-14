@@ -69,7 +69,6 @@ public static class MauiProgram
 #endif
 
 		Serilog.Log.Logger = logConfig.CreateLogger();
-		builder.Logging.AddSerilog(dispose: true);
         Serilog.Log.Logger.Write(LogEventLevel.Information, "Test server started at {time}", DateTimeOffset.UtcNow);
 
 		Couchbase.Lite.Database.Log.Custom = new SerilogLogger();

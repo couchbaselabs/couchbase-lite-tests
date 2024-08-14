@@ -15,7 +15,7 @@ namespace LogSlurp
         public async Task OpenLogStream()
         {
             if(HttpContext.WebSockets.IsWebSocketRequest) {
-                var id = await GetLogID(true);
+                var id = await GetLogID();
                 if(id == null) {
                     return;
                 }
@@ -54,7 +54,7 @@ namespace LogSlurp
         [HttpPost]
         public async Task FinishLog()
         {
-            var id = await GetLogID(true);
+            var id = await GetLogID();
             if (id == null) {
                 return;
             }
@@ -72,9 +72,15 @@ namespace LogSlurp
         [HttpGet]
         public async Task<ActionResult> RetrieveLog()
         {
-            var id = await GetLogID(false);
-            if (id == null) {
+            var id = HttpContext.Request.Headers[LogIDHeader].FirstOrDefault();
+            if (id == null || id == String.Empty) {
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await HttpContext.Response.WriteAsync($"Missing header '{LogIDHeader}'");
                 return BadRequest();
+            }
+
+            if (FileLoggers.TryGetValue(id, out var writer)) {
+                await writer.FlushAsync();
             }
 
             var stream = System.IO.File.Open(Path.Combine(Path.GetTempPath(), "logslurp", $"{id}.txt"),
@@ -85,7 +91,7 @@ namespace LogSlurp
             return File(stream, "text/plain");
         }
 
-        private async Task<string?> GetLogID(bool mustExist)
+        private async Task<string?> GetLogID()
         {
             var id = HttpContext.Request.Headers[LogIDHeader].FirstOrDefault();
             if (id == null || id == String.Empty) {
@@ -94,7 +100,7 @@ namespace LogSlurp
                 return null;
             }
 
-            if (mustExist && !FileLoggers.ContainsKey(id)) {
+            if (!FileLoggers.ContainsKey(id)) {
                 HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
                 await HttpContext.Response.WriteAsync($"Unknown Log ID '{id}'");
                 return null;

@@ -1,17 +1,13 @@
-﻿using Microsoft.Extensions.Logging;
-using Serilog;
+﻿using Serilog;
 using Serilog.Configuration;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Formatting;
 using Serilog.Templates;
-using System.Collections.Specialized;
 using System.Net;
 using System.Net.WebSockets;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using TestServer.Services;
 
 namespace TestServer.Handlers;
 
@@ -71,9 +67,6 @@ internal static class SerilogExtensions
 
 internal static partial class HandlerList
 {
-    private static readonly Microsoft.Extensions.Logging.ILogger SetupLoggingLogger
-        = MauiProgram.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("SetupLoggingHandler");
-
     private static Serilog.ILogger? Original = null;
 
     [HttpHandler("setupLogging")]
