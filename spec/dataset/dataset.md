@@ -59,6 +59,7 @@ Note: Same sync function for all collections
 | Username | Password  | admin_channels          |
 | :------- | --------- |-------------------------|
 | user1    | pass      | ["*"] (All collections) |
+| user2    | pass      | None (Only public `!`)  |
 
 ### Sample Docs
 
