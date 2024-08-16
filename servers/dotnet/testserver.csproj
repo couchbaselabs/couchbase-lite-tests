@@ -38,6 +38,8 @@
         <PublisherName>borrrden</PublisherName>
 		<GenerateTestArtifacts>True</GenerateTestArtifacts>
 		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+		<SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
+		<UseInterpreter Condition="$(TargetFramework.Contains('-ios'))">true</UseInterpreter>
 	</PropertyGroup>
 
 	<ItemGroup>

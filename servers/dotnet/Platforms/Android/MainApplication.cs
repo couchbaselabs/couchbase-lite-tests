@@ -11,5 +11,9 @@ public class MainApplication : MauiApplication
 	{
 	}
 
-	protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+    protected override MauiApp CreateMauiApp()
+    {
+        Couchbase.Lite.Support.Droid.Activate(ApplicationContext);
+        return MauiProgram.CreateMauiApp();
+    }
 }
