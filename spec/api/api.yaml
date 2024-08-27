@@ -598,6 +598,10 @@ paths:
       responses:
         '200':
           description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResults'
         '400':
           $ref: '#/components/responses/Error'
         '500':
@@ -970,6 +974,13 @@ components:
           description: 'The SQL++ query to run'
           type: string
           example: "select meta().id from _default"
+    QueryResults:
+      type: object
+      required: ['results']
+      properties:
+        results:
+          description: 'The JSON serialized results of the query run'
+          type: object
   responses:
     Error:
       description: |- 
