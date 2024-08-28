@@ -34,6 +34,9 @@ info:
       ESCAPE   ::= '\' (! EOP )
 
     Changes
+    
+    0.4.0 (TBD)
+    * Added runQuery endpoint
 
     0.3.1 (08/13/24)
     * Added conflictResolver to ReplicationCollectionEntry
@@ -89,7 +92,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 0.3.1
+  version: 0.4.0
 tags:
   - name: API
 paths:
@@ -578,6 +581,31 @@ paths:
       responses:
         '200':
           description: Success
+  /runQuery:
+    post:
+      tags:
+        - API
+      summary: Runs a SQL++ query against a database
+      description: Given a database and text query, executes the query and returns the result as JSON
+      operationId: runQuery
+      requestBody:
+        description: |-
+          The request object specifies the database and query
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunQueryConfiguration'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResults'
+        '400':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
 components:
   schemas:
     Collections:
@@ -934,6 +962,25 @@ components:
           description: 'Any additional info regarding the server'
           type: string
           example: "CBL Commit 61671d0"
+    RunQueryConfiguration:
+      type: object
+      required: ['database', 'query']
+      properties:
+        database:
+          description: 'The database which will run the query provided'
+          type: string
+          example: 'db1'
+        query:
+          description: 'The SQL++ query to run'
+          type: string
+          example: "select meta().id from _default"
+    QueryResults:
+      type: object
+      required: ['results']
+      properties:
+        results:
+          description: 'The JSON serialized results of the query run'
+          type: object
   responses:
     Error:
       description: |- 
