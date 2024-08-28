@@ -964,9 +964,9 @@ components:
           example: "CBL Commit 61671d0"
     RunQueryConfiguration:
       type: object
-      required: ['db', 'query']
+      required: ['database', 'query']
       properties:
-        db:
+        database:
           description: 'The database which will run the query provided'
           type: string
           example: 'db1'
