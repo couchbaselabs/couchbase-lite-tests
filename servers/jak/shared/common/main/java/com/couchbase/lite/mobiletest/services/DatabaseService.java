@@ -29,6 +29,8 @@ import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.DatabaseConfiguration;
 import com.couchbase.lite.Document;
+import com.couchbase.lite.Result;
+import com.couchbase.lite.ResultSet;
 import com.couchbase.lite.internal.core.C4Database;
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
@@ -188,6 +190,18 @@ public final class DatabaseService {
         }
     }
 
+    public String runQuery(@NonNull Database db, @NonNull String query) {
+        final StringBuilder json = new StringBuilder("[");
+        try (ResultSet rs = db.createQuery(query).execute()) {
+            for (Result r: rs.allResults()) {
+                if (json.length() > 1) { json.append(","); }
+                json.append(r.toJSON());
+            }
+        }
+        catch (CouchbaseLiteException e) { throw new CblApiFailure("Query failed: \"" + query + "\"", e); }
+
+        return json.append("]").toString();
+    }
 
     // New stream constructors are supported only in API 26+
     public void installDataset(@NonNull TestContext ctxt, @NonNull String datasetName, @NonNull String dbName) {

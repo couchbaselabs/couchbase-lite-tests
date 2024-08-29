@@ -28,6 +28,7 @@ import com.couchbase.lite.mobiletest.endpoints.v1.GetReplStatus;
 import com.couchbase.lite.mobiletest.endpoints.v1.Logger;
 import com.couchbase.lite.mobiletest.endpoints.v1.PerformMaintenance;
 import com.couchbase.lite.mobiletest.endpoints.v1.Reset;
+import com.couchbase.lite.mobiletest.endpoints.v1.RunQuery;
 import com.couchbase.lite.mobiletest.endpoints.v1.SnapshotDocs;
 import com.couchbase.lite.mobiletest.endpoints.v1.UpdateDb;
 import com.couchbase.lite.mobiletest.endpoints.v1.VerifyDocs;
@@ -60,6 +61,7 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
         addEndpoint(1, "/snapshotDocuments", (c, r) -> new SnapshotDocs(app.getDbSvc()).snapshot(c, r));
         addEndpoint(1, "/verifyDocuments", (c, r) -> new VerifyDocs(app.getDbSvc()).verify(c, r));
         addEndpoint(1, "/performMaintenance", (c, r) -> new PerformMaintenance(app.getDbSvc()).doMaintenance(c, r));
+        addEndpoint(1, "/runQuery", (c, r) -> new RunQuery(app.getDbSvc()).runQuery(c, r));
     }
 
     // This method returns a Reply.  Be sure to close it!
