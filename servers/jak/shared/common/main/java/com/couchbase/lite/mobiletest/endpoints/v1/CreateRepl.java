@@ -196,7 +196,7 @@ public class CreateRepl {
             throw new ClientError("Replicator configuration doesn't specify a list of collections");
         }
 
-        final Database db = TestApp.getApp().getDbSvc().getOpenDb(ctxt, dbName);
+        final Database db = dbSvc.getOpenDb(ctxt, dbName);
 
         final ReplicatorConfiguration replConfig;
         if (collections.isEmpty()) { replConfig = new ReplicatorConfiguration(db, endpoint); }
