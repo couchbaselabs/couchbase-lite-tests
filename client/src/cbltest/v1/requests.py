@@ -541,6 +541,35 @@ class SetupLoggingRequestBody(TestServerRequestBody):
 
     def to_json(self) -> Any:
         return {"url": self.__url, "id": self.__id, "tag": self.__tag}
+    
+class RunQueryRequestBody(TestServerRequestBody):
+    """
+    The body of a POST /runQuery request as specified in version 1 of the 
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+
+    Example Body::
+
+        {
+            "database": "db",
+            "query": "select meta().id from _"
+        }
+    """
+
+    @property
+    def database(self) -> str:
+        return self.__db
+
+    @property
+    def query(self) -> str:
+        return self.__query
+    
+    def __init__(self, database: str, query: str):
+        super().__init__(1)
+        self.__db = database
+        self.__query = query
+
+    def to_json(self) -> Any:
+        return {"database": self.__db, "query": self.__query}
 
 # Below this point are all of the concrete test server request types
 # Remember the note from the top of this file about the actual type of the payload
@@ -631,3 +660,12 @@ class SetupLoggingRequest(TestServerRequest):
     
     def __init__(self, uuid: UUID, payload: SetupLoggingRequestBody):
         super().__init__(1, uuid, "setupLogging", SetupLoggingRequestBody, payload=payload)
+
+class RunQueryRequest(TestServerRequest):
+    """
+    A POST /runQuery request as specified in version 1 of the 
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+    """
+    
+    def __init__(self, uuid: UUID, payload: RunQueryRequestBody):
+        super().__init__(1, uuid, "runQuery", RunQueryRequestBody, payload=payload)

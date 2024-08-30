@@ -298,3 +298,32 @@ class SetupLoggingResponse(TestServerResponse):
     """
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "setupLogging")
+
+class RunQueryResponse(TestServerResponse):
+    """
+    A POST /runQuery response as specified in version 1 of the 
+    [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
+
+    Example Body::
+
+        {
+            "results": [
+                {...},
+                {...},
+            ]
+    """
+
+    __results_key: Final[str] = "results"
+
+    @property
+    def results(self) -> List[Dict]:
+        return self.__results
+
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "runQuery")
+        if not self.__results_key in body:
+            return
+        
+        results = _get_typed_required(body, self.__results_key, list)
+        self.__results = [dict(e) for e in results] if results is not None else []
+
