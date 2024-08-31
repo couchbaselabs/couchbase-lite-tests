@@ -5,10 +5,11 @@ from typing import Dict, List, cast, Any, Optional
 from opentelemetry.trace import get_tracer
 
 from cbltest.requests import TestServerRequestType
-from cbltest.v1.responses import PostGetAllDocumentsResponse, PostGetAllDocumentsEntry, PostSnapshotDocumentsResponse, PostVerifyDocumentsResponse, ValueOrMissing
+from cbltest.v1.responses import (PostGetAllDocumentsResponse, PostGetAllDocumentsEntry, PostSnapshotDocumentsResponse, 
+                                  PostVerifyDocumentsResponse, ValueOrMissing, RunQueryResponse)
 from cbltest.v1.requests import (DatabaseUpdateEntry, DatabaseUpdateType, PostGetAllDocumentsRequestBody, 
                                  PostUpdateDatabaseRequestBody, SnapshotDocumentEntry, PostSnapshotDocumentsRequestBody,
-                                 PostVerifyDocumentsRequestBody, PostPerformMaintenanceRequestBody)
+                                 PostVerifyDocumentsRequestBody, PostPerformMaintenanceRequestBody, RunQueryRequestBody)
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory
 from cbltest.api.error import CblTestError
@@ -288,3 +289,15 @@ class Database:
             payload = PostPerformMaintenanceRequestBody(self.__name, str(type))
             req = self.__request_factory.create_request(TestServerRequestType.PERFORM_MAINTENANCE, payload)
             await self.__request_factory.send_request(self.__index, req)
+
+    async def run_query(self, query: str) -> List[Dict]:
+        """
+        Runs a SQL++ query on the database and returns the results
+
+        :param query: The SQL++ query to run
+        """
+        with self.__tracer.start_as_current_span("run_query"):
+            payload = RunQueryRequestBody(self.__name, query)
+            req = self.__request_factory.create_request(TestServerRequestType.RUN_QUERY, payload)
+            resp = await self.__request_factory.send_request(self.__index, req)
+            return cast(RunQueryResponse, resp).results
