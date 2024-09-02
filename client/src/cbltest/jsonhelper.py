@@ -110,3 +110,38 @@ def _get_typed_required(d: dict, key: str, type: Type[T]) -> T:
         raise ValueError(f"Expecting {str(type)} for key {key} but found {ret_val} instead")
     
     return cast(T, ret_val)
+
+def json_equivalent(left: Any, right: Any) -> bool:
+    if isinstance(left, dict):
+        if not isinstance(right, dict):
+            return False
+        
+        left_dict = cast(dict, left)
+        right_dict = cast(dict, right)
+        for key in left_dict:
+            if not key in right_dict:
+                return False
+            
+            if not json_equivalent(left_dict[key], right_dict[key]):
+                return False
+            
+        return True
+    
+    if isinstance(left, list):
+        if not isinstance(right, list):
+            return False
+        
+        left_list = cast(list, left)
+        right_list = cast(list, right)
+        if len(left_list) != len(right_list):
+            return False
+        
+        for i in range(0, len(left_list)):
+            if not json_equivalent(left_list[i], right_list[i]):
+                return False
+            
+        return True
+    
+    return left == right
+        
+    

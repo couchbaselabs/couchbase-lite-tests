@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import List
+from typing import Dict, List
 from opentelemetry.trace import get_tracer
 
 from couchbase.bucket import Bucket
@@ -8,8 +8,9 @@ from couchbase.options import ClusterOptions
 from couchbase.auth import PasswordAuthenticator
 from couchbase.management.buckets import CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
+from couchbase.management.options import CreatePrimaryQueryIndexOptions
 from couchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException, ScopeAlreadyExistsException
-from couchbase.exceptions import CollectionAlreadyExistsException
+from couchbase.exceptions import CollectionAlreadyExistsException, QueryIndexAlreadyExistsException
 
 from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
@@ -84,6 +85,36 @@ class CouchbaseServer:
                 pass
 
     def indexes_count(self, bucket: str) -> int:
-        index_mgr = self.__cluster.query_indexes()
-        indexes = list(index_mgr.get_all_indexes(bucket))
-        return len(indexes)
+        """
+        Returns the number of indexes that are in the specified bucket
+
+        :param bucket: The bucket to check for indexes
+        """
+        with self.__tracer.start_as_current_span("indexes_count", attributes={"cbl.bucket.name": bucket}):
+            index_mgr = self.__cluster.query_indexes()
+            indexes = list(index_mgr.get_all_indexes(bucket))
+            return len(indexes)
+    
+    def run_query(self, query: str, bucket: str, scope: str = "_default", collection: str = "_default") -> List[Dict]:
+        """
+        Runs the specified query on the server.  The query may be formatted in a special way.
+
+        :param query: The SQL++ query to run
+        :param bucket: The bucket that the data to query is located in
+        :param scope: The scope that the data to query is located in
+        :param collection: The collection that the data to query is located in
+
+        .. note::
+            The FROM clause of this query can be a python substitution string ({}).  If
+            it is, the FROM clause will be replaced with the proper bucket.scope.collection
+            format at execution time.
+        """
+        actual_query = query.format(f"{bucket}.{scope}.{collection}")
+        with self.__tracer.start_as_current_span("run_query", attributes={"cbl.query.name": actual_query}):
+            query_obj = self.__cluster.query(actual_query)
+            try:
+                self.__cluster.query_indexes().create_primary_index(bucket, CreatePrimaryQueryIndexOptions(scope_name=scope, collection_name=collection))
+            except QueryIndexAlreadyExistsException:
+                pass
+            
+            return list(dict(result) for result in query_obj.execute())
