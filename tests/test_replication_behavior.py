@@ -7,14 +7,14 @@ from cbltest.api.replicator_types import ReplicatorCollectionEntry, ReplicatorTy
 from cbltest.api.cbltestclass import CBLTestClass
 import pytest
 
-class TestReplicationAutoPurge(CBLTestClass):
+class TestReplicationBehavior(CBLTestClass):
     @pytest.mark.asyncio
     async def test_pull_empty_database_active_only(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "names")
 
-        self.mark_test_step("Delete name_101 through name_150")
+        self.mark_test_step("Delete name_101 through name_150 on sync gateway")
         all_docs = await cblpytest.sync_gateways[0].get_all_documents("names")
         for i in range(101, 151):
             doc_id = f"name_{i}"
