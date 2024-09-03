@@ -12,7 +12,7 @@ from cbltest.api.replicator_types import (ReplicatorCollectionEntry, ReplicatorT
 import pytest, pytest_asyncio
 
 class TestQueryConsistency(CBLTestClass):
-    __database: Optional[Database]
+    __database: Optional[Database] = None
 
     @pytest_asyncio.fixture(autouse=True)
     async def setup_method_fixture(self, cblpytest: CBLPyTest, dataset_path: Path):
@@ -109,10 +109,15 @@ class TestQueryConsistency(CBLTestClass):
 
     @pytest.mark.asyncio
     async def test_query_where_and_or(self, cblpytest: CBLPyTest):
+        # This is annoying because the sort algorithm is different between server and lite
+        def id_sort(x: Dict):
+            return x["id"]
+        
         await self._test_query(
             cblpytest,
             'SELECT meta().id FROM {} WHERE (country = "United States" OR country = "France") AND vacancy = true',
-            "airlines")
+            "hotels",
+            id_sort)
         
     @pytest.mark.asyncio
     async def test_multiple_selects(self, cblpytest: CBLPyTest):
@@ -123,7 +128,7 @@ class TestQueryConsistency(CBLTestClass):
         await self._test_query(
             cblpytest,
             'SELECT name, meta().id FROM {} WHERE country = "France"',
-            "airlines",
+            "hotels",
             id_sort)
         
     @pytest.mark.asyncio
