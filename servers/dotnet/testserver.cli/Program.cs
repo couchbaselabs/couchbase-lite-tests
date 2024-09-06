@@ -65,6 +65,6 @@ var ipAddresses = "Server running at:" +
 Console.WriteLine(ipAddresses);
 Console.WriteLine("Press any key to exit at any time...");
 
-Console.ReadKey();
+Console.Read();
 
 server.Stop();

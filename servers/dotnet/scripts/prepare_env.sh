@@ -25,28 +25,33 @@ function banner() {
     echo
 }
 
-banner "Preparing .NET $DOTNET_VERSION environment"
-
-if [ ! -f ./dotnet-install.sh ]; then
+function install_dotnet() {
+    if [ ! -f ./dotnet-install.sh ]; then
 	curl -LO https://dot.net/v1/dotnet-install.sh
 	chmod +x ./dotnet-install.sh
-fi
+    fi
 
-banner "Installing .NET $DOTNET_VERSION"
+    banner "Installing .NET $DOTNET_VERSION"
 
-./dotnet-install.sh -c $DOTNET_VERSION
+    ./dotnet-install.sh -c $DOTNET_VERSION
 
-banner "Installing XHarness"
+    banner "Installing XHarness"
 
-$HOME/.dotnet/dotnet tool install --global --add-source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-eng/nuget/v3/index.json Microsoft.DotNet.XHarness.CLI --version "8.0.0-prerelease*"
+    $DOTNET_ROOT/dotnet tool install --global --add-source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-eng/nuget/v3/index.json Microsoft.DotNet.XHarness.CLI --version "8.0.0-prerelease*"
+}
 
-banner "Installing MAUI workload"
+function install_maui() {
+    banner "Installing MAUI workload"
 
-$HOME/.dotnet/dotnet workload install maui
+    $DOTNET_ROOT/dotnet workload install maui
+}
 
-banner "Copying dataset resources"
+function copy_datasets() {
+    banner "Copying dataset resources"
 
-pushd $SCRIPT_DIR/../testserver/Resources/Raw
-cp -f $SCRIPT_DIR/../../../dataset/server/dbs/*.zip .
-cp -Rf $SCRIPT_DIR/../../../dataset/server/blobs .
-popd
+    pushd $SCRIPT_DIR/../testserver/Resources/Raw
+    cp -f $SCRIPT_DIR/../../../dataset/server/dbs/*.zip .
+    cp -Rf $SCRIPT_DIR/../../../dataset/server/blobs .
+    popd
+}
+
