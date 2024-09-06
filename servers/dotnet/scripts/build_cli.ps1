@@ -4,6 +4,13 @@ $DOTNET_VERSION = Get-DotnetVersion
 
 Install-DotNet
 
+Banner -Text "Copying Datasets"
+
+Push-Location $PSScriptRoot/../testserver.cli/Resources/
+Copy-Item -Force $PSScriptRoot/../../../dataset/server/dbs/*.zip .
+Copy-Item -Recurse -Force $PSScriptRoot/../../../dataset/server/blobs .
+Pop-Location
+
 Banner -Text "Executing build for .NET $DOTNET_VERSION CLI"
 
 # Build

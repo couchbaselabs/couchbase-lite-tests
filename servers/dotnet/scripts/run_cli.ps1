@@ -6,12 +6,5 @@ if(-not ($ServerExe)) {
     exit 1
 }
 
-Banner -Text "Copying Datasets"
-
-Push-Location $PSScriptRoot/../testserver.cli/Resources/
-Copy-Item -Force $PSScriptRoot/../../../dataset/server/dbs/*.zip .
-Copy-Item -Recurse -Force $PSScriptRoot/../../../dataset/server/blobs .
-Pop-Location
-
 Banner -Text "Launching $ServerExe..."
 Start-Process $ServerExe

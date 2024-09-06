@@ -12,7 +12,7 @@ function Banner {
         $Text
     )
     Write-Host
-    Write-Host -ForegroundColor Green $Text
+    Write-Host -ForegroundColor Green "===== $Text ====="
     Write-Host
 }
 
