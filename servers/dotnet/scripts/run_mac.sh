@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-pushd $SCRIPT_DIR/..
+pushd $SCRIPT_DIR/../testserver
 
 app_location=$(find bin/Release/net8.0-maccatalyst -name "*.app")
 if [ -z "$app_location" ]; then

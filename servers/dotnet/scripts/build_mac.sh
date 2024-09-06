@@ -6,5 +6,5 @@ source $SCRIPT_DIR/prepare_env.sh
 
 banner "Executing build for .NET $DOTNET_VERSION Mac Catalyst..."
 
-pushd $SCRIPT_DIR/..
+pushd $SCRIPT_DIR/../testserver
 $HOME/.dotnet/dotnet builc -f net$DOTNET_VERSION-maccatalyst -c Release

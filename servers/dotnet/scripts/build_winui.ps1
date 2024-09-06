@@ -9,6 +9,6 @@ Copy-Datasets
 Banner -Text "Executing build for .NET $DOTNET_VERSION WinUI"
 
 # Build
-Push-Location $PSScriptRoot\..
+Push-Location $PSScriptRoot\..\testserver
 & $env:LOCALAPPDATA\Microsoft\dotnet\dotnet publish .\testserver.csproj -c Release -f net8.0-windows10.0.19041.0
 Pop-Location

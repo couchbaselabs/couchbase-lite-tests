@@ -1,7 +1,9 @@
 ﻿using Couchbase.Lite;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.IO.Compression;
 using System.Text.Json;
+using TestServer.Services;
 
 namespace TestServer
 {
@@ -11,7 +13,7 @@ namespace TestServer
         private readonly Dictionary<string, IDisposable> _activeDisposables = new();
         private readonly HashSet<object> _keepAlives = new();
         private readonly AutoReaderWriterLock _lock = new AutoReaderWriterLock();
-        private readonly ILogger<ObjectManager> _logger = MauiProgram.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<ObjectManager>();
+        private readonly IFileSystem _fileSystem = CBLTestServer.ServiceProvider.GetRequiredService<IFileSystem>();
 
         public readonly string FilesDirectory;
 
@@ -36,7 +38,7 @@ namespace TestServer
                     db.Value.Delete();
                     db.Value.Dispose();
                 } catch (Exception ex) {
-                    _logger.LogWarning(ex, "Failed to delete/dispose {name}", db.Value.Name);
+                    Serilog.Log.Logger.Warning(ex, "Failed to delete/dispose {name}", db.Value.Name);
                 }
             }
 
@@ -81,7 +83,7 @@ namespace TestServer
 
             Stream asset;
             try {
-                asset = await FileSystem.OpenAppPackageFileAsync($"{name}.cblite2.zip");
+                asset = await _fileSystem.OpenAppPackageFileAsync($"{name}.cblite2.zip");
             } catch (Exception ex) {
                 throw new ApplicationException($"Unable to open dataset '{name}'", ex);
             }
@@ -110,7 +112,7 @@ namespace TestServer
         {
             Stream asset;
             try {
-                asset = await FileSystem.OpenAppPackageFileAsync($"blobs/{name}");
+                asset = await _fileSystem.OpenAppPackageFileAsync($"blobs/{name}");
             } catch (FileNotFoundException) {
                 throw new JsonException($"Request for nonexistent blob '{name}'");
             } catch (Exception ex) {

@@ -2,7 +2,7 @@
 
 namespace TestServer.Services
 {
-    internal interface IDeviceInformation
+    public interface IDeviceInformation
     {
         [JsonPropertyName("model")]
         string Model { get; }

@@ -1,7 +1,9 @@
 ﻿using Couchbase.Lite.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.Metrics;
 using System.Net;
+using TestServer.Services;
 
 namespace TestServer
 {
@@ -17,7 +19,9 @@ namespace TestServer
 
         private static readonly Stream NullStream = new MemoryStream(Array.Empty<byte>());
 
-        public static readonly ObjectManager Manager = new ObjectManager(Path.Join(FileSystem.AppDataDirectory, "testfiles"));
+        private static IServiceProvider _ServiceProvider = default!;
+
+        public static ObjectManager Manager { get; private set; } = default!;
 
         #endregion
 
@@ -25,10 +29,18 @@ namespace TestServer
 
         private CancellationTokenSource? _cancelSource;
         private HttpListener? _httpListener;
-        private readonly ILogger<CBLTestServer> _logger 
-            = MauiProgram.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<CBLTestServer>();
 
         #endregion
+
+        public static IServiceProvider ServiceProvider
+        {
+            get => _ServiceProvider;
+            set {
+                _ServiceProvider = value;
+                var fileSystem = _ServiceProvider.GetRequiredService<IFileSystem>();
+                Manager = new ObjectManager(Path.Join(fileSystem.AppDataDirectory, "testfiles"));
+            }
+        }
 
         #region Public Methods
 
@@ -72,12 +84,12 @@ namespace TestServer
             while (!cancelSource.IsCancellationRequested) {
                 var nextRequest = await httpListener.GetContextAsync().ConfigureAwait(false);
                 if (nextRequest?.Request == null) {
-                    _logger.LogWarning("Weird error: null request, skipping...");
+                    Serilog.Log.Logger.Warning("Weird error: null request, skipping...");
                     continue;
                 }
 
                 if (nextRequest.Request?.Url == null) {
-                    _logger.LogWarning("Weird error: null url, skipping...");
+                    Serilog.Log.Logger.Warning("Weird error: null url, skipping...");
                     continue;
                 }
 
@@ -93,7 +105,7 @@ namespace TestServer
                 }
                 
                 var _ = Router.Handle(nextRequest.Request.Url, nextRequest.Request.InputStream ?? NullStream, nextRequest.Response, version)
-                    .ContinueWith(t => _logger.LogWarning("Exception caught during router handling: {e}", t.Exception?.InnerException),
+                    .ContinueWith(t => Serilog.Log.Logger.Warning("Exception caught during router handling: {e}", t.Exception?.InnerException),
                     TaskContinuationOptions.OnlyOnFaulted);
             }
         }
