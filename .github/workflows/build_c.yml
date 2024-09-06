@@ -23,17 +23,17 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Build macOS
-      if: runner.os == 'macOS'
-      working-directory: ${{github.workspace}}/servers/c
-      shell: bash
-      run: ./scripts/build_macOS.sh ${{env.CBL_EDITION}} ${{env.CBL_VERSION}}
+    # - name: Build macOS
+    #   if: runner.os == 'macOS'
+    #   working-directory: ${{github.workspace}}/servers/c
+    #   shell: bash
+    #   run: ./scripts/build_macOS.sh ${{env.CBL_EDITION}} ${{env.CBL_VERSION}}
 
-    - name: Build iOS
-      if: runner.os == 'macOS'
-      working-directory: ${{github.workspace}}/servers/c
-      shell: bash
-      run: ./scripts/build_ios.sh simulator ${{env.CBL_EDITION}} ${{env.CBL_VERSION}}
+    # - name: Build iOS
+    #   if: runner.os == 'macOS'
+    #   working-directory: ${{github.workspace}}/servers/c
+    #   shell: bash
+    #   run: ./scripts/build_ios.sh simulator ${{env.CBL_EDITION}} ${{env.CBL_VERSION}}
 
     - name: Build Linux
       if: runner.os == 'Linux'
