@@ -16,10 +16,10 @@ class TestReplicationBehavior(CBLTestClass):
 
         self.mark_test_step("Delete name_101 through name_150 on sync gateway")
         all_docs = await cblpytest.sync_gateways[0].get_all_documents("names")
-        for i in range(101, 151):
-            doc_id = f"name_{i}"
-            revid = next(x.revid for x in all_docs.rows if x.id == doc_id)
-            await cblpytest.sync_gateways[0].delete_document(doc_id, revid, "names")
+        for row in all_docs.rows:
+            name_number = int(row.id[-3:])
+            if name_number <= 150:
+                await cblpytest.sync_gateways[0].delete_document(row.id, row.revid, "names")
 
         self.mark_test_step("Reset local database, and load `empty` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db("empty", ["db1"])
