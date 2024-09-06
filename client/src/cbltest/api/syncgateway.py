@@ -146,8 +146,8 @@ class AllDocumentsResponse:
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
         self.__rows: List[AllDocumentsResponseRow] = []
-        for row in input["rows"]:
-            self.__rows.append(AllDocumentsResponseRow(row["key"], row["id"], row["value"]["rev"]))
+        for row in cast(List[Dict], input["rows"]):
+            self.__rows.append(AllDocumentsResponseRow(row["key"], row["id"], cast(Dict, row["value"])["rev"]))
 
 
 class DocumentUpdateEntry(JSONSerializable):
