@@ -44,7 +44,7 @@ class TestQueryConsistency(CBLTestClass):
 
         query_for_logging = query.format(f"travel.{collection}")
         self.mark_test_step(f"Run '{query_for_logging}' on test server")
-        local_results = await self.__database.run_query(query_for_logging)
+        local_results = await TestQueryConsistency.__database.run_query(query_for_logging)
 
         self.mark_test_step(f"Run '{query_for_logging}' on Couchbase Server")
         remote_results = cblpytest.couchbase_servers[0].run_query(
