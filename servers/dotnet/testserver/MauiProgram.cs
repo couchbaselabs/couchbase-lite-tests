@@ -3,47 +3,12 @@ using Serilog;
 using Serilog.Events;
 using System.Diagnostics;
 using TestServer.Platforms;
+using TestServer.Utilities;
 
 namespace TestServer;
 
-public sealed class SerilogLogger : Couchbase.Lite.Logging.ILogger
-{
-	public SerilogLogger()
-	{
-	}
-
-	public LogLevel Level => LogLevel.Debug;
-
-    public void Log(LogLevel level, LogDomain domain, string message)
-    {
-		var outLevel = LogEventLevel.Information;
-		switch(level) {
-			case LogLevel.Debug:
-				outLevel = LogEventLevel.Debug;
-				break;
-			case LogLevel.Verbose:
-				outLevel = LogEventLevel.Verbose;
-				break;
-			case LogLevel.Warning:
-				outLevel = LogEventLevel.Warning;
-				break;
-			case LogLevel.Error:
-				outLevel = LogEventLevel.Error;
-				break;
-			case LogLevel.None:
-				return;
-			default:
-				break;
-		}
-
-        Serilog.Log.Logger.Write(outLevel, "[{domain}] {msg}", domain, message);
-    }
-}
-
 public static class MauiProgram
 {
-	public static IServiceProvider ServiceProvider { get; private set; } = default!;
-
 	public static string LogFilePath { get; private set; } = default!;
 
 	public static MauiApp CreateMauiApp()
@@ -78,7 +43,7 @@ public static class MauiProgram
         Debug.WriteLine($"Beginning combined server/cbl log to {LogFilePath}");
 
         var retVal = builder.Build();
-		ServiceProvider = retVal.Services;
+		CBLTestServer.ServiceProvider = retVal.Services;
 		return retVal;
 	}
 }

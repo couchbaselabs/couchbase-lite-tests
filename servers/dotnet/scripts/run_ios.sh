@@ -12,7 +12,7 @@ if [ $# -lt 1 ]; then
     exit 1
 fi
 
-pushd $SCRIPT_DIR/..
+pushd $SCRIPT_DIR/../testserver
 
 source $SCRIPT_DIR/prepare_env.sh
 app_location=$(find bin/Release/net8.0-ios/ -name "*.app")

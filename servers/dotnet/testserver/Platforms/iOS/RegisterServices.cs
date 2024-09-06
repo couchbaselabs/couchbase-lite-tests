@@ -8,6 +8,7 @@ namespace TestServer.Platforms
         public static MauiAppBuilder AddTestServerServices(this MauiAppBuilder builder)
         {
             builder.Services.AddSingleton<IDeviceInformation, DeviceInformation>();
+            builder.Services.AddSingleton<Services.IFileSystem, MauiFileSystem>();
             return builder;
         }
     }

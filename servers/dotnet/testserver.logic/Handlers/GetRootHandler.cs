@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Collections.Specialized;
 using System.Net;
 using System.Reflection;
@@ -18,7 +19,7 @@ internal static partial class HandlerList
             version = typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
             apiVersion = resolvedVersion,
             cbl = "couchbase-lite-net",
-            device = MauiProgram.ServiceProvider.GetRequiredService<IDeviceInformation>() 
+            device = CBLTestServer.ServiceProvider.GetRequiredService<IDeviceInformation>() 
         };
 
         response.WriteBody(responseBody, resolvedVersion);

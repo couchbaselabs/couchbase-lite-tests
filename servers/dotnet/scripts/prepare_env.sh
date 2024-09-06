@@ -46,7 +46,7 @@ $HOME/.dotnet/dotnet workload install maui
 
 banner "Copying dataset resources"
 
-pushd $SCRIPT_DIR/../Resources/Raw
+pushd $SCRIPT_DIR/../testserver/Resources/Raw
 cp -f $SCRIPT_DIR/../../../dataset/server/dbs/*.zip .
 cp -Rf $SCRIPT_DIR/../../../dataset/server/blobs .
 popd
