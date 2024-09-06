@@ -49,5 +49,6 @@ class TestReplicationBehavior(CBLTestClass):
         
         self.mark_test_step("Check that only the 50 non deleted documents were replicated")
         assert len(replicator.document_updates) == 50
-
-
+        for entry in replicator.document_updates:
+            name_number = int(entry.document_id[-3:])
+            assert name_number > 150 and name_number <= 200, f"Unexpected document found in replication: {entry.document_id}"
