@@ -377,7 +377,7 @@ paths:
         - API
       summary: Stop a replicator
       description: |- 
-        Stop a replicator. If success, the created replicator identifier will be returned.
+        Stop a replicator.
         Note: 
           - Return 400 error when the specified replicator is not found.
           - The stopped replicator cannot be restarted.
@@ -997,17 +997,19 @@ components:
           type: object
           additionalProperties:
             type: object
-            properties:
-              collections:
-                description: 'A list of collection names to be created. Cannot be used together with dataset.'
-                type: array
-                items:
-                  type: string
-                example: ["_default.employees", "_default.departments"]
-              dataset:
-                description: 'Dataset name. Cannot be used together with collections.'
-                type: string
-                example: "travel"
+            oneOf:
+              - properties:
+                  collections:
+                    description: 'A list of collection names to be created. Cannot be used together with dataset.'
+                    type: array
+                    items:
+                      type: string
+                    example: ["_default.employees", "_default.departments"]
+              - properties:
+                  dataset:
+                    description: 'Dataset name. Cannot be used together with collections.'
+                    type: string
+                    example: "travel"
           example: {'db1': {}, 'db2': {'collections': ["_default.employees"]}, 'db3': {'dataset': "travel"}} 
     ServerInfo:
       type: object
