@@ -3,7 +3,9 @@ using Serilog;
 using Serilog.Events;
 using System.Diagnostics;
 using TestServer.Platforms;
+using TestServer.Services;
 using TestServer.Utilities;
+using IFileSystem = TestServer.Services.IFileSystem;
 
 namespace TestServer;
 
@@ -22,6 +24,8 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 			});
+
+		builder.Services.AddSingleton<IFileSystem, MauiFileSystem>();
 
 		LogFilePath = $"{Path.GetTempFileName()}.txt";
 		var logConfig = new LoggerConfiguration()

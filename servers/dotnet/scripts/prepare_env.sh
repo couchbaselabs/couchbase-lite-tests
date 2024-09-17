@@ -49,6 +49,7 @@ function install_maui() {
 function copy_datasets() {
     banner "Copying dataset resources"
 
+    mkdir -p $SCRIPT_DIR/../testserver/Resources/Raw
     pushd $SCRIPT_DIR/../testserver/Resources/Raw
     cp -f $SCRIPT_DIR/../../../dataset/server/dbs/*.zip .
     cp -Rf $SCRIPT_DIR/../../../dataset/server/blobs .
