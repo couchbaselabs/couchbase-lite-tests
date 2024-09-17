@@ -11,4 +11,4 @@ copy_datasets
 banner "Executing build for .NET $DOTNET_VERSION Mac Catalyst..."
 
 pushd $SCRIPT_DIR/../testserver
-$HOME/.dotnet/dotnet builc -f net$DOTNET_VERSION-maccatalyst -c Release
+$HOME/.dotnet/dotnet build -f net$DOTNET_VERSION-maccatalyst -c Release
