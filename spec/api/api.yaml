@@ -35,6 +35,11 @@ info:
 
     Changes
     
+    0.5.0 (09/17/2024)
+    * Updated reset payload structure
+    * Added stopReplicator
+    * Added getDocument
+
     0.4.0 (TBD)
     * Added runQuery endpoint
 
@@ -92,7 +97,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 0.4.0
+  version: 0.5.0
 tags:
   - name: API
 paths:
