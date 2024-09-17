@@ -126,15 +126,22 @@ paths:
         - API
       summary: Reset the test server
       description: |- 
-        Reset the test server by deleting all of the databases and re-creating new databases with prebuilt datasets if specified. 
+        Reset the test server by deleting all of the databases and re-creating new databases as specified. 
       operationId: reset
       requestBody:
         description: |- 
-          The request object describes how the databases will be setup after being reset. The properties include:
+          The request object describes how the databases will be setup after being reset. The request object
+          contains one optional key named "databases" which specifies the databases to be created. If not 
+          specified,  no databases will be created.
 
-          * **datasets** (Optional) : the datasets which are prebuilt databases to be copied as the specified database names.
-            The data structure is a JSON dictionary where the keys are the dataset names and the values are an array of the
-            database names. Without specified, no databases will be created.  The special catalog name 'empty' will create databases with no content inside.
+          The "databases" if specified contains a dictionary describing how the database to be created
+          as follows:
+            * An empty dictionary for creating an empty database.
+            * A dictionary contains a single key named "collections", with a list of the collection names 
+              as its value, for creating a database with those collections.
+            * A dictionary contains a single key named contains a key named "dataset", 
+              with a dataset name as its value, for creating a database from the specified dataset 
+              which is a prebuilt database. '
         content:
           application/json:
             schema:
@@ -181,6 +188,43 @@ paths:
             application/json:
               schema: 
                 $ref: '#/components/schemas/CollectionDocuments'
+        '400':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /getDocument:
+    post:
+      tags:
+        - API
+      summary: Get a document.
+      description: |- 
+        Get a document by the document ID. The result is a dictionary containing 
+        document's properties and its metadata which are document ID and revision history.
+      operationId: getDocument
+      requestBody:
+        description: |- 
+          The request object containing the collection name and document ID.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentID'
+        required: true
+      responses:
+        '200':
+          description: |- 
+            Success
+
+            The response body is an object containing document properties and metadata. The metadata 
+            keys are : 
+              * _id : Document ID
+              * _revs: Revision history including the current revision ID as the first item. 
+            
+            The format of the revision history is described in this document:
+            https://github.com/couchbase/couchbase-lite-core/blob/master/modules/docs/pages/replication-protocol.adoc#4-revision-ids-and-histories
+          content:
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/Document'
         '400':
           $ref: '#/components/responses/Error'
         '500':
@@ -323,6 +367,32 @@ paths:
             application/json:
               schema: 
                 $ref: '#/components/schemas/Replicator'
+        '400':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /stopReplicator:
+    post:
+      tags:
+        - API
+      summary: Stop a replicator
+      description: |- 
+        Stop a replicator. If success, the created replicator identifier will be returned.
+        Note: 
+          - Return 400 error when the specified replicator is not found.
+          - The stopped replicator cannot be restarted.
+      operationId: stopReplicator
+      requestBody:
+        description: |- 
+          The request object containing the replicator identifier.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Replicator'
+        required: true
+      responses:
+        '200':
+          description: Success
         '400':
           $ref: '#/components/responses/Error'
         '500':
@@ -626,6 +696,12 @@ components:
         type: string
       example: { 'catalog.cloths': [{'id': 'c1', 'rev': '1-abc'}, {'id': 'c2', 'rev': '1-9ef'}], 
                  'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1-e0f'}]}
+    Document:
+      description: |-
+        Contains document's properties and the metadata.
+      type: object
+      additionalProperties: { }
+      example: {'_id': 'doc1', '_revs': '17f4ed7b51a50000@MlAW1NbbT8KcTRO8oPnpgw, 17f4ed7b42a70000@ScJAVJf3TdOUanAcByIcXg', 'foo': 'bar'}
     DocumentID:
       type: object
       required: ['collection', 'id']
@@ -914,13 +990,25 @@ components:
     ResetConfiguration:
       type: object
       properties:
-        datasets:
+        databases:
+          description: |-
+            Contains database names as keys, with values are dictionaries descrbing how the databases 
+            will be created.
           type: object
           additionalProperties:
-            type: array
-            items:
-              type: string
-          example: { 'catalog': ['db1', 'db2'] }
+            type: object
+            properties:
+              collections:
+                description: 'A list of collection names to be created. Cannot be used together with dataset.'
+                type: array
+                items:
+                  type: string
+                example: ["_default.employees", "_default.departments"]
+              dataset:
+                description: 'Dataset name. Cannot be used together with collections.'
+                type: string
+                example: "travel"
+          example: {'db1': {}, 'db2': {'collections': ["_default.employees"]}, 'db3': {'dataset': "travel"}} 
     ServerInfo:
       type: object
       required: ['version', 'apiVersion', 'cbl', 'device']
