@@ -27,6 +27,7 @@ namespace ts::cbl {
         bool enablePinCert{false};
         bool enableDocumemntListener{false};
         bool enableAutoPurge{true};
+        std::optional<std::string> pinnedServerCert;
     };
 
     struct ReplicationCollection {

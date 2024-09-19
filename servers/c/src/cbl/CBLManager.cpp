@@ -26,7 +26,6 @@ using namespace ts::support::error;
 #define DB_FILE_ZIP_EXTRACTED_DIR "extracted"
 #define ASSET_DBS_DIR "dbs"
 #define ASSET_BLOBS_DIR "blobs"
-#define ASSET_CERT_FILE "cert/cert.pem"
 
 namespace ts::cbl {
     /// Constructor
@@ -131,7 +130,8 @@ namespace ts::cbl {
         return db;
     }
 
-    CBLCollection *CBLManager::collection(const CBLDatabase *db, const string &name, bool mustExist) {
+    CBLCollection *
+    CBLManager::collection(const CBLDatabase *db, const string &name, bool mustExist) {
         CBLError error{};
         auto spec = CollectionSpec(name);
         auto col = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
@@ -142,7 +142,8 @@ namespace ts::cbl {
         return col;
     }
 
-    const CBLDocument *CBLManager::document(const CBLDatabase *db, const string &collectionName, const string &id) {
+    const CBLDocument *
+    CBLManager::document(const CBLDatabase *db, const string &collectionName, const string &id) {
         auto collection = CBLManager::collection(db, collectionName);
         CBLError error{};
         auto doc = CBLCollection_GetDocument(collection, FLS(id), &error);
@@ -198,22 +199,6 @@ namespace ts::cbl {
 
     /// Replicator
 
-    FLSliceResult CBLManager::getServerCert() {
-        auto certPath = path(_assetDir).append(ASSET_CERT_FILE);
-        ifstream ifs(certPath.string(), ios::in | ios::binary);
-        DEFER { ifs.close(); };
-
-        ifs.exceptions(ifstream::failbit | ifstream::badbit);
-        ifs.seekg(0, ios::end);
-
-        auto length = ifs.tellg();
-        ifs.seekg(0, ios::beg);
-
-        auto result = FLSliceResult_New(length);
-        ifs.read((char *) result.buf, length);
-        return result;
-    }
-
     std::string CBLManager::startReplicator(const ReplicatorParams &params, bool reset) {
         lock_guard <mutex> lock(_mutex);
         auto db = databaseUnlocked(params.database);
@@ -268,9 +253,11 @@ namespace ts::cbl {
                     throw logic_error("Cannot find push filter named " + pushFilter->name);
                 }
                 context->filters[replColSpec.collection] = unique_ptr<ReplicationFilter>(filter);
-                replCol.pushFilter = [](void *ctx, CBLDocument *doc, CBLDocumentFlags flags) -> bool {
+                replCol.pushFilter = [](void *ctx, CBLDocument *doc,
+                                        CBLDocumentFlags flags) -> bool {
                     auto collectionName = CollectionSpec(CBLDocument_Collection(doc)).fullName();
-                    return ((ReplicatorContext *) ctx)->filters[collectionName].get()->run(doc, flags);
+                    return ((ReplicatorContext *) ctx)->filters[collectionName].get()->run(doc,
+                                                                                           flags);
                 };
             }
 
@@ -282,9 +269,11 @@ namespace ts::cbl {
                     throw logic_error("Cannot find pull filter named " + pullFilter->name);
                 }
                 context->filters[replColSpec.collection] = unique_ptr<ReplicationFilter>(filter);
-                replCol.pullFilter = [](void *ctx, CBLDocument *doc, CBLDocumentFlags flags) -> bool {
+                replCol.pullFilter = [](void *ctx, CBLDocument *doc,
+                                        CBLDocumentFlags flags) -> bool {
                     auto collectionName = CollectionSpec(CBLDocument_Collection(doc)).fullName();
-                    return ((ReplicatorContext *) ctx)->filters[collectionName].get()->run(doc, flags);
+                    return ((ReplicatorContext *) ctx)->filters[collectionName].get()->run(doc,
+                                                                                           flags);
                 };
             }
             replCols.push_back(replCol);
@@ -319,12 +308,10 @@ namespace ts::cbl {
         config.authenticator = auth;
         config.disableAutoPurge = !params.enableAutoPurge;
 
-        FLSliceResult cert = FLSliceResult_CreateWith(nullptr, 0);
-        if (params.endpoint.compare(0, 6, "wss://") == 0 && params.enablePinCert) {
-            cert = getServerCert();
-            config.pinnedServerCertificate = FLSliceResult_AsSlice(cert);
+        if (params.endpoint.compare(0, 6, "wss://") == 0 && params.pinnedServerCert) {
+            config.pinnedServerCertificate = {params.pinnedServerCert->data(),
+                                              params.pinnedServerCert->size()};
         }
-        DEFER { FLSliceResult_Release(cert); };
 
         CBLReplicator *repl = CBLReplicator_Create(&config, &error);
         checkCBLError(error);
@@ -343,7 +330,8 @@ namespace ts::cbl {
                 for (unsigned i = 0; i < numDocuments; i++) {
                     ReplicatedDocument doc{};
                     doc.isPush = isPush;
-                    doc.collection = CollectionSpec(STR(documents[i].scope), STR(documents[i].collection)).fullName();
+                    doc.collection = CollectionSpec(STR(documents[i].scope),
+                                                    STR(documents[i].collection)).fullName();
                     doc.documentID = STR(documents[i].ID);
                     doc.flags = documents[i].flags;
                     doc.error = documents[i].error;
@@ -371,14 +359,16 @@ namespace ts::cbl {
         return _contextMaps[id]->replicator;
     }
 
-    void CBLManager::addDocumentReplication(const std::string &id, const vector <ReplicatedDocument> &docs) {
+    void CBLManager::addDocumentReplication(const std::string &id,
+                                            const vector <ReplicatedDocument> &docs) {
         lock_guard<mutex> lock(_mutex);
         if (_contextMaps.find(id) != _contextMaps.end()) {
             _contextMaps[id]->replicatedDocs.push_back(docs);
         }
     }
 
-    std::optional<CBLManager::ReplicatorStatus> CBLManager::replicatorStatus(const std::string &id) {
+    std::optional<CBLManager::ReplicatorStatus>
+    CBLManager::replicatorStatus(const std::string &id) {
         lock_guard<mutex> lock(_mutex);
         if (_contextMaps.find(id) != _contextMaps.end()) {
             ReplicatorStatus result{};
