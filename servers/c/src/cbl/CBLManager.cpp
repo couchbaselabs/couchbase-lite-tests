@@ -82,19 +82,22 @@ namespace ts::cbl {
         }
 
         string fromDbPath;
-        auto dbAssetPath = path(_assetDir).append(ASSET_DBS_DIR);
-        auto zipFilePath = path(dbAssetPath).append(name + DB_FILE_ZIP_EXT);
-        if (filesystem::exists(zipFilePath)) {
-            if (auto it = _extDatasetPaths.find(name); it != _extDatasetPaths.end()) {
-                fromDbPath = it->second;
+
+        if (name != "empty") {
+            auto dbAssetPath = path(_assetDir).append(ASSET_DBS_DIR);
+            auto zipFilePath = path(dbAssetPath).append(name + DB_FILE_ZIP_EXT);
+            if (filesystem::exists(zipFilePath)) {
+                if (auto it = _extDatasetPaths.find(name); it != _extDatasetPaths.end()) {
+                    fromDbPath = it->second;
+                } else {
+                    auto extDirPath = path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
+                    zip::extractZip(zipFilePath.string(), extDirPath.string());
+                    fromDbPath = extDirPath.append(name + DB_FILE_EXT).string();
+                    _extDatasetPaths[name] = fromDbPath;
+                }
             } else {
-                auto extDirPath = path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
-                zip::extractZip(zipFilePath.string(), extDirPath.string());
-                fromDbPath = extDirPath.append(name + DB_FILE_EXT).string();
-                _extDatasetPaths[name] = fromDbPath;
+                fromDbPath = dbAssetPath.append(name + DB_FILE_EXT).string();
             }
-        } else {
-            fromDbPath = dbAssetPath.append(name + DB_FILE_EXT).string();
         }
 
         CBLError error{};
@@ -105,8 +108,10 @@ namespace ts::cbl {
             }
         }
 
-        if (!CBL_CopyDatabase(FLS(fromDbPath), FLS(targetDatabaseName), &config, &error)) {
-            throw CBLException(error);
+        if (!fromDbPath.empty()) {
+            if (!CBL_CopyDatabase(FLS(fromDbPath), FLS(targetDatabaseName), &config, &error)) {
+                throw CBLException(error);
+            }
         }
 
         CBLDatabase *db = CBLDatabase_Open(FLS(targetDatabaseName), &config, &error);
