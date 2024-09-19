@@ -164,6 +164,7 @@
 		4076E73E2A9EAD04003DD799 /* StringUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E71A2A9EAD04003DD799 /* StringUtil.cpp */; };
 		4076E73F2A9EAD04003DD799 /* Files+Apple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4076E71C2A9EAD04003DD799 /* Files+Apple.mm */; };
 		4076E7402A9EAD04003DD799 /* Dispatcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E71F2A9EAD04003DD799 /* Dispatcher.cpp */; };
+		40F0BF3B2C9BE90E00027A7A /* PostRunQuery.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -392,6 +393,7 @@
 		4076E71E2A9EAD04003DD799 /* Precondition.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Precondition.h; sourceTree = "<group>"; };
 		4076E71F2A9EAD04003DD799 /* Dispatcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Dispatcher.cpp; sourceTree = "<group>"; };
 		4076E7202A9EAD04003DD799 /* Request.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Request.h; sourceTree = "<group>"; };
+		40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostRunQuery.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -673,16 +675,17 @@
 		4076E6E42A9EAD04003DD799 /* dispatcher */ = {
 			isa = PBXGroup;
 			children = (
-				4076E6E52A9EAD04003DD799 /* GetRoot.cpp */,
-				4076E6E62A9EAD04003DD799 /* PostGetReplicatorStatus.cpp */,
-				4076E6E72A9EAD04003DD799 /* PostGetDocument.cpp */,
-				4076E6E82A9EAD04003DD799 /* PostSnapshotDocuments.cpp */,
-				4076E6E92A9EAD04003DD799 /* PostUpdateDatabase.cpp */,
-				4076E6EA2A9EAD04003DD799 /* PostPerformMaintenance.cpp */,
-				4076E6EB2A9EAD04003DD799 /* PostGetAllDocuments.cpp */,
-				4076E6EC2A9EAD04003DD799 /* PostStartReplicator.cpp */,
 				4076E6ED2A9EAD04003DD799 /* Dispatcher+Common.h */,
+				4076E6E52A9EAD04003DD799 /* GetRoot.cpp */,
+				4076E6EB2A9EAD04003DD799 /* PostGetAllDocuments.cpp */,
+				4076E6E72A9EAD04003DD799 /* PostGetDocument.cpp */,
+				4076E6E62A9EAD04003DD799 /* PostGetReplicatorStatus.cpp */,
+				4076E6EA2A9EAD04003DD799 /* PostPerformMaintenance.cpp */,
 				4076E6EE2A9EAD04003DD799 /* PostReset.cpp */,
+				40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */,
+				4076E6E82A9EAD04003DD799 /* PostSnapshotDocuments.cpp */,
+				4076E6EC2A9EAD04003DD799 /* PostStartReplicator.cpp */,
+				4076E6E92A9EAD04003DD799 /* PostUpdateDatabase.cpp */,
 				4076E6EF2A9EAD04003DD799 /* PostVerifyDocuments.cpp */,
 			);
 			path = dispatcher;
@@ -896,6 +899,7 @@
 				40348C312A8B0144002DA787 /* zip_file_set_comment.c in Sources */,
 				406CE9E62A8C02C8003ACFBB /* IPAddress.swift in Sources */,
 				40348BE52A8B0143002DA787 /* zip_source_seek.c in Sources */,
+				40F0BF3B2C9BE90E00027A7A /* PostRunQuery.cpp in Sources */,
 				40348C332A8B0144002DA787 /* zip_source_remove.c in Sources */,
 				40348C2D2A8B0144002DA787 /* zip_extra_field_api.c in Sources */,
 				40348C352A8B0144002DA787 /* zip_winzip_aes.c in Sources */,

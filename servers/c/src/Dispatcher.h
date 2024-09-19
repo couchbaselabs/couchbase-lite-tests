@@ -53,6 +53,8 @@ namespace ts {
 
         int handlePOSTPerformMaintenance(Request &request);
 
+        int handlePOSTRunQuery(Request &request);
+
         // Handler Functions for Testing:
         int handlePOSTGetDocument(Request &request);
 
