@@ -40,6 +40,7 @@ set(SOURCE_FILES
         src/dispatcher/PostPerformMaintenance.cpp
         src/dispatcher/PostGetReplicatorStatus.cpp
         src/dispatcher/PostReset.cpp
+        src/dispatcher/PostRunQuery.cpp
         src/dispatcher/PostSnapshotDocuments.cpp
         src/dispatcher/PostStartReplicator.cpp
         src/dispatcher/PostUpdateDatabase.cpp

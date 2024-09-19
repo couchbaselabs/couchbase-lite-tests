@@ -21,7 +21,8 @@ using namespace ts::support::error;
 namespace ts {
     Dispatcher::Dispatcher(const TestServer *testServer) {
         _testServer = testServer;
-        _cblManager = make_unique<CBLManager>(_testServer->context().databaseDir, _testServer->context().assetsDir);
+        _cblManager = make_unique<CBLManager>(_testServer->context().databaseDir,
+                                              _testServer->context().assetsDir);
 
         addRule({"GET", "/", HANDLER(handleGETRoot)});
         addRule({"POST", "/reset", HANDLER(handlePOSTReset)});
@@ -32,6 +33,7 @@ namespace ts {
         addRule({"POST", "/snapshotDocuments", HANDLER(handlePOSTSnapshotDocuments)});
         addRule({"POST", "/verifyDocuments", HANDLER(handlePOSTVerifyDocuments)});
         addRule({"POST", "/performMaintenance", HANDLER(handlePOSTPerformMaintenance)});
+        addRule({"POST", "/runQuery", HANDLER(handlePOSTRunQuery)});
 
         // For testing:
         addRule({"POST", "/test/getDocument", HANDLER(handlePOSTGetDocument)});
