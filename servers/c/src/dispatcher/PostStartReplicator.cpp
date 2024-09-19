@@ -71,6 +71,14 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
         params.enableDocumemntListener = GetValue<bool>(config, "enableDocumentListener");
     }
 
+    if (config.contains("enableAutoPurge")) {
+        params.enableAutoPurge = GetValue<bool>(config, "enableAutoPurge");
+    }
+
+    if (config.contains("pinnedServerCert")) {
+        params.pinnedServerCert = GetValue<string>(config, "pinnedServerCert");
+    }
+    
     vector<ReplicationCollection> collections;
     for (auto &colObject: GetValue<vector<json>>(config, "collections")) {
         vector<string> names;

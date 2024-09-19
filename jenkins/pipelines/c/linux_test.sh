@@ -26,6 +26,8 @@ pushd tests > /dev/null
 python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.example.json
+rm -f "${WORKSPACE}/jenkins/pipelines/c/config.c.json"
+cp "${WORKSPACE}/jenkins/pipelines/c/config.c.json" .
+pytest -v --no-header -W ignore::DeprecationWarning --config config.c.json
 deactivate
 popd > /dev/null
