@@ -29,7 +29,7 @@ python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
 
-rm -f "${WORKSPACE}/jenkins/pipelines/c/config.c-ios.json"
+rm -f "config.c-ios.json"
 cp "${WORKSPACE}/jenkins/pipelines/c/config.c-ios.json" .
 pytest -v --no-header -W ignore::DeprecationWarning --config config.c-ios.json
 deactivate
