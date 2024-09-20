@@ -8,7 +8,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 import pytest
 
 class TestReplicationBehavior(CBLTestClass):
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_empty_database_active_only(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])

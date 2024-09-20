@@ -14,7 +14,7 @@ from cbltest.api.syncgateway import DocumentUpdateEntry
 
 
 class TestReplicationAutoPurge(CBLTestClass):
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_remove_docs_from_channel_with_auto_purge_enabled(self, cblpytest: CBLPyTest,
                                                                     dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
@@ -120,7 +120,7 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_revoke_access_with_auto_purge_enabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
@@ -242,7 +242,7 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_remove_docs_from_channel_with_auto_purge_disabled(self, cblpytest: CBLPyTest,
                                                                      dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
@@ -358,7 +358,7 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_revoke_access_with_auto_purge_disabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
@@ -452,7 +452,7 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_filter_removed_access_documents(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
