@@ -165,6 +165,7 @@
 		4076E73F2A9EAD04003DD799 /* Files+Apple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4076E71C2A9EAD04003DD799 /* Files+Apple.mm */; };
 		4076E7402A9EAD04003DD799 /* Dispatcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E71F2A9EAD04003DD799 /* Dispatcher.cpp */; };
 		40F0BF3B2C9BE90E00027A7A /* PostRunQuery.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */; };
+		40F0BF402C9CF17400027A7A /* CBLReplicationConflictResolver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40F0BF3E2C9CF17400027A7A /* CBLReplicationConflictResolver.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -394,6 +395,8 @@
 		4076E71F2A9EAD04003DD799 /* Dispatcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Dispatcher.cpp; sourceTree = "<group>"; };
 		4076E7202A9EAD04003DD799 /* Request.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Request.h; sourceTree = "<group>"; };
 		40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostRunQuery.cpp; sourceTree = "<group>"; };
+		40F0BF3E2C9CF17400027A7A /* CBLReplicationConflictResolver.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CBLReplicationConflictResolver.cpp; sourceTree = "<group>"; };
+		40F0BF3F2C9CF17400027A7A /* CBLReplicationConflictResolver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLReplicationConflictResolver.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -694,21 +697,23 @@
 		4076E6F22A9EAD04003DD799 /* cbl */ = {
 			isa = PBXGroup;
 			children = (
-				4076E6F32A9EAD04003DD799 /* CBLManager.cpp */,
+				4076E6F72A9EAD04003DD799 /* CBLHeader.h */,
 				4076E6F42A9EAD04003DD799 /* CBLInfo.h */,
+				4076E6F32A9EAD04003DD799 /* CBLManager.cpp */,
+				4076E6FA2A9EAD04003DD799 /* CBLManager.h */,
+				40F0BF3E2C9CF17400027A7A /* CBLReplicationConflictResolver.cpp */,
+				40F0BF3F2C9CF17400027A7A /* CBLReplicationConflictResolver.h */,
+				4076E6F92A9EAD04003DD799 /* CBLReplicationFilter.cpp */,
+				4076E7012A9EAD04003DD799 /* CBLReplicationFilter.h */,
+				4076E6FC2A9EAD04003DD799 /* CBLReplicatorParams.h */,
+				4076E6FF2A9EAD04003DD799 /* CollectionSpec.cpp */,
+				4076E6FB2A9EAD04003DD799 /* CollectionSpec.h */,
+				4076E7002A9EAD04003DD799 /* Fleece.cpp */,
 				4076E6F52A9EAD04003DD799 /* Fleece.h */,
 				4076E6F62A9EAD04003DD799 /* KeyPath.cpp */,
-				4076E6F72A9EAD04003DD799 /* CBLHeader.h */,
-				4076E6F82A9EAD04003DD799 /* Snapshot.cpp */,
-				4076E6F92A9EAD04003DD799 /* CBLReplicationFilter.cpp */,
-				4076E6FA2A9EAD04003DD799 /* CBLManager.h */,
-				4076E6FB2A9EAD04003DD799 /* CollectionSpec.h */,
-				4076E6FC2A9EAD04003DD799 /* CBLReplicatorParams.h */,
 				4076E6FD2A9EAD04003DD799 /* KeyPath.h */,
+				4076E6F82A9EAD04003DD799 /* Snapshot.cpp */,
 				4076E6FE2A9EAD04003DD799 /* Snapshot.h */,
-				4076E6FF2A9EAD04003DD799 /* CollectionSpec.cpp */,
-				4076E7002A9EAD04003DD799 /* Fleece.cpp */,
-				4076E7012A9EAD04003DD799 /* CBLReplicationFilter.h */,
 			);
 			path = cbl;
 			sourceTree = "<group>";
@@ -836,6 +841,7 @@
 				40348C5B2A8B0144002DA787 /* zip_get_encryption_implementation.c in Sources */,
 				40348C1E2A8B0144002DA787 /* zip_progress.c in Sources */,
 				40348C492A8B0144002DA787 /* zip_stat.c in Sources */,
+				40F0BF402C9CF17400027A7A /* CBLReplicationConflictResolver.cpp in Sources */,
 				4076E72D2A9EAD04003DD799 /* TestServer.cpp in Sources */,
 				4076E7322A9EAD04003DD799 /* CollectionSpec.cpp in Sources */,
 				40348C592A8B0144002DA787 /* zip_source_error.c in Sources */,

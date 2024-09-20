@@ -36,5 +36,6 @@ namespace ts::cbl {
         std::vector<std::string> documentIDs;
         std::optional<ReplicationFilterSpec> pushFilter;
         std::optional<ReplicationFilterSpec> pullFilter;
+        std::optional<ConflictResolverSpec> conflictResolver;
     };
 }

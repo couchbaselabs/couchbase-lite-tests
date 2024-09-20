@@ -4,6 +4,7 @@
 #include "CBLHeader.h"
 #include CBL_HEADER(CouchbaseLite.h)
 #include FLEECE_HEADER(Fleece.h)
+#include "CBLReplicationConflictResolver.h"
 #include "CBLReplicationFilter.h"
 #include "CBLReplicatorParams.h"
 #include "Snapshot.h"
@@ -37,7 +38,8 @@ namespace ts::cbl {
          * Do not release the database instance unless the object is additionally retained. */
         CBLDatabase *database(const std::string &name);
 
-        static CBLCollection *collection(const CBLDatabase *db, const std::string &name, bool mustExist = true);
+        static CBLCollection *
+        collection(const CBLDatabase *db, const std::string &name, bool mustExist = true);
 
         static const CBLDocument *
         document(const CBLDatabase *db, const std::string &collectionName, const std::string &id);
@@ -85,9 +87,11 @@ namespace ts::cbl {
 
         FLSliceResult getServerCert();
 
-        void addDocumentReplication(const std::string &id, const std::vector<ReplicatedDocument> &docs);
+        void
+        addDocumentReplication(const std::string &id, const std::vector<ReplicatedDocument> &docs);
 
         std::mutex _mutex;
+        std::mutex _replicatorMutex;
 
         std::string _databaseDir;
         std::string _assetDir;
@@ -117,6 +121,9 @@ namespace ts::cbl {
 
             /** Map of collection name and replication filter object */
             std::unordered_map<std::string, std::unique_ptr<ReplicationFilter>> filters;
+
+            /** Map of collection name and conflict resolver object */
+            std::unordered_map<std::string, std::unique_ptr<ConflictResolver>> conflictResolvers;
 
             /** Replicated Documents in batch */
             std::vector<std::vector<ReplicatedDocument>> replicatedDocs;

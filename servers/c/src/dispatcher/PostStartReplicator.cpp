@@ -78,7 +78,7 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
     if (config.contains("pinnedServerCert")) {
         params.pinnedServerCert = GetValue<string>(config, "pinnedServerCert");
     }
-    
+
     vector<ReplicationCollection> collections;
     for (auto &colObject: GetValue<vector<json>>(config, "collections")) {
         vector<string> names;
@@ -96,25 +96,38 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
             if (colObject.contains("channels")) {
                 col.channels = GetValue<vector<string>>(colObject, "channels");
             }
+
             if (colObject.contains("documentIDs")) {
                 col.documentIDs = GetValue<vector<string>>(colObject, "documentIDs");
             }
+
             if (colObject.contains("pushFilter")) {
                 auto filterObject = GetValue<json>(colObject, "pushFilter");
-                ReplicationFilterSpec filterSpec = {};
-                filterSpec.name = GetValue<string>(filterObject, "name");
-                filterSpec.params = filterObject.contains("params") ?
-                                    GetValue<json>(filterObject, "params") : json::object();
-                col.pushFilter = filterSpec;
+                ReplicationFilterSpec spec{};
+                spec.name = GetValue<string>(filterObject, "name");
+                spec.params = filterObject.contains("params") ?
+                              GetValue<json>(filterObject, "params") : json::object();
+                col.pushFilter = spec;
             }
+
             if (colObject.contains("pullFilter")) {
                 auto filterObject = GetValue<json>(colObject, "pullFilter");
-                ReplicationFilterSpec filterSpec = {};
-                filterSpec.name = GetValue<string>(filterObject, "name");
-                filterSpec.params = filterObject.contains("params") ?
-                                    GetValue<json>(filterObject, "params") : json::object();
-                col.pullFilter = filterSpec;
+                ReplicationFilterSpec spec{};
+                spec.name = GetValue<string>(filterObject, "name");
+                spec.params = filterObject.contains("params") ?
+                              GetValue<json>(filterObject, "params") : json::object();
+                col.pullFilter = spec;
             }
+            
+            if (colObject.contains("conflictResolver")) {
+                auto conflictResolver = GetValue<json>(colObject, "conflictResolver");
+                ConflictResolverSpec spec{};
+                spec.name = GetValue<string>(conflictResolver, "name");
+                spec.params = conflictResolver.contains("params") ?
+                              GetValue<json>(conflictResolver, "params") : json::object();
+                col.conflictResolver = spec;
+            }
+
             collections.push_back(col);
         }
     }
