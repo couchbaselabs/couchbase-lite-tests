@@ -4,11 +4,13 @@
 #include "CBLHeader.h"
 #include CBL_HEADER(CouchbaseLite.h)
 
+#include "CollectionSpec.h"
 #include "Define.h"
 #include "JSON.h"
 
 // lib
-#include <unordered_set>
+#include <unordered_map>
+#include <vector>
 
 using namespace std;
 using namespace ts::support::json_util;
@@ -18,12 +20,13 @@ namespace ts::cbl {
     public:
         explicit DocumentIDsFilter(const ReplicationFilterSpec &spec) : ReplicationFilter(spec) {
             auto params = ReplicationFilter::spec().params;
-            _documentIDs = GetValue<unordered_set<string>>(params, "documentIDs");
+            _documentIDs = GetValue<unordered_map<string, vector<string>>>(params, "documentIDs");
         }
 
         bool run(CBLDocument *doc, unsigned int flags) override {
-            auto ids = _documentIDs.find(STR(CBLDocument_ID(doc)));
-            if (ids == _documentIDs.end()) {
+            auto collectionName = CollectionSpec(CBLDocument_Collection(doc)).fullName();
+            auto ids = _documentIDs[collectionName];
+            if (std::find(ids.begin(), ids.end(), STR(CBLDocument_ID(doc))) == ids.end()) {
                 return false;
             }
             return true;
@@ -32,12 +35,13 @@ namespace ts::cbl {
         static string name() { return "documentIDs"; }
 
     private:
-        unordered_set <string> _documentIDs;
+        unordered_map <string, vector<string>> _documentIDs;
     };
 
     class DeletedDocumentsOnlyFilter : public ReplicationFilter {
     public:
-        explicit DeletedDocumentsOnlyFilter(const ReplicationFilterSpec &spec) : ReplicationFilter(spec) {}
+        explicit DeletedDocumentsOnlyFilter(const ReplicationFilterSpec &spec) : ReplicationFilter(
+            spec) {}
 
         bool run(CBLDocument *doc, unsigned int flags) override {
             return flags == kCBLDocumentFlagsDeleted;
