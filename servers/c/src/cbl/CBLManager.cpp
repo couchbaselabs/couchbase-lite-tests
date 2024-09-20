@@ -38,10 +38,9 @@ namespace ts::cbl {
     /// Database
 
     void CBLManager::reset() {
-        lock_guard <mutex> lock(_mutex);
-
         // Delete and release all databases:
         {
+            lock_guard <mutex> lock(_mutex);
             auto it = _databases.begin();
             while (it != _databases.end()) {
                 CBLDatabase *db = it->second;
@@ -59,6 +58,7 @@ namespace ts::cbl {
 
         // Release all replicators, their collections, and document listener tokens:
         {
+            lock_guard <mutex> lock(_replicatorMutex);
             auto it = _contextMaps.begin();
             while (it != _contextMaps.end()) {
                 auto &context = it->second;
@@ -281,6 +281,27 @@ namespace ts::cbl {
                                                                                            flags);
                 };
             }
+
+            // Conflict Resolver:
+            auto conflictResolver = replColSpec.conflictResolver;
+            if (conflictResolver) {
+                auto resolver = ConflictResolver::make_resolver(conflictResolver.value());
+                if (!resolver) {
+                    throw logic_error(
+                        "Cannot find conflict resolver named " + conflictResolver->name);
+                }
+                context->conflictResolvers[replColSpec.collection] = unique_ptr<ConflictResolver>(
+                    resolver);
+                replCol.conflictResolver = [](void *ctx, FLString documentID,
+                                              const CBLDocument *localDoc,
+                                              const CBLDocument *remoteDoc) -> const CBLDocument * {
+                    auto doc = localDoc ? localDoc : remoteDoc;
+                    auto collectionName = CollectionSpec(CBLDocument_Collection(doc)).fullName();
+                    return ((ReplicatorContext *) ctx)->conflictResolvers[collectionName].get()->resolve(
+                        localDoc, remoteDoc);
+                };
+            }
+
             replCols.push_back(replCol);
         }
 
@@ -348,16 +369,18 @@ namespace ts::cbl {
             context->token = token;
         }
 
-        _contextMaps[id] = std::move(context);
-
-        CBLReplicator_Start(repl, reset);
+        {
+            lock_guard <mutex> lock(_replicatorMutex);
+            _contextMaps[id] = std::move(context);
+            CBLReplicator_Start(repl, reset);
+        }
 
         success = true;
         return id;
     }
 
     CBLReplicator *CBLManager::replicator(const string &id) {
-        lock_guard<mutex> lock(_mutex);
+        lock_guard<mutex> lock(_replicatorMutex);
         if (_contextMaps.find(id) == _contextMaps.end()) {
             return nullptr;
         }
@@ -366,7 +389,7 @@ namespace ts::cbl {
 
     void CBLManager::addDocumentReplication(const std::string &id,
                                             const vector <ReplicatedDocument> &docs) {
-        lock_guard<mutex> lock(_mutex);
+        lock_guard<mutex> lock(_replicatorMutex);
         if (_contextMaps.find(id) != _contextMaps.end()) {
             _contextMaps[id]->replicatedDocs.push_back(docs);
         }
@@ -374,7 +397,11 @@ namespace ts::cbl {
 
     std::optional<CBLManager::ReplicatorStatus>
     CBLManager::replicatorStatus(const std::string &id) {
-        lock_guard<mutex> lock(_mutex);
+        // Note: Do not lock with _mutex as it could cause the deadlock when trying
+        // to delete the database from the reset function at the same time that
+        // the replicator notifies its status. A quick fix is to use a different
+        // lock to guard the _contextMaps.
+        lock_guard<mutex> lock(_replicatorMutex);
         if (_contextMaps.find(id) != _contextMaps.end()) {
             ReplicatorStatus result{};
             result.status = CBLReplicator_Status(_contextMaps[id]->replicator);

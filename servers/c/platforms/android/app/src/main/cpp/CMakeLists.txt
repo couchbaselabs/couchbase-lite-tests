@@ -16,6 +16,7 @@ set(SHARED_SRC
         ${SHARED_SRC_DIR}/Request.cpp
         ${SHARED_SRC_DIR}/TestServer.cpp
         ${SHARED_SRC_DIR}/cbl/CBLManager.cpp
+        ${SHARED_SRC_DIR}/cbl/CBLReplicationConflictResolver.cpp
         ${SHARED_SRC_DIR}/cbl/CBLReplicationFilter.cpp
         ${SHARED_SRC_DIR}/cbl/CollectionSpec.cpp
         ${SHARED_SRC_DIR}/cbl/Fleece.cpp

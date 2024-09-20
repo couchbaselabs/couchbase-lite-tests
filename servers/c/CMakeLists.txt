@@ -29,6 +29,7 @@ set(SOURCE_FILES
         src/Request.cpp
         src/TestServer.cpp
         src/cbl/CBLManager.cpp
+        src/cbl/CBLReplicationConflictResolver.cpp
         src/cbl/CBLReplicationFilter.cpp
         src/cbl/CollectionSpec.cpp
         src/cbl/Fleece.cpp
