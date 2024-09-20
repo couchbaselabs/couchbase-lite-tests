@@ -57,7 +57,7 @@ class TestQueryConsistency(CBLTestClass):
 
         assert comparison(local_results, remote_results)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_query_docids(self, cblpytest: CBLPyTest):
         # This is annoying because the sort algorithm is different between server and lite
         def id_sort(x: Dict):
@@ -69,7 +69,7 @@ class TestQueryConsistency(CBLTestClass):
             "airlines",
             id_sort)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_any_operator(self, cblpytest: CBLPyTest):
         # This is annoying because the sort algorithm is different between server and lite
         def id_sort(x: Dict):
@@ -81,7 +81,7 @@ class TestQueryConsistency(CBLTestClass):
             "routes",
             id_sort)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("doc_id", [
         "airline_10",
         "doc_id_does_not_exist",
@@ -92,7 +92,7 @@ class TestQueryConsistency(CBLTestClass):
             f'SELECT * FROM {{}} WHERE meta().id = "{doc_id}"',
             "airlines")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("limit, offset", [
         (5, 5),
         (-5, -5)
@@ -107,7 +107,7 @@ class TestQueryConsistency(CBLTestClass):
             "airlines",
             comparison=comparison)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_query_where_and_or(self, cblpytest: CBLPyTest):
         # This is annoying because the sort algorithm is different between server and lite
         def id_sort(x: Dict):
@@ -119,7 +119,7 @@ class TestQueryConsistency(CBLTestClass):
             "hotels",
             id_sort)
         
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_selects(self, cblpytest: CBLPyTest):
         # This is annoying because the sort algorithm is different between server and lite
         def id_sort(x: Dict):
@@ -131,7 +131,7 @@ class TestQueryConsistency(CBLTestClass):
             "hotels",
             id_sort)
         
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("like_val", [
         "Royal Engineers Museum",
         "Royal engineers museum",

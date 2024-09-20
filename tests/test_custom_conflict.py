@@ -90,7 +90,7 @@ class TestCustomConflict(CBLTestClass):
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Conflict resolution resulted in bad data: {verify_result.description}"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_custom_conflict_local_wins(self, cblpytest: CBLPyTest, dataset_path: Path):
         def setup_snapshot(updater: SnapshotUpdater):
             updater.upsert_document("_default._default", "name_101", [{"name.last": "Smith"}])
@@ -98,7 +98,7 @@ class TestCustomConflict(CBLTestClass):
         
         await self.do_custom_conflict_test(cblpytest, dataset_path, ReplicatorConflictResolver("local-wins"), setup_snapshot)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_custom_conflict_remote_wins(self, cblpytest: CBLPyTest, dataset_path: Path):
         def setup_snapshot(updater: SnapshotUpdater):
             updater.upsert_document("_default._default", "name_101", [{"name.last": "Jones"}])
@@ -106,7 +106,7 @@ class TestCustomConflict(CBLTestClass):
         
         await self.do_custom_conflict_test(cblpytest, dataset_path, ReplicatorConflictResolver("remote-wins"), setup_snapshot)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_custom_conflict_delete(self, cblpytest: CBLPyTest, dataset_path: Path):
         def setup_snapshot(updater: SnapshotUpdater):
             updater.delete_document("_default._default", "name_101")
@@ -114,7 +114,7 @@ class TestCustomConflict(CBLTestClass):
         
         await self.do_custom_conflict_test(cblpytest, dataset_path, ReplicatorConflictResolver("delete"), setup_snapshot)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_custom_conflict_merge(self, cblpytest: CBLPyTest, dataset_path: Path):
         def setup_snapshot(updater: SnapshotUpdater):
             updater.upsert_document("_default._default", "name_101", [{"name": [{"first": "Davis", "last": "Smith"}, {"first": "Davis", "last": "Jones"}]}])

@@ -21,7 +21,7 @@ class TestReplicationFilter(CBLTestClass):
 
         assert len(expected) == 0, f"Not all document updates were found (e.g. {next(iter(expected))})"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_push_document_ids_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
@@ -82,7 +82,7 @@ class TestReplicationFilter(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_document_ids_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
@@ -151,7 +151,7 @@ class TestReplicationFilter(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_channels_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
@@ -237,7 +237,7 @@ class TestReplicationFilter(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_replicate_public_channel(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
@@ -318,7 +318,7 @@ class TestReplicationFilter(CBLTestClass):
         assert "see you later" in sgw_doc.body, "updated key missing from test_public in SGW"
         assert sgw_doc.body["see you later"] == "world", "incorrect data in updated key from test_public in SGW"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_custom_push_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
@@ -376,7 +376,7 @@ class TestReplicationFilter(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_custom_pull_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         def repl_filter(x):
             return (x.error == None) or ((x.error.domain == "CouchbaseLite") and (x.error.code == 10403))
