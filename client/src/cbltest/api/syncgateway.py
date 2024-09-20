@@ -221,6 +221,8 @@ class SyncGateway:
 
         if secure:
             ssl_context = ssl.create_default_context(cadata=self.tls_cert())
+            # Disable hostname check so that the pre-generated SG can be used on any machines.
+            ssl_context.check_hostname = False
             self.__admin_session = ClientSession(f"{scheme}{url}:{admin_port}", auth=BasicAuth(username, password, "ascii"), connector=TCPConnector(ssl=ssl_context))
         else:
             self.__admin_session = ClientSession(f"{scheme}{url}:{admin_port}", auth=BasicAuth(username, password, "ascii"))
