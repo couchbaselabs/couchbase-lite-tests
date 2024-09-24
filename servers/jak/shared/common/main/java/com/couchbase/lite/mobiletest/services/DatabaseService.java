@@ -23,7 +23,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+
+import org.nanohttpd.protocols.http.response.Status;
 
 import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
@@ -103,6 +106,16 @@ public final class DatabaseService {
         return ((collection == null) ? "???" : getCollectionFQN(collection)) + "." + document.getId();
     }
 
+    @NonNull
+    public static String getDocumentFQN(@NonNull Collection collection, @NonNull String docId) {
+        return getCollectionFQN(collection) + "." + docId;
+    }
+
+    @NonNull
+    public static String getDocumentFQN(@NonNull String dbName, @NonNull String collectionName, @NonNull String docId) {
+        return dbName + "." + collectionName + "." + docId;
+    }
+
 
     // Instance members
 
@@ -161,20 +174,24 @@ public final class DatabaseService {
     }
 
     @NonNull
-    public Document getDocument(
+    public Map<String, Object> getDocument(
         @NonNull TestContext ctxt,
-        @NonNull Database db,
+        @NonNull String dbName,
         @NonNull String collName,
         @NonNull String docId) {
-        final Document doc = getDocOrNull(ctxt, db, collName, docId);
-        if (doc == null) { throw new ClientError("Document not found: " + docId); }
-        return doc;
+        final Document doc = getDocOrNull(ctxt, getOpenDb(ctxt, dbName), collName, docId);
+        if (doc == null) {
+            throw new ClientError(Status.NOT_FOUND, "Document not found: " + getDocumentFQN(dbName, collName, docId));
+        }
+        return doc.toMap();
     }
 
     @NonNull
     public Document getDocument(@NonNull Collection collection, @NonNull String docId) {
         final Document doc = getDocOrNull(collection, docId);
-        if (doc == null) { throw new ClientError("Document not found: " + docId); }
+        if (doc == null) {
+            throw new ClientError(Status.NOT_FOUND, "Document not found: " + getDocumentFQN(collection, docId));
+        }
         return doc;
     }
 
@@ -186,7 +203,6 @@ public final class DatabaseService {
         @NonNull String docId) {
         return getDocOrNull(getCollection(ctxt, db, collName), docId);
     }
-
 
     @Nullable
     public Document getDocOrNull(@NonNull Collection collection, @NonNull String docId) {

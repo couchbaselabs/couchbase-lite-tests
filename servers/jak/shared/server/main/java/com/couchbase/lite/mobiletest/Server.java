@@ -110,7 +110,7 @@ public class Server extends NanoHTTPD {
         }
         catch (ClientError err) {
             Log.err(TAG, "Client error", err);
-            resp = handleError(reply, Status.BAD_REQUEST, reqId, err);
+            resp = handleError(reply, err.getStatus(), reqId, err);
         }
         catch (ServerError err) {
             Log.err(TAG, "Server error", err);
