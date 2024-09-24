@@ -24,6 +24,7 @@ import java.util.Map;
 
 import com.couchbase.lite.mobiletest.endpoints.v1.CreateRepl;
 import com.couchbase.lite.mobiletest.endpoints.v1.GetAllDocs;
+import com.couchbase.lite.mobiletest.endpoints.v1.GetDocument;
 import com.couchbase.lite.mobiletest.endpoints.v1.GetReplStatus;
 import com.couchbase.lite.mobiletest.endpoints.v1.Logger;
 import com.couchbase.lite.mobiletest.endpoints.v1.PerformMaintenance;
@@ -63,6 +64,7 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
         addEndpoint(1, "/verifyDocuments", (c, r) -> new VerifyDocs(app.getDbSvc()).verify(c, r));
         addEndpoint(1, "/performMaintenance", (c, r) -> new PerformMaintenance(app.getDbSvc()).doMaintenance(c, r));
         addEndpoint(1, "/runQuery", (c, r) -> new RunQuery(app.getDbSvc()).runQuery(c, r));
+        addEndpoint(1, "/getDocument", (c, r) -> new GetDocument(app.getDbSvc()).getDocument(c, r));
     }
 
     // This method returns a Reply.  Be sure to close it!
