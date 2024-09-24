@@ -39,6 +39,7 @@ import com.couchbase.lite.mobiletest.trees.TypedMap;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
+// Implements api.yaml 0.4.0
 public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint> {
     private static final String TAG = "POST";
 

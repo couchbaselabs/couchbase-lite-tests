@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.couchbase.lite.Collection;
@@ -79,6 +80,11 @@ public final class DatabaseService {
             throw new ClientError("Cannot parse collection fqn: " + collFQN);
         }
         return collDbScopeAndName;
+    }
+
+    @NonNull
+    public static String getCollectionFQN(@NonNull String[] collFQN) {
+        return String.join(".", collFQN);
     }
 
     @NonNull
@@ -204,6 +210,24 @@ public final class DatabaseService {
     }
 
     // New stream constructors are supported only in API 26+
+    public void installDatabase(@NonNull TestContext ctxt, @NonNull String dbName, List<String[]> collFQNs) {
+        final File dbDir = ctxt.getDbDir();
+        if (dbDir == null) { throw new ServerError("Cannot find test directory on install dataset"); }
+
+        if (Database.exists(dbName, dbDir)) { throw new ClientError("Database already exists: " + dbName); }
+
+        final Database db = openDb(ctxt, dbName);
+        for (String[] fqn: collFQNs) {
+            try { db.createCollection(fqn[1], fqn[0]); }
+            catch (CouchbaseLiteException e) {
+                throw new CblApiFailure("Failed creating collection: " + getCollectionFQN(fqn), e);
+            }
+        }
+
+        ctxt.addDb(dbName, db);
+    }
+
+    // New stream constructors are supported only in API 26+
     public void installDataset(@NonNull TestContext ctxt, @NonNull String datasetName, @NonNull String dbName) {
         final File dbDir = ctxt.getDbDir();
         if (dbDir == null) { throw new ServerError("Cannot find test directory on install dataset"); }
@@ -237,9 +261,10 @@ public final class DatabaseService {
         openDb(ctxt, dbName);
     }
 
-    private void openDb(@NonNull TestContext ctxt, @NonNull String name) {
+    @NonNull
+    private Database openDb(@NonNull TestContext ctxt, @NonNull String name) {
         Database db = ctxt.getDb(name);
-        if (db != null) { return; }
+        if (db != null) { return db; }
 
         final File dbDir = ctxt.getDbDir();
         if (dbDir == null) { throw new ServerError("Cannot find test directory for open"); }
@@ -250,6 +275,8 @@ public final class DatabaseService {
 
         ctxt.addDb(name, db);
         Log.p(TAG, "Created database: " + name);
+
+        return db;
     }
 
     private boolean closeDbInternal(@NonNull TestContext ctxt, @NonNull String name) {
