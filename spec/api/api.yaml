@@ -34,7 +34,12 @@ info:
       ESCAPE   ::= '\' (! EOP )
 
     Changes
-    
+
+    0.5.1 (09/24/2024)
+    * Added reset parameter "test"
+    * Permit null as a collection list in reset
+    * getDocument returns status 404 on doc not found.
+
     0.5.0 (09/17/2024)
     * Updated reset payload structure
     * Added stopReplicator
@@ -108,7 +113,7 @@ paths:
       summary: Get Test Server information
       description: |- 
         Get Test Server information containing the following information (tentative):
-
+ 
         * version : Test Server version number which is the same as CBL release number.
         * apiVersion: API version number. This will increase when we have breaking change.
         * cbl: The name of the CBL library used.
@@ -131,7 +136,7 @@ paths:
         - API
       summary: Reset the test server
       description: |- 
-        Reset the test server by deleting all of the databases and re-creating new databases as specified. 
+        Reset the test server by deleting all of the databases and re-creating new databases as specified.
       operationId: reset
       requestBody:
         description: |- 
@@ -182,7 +187,7 @@ paths:
             If the specified collections in the request, the dictionary will not contain those collections.
           content:
             application/json:
-              schema: 
+              schema:
                 $ref: '#/components/schemas/CollectionDocuments'
         '400':
           $ref: '#/components/responses/Error'
@@ -219,9 +224,11 @@ paths:
             https://github.com/couchbase/couchbase-lite-core/blob/master/modules/docs/pages/replication-protocol.adoc#4-revision-ids-and-histories
           content:
             application/json:
-              schema: 
+              schema:
                 $ref: '#/components/schemas/Document'
         '400':
+          $ref: '#/components/responses/Error'
+        '404':
           $ref: '#/components/responses/Error'
         '500':
           $ref: '#/components/responses/Error'
@@ -361,7 +368,7 @@ paths:
             The response body is an object containing the replicator object identifier.
           content:
             application/json:
-              schema: 
+              schema:
                 $ref: '#/components/schemas/Replicator'
         '400':
           $ref: '#/components/responses/Error'
@@ -429,7 +436,7 @@ paths:
         The non-existing or deleted documents will be recorded as null in the snapshot.
         
         The API will return a UUID of the snapshot, which can be used when calling POST /verifyDocuments to 
-        verify changes against the snapshot, for example, after finishing replication. 
+        verify changes against the snapshot, for example, after finishing replication.
       operationId: snapshotDocuments
       requestBody:
         description: |-
@@ -456,11 +463,11 @@ paths:
             The response body is an object containing the snapshot identifier.
           content:
             application/json:
-              schema: 
+              schema:
                 type: object
                 required: ['id']
                 properties:
-                  id: 
+                  id:
                     type: string
                     format: uuid
                     example: '123e0000-e89b-12d3-a456-426614174000'
@@ -507,7 +514,7 @@ paths:
         description: Verify document changes from the given document snapshot recorded by using POST /snapshotDocuments.
         content:
           application/json:
-            schema: 
+            schema:
               type: object
               required: ['database', 'snapshot', 'changes']
               properties:
@@ -527,11 +534,11 @@ paths:
           description: Success
           content:
             application/json:
-              schema: 
+              schema:
                 type: object
                 required: ['result']
                 properties:
-                  result: 
+                  result:
                     type: boolean
                     example: false
                   description:
@@ -576,7 +583,7 @@ paths:
                     description: |-
                       The actual value of the unexpected keypath. If the actual keypath doesn't exist, 
                       this 'actual' key will be omitted.
-                    oneOf: 
+                    oneOf:
                       - type: boolean
                       - type: integer
                       - type: number
@@ -588,7 +595,7 @@ paths:
                     description: |-
                       The expected value of the unexpected keypath. If the expected keypath doesn't exist, this 'expected'
                       key will be omitted.
-                    oneOf: 
+                    oneOf:
                       - type: boolean
                       - type: integer
                       - type: number
@@ -690,7 +697,7 @@ components:
       type: object
       additionalProperties:
         type: string
-      example: { 'catalog.cloths': [{'id': 'c1', 'rev': '1-abc'}, {'id': 'c2', 'rev': '1-9ef'}], 
+      example: { 'catalog.cloths': [{'id': 'c1', 'rev': '1-abc'}, {'id': 'c2', 'rev': '1-9ef'}],
                  'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1-e0f'}]}
     Document:
       description: |-
@@ -718,10 +725,10 @@ components:
         documentID:
           type: string
           example: 'doc1'
-        isPush: 
+        isPush:
           type: boolean
           example: true
-        flags: 
+        flags:
           description: 'The document replication flags. An empty array indicates no flags.'
           type: array
           items:
@@ -734,7 +741,7 @@ components:
       type: object
       required: ['type', 'collection', 'documentID']
       properties:
-        type: 
+        type:
           type: string
           enum: ['UPDATE', 'DELETE', 'PURGE']
           example: 'UPDATE'
@@ -779,11 +786,11 @@ components:
           type: string
           enum: [TESTSERVER, CBL, POSIX, SQLITE, FLEECE]
           example: 'TESTSERVER'
-        code: 
+        code:
           type: integer
           format: int32
           example: 1
-        message: 
+        message:
           type: string
           example: 'This is an error'
     PerformMaintenanceConfiguration:
@@ -819,7 +826,7 @@ components:
       type: object
       required: ['id']
       properties:
-        id: 
+        id:
           type: string
           format: uuid
           example: '123e4567-e89b-12d3-a456-426614174000'
@@ -898,7 +905,7 @@ components:
       type: object
       required: ['names']
       properties:
-        names: 
+        names:
           description: An array of collections that share the same configuration.
           type: array
           items:
@@ -964,7 +971,7 @@ components:
       type: object
       required: ['activity', 'progress']
       properties:
-        activity: 
+        activity:
           type: string
           enum: ['STOPPED', 'OFFLINE', 'CONNECTING', 'IDLE', 'BUSY']
         progress:
@@ -986,13 +993,13 @@ components:
           $ref: '#/components/schemas/Error'
     ResetConfiguration:
       description: |-
-        ResetConfiguration describes how the databases will be setup after being reset.
-        contains one optional key named "databases" which specifies the databases to be created. 
-        If not specified,  no databases will be created.
+        ResetConfiguration describes how the databases will be setup after the reset.
+        It contains two optional keys. "test" specifies the neame of the test that will be run next.
+        "databases" specifies the databases to be created. If it not specified, no databases are created.
         
-        The "databases" if specified contains a dictionary describing how the database to be created 
+        If specified "databases" if specified contains a dictionary describing how the database to be created 
         as follows:
-            * An empty dictionary for creating an empty database.
+            * Null or an empty dictionary for creating an empty database.
             * A dictionary contains a single key named "collections", with a list of the collection names 
               as its value, for creating a database with those collections.
             * A dictionary contains a single key named contains a key named "dataset", 
@@ -1000,18 +1007,27 @@ components:
               which is a prebuilt database. '
       type: object
       properties:
+        test:
+          description: |-
+            The name of the test that will be run next
+          type: string
         databases:
           description: |-
             Contains database names as keys, with values are dictionaries descrbing how the databases 
             will be created.
           type: object
+          nullable: true
           additionalProperties:
             type: object
             oneOf:
               - properties:
                   collections:
-                    description: 'A list of collection names to be created. Cannot be used together with dataset.'
+                    description: |-
+                      A list of fully qualified collection names (<scope>.<collection>) to be created in the database.
+                      Collections may be null, but if an array is provided, it may not be empty.
+                      The Collections parameter cannot be used together with dataset.'
                     type: array
+                    nullable: true
                     items:
                       type: string
                     example: ["_default.employees", "_default.departments"]
@@ -1020,7 +1036,7 @@ components:
                     description: 'Dataset name. Cannot be used together with collections.'
                     type: string
                     example: "travel"
-          example: {'db1': {}, 'db2': {'collections': ["_default.employees"]}, 'db3': {'dataset': "travel"}} 
+          example: {'db1': {}, 'db2': {'collections': ["_default.employees"]}, 'db3': {'dataset': "travel"}}
     ServerInfo:
       type: object
       required: ['version', 'apiVersion', 'cbl', 'device']
@@ -1050,11 +1066,11 @@ components:
               description: 'Operating System Name'
               type: string
               example: 'Android OS Name'
-            systemVersion:  
+            systemVersion:
               description: 'Operating System Version'
               type: string
               example: '6.0.0'
-            systemApiVersion:  
+            systemApiVersion:
               description: 'Operating System API Version'
               type: string
               example: '19'
@@ -1086,6 +1102,7 @@ components:
       description: |- 
         HTTP Status:
           * 400 : Client request error (e.g. protocol error or JSON request body error) or CouchbaseLite error or exception.
+          * 404 : Document not found.
           * 500 : Server error
         
         Response body: JSON object including domain, code, and message.
