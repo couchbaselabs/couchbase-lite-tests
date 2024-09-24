@@ -42,6 +42,10 @@ public class TypedMap extends TypedCollection {
         return (val == null) ? null : val.getClass();
     }
 
+    public boolean isEmpty() { return data.isEmpty(); }
+
+    public boolean containsKey(@NonNull String key) { return data.containsKey(key); }
+
     @NonNull
     public Set<String> getKeys() { return new HashSet<>(data.keySet()); }
 

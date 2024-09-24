@@ -16,9 +16,12 @@
 package com.couchbase.lite.mobiletest.endpoints.v1;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -36,14 +39,24 @@ public class Reset {
     private static final String TAG = "RESET";
 
     private static final String KEY_TEST_NAME = "test";
-    private static final String KEY_DATASETS = "datasets";
+    private static final String KEY_DATABASES = "databases";
+    private static final String KEY_COLLECTIONS = "collections";
+    private static final String KEY_DATASET = "datasets";
 
     private static final Set<String> LEGAL_RESET_KEYS;
     static {
         final Set<String> l = new HashSet<>();
         l.add(KEY_TEST_NAME);
-        l.add(KEY_DATASETS);
+        l.add(KEY_DATABASES);
         LEGAL_RESET_KEYS = Collections.unmodifiableSet(l);
+    }
+
+    private static final Set<String> LEGAL_DATABASE_KEYS;
+    static {
+        final Set<String> l = new HashSet<>();
+        l.add(KEY_COLLECTIONS);
+        l.add(KEY_DATASET);
+        LEGAL_DATABASE_KEYS = Collections.unmodifiableSet(l);
     }
 
 
@@ -54,11 +67,12 @@ public class Reset {
 
     @NonNull
     public final Map<String, Object> reset(@NonNull TestContext oldCtxt, @NonNull TypedMap req) {
-        final String client = oldCtxt.getClient();
+        req.validate(LEGAL_RESET_KEYS);
 
         final String endingTest = oldCtxt.getTestName();
         if (endingTest != null) { Log.p(TAG, "<<<<<<<<<< " + endingTest); }
 
+        final String client = oldCtxt.getClient();
         app.clearReplSvc();
         app.clearDbSvc();
         oldCtxt.close();
@@ -71,39 +85,75 @@ public class Reset {
         dbSvc.init(ctxt);
         app.getReplSvc().init(ctxt);
 
-        req.validate(LEGAL_RESET_KEYS);
-
         if (startingTest != null) {
             Log.p(TAG, ">>>>>>>>>> " + startingTest);
             ctxt.setTestName(startingTest);
         }
 
-        final TypedMap datasets = req.getMap(KEY_DATASETS);
-        if (datasets != null) { installDatasets(ctxt, dbSvc, datasets); }
+        createDbs(ctxt, dbSvc, req.getMap(KEY_DATABASES));
 
         return Collections.emptyMap();
     }
 
-    private void installDatasets(
-        @NonNull TestContext ctxt,
-        @NonNull DatabaseService dbSvc,
-        @NonNull TypedMap datasets) {
-        final Set<String> datasetNames = datasets.getKeys();
-        if (datasetNames.isEmpty()) { return; }
+    private void createDbs(@NonNull TestContext ctxt, @NonNull DatabaseService dbSvc, @Nullable TypedMap databases) {
+        if ((databases == null) || databases.isEmpty()) { return; }
 
-        for (String dataset: datasetNames) {
-            final TypedList databases = datasets.getList(dataset);
-            if ((databases == null) || (databases.size() <= 0)) {
-                throw new ClientError("No target databases for in dataset " + dataset + " in init");
+        final Set<String> dbNames = databases.getKeys();
+        for (String dbName: dbNames) {
+            final TypedMap dbDesc = databases.getMap(dbName);
+
+            if ((dbDesc == null) || dbDesc.isEmpty()) {
+                createDb(ctxt, dbSvc, dbName, null);
+                return;
             }
-            for (int i = 0; i < databases.size(); i++) {
-                final String dbName = databases.getString(i);
-                if (StringUtils.isEmpty(dbName)) {
-                    throw new ClientError("Empty target database name in dataset " + dataset + " in init");
+
+            dbDesc.validate(LEGAL_DATABASE_KEYS);
+
+            final String dataset = dbDesc.getString(KEY_DATASET);
+            if (dataset != null) {
+                if (!dbDesc.containsKey(KEY_COLLECTIONS)) {
+                    throw new ClientError(
+                        "Both collections and dataset specified for database " + dbName + " in reset");
                 }
-                dbSvc.installDataset(ctxt, dataset, dbName);
+                installDataset(ctxt, dbSvc, dbName, dataset);
+                return;
+            }
+
+            final TypedList collections = dbDesc.getList(KEY_COLLECTIONS);
+            if ((collections == null) || collections.isEmpty()) {
+                throw new ClientError("Null or empty collections list for database " + dbName + " in reset");
+            }
+
+            createDb(ctxt, dbSvc, dbName, collections);
+        }
+    }
+
+
+    private static void createDb(
+        @NonNull TestContext ctxt,
+        @NonNull DatabaseService svc,
+        @NonNull String dbName,
+        @Nullable TypedList collections) {
+        final List<String[]> collFQNs = new ArrayList<>();
+        if (collections != null) {
+            for (int i = 0; i < collections.size(); i++) {
+                final String fqn = collections.getString(i);
+                if (fqn == null) { throw new ClientError("Null collection for database " + dbName + " in reset"); }
+                collFQNs.add(DatabaseService.parseCollectionFullName(fqn));
             }
         }
+        svc.installDatabase(ctxt, dbName, collFQNs);
+    }
+
+    private void installDataset(
+        @NonNull TestContext ctxt,
+        @NonNull DatabaseService dbSvc,
+        @NonNull String dbName,
+        @Nullable String dataset) {
+        if (StringUtils.isEmpty(dataset)) {
+            throw new ClientError("Dataset is null for database " + dbName + " in reset");
+        }
+        dbSvc.installDataset(ctxt, dataset, dbName);
     }
 }
 
