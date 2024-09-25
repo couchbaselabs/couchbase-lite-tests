@@ -19,7 +19,6 @@ Test Parameters
 
 These are not defined by the TDK, but rather the test writer (with possible help from TDK devs).  The parameters make use of the concept of `pytest fixtures <https://docs.pytest.org/en/stable/explanation/fixtures.html>`_ and so the tests can use as many or as few as they prefer.  Currently, the tests in the TDK repo define several fixtures as follows:
 
-- *event_loop* : Likely not used directly by the tests, but overrides the default event loop present in pytest sessions to a long lasting one that allows the reuse of a single Couchbase Server connection
 - *cblpytest* : Probably the most important fixture of them all.  This contains a preconfigured top level object which is a factory for all other classes that the test will use (see the above Getting Started section)
 - *dataset_path* : The path on disk to the data files that the TDK will make use of (such as sync gateway configuration files, etc)
 

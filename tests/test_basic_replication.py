@@ -22,7 +22,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `travel` dataset")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -56,7 +56,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -91,7 +91,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -126,7 +126,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -163,7 +163,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -241,7 +241,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -356,7 +356,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -501,7 +501,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -535,7 +535,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -569,7 +569,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -604,7 +604,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -681,7 +681,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''

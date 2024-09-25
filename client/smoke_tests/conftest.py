@@ -4,13 +4,6 @@ from cbltest import CBLPyTest
 
 import pytest
 import pytest_asyncio
-import asyncio
-
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.get_event_loop()
-    yield loop
-    loop.close()
 
 @pytest_asyncio.fixture(scope="session")
 async def cblpytest(request: pytest.FixtureRequest):

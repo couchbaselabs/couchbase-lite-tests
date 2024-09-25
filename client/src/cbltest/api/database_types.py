@@ -2,10 +2,9 @@ from enum import Enum
 from typing import Any
 from cbltest.api.jsonserializable import JSONSerializable
 
-class SnapshotDocumentEntry(JSONSerializable):
+class DocumentEntry(JSONSerializable):
     """
-    A class for recording the fully qualified name of a document to be saved in a snapshot.
-    This class is used in conjunction with :class:`PostSnapshotDocumentsRequestBody`
+    A class for recording the fully qualified name of a document in any database
     """
     def __init__(self, collection: str, id: str):
         self.collection: str = collection

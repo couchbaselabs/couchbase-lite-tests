@@ -9,7 +9,6 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry import trace
-import asyncio
 
 import pytest
 import pytest_asyncio
@@ -36,19 +35,6 @@ def span_generation(request: pytest.FixtureRequest):
             yield current_span
     else:
         yield None
-
-# This is important to have in any conftest.py that uses the TDK.
-# The explanation of what this does is a bit chaotic, but the event
-# loop powers asynchronous behavior and by default it doesn't last
-# long enough for the Couchbase Server SDK.  If it gets closed too early 
-# then Couchbase Server SDK operations start failing because of operating
-# on a closed event loop.  This extends the loop to last throughout the
-# entire session.
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.get_event_loop()
-    yield loop
-    loop.close()
 
 @pytest_asyncio.fixture(scope="session")
 async def cblpytest(request: pytest.FixtureRequest):

@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 from cbltest import CBLPyTest
-from cbltest.api.database_types import SnapshotDocumentEntry
+from cbltest.api.database_types import DocumentEntry
 from cbltest.api.database import SnapshotUpdater, DatabaseUpdater
 from cbltest.api.error import CblTestServerBadResponseError
 from cbltest.globals import CBLPyTestGlobal
@@ -27,11 +27,11 @@ class TestSnapshotVerify:
         for instance in instances:
             instance.purge_document(collection, document)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_good_update(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -44,11 +44,11 @@ class TestSnapshotVerify:
         assert not verify_result.expected.exists, "Response should not contain 'expected'"
         assert verify_result.document is None, "Response should not contain 'document'"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_good_delete(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -61,11 +61,11 @@ class TestSnapshotVerify:
         assert not verify_result.expected.exists, "Response should not contain 'expected'"
         assert verify_result.document is None, "Response should not contain 'document'"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_delete(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_2")
+            DocumentEntry("_default._default", "name_2")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -80,11 +80,11 @@ class TestSnapshotVerify:
         assert not verify_result.expected.exists, "Response should not contain 'expected'"
         assert verify_result.document is None, "Response should not contain 'document'"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_good_purge(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -97,11 +97,11 @@ class TestSnapshotVerify:
         assert not verify_result.expected.exists, "Response should not contain 'expected'"
         assert verify_result.document is None, "Response should not contain 'document'"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_purge(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_2")
+            DocumentEntry("_default._default", "name_2")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -116,11 +116,11 @@ class TestSnapshotVerify:
         assert not verify_result.expected.exists, "Response should not contain 'expected'"
         assert verify_result.document is None, "Response should not contain 'document'"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_single_dict_update(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -135,11 +135,11 @@ class TestSnapshotVerify:
         assert verify_result.expected.exists and verify_result.expected.value == "bad_value", "Incorrect 'expected' in response"
         assert verify_result.document is not None, "Missing document property in response"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_single_array_update(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -154,11 +154,11 @@ class TestSnapshotVerify:
         assert verify_result.expected.exists and verify_result.expected.value == "foo@baz.com", "Incorrect 'expected' in response"
         assert verify_result.document is not None, "Missing document property in response"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_array_order_update(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -173,11 +173,11 @@ class TestSnapshotVerify:
         assert verify_result.expected.exists and verify_result.expected.value == "shawna.matheney@nosql-matters.org", "Incorrect 'expected' in response"
         assert verify_result.document is not None, "Missing document property in response"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_nonexistent_property(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -192,11 +192,11 @@ class TestSnapshotVerify:
         assert verify_result.expected.exists and verify_result.expected.value == ["shawna.matheney@nosql-matters.org","foo@bar.com"], "Incorrect 'expected' in response"
         assert verify_result.document is not None, "Missing document property in response"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_remove_property(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -211,11 +211,11 @@ class TestSnapshotVerify:
         assert not verify_result.expected.exists, "'expected' should be missing"
         assert verify_result.document is not None, "Missing document property in response"
         
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_snapshot(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -223,11 +223,11 @@ class TestSnapshotVerify:
         with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
             await db.verify_documents(snapshot_updater)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_wrongly_existing_doc(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "foo_1")
+            DocumentEntry("_default._default", "foo_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -240,11 +240,11 @@ class TestSnapshotVerify:
         assert not verify_result.actual.exists and not verify_result.actual.exists and verify_result.document is None, \
               "The return value should not have expected, actual, or document"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_wrongly_nonexistent_unmodified(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -257,11 +257,11 @@ class TestSnapshotVerify:
         assert not verify_result.actual.exists and not verify_result.actual.exists and verify_result.document is None, \
             "The return value should not have expected, actual or document"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_wrongly_nonexistent_modified(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -275,11 +275,11 @@ class TestSnapshotVerify:
         assert not verify_result.actual.exists and not verify_result.actual.exists and verify_result.document is None, \
             "The return value should not have expected, actual or document"
         
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_blob_update(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
@@ -294,11 +294,11 @@ class TestSnapshotVerify:
         assert not verify_result.expected.exists, "Response should not contain 'expected'"
         assert verify_result.document is None, "Response should not contain 'document'"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_blob_update(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("_default._default", "name_1")
+            DocumentEntry("_default._default", "name_1")
         ])
 
         snapshot_updater = SnapshotUpdater(snapshot_id)

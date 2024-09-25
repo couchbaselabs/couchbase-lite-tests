@@ -31,6 +31,7 @@ class TestServerRequestType(Enum):
     PERFORM_MAINTENANCE = "PostPerformMaintenanceRequest"
     SETUP_LOGGING = "SetupLoggingRequest"
     RUN_QUERY = "RunQueryRequest"
+    GET_DOCUMENT = "GetDocumentRequest"
 
     def __str__(self) -> str:
         return self.value

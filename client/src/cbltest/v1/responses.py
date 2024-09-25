@@ -291,7 +291,7 @@ class PostPerformMaintenanceResponse(TestServerResponse):
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "performMaintenance")
 
-class SetupLoggingResponse(TestServerResponse):
+class PostSetupLoggingResponse(TestServerResponse):
     """
     A POST /setupLogging response as specified in version 1 of the 
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -299,7 +299,7 @@ class SetupLoggingResponse(TestServerResponse):
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "setupLogging")
 
-class RunQueryResponse(TestServerResponse):
+class PostRunQueryResponse(TestServerResponse):
     """
     A POST /runQuery response as specified in version 1 of the 
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -311,6 +311,7 @@ class RunQueryResponse(TestServerResponse):
                 {...},
                 {...},
             ]
+        }
     """
 
     __results_key: Final[str] = "results"
@@ -319,11 +320,34 @@ class RunQueryResponse(TestServerResponse):
     def results(self) -> List[Dict]:
         return self.__results
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: Dict):
         super().__init__(status_code, uuid, 1, body, "runQuery")
         if not self.__results_key in body:
             return
         
         results = _get_typed_required(body, self.__results_key, list)
         self.__results = [dict(e) for e in results] if results is not None else []
+
+class PostGetDocumentResponse(TestServerResponse):
+    """
+    A POST /getDocument response as specified in version 1 of the 
+    [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
+
+    Example Body::
+
+        {
+            "_id": "doc1",
+            "_revs": "17f4ed7b51a50000@MlAW1NbbT8KcTRO8oPnpgw, 17f4ed7b42a70000@ScJAVJf3TdOUanAcByIcXg",
+            "foo": "bar
+        }
+    """
+
+    @property
+    def raw_body(self) -> Dict:
+        """The raw return value from the server (containing id, revs, and body)"""
+        return self.__body
+    
+    def __init__(self, status_code: int, uuid: str, body: Dict):
+        super().__init__(status_code, uuid, 1, body, "getDocument")
+        self.__body = body
 

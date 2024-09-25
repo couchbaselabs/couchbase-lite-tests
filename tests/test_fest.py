@@ -6,7 +6,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database import SnapshotUpdater, Database
-from cbltest.api.database_types import SnapshotDocumentEntry
+from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator, WaitForDocumentEventEntry, \
     ReplicatorDocumentFlags
@@ -35,7 +35,7 @@ class TestFest(CBLTestClass):
 
     async def setup_test_fest_dbs(self, cblpytest: CBLPyTest) -> List[Database]:
         self.mark_test_step("Reset local databases load them with the todo dataset")
-        return await cblpytest.test_servers[0].create_and_reset_db("todo", ["db1", "db2"])
+        return await cblpytest.test_servers[0].create_and_reset_db(["db1", "db2"], dataset="todo")
 
     async def setup_test_fest_repls(self, cblpytest: CBLPyTest, dbs: Tuple[Database, Database],
                                     users: Tuple[str, str] = ("user1", "user1")) -> Tuple[Replicator, Replicator]:
@@ -86,14 +86,14 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot db1")
         snap1 = await db1.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db2-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db2-list1-task1")
+            DocumentEntry("_default.lists", "db2-list1"),
+            DocumentEntry("_default.tasks", "db2-list1-task1")
         ])
 
         self.mark_test_step("Snapshot db2")
         snap2 = await db2.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1")
         ])
 
         self.mark_test_step("Start the replicators")
@@ -160,8 +160,8 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot db2")
         snap2 = await db2.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1")
         ])
 
         self.mark_test_step("Create a list and a task in db1")
@@ -174,8 +174,8 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot db1")
         snap1 = await db1.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1")
         ])
 
         self.mark_test_step("Start the replicators")
@@ -237,8 +237,8 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot documents in db1")
         snap1 = await db1.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1")
         ])
 
         self.mark_test_step("Start the replicators")
@@ -255,8 +255,8 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1")
         ])
 
         self.mark_test_step("Delete the task _default.tasks.db1-list1-task1 in db1")
@@ -302,9 +302,9 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot documents in db1")
         snap1 = await db1.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task2")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1"),
+            DocumentEntry("_default.tasks", "db1-list1-task2")
         ])
 
         self.mark_test_step("Start the replicators")
@@ -323,9 +323,9 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task2")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1"),
+            DocumentEntry("_default.tasks", "db1-list1-task2")
         ])
 
         self.mark_test_step("Delete the _default.tasks, db1-list1-task1 task in db1")
@@ -378,10 +378,10 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot documents in db1")
         snap1 = await db1.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1"),
-            SnapshotDocumentEntry("_default.lists", "db2-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db2-list1-task1")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1"),
+            DocumentEntry("_default.lists", "db2-list1"),
+            DocumentEntry("_default.tasks", "db2-list1-task1")
         ])
 
         self.mark_test_step("Create a list and a task in db2")
@@ -394,10 +394,10 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1"),
-            SnapshotDocumentEntry("_default.lists", "db2-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db2-list1-task1")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1"),
+            DocumentEntry("_default.lists", "db2-list1"),
+            DocumentEntry("_default.tasks", "db2-list1-task1")
         ])
 
         self.mark_test_step("Start the replicators")
@@ -438,10 +438,10 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot documents in db2")
         snap = await db2.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task2"),
-            SnapshotDocumentEntry("_default.users", "db1-list1-user2")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1"),
+            DocumentEntry("_default.tasks", "db1-list1-task2"),
+            DocumentEntry("_default.users", "db1-list1-user2")
         ])
 
         self.mark_test_step("Start the replicators")
@@ -509,10 +509,10 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task2"),
-            SnapshotDocumentEntry("_default.users", "db1-list1-user2")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1"),
+            DocumentEntry("_default.tasks", "db1-list1-task2"),
+            DocumentEntry("_default.users", "db1-list1-user2")
         ])
 
         self.mark_test_step("Create a list and two tasks in db1")
@@ -529,8 +529,8 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot documents in db1")
         snap1 = await db1.create_snapshot([
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task2")
+            DocumentEntry("_default.tasks", "db1-list1-task1"),
+            DocumentEntry("_default.tasks", "db1-list1-task2")
         ])
 
         self.mark_test_step("Start the replicators")
@@ -607,10 +607,10 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot([
-            SnapshotDocumentEntry("_default.lists", "db1-list1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task1"),
-            SnapshotDocumentEntry("_default.tasks", "db1-list1-task2"),
-            SnapshotDocumentEntry("_default.users", "db1-list1-user2")
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1"),
+            DocumentEntry("_default.tasks", "db1-list1-task2"),
+            DocumentEntry("_default.users", "db1-list1-user2")
         ])
 
         self.mark_test_step("Start the replicators")

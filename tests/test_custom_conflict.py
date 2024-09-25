@@ -11,7 +11,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.api.database import SnapshotUpdater
-from cbltest.api.database_types import SnapshotDocumentEntry
+from cbltest.api.database_types import DocumentEntry
 from cbltest.api.syncgateway import DocumentUpdateEntry
 
 class TestCustomConflict(CBLTestClass):
@@ -22,7 +22,7 @@ class TestCustomConflict(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset empty local database")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("empty", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
         self.mark_test_step("""
@@ -48,7 +48,7 @@ class TestCustomConflict(CBLTestClass):
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "names",
                                        ["_default._default"])
         
-        snapshot_id = await db.create_snapshot([SnapshotDocumentEntry("_default._default", "name_101")])
+        snapshot_id = await db.create_snapshot([DocumentEntry("_default._default", "name_101")])
         snapshot_updater = SnapshotUpdater(snapshot_id)
 
         self.mark_test_step("Modify the local name_101 document `name.last` = 'Smith'")

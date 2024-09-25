@@ -14,7 +14,7 @@ class TestUpdateDatabase:
 
         self.db: Optional[Database] = None
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
         "attempt", [
             # Empty
@@ -53,13 +53,13 @@ class TestUpdateDatabase:
     )
     async def test_bad_updates(self, cblpytest: CBLPyTest, attempt: str) -> None:
         if self.db is None:
-            self.db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+            self.db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
 
         with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
             async with self.db.batch_updater() as b:
                 b.upsert_document("_default._default", "name_1", [{attempt: 5}])
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
         "attempt",  [
             # Add a brand new root key (with the optional JSON path $ for bonus points)
@@ -107,14 +107,14 @@ class TestUpdateDatabase:
     )
     async def test_good_updates(self, cblpytest: CBLPyTest, attempt: str) -> None:
         if self.db is None:
-            self.db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+            self.db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
             
         async with self.db.batch_updater() as b:
             b.upsert_document("_default._default", "name_1", [{attempt: 5}])
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_nonexistent_blob(self, cblpytest: CBLPyTest) -> None:
-        db = (await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"]))[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
 
         with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
             async with db.batch_updater() as b:

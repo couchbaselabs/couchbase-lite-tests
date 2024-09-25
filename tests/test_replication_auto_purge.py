@@ -6,7 +6,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database import SnapshotUpdater
-from cbltest.api.database_types import SnapshotDocumentEntry
+from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import ReplicatorCollectionEntry, ReplicatorBasicAuthenticator, ReplicatorType, \
     WaitForDocumentEventEntry, ReplicatorActivityLevel, ReplicatorDocumentFlags, ReplicatorFilter
@@ -22,7 +22,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("posts", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -127,7 +127,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("posts", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -250,7 +250,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("posts", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -288,11 +288,11 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         self.mark_test_step("Snapshot the database")
         snap = await db.create_snapshot([
-            SnapshotDocumentEntry("_default.posts", "post_1"),
-            SnapshotDocumentEntry("_default.posts", "post_2"),
-            SnapshotDocumentEntry("_default.posts", "post_3"),
-            SnapshotDocumentEntry("_default.posts", "post_4"),
-            SnapshotDocumentEntry("_default.posts", "post_5")
+            DocumentEntry("_default.posts", "post_1"),
+            DocumentEntry("_default.posts", "post_2"),
+            DocumentEntry("_default.posts", "post_3"),
+            DocumentEntry("_default.posts", "post_4"),
+            DocumentEntry("_default.posts", "post_5")
         ])
 
         self.mark_test_step('''
@@ -365,7 +365,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("posts", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -459,7 +459,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("posts", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -499,11 +499,11 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         self.mark_test_step("Snapshot the database")
         snap = await db.create_snapshot([
-            SnapshotDocumentEntry("_default.posts", "post_1"),
-            SnapshotDocumentEntry("_default.posts", "post_2"),
-            SnapshotDocumentEntry("_default.posts", "post_3"),
-            SnapshotDocumentEntry("_default.posts", "post_4"),
-            SnapshotDocumentEntry("_default.posts", "post_5")
+            DocumentEntry("_default.posts", "post_1"),
+            DocumentEntry("_default.posts", "post_2"),
+            DocumentEntry("_default.posts", "post_3"),
+            DocumentEntry("_default.posts", "post_4"),
+            DocumentEntry("_default.posts", "post_5")
         ])
 
         self.mark_test_step('''

@@ -1,15 +1,16 @@
 from __future__ import annotations
 from json import dumps
 
-from typing import Dict, List, cast, Any, Optional
+from typing import Dict, Final, List, cast, Any, Optional
 from opentelemetry.trace import get_tracer
 
 from cbltest.requests import TestServerRequestType
 from cbltest.v1.responses import (PostGetAllDocumentsResponse, PostGetAllDocumentsEntry, PostSnapshotDocumentsResponse, 
-                                  PostVerifyDocumentsResponse, ValueOrMissing, RunQueryResponse)
+                                  PostVerifyDocumentsResponse, ValueOrMissing, PostRunQueryResponse, PostGetDocumentResponse)
 from cbltest.v1.requests import (DatabaseUpdateEntry, DatabaseUpdateType, PostGetAllDocumentsRequestBody, 
-                                 PostUpdateDatabaseRequestBody, SnapshotDocumentEntry, PostSnapshotDocumentsRequestBody,
-                                 PostVerifyDocumentsRequestBody, PostPerformMaintenanceRequestBody, RunQueryRequestBody)
+                                 PostUpdateDatabaseRequestBody, DocumentEntry, PostSnapshotDocumentsRequestBody,
+                                 PostVerifyDocumentsRequestBody, PostPerformMaintenanceRequestBody, PostRunQueryRequestBody,
+                                 PostGetDocumentRequestBody)
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import RequestFactory
 from cbltest.api.error import CblTestError
@@ -204,6 +205,38 @@ class VerifyResult:
     def __init__(self, rest_response: PostVerifyDocumentsResponse) -> None:
         self.__response = rest_response
 
+class GetDocumentResult:
+    """
+    The result of a call to POST /getDocument
+    """
+
+    __id_key: Final[str] = "_id"
+    __revs_key: Final[str] = "_revs"
+    
+    @property
+    def id(self) -> str:
+        """Gets the ID of the document"""
+        return self.__id
+    
+    @property
+    def revs(self) -> str:
+        """Gets the revision history fo the document"""
+        return self.__revs
+    
+    @property
+    def body(self) -> Dict[str, Any]:
+        """Gets the body of the document"""
+        return self.__body
+    
+    def __init__(self, raw: Dict[str, Any]) -> None:
+        assert self.__id_key in raw and self.__revs_key in raw, "Malformed raw dict in GetDocumentResult"
+        self.__id = raw[self.__id_key]
+        self.__revs = raw[self.__revs_key]
+        raw.pop(self.__id_key)
+        raw.pop(self.__revs_key)
+        self.__body = raw
+        
+
 class Database:
     """
     A class for interacting with a Couchbase Lite database inside of a test server.
@@ -252,8 +285,24 @@ class Database:
                 ret_val[c] = list(AllDocumentsEntry(d) for d in cast_resp.documents_for_collection(c))
 
             return ret_val
+        
+    async def get_document(self, document: DocumentEntry) -> GetDocumentResult:
+        """
+        Performs a getDocument request for the given document information
+
+        :param document: The collection and ID of a document to be retrieved
+        """
+        with self.__tracer.start_as_current_span("get_document", attributes={"cbl.database.anme": self.__name,
+                                                                             "cbl.collection.name": document.collection,
+                                                                             "cbl.document.id": document.id}):
+            payload = PostGetDocumentRequestBody(self.__name, document)
+            req = self.__request_factory.create_request(TestServerRequestType.GET_DOCUMENT, payload)
+            resp = await self.__request_factory.send_request(self.__index, req)
+            cast_resp = cast(PostGetDocumentResponse, resp)
+            return GetDocumentResult(cast_resp.raw_body)
+            
     
-    async def create_snapshot(self, documents: List[SnapshotDocumentEntry]) -> str:
+    async def create_snapshot(self, documents: List[DocumentEntry]) -> str:
         """
         Creates a snapshot on the database to use for later verification
 
@@ -297,7 +346,7 @@ class Database:
         :param query: The SQL++ query to run
         """
         with self.__tracer.start_as_current_span("run_query"):
-            payload = RunQueryRequestBody(self.__name, query)
+            payload = PostRunQueryRequestBody(self.__name, query)
             req = self.__request_factory.create_request(TestServerRequestType.RUN_QUERY, payload)
             resp = await self.__request_factory.send_request(self.__index, req)
-            return cast(RunQueryResponse, resp).results
+            return cast(PostRunQueryResponse, resp).results

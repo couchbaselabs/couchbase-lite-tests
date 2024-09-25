@@ -1,7 +1,7 @@
 from typing import Final
 
 # For hatchling to easily detect the version
-__version__ = "0.4.0"
+__version__ = "0.5.2"
 
 # Typed version for outside use
 VERSION: Final[str] = __version__

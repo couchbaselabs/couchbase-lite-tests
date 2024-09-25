@@ -10,12 +10,12 @@ class TestLogSlurp:
         # will not be informed about the currently running test
         CBLPyTestGlobal.running_test_name = method.__name__
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_logslurp(self, cblpytest: CBLPyTest) -> None:
         if cblpytest.config.logslurp_url is None:
             pytest.skip("No LogSlurp server configured")
 
-        await cblpytest.test_servers[0].create_and_reset_db("empty", ["test"])
+        await cblpytest.test_servers[0].create_and_reset_db(["test"])
         handler = next(h for h in _cbl_log.handlers if isinstance(h, LogSlurpHandler))
         print(handler.id)
         resp = requests.get(f"http://{cblpytest.config.logslurp_url}/retrieveLog", headers={"CBL-Log-ID": handler.id})

@@ -8,7 +8,7 @@ from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import SnapshotUpdater
-from cbltest.api.database_types import SnapshotDocumentEntry
+from cbltest.api.database_types import DocumentEntry
 
 from test_replication_filter_data import *
 import pytest
@@ -28,7 +28,7 @@ class TestReplicationFilter(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -89,7 +89,7 @@ class TestReplicationFilter(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -158,7 +158,7 @@ class TestReplicationFilter(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -244,9 +244,9 @@ class TestReplicationFilter(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `empty` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("empty", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
-        snapshot_id = await db.create_snapshot([SnapshotDocumentEntry("_default._default", "test_public")])
+        snapshot_id = await db.create_snapshot([DocumentEntry("_default._default", "test_public")])
         snapshot_updater = SnapshotUpdater(snapshot_id)
 
         self.mark_test_step("""
@@ -325,7 +325,7 @@ class TestReplicationFilter(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -386,7 +386,7 @@ class TestReplicationFilter(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("names", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
         self.mark_test_step('''
