@@ -43,6 +43,7 @@ import com.couchbase.lite.LogLevel;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
+import com.couchbase.lite.mobiletest.services.LogService;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
@@ -91,6 +92,7 @@ public abstract class TestApp {
 
     private final Map<String, TestContext> testContexts = new HashMap<>();
 
+    private final AtomicReference<LogService> logSvc = new AtomicReference<>();
     private final AtomicReference<DatabaseService> dbSvc = new AtomicReference<>();
     private final AtomicReference<ReplicatorService> replSvc = new AtomicReference<>();
 
@@ -176,6 +178,16 @@ public abstract class TestApp {
 
     @Nullable
     public final ReplicatorService clearReplSvc() { return replSvc.getAndSet(null); }
+
+    @NonNull
+    public final LogService getLogSvc() {
+        final LogService mgr = logSvc.get();
+        if (mgr == null) { logSvc.compareAndSet(null, new LogService()); }
+        return logSvc.get();
+    }
+
+    @Nullable
+    public final LogService clearLogSvc() { return logSvc.getAndSet(null); }
 
     @NonNull
     protected final Date getExpirationTime() {

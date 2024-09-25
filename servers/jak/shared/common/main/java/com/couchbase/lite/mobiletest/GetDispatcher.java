@@ -25,7 +25,7 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.json.ReplyBuilder;
 import com.couchbase.lite.mobiletest.util.Log;
 
-// Implements api.yaml 0.4.0
+// Implements API 0.5.2
 public final class GetDispatcher extends BaseDispatcher<GetDispatcher.Endpoint> {
     private static final String TAG = "GET";
 
