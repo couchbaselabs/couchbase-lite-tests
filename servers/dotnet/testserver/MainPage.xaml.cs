@@ -37,7 +37,8 @@ public partial class MainPage : ContentPage
     {
         base.OnAppearing();
 
-        _versionLabel.Text = "CBL Version: " + typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+        _versionLabel.Text = "Test Server Version: " + CBLTestServer.Version;
+        _cblVersionLabel.Text = "CBL Version: " + typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
 
         var validIPs = NetworkInterface.GetAllNetworkInterfaces().Where(IsInterfaceValid)
                     .SelectMany(x => x.GetIPProperties().UnicastAddresses)

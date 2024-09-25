@@ -1,8 +1,6 @@
-﻿using Couchbase.Lite.Logging;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using System.Diagnostics.Metrics;
+﻿using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using System.Reflection;
 using TestServer.Services;
 
 namespace TestServer
@@ -31,6 +29,8 @@ namespace TestServer
         private HttpListener? _httpListener;
 
         #endregion
+
+        public static string Version => typeof(CBLTestServer).Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()!.Version;
 
         public static IServiceProvider ServiceProvider
         {

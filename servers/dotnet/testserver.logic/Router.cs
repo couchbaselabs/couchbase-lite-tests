@@ -20,7 +20,7 @@ namespace TestServer.Handlers
 {
     internal static partial class HandlerList
     {
-        private static (string scope, string name) CollectionSpec(string inputName)
+        public static (string scope, string name) CollectionSpec(string inputName)
         {
             var split = inputName.Split('.');
             if(split.Length == 1) {

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.IO.Compression;
 using System.Text.Json;
+using TestServer.Handlers;
 using TestServer.Services;
 
 namespace TestServer
@@ -46,7 +47,7 @@ namespace TestServer
             _keepAlives.Clear();
         }
 
-        public async Task LoadDataset(string name, IEnumerable<string> targetDbNames)
+        public async Task LoadDatabase(string? datasetName, IEnumerable<string> targetDbNames, IEnumerable<string>? collections = null)
         {
             IEnumerable<string> targetsToCreate = default!;
             using (var rl = _lock.GetReadLock()) {
@@ -56,7 +57,7 @@ namespace TestServer
                 }
             }
 
-            void CreateNewDatabases(string datasetName)
+            void CreateNewDatabases(string? datasetName, IEnumerable<string>? collections)
             {
                 foreach (var targetName in targetsToCreate) {
                     if (Database.Exists(targetName, FilesDirectory)) {
@@ -68,27 +69,34 @@ namespace TestServer
                         Directory = FilesDirectory
                     };
 
-                    if (datasetName != "empty") {
-                        Database.Copy(Path.Join(FilesDirectory, $"{name}.cblite2"), targetName, dbConfig);
+                    if (datasetName != null) {
+                        Database.Copy(Path.Join(FilesDirectory, $"{datasetName}.cblite2"), targetName, dbConfig);
+                        _activeDatabases[targetName] = new Database(targetName, dbConfig);
+                    } else if(collections != null) {
+                        var newDb = new Database(targetName, dbConfig);
+                        _activeDatabases[targetName] = newDb;
+                        foreach (var c in collections) {
+                            var collSpec = HandlerList.CollectionSpec(c);
+                            using var coll = newDb.CreateCollection(collSpec.name, collSpec.scope);
+                        }
                     }
 
-                    _activeDatabases[targetName] = new Database(targetName, dbConfig);
                 }
             }
 
-            if(name == "empty") {
-                CreateNewDatabases(name);
+            if(datasetName == null) {
+                CreateNewDatabases(null, collections);
                 return;
             }
 
             Stream asset;
             try {
-                asset = await _fileSystem.OpenAppPackageFileAsync($"{name}.cblite2.zip");
+                asset = await _fileSystem.OpenAppPackageFileAsync($"{datasetName}.cblite2.zip");
             } catch (Exception ex) {
-                throw new ApplicationException($"Unable to open dataset '{name}'", ex);
+                throw new ApplicationException($"Unable to open dataset '{datasetName}'", ex);
             }
 
-            var destinationZip = Path.Combine(FilesDirectory, $"{name}.cblite2.zip");
+            var destinationZip = Path.Combine(FilesDirectory, $"{datasetName}.cblite2.zip");
             using var wl = _lock.GetWriteLock();
             if (File.Exists(destinationZip)) {
                 File.Delete(destinationZip);
@@ -99,13 +107,13 @@ namespace TestServer
                 asset.Dispose();
             }
 
-            if (Database.Exists(name, FilesDirectory)) {
-                Database.Delete(name, FilesDirectory);
+            if (Database.Exists(datasetName, FilesDirectory)) {
+                Database.Delete(datasetName, FilesDirectory);
             }
 
             ZipFile.ExtractToDirectory(destinationZip, FilesDirectory);
-            CreateNewDatabases(name);
-            Database.Delete(name, FilesDirectory);
+            CreateNewDatabases(datasetName, null);
+            Database.Delete(datasetName, FilesDirectory);
         }
 
         public async Task<Stream> LoadBlob(string name)
