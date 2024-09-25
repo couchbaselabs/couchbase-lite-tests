@@ -26,8 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.nanohttpd.protocols.http.response.Status;
-
 import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
@@ -40,6 +38,7 @@ import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.errors.HTTPStatus;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.util.FileUtils;
@@ -181,7 +180,9 @@ public final class DatabaseService {
         @NonNull String docId) {
         final Document doc = getDocOrNull(ctxt, getOpenDb(ctxt, dbName), collName, docId);
         if (doc == null) {
-            throw new ClientError(Status.NOT_FOUND, "Document not found: " + getDocumentFQN(dbName, collName, docId));
+            throw new ClientError(
+                HTTPStatus.NOT_FOUND,
+                "Document not found: " + getDocumentFQN(dbName, collName, docId));
         }
         return doc.toMap();
     }
@@ -190,7 +191,9 @@ public final class DatabaseService {
     public Document getDocument(@NonNull Collection collection, @NonNull String docId) {
         final Document doc = getDocOrNull(collection, docId);
         if (doc == null) {
-            throw new ClientError(Status.NOT_FOUND, "Document not found: " + getDocumentFQN(collection, docId));
+            throw new ClientError(
+                HTTPStatus.NOT_FOUND,
+                "Document not found: " + getDocumentFQN(collection, docId));
         }
         return doc;
     }
@@ -212,17 +215,18 @@ public final class DatabaseService {
         }
     }
 
+    @NonNull
     public String runQuery(@NonNull Database db, @NonNull String query) {
         final StringBuilder json = new StringBuilder("[");
         try (ResultSet rs = db.createQuery(query).execute()) {
             for (Result r: rs.allResults()) {
-                if (json.length() > 1) { json.append(","); }
+                if (json.length() > 1) { json.append(','); }
                 json.append(r.toJSON());
             }
         }
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Query failed: \"" + query + "\"", e); }
 
-        return json.append("]").toString();
+        return json.append(']').toString();
     }
 
     // New stream constructors are supported only in API 26+

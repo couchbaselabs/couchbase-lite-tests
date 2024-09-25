@@ -134,15 +134,15 @@ public class Reset {
         @NonNull DatabaseService svc,
         @NonNull String dbName,
         @Nullable TypedList collections) {
-        final List<String[]> collFQNs = new ArrayList<>();
+        final List<String[]> collFqns = new ArrayList<>();
         if (collections != null) {
             for (int i = 0; i < collections.size(); i++) {
                 final String fqn = collections.getString(i);
                 if (fqn == null) { throw new ClientError("Null collection for database " + dbName + " in reset"); }
-                collFQNs.add(DatabaseService.parseCollectionFullName(fqn));
+                collFqns.add(DatabaseService.parseCollectionFullName(fqn));
             }
         }
-        svc.installDatabase(ctxt, dbName, collFQNs);
+        svc.installDatabase(ctxt, dbName, collFqns);
     }
 
     private void installDataset(

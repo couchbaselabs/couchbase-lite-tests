@@ -145,7 +145,7 @@ public class TestServerApp extends HttpServlet {
         }
         catch (ClientError err) {
             Log.err(TAG, "Client error", err);
-            handleError(HttpServletResponse.SC_BAD_REQUEST, reqId, err, resp);
+            handleError(err.getStatus().getCode(), reqId, err, resp);
         }
         catch (ServerError err) {
             Log.err(TAG, "Server error", err);

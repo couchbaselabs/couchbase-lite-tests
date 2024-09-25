@@ -16,6 +16,7 @@
 package com.couchbase.lite.mobiletest.errors;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 
 // The base class for TestServer errors
@@ -32,7 +33,7 @@ public class TestError extends RuntimeException {
         this.code = code;
     }
 
-    public TestError(@NonNull String domain, int code, @NonNull String message, @NonNull Throwable cause) {
+    public TestError(@NonNull String domain, int code, @NonNull String message, @Nullable Throwable cause) {
         super(message, cause);
         this.domain = domain;
         this.code = code;

@@ -61,7 +61,7 @@ public class Server extends NanoHTTPD {
         postDispatcher = new PostDispatcher(app);
     }
 
-    @SuppressWarnings({"PMD.PreserveStackTrace", "PMD.CloseResource"})
+    @SuppressWarnings({"PMD.PreserveStackTrace", "PMD.CloseResource", "PMD.PrematureDeclaration"})
     @SuppressFBWarnings("NP_LOAD_OF_KNOWN_NULL_VALUE")
     @NonNull
     @Override
@@ -110,7 +110,7 @@ public class Server extends NanoHTTPD {
         }
         catch (ClientError err) {
             Log.err(TAG, "Client error", err);
-            resp = handleError(reply, err.getStatus(), reqId, err);
+            resp = handleError(reply, Status.lookup(err.getStatus().getCode()), reqId, err);
         }
         catch (ServerError err) {
             Log.err(TAG, "Server error", err);

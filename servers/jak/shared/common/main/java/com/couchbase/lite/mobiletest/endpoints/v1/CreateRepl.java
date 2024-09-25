@@ -40,7 +40,6 @@ import com.couchbase.lite.ReplicatorConfiguration;
 import com.couchbase.lite.ReplicatorType;
 import com.couchbase.lite.SessionAuthenticator;
 import com.couchbase.lite.URLEndpoint;
-import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
@@ -330,7 +329,7 @@ public class CreateRepl {
         if (name == null) { throw new ClientError("Filter doesn't specify a name"); }
         switch (name) {
             case FILTER_DOC_ID:
-                 return buildDocIdFilter(spec.getMap(KEY_PARAMS));
+                return buildDocIdFilter(spec.getMap(KEY_PARAMS));
             case FILTER_DELETED:
                 return replSvc.getDeletedDocFilter();
             default:
