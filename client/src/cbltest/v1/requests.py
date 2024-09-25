@@ -1,10 +1,10 @@
 from enum import Enum
-from typing import Dict, List, cast, Any, Optional
+from typing import Dict, List, Type, cast, Any, Optional
 from uuid import UUID
 
 from varname import nameof
 
-from cbltest.api.database_types import SnapshotDocumentEntry
+from cbltest.api.database_types import DocumentEntry
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.api.replicator_types import ReplicatorAuthenticator, ReplicatorCollectionEntry, ReplicatorType
 from cbltest.assertions import _assert_not_null
@@ -28,27 +28,24 @@ class PostResetRequestBody(TestServerRequestBody):
     Example Body::
 
         {
-            "test": "test_push",
-            "datasets": {
-                "catalog": [
-                    "db1",
-                    "db2"
-                ]
+            "databases": {
+                "db1": {},
+                "db2": {
+                    "collections": [
+                        "_default.employees"
+                    ]
+                },
+                "db3": {
+                    "dataset": "travel"
+                }
             }
         }
     """
 
-    @property
-    def datasets(self) -> Dict[str, Any]:
-        """
-        Gets the datasets contained in the :class:`PostResetRequestBody`
-        """
-        return self.__datasets
-
     def __init__(self, name: Optional[str] = None):
         super().__init__(1)
         self.__test_name = name
-        self.__datasets: Dict[str, Any] = {}
+        self.__databases: Dict[str, Dict[str, Any]] = {}
 
     def add_dataset(self, name: str, result_db_names: List[str]) -> None:
         """
@@ -57,12 +54,25 @@ class PostResetRequestBody(TestServerRequestBody):
         :param name: The name of the dataset to add (i.e. catalog in the class docs example)
         :param result_db_names: A list of databases to populate with the data from the dataset
         """
-        self.__datasets[name] = result_db_names
+        for db_name in result_db_names:
+            self.__databases[db_name] = { "dataset": name }
+
+    def add_empty(self, result_db_names: List[str], collections: Optional[List[str]] = None):
+        """
+        Add an empty database entry to the :class`PostResetRequestBody`
+
+        :param result_db_names: A list of databases to create
+        :param collections: Collections to add to the databases after creation
+        """
+        for db_name in result_db_names:
+            entry = {} if collections is None else { "collections" : collections }
+            self.__databases[db_name] = entry
 
     def to_json(self) -> Dict[str, Any]:
-        json: Dict[str, Any] = {"datasets": self.__datasets}
+        json: Dict[str, Any] = {"databases": self.__databases}
         if self.__test_name:
             json["test"] = self.__test_name
+            
         return json
 
 
@@ -258,14 +268,14 @@ class PostSnapshotDocumentsRequestBody(TestServerRequestBody):
         """Gets the database that this snapshot will be taken from"""
         return self.__database
 
-    def entries(self) -> List[SnapshotDocumentEntry]:
+    def entries(self) -> List[DocumentEntry]:
         """
         Gets the (mutable) list of documents to be snapshotted.  This list can be
         directly added to or removed from
         """
         return self.__entries
 
-    def __init__(self, database: str, entries: Optional[List[SnapshotDocumentEntry]] = None):
+    def __init__(self, database: str, entries: Optional[List[DocumentEntry]] = None):
         super().__init__(1)
         self.__database = database
         self.__entries = entries if entries is not None else []
@@ -504,7 +514,7 @@ class PostPerformMaintenanceRequestBody(TestServerRequestBody):
         return {"database": self.__db, "maintenanceType": self.__type}
 
 
-class SetupLoggingRequestBody(TestServerRequestBody):
+class PostSetupLoggingRequestBody(TestServerRequestBody):
     """
     The body of a POST /setupLogging request as specified in version 1 of the 
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
@@ -542,7 +552,7 @@ class SetupLoggingRequestBody(TestServerRequestBody):
     def to_json(self) -> Any:
         return {"url": self.__url, "id": self.__id, "tag": self.__tag}
     
-class RunQueryRequestBody(TestServerRequestBody):
+class PostRunQueryRequestBody(TestServerRequestBody):
     """
     The body of a POST /runQuery request as specified in version 1 of the 
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
@@ -570,6 +580,41 @@ class RunQueryRequestBody(TestServerRequestBody):
 
     def to_json(self) -> Any:
         return {"database": self.__db, "query": self.__query}
+    
+class PostGetDocumentRequestBody(TestServerRequestBody):
+    """
+    The body of a POST /getDocument request as specified in version 1 of the 
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+
+    Example Body::
+
+        {
+            "database": "db",
+            "document": {
+                "collection": "foo.bar",
+                "id": "doc1"
+            }
+        }
+    """
+
+    @property
+    def database(self) -> str:
+        """Gets the database to retrieve the document from"""
+        return self.__database
+    
+    @property
+    def document(self) -> DocumentEntry:
+        """Gets the document information to use to retrieve the document"""
+        return self.__document
+    
+    def __init__(self, database: str, document: DocumentEntry):
+        super().__init__(1)
+        self.__database = database
+        self.__document = document
+
+    def to_json(self) -> Any:
+        return {"database": self.__database, "document": self.__document.to_json()}
+
 
 # Below this point are all of the concrete test server request types
 # Remember the note from the top of this file about the actual type of the payload
@@ -652,20 +697,29 @@ class PostPerformMaintenanceRequest(TestServerRequest):
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
         super().__init__(1, uuid, "performMaintenance", PostPerformMaintenanceRequestBody, payload=payload)
 
-class SetupLoggingRequest(TestServerRequest):
+class PostSetupLoggingRequest(TestServerRequest):
     """
     A POST /setupLogging request as specified in version 1 of the 
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
     
-    def __init__(self, uuid: UUID, payload: SetupLoggingRequestBody):
-        super().__init__(1, uuid, "setupLogging", SetupLoggingRequestBody, payload=payload)
+    def __init__(self, uuid: UUID, payload: PostSetupLoggingRequestBody):
+        super().__init__(1, uuid, "setupLogging", PostSetupLoggingRequestBody, payload=payload)
 
-class RunQueryRequest(TestServerRequest):
+class PostRunQueryRequest(TestServerRequest):
     """
     A POST /runQuery request as specified in version 1 of the 
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
     
-    def __init__(self, uuid: UUID, payload: RunQueryRequestBody):
-        super().__init__(1, uuid, "runQuery", RunQueryRequestBody, payload=payload)
+    def __init__(self, uuid: UUID, payload: PostRunQueryRequestBody):
+        super().__init__(1, uuid, "runQuery", PostRunQueryRequestBody, payload=payload)
+
+class PostGetDocumentRequest(TestServerRequest):
+    """
+    A POST /getDocument request as specified in version 1 of the 
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+    """
+
+    def __init__(self, uuid: UUID, payload: TestServerRequestBody):
+        super().__init__(1, uuid, "getDocument", PostGetDocumentRequestBody, payload=payload)

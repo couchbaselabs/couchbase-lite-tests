@@ -22,7 +22,7 @@ class TestReplicationBehavior(CBLTestClass):
                 await cblpytest.sync_gateways[0].delete_document(row.id, row.revid, "names")
 
         self.mark_test_step("Reset local database, and load `empty` dataset")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("empty", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
         self.mark_test_step('''

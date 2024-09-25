@@ -1,4 +1,4 @@
-from typing import List, cast
+from typing import List, cast, Optional
 
 from opentelemetry.trace import get_tracer
 
@@ -6,7 +6,7 @@ from cbltest.api.database import Database
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.responses import GetRootResponse
-from cbltest.v1.requests import PostResetRequestBody, SetupLoggingRequestBody
+from cbltest.v1.requests import PostResetRequestBody, PostSetupLoggingRequestBody
 from cbltest.version import VERSION
 
 
@@ -36,16 +36,28 @@ class TestServer:
             resp = await self.__request_factory.send_request(self.__index, request)
             return cast(GetRootResponse, resp)
 
-    async def create_and_reset_db(self, dataset: str, db_names: List[str]) -> List[Database]:
+    async def create_and_reset_db(self, db_names: List[str], dataset: Optional[str] = None, 
+                                  collections: Optional[List[str]] = None) -> List[Database]:
         """
         Creates and returns a set of Databases based on the given dataset
 
-        :param dataset: The name of the dataset to use for creating the databases
-        :param db_names: A list of database names, each of which will become a database with the dataset data
+        :param db_names: A list of database names, each of which will become a database based on
+                         the other two args
+        :param dataset: The name of the dataset to use for creating the databases (if not specified
+                        an empty database will be created).  Cannot be combined with collections.
+        :param collections: The name of the collections to add after creating the database.  Cannot
+                            be combined with dataset.
         """
+        assert collections is None or dataset is None, \
+            "dataset and collections cannot both be specified"
+            
         with self.__tracer.start_as_current_span("create_and_reset_db"):
             payload = PostResetRequestBody(CBLPyTestGlobal.running_test_name)
-            payload.add_dataset(dataset, db_names)
+            if dataset is not None:
+                payload.add_dataset(dataset, db_names)
+            else:
+                payload.add_empty(db_names, collections)
+
             request = self.__request_factory.create_request(TestServerRequestType.RESET, payload)
             await self.__request_factory.send_request(self.__index, request)
             ret_val: List[Database] = []
@@ -63,7 +75,7 @@ class TestServer:
         :param tag: The tag to use for this test server
         """
         with self.__tracer.start_as_current_span("setup_logging"):
-            payload = SetupLoggingRequestBody(url, id, tag)
+            payload = PostSetupLoggingRequestBody(url, id, tag)
             request = self.__request_factory.create_request(TestServerRequestType.SETUP_LOGGING, payload)
             await self.__request_factory.send_request(self.__index, request)
 

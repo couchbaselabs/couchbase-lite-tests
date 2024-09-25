@@ -15,16 +15,16 @@ class TestStartReplicator:
         # will not be informed about the currently running test
         CBLPyTestGlobal.running_test_name = method.__name__
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_invalid_database(self, cblpytest: CBLPyTest) -> None:
         repl = Replicator(Database(cblpytest.request_factory, 0, "fake"),
                           "ws://localhost:4984/db")
         with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
             await repl.start()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_bad_endpoint(self, cblpytest: CBLPyTest) -> None:
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("empty", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
         repl = Replicator(db, "ws://foo:4984/db")
@@ -33,7 +33,7 @@ class TestStartReplicator:
         assert status.error is not None and ErrorDomain.equal(status.error.domain, ErrorDomain.CBL) \
             and status.error.code == 5002
         
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
         "name,parameters", [ 
             ("local-wins", None), 
@@ -43,7 +43,7 @@ class TestStartReplicator:
         ]
     )
     async def test_known_conflict_resolvers(self, cblpytest: CBLPyTest, name: str, parameters: Optional[dict]):
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("empty", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
         
         repl = Replicator(db, "ws://localhost:5984/db", collections=[ReplicatorCollectionEntry(
@@ -54,9 +54,9 @@ class TestStartReplicator:
         # due to HTTP 400
         await repl.start()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_bad_conflict_resolver(self, cblpytest: CBLPyTest):
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("empty", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
         
         repl = Replicator(db, "ws://localhost:5984/db", collections=[ReplicatorCollectionEntry(

@@ -1,5 +1,5 @@
-pytest
-pytest-asyncio
+pytest >=8.3.3,<9.0
+pytest-asyncio >=0.24.0
 opentelemetry-sdk
 opentelemetry-exporter-otlp-proto-grpc
 ../client

@@ -4,7 +4,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database import SnapshotUpdater
-from cbltest.api.database_types import MaintenanceType, SnapshotDocumentEntry
+from cbltest.api.database_types import MaintenanceType, DocumentEntry
 from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry, ReplicatorActivityLevel
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
@@ -21,7 +21,7 @@ class TestReplicationBlob(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step('''
@@ -109,7 +109,7 @@ class TestReplicationBlob(CBLTestClass):
 
         self.mark_test_step("Snapshot document hotel_1.")
         snapshot_id = await db.create_snapshot([
-            SnapshotDocumentEntry("travel.hotels", "hotel_1")
+            DocumentEntry("travel.hotels", "hotel_1")
         ])
 
         self.mark_test_step("Start the replicator with the same config as the step 3.")

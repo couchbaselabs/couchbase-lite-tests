@@ -24,7 +24,7 @@ class TestQueryConsistency(CBLTestClass):
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "travel")
 
-        dbs = await cblpytest.test_servers[0].create_and_reset_db("travel", ["db1"])
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         replicator = Replicator(dbs[0], cblpytest.sync_gateways[0].replication_url("travel"),
                                 collections=[ReplicatorCollectionEntry(["travel.airlines", "travel.routes", "travel.landmarks",
                                                                         "travel.airports", "travel.hotels"])],
