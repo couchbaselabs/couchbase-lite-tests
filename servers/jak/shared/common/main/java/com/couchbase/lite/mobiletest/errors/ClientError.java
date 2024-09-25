@@ -16,24 +16,27 @@
 package com.couchbase.lite.mobiletest.errors;
 
 import androidx.annotation.NonNull;
-
-import org.nanohttpd.protocols.http.response.Status;
+import androidx.annotation.Nullable;
 
 
 // Use this to report a bad client request
 public class ClientError extends TestError {
-    private final Status status;
+    @NonNull
+    private final HTTPStatus status;
 
     public ClientError(@NonNull String message) { this(message, null); }
 
-    public ClientError(@NonNull Status status, @NonNull String message) { this(Status.BAD_REQUEST, message, null); }
+    public ClientError(@NonNull HTTPStatus status, @NonNull String message) { this(status, message, null); }
 
-    public ClientError(@NonNull String message, @NonNull Throwable cause) { this(Status.BAD_REQUEST, message, cause); }
+    public ClientError(@NonNull String message, @Nullable Throwable cause) {
+        this(HTTPStatus.BAD_REQUEST, message, cause);
+    }
 
-    public ClientError(@NonNull Status status, @NonNull String message, @NonNull Throwable cause) {
-        super(DOMAIN_TESTSERVER, status.getRequestStatus(), message, cause);
+    public ClientError(@NonNull HTTPStatus status, @NonNull String message, @Nullable Throwable cause) {
+        super(DOMAIN_TESTSERVER, status.getCode(), message, cause);
         this.status = status;
     }
 
-    public Status getStatus() { return status; }
+    @NonNull
+    public HTTPStatus getStatus() { return status; }
 }

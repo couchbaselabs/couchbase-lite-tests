@@ -49,6 +49,7 @@ public class RunQuery {
 
     public RunQuery(@NonNull DatabaseService dbSvc) { this.dbSvc = dbSvc; }
 
+    @SuppressWarnings("PMD.PrematureDeclaration")
     @NonNull
     public Map<String, Object> runQuery(@NonNull TestContext ctxt, @NonNull TypedMap req) {
         req.validate(LEGAL_KEYS);
