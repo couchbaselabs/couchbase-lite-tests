@@ -22,12 +22,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 
-import com.couchbase.lite.mobiletest.endpoints.v1.CreateRepl;
 import com.couchbase.lite.mobiletest.endpoints.v1.GetAllDocs;
 import com.couchbase.lite.mobiletest.endpoints.v1.GetDocument;
-import com.couchbase.lite.mobiletest.endpoints.v1.GetReplStatus;
 import com.couchbase.lite.mobiletest.endpoints.v1.Logger;
 import com.couchbase.lite.mobiletest.endpoints.v1.PerformMaintenance;
+import com.couchbase.lite.mobiletest.endpoints.v1.ReplicatorManager;
 import com.couchbase.lite.mobiletest.endpoints.v1.Reset;
 import com.couchbase.lite.mobiletest.endpoints.v1.RunQuery;
 import com.couchbase.lite.mobiletest.endpoints.v1.SnapshotDocs;
@@ -40,7 +39,9 @@ import com.couchbase.lite.mobiletest.trees.TypedMap;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
-// Implements api.yaml 0.4.0
+// Implements API 0.5.2
+// -- setupLoggging is not implemented
+// -- Replicator conflict resolver is not implemented
 public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint> {
     private static final String TAG = "POST";
 
@@ -55,16 +56,27 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
 
         // build the dispatch table
         addEndpoint(1, "/reset", (c, r) -> new Reset(app).reset(c, r));
-        addEndpoint(1, "/log", (c, r) -> new Logger().log(r));
+        addEndpoint(1, "/log", (c, r) -> new Logger(app.getLogSvc()).log(r));
+        addEndpoint(1, "/setupLogging", (c, r) -> new Logger(app.getLogSvc()).setupLogging(r));
         addEndpoint(1, "/getAllDocuments", (c, r) -> new GetAllDocs(app.getDbSvc()).getAllDocs(c, r));
         addEndpoint(1, "/updateDatabase", (c, r) -> new UpdateDb(app.getDbSvc()).updateDb(c, r));
-        addEndpoint(1, "/startReplicator", (c, r) -> new CreateRepl(app.getDbSvc(), app.getReplSvc()).createRepl(c, r));
-        addEndpoint(1, "/getReplicatorStatus", (c, r) -> new GetReplStatus(app.getReplSvc()).getReplStatus(c, r));
         addEndpoint(1, "/snapshotDocuments", (c, r) -> new SnapshotDocs(app.getDbSvc()).snapshot(c, r));
         addEndpoint(1, "/verifyDocuments", (c, r) -> new VerifyDocs(app.getDbSvc()).verify(c, r));
         addEndpoint(1, "/performMaintenance", (c, r) -> new PerformMaintenance(app.getDbSvc()).doMaintenance(c, r));
         addEndpoint(1, "/runQuery", (c, r) -> new RunQuery(app.getDbSvc()).runQuery(c, r));
         addEndpoint(1, "/getDocument", (c, r) -> new GetDocument(app.getDbSvc()).getDocument(c, r));
+        addEndpoint(
+            1,
+            "/startReplicator",
+            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).createRepl(c, r));
+        addEndpoint(
+            1,
+            "/getReplicatorStatus",
+            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).getReplStatus(c, r));
+        addEndpoint(
+            1,
+            "/stopReplicator",
+            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).stopRepl(c, r));
     }
 
     // This method returns a Reply.  Be sure to close it!

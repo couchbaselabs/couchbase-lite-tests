@@ -30,17 +30,26 @@ import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 public class GetDocument {
     private static final String KEY_DATABASE = "database";
+    private static final String KEY_DOCUMENTS = "document";
     private static final String KEY_COLLECTION = "collection";
     private static final String KEY_DOC_ID = "id";
 
-    private static final Set<String> LEGAL_GET_DOCUMENT_KEYS;
+    private static final Set<String> LEGAL_GET_DOC_KEYS;
     static {
         final Set<String> l = new HashSet<>();
         l.add(KEY_DATABASE);
+        l.add(KEY_DOCUMENTS);
+        LEGAL_GET_DOC_KEYS = Collections.unmodifiableSet(l);
+    }
+
+    private static final Set<String> LEGAL_DOC_SPEC_KEYS;
+    static {
+        final Set<String> l = new HashSet<>();
         l.add(KEY_COLLECTION);
         l.add(KEY_DOC_ID);
-        LEGAL_GET_DOCUMENT_KEYS = Collections.unmodifiableSet(l);
+        LEGAL_DOC_SPEC_KEYS = Collections.unmodifiableSet(l);
     }
+
 
     @NonNull
     private final DatabaseService dbSvc;
@@ -49,10 +58,14 @@ public class GetDocument {
 
     @NonNull
     public Map<String, Object> getDocument(@NonNull TestContext ctxt, @NonNull TypedMap req) {
-        req.validate(LEGAL_GET_DOCUMENT_KEYS);
+        req.validate(LEGAL_GET_DOC_KEYS);
 
         final String dbName = req.getString(KEY_DATABASE);
         if (dbName == null) { throw new ClientError("No database specified for getDocument"); }
+
+        final TypedMap docSpec = req.getMap(KEY_DOCUMENTS);
+        if (docSpec == null) { throw new ClientError("No document specified for getDocument"); }
+        req.validate(LEGAL_DOC_SPEC_KEYS);
 
         final String collectionName = req.getString(KEY_COLLECTION);
         if (collectionName == null) { throw new ClientError("No collection specified for getDocument"); }

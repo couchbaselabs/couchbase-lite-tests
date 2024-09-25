@@ -18,10 +18,17 @@ package com.couchbase.lite.mobiletest.endpoints.v1;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,15 +40,25 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import com.couchbase.lite.BasicAuthenticator;
 import com.couchbase.lite.CollectionConfiguration;
+import com.couchbase.lite.ConflictResolver;
+import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
+import com.couchbase.lite.DocumentFlag;
+import com.couchbase.lite.DocumentReplication;
+import com.couchbase.lite.ReplicatedDocument;
 import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.ReplicatorConfiguration;
+import com.couchbase.lite.ReplicatorProgress;
+import com.couchbase.lite.ReplicatorStatus;
 import com.couchbase.lite.ReplicatorType;
 import com.couchbase.lite.SessionAuthenticator;
 import com.couchbase.lite.URLEndpoint;
 import com.couchbase.lite.mobiletest.TestContext;
+import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.errors.ServerError;
+import com.couchbase.lite.mobiletest.json.ErrorBuilder;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.trees.TypedList;
@@ -49,11 +66,12 @@ import com.couchbase.lite.mobiletest.trees.TypedMap;
 import com.couchbase.lite.mobiletest.util.Log;
 
 
-public class CreateRepl {
-    private static final String TAG = "CREATE_REPL_V1";
+public class ReplicatorManager {
+    private static final String TAG = "REPL_MGR_V1";
 
     private static final String KEY_REPL_ID = "id";
 
+    // Create replicator
     private static final String KEY_RESET = "reset";
     private static final String KEY_CONFIG = "config";
     private static final String KEY_DATABASE = "database";
@@ -78,19 +96,32 @@ public class CreateRepl {
     private static final String KEY_DOCUMENT_IDS = "documentIDs";
     private static final String KEY_PUSH_FILTER = "pushFilter";
     private static final String KEY_PULL_FILTER = "pullFilter";
+    private static final String KEY_CONFLICT_RESOLVER = "conflictResolver";
     private static final String KEY_NAME = "name";
     private static final String KEY_PARAMS = "params";
     private static final String FILTER_DELETED = "deletedDocumentsOnly";
     private static final String FILTER_DOC_ID = "documentIDs";
     private static final String KEY_DOC_IDS = "documentIDs";
     private static final String KEY_ENABLE_AUTOPURGE = "enableAutoPurge";
+    private static final String KEY_PINNED_CERT = "pinnedServerCert";
 
-    private static final Set<String> LEGAL_KEYS;
+    // Replicator status
+    private static final String KEY_REPL_ACTIVITY = "activity";
+    private static final String KEY_REPL_PROGRESS = "progress";
+    private static final String KEY_REPL_DOCS = "documents";
+    private static final String KEY_REPL_DOCS_COMPLETE = "completed";
+    private static final String KEY_REPL_COLLECTION = "collection";
+    private static final String KEY_REPL_DOC_ID = "documentID";
+    private static final String KEY_REPL_PUSH = "isPush";
+    private static final String KEY_REPL_FLAGS = "flags";
+    private static final String KEY_REPL_ERROR = "error";
+
+    private static final Set<String> LEGAL_CREATE_KEYS;
     static {
         final Set<String> l = new HashSet<>();
         l.add(KEY_CONFIG);
         l.add(KEY_RESET);
-        LEGAL_KEYS = Collections.unmodifiableSet(l);
+        LEGAL_CREATE_KEYS = Collections.unmodifiableSet(l);
     }
 
     private static final Set<String> LEGAL_CONFIG_KEYS;
@@ -104,6 +135,7 @@ public class CreateRepl {
         l.add(KEY_AUTHENTICATOR);
         l.add(KEY_ENABLE_DOC_LISTENER);
         l.add(KEY_ENABLE_AUTOPURGE);
+        l.add(KEY_PINNED_CERT);
         LEGAL_CONFIG_KEYS = Collections.unmodifiableSet(l);
     }
 
@@ -115,6 +147,7 @@ public class CreateRepl {
         l.add(KEY_DOCUMENT_IDS);
         l.add(KEY_PUSH_FILTER);
         l.add(KEY_PULL_FILTER);
+        l.add(KEY_CONFLICT_RESOLVER);
         LEGAL_COLLECTION_KEYS = Collections.unmodifiableSet(l);
     }
 
@@ -137,12 +170,27 @@ public class CreateRepl {
         LEGAL_SESSION_AUTH_KEYS = Collections.unmodifiableSet(l);
     }
 
+    private static final EnumMap<DocumentFlag, String> DOC_FLAGS;
+    static {
+        final EnumMap<DocumentFlag, String> m = new EnumMap<>(DocumentFlag.class);
+        m.put(DocumentFlag.DELETED, "DELETED");
+        m.put(DocumentFlag.ACCESS_REMOVED, "ACCESSREMOVED");
+        DOC_FLAGS = m;
+    }
+
+    private static final Set<String> LEGAL_STOP_KEYS;
+    static {
+        final Set<String> l = new HashSet<>();
+        l.add(KEY_REPL_ID);
+        LEGAL_STOP_KEYS = Collections.unmodifiableSet(l);
+    }
+
     @NonNull
     private final DatabaseService dbSvc;
     @NonNull
     private final ReplicatorService replSvc;
 
-    public CreateRepl(@NonNull DatabaseService dbSvc, @NonNull ReplicatorService replSvc) {
+    public ReplicatorManager(@NonNull DatabaseService dbSvc, @NonNull ReplicatorService replSvc) {
         this.dbSvc = dbSvc;
         this.replSvc = replSvc;
     }
@@ -150,7 +198,7 @@ public class CreateRepl {
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @NonNull
     public Map<String, Object> createRepl(@NonNull TestContext ctxt, @NonNull TypedMap req) {
-        req.validate(LEGAL_KEYS);
+        req.validate(LEGAL_CREATE_KEYS);
 
         final TypedMap config = req.getMap(KEY_CONFIG);
         if (config == null) { throw new ClientError("No replicator configuration specified"); }
@@ -175,9 +223,76 @@ public class CreateRepl {
         return ret;
     }
 
+    @NonNull
+    public Map<String, Object> getReplStatus(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+        final String replId = req.getString(KEY_REPL_ID);
+        if (replId == null) { throw new ClientError("Replicator id not specified"); }
+
+        final ReplicatorStatus replStatus = replSvc.getReplStatus(ctxt, replId);
+        Log.p(TAG, "Replicator status: " + replStatus);
+
+        final Map<String, Object> resp = new HashMap<>();
+
+        resp.put(KEY_REPL_ACTIVITY, replStatus.getActivityLevel().toString());
+
+        final CouchbaseLiteException err = replStatus.getError();
+        if (err != null) { resp.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err)).build()); }
+
+        final Map<String, Object> progress = new HashMap<>();
+        final ReplicatorProgress replProgress = replStatus.getProgress();
+        progress.put(KEY_REPL_DOCS_COMPLETE, replProgress.getCompleted() >= replProgress.getTotal());
+        resp.put(KEY_REPL_PROGRESS, progress);
+
+        final List<DocumentReplication> docs = replSvc.getReplicatedDocs(ctxt, replId);
+        if (docs != null) {
+            final List<Map<String, Object>> docRepls = getReplicatedDocs(docs);
+            if (!docRepls.isEmpty()) { resp.put(KEY_REPL_DOCS, docRepls); }
+        }
+
+        return resp;
+    }
+
+    @NonNull
+    public Map<String, Object> stopRepl(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+        req.validate(LEGAL_STOP_KEYS);
+
+        final String replId = req.getString(KEY_REPL_ID);
+        if (replId == null) { throw new ClientError("Replicator id not specified in stopReplicator"); }
+
+        replSvc.stopRepl(ctxt, replId);
+
+        return Collections.emptyMap();
+    }
+
+    @NonNull
+    private List<Map<String, Object>> getReplicatedDocs(@NonNull List<DocumentReplication> replicatedDocs) {
+        final List<Map<String, Object>> docRepls = new ArrayList<>();
+        for (DocumentReplication replicatedDoc: replicatedDocs) {
+            for (ReplicatedDocument replDoc: replicatedDoc.getDocuments()) {
+                final Map<String, Object> docRepl = new HashMap<>();
+
+                docRepl.put(KEY_REPL_COLLECTION, replDoc.getCollectionScope() + "." + replDoc.getCollectionName());
+
+                docRepl.put(KEY_REPL_DOC_ID, replDoc.getID());
+
+                docRepl.put(KEY_REPL_PUSH, replicatedDoc.isPush());
+
+                final List<String> flagList = new ArrayList<>();
+                for (DocumentFlag flag: replDoc.getFlags()) { flagList.add(DOC_FLAGS.get(flag)); }
+                docRepl.put(KEY_REPL_FLAGS, flagList);
+
+                final CouchbaseLiteException err = replDoc.getError();
+                if (err != null) { docRepl.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err)).build()); }
+
+                docRepls.add(docRepl);
+            }
+        }
+        return docRepls;
+    }
+
     @SuppressWarnings({"deprecation", "PMD.NPathComplexity"})
     @NonNull
-    public ReplicatorConfiguration buildConfig(@NonNull TestContext ctxt, @NonNull TypedMap config) {
+    private ReplicatorConfiguration buildConfig(@NonNull TestContext ctxt, @NonNull TypedMap config) {
         final String uri = config.getString(KEY_ENDPOINT);
         if (uri == null) { throw new ClientError("Replicator configuration doesn't specify an endpoint"); }
 
@@ -226,6 +341,9 @@ public class CreateRepl {
 
         final Boolean enableAutoPurge = config.getBoolean(KEY_ENABLE_AUTOPURGE);
         if (enableAutoPurge != null) { replConfig.setAutoPurgeEnabled(enableAutoPurge); }
+
+        final String pinnedCert = config.getString(KEY_PINNED_CERT);
+        if (pinnedCert != null) { replConfig.setPinnedServerX509Certificate(str2X509Cert(pinnedCert)); }
 
         final TypedMap authenticator = config.getMap(KEY_AUTHENTICATOR);
         if (authenticator != null) {
@@ -284,6 +402,9 @@ public class CreateRepl {
         final TypedMap pullFilter = spec.getMap(KEY_PULL_FILTER);
         if (pullFilter != null) { collectionConfig.setPullFilter(buildReplicatorFilter(pullFilter)); }
 
+        final TypedMap conflictResolver = spec.getMap(KEY_CONFLICT_RESOLVER);
+        if (conflictResolver != null) { collectionConfig.setConflictResolver(buildConflictResolver(conflictResolver)); }
+
         return collectionConfig;
     }
 
@@ -338,6 +459,13 @@ public class CreateRepl {
     }
 
     @NonNull
+    private ConflictResolver buildConflictResolver(@NonNull TypedMap spec) {
+        final String name = spec.getString(KEY_NAME);
+        if (name == null) { throw new ClientError("Filter doesn't specify a name"); }
+        throw new ServerError("Conflict resolvers not implemented: " + name);
+    }
+
+    @NonNull
     private ReplicationFilter buildDocIdFilter(@Nullable TypedMap spec) {
         if (spec == null) { throw new ClientError("DocId filter specifies no doc ids"); }
 
@@ -357,5 +485,15 @@ public class CreateRepl {
         }
 
         return replSvc.getDocIdFilter(permitted);
+    }
+
+    @NonNull
+    private X509Certificate str2X509Cert(@NonNull String certificate) {
+        try (InputStream certStream = new ByteArrayInputStream(certificate.getBytes(StandardCharsets.UTF_8))) {
+            return (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(certStream);
+        }
+        catch (java.security.cert.CertificateException | IOException e) {
+            throw new ClientError("Could not decode the certificate", e);
+        }
     }
 }

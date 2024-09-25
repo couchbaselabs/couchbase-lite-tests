@@ -28,7 +28,9 @@ import com.couchbase.lite.DocumentFlag;
 import com.couchbase.lite.DocumentReplication;
 import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
+import com.couchbase.lite.ReplicatorStatus;
 import com.couchbase.lite.mobiletest.TestContext;
+import com.couchbase.lite.mobiletest.errors.ClientError;
 
 
 public class ReplicatorService {
@@ -69,8 +71,14 @@ public class ReplicatorService {
         ctxt.addDocReplListener(replId, listener);
     }
 
-    @Nullable
-    public Replicator getRepl(@NonNull TestContext ctxt, @NonNull String replId) { return ctxt.getRepl(replId); }
+    @NonNull
+    public ReplicatorStatus getReplStatus(@NonNull TestContext ctxt, @NonNull String replId) {
+        return getReplicator(ctxt, replId).getStatus();
+    }
+
+    public void stopRepl(@NonNull TestContext ctxt, @NonNull String replId) {
+        getReplicator(ctxt, replId).stop();
+    }
 
     @Nullable
     public List<DocumentReplication> getReplicatedDocs(@NonNull TestContext ctxt, @NonNull String replId) {
@@ -83,4 +91,11 @@ public class ReplicatorService {
 
     @NonNull
     public ReplicationFilter getDocIdFilter(@NonNull Set<String> permitted) { return new DocIdFilter(permitted); }
+
+    @NonNull
+    private Replicator getReplicator(@NonNull TestContext ctxt, @NonNull String replId) {
+        final Replicator repl = ctxt.getRepl(replId);
+        if (repl == null) { throw new ClientError("No such replicator: " + replId); }
+        return repl;
+    }
 }
