@@ -25,6 +25,14 @@
                 FontSize="18"
                 HorizontalOptions="Center" />
 
+            <Label
+                Text="..."
+                x:Name="_cblVersionLabel"
+                SemanticProperties.HeadingLevel="Level2"
+                SemanticProperties.Description="Couchbase Lite Version"
+                FontSize="18"
+                HorizontalOptions="Center" />
+
         </VerticalStackLayout>
     </ScrollView>
 

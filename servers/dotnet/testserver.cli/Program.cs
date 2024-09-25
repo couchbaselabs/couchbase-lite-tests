@@ -53,6 +53,7 @@ static bool IsInterfaceValid(NetworkInterface ni)
 var server = new CBLTestServer();
 server.Start();
 
+Console.WriteLine($"Test Server Version: {CBLTestServer.Version}");
 Console.WriteLine("CBL Version: " + typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
 var validIPs = NetworkInterface.GetAllNetworkInterfaces().Where(IsInterfaceValid)
                     .SelectMany(x => x.GetIPProperties().UnicastAddresses)

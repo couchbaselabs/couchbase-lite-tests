@@ -21,14 +21,14 @@ internal static partial class HandlerList
         }
     }
 
-    internal readonly record struct SnapshotDocumentEntry
+    internal readonly record struct DocumentEntry
     {
         public required string collection { get; init; }
 
         public required string id { get; init; }
 
         [JsonConstructor]
-        public SnapshotDocumentEntry(string collection, string id)
+        public DocumentEntry(string collection, string id)
         {
             this.collection = collection;
             this.id = id;
@@ -39,10 +39,10 @@ internal static partial class HandlerList
     {
         public required string database { get; init; }
 
-        public required IReadOnlyList<SnapshotDocumentEntry> documents { get; init; }
+        public required IReadOnlyList<DocumentEntry> documents { get; init; }
 
         [JsonConstructor]
-        public SnapshotDocumentBody(string database, IReadOnlyList<SnapshotDocumentEntry> documents)
+        public SnapshotDocumentBody(string database, IReadOnlyList<DocumentEntry> documents)
         {
             this.database = database;
             this.documents = documents;
