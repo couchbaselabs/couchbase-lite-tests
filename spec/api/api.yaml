@@ -34,6 +34,8 @@ info:
       ESCAPE   ::= '\' (! EOP )
 
     Changes
+    0.6.0 (09/27/2025)
+    * Replace setupLogging endpoint with expanded newSession endpoint
 
     0.5.2 (09/25/2025)
     * Split getDocument into database and document key to more closely match other API
@@ -73,7 +75,7 @@ info:
 
     0.2.1 (08/18/23)
     * Added note about out-of-scope functions to /verifyDocuments.
-    * Changed wording in /snapshotDocuments description. 
+    * Changed wording in /snapshotDocuments description.
 
     0.2.0 (08/17/23)
     * Change verifyDocuments to verify all documents in snaphot
@@ -97,7 +99,7 @@ info:
 
     0.1.5 (08/02/23)
     * Changed /updateDatabase to use keypaths for specifying the changes
-    
+
     0.1.4 (07/28/23)
     * Fixed required fields and update description in ServerInfo.
     * Added additionalInfo to the ServerInfo.
@@ -105,7 +107,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 0.5.0
+  version: 0.6.0
 tags:
   - name: API
 paths:
@@ -114,9 +116,9 @@ paths:
       tags:
         - API
       summary: Get Test Server information
-      description: |- 
+      description: |-
         Get Test Server information containing the following information (tentative):
- 
+
         * version : Test Server version number which is the same as CBL release number.
         * apiVersion: API version number. This will increase when we have breaking change.
         * cbl: The name of the CBL library used.
@@ -138,13 +140,13 @@ paths:
       tags:
         - API
       summary: Reset the test server
-      description: |- 
+      description: |-
         Reset the test server by deleting all of the databases and re-creating new databases as specified.
       operationId: reset
       requestBody:
-        description: |- 
-          The request object describes how the databases will be setup after being reset. The request 
-          contains one optional key named "databases" which specifies the databases to be created. 
+        description: |-
+          The request object describes how the databases will be setup after being reset. The request
+          contains one optional key named "databases" which specifies the databases to be created.
           If not specified,  no databases will be created.
         content:
           application/json:
@@ -166,8 +168,8 @@ paths:
       description: Get info including of document IDs and revision IDs all document from the specified collections
       operationId: getAllDocuments
       requestBody:
-        description: |- 
-          The request object provides a list of the collections in the specified database. The properties include: 
+        description: |-
+          The request object provides a list of the collections in the specified database. The properties include:
 
           * **database** : The database name
           * **collections** : An array of the collection names. The collection name is in the <scope-name>.<collection-name> format.
@@ -182,7 +184,7 @@ paths:
         required: true
       responses:
         '200':
-          description: |- 
+          description: |-
             Success
 
             The response body is an object where key is the collection name and the value is an array of objects containing document info including two keys, 'id' (documentID) and rev (revisionID).
@@ -201,12 +203,12 @@ paths:
       tags:
         - API
       summary: Get a document.
-      description: |- 
-        Get a document by the document ID. The result is a dictionary containing 
+      description: |-
+        Get a document by the document ID. The result is a dictionary containing
         document's properties and its metadata which are document ID and revision history.
       operationId: getDocument
       requestBody:
-        description: |- 
+        description: |-
           The request object containing the collection name and document ID.
         content:
           application/json:
@@ -222,14 +224,14 @@ paths:
         required: true
       responses:
         '200':
-          description: |- 
+          description: |-
             Success
 
-            The response body is an object containing document properties and metadata. The metadata 
-            keys are : 
+            The response body is an object containing document properties and metadata. The metadata
+            keys are :
               * _id : Document ID
-              * _revs: Revision history including the current revision ID as the first item. 
-            
+              * _revs: Revision history including the current revision ID as the first item.
+
             The format of the revision history is described in this document:
             https://github.com/couchbase/couchbase-lite-core/blob/master/modules/docs/pages/replication-protocol.adoc#4-revision-ids-and-histories
           content:
@@ -248,33 +250,33 @@ paths:
         - API
       summary: Update documents in the database.
       description: |-
-        Perform document updates in batch. The request body contains an array of DatabaseUpdateItem object which describes 
-        how documents are updated, deleted or purged. For updating a document, the changes to the document are specified 
+        Perform document updates in batch. The request body contains an array of DatabaseUpdateItem object which describes
+        how documents are updated, deleted or purged. For updating a document, the changes to the document are specified
         in 'updatedProperties' and 'removedProperties'.
 
         updatedProperties:
 
-        An array of objects. Each object contains one or more keys that are key paths into the document to be updated with the 
+        An array of objects. Each object contains one or more keys that are key paths into the document to be updated with the
         values associated with the keys. The objects in the array are evaluated in their natural order.
 
-        The keypath identifies a unique location in the document's property tree starting from the root that follows 
+        The keypath identifies a unique location in the document's property tree starting from the root that follows
         dictionary properties and array elements. The keypath looks like "foo.bar[1].baz". The keypath structure can be found
         in the description at the beginning of this specification.
 
-        The value at the location specified by the keypath is replaced with the value associated with the keypath, in the object 
-        regardless of its type. When a path in the keypath refers to a non-existent property, the key is added and 
+        The value at the location specified by the keypath is replaced with the value associated with the keypath, in the object
+        regardless of its type. When a path in the keypath refers to a non-existent property, the key is added and
         its value set as a dictionary or an array depending on the type of the path.
 
-        When a path in the keypath includes an array index that is out of bounds (the array is smaller than the specified index), the array 
-        is padded with nulls until it is exactly large enough to make the specified index legal.  
-        
+        When a path in the keypath includes an array index that is out of bounds (the array is smaller than the specified index), the array
+        is padded with nulls until it is exactly large enough to make the specified index legal.
+
         When a path (dictionary or array) in the keypath doesn't match the actual value type, the error will be returned.
-        
+
         Examples,
 
         Document:
-        { 
-          "name", {"first": "John", "last": "Doe"}, 
+        {
+          "name", {"first": "John", "last": "Doe"},
           "addresses": [{"city": "San Francisco"}, {"city": "Palo Alto"}]
         }
 
@@ -289,28 +291,28 @@ paths:
         addresses[0].city = "Santa Clara" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}], ...}
         addresses[4].city = "San Mateo" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}, null, {"city": "San Mateo"}], ...}
         phones[1] = "650-123-4567" -> {"phones": [null, "650-123-4567"]}
-        
+
         removedProperties:
 
         An array of the key paths which refer to ditionary keys or array elements to be removed. If a keypath refer to a non-existent
-        property or array element, the remove for the keypath will be no-ops. When removing multiple items in an array, the order of the array indexes 
+        property or array element, the remove for the keypath will be no-ops. When removing multiple items in an array, the order of the array indexes
         should be from high to low to avoid index mutation during the removal.
 
         updatedBlobs:
 
-        A dictionary whose keys are the key paths into the document to be updated with the blob objects and values are 
+        A dictionary whose keys are the key paths into the document to be updated with the blob objects and values are
         the blob file names listed in the blob dataset.
 
-        The logic to update blobs is similar to the logic when updating properties. The value at the location specified 
-        by the keypath is replaced with the blob object in the object regardless of its type. When a path in the keypath 
-        refers to a non-existent property, the key is added and  its value set as a dictionary or an array depending on 
-        the type of the path. When a path in the keypath includes an array index that is out of bounds, the array 
+        The logic to update blobs is similar to the logic when updating properties. The value at the location specified
+        by the keypath is replaced with the blob object in the object regardless of its type. When a path in the keypath
+        refers to a non-existent property, the key is added and  its value set as a dictionary or an array depending on
+        the type of the path. When a path in the keypath includes an array index that is out of bounds, the array
         is padded with nulls until it is exactly large enough to make the specified index legal.
 
-        The blob object is created from the content of the blob file refered by the blob file name, the dictionary value 
+        The blob object is created from the content of the blob file refered by the blob file name, the dictionary value
         associated with each key path. If the blob file name refers to non-existing blob file, 400 request error will
-        be returned. 
-        
+        be returned.
+
         The content_type of the blob used when creating a blob object can be detected from the blob file name's extension
         as the following rules:
           * "image/jpeg" for the .jpg
@@ -348,17 +350,17 @@ paths:
       tags:
         - API
       summary: Create and start a replicator
-      description: |- 
+      description: |-
         Create and start a replicator. If success, the created replicator identifier will be returned.
       operationId: startReplicator
       requestBody:
-        description: |- 
-          The request object containing the replicator configuration and the reset checkpoint flag 
+        description: |-
+          The request object containing the replicator configuration and the reset checkpoint flag
           used when starting the replicator.
-          
-          Note: 
+
+          Note:
            - If no collections specified, the replicator will be created with the database which means
-             the default collection will be used. 
+             the default collection will be used.
            - 400 Error returned when no collections set in the specified collection
         content:
           application/json:
@@ -374,7 +376,7 @@ paths:
         required: true
       responses:
         '200':
-          description: |- 
+          description: |-
             Success
 
             The response body is an object containing the replicator object identifier.
@@ -391,14 +393,14 @@ paths:
       tags:
         - API
       summary: Stop a replicator
-      description: |- 
+      description: |-
         Stop a replicator.
-        Note: 
+        Note:
           - Return 400 error when the specified replicator is not found.
           - The stopped replicator cannot be restarted.
       operationId: stopReplicator
       requestBody:
-        description: |- 
+        description: |-
           The request object containing the replicator identifier.
         content:
           application/json:
@@ -420,7 +422,7 @@ paths:
       description: Get the current status of the replicator.
       operationId: getReplicatorStatus
       requestBody:
-        description: |- 
+        description: |-
           The request object containing the replicator identifier.
         content:
           application/json:
@@ -443,11 +445,11 @@ paths:
       tags:
         - API
       summary: Snapshot documents for verifying changes
-      description: |- 
-        Given a list of document IDs, snapshot the documents by getting and saving the documents in the memory. 
+      description: |-
+        Given a list of document IDs, snapshot the documents by getting and saving the documents in the memory.
         The non-existing or deleted documents will be recorded as null in the snapshot.
-        
-        The API will return a UUID of the snapshot, which can be used when calling POST /verifyDocuments to 
+
+        The API will return a UUID of the snapshot, which can be used when calling POST /verifyDocuments to
         verify changes against the snapshot, for example, after finishing replication.
       operationId: snapshotDocuments
       requestBody:
@@ -469,7 +471,7 @@ paths:
         required: true
       responses:
         '200':
-          description: |- 
+          description: |-
             Success
 
             The response body is an object containing the snapshot identifier.
@@ -492,34 +494,34 @@ paths:
       tags:
         - API
       summary: Verify document changes from a document snapshot.
-      description: |- 
-        Verify all documents in the snapshot. The request body contains a list of changes to be verified. 
-        For the snapped-shot documents that are not in the list of changes, the documents will be 
+      description: |-
+        Verify all documents in the snapshot. The request body contains a list of changes to be verified.
+        For the snapped-shot documents that are not in the list of changes, the documents will be
         verified as unchanged documents.
 
         Verification Logic:
         1. If the document specified in the delta doesn't exist in the snapshot, the 400 request error will be returned.
-        2. If the document specified in the delta with change type PURGE or DELETE, the corresponding snapshot document 
+        2. If the document specified in the delta with change type PURGE or DELETE, the corresponding snapshot document
            value in the snaphot MUST be null.
-        3. If the document specified in the delta with change type UPDATE, the expected document which is the 
-           corresponding snaphot document applied with the specified delta will be compared with the actual document 
-           which is the current document in the collection. The body of expected and actual document MUST be the same. 
-        4. When checking if the two blob objects (actual and expected) are equals, the platform blob's equals() method 
+        3. If the document specified in the delta with change type UPDATE, the expected document which is the
+           corresponding snaphot document applied with the specified delta will be compared with the actual document
+           which is the current document in the collection. The body of expected and actual document MUST be the same.
+        4. When checking if the two blob objects (actual and expected) are equals, the platform blob's equals() method
            will be used. If the two blob objects are equals, in addition, the blob content of the two blobs will be
-           compared. When reading the content of the actual blob, if the blob file is unexpectedly missing from 
-           the database, there could be a runtime exception thrown, please make sure to catch the exception and 
-           mark the verification result as failed with the appropriate description (See the case 6 in the response). 
+           compared. When reading the content of the actual blob, if the blob file is unexpectedly missing from
+           the database, there could be a runtime exception thrown, please make sure to catch the exception and
+           mark the verification result as failed with the appropriate description (See the case 6 in the response).
            For the actual / expected value of the blob, use the blob's properties.
 
            For that platform such as Swift that cannot catch the runtime exception to check that the blob is missing
            when getting the blob's content, use Database's getBlob(Dictionary blobProperties) which will throw
            CouchbaseLiteException when blob doesn't exist to get the same blob object for getting the blob content.
 
-        Note: 
-        * The documents outside the snapshot will not be verified. To verify expected new documents 
+        Note:
+        * The documents outside the snapshot will not be verified. To verify expected new documents
           can be done by including these new documents (not existing before) to the snapshot and verifying
           them with UPDATE changes.
-        * Verifying unexpected new documents is out-of-scope. To do that use either POST /getAllDocuments or 
+        * Verifying unexpected new documents is out-of-scope. To do that use either POST /getAllDocuments or
           document replication listener to verify.
       operationId: verifyDocuments
       requestBody:
@@ -555,8 +557,8 @@ paths:
                     example: false
                   description:
                     description: |-
-                      Describing about the failed verification result. The information includes the document id, 
-                      and the reason that causes the verification to failed as follows: 
+                      Describing about the failed verification result. The information includes the document id,
+                      and the reason that causes the verification to failed as follows:
 
                       Case 1 : Document should exists in the collection but it doesn't exist to verify.
                       Reason : Document '<doc-id>' in '<scope.collection>' was not found
@@ -576,24 +578,24 @@ paths:
                       Case 6 : Blob file doesn't exist in the database.
                       Reason : Document '<doc-id> in '<scope.collection>' had non-existing blob at key '<keypath>'
 
-                      For the Case, The first unexpected keypath is shown in the reason description. 
-                      Its actual value, expected value, and the entire actual document body will be shown in 
-                      'actual', 'expected', 'document' key of the verification result object separately. If 
+                      For the Case, The first unexpected keypath is shown in the reason description.
+                      Its actual value, expected value, and the entire actual document body will be shown in
+                      'actual', 'expected', 'document' key of the verification result object separately. If
                       the value of the 'actual' or 'expected' key is MISSING, the key will be omitted.
 
                       The following cases are listed as request errors (response status = 400):
 
                       Error Case 1 : The specified database in the request was not found.
-                      
+
                       Error Case 2 : The specified snapshot was not found.
-                      
+
                       Error Case 3 : The document in the collection to be verified didn't exist in the snapshot.
 
                     type: string
                     example: "Document 'doc-1' in 'scope.collection' has unexpected properties at key 'address.city'"
                   actual:
                     description: |-
-                      The actual value of the unexpected keypath. If the actual keypath doesn't exist, 
+                      The actual value of the unexpected keypath. If the actual keypath doesn't exist,
                       this 'actual' key will be omitted.
                     oneOf:
                       - type: boolean
@@ -633,7 +635,7 @@ paths:
       description: Perform maintenance on the specified database per the specified maintenance type
       operationId: performMaintenance
       requestBody:
-        description: |- 
+        description: |-
           The request object specifies the name of the database and the performance type be be performed on.
           If the database doesn't exist, 400 request error will be returned.
         content:
@@ -648,20 +650,24 @@ paths:
           $ref: '#/components/responses/Error'
         '500':
           $ref: '#/components/responses/Error'
-  /setupLogging:
+  /newSession:
     post:
       tags:
         - API
-      summary: Setup logging to LogSlurp server
-      description: Instructs the test server to send all of its logging (either from the server, or from the CBL library) to the specified server
-      operationId: setupLogging
+      summary: Creates a new test session
+      description: |-
+        Creates a new session identified by a unique client ID. A session id (in the HTTP header CBLTest-Client-ID
+        for all requests) must be introduced using this endpoint. A request with a client id not introduced here is in error.
+        Optionally, this call allows instructing the test server to send all logging for the session
+        (both from the server and from the CBL library) to a specified log slurper.
+      operationId: newSession
       requestBody:
         description: |-
-          The request object specifies the URL, logging ID, and logging tag to use when interfacing with LogSlurp.
+          The request object specifies a client id and, optionally the URL of a log slurper and the tag to be used when logging to it.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SetupLoggingConfiguration'
+              $ref: '#/components/schemas/NewSession'
         required: true
       responses:
         '200':
@@ -767,13 +773,13 @@ components:
           example: 'doc1'
         updatedProperties:
           description: |-
-            An array of dictionaries, each of which contains one or more keys that are key paths into the document 
+            An array of dictionaries, each of which contains one or more keys that are key paths into the document
             to be updated with the values associated with the keys.
           type: array
           items:
             type: object
             additionalProperties: { }
-            example: 
+            example:
               [
                 {'people[47].address': {'street': 'Oak St. ', 'city': 'Auburn'} },
                 {'people[3].address': {'street': 'Elm St. ', 'city': 'Sibley'} }
@@ -785,7 +791,7 @@ components:
             type: string
             example: [ 'people[22].address', 'people[3]' ]
         updatedBlobs:
-          description: A dictionary whose keys are the key paths into the document to be updated with the 
+          description: A dictionary whose keys are the key paths into the document to be updated with the
             blob objects and values are the blob keys in the dataset.
           type: object
           additionalProperties: { }
@@ -818,22 +824,26 @@ components:
           type: string
           enum: ['compact', 'integrityCheck', 'optimize', 'fullOptimize']
           example: 'compact'
-    SetupLoggingConfiguration:
+    NewSession:
       type: object
-      required: ['url', 'id', 'tag']
+      required: ['id']
       properties:
-        url:
-          description: The URL of the LogSlurp server
-          type: string
-          example: 'localhost:8180'
         id:
-          description: The ID to use when connection to the server
+          description: The Session ID to appear in the header of all subsequent requests
           type: string
-          example: 'c64aae38-7c1c-4604-934a-e267fc39c3c4'
-        tag:
-          description: The tag to identify this particular host
-          type: string
-          example: 'test-server[0]'
+          example: 'c64aae38-87c1c-4524-823a-e267fc39c3c4'
+        logging:
+          type: object
+          required: ['url', 'tag']
+          properties:
+            url:
+              description: The URL of the LogSlurp server
+              type: string
+              example: 'localhost:8180'
+            tag:
+              description: The tag to identify this particular host
+              type: string
+              example: 'test-server[0]'
     Replicator:
       type: object
       required: ['id']
@@ -946,9 +956,9 @@ components:
           type: string
           $ref: '#/components/schemas/ConflictResolver'
     ReplicationFilter:
-      description: |- 
+      description: |-
         Replication Function to call before pushing a document or before saving a pulled documents.
-        The replication filter is predefined and implemented in the test server. Each filter will be given 
+        The replication filter is predefined and implemented in the test server. Each filter will be given
         with a unique name that will be used to reference to the filter and will have a different parameters
         or none to pass to.
 
@@ -994,9 +1004,9 @@ components:
               type: boolean
               example: true
         documents:
-          description: |- 
-            'This will include only when enableDocumentListener is set to true in ReplicatorConfiguration when calling /startReplicator. 
-             The returned documents will be deleted after the documents are returned so the subsequnce call to get the replicator status 
+          description: |-
+            'This will include only when enableDocumentListener is set to true in ReplicatorConfiguration when calling /startReplicator.
+             The returned documents will be deleted after the documents are returned so the subsequnce call to get the replicator status
              will not contain the previous returned documents.'
           type: array
           items:
@@ -1008,14 +1018,14 @@ components:
         ResetConfiguration describes how the databases will be setup after the reset.
         It contains two optional keys. "test" specifies the neame of the test that will be run next.
         "databases" specifies the databases to be created. If it not specified, no databases are created.
-        
-        If specified "databases" if specified contains a dictionary describing how the database to be created 
+
+        If specified "databases" if specified contains a dictionary describing how the database to be created
         as follows:
             * Null or an empty dictionary for creating an empty database.
-            * A dictionary contains a single key named "collections", with a list of the collection names 
+            * A dictionary contains a single key named "collections", with a list of the collection names
               as its value, for creating a database with those collections.
-            * A dictionary contains a single key named contains a key named "dataset", 
-              with a dataset name as its value, for creating a database from the specified dataset 
+            * A dictionary contains a single key named contains a key named "dataset",
+              with a dataset name as its value, for creating a database from the specified dataset
               which is a prebuilt database. '
       type: object
       properties:
@@ -1025,7 +1035,7 @@ components:
           type: string
         databases:
           description: |-
-            Contains database names as keys, with values are dictionaries descrbing how the databases 
+            Contains database names as keys, with values are dictionaries descrbing how the databases
             will be created.
           type: object
           nullable: true
@@ -1111,14 +1121,14 @@ components:
           type: object
   responses:
     Error:
-      description: |- 
+      description: |-
         HTTP Status:
           * 400 : Client request error (e.g. protocol error or JSON request body error) or CouchbaseLite error or exception.
           * 404 : Document not found.
           * 500 : Server error
-        
+
         Response body: JSON object including domain, code, and message.
-          * CouchbaseLite error: The domain (CBL,POSIX,SQLITE,FLEECE) and the code will be from CouchbaseLite error. 
+          * CouchbaseLite error: The domain (CBL,POSIX,SQLITE,FLEECE) and the code will be from CouchbaseLite error.
           * Non CouchbaseLite error:  The domain will be TESTSERVER and the code will be the same as the status code.
 
       content:
