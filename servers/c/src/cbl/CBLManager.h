@@ -31,10 +31,13 @@ namespace ts::cbl {
 
         void reset();
 
-        void loadDataset(const std::string &name, const std::string &targetDatabaseName);
+        void createDatabaseWithDataset(const std::string &dbName, const std::string &datasetName);
+
+        void createDatabaseWithCollections(const std::string &dbName,
+                                           std::vector<std::string> collections);
 
         /**
-         * Get the loaded database. The database instance is managed by the CBLManager.
+         * Get a created database. The database instance is managed by the CBLManager.
          * Do not release the database instance unless the object is additionally retained. */
         CBLDatabase *database(const std::string &name);
 
@@ -69,6 +72,8 @@ namespace ts::cbl {
         };
 
         std::string startReplicator(const ReplicatorParams &params, bool reset);
+
+        void stopReplicator(const std::string &id);
 
         CBLReplicator *replicator(const std::string &id);
 

@@ -5,16 +5,32 @@ int Dispatcher::handlePOSTReset(Request &request) {
 
     json body = request.jsonBody();
     CheckBody(body);
-    if (body.contains("datasets")) {
-        auto datasets = GetValue<unordered_map<string, vector<string>>>(body, "datasets");
-        for (auto &dataset: datasets) {
-            auto datasetName = dataset.first;
-            auto dbNames = dataset.second;
-            if (dbNames.empty()) {
-                throw RequestError("dataset '" + datasetName + "' has no database names");
+
+    if (body.contains("databases")) {
+        auto databases = GetValue<unordered_map<string, json>>(body, "databases");
+        for (auto &db: databases) {
+            auto dbName = db.first;
+            if (dbName.empty()) {
+                throw RequestError("database name cannot be empty.");
             }
-            for (auto &dbName: dbNames) {
-                _cblManager->loadDataset(datasetName, dbName);
+
+            auto spec = db.second;
+            if (spec.empty()) {
+                _cblManager->createDatabaseWithCollections(dbName, {});
+            } else {
+                if (spec.contains("collections") && spec.contains("dataset")) {
+                    throw RequestError("Database cannot contain both collections and dataset.");
+                }
+                if (spec.contains("collections")) {
+                    auto collections = GetValue<vector<string>>(spec, "collections");
+                    _cblManager->createDatabaseWithCollections(dbName, collections);
+                } else if (spec.contains("dataset")) {
+                    auto dataset = GetValue<string>(spec, "dataset");
+                    _cblManager->createDatabaseWithDataset(dbName, dataset);
+                } else {
+                    throw RequestError(
+                        "Database must contain either collections, dataset, or empty.");
+                }
             }
         }
     }

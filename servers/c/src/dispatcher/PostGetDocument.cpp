@@ -2,13 +2,19 @@
 
 // Handler Functions For Internal Testing
 
+// TODO: Enable this when 4.0 binary is ready
+//extern "C" {
+//FLString CBLDocument_RevisionHistory(const CBLDocument *doc);
+//}
+
 int Dispatcher::handlePOSTGetDocument(Request &request) {
     json body = request.jsonBody();
     CheckBody(body);
 
     auto dbName = GetValue<string>(body, "database");
-    auto colName = GetValue<string>(body, "collection");
-    auto docID = GetValue<string>(body, "documentID");
+    auto docInfo = GetValue<json>(body, "document");
+    auto colName = GetValue<string>(docInfo, "collection");
+    auto docID = GetValue<string>(docInfo, "id");
 
     auto db = _cblManager->database(dbName);
     auto col = _cblManager->collection(db, colName);
@@ -16,16 +22,14 @@ int Dispatcher::handlePOSTGetDocument(Request &request) {
     CBLError error{};
     auto doc = CBLCollection_GetDocument(col, FLS(docID), &error);
     checkCBLError(error);
+    checkNotNull(doc, str::concat("Document '", colName, ".", docID, "' not found"));
     AUTO_RELEASE(doc);
 
-    if (doc) {
-        auto props = CBLDocument_Properties(doc);
-        auto jsonSlice = FLValue_ToJSON((FLValue) props);
-        DEFER { FLSliceResult_Release(jsonSlice); };
+    auto props = CBLDocument_Properties(doc);
+    auto json = ts_support::fleece::toJSON((FLValue) props);
+    json["_id"] = docID;
 
-        auto json = nlohmann::json::parse(STR(jsonSlice));
-        return request.respondWithJSON(json);
-    } else {
-        throw RequestError(str::concat("Document '", colName, ".", docID, "' not found"));
-    }
+    // TODO: Use CBLDocument_RevisionHistory(doc) instead when 4.0 binary is ready.
+    json["_revs"] = STR(CBLDocument_RevisionID(doc));
+    return request.respondWithJSON(json);
 }

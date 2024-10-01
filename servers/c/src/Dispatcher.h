@@ -45,6 +45,8 @@ namespace ts {
 
         int handlePOSTStartReplicator(Request &request);
 
+        int handlePOSTStopReplicator(Request &request);
+
         int handlePOSTGetReplicatorStatus(Request &request);
 
         int handlePOSTSnapshotDocuments(Request &request);

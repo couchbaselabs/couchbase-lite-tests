@@ -32,8 +32,8 @@ namespace ts::cbl {
 
     struct ReplicationCollection {
         std::string collection;
-        std::vector<std::string> channels;
-        std::vector<std::string> documentIDs;
+        std::optional<std::vector<std::string>> channels;
+        std::optional<std::vector<std::string>> documentIDs;
         std::optional<ReplicationFilterSpec> pushFilter;
         std::optional<ReplicationFilterSpec> pullFilter;
         std::optional<ConflictResolverSpec> conflictResolver;
