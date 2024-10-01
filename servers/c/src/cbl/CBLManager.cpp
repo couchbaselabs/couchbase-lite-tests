@@ -75,50 +75,84 @@ namespace ts::cbl {
         }
     }
 
-    void CBLManager::loadDataset(const string &name, const string &targetDatabaseName) {
+    void CBLManager::createDatabaseWithDataset(const string &dbName, const string &datasetName) {
         lock_guard<mutex> lock(_mutex);
-        if (auto i = _databases.find(targetDatabaseName); i != _databases.end()) {
-            return;
+        if (auto i = _databases.find(dbName); i != _databases.end()) {
+            throw logic_error("Database '" + dbName + "' has already been loaded or created.");
         }
 
         string fromDbPath;
-
-        if (name != "empty") {
-            auto dbAssetPath = path(_assetDir).append(ASSET_DBS_DIR);
-            auto zipFilePath = path(dbAssetPath).append(name + DB_FILE_ZIP_EXT);
-            if (filesystem::exists(zipFilePath)) {
-                if (auto it = _extDatasetPaths.find(name); it != _extDatasetPaths.end()) {
-                    fromDbPath = it->second;
-                } else {
-                    auto extDirPath = path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
-                    zip::extractZip(zipFilePath.string(), extDirPath.string());
-                    fromDbPath = extDirPath.append(name + DB_FILE_EXT).string();
-                    _extDatasetPaths[name] = fromDbPath;
-                }
+        auto dbAssetPath = path(_assetDir).append(ASSET_DBS_DIR);
+        auto zipFilePath = path(dbAssetPath).append(datasetName + DB_FILE_ZIP_EXT);
+        if (filesystem::exists(zipFilePath)) {
+            if (auto it = _extDatasetPaths.find(datasetName); it != _extDatasetPaths.end()) {
+                fromDbPath = it->second;
             } else {
-                fromDbPath = dbAssetPath.append(name + DB_FILE_EXT).string();
+                auto extDirPath = path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
+                zip::extractZip(zipFilePath.string(), extDirPath.string());
+                fromDbPath = extDirPath.append(datasetName + DB_FILE_EXT).string();
+                _extDatasetPaths[datasetName] = fromDbPath;
             }
+        } else {
+            fromDbPath = dbAssetPath.append(datasetName + DB_FILE_EXT).string();
         }
 
         CBLError error{};
         CBLDatabaseConfiguration config = {FLS(_databaseDir)};
-        if (CBL_DatabaseExists(FLS(targetDatabaseName), config.directory)) {
-            if (!CBL_DeleteDatabase(FLS(targetDatabaseName), config.directory, &error)) {
+
+        // For any reasons if the database exists, delete it.
+        if (CBL_DatabaseExists(FLS(dbName), config.directory)) {
+            if (!CBL_DeleteDatabase(FLS(dbName), config.directory, &error)) {
                 throw CBLException(error);
             }
         }
 
+        // Copy:
         if (!fromDbPath.empty()) {
-            if (!CBL_CopyDatabase(FLS(fromDbPath), FLS(targetDatabaseName), &config, &error)) {
+            if (!CBL_CopyDatabase(FLS(fromDbPath), FLS(dbName), &config, &error)) {
                 throw CBLException(error);
             }
         }
 
-        CBLDatabase *db = CBLDatabase_Open(FLS(targetDatabaseName), &config, &error);
+        CBLDatabase *db = CBLDatabase_Open(FLS(dbName), &config, &error);
         if (!db) {
             throw CBLException(error);
         }
-        _databases[targetDatabaseName] = db;
+        _databases[dbName] = db;
+    }
+
+    void
+    CBLManager::createDatabaseWithCollections(const string &dbName, vector <string> collections) {
+        lock_guard<mutex> lock(_mutex);
+        if (auto i = _databases.find(dbName); i != _databases.end()) {
+            throw logic_error("Database '" + dbName + "' has already been loaded or created.");
+        }
+
+        CBLError error{};
+        CBLDatabaseConfiguration config = {FLS(_databaseDir)};
+
+        // For any reasons if the database exists, delete it.
+        if (CBL_DatabaseExists(FLS(dbName), config.directory)) {
+            if (!CBL_DeleteDatabase(FLS(dbName), config.directory, &error)) {
+                throw CBLException(error);
+            }
+        }
+
+        CBLDatabase *db = CBLDatabase_Open(FLS(dbName), &config, &error);
+        if (!db) {
+            throw CBLException(error);
+        }
+
+        for (auto name: collections) {
+            auto spec = CollectionSpec(name);
+            auto col = CBLDatabase_CreateCollection(db, FLS(spec.name()), FLS(spec.scope()),
+                                                    &error);
+            if (!col) {
+                throw CBLException(error);
+            }
+            CBLCollection_Release(col);
+        }
+        _databases[dbName] = db;
     }
 
     CBLDatabase *CBLManager::database(const string &name) {
@@ -233,18 +267,18 @@ namespace ts::cbl {
             replCol.collection = col;
 
             // Channels:
-            if (!replColSpec.channels.empty()) {
+            if (replColSpec.channels) {
                 auto channels = FLMutableArray_New();
-                for (auto &channel: replColSpec.channels) {
+                for (auto &channel: replColSpec.channels.value()) {
                     FLMutableArray_AppendString(channels, FLS(channel));
                 }
                 replCol.channels = channels;
             }
 
             // documentIDs:
-            if (!replColSpec.documentIDs.empty()) {
+            if (replColSpec.documentIDs) {
                 auto docIDs = FLMutableArray_New();
-                for (auto &docID: replColSpec.documentIDs) {
+                for (auto &docID: replColSpec.documentIDs.value()) {
                     FLMutableArray_AppendString(docIDs, FLS(docID));
                 }
                 replCol.documentIDs = docIDs;
@@ -377,6 +411,12 @@ namespace ts::cbl {
 
         success = true;
         return id;
+    }
+
+    void CBLManager::stopReplicator(const std::string &id) {
+        auto repl = replicator(id);
+        checkNotNull(repl, "Replicator Not Found");
+        CBLReplicator_Stop(repl);
     }
 
     CBLReplicator *CBLManager::replicator(const string &id) {

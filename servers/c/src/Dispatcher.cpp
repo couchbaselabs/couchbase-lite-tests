@@ -18,6 +18,8 @@ using namespace ts::support::error;
 
 #define HANDLER(h) [this](Request& request) -> int { return h(request); }
 
+// API Version : 0.5.2
+// - no /setupLogging
 namespace ts {
     Dispatcher::Dispatcher(const TestServer *testServer) {
         _testServer = testServer;

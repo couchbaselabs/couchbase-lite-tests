@@ -44,6 +44,7 @@ set(SOURCE_FILES
         src/dispatcher/PostRunQuery.cpp
         src/dispatcher/PostSnapshotDocuments.cpp
         src/dispatcher/PostStartReplicator.cpp
+        src/dispatcher/PostStopReplicator.cpp
         src/dispatcher/PostUpdateDatabase.cpp
         src/dispatcher/PostVerifyDocuments.cpp
         src/support/Error.cpp
