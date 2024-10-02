@@ -5,14 +5,16 @@ param (
 )
 
 Write-Host "Build TestServer for WinUI..."
-Push-Location $PSScriptRoot\..\..\..\servers\dotnet
+Push-Location $PSScriptRoot\..\..\..\servers\dotnet\testserver
 
 $nugetPackageVersion = "$Version-b$($Build.PadLeft(4, '0'))"
 Write-Host "Using NuGet package version $nugetPackageVersion"
 dotnet add .\testserver.csproj package couchbase.lite.enterprise --version $nugetPackageVersion
 dotnet publish .\testserver.csproj -c Release -f net7.0-windows10.0.19041.0
+Pop-Location
 
 Write-Host "Run TestServer..."
+Push-Location $PSScriptRoot\..\..\..\servers\dotnet
 scripts\run_winui.ps1
 Pop-Location
 
