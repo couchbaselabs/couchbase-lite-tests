@@ -26,6 +26,7 @@ Push-Location $PSScriptRoot\..\..\..\tests
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
-pytest -v --no-header --config config.example.json
+Copy-Item $PSScriptRoot\..\..\..\jenkins\pipelines\dotnet\config.json .
+pytest -v --no-header --config config.json
 deactivate
 Pop-Location
