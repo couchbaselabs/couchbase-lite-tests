@@ -1,6 +1,16 @@
 openapi: 3.1.0
+security: []
+servers:
+  - url: 'http://{tenant}:8080'
+    variables:
+      tenant:
+        default: localhost
+        description: The running test server
 info:
   title: Couchbase Lite Test Server API
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
   description: |-
     This is a REST API specification for Couchbase Lite Test Server.
 
@@ -110,9 +120,11 @@ info:
   version: 0.6.0
 tags:
   - name: API
+    description: The API endpoints of the test server
 paths:
   /:
     get:
+      operationId: getInfo
       tags:
         - API
       summary: Get Test Server information
@@ -672,6 +684,8 @@ paths:
       responses:
         '200':
           description: Success
+        '400':
+          $ref: '#/components/responses/Error'
   /runQuery:
     post:
       tags:
@@ -1037,8 +1051,7 @@ components:
           description: |-
             Contains database names as keys, with values are dictionaries descrbing how the databases
             will be created.
-          type: object
-          nullable: true
+          type: ['null', object]
           additionalProperties:
             type: object
             oneOf:
@@ -1048,8 +1061,7 @@ components:
                       A list of fully qualified collection names (<scope>.<collection>) to be created in the database.
                       Collections may be null, but if an array is provided, it may not be empty.
                       The Collections parameter cannot be used together with dataset.'
-                    type: array
-                    nullable: true
+                    type: ['null', array]
                     items:
                       type: string
                     example: ["_default.employees", "_default.departments"]
