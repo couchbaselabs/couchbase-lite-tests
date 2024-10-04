@@ -530,7 +530,7 @@ class PostNewSessionRequestBody(TestServerRequestBody):
     """
 
     @property
-    def url(self) -> str:
+    def url(self) -> Optional[str]:
         """Returns the URL of the LogSlurp server"""
         return self.__url
     
@@ -540,9 +540,10 @@ class PostNewSessionRequestBody(TestServerRequestBody):
         return self.__id
     
     @property
-    def tag(self) -> str:
+    def tag(self) -> Optional[str]:
         """Returns the tag to use to print in log statements from this particular remote"""
         return self.__tag
+
     def __init__(self, id: str, url: Optional[str], tag: Optional[str]):
         super().__init__(1)
         self.__url = url
@@ -550,7 +551,7 @@ class PostNewSessionRequestBody(TestServerRequestBody):
         self.__tag = tag
 
     def to_json(self) -> Any:
-        json = {"id": self.__id}
+        json: Dict[str, Any] = {"id": self.__id}
         if self.__url is not None and self.__tag is not None:
             json["logging"] = {"url": self.__url, "tag": self.__tag}
 
