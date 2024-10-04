@@ -6,4 +6,4 @@ using System.Threading.Tasks;
 
 namespace ClientLogger;
 
-internal readonly record struct StartNewLogResponse(string log_id);
+internal readonly record struct StartNewLogBody(string log_id);

@@ -1,8 +1,10 @@
 from cbltest import CBLPyTest
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.logging import _cbl_log, LogSlurpHandler
+from cbltest.api.error import CblTestServerBadResponseError
 import pytest
 import requests
+
 
 class TestLogSlurp:
     def setup_method(self, method):
@@ -21,3 +23,8 @@ class TestLogSlurp:
         resp = requests.get(f"http://{cblpytest.config.logslurp_url}/retrieveLog", headers={"CBL-Log-ID": handler.id})
         print(resp.text)
         assert f">>>>>>>>>> {CBLPyTestGlobal.running_test_name}" in resp.text
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_duplicate_new_session(self, cblpytest: CBLPyTest) -> None:
+        with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
+            await cblpytest.test_servers[0].new_session(str(cblpytest.request_factory.uuid), None, None)

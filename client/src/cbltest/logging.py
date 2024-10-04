@@ -52,24 +52,20 @@ console = StreamHandler(stdout)
 console.setLevel(DEBUG)
 console.setFormatter(Formatter('%(asctime)s [%(levelname)s]: %(message)s'))
 
-def cbl_log_init(logslurp_url: Optional[str]) -> Optional[str]:
+def cbl_log_init(log_id: str, logslurp_url: Optional[str]) -> None:
     _cbl_log.addHandler(file)
     _cbl_log.addHandler(console)
 
-    log_id: Optional[str] = None
     if logslurp_url is not None:
-        resp = requests.post(f"http://{logslurp_url}/startNewLog")
+        resp = requests.post(f"http://{logslurp_url}/startNewLog", json={"log_id": log_id})
         if resp.status_code != 200:
             cbl_warning("Failed to start new logslurp log")
         else:
-            respJson = cast(dict, resp.json())
-            log_id = cast(str, respJson["log_id"])
             logslurp_handler = LogSlurpHandler(logslurp_url, log_id)
             logslurp_handler.setFormatter(Formatter('[%(levelname)s]: %(message)s'))
             _cbl_log.addHandler(logslurp_handler)
 
     _cbl_log.info(f"-- Python test client v{VERSION} started --\n")
-    return log_id
 
 def cbl_setLogLevel(level: LogLevel):
     if level == LogLevel.ERROR:

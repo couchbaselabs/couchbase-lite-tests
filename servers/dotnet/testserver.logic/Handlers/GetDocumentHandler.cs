@@ -2,6 +2,7 @@
 using Couchbase.Lite.Unsupported;
 using System.Net;
 using System.Text.Json;
+using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
@@ -11,13 +12,13 @@ internal static partial class HandlerList
     internal readonly record struct GetDocumentBody(string database, DocumentEntry document);
 
     [HttpHandler("getDocument")]
-    public static Task GetDocumentHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task GetDocumentHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
     {
         if (!body.RootElement.TryDeserialize<GetDocumentBody>(response, version, out var deserializedBody)) {
             return Task.CompletedTask;
         }
 
-        var dbObject = CBLTestServer.Manager.GetDatabase(deserializedBody.database);
+        var dbObject = session.ObjectManager.GetDatabase(deserializedBody.database);
         if (dbObject == null) {
             var errorObject = new
             {

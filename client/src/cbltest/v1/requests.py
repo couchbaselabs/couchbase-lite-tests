@@ -512,19 +512,20 @@ class PostPerformMaintenanceRequestBody(TestServerRequestBody):
 
     def to_json(self) -> Any:
         return {"database": self.__db, "maintenanceType": self.__type}
-
-
-class PostSetupLoggingRequestBody(TestServerRequestBody):
+    
+class PostNewSessionRequestBody(TestServerRequestBody):
     """
-    The body of a POST /setupLogging request as specified in version 1 of the 
+    The body of a POST /newSession request as specified in version 1 of the 
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
 
         {
-            "url": "localhost:8180",
-            "id": "<guid>",
-            "tag": "test-server[0]
+            "id": <guid>
+            "logging": {
+                "url": "localhost:8180",
+                "tag": "test-server[0]
+            }
         }
     """
 
@@ -542,15 +543,18 @@ class PostSetupLoggingRequestBody(TestServerRequestBody):
     def tag(self) -> str:
         """Returns the tag to use to print in log statements from this particular remote"""
         return self.__tag
-
-    def __init__(self, url: str, id: str, tag: str):
+    def __init__(self, id: str, url: Optional[str], tag: Optional[str]):
         super().__init__(1)
         self.__url = url
         self.__id = id
         self.__tag = tag
 
     def to_json(self) -> Any:
-        return {"url": self.__url, "id": self.__id, "tag": self.__tag}
+        json = {"id": self.__id}
+        if self.__url is not None and self.__tag is not None:
+            json["logging"] = {"url": self.__url, "tag": self.__tag}
+
+        return json
     
 class PostRunQueryRequestBody(TestServerRequestBody):
     """
@@ -697,14 +701,14 @@ class PostPerformMaintenanceRequest(TestServerRequest):
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
         super().__init__(1, uuid, "performMaintenance", PostPerformMaintenanceRequestBody, payload=payload)
 
-class PostSetupLoggingRequest(TestServerRequest):
+class PostNewSessionRequest(TestServerRequest):
     """
-    A POST /setupLogging request as specified in version 1 of the 
+    A POST /newSession request as specified in version 1 of the 
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
     
-    def __init__(self, uuid: UUID, payload: PostSetupLoggingRequestBody):
-        super().__init__(1, uuid, "setupLogging", PostSetupLoggingRequestBody, payload=payload)
+    def __init__(self, uuid: UUID, payload: PostNewSessionRequestBody):
+        super().__init__(1, uuid, "newSession", PostNewSessionRequestBody, payload=payload)
 
 class PostRunQueryRequest(TestServerRequest):
     """

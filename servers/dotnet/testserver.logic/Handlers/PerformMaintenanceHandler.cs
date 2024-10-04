@@ -6,6 +6,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using TestServer.Utilities;
 
 namespace TestServer.Handlers
 {
@@ -13,7 +14,7 @@ namespace TestServer.Handlers
     {
         
         [HttpHandler("performMaintenance")]
-        public static Task PerformMaintenanceHandler(int version, JsonDocument body, HttpListenerResponse response)
+        public static Task PerformMaintenanceHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
         {
             if (!body.RootElement.TryGetProperty("database", out var database) || database.ValueKind != JsonValueKind.String) {
                 response.WriteBody(Router.CreateErrorResponse("'database' property not found or invalid"), version, HttpStatusCode.BadRequest);
@@ -32,7 +33,7 @@ namespace TestServer.Handlers
             }
 
             var dbName = database.GetString()!;
-            var dbObject = CBLTestServer.Manager.GetDatabase(dbName);
+            var dbObject = session.ObjectManager.GetDatabase(dbName);
             if (dbObject == null) {
                 var errorObject = new
                 {

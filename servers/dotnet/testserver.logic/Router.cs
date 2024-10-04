@@ -10,8 +10,13 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using TestServer.Handlers;
+using TestServer.Utilities;
 
+// This is a shim between the received HTTP message
+// and the actual invocation which will transform
+// the clientID into a session IF NEEDED
 using HandlerAction = System.Func<int,
+    System.String,
     System.Text.Json.JsonDocument,
     System.Net.HttpListenerResponse,
     System.Threading.Tasks.Task>;
@@ -73,9 +78,12 @@ namespace TestServer
     {
         public string Path { get; }
 
-        public HttpHandlerAttribute(string path)
+        public bool NoSession { get; }
+
+        public HttpHandlerAttribute(string path, bool noSession = false)
         {
             Path = path;
+            NoSession = noSession;
         }
     }
 
@@ -84,20 +92,37 @@ namespace TestServer
         #region Constants
 
         public const string ApiVersionHeader = "CBLTest-API-Version";
+        public const string ClientIdHeader = "CBLTest-Client-ID";
 
-        private static readonly IDictionary<string, HandlerAction> RouteMap =
-            new Dictionary<string, HandlerAction>();
+        private static readonly Dictionary<string, HandlerAction> RouteMap =
+            new();
 
         #endregion
 
         #region Constructors
 
+        private static IEnumerable<(string, MethodInfo)> HandlerMethods(bool noSession)
+        {
+            return typeof(HandlerList).GetMethods().Where(x =>
+            {
+                var att = x.GetCustomAttribute<HttpHandlerAttribute>();
+                if (att == null) {
+                    return false;
+                }
+
+                return att.NoSession == noSession;
+            }).Select(x => (x.GetCustomAttribute<HttpHandlerAttribute>()!.Path, x));
+        }
+
         static Router()
         {
-            foreach(var method in typeof(HandlerList).GetMethods()
-                .Where(x => x.GetCustomAttribute(typeof(HttpHandlerAttribute)) != null)) {
-                var key = method.GetCustomAttribute<HttpHandlerAttribute>()!.Path;
-                var invocation = new HandlerAction((args, body, response) => (Task)method.Invoke(null, new object[] { args, body, response })!);
+            foreach(var (key, method) in HandlerMethods(false)) {
+                var invocation = new HandlerAction((version, clientId, body, response) => (Task)method.Invoke(null, [version, Session.For(clientId), body, response])!);
+                RouteMap.Add(key, invocation);
+            }
+
+            foreach (var (key, method) in HandlerMethods(true)) {
+                var invocation = new HandlerAction((version, clientId, body, response) => (Task)method.Invoke(null, [version, body, response])!);
                 RouteMap.Add(key, invocation);
             }
         }
@@ -147,13 +172,18 @@ namespace TestServer
                 return;
             }
 
+            if(ex is ApplicationStatusException e) {
+                response.WriteBody(CreateErrorResponse(ex.Message), version, e.StatusCode);
+                return;
+            }
+
             var msg = MultiExceptionString(ex);
             Serilog.Log.Logger.Warning("Error in handler for {endpoint}", endpoint);
             Serilog.Log.Logger.Warning("{msg}", msg);
             response.WriteBody(CreateErrorResponse(msg), version, HttpStatusCode.InternalServerError);
         }
 
-        internal static async Task Handle(Uri endpoint, Stream body, HttpListenerResponse response, int version)
+        internal static async Task Handle(string clientId, Uri endpoint, Stream body, HttpListenerResponse response, int version)
         {
             if(version > CBLTestServer.MaxApiVersion) {
                 response.WriteBody("The API version specified is not supported", CBLTestServer.MaxApiVersion, HttpStatusCode.Forbidden);
@@ -166,7 +196,7 @@ namespace TestServer
                 return;
             }
 
-            if (!RouteMap.TryGetValue(path, out HandlerAction? action)) {
+            if (!RouteMap.TryGetValue(path, out var action)) {
                 response.WriteEmptyBody(version, HttpStatusCode.NotFound);
                 return;
             }
@@ -188,14 +218,11 @@ namespace TestServer
             }
 
             try {
-                await action(version, bodyObj, response).ConfigureAwait(false);
+                await action(version, clientId, bodyObj, response).ConfigureAwait(false);
             } catch (TargetInvocationException ex) {
                 switch(ex.InnerException) {
                     case null:
                         HandleException(ex, endpoint, version, response);
-                        break;
-                    case JsonException e:
-                        response.WriteBody(CreateErrorResponse(e.Message), version, HttpStatusCode.BadRequest);
                         break;
                     default:
                         HandleException(ex.InnerException, endpoint, version, response);
