@@ -51,7 +51,11 @@ static bool IsInterfaceValid(NetworkInterface ni)
 }
 
 var server = new CBLTestServer();
-server.Start();
+if (args.Length == 1) {
+    server.Port = UInt16.Parse(args[0]);
+}
+
+var _ = server.Start();
 
 Console.WriteLine($"Test Server Version: {CBLTestServer.Version}");
 Console.WriteLine("CBL Version: " + typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
@@ -62,7 +66,7 @@ var validIPs = NetworkInterface.GetAllNetworkInterfaces().Where(IsInterfaceValid
 var ipAddresses = "Server running at:" +
     Environment.NewLine +
     String.Join(Environment.NewLine, validIPs
-    .Select(x => $"http://{x.Address}:8080"));
+    .Select(x => $"http://{x.Address}:{server.Port}"));
 Console.WriteLine(ipAddresses);
 Console.WriteLine("Press any key to exit at any time...");
 
