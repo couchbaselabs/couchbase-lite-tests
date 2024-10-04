@@ -13,7 +13,7 @@ namespace TestServer
 
         public static readonly string ServerID = Guid.NewGuid().ToString();
 
-        private const ushort Port = 8080;
+        private const ushort DefaultPort = 8080;
 
         private static readonly Stream NullStream = new MemoryStream(Array.Empty<byte>());
 
@@ -22,6 +22,8 @@ namespace TestServer
         public static ObjectManager Manager { get; private set; } = default!;
 
         #endregion
+
+        public ushort Port { get; set; } = DefaultPort;
 
         #region Variables
 
