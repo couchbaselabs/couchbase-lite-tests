@@ -19,8 +19,10 @@ extension ContentTypes {
         let endpoint: String
         let replicatorType: ReplicatorType
         let continuous: Bool
-        let authenticator: ReplicatorAuthenticator
+        let authenticator: ReplicatorAuthenticator?
+        let pinnedServerCert: String?
         let enableDocumentListener: Bool
+        let enableAutoPurge: Bool
         
         public var description: String {
             var result: String = "ReplicatorConfiguration\n"
@@ -42,12 +44,21 @@ extension ContentTypes {
                 if let pullFilter = replColl.pullFilter {
                     result += "\t\tpullFilter: \(pullFilter.name)\n"
                 }
+                if let conflictResolver = replColl.conflictResolver {
+                    result += "\t\tconflictResolver: \(conflictResolver.name)\n"
+                }
             }
             
             result += "\treplicatorType: \(replicatorType.rawValue)\n"
             result += "\tcontinuous: \(continuous.description)\n"
-            result += "\tauthenticatorType: \(authenticator.type.rawValue)\n"
+            
+            if let auth = authenticator {
+                result += "\tauthenticatorType: \(auth.type.rawValue)\n"
+            }
+            
+            result += "\tpinnedServerCert: \(pinnedServerCert != nil ? "true" : "false")\n"
             result += "\tenableDocumentListener: \(enableDocumentListener.description)\n"
+            result += "\tenableAutoPeruge: \(enableAutoPurge.description)\n"
             
             return result
         }
@@ -57,19 +68,25 @@ extension ContentTypes {
             database = try container.decode(String.self, forKey: .database)
             collections = try container.decode([ReplicationCollection].self, forKey: .collections)
             endpoint = try container.decode(String.self, forKey: .endpoint)
-            replicatorType = try container.decode(ReplicatorType.self, forKey: .replicatorType)
-            continuous = try container.decode(Bool.self, forKey: .continuous)
-            enableDocumentListener = try container.decode(Bool.self, forKey: .enableDocumentListener)
-
-            // Decode the 'type' field from the 'authenticator' container to determine the authenticator type
-            let authContainer = try container.nestedContainer(keyedBy: AuthenticatorCodingKeys.self, forKey: .authenticator)
-            let authType = try authContainer.decode(AuthenticatorType.self, forKey: .type)
-            switch authType {
-            case .BASIC:
-                authenticator = try container.decode(ReplicatorBasicAuthenticator.self, forKey: .authenticator)
-            case .SESSION:
-                authenticator = try container.decode(ReplicatorSessionAuthenticator.self, forKey: .authenticator)
+            replicatorType = try container.decodeIfPresent(ReplicatorType.self, forKey: .replicatorType) ?? .pushpull
+            continuous = try container.decodeIfPresent(Bool.self, forKey: .continuous) ?? false
+            enableDocumentListener = try container.decodeIfPresent(Bool.self, forKey: .enableDocumentListener) ?? false
+            enableAutoPurge = try container.decodeIfPresent(Bool.self, forKey: .enableAutoPurge) ?? true
+            
+            if container.contains(.authenticator) {
+                let authContainer = try container.nestedContainer(keyedBy: AuthenticatorCodingKeys.self, forKey: .authenticator)
+                let authType = try authContainer.decode(AuthenticatorType.self, forKey: .type)
+                switch authType {
+                case .BASIC:
+                    authenticator = try container.decode(ReplicatorBasicAuthenticator.self, forKey: .authenticator)
+                case .SESSION:
+                    authenticator = try container.decode(ReplicatorSessionAuthenticator.self, forKey: .authenticator)
+                }
+            } else {
+                authenticator = nil
             }
+            
+            pinnedServerCert = try container.decodeIfPresent(String.self, forKey: .pinnedServerCert)
         }
 
         func encode(to encoder: Encoder) throws {
@@ -80,16 +97,21 @@ extension ContentTypes {
             try container.encode(replicatorType, forKey: .replicatorType)
             try container.encode(continuous, forKey: .continuous)
             try container.encode(enableDocumentListener, forKey: .enableDocumentListener)
+            try container.encode(enableAutoPurge, forKey: .enableAutoPurge)
 
             // Encode the `authenticator` property
-            switch authenticator {
-            case let basicAuth as ReplicatorBasicAuthenticator:
-                try container.encode(basicAuth, forKey: .authenticator)
-            case let sessionAuth as ReplicatorSessionAuthenticator:
-                try container.encode(sessionAuth, forKey: .authenticator)
-            default:
-                throw EncodingError.invalidValue(authenticator, EncodingError.Context(codingPath: [CodingKeys.authenticator], debugDescription: "Invalid authenticator type"))
+            if let auth = authenticator {
+                switch auth {
+                case let basicAuth as ReplicatorBasicAuthenticator:
+                    try container.encode(basicAuth, forKey: .authenticator)
+                case let sessionAuth as ReplicatorSessionAuthenticator:
+                    try container.encode(sessionAuth, forKey: .authenticator)
+                default:
+                    throw EncodingError.invalidValue(auth, EncodingError.Context(codingPath: [CodingKeys.authenticator], debugDescription: "Invalid authenticator type"))
+                }
             }
+            
+            try container.encodeIfPresent(pinnedServerCert, forKey: .pinnedServerCert)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -99,7 +121,9 @@ extension ContentTypes {
             case replicatorType
             case continuous
             case authenticator
+            case pinnedServerCert
             case enableDocumentListener
+            case enableAutoPurge
         }
         
         private enum AuthenticatorCodingKeys: String, CodingKey {

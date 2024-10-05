@@ -1,5 +1,5 @@
 //
-//  ReplicationFilter.swift
+//  ReplicationFilterFactory.swift
 //  CBL-Tests-iOS
 //
 //  Created by Callum Birks on 11/08/2023.
