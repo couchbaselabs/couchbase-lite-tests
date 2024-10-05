@@ -9,20 +9,26 @@ import Vapor
 
 extension Handlers {
     static let resetHandler: EndpointHandlerEmptyResponse = { req throws in
-        guard let databaseManager = DatabaseManager.shared
-        else {
+        guard let databaseManager = DatabaseManager.shared else {
             throw TestServerError.cblDBNotOpen
         }
         
-        if let resetConfig = try? req.content.decode(ContentTypes.ResetConfiguration.self),
-           !resetConfig.datasets.isEmpty {
-            for resetReq in resetConfig.datasets {
-                for dbName in resetReq.value {
-                    try databaseManager.reset(dbName: dbName, dataset: resetReq.key)
+        try databaseManager.reset()
+        
+        if let config = try? req.content.decode(ContentTypes.ResetConfiguration.self), let databases = config.databases {
+            for (dbName, spec) in databases {
+                if spec["dataset"] != nil && spec["collections"] != nil {
+                    throw TestServerError.badRequest("Invalid Reset Spec, dataset and collection cannot both be specified.")
+                }
+                
+                if let dataset = spec["dataset"]?.value as? String {
+                    try databaseManager.createDatabase(dbName: dbName, dataset: dataset)
+                } else if let collections = spec["collections"]?.value as? [String] {
+                    try databaseManager.createDatabase(dbName: dbName, collections: collections)
+                } else {
+                    try databaseManager.createDatabase(dbName: dbName)
                 }
             }
-        } else {
-            try databaseManager.resetAll()
         }
         
         return Response(status: .ok)

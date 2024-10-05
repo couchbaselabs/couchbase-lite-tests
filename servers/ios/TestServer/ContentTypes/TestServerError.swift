@@ -44,6 +44,6 @@ struct TestServerError : Error, Codable {
     }
     
     static let cblDBNotOpen = TestServerError(domain: .CBL, code: CBLError.notOpen, message: "Database is not open.")
-    static let cblDocNotFound = TestServerError(domain: .CBL, code: CBLError.notFound, message: "Could not find document.")
+    static let docNotFoundErr = TestServerError(domain: .TESTSERVER, code: 404, message: "Document not found")
     static let internalErr = TestServerError(domain: .TESTSERVER, code: 500, message: "Internal server error.")
 }

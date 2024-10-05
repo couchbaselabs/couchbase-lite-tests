@@ -15,6 +15,8 @@ struct AnyCodable: Codable {
         // Potentially unwrap if value is AnyCodable
         let value = value is AnyCodable ? (value as! AnyCodable).value : value
         switch value {
+        case let value as NSNull:
+            self.value = value
         case let value as Bool:
             self.value = value
         case let value as Int:
@@ -31,13 +33,15 @@ struct AnyCodable: Codable {
         case let value as CouchbaseLiteSwift.Blob:
             self.value = try value.properties.mapValues { try AnyCodable($0) }
         default:
-            throw TestServerError(domain: .TESTSERVER, code: 500, message: "Internal error parsing value type")
+            throw TestServerError(domain: .TESTSERVER, code: 500, message: "Internal error parsing value type: \(value)")
         }
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        if let value = try? container.decode(Bool.self) {
+        if container.decodeNil() {
+            self.value = NSNull()
+        } else if let value = try? container.decode(Bool.self) {
             self.value = value
         } else if let value = try? container.decode(Int.self) {
             self.value = value
@@ -57,6 +61,8 @@ struct AnyCodable: Codable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self.value {
+        case _ as NSNull:
+            try container.encodeNil()
         case let value as Bool:
             try container.encode(value)
         case let value as Int:

@@ -23,7 +23,7 @@ struct ErrorResponseFactory {
     
     public static func CreateErrorResponse(_ request: Request, _ error: TestServerError) -> Response {
         // Test server errors are 500 Internal, other errors are 400 Bad Request
-        let status: HTTPStatus = error.domain == .TESTSERVER ? HTTPStatus(statusCode: error.code) : .internalServerError
+        let status: HTTPStatus = error.domain == .TESTSERVER ? HTTPStatus(statusCode: error.code) : .badRequest
         let headers: HTTPHeaders = [:]
         
         return EncodeErrorResponse(request: request, status: status, headers: headers, error: error)

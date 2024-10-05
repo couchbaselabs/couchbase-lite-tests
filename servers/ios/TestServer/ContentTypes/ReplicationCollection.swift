@@ -14,5 +14,6 @@ extension ContentTypes {
         let documentIDs: [String]?
         let pushFilter: ReplicationFilter?
         let pullFilter: ReplicationFilter?
+        let conflictResolver: ReplicationConflictResolver?
     }
 }

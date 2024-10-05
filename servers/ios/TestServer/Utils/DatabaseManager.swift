@@ -81,8 +81,6 @@ class DatabaseManager {
         
         var replConfig = ReplicatorConfiguration(target: URLEndpoint(url: endpointURL))
         
-        replConfig.authenticator = try DatabaseManager.getCBLAuthenticator(from: config.authenticator)
-        
         switch(config.replicatorType) {
         case .push:
             replConfig.replicatorType = .push
@@ -94,25 +92,46 @@ class DatabaseManager {
         
         replConfig.continuous = config.continuous
         
-        for configColl in config.collections {
-            let collections = try configColl.names.map({ collName in
-                guard let collection = try collection(collName, inDB: database)
-                else {
-                    TestServer.logger.log(level: .error, "Failed to start Replicator, Collection '\(collName)' does not exist in \(config.database).")
-                    throw TestServerError.badRequest("Collection '\(collName)' does not exist in \(config.database).")
+        replConfig.enableAutoPurge = config.enableAutoPurge
+        
+        if let auth = config.authenticator {
+            replConfig.authenticator = try DatabaseManager.getCBLAuthenticator(from: auth)
+        }
+        
+        if let pinnedCert = config.pinnedServerCert {
+            guard let cert = CertUtil.certificate(from: pinnedCert) else {
+                throw TestServerError.badRequest("Pinned server cert has invalid format.")
+            }
+            replConfig.pinnedServerCertificate = cert
+        }
+        
+        if config.collections.count > 0 {
+            for configColl in config.collections {
+                let collections = try configColl.names.map({ collName in
+                    guard let collection = try collection(collName, inDB: database)
+                    else {
+                        TestServer.logger.log(level: .error, "Failed to start Replicator, Collection '\(collName)' does not exist in \(config.database).")
+                        throw TestServerError.badRequest("Collection '\(collName)' does not exist in \(config.database).")
+                    }
+                    return collection
+                })
+                
+                var collConfig = CollectionConfiguration()
+                collConfig.channels = configColl.channels
+                collConfig.documentIDs = configColl.documentIDs
+                if let pullFilter = configColl.pullFilter {
+                    collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter)
                 }
-                return collection
-            })
-            var collConfig = CollectionConfiguration()
-            collConfig.channels = configColl.channels
-            collConfig.documentIDs = configColl.documentIDs
-            if let pullFilter = configColl.pullFilter {
-                collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter)
+                if let pushFilter = configColl.pushFilter {
+                    collConfig.pushFilter = try DatabaseManager.getCBLReplicationFilter(from: pushFilter)
+                }
+                if let resolver = configColl.conflictResolver {
+                    collConfig.conflictResolver = try DatabaseManager.getCBLReplicationConflictResolver(from: resolver)
+                }
+                replConfig.addCollections(collections, config: collConfig)
             }
-            if let pushFilter = configColl.pushFilter {
-                collConfig.pushFilter = try DatabaseManager.getCBLReplicationFilter(from: pushFilter)
-            }
-            replConfig.addCollections(collections, config: collConfig)
+        } else {
+            replConfig.addCollection(try database.defaultCollection())
         }
         
         let replicatorID = UUID()
@@ -162,6 +181,15 @@ class DatabaseManager {
         TestServer.logger.log(level: .debug, "Replicator started successfully with ID \(replicatorID)")
         
         return replicatorID
+    }
+    
+    public func stopReplicator(forID replID: UUID) throws {
+        TestServer.logger.log(level: .debug, "Stop Replicator for ID \(replID) is requested.")
+        guard let replicator = replicators[replID] else {
+            throw TestServerError.badRequest("Replicator with ID '\(replID)' does not exist.")
+        }
+        replicator.stop()
+        TestServer.logger.log(level: .debug, "Stop Replicator for ID \(replID) is successfully requested.")
     }
     
     public func replicatorStatus(forID replID: UUID) -> ContentTypes.ReplicatorStatus? {
@@ -224,23 +252,26 @@ class DatabaseManager {
     }
     
     public func collection(_ name: String, inDB database: Database) throws -> Collection? {
-        let scopeAndColl = name.components(separatedBy: ".")
-        guard let scope = scopeAndColl.first, let coll = scopeAndColl.last
-        else {
-            TestServer.logger.log(level: .error, "Failed to fetch collection, '\(name)' is an invalid FQN.")
-            throw TestServerError.badRequest("'\(name)' is not a valid qualified collection name.")
-        }
-        
-        TestServer.logger.log(level: .debug, "Fetching collection with DB: \(database.name), scope: \(scope), collection: \(coll)")
-        
+        TestServer.logger.log(level: .debug, "Fetching collection with DB: \(database.name), collection: \(name)")
         do {
-            let collection = try database.collection(name: coll, scope: scope)
+            let spec = try CollectionSpec(name)
+            let collection = try database.collection(name: spec.collection, scope: spec.scope)
             TestServer.logger.log(level: .debug, "Fetched collection, result: \(collection.debugDescription)")
             return collection
         } catch(let error as NSError) {
             TestServer.logger.log(level: .error, "Failed to fetch collection due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
+    }
+    
+    public func getDocument(_ id: String, fromCollection collName: String, inDB dbName: String) throws -> Document? {
+        TestServer.logger.log(level: .debug, "Getting document '\(id)' from collection '\(collName)' in database '\(dbName)'")
+        
+        guard let collection = try collection(collName, inDB: dbName) else {
+            throw TestServerError.badRequest("Cannot find collection '\(collName)' in db '\(dbName)'")
+        }
+        
+        return try collection.document(id: id)
     }
     
     // Returns [scope_name.collection_name]
@@ -310,26 +341,16 @@ class DatabaseManager {
         TestServer.logger.log(level: .debug, "Database '\(dbName)' closed successfully.")
     }
     
-    public func reset(dbName: String, dataset: String? = nil) throws {
-        TestServer.logger.log(level: .debug, "Resetting DB \(dbName)\(dataset != nil ? " with dataset \(dataset!)" : "")")
+    public func createDatabase(dbName: String, dataset: String) throws {
+        TestServer.logger.log(level: .debug, "Create Database \(dbName) with dataset \(dataset)")
         
         // For the first time called, reset the temp directory for extracting the dataset
         if databases.isEmpty {
             try DatabaseManager.resetExtractedDatasetDir()
         }
         
-        // If database is open, close
-        if databases[dbName] != nil {
-            try closeDatabase(withName: dbName)
-        }
-        
-        // Delete any existing DB with this name
-        try? Database.delete(withName: dbName)
-        
-        // Load dataset if requested (performs Database.copy)
-        if let dataset = dataset {
-            try DatabaseManager.loadDataset(withName: dataset, dbName: dbName)
-        }
+        // Load database with the dataset
+        try DatabaseManager.loadDataset(withName: dataset, dbName: dbName)
         
         // Open database
         do {
@@ -338,13 +359,44 @@ class DatabaseManager {
             TestServer.logger.log(level: .error, "CBL Error while re-opening DB: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
-        TestServer.logger.log(level: .debug, "Database '\(dbName)' has been reset.")
+        TestServer.logger.log(level: .debug, "Database '\(dbName)' has been created with the dataset \(dataset).")
     }
     
-    public func resetAll() throws {
-        for dbName in databases.keys {
-            try reset(dbName: dbName)
+    public func createDatabase(dbName: String, collections: [String] = []) throws {
+        TestServer.logger.log(level: .debug, "Create Database \(dbName) with collections \(collections)")
+        
+        // For the first time called, reset the temp directory for extracting the dataset
+        if databases.isEmpty {
+            try DatabaseManager.resetExtractedDatasetDir()
         }
+        
+        // For any reasons if the database exists, delete it.
+        if Database.exists(withName: dbName) {
+            try Database.delete(withName: dbName)
+        }
+        
+        // Open database
+        do {
+            let db = try Database(name: dbName)
+            for collName in collections {
+                let spec = try CollectionSpec(collName)
+                try _ = db.createCollection(name: spec.collection, scope: spec.scope)
+            }
+            databases[dbName] = db
+        } catch(let error as NSError) {
+            TestServer.logger.log(level: .error, "CBL Error while re-opening DB: \(error)")
+            throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
+        }
+        TestServer.logger.log(level: .debug, "Database '\(dbName)' has been created with the collections \(collections).")
+    }
+    
+    public func reset() throws {
+        TestServer.logger.log(level: .debug, "Resetting all databases")
+        for dbName in databases.keys {
+            try closeDatabase(withName: dbName)
+            try? Database.delete(withName: dbName)
+        }
+        databases.removeAll()
     }
     
     private static func getCBLAuthenticator(from auth: ReplicatorAuthenticator) throws -> Authenticator {
@@ -362,15 +414,18 @@ class DatabaseManager {
         return try ReplicationFilterFactory.getFilter(withName: filter.name, params: filter.params)
     }
     
+    private static func getCBLReplicationConflictResolver(from resolver: ContentTypes.ReplicationConflictResolver) throws -> ConflictResolverProtocol {
+        return try ReplicationConflictResolverFactory.getResolver(withName: resolver.name, params: resolver.params)
+    }
+    
     private static func loadDataset(withName name: String, dbName: String) throws {
         TestServer.logger.log(level: .debug, "Loading dataset '\(name)' into DB '\(dbName)'")
+        
         let res = ("dbs" as NSString).appendingPathComponent(name)
-        guard let datasetZipURL = Bundle.main.url(forResource: res, withExtension: "cblite2.zip")
-        else {
+        guard let datasetZipURL = Bundle.main.url(forResource: res, withExtension: "cblite2.zip") else {
             TestServer.logger.log(level: .error, "Failed to load dataset, dataset '\(name)' does not exist.")
             throw TestServerError(domain: .TESTSERVER, code: 400, message: "Dataset does not exist")
         }
-        
         TestServer.logger.log(level: .debug, "Found dataset at \(datasetZipURL.absoluteString)")
         
         // datasetZipURL is "../x.cblite2.zip", datasetURL is "../x.cblite2"
@@ -388,6 +443,11 @@ class DatabaseManager {
                 TestServer.logger.log(level: .error, "Error while unzipping dataset at \(datasetZipURL.absoluteString)")
                 throw TestServerError(domain: .CBL, code: CBLError.cantOpenFile, message: "Couldn't unzip dataset archive.")
             }
+        }
+        
+        // For any reasons if the database exists, delete it.
+        if Database.exists(withName: dbName) {
+            try Database.delete(withName: dbName)
         }
         
         do {

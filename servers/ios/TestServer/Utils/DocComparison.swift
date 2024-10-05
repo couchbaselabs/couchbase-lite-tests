@@ -115,13 +115,17 @@ struct DocComparison : Content {
     }
         
     private static func isEqual(_ left: Array<Any>, _ right: Array<Any>, keypath: String) throws -> CompareResult {
-        for i in 0...(left.count - 1) {
-            let result = try isEqual(left[i], right[i], keypath: keypath + "[\(i)]")
-            if !result.equal {
-                return result
+        if left.count != right.count {
+            return .fail(reason: .MismatchedProperty, keypath: keypath)
+        }
+        if left.count > 0 {
+            for i in 0...(left.count - 1) {
+                let result = try isEqual(left[i], right[i], keypath: keypath + "[\(i)]")
+                if !result.equal {
+                    return result
+                }
             }
         }
-        
         return .success
     }
     
@@ -131,7 +135,7 @@ struct DocComparison : Content {
         
         for (leftKey, leftVal) in leftDict {
             if !rightDict.keys.contains(leftKey) {
-                return ContentTypes.VerifyResponse(result: false, description: FailDescriptions.case4(docID: docID, qualifiedCollection: qualifiedCollection, keypath: leftKey), document: try AnyCodable(leftDict), expected: try AnyCodable(leftDict), actual: try AnyCodable(rightDict))
+                return ContentTypes.VerifyResponse(result: false, description: FailDescriptions.case4(docID: docID, qualifiedCollection: qualifiedCollection, keypath: leftKey), document: try AnyCodable(rightDict), expected: try AnyCodable(leftDict), actual: try AnyCodable(rightDict))
             }
             
             let result = try isEqual(leftVal, rightDict[leftKey], keypath: leftKey)
@@ -152,7 +156,7 @@ struct DocComparison : Content {
                 
                 let description = result.reason == .MissingBlobFile ? FailDescriptions.case6(docID: docID, qualifiedCollection: qualifiedCollection, keypath: result.keypath ?? "") : FailDescriptions.case4(docID: docID, qualifiedCollection: qualifiedCollection, keypath: result.keypath ?? "")
                 
-                return ContentTypes.VerifyResponse(result: false, description: description, document: try AnyCodable(leftDict), expected: try AnyCodable(leftCopy), actual: try AnyCodable(rightCopy))
+                return ContentTypes.VerifyResponse(result: false, description: description, document: try AnyCodable(rightDict), expected: try AnyCodable(leftCopy), actual: try AnyCodable(rightCopy))
             }
         }
         

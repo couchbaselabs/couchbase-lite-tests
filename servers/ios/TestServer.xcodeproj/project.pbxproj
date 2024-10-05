@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		40AA34992CAF5D20004F4D08 /* StopReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34982CAF5D20004F4D08 /* StopReplicator.swift */; };
+		40AA349D2CAF6755004F4D08 /* CollectionSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */; };
+		40AA34A12CAF6BE4004F4D08 /* ReplicationConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A02CAF6BE4004F4D08 /* ReplicationConflictResolver.swift */; };
+		40AA34A32CAF8C4C004F4D08 /* ReplicationConflictResolverFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A22CAF8C4C004F4D08 /* ReplicationConflictResolverFactory.swift */; };
+		40AA34A52CAF94A4004F4D08 /* GetDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A42CAF94A4004F4D08 /* GetDocument.swift */; };
+		40AA34A72CAF9BC8004F4D08 /* GetDocumentRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A62CAF9BC8004F4D08 /* GetDocumentRequest.swift */; };
+		40AA34B62CAFB28E004F4D08 /* CertUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34B52CAFB28E004F4D08 /* CertUtil.swift */; };
 		40BDA7522AF1BFCC008DB256 /* TestServerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA7512AF1BFCC008DB256 /* TestServerApp.swift */; };
 		40BDA7542AF1BFCC008DB256 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA7532AF1BFCC008DB256 /* ContentView.swift */; };
 		40BDA7562AF1BFCD008DB256 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 40BDA7552AF1BFCD008DB256 /* Assets.xcassets */; };
@@ -29,7 +36,7 @@
 		40BDA8102AF1C15C008DB256 /* MutableObjectProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8092AF1C15C008DB256 /* MutableObjectProtocol.swift */; };
 		40BDA8112AF1C15C008DB256 /* Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA80A2AF1C15C008DB256 /* Snapshot.swift */; };
 		40BDA8122AF1C15C008DB256 /* DocComparison.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA80B2AF1C15C008DB256 /* DocComparison.swift */; };
-		40BDA8132AF1C15C008DB256 /* ReplicationFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA80C2AF1C15C008DB256 /* ReplicationFilter.swift */; };
+		40BDA8132AF1C15C008DB256 /* ReplicationFilterFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA80C2AF1C15C008DB256 /* ReplicationFilterFactory.swift */; };
 		40BDA8142AF1C15C008DB256 /* KeyPathParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA80D2AF1C15C008DB256 /* KeyPathParser.swift */; };
 		40BDA8152AF1C15C008DB256 /* AnyCodable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA80E2AF1C15C008DB256 /* AnyCodable.swift */; };
 		40BDA81C2AF1C311008DB256 /* CouchbaseLiteSwift.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 40BDA81B2AF1C311008DB256 /* CouchbaseLiteSwift.xcframework */; };
@@ -60,6 +67,9 @@
 		40BDA8F32AF20AAB008DB256 /* ReplicatorAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8DD2AF20AAB008DB256 /* ReplicatorAuthenticator.swift */; };
 		40BDA8F42AF20AAB008DB256 /* DatabaseUpdateItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8DE2AF20AAB008DB256 /* DatabaseUpdateItem.swift */; };
 		40BDA8F52AF20AAB008DB256 /* ReplicationCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8DF2AF20AAB008DB256 /* ReplicationCollection.swift */; };
+		40C7A5632CA4AF5C0053ADCB /* RunQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A5622CA4AF5C0053ADCB /* RunQuery.swift */; };
+		40C7A5652CA4AFB40053ADCB /* RunQueryConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A5642CA4AFB40053ADCB /* RunQueryConfiguration.swift */; };
+		40C7A5672CA4B15B0053ADCB /* QueryResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A5662CA4B15B0053ADCB /* QueryResults.swift */; };
 		EACC964D2AF3F8B500999C70 /* CBLVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EACC964C2AF3F8B500999C70 /* CBLVersion.swift */; };
 /* End PBXBuildFile section */
 
@@ -78,6 +88,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		40AA34982CAF5D20004F4D08 /* StopReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopReplicator.swift; sourceTree = "<group>"; };
+		40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionSpec.swift; sourceTree = "<group>"; };
+		40AA34A02CAF6BE4004F4D08 /* ReplicationConflictResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationConflictResolver.swift; sourceTree = "<group>"; };
+		40AA34A22CAF8C4C004F4D08 /* ReplicationConflictResolverFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationConflictResolverFactory.swift; sourceTree = "<group>"; };
+		40AA34A42CAF94A4004F4D08 /* GetDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetDocument.swift; sourceTree = "<group>"; };
+		40AA34A62CAF9BC8004F4D08 /* GetDocumentRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetDocumentRequest.swift; sourceTree = "<group>"; };
+		40AA34B52CAFB28E004F4D08 /* CertUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertUtil.swift; sourceTree = "<group>"; };
 		40BDA74E2AF1BFCC008DB256 /* TestServer-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TestServer-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		40BDA7512AF1BFCC008DB256 /* TestServerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestServerApp.swift; sourceTree = "<group>"; };
 		40BDA7532AF1BFCC008DB256 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -101,7 +118,7 @@
 		40BDA8092AF1C15C008DB256 /* MutableObjectProtocol.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MutableObjectProtocol.swift; sourceTree = "<group>"; };
 		40BDA80A2AF1C15C008DB256 /* Snapshot.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Snapshot.swift; sourceTree = "<group>"; };
 		40BDA80B2AF1C15C008DB256 /* DocComparison.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DocComparison.swift; sourceTree = "<group>"; };
-		40BDA80C2AF1C15C008DB256 /* ReplicationFilter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplicationFilter.swift; sourceTree = "<group>"; };
+		40BDA80C2AF1C15C008DB256 /* ReplicationFilterFactory.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplicationFilterFactory.swift; sourceTree = "<group>"; };
 		40BDA80D2AF1C15C008DB256 /* KeyPathParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KeyPathParser.swift; sourceTree = "<group>"; };
 		40BDA80E2AF1C15C008DB256 /* AnyCodable.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AnyCodable.swift; sourceTree = "<group>"; };
 		40BDA81B2AF1C311008DB256 /* CouchbaseLiteSwift.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = CouchbaseLiteSwift.xcframework; path = Frameworks/CouchbaseLiteSwift.xcframework; sourceTree = "<group>"; };
@@ -129,6 +146,9 @@
 		40BDA8DD2AF20AAB008DB256 /* ReplicatorAuthenticator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplicatorAuthenticator.swift; sourceTree = "<group>"; };
 		40BDA8DE2AF20AAB008DB256 /* DatabaseUpdateItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DatabaseUpdateItem.swift; sourceTree = "<group>"; };
 		40BDA8DF2AF20AAB008DB256 /* ReplicationCollection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplicationCollection.swift; sourceTree = "<group>"; };
+		40C7A5622CA4AF5C0053ADCB /* RunQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunQuery.swift; sourceTree = "<group>"; };
+		40C7A5642CA4AFB40053ADCB /* RunQueryConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunQueryConfiguration.swift; sourceTree = "<group>"; };
+		40C7A5662CA4B15B0053ADCB /* QueryResults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryResults.swift; sourceTree = "<group>"; };
 		EACC964C2AF3F8B500999C70 /* CBLVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBLVersion.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -201,13 +221,16 @@
 			isa = PBXGroup;
 			children = (
 				40BDA7F72AF1C13B008DB256 /* GetAllDocuments.swift */,
+				40AA34A42CAF94A4004F4D08 /* GetDocument.swift */,
 				40BDA7F62AF1C13B008DB256 /* GetReplicatorStatus.swift */,
 				40BDA7F02AF1C13B008DB256 /* GetRootHandler.swift */,
 				40BDA7F32AF1C13B008DB256 /* Handler.swift */,
 				40BDA7F52AF1C13B008DB256 /* PerformMaintenance.swift */,
 				40BDA7EE2AF1C13B008DB256 /* ResetHandler.swift */,
+				40C7A5622CA4AF5C0053ADCB /* RunQuery.swift */,
 				40BDA7F42AF1C13B008DB256 /* SnapshotDocuments.swift */,
 				40BDA7EF2AF1C13B008DB256 /* StartReplicator.swift */,
+				40AA34982CAF5D20004F4D08 /* StopReplicator.swift */,
 				40BDA7F22AF1C13B008DB256 /* UpdateDatabase.swift */,
 				40BDA7F12AF1C13B008DB256 /* VerifyDocuments.swift */,
 			);
@@ -227,13 +250,16 @@
 			isa = PBXGroup;
 			children = (
 				40BDA80E2AF1C15C008DB256 /* AnyCodable.swift */,
+				40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */,
 				40BDA7632AF1C0AF008DB256 /* DatabaseManager.swift */,
 				40BDA80B2AF1C15C008DB256 /* DocComparison.swift */,
 				40BDA8082AF1C15C008DB256 /* DocumentUpdater.swift */,
 				40BDA80D2AF1C15C008DB256 /* KeyPathParser.swift */,
 				40BDA8092AF1C15C008DB256 /* MutableObjectProtocol.swift */,
-				40BDA80C2AF1C15C008DB256 /* ReplicationFilter.swift */,
+				40AA34A22CAF8C4C004F4D08 /* ReplicationConflictResolverFactory.swift */,
+				40BDA80C2AF1C15C008DB256 /* ReplicationFilterFactory.swift */,
 				40BDA80A2AF1C15C008DB256 /* Snapshot.swift */,
+				40AA34B52CAFB28E004F4D08 /* CertUtil.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -264,14 +290,18 @@
 				40BDA8DE2AF20AAB008DB256 /* DatabaseUpdateItem.swift */,
 				40BDA8D92AF20AAB008DB256 /* DocumentID.swift */,
 				40BDA8D22AF20AAB008DB256 /* DocumentReplication.swift */,
+				40AA34A62CAF9BC8004F4D08 /* GetDocumentRequest.swift */,
 				40BDA8D32AF20AAB008DB256 /* PerformMaintenanceConfiguration.swift */,
+				40C7A5662CA4B15B0053ADCB /* QueryResults.swift */,
 				40BDA8DF2AF20AAB008DB256 /* ReplicationCollection.swift */,
+				40AA34A02CAF6BE4004F4D08 /* ReplicationConflictResolver.swift */,
 				40BDA8D42AF20AAB008DB256 /* ReplicationFilterRQ.swift */,
 				40BDA8DA2AF20AAB008DB256 /* Replicator.swift */,
 				40BDA8DD2AF20AAB008DB256 /* ReplicatorAuthenticator.swift */,
 				40BDA8D52AF20AAB008DB256 /* ReplicatorConfiguration.swift */,
 				40BDA8CB2AF20AAB008DB256 /* ReplicatorStatus.swift */,
 				40BDA8D82AF20AAB008DB256 /* ResetConfiguration.swift */,
+				40C7A5642CA4AFB40053ADCB /* RunQueryConfiguration.swift */,
 				40BDA8DC2AF20AAB008DB256 /* ServerInfo.swift */,
 				40BDA8CF2AF20AAB008DB256 /* SnapshotID.swift */,
 				40BDA8CC2AF20AAB008DB256 /* SnapshotRequest.swift */,
@@ -394,10 +424,11 @@
 				40BDA8102AF1C15C008DB256 /* MutableObjectProtocol.swift in Sources */,
 				40BDA7542AF1BFCC008DB256 /* ContentView.swift in Sources */,
 				40BDA8122AF1C15C008DB256 /* DocComparison.swift in Sources */,
+				40AA34A72CAF9BC8004F4D08 /* GetDocumentRequest.swift in Sources */,
 				40BDA8F32AF20AAB008DB256 /* ReplicatorAuthenticator.swift in Sources */,
 				40BDA8112AF1C15C008DB256 /* Snapshot.swift in Sources */,
 				40BDA8E22AF20AAB008DB256 /* SnapshotRequest.swift in Sources */,
-				40BDA8132AF1C15C008DB256 /* ReplicationFilter.swift in Sources */,
+				40BDA8132AF1C15C008DB256 /* ReplicationFilterFactory.swift in Sources */,
 				40BDA8EC2AF20AAB008DB256 /* VerifyRequest.swift in Sources */,
 				40BDA8062AF1C13B008DB256 /* HeadersMiddleware.swift in Sources */,
 				40BDA8F22AF20AAB008DB256 /* ServerInfo.swift in Sources */,
@@ -413,27 +444,36 @@
 				40BDA8F52AF20AAB008DB256 /* ReplicationCollection.swift in Sources */,
 				40BDA8E02AF20AAB008DB256 /* VerifyResponse.swift in Sources */,
 				40BDA8E32AF20AAB008DB256 /* StartReplicatorRequest.swift in Sources */,
+				40AA349D2CAF6755004F4D08 /* CollectionSpec.swift in Sources */,
 				40BDA8F02AF20AAB008DB256 /* Replicator.swift in Sources */,
 				40BDA8E82AF20AAB008DB256 /* DocumentReplication.swift in Sources */,
+				40AA34A12CAF6BE4004F4D08 /* ReplicationConflictResolver.swift in Sources */,
 				40BDA8E72AF20AAB008DB256 /* CollectionDocuments.swift in Sources */,
+				40C7A5672CA4B15B0053ADCB /* QueryResults.swift in Sources */,
 				EACC964D2AF3F8B500999C70 /* CBLVersion.swift in Sources */,
+				40AA34992CAF5D20004F4D08 /* StopReplicator.swift in Sources */,
 				40BDA8E92AF20AAB008DB256 /* PerformMaintenanceConfiguration.swift in Sources */,
 				40BDA8022AF1C13B008DB256 /* PerformMaintenance.swift in Sources */,
 				40BDA8032AF1C13B008DB256 /* GetReplicatorStatus.swift in Sources */,
 				40BDA8012AF1C13B008DB256 /* SnapshotDocuments.swift in Sources */,
 				40BDA8E42AF20AAB008DB256 /* ContentTypes.swift in Sources */,
 				40BDA8152AF1C15C008DB256 /* AnyCodable.swift in Sources */,
+				40AA34A32CAF8C4C004F4D08 /* ReplicationConflictResolverFactory.swift in Sources */,
 				40BDA8E62AF20AAB008DB256 /* Collections.swift in Sources */,
 				40BDA7642AF1C0AF008DB256 /* TestServer.swift in Sources */,
 				40BDA80F2AF1C15C008DB256 /* DocumentUpdater.swift in Sources */,
+				40AA34A52CAF94A4004F4D08 /* GetDocument.swift in Sources */,
 				40BDA8052AF1C13B008DB256 /* ErrorMiddleware.swift in Sources */,
 				40BDA8042AF1C13B008DB256 /* GetAllDocuments.swift in Sources */,
 				40BDA8F12AF20AAB008DB256 /* UpdateRequest.swift in Sources */,
 				40BDA8ED2AF20AAB008DB256 /* TestServerError.swift in Sources */,
 				40BDA8142AF1C15C008DB256 /* KeyPathParser.swift in Sources */,
+				40C7A5652CA4AFB40053ADCB /* RunQueryConfiguration.swift in Sources */,
+				40C7A5632CA4AF5C0053ADCB /* RunQuery.swift in Sources */,
 				40BDA8EE2AF20AAB008DB256 /* ResetConfiguration.swift in Sources */,
 				40BDA8EB2AF20AAB008DB256 /* ReplicatorConfiguration.swift in Sources */,
 				40BDA8E12AF20AAB008DB256 /* ReplicatorStatus.swift in Sources */,
+				40AA34B62CAFB28E004F4D08 /* CertUtil.swift in Sources */,
 				40BDA7FF2AF1C13B008DB256 /* UpdateDatabase.swift in Sources */,
 				40BDA8EF2AF20AAB008DB256 /* DocumentID.swift in Sources */,
 			);

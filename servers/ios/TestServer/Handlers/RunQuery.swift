@@ -9,29 +9,24 @@ import Vapor
 import CouchbaseLiteSwift
 
 extension Handlers {
-    static let runQuery: EndpointHandler<ContentTypes.RunQueryConfiguration> = { req throws in
+    static let runQuery: EndpointHandler<ContentTypes.QueryResults> = { req throws in
         guard let config = try? req.content.decode(ContentTypes.RunQueryConfiguration.self)
         else {
             throw TestServerError.badRequest("Request body does not match the 'RunQueryConfiguration' scheme.")
         }
-        return try runQuery(database: config.database, query: config.query)
+        return try _runQuery(database: config.database, query: config.query)
     }
 }
 
-fileprivate func runQuery(database: String, query: String) throws -> ContentTypes.CollectionDocuments {
-    var result = ContentTypes.CollectionDocuments()
+fileprivate func _runQuery(database: String, query: String) throws -> ContentTypes.QueryResults {
     guard let dbManager = DatabaseManager.shared
     else { throw TestServerError.cblDBNotOpen }
     
+    var results: Array<Dictionary<String, AnyCodable>> = []
     let queryResult = try dbManager.runQuery(dbName: database, queryString: query)
-    
-    
-                                             
-    
-    for collectionName in collections {
-        let queryResult = try dbManager.runQuery(dbName: database, queryString: "SELECT meta().id, meta().revisionID FROM \(collectionName)")
-        let collectionDocs = queryResult.map({ result in ContentTypes.CollectionDoc(id: result.string(at: 0)!, rev: result.string(at: 1)!) })
-        result[collectionName] = collectionDocs
+    for row in queryResult {
+        let result: [String: AnyCodable] = try row.toDictionary().mapValues { try AnyCodable($0) }
+        results.append(result)
     }
-    return result
+    return ContentTypes.QueryResults(results: results)
 }

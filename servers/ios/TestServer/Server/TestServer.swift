@@ -53,16 +53,19 @@ class TestServer : ObservableObject {
         setupRoutes(app)
     }
     
+    /// Implement API v0.5.2
     private func setupRoutes(_ app: Application) {
         app.get("", use: Handlers.getRoot)
         app.post("reset", use: Handlers.resetHandler)
         app.post("getAllDocuments", use: Handlers.getAllDocuments)
+        app.post("getDocument", use: Handlers.getDocument)
         app.post("updateDatabase", use: Handlers.updateDatabase)
         app.post("snapshotDocuments", use: Handlers.snapshotDocuments)
         app.post("verifyDocuments", use: Handlers.verifyDocuments)
         app.post("startReplicator", use: Handlers.startReplicator)
         app.post("getReplicatorStatus", use: Handlers.getReplicatorStatus)
         app.post("performMaintenance", use: Handlers.performMaintenance)
+        app.post("runQuery", use: Handlers.runQuery)
         
         TestServer.logger.log(level: .debug, "Server configured with the following routes: \n\(app.routes.description)")
     }
