@@ -29,9 +29,9 @@ class TestServerRequestType(Enum):
     SNAPSHOT_DOCS = "PostSnapshotDocumentsRequest"
     VERIFY_DOCS = "PostVerifyDocumentsRequest"
     PERFORM_MAINTENANCE = "PostPerformMaintenanceRequest"
-    SETUP_LOGGING = "PostSetupLoggingRequest"
     RUN_QUERY = "PostRunQueryRequest"
     GET_DOCUMENT = "PostGetDocumentRequest"
+    NEW_SESSION = "PostNewSessionRequest"
 
     def __str__(self) -> str:
         return self.value
@@ -173,6 +173,11 @@ class RequestFactory:
     def version(self) -> int:
         """Gets the API version that this factory is using"""
         return self.__version
+    
+    @property
+    def uuid(self) -> UUID:
+        """Gets the UUID identifying this request factory"""
+        return self.__uuid
     
     def __init__(self, config: ParsedConfig):
         self.__record_path = Path("http_log")

@@ -111,13 +111,13 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("updateDatabase")]
-    public static async Task UpdateDatabaseHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static async Task UpdateDatabaseHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryDeserialize<UpdateDatabaseBody>(response, version, out var updateBody)) {
             return;
         }
 
-        var db = CBLTestServer.Manager.GetDatabase(updateBody.database);
+        var db = session.ObjectManager.GetDatabase(updateBody.database);
         if(db == null) {
             response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{updateBody.database}'"), version, HttpStatusCode.BadRequest);
             return;
@@ -126,7 +126,7 @@ internal static partial class HandlerList
         var blobUpdate = new Dictionary<string, object>();
         foreach(var update in updateBody.updates.Where(x => x.updatedBlobs != null && x.updatedBlobs.Any())) {
             foreach(var b in update.updatedBlobs!) {
-                var nextBlob = await CBLTestServer.Manager.LoadBlob(b.Value).ConfigureAwait(false);
+                var nextBlob = await session.ObjectManager.LoadBlob(b.Value).ConfigureAwait(false);
                 blobUpdate[b.Key] = new Blob(BlobType(b.Value), nextBlob);
             }
         }

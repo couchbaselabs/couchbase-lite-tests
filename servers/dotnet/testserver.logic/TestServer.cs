@@ -19,8 +19,6 @@ namespace TestServer
 
         private static IServiceProvider _ServiceProvider = default!;
 
-        public static ObjectManager Manager { get; private set; } = default!;
-
         #endregion
 
         public ushort Port { get; set; } = DefaultPort;
@@ -34,15 +32,7 @@ namespace TestServer
 
         public static string Version => typeof(CBLTestServer).Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()!.Version;
 
-        public static IServiceProvider ServiceProvider
-        {
-            get => _ServiceProvider;
-            set {
-                _ServiceProvider = value;
-                var fileSystem = _ServiceProvider.GetRequiredService<IFileSystem>();
-                Manager = new ObjectManager(Path.Join(fileSystem.AppDataDirectory, "testfiles"));
-            }
-        }
+        public static IServiceProvider ServiceProvider { get; set; } = default!;
 
         #region Public Methods
 
@@ -105,8 +95,15 @@ namespace TestServer
                 if(versionHeader != null) {
                     int.TryParse(versionHeader, out version);
                 }
+
+                var clientId = nextRequest.Request.Headers.Get(Router.ClientIdHeader);
+                if(clientId == null) {
+                    var response = Router.CreateErrorResponse($"Header '{Router.ClientIdHeader}' missing");
+                    nextRequest.Response.WriteBody(response, version, HttpStatusCode.BadRequest);
+                    continue;
+                }
                 
-                var _ = Router.Handle(nextRequest.Request.Url, nextRequest.Request.InputStream ?? NullStream, nextRequest.Response, version)
+                var _ = Router.Handle(clientId, nextRequest.Request.Url, nextRequest.Request.InputStream ?? NullStream, nextRequest.Response, version)
                     .ContinueWith(t => Serilog.Log.Logger.Warning("Exception caught during router handling: {e}", t.Exception?.InnerException),
                     TaskContinuationOptions.OnlyOnFaulted);
             }

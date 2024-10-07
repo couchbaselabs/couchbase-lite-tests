@@ -1,18 +1,17 @@
 ﻿
 using ClientLogger;
+using System.Net.Http.Json;
 using System.Net.WebSockets;
 using System.Text;
-using System.Text.Json;
 
 const int Port = 5186;
 
 using var httpClient = new HttpClient();
-var response = await httpClient.PostAsync($"http://localhost:{Port}/startNewLog", null);
-var responseContent = await response.Content.ReadAsStreamAsync();
-var responseObject = await JsonSerializer.DeserializeAsync<StartNewLogResponse>(responseContent);
+var log_id = Guid.NewGuid().ToString();
+var response = await httpClient.PostAsync($"http://localhost:{Port}/startNewLog", JsonContent.Create(log_id));
 
 var ws = new ClientWebSocket();
-ws.Options.SetRequestHeader("CBL-Log-ID", responseObject.log_id);
+ws.Options.SetRequestHeader("CBL-Log-ID", log_id);
 ws.Options.SetRequestHeader("CBL-Log-Tag", "ClientLogger");
 await ws.ConnectAsync(new Uri($"ws://localhost:{Port}/openLogStream"), CancellationToken.None);
 
@@ -25,7 +24,7 @@ while(next != null && next != "quit") {
 
 await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
 
-httpClient.DefaultRequestHeaders.Add("CBL-Log-ID", responseObject.log_id);
+httpClient.DefaultRequestHeaders.Add("CBL-Log-ID", log_id);
 response = await httpClient.PostAsync($"http://localhost:{Port}/finishLog", null);
 response.EnsureSuccessStatusCode();
 

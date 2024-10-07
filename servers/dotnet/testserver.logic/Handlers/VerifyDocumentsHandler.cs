@@ -211,20 +211,20 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("verifyDocuments")]
-    public static async Task VerifyDocumentsHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static async Task VerifyDocumentsHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
     {
         if (!body.RootElement.TryDeserialize<VerifyDocumentsBody>(response, version, out var verifyBody)) {
             return;
         }
 
-        var db = CBLTestServer.Manager.GetDatabase(verifyBody.database);
+        var db = session.ObjectManager.GetDatabase(verifyBody.database);
         if (db == null) {
             // Error 1 : The specified database was not found.
             response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{verifyBody.database}'!"), version, HttpStatusCode.BadRequest);
             return;
         }
 
-        var snapshot = CBLTestServer.Manager.GetObject<Snapshot>(verifyBody.snapshot);
+        var snapshot = session.ObjectManager.GetObject<Snapshot>(verifyBody.snapshot);
         if(snapshot == null) {
             // Error 2 : The specified snapshot was not found.
             response.WriteBody(Router.CreateErrorResponse($"Unable to find snapshot named '{verifyBody.snapshot}'!"), version, HttpStatusCode.BadRequest);
@@ -285,7 +285,7 @@ internal static partial class HandlerList
 
             if(change.updatedBlobs != null) {
                 foreach(var entry in change.updatedBlobs) {
-                    var blob = await CBLTestServer.Manager.LoadBlob(entry.Value).ConfigureAwait(false);
+                    var blob = await session.ObjectManager.LoadBlob(entry.Value).ConfigureAwait(false);
                     KeyPathParser.Update(mutableCopy, entry.Key, new Blob(BlobType(entry.Value), blob));
                 }
             }

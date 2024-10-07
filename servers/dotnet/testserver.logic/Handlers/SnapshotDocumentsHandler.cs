@@ -2,6 +2,7 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
@@ -50,19 +51,19 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("snapshotDocuments")]
-    public static Task SnapshotDocumentsHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task SnapshotDocumentsHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
     {
         if (!body.RootElement.TryDeserialize<SnapshotDocumentBody>(response, version, out var snapshotBody)) {
             return Task.CompletedTask;
         }
 
-        var db = CBLTestServer.Manager.GetDatabase(snapshotBody.database);
+        var db = session.ObjectManager.GetDatabase(snapshotBody.database);
         if (db == null) {
             response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{snapshotBody.database}'!"), version, HttpStatusCode.BadRequest);
             return Task.CompletedTask;
         }
 
-        var (snapshot, id) = CBLTestServer.Manager.RegisterObject(() => new Snapshot());
+        var (snapshot, id) = session.ObjectManager.RegisterObject(() => new Snapshot());
         foreach(var snapshotEntry in snapshotBody.documents) {
             var collSpec = CollectionSpec(snapshotEntry.collection);
             var doc = db.GetCollection(collSpec.name, collSpec.scope)?.GetDocument(snapshotEntry.id);

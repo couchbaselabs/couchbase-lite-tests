@@ -5,12 +5,13 @@ using System.Net;
 using System.Reflection;
 using System.Text.Json;
 using TestServer.Services;
+using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
-    [HttpHandler("")]
+    [HttpHandler("", noSession: true)]
     public static Task GetRootHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
         var resolvedVersion = version != 0 ? version : CBLTestServer.MaxApiVersion;

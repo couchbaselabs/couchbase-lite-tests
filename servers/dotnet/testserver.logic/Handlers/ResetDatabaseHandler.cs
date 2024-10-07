@@ -1,12 +1,13 @@
 ﻿using System.Net;
 using System.Text.Json;
+using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
     [HttpHandler("reset")]
-    public static async Task ResetDatabaseHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static async Task ResetDatabaseHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
     {
         if(body.RootElement.TryGetProperty("test", out var name) && name.ValueKind == JsonValueKind.String) {
             Serilog.Log.Logger.Information(">>>>>>>>>> {name}", name);
@@ -74,21 +75,21 @@ internal static partial class HandlerList
         }
 
         var tasks = new List<Task>();
-        CBLTestServer.Manager.Reset();
+        session.ObjectManager.Reset();
         foreach(var newDatabase in databases.EnumerateObject()) {
             var dbName = newDatabase.Name;
             if (!newDatabase.Value.TryGetProperty("dataset", out var _)) {
                 // Entries with dataset will be handled later via the coalesced dictionary
                 if(newDatabase.Value.TryGetProperty("collections", out var collectionsJson)) {
-                    tasks.Add(CBLTestServer.Manager.LoadDatabase(null, [dbName], collectionsJson.Deserialize<IEnumerable<string>>()));
+                    tasks.Add(session.ObjectManager.LoadDatabase(null, [dbName], collectionsJson.Deserialize<IEnumerable<string>>()));
                 } else {
-                    tasks.Add(CBLTestServer.Manager.LoadDatabase(null, [dbName], null));
+                    tasks.Add(session.ObjectManager.LoadDatabase(null, [dbName], null));
                 }
             }
         }
 
         foreach(var datasetEntry in datasetToDbNames) {
-            tasks.Add(CBLTestServer.Manager.LoadDatabase(datasetEntry.Key, datasetEntry.Value));
+            tasks.Add(session.ObjectManager.LoadDatabase(datasetEntry.Key, datasetEntry.Value));
         }
 
         try {
