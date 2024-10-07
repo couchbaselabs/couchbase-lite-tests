@@ -5,6 +5,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
@@ -13,13 +14,13 @@ internal static partial class HandlerList
     internal readonly record struct RunQueryBody(string database, string query);
 
     [HttpHandler("runQuery")]
-    public static Task RunQueryHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task RunQueryHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
     {
         if (!body.RootElement.TryDeserialize<RunQueryBody>(response, version, out var runQueryBody)) {
             return Task.CompletedTask;
         }
 
-        var db = CBLTestServer.Manager.GetDatabase(runQueryBody.database);
+        var db = session.ObjectManager.GetDatabase(runQueryBody.database);
         if (db == null) {
             response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{runQueryBody.database}'"), version, HttpStatusCode.BadRequest);
             return Task.CompletedTask;

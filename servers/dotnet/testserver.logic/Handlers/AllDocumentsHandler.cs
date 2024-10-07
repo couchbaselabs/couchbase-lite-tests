@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
+using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
@@ -11,7 +12,7 @@ internal readonly record struct AllDocumentsResponse(string id, string rev);
 internal static partial class HandlerList
 {
     [HttpHandler("getAllDocuments")]
-    public static Task AllDocumentsHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task AllDocumentsHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryGetProperty("database", out var database) || database.ValueKind != JsonValueKind.String) {
             response.WriteBody(Router.CreateErrorResponse("'database' property not found or invalid"), version, HttpStatusCode.BadRequest);
@@ -24,7 +25,7 @@ internal static partial class HandlerList
         }
 
         var dbName = database.GetString()!;
-        var dbObject = CBLTestServer.Manager.GetDatabase(dbName);
+        var dbObject = session.ObjectManager.GetDatabase(dbName);
         if(dbObject == null) {
             var errorObject = new
             {

@@ -12,6 +12,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using TestServer.Services;
+using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
@@ -36,13 +37,13 @@ internal static partial class HandlerList
         IReadOnlyList<DocumentReplicationEvent> documents, ErrorReturnBody? error = null);
 
     [HttpHandler("getReplicatorStatus")]
-    public static Task ReplicatorStatusHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task ReplicatorStatusHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryDeserialize<ReplicatorStatusBody>(response, version, out var replicatorStatusBody)) {
             return Task.CompletedTask;
         }
 
-        var replicator = CBLTestServer.Manager.GetObject<Replicator>(replicatorStatusBody.id);
+        var replicator = session.ObjectManager.GetObject<Replicator>(replicatorStatusBody.id);
         if(replicator == null) {
             response.WriteBody(Router.CreateErrorResponse($"Unable to find replicator with id '{replicatorStatusBody.id}'"), version, HttpStatusCode.BadRequest);
             return Task.CompletedTask;
@@ -63,7 +64,7 @@ internal static partial class HandlerList
         }
 
         var docs = new List<DocumentReplicationEvent>();
-        var listener = CBLTestServer.Manager.GetObject<ReplicatorDocumentListener>($"{replicatorStatusBody.id}_listener");
+        var listener = session.ObjectManager.GetObject<ReplicatorDocumentListener>($"{replicatorStatusBody.id}_listener");
         if(listener != null) {
             docs = listener.ToList();
         }

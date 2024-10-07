@@ -1,8 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Net.WebSockets;
+using System.Text.Json.Serialization;
 
 namespace LogSlurp
 {
+    public readonly record struct StartNewLogBody(string log_id);
+
     public sealed class LogController : ControllerBase
     {
         private const string LogIDHeader = "CBL-Log-ID";
@@ -37,17 +40,31 @@ namespace LogSlurp
 
         [Route("/startNewLog")]
         [HttpPost]
-        public ActionResult StartNewLog()
+        public async Task StartNewLog([FromBody]StartNewLogBody body)
         {
-            var id = Guid.NewGuid().ToString();
+            if(!ModelState.IsValid) {
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                foreach(var state in ModelState) {
+                    foreach(var err in state.Value.Errors) {
+                        await HttpContext.Response.WriteAsync(err.ErrorMessage ?? "<unknown>");
+                    }
+                }
+                return;
+            }
+
+            if(FileLoggers.ContainsKey(body.log_id)) {
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await HttpContext.Response.WriteAsync($"Log with id '{body.log_id}' already started!");
+                return;
+            }
+
             Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "logslurp"));
-            var stream = System.IO.File.Open(Path.Combine(Path.GetTempPath(), "logslurp", $"{id}.txt"),
+            var stream = System.IO.File.Open(Path.Combine(Path.GetTempPath(), "logslurp", $"{body.log_id}.txt"),
                 FileMode.CreateNew, 
                 FileAccess.Write,
                 FileShare.Read);
 
-            FileLoggers[id] = new StreamWriter(stream);
-            return new JsonResult(new { log_id = id });
+            FileLoggers[body.log_id] = new StreamWriter(stream);
         }
 
         [Route("/finishLog")]

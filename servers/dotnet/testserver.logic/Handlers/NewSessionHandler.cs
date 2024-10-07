@@ -8,17 +8,9 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using TestServer.Utilities;
 
 namespace TestServer.Handlers;
-
-internal readonly record struct SetupLoggingBody
-{
-    public required string url { get; init; }
-
-    public required string id { get; init; }
-
-    public required string tag { get; init; }
-}
 
 internal sealed class LogSlurpSink : ILogEventSink
 {
@@ -65,14 +57,24 @@ internal static class SerilogExtensions
     }
 }
 
+internal record NewSessionLoggingInfo(string url, string tag);
+
+internal readonly record struct NewSessionBody(string id, NewSessionLoggingInfo? logging);
+
 internal static partial class HandlerList
 {
     private static Serilog.ILogger? Original = null;
 
-    [HttpHandler("setupLogging")]
-    public static Task SetupLoggingHandler(int version, JsonDocument body, HttpListenerResponse response)
+    [HttpHandler("newSession", noSession: true)]
+    public static Task NewSessionHandler(int version, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<SetupLoggingBody>(response, version, out var setupLoggingBody)) {
+        if (!body.RootElement.TryDeserialize<NewSessionBody>(response, version, out var newSessionBody)) {
+            return Task.CompletedTask;
+        }
+
+        Session.Create(CBLTestServer.ServiceProvider, newSessionBody.id);
+
+        if(newSessionBody.logging == null) {
             return Task.CompletedTask;
         }
 
@@ -84,7 +86,7 @@ internal static partial class HandlerList
 
         Log.Logger = new LoggerConfiguration()
             .WriteTo.Logger(Original)
-            .WriteTo.LogSlurp(setupLoggingBody.url, setupLoggingBody.id, setupLoggingBody.tag)
+            .WriteTo.LogSlurp(newSessionBody.logging.url, newSessionBody.id, newSessionBody.logging.tag)
             .CreateLogger();
 
         Log.Information("Test server consolidated logging started");

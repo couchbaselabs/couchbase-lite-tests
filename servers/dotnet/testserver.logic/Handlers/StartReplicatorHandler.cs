@@ -6,6 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 using FilterGenerator = Func<IReadOnlyDictionary<string, object>?, HandlerList.IReplicatorFilter>;
@@ -275,13 +276,13 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("startReplicator")]
-    public static Task StartReplicatorHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task StartReplicatorHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryDeserialize<StartReplicatorBody>(response, version, out var deserializedBody)) {
             return Task.CompletedTask;
         }
 
-        var db = CBLTestServer.Manager.GetDatabase(deserializedBody.config.database);
+        var db = session.ObjectManager.GetDatabase(deserializedBody.config.database);
         if (db == null) {
             response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{deserializedBody.config.database}'!"), version, HttpStatusCode.BadRequest);
             return Task.CompletedTask;
@@ -320,7 +321,7 @@ internal static partial class HandlerList
                     }
 
                     var filter = ReplicatorFilters.FilterMap[c.pushFilter.name](c.pushFilter.parameters);
-                    CBLTestServer.Manager.KeepAlive(filter);
+                    session.ObjectManager.KeepAlive(filter);
                     collConfig.PushFilter = filter.Execute;
                 }
 
@@ -330,7 +331,7 @@ internal static partial class HandlerList
                     }
 
                     var filter = ReplicatorFilters.FilterMap[c.pullFilter.name](c.pullFilter.parameters);
-                    CBLTestServer.Manager.KeepAlive(filter);
+                    session.ObjectManager.KeepAlive(filter);
                     collConfig.PullFilter = filter.Execute;
                 }
 
@@ -350,10 +351,10 @@ internal static partial class HandlerList
             replConfig.PinnedServerCertificate = new X509Certificate2(Encoding.ASCII.GetBytes(deserializedBody.config.pinnedServerCert));
         }
 
-        (var repl, var id) = CBLTestServer.Manager.RegisterObject(() => new Replicator(replConfig));
+        (var repl, var id) = session.ObjectManager.RegisterObject(() => new Replicator(replConfig));
         if(deserializedBody.config.enableDocumentListener) {
             var listener = new ReplicatorDocumentListener(repl);
-            CBLTestServer.Manager.RegisterObject(() => new ReplicatorDocumentListener(repl), $"{id}_listener");
+            session.ObjectManager.RegisterObject(() => new ReplicatorDocumentListener(repl), $"{id}_listener");
         }
 
         repl.Start(deserializedBody.reset);

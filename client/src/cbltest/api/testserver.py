@@ -6,7 +6,7 @@ from cbltest.api.database import Database
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.responses import GetRootResponse
-from cbltest.v1.requests import PostResetRequestBody, PostSetupLoggingRequestBody
+from cbltest.v1.requests import PostResetRequestBody, PostNewSessionRequestBody
 from cbltest.version import VERSION
 
 
@@ -66,7 +66,7 @@ class TestServer:
 
             return ret_val
         
-    async def setup_logging(self, url: str, id: str, tag: str):
+    async def new_session(self, id: str, url: Optional[str], tag: Optional[str]):
         """
         Instructs this test server to log to the given LogSlurp instance
 
@@ -74,9 +74,9 @@ class TestServer:
         :param id: The ID of the log to log to
         :param tag: The tag to use for this test server
         """
-        with self.__tracer.start_as_current_span("setup_logging"):
-            payload = PostSetupLoggingRequestBody(url, id, tag)
-            request = self.__request_factory.create_request(TestServerRequestType.SETUP_LOGGING, payload)
+        with self.__tracer.start_as_current_span("new_session"):
+            payload = PostNewSessionRequestBody(id, url, tag)
+            request = self.__request_factory.create_request(TestServerRequestType.NEW_SESSION, payload)
             await self.__request_factory.send_request(self.__index, request)
 
     async def cleanup(self) -> None:
