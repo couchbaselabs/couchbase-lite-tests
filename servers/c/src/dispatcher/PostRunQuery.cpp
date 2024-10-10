@@ -1,13 +1,13 @@
 #include "Dispatcher+Common.h"
 
-int Dispatcher::handlePOSTRunQuery(Request &request) {
+int Dispatcher::handlePOSTRunQuery(Request &request, Session *session) {
     json body = request.jsonBody();
     CheckBody(body);
 
     auto dbName = GetValue<string>(body, "database");
     auto queryStr = GetValue<string>(body, "query");
 
-    auto db = _cblManager->database(dbName);
+    auto db = session->cblManager()->database(dbName);
 
     CBLError error{};
     auto query = CBLDatabase_CreateQuery(db, kCBLN1QLLanguage, FLS(queryStr), nullptr, &error);

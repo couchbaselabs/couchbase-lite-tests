@@ -31,12 +31,6 @@ using namespace ts::support::json_util;
 using namespace ts::support::str;
 using namespace std;
 
-static inline void CheckBody(const json &body) {
-    if (!body.is_object()) {
-        throw RequestError("Request body is not json object");
-    }
-}
-
 namespace ts {
     enum class UpdateDatabaseType {
         update, del, purge

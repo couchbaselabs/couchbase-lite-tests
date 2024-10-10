@@ -28,4 +28,10 @@ namespace ts::support::error {
     public:
         explicit RequestError(const std::string &s) : logic_error(s) {}
     };
+
+    static inline void CheckBody(const nlohmann::json &body) {
+        if (!body.is_object()) {
+            throw ts::support::error::RequestError("Request body is not json object");
+        }
+    }
 }

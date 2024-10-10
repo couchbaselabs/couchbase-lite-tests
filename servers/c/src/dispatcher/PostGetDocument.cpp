@@ -7,7 +7,7 @@
 //FLString CBLDocument_RevisionHistory(const CBLDocument *doc);
 //}
 
-int Dispatcher::handlePOSTGetDocument(Request &request) {
+int Dispatcher::handlePOSTGetDocument(Request &request, Session *session) {
     json body = request.jsonBody();
     CheckBody(body);
 
@@ -16,8 +16,9 @@ int Dispatcher::handlePOSTGetDocument(Request &request) {
     auto colName = GetValue<string>(docInfo, "collection");
     auto docID = GetValue<string>(docInfo, "id");
 
-    auto db = _cblManager->database(dbName);
-    auto col = _cblManager->collection(db, colName);
+    auto cblManager = session->cblManager();
+    auto db = cblManager->database(dbName);
+    auto col = cblManager->collection(db, colName);
 
     CBLError error{};
     auto doc = CBLCollection_GetDocument(col, FLS(docID), &error);

@@ -7,7 +7,8 @@
 // support
 #include "Device.h"
 
-int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-member-functions-to-static)
+int Dispatcher::handleGETRoot(Request &request,
+                              Session *session) { // NOLINT(readability-convert-member-functions-to-static)
     json result;
     result["version"] = cbl_info::version();
     result["apiVersion"] = TestServer::API_VERSION;
@@ -31,7 +32,8 @@ int Dispatcher::handleGETRoot(Request &request) { // NOLINT(readability-convert-
         device["systemApiVersion"] = apiVersion;
     }
     result["device"] = device;
-    result["additionalInfo"] = "Edition: " + cbl_info::edition() + ", Build: " + to_string(cbl_info::build());
+    result["additionalInfo"] =
+        "Edition: " + cbl_info::edition() + ", Build: " + to_string(cbl_info::build());
 
     return request.respondWithJSON(result);
 }

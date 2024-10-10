@@ -74,17 +74,18 @@ bool verifyProperties(CBLDatabase *db, const string &docID, const string &colNam
     return result.ok;
 }
 
-int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
+int Dispatcher::handlePOSTVerifyDocuments(Request &request, Session *session) {
     json body = request.jsonBody();
     CheckBody(body);
 
     VerifyResult verifyResult{true};
 
     auto dbName = GetValue<string>(body, "database");
-    auto db = _cblManager->database(dbName);
+    auto cblManager = session->cblManager();
+    auto db = cblManager->database(dbName);
 
     auto snapshotID = GetValue<string>(body, "snapshot");
-    auto snapshot = _cblManager->snapshot(snapshotID);
+    auto snapshot = cblManager->snapshot(snapshotID);
 
     vector<CBLBlob *> retainedBlobs;
     DEFER {
@@ -123,11 +124,12 @@ int Dispatcher::handlePOSTVerifyDocuments(Request &request) {
             AUTO_RELEASE(expectedDoc);
 
             auto expectedProps = CBLDocument_MutableProperties(expectedDoc);
-            ts_support::fleece::applyDeltaUpdates(expectedProps, change, [&](const string &name) -> CBLBlob * {
-                auto blob = _cblManager->blob(name, db);
-                retainedBlobs.push_back(blob);
-                return blob;
-            });
+            ts_support::fleece::applyDeltaUpdates(expectedProps, change,
+                                                  [&](const string &name) -> CBLBlob * {
+                                                      auto blob = cblManager->blob(name, db);
+                                                      retainedBlobs.push_back(blob);
+                                                      return blob;
+                                                  });
 
             auto props = CBLDocument_Properties(curDoc);
             if (!verifyProperties(db, docID, colName, props, expectedProps, verifyResult)) {

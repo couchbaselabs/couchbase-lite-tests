@@ -2,6 +2,7 @@
 
 // cbl
 #include "CBLManager.h"
+#include "SessionManager.h"
 
 // lib
 #include <functional>
@@ -22,7 +23,7 @@ namespace ts {
         int handle(mg_connection *conn) const;
 
     private:
-        using Handler = std::function<int(Request &request)>;
+        using Handler = std::function<int(Request &request, Session *session)>;
         struct Rule {
             std::string method;
             std::string path;
@@ -35,34 +36,36 @@ namespace ts {
 
         // Handler Functions:
 
-        int handleGETRoot(Request &request);
+        int handleGETRoot(Request &request, Session *session);
 
-        int handlePOSTReset(Request &request);
+        int handlePOSTReset(Request &request, Session *session);
 
-        int handlePOSTGetAllDocuments(Request &request);
+        int handlePOSTNewSession(Request &request, Session *session);
 
-        int handlePOSTUpdateDatabase(Request &request);
+        int handlePOSTGetAllDocuments(Request &request, Session *session);
 
-        int handlePOSTStartReplicator(Request &request);
+        int handlePOSTUpdateDatabase(Request &request, Session *session);
 
-        int handlePOSTStopReplicator(Request &request);
+        int handlePOSTStartReplicator(Request &request, Session *session);
 
-        int handlePOSTGetReplicatorStatus(Request &request);
+        int handlePOSTStopReplicator(Request &request, Session *session);
 
-        int handlePOSTSnapshotDocuments(Request &request);
+        int handlePOSTGetReplicatorStatus(Request &request, Session *session);
 
-        int handlePOSTVerifyDocuments(Request &request);
+        int handlePOSTSnapshotDocuments(Request &request, Session *session);
 
-        int handlePOSTPerformMaintenance(Request &request);
+        int handlePOSTVerifyDocuments(Request &request, Session *session);
 
-        int handlePOSTRunQuery(Request &request);
+        int handlePOSTPerformMaintenance(Request &request, Session *session);
+
+        int handlePOSTRunQuery(Request &request, Session *session);
 
         // Handler Functions for Testing:
-        int handlePOSTGetDocument(Request &request);
+        int handlePOSTGetDocument(Request &request, Session *session);
 
         // Member Variables:
         const TestServer *_testServer{nullptr};
         std::vector<Rule> _rules;
-        std::unique_ptr<ts::cbl::CBLManager> _cblManager;
+        std::unique_ptr<ts::SessionManager> _sessionManager;
     };
 }

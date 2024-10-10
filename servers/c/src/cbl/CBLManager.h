@@ -34,7 +34,7 @@ namespace ts::cbl {
         void createDatabaseWithDataset(const std::string &dbName, const std::string &datasetName);
 
         void createDatabaseWithCollections(const std::string &dbName,
-                                           std::vector<std::string> collections);
+                                           const std::vector<std::string> &collections);
 
         /**
          * Get a created database. The database instance is managed by the CBLManager.

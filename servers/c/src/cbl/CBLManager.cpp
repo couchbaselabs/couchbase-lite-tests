@@ -122,7 +122,8 @@ namespace ts::cbl {
     }
 
     void
-    CBLManager::createDatabaseWithCollections(const string &dbName, vector <string> collections) {
+    CBLManager::createDatabaseWithCollections(const string &dbName,
+                                              const vector <string> &collections) {
         lock_guard<mutex> lock(_mutex);
         if (auto i = _databases.find(dbName); i != _databases.end()) {
             throw logic_error("Database '" + dbName + "' has already been loaded or created.");
@@ -143,7 +144,7 @@ namespace ts::cbl {
             throw CBLException(error);
         }
 
-        for (auto name: collections) {
+        for (const auto &name: collections) {
             auto spec = CollectionSpec(name);
             auto col = CBLDatabase_CreateCollection(db, FLS(spec.name()), FLS(spec.scope()),
                                                     &error);
@@ -202,7 +203,7 @@ namespace ts::cbl {
 
     std::string blobContentType(const string &name) {
         auto comps = str::split(name, '.');
-        auto ext = comps.back();
+        const auto &ext = comps.back();
         if (ext == "jpg") {
             return "image/jpeg";
         }
@@ -404,7 +405,7 @@ namespace ts::cbl {
         }
 
         {
-            lock_guard <mutex> lock(_replicatorMutex);
+            lock_guard <mutex> replLock(_replicatorMutex);
             _contextMaps[id] = std::move(context);
             CBLReplicator_Start(repl, reset);
         }

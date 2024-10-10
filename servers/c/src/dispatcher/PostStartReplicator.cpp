@@ -30,7 +30,7 @@ namespace ts {
     );
 }
 
-int Dispatcher::handlePOSTStartReplicator(Request &request) {
+int Dispatcher::handlePOSTStartReplicator(Request &request, Session *session) {
     static constexpr const char *kAuthTypeBasic = "BASIC";
 
     json body = request.jsonBody();
@@ -114,7 +114,7 @@ int Dispatcher::handlePOSTStartReplicator(Request &request) {
     params.collections = collections;
 
     bool reset = GetValue<bool>(body, "reset", false);
-    string id = _cblManager->startReplicator(params, reset);
+    string id = session->cblManager()->startReplicator(params, reset);
 
     json result;
     result["id"] = id;

@@ -25,8 +25,9 @@ set(SHARED_SRC
         ${SHARED_SRC_DIR}/dispatcher/GetRoot.cpp
         ${SHARED_SRC_DIR}/dispatcher/PostGetAllDocuments.cpp
         ${SHARED_SRC_DIR}/dispatcher/PostGetDocument.cpp
-        ${SHARED_SRC_DIR}/dispatcher/PostPerformMaintenance.cpp
         ${SHARED_SRC_DIR}/dispatcher/PostGetReplicatorStatus.cpp
+        ${SHARED_SRC_DIR}/dispatcher/PostNewSession.cpp
+        ${SHARED_SRC_DIR}/dispatcher/PostPerformMaintenance.cpp
         ${SHARED_SRC_DIR}/dispatcher/PostReset.cpp
         ${SHARED_SRC_DIR}/dispatcher/PostRunQuery.cpp
         ${SHARED_SRC_DIR}/dispatcher/PostSnapshotDocuments.cpp

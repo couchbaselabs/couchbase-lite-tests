@@ -2,12 +2,12 @@
 
 static const string kStatuses[5] = {"STOPPED", "OFFLINE", "CONNECTING", "IDLE", "BUSY"};
 
-int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
+int Dispatcher::handlePOSTGetReplicatorStatus(Request &request, Session *session) {
     json body = request.jsonBody();
     CheckBody(body);
 
     auto id = GetValue<string>(body, "id");
-    auto replStatus = _cblManager->replicatorStatus(id);
+    auto replStatus = session->cblManager()->replicatorStatus(id);
     if (!replStatus) {
         throw RequestError("Replicator '" + id + "' not found");
     }
@@ -39,7 +39,9 @@ int Dispatcher::handlePOSTGetReplicatorStatus(Request &request) {
                 vector<string> flags;
                 if (replDoc.flags) {
                     if (replDoc.flags & kCBLDocumentFlagsDeleted) { flags.emplace_back("DELETED"); }
-                    if (replDoc.flags & kCBLDocumentFlagsAccessRemoved) { flags.emplace_back("ACCESSREMOVED"); }
+                    if (replDoc.flags & kCBLDocumentFlagsAccessRemoved) {
+                        flags.emplace_back("ACCESSREMOVED");
+                    }
                 }
                 doc["flags"] = flags;
 
