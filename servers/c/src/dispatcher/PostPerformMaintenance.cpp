@@ -17,12 +17,12 @@ static auto MaintenanceTypes = StringEnum<CBLMaintenanceType>(
     }
 );
 
-int Dispatcher::handlePOSTPerformMaintenance(Request &request) {
+int Dispatcher::handlePOSTPerformMaintenance(Request &request, Session *session) {
     json body = request.jsonBody();
     CheckBody(body);
 
     auto dbName = GetValue<string>(body, "database");
-    auto db = _cblManager->database(dbName);
+    auto db = session->cblManager()->database(dbName);
 
     auto typeValue = GetValue<string>(body, "maintenanceType");
     auto maintenanceType = MaintenanceTypes.value(typeValue);

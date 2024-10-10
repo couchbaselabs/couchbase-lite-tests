@@ -164,6 +164,7 @@
 		4076E73E2A9EAD04003DD799 /* StringUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E71A2A9EAD04003DD799 /* StringUtil.cpp */; };
 		4076E73F2A9EAD04003DD799 /* Files+Apple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4076E71C2A9EAD04003DD799 /* Files+Apple.mm */; };
 		4076E7402A9EAD04003DD799 /* Dispatcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E71F2A9EAD04003DD799 /* Dispatcher.cpp */; };
+		40D3FAC22CB784DF00696D75 /* PostNewSession.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40D3FAC12CB784DF00696D75 /* PostNewSession.cpp */; };
 		40F0BF3B2C9BE90E00027A7A /* PostRunQuery.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */; };
 		40F0BF402C9CF17400027A7A /* CBLReplicationConflictResolver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40F0BF3E2C9CF17400027A7A /* CBLReplicationConflictResolver.cpp */; };
 /* End PBXBuildFile section */
@@ -394,6 +395,8 @@
 		4076E71E2A9EAD04003DD799 /* Precondition.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Precondition.h; sourceTree = "<group>"; };
 		4076E71F2A9EAD04003DD799 /* Dispatcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Dispatcher.cpp; sourceTree = "<group>"; };
 		4076E7202A9EAD04003DD799 /* Request.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Request.h; sourceTree = "<group>"; };
+		40D3FAC12CB784DF00696D75 /* PostNewSession.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PostNewSession.cpp; sourceTree = "<group>"; };
+		40D3FAC32CB784F400696D75 /* SessionManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SessionManager.h; sourceTree = "<group>"; };
 		40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostRunQuery.cpp; sourceTree = "<group>"; };
 		40F0BF3E2C9CF17400027A7A /* CBLReplicationConflictResolver.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CBLReplicationConflictResolver.cpp; sourceTree = "<group>"; };
 		40F0BF3F2C9CF17400027A7A /* CBLReplicationConflictResolver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLReplicationConflictResolver.h; sourceTree = "<group>"; };
@@ -668,6 +671,7 @@
 				4076E6F02A9EAD04003DD799 /* Dispatcher.h */,
 				4076E6E32A9EAD04003DD799 /* Request.cpp */,
 				4076E7202A9EAD04003DD799 /* Request.h */,
+				40D3FAC32CB784F400696D75 /* SessionManager.h */,
 				4076E6F12A9EAD04003DD799 /* TestServer.cpp */,
 				4076E6E22A9EAD04003DD799 /* TestServer.h */,
 			);
@@ -683,6 +687,7 @@
 				4076E6EB2A9EAD04003DD799 /* PostGetAllDocuments.cpp */,
 				4076E6E72A9EAD04003DD799 /* PostGetDocument.cpp */,
 				4076E6E62A9EAD04003DD799 /* PostGetReplicatorStatus.cpp */,
+				40D3FAC12CB784DF00696D75 /* PostNewSession.cpp */,
 				4076E6EA2A9EAD04003DD799 /* PostPerformMaintenance.cpp */,
 				4076E6EE2A9EAD04003DD799 /* PostReset.cpp */,
 				40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */,
@@ -923,6 +928,7 @@
 				4076E7222A9EAD04003DD799 /* Request.cpp in Sources */,
 				40348BE72A8B0143002DA787 /* zip_source_get_file_attributes.c in Sources */,
 				40348BF72A8B0143002DA787 /* zip_file_set_encryption.c in Sources */,
+				40D3FAC22CB784DF00696D75 /* PostNewSession.cpp in Sources */,
 				40348C012A8B0143002DA787 /* zip_source_winzip_aes_decode.c in Sources */,
 				40348C322A8B0144002DA787 /* zip_source_seek_write.c in Sources */,
 				40348C562A8B0144002DA787 /* zip_source_pkware_decode.c in Sources */,

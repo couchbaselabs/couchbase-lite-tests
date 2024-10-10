@@ -1,11 +1,12 @@
 #include "Dispatcher+Common.h"
 
-int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
+int Dispatcher::handlePOSTUpdateDatabase(Request &request, Session *session) {
     json body = request.jsonBody();
     CheckBody(body);
 
     auto dbName = GetValue<string>(body, "database");
-    auto db = _cblManager->database(dbName);
+    auto cblManager = session->cblManager();
+    auto db = cblManager->database(dbName);
     {
         CBLError error{};
         bool commit = false;
@@ -44,11 +45,12 @@ int Dispatcher::handlePOSTUpdateDatabase(Request &request) {
                 AUTO_RELEASE(doc);
 
                 auto props = CBLDocument_MutableProperties(doc);
-                ts_support::fleece::applyDeltaUpdates(props, update, [&](const string &name) -> CBLBlob * {
-                    auto blob = _cblManager->blob(name, db);
-                    retainedBlobs.push_back(blob);
-                    return blob;
-                });
+                ts_support::fleece::applyDeltaUpdates(props, update,
+                                                      [&](const string &name) -> CBLBlob * {
+                                                          auto blob = cblManager->blob(name, db);
+                                                          retainedBlobs.push_back(blob);
+                                                          return blob;
+                                                      });
 
                 CBLCollection_SaveDocument(col, doc, &error);
                 checkCBLError(error);

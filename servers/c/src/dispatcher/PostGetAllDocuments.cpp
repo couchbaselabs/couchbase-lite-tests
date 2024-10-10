@@ -1,13 +1,13 @@
 #include "Dispatcher+Common.h"
 
-int Dispatcher::handlePOSTGetAllDocuments(Request &request) {
+int Dispatcher::handlePOSTGetAllDocuments(Request &request, Session *session) {
     json body = request.jsonBody();
     CheckBody(body);
 
     auto dbName = GetValue<string>(body, "database");
     auto colNames = GetValue<vector<string>>(body, "collections");
 
-    auto db = _cblManager->database(dbName);
+    auto db = session->cblManager()->database(dbName);
     json result = json::object();
     for (auto &colName: colNames) {
         auto col = CBLManager::collection(db, colName, false);
@@ -16,7 +16,8 @@ int Dispatcher::handlePOSTGetAllDocuments(Request &request) {
         if (col) {
             CBLError error{};
             string str = "SELECT meta().id, meta().revisionID FROM " + colName;
-            CBLQuery *query = CBLDatabase_CreateQuery(db, kCBLN1QLLanguage, FLS(str), nullptr, &error);
+            CBLQuery *query = CBLDatabase_CreateQuery(db, kCBLN1QLLanguage, FLS(str), nullptr,
+                                                      &error);
             checkCBLError(error);
             AUTO_RELEASE(query);
 

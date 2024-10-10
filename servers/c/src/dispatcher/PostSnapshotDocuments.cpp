@@ -1,14 +1,15 @@
 #include "Dispatcher+Common.h"
 
-int Dispatcher::handlePOSTSnapshotDocuments(Request &request) {
+int Dispatcher::handlePOSTSnapshotDocuments(Request &request, Session *session) {
     json body = request.jsonBody();
     CheckBody(body);
 
     auto dbName = GetValue<string>(body, "database");
     auto documents = GetValue<vector<json>>(body, "documents");
 
-    auto db = _cblManager->database(dbName);
-    auto snapshot = _cblManager->createSnapshot();
+    auto cblManager = session->cblManager();
+    auto db = cblManager->database(dbName);
+    auto snapshot = cblManager->createSnapshot();
     try {
         for (auto &docInfo: documents) {
             auto collectionName = GetValue<string>(docInfo, "collection");
@@ -18,7 +19,7 @@ int Dispatcher::handlePOSTSnapshotDocuments(Request &request) {
             snapshot->putDocument(collectionName, docID, doc);
         }
     } catch (const std::exception &e) {
-        _cblManager->deleteSnapshot(snapshot->id());
+        cblManager->deleteSnapshot(snapshot->id());
         throw e;
     }
 

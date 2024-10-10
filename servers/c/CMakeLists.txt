@@ -38,8 +38,9 @@ set(SOURCE_FILES
         src/dispatcher/GetRoot.cpp
         src/dispatcher/PostGetAllDocuments.cpp
         src/dispatcher/PostGetDocument.cpp
-        src/dispatcher/PostPerformMaintenance.cpp
         src/dispatcher/PostGetReplicatorStatus.cpp
+        src/dispatcher/PostNewSession.cpp
+        src/dispatcher/PostPerformMaintenance.cpp
         src/dispatcher/PostReset.cpp
         src/dispatcher/PostRunQuery.cpp
         src/dispatcher/PostSnapshotDocuments.cpp
