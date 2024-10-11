@@ -8,10 +8,10 @@
 import CouchbaseLiteSwift
 
 struct DocumentUpdater {
-    public static func processUpdate(item: ContentTypes.DatabaseUpdateItem, inDB dbName: String) throws {
+    public static func processUpdate(dbManager:DatabaseManager, item: ContentTypes.DatabaseUpdateItem, inDB dbName: String) throws {
         TestServer.logger.log(level: .debug, "Processing /updateDatabase request for database '\(dbName)'")
         
-        guard let collection = try DatabaseManager.shared?.collection(item.collection, inDB: dbName)
+        guard let collection = try dbManager.collection(item.collection, inDB: dbName)
         else {
             TestServer.logger.log(level: .error, "Failed to perform update, database '\(dbName)' not open.")
             throw TestServerError.cblDBNotOpen

@@ -13,7 +13,12 @@ extension Handlers {
         guard let getDoc = try? req.content.decode(ContentTypes.GetDocumentRequest.self) else {
             throw TestServerError.badRequest("Request body does not match the 'GetDocument' scheme.")
         }
-        let json = try document(id: getDoc.document.id, collection: getDoc.document.collection, database: getDoc.database)
+        
+        let dbManager = try req.databaseManager()
+        let json = try document(dbManager: dbManager,
+                                id: getDoc.document.id,
+                                collection: getDoc.document.collection,
+                                database: getDoc.database)
         
         let response = Response(status: .ok)
         response.body = .init(data: try JSONEncoder().encode(json))
@@ -22,11 +27,7 @@ extension Handlers {
     }
 }
 
-fileprivate func document(id: String, collection: String, database: String) throws -> Dictionary<String, AnyCodable> {
-    guard let dbManager = DatabaseManager.shared else {
-        throw TestServerError.cblDBNotOpen
-    }
-    
+fileprivate func document(dbManager: DatabaseManager, id: String, collection: String, database: String) throws -> Dictionary<String, AnyCodable> {
     guard let doc = try dbManager.getDocument(id, fromCollection: collection, inDB: database) else {
         throw TestServerError.docNotFoundErr
     }

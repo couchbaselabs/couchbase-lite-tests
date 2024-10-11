@@ -16,21 +16,23 @@ extension Handlers {
             throw TestServerError.badRequest("Request body is not a valid Update request.")
         }
 
+        let dbManager = try req.databaseManager()
+        
         for update in updateRequest.updates {
             switch(update.type) {
             case .UPDATE:
-                try DocumentUpdater.processUpdate(item: update, inDB: updateRequest.database)
+                try DocumentUpdater.processUpdate(dbManager:dbManager, item: update, inDB: updateRequest.database)
             case .DELETE:
-                guard let collection = try DatabaseManager.shared?.collection(update.collection, inDB: updateRequest.database)
-                else {
+                guard let collection = try dbManager.collection(update.collection, inDB: updateRequest.database) else {
                     TestServer.logger.log(level: .error, "Failed to perform delete, collection '\(update.collection)' not found in database '\(updateRequest.database)'")
                     throw TestServerError(domain: .CBL, code: CBLError.notFound, message: "Collection '\(update.collection)' not found in database '\(updateRequest.database)'")
                 }
-                guard let doc = try? collection.document(id: update.documentID)
-                else {
+                
+                guard let doc = try? collection.document(id: update.documentID) else {
                     TestServer.logger.log(level: .error, "Failed to perform delete, document '\(update.documentID)' not found")
                     throw TestServerError(domain: .CBL, code: CBLError.notFound, message: "Document '\(update.documentID)' not found")
                 }
+                
                 do {
                     try collection.delete(document: doc)
                 } catch(let error as NSError) {
@@ -39,16 +41,16 @@ extension Handlers {
                 }
                 
             case .PURGE:
-                guard let collection = try DatabaseManager.shared?.collection(update.collection, inDB: updateRequest.database)
-                else {
+                guard let collection = try dbManager.collection(update.collection, inDB: updateRequest.database) else {
                     TestServer.logger.log(level: .error, "Failed to perform purge, collection '\(update.collection)' not found in database '\(updateRequest.database)'")
                     throw TestServerError(domain: .CBL, code: CBLError.notFound, message: "Collection '\(update.collection)' not found in database '\(updateRequest.database)'")
                 }
-                guard let doc = try? collection.document(id: update.documentID)
-                else {
+                
+                guard let doc = try? collection.document(id: update.documentID) else {
                     TestServer.logger.log(level: .error, "Failed to perform purge, document '\(update.documentID)' not found")
                     throw TestServerError(domain: .CBL, code: CBLError.notFound, message: "Document '\(update.documentID)' not found")
                 }
+                
                 do {
                     try collection.purge(document: doc)
                 } catch(let error as NSError) {

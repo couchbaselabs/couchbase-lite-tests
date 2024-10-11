@@ -9,11 +9,14 @@ import Vapor
 
 extension Handlers {
     static let snapshotDocuments: EndpointHandler<ContentTypes.SnapshotID> = { req throws in
-        guard let snapshotRequest = try? req.content.decode(ContentTypes.SnapshotRequest.self)
-        else { throw TestServerError.badRequest("Request body is not a valid Snapshot Request.") }
+        guard let snapshotRequest = try? req.content.decode(ContentTypes.SnapshotRequest.self) else {
+            throw TestServerError.badRequest("Request body is not a valid Snapshot Request.")
+        }
         
-        let snapshotID = try Snapshot.saveSnapshot(dbName: snapshotRequest.database, docIDs: snapshotRequest.documents)
-        
+        let dbManager = try req.databaseManager()
+        let snapshotID = try Snapshot.saveSnapshot(dbManager: dbManager,
+                                                   dbName: snapshotRequest.database,
+                                                   docIDs: snapshotRequest.documents)
         return ContentTypes.SnapshotID(id: snapshotID)
     }
 }

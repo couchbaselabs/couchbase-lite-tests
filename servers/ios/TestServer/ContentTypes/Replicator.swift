@@ -8,7 +8,7 @@
 import Vapor
 
 extension ContentTypes {
-    struct Replicator : Content {
+struct Replicator : Content {
         let id: UUID
     }
 }

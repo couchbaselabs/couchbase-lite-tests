@@ -47,7 +47,7 @@ class TestServer : ObservableObject {
         
         // Use custom error middleware
         app.middleware = .init()
-        app.middleware.use(HeadersMiddleware())
+        app.middleware.use(TestServerMiddleware())
         app.middleware.use(TestServerErrorMiddleware())
 
         setupRoutes(app)
@@ -56,6 +56,7 @@ class TestServer : ObservableObject {
     /// Implement API v0.5.2
     private func setupRoutes(_ app: Application) {
         app.get("", use: Handlers.getRoot)
+        app.post("newSession", use: Handlers.newSession)
         app.post("reset", use: Handlers.resetHandler)
         app.post("getAllDocuments", use: Handlers.getAllDocuments)
         app.post("getDocument", use: Handlers.getDocument)
