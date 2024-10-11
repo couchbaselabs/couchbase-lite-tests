@@ -1,5 +1,5 @@
 //
-//  ErrorMiddleware.swift
+//  TestServerErrorMiddleware.swift
 //  CBL-Tests-iOS
 //
 //  Created by Callum Birks on 02/08/2023.

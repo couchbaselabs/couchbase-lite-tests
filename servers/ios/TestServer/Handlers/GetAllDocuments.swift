@@ -10,18 +10,19 @@ import CouchbaseLiteSwift
 
 extension Handlers {
     static let getAllDocuments: EndpointHandler<ContentTypes.CollectionDocuments> = { req throws in
-        guard let collections = try? req.content.decode(ContentTypes.Collections.self)
-        else {
+        guard let collections = try? req.content.decode(ContentTypes.Collections.self) else {
             throw TestServerError.badRequest("Request body does not match the 'Collections' scheme.")
         }
-        return try getCollectionsDocuments(database: collections.database, collections: collections.collections)
+        
+        let dbManager = try req.databaseManager()
+        return try getCollectionsDocuments(dbManager: dbManager,
+                                           database: collections.database,
+                                           collections: collections.collections)
     }
 }
 
-fileprivate func getCollectionsDocuments(database: String, collections: [String]) throws -> ContentTypes.CollectionDocuments {
+fileprivate func getCollectionsDocuments(dbManager: DatabaseManager, database: String, collections: [String]) throws -> ContentTypes.CollectionDocuments {
     var result = ContentTypes.CollectionDocuments()
-    guard let dbManager = DatabaseManager.shared
-    else { throw TestServerError.cblDBNotOpen }
     for collectionName in collections {
         let queryResult = try dbManager.runQuery(dbName: database, queryString: "SELECT meta().id, meta().revisionID FROM \(collectionName)")
         let collectionDocs = queryResult.map({ result in ContentTypes.CollectionDoc(id: result.string(at: 0)!, rev: result.string(at: 1)!) })

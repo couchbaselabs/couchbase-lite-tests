@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4029C4A02CB88E0300C34775 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4029C49F2CB88E0300C34775 /* SessionManager.swift */; };
+		404619D02CB9A761003835C7 /* NewSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619CF2CB9A761003835C7 /* NewSession.swift */; };
+		404619D22CB9A985003835C7 /* NewSessionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619D12CB9A985003835C7 /* NewSessionHandler.swift */; };
 		40AA34992CAF5D20004F4D08 /* StopReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34982CAF5D20004F4D08 /* StopReplicator.swift */; };
 		40AA349D2CAF6755004F4D08 /* CollectionSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */; };
 		40AA34A12CAF6BE4004F4D08 /* ReplicationConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A02CAF6BE4004F4D08 /* ReplicationConflictResolver.swift */; };
@@ -30,8 +33,8 @@
 		40BDA8022AF1C13B008DB256 /* PerformMaintenance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA7F52AF1C13B008DB256 /* PerformMaintenance.swift */; };
 		40BDA8032AF1C13B008DB256 /* GetReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA7F62AF1C13B008DB256 /* GetReplicatorStatus.swift */; };
 		40BDA8042AF1C13B008DB256 /* GetAllDocuments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA7F72AF1C13B008DB256 /* GetAllDocuments.swift */; };
-		40BDA8052AF1C13B008DB256 /* ErrorMiddleware.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA7F92AF1C13B008DB256 /* ErrorMiddleware.swift */; };
-		40BDA8062AF1C13B008DB256 /* HeadersMiddleware.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA7FA2AF1C13B008DB256 /* HeadersMiddleware.swift */; };
+		40BDA8052AF1C13B008DB256 /* TestServerErrorMiddleware.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA7F92AF1C13B008DB256 /* TestServerErrorMiddleware.swift */; };
+		40BDA8062AF1C13B008DB256 /* TestServerMiddleware.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA7FA2AF1C13B008DB256 /* TestServerMiddleware.swift */; };
 		40BDA80F2AF1C15C008DB256 /* DocumentUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8082AF1C15C008DB256 /* DocumentUpdater.swift */; };
 		40BDA8102AF1C15C008DB256 /* MutableObjectProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8092AF1C15C008DB256 /* MutableObjectProtocol.swift */; };
 		40BDA8112AF1C15C008DB256 /* Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA80A2AF1C15C008DB256 /* Snapshot.swift */; };
@@ -88,6 +91,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		4029C49F2CB88E0300C34775 /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
+		404619CF2CB9A761003835C7 /* NewSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSession.swift; sourceTree = "<group>"; };
+		404619D12CB9A985003835C7 /* NewSessionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionHandler.swift; sourceTree = "<group>"; };
 		40AA34982CAF5D20004F4D08 /* StopReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopReplicator.swift; sourceTree = "<group>"; };
 		40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionSpec.swift; sourceTree = "<group>"; };
 		40AA34A02CAF6BE4004F4D08 /* ReplicationConflictResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationConflictResolver.swift; sourceTree = "<group>"; };
@@ -112,8 +118,8 @@
 		40BDA7F52AF1C13B008DB256 /* PerformMaintenance.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PerformMaintenance.swift; sourceTree = "<group>"; };
 		40BDA7F62AF1C13B008DB256 /* GetReplicatorStatus.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GetReplicatorStatus.swift; sourceTree = "<group>"; };
 		40BDA7F72AF1C13B008DB256 /* GetAllDocuments.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GetAllDocuments.swift; sourceTree = "<group>"; };
-		40BDA7F92AF1C13B008DB256 /* ErrorMiddleware.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ErrorMiddleware.swift; sourceTree = "<group>"; };
-		40BDA7FA2AF1C13B008DB256 /* HeadersMiddleware.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HeadersMiddleware.swift; sourceTree = "<group>"; };
+		40BDA7F92AF1C13B008DB256 /* TestServerErrorMiddleware.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestServerErrorMiddleware.swift; sourceTree = "<group>"; };
+		40BDA7FA2AF1C13B008DB256 /* TestServerMiddleware.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestServerMiddleware.swift; sourceTree = "<group>"; };
 		40BDA8082AF1C15C008DB256 /* DocumentUpdater.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DocumentUpdater.swift; sourceTree = "<group>"; };
 		40BDA8092AF1C15C008DB256 /* MutableObjectProtocol.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MutableObjectProtocol.swift; sourceTree = "<group>"; };
 		40BDA80A2AF1C15C008DB256 /* Snapshot.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Snapshot.swift; sourceTree = "<group>"; };
@@ -225,6 +231,7 @@
 				40BDA7F62AF1C13B008DB256 /* GetReplicatorStatus.swift */,
 				40BDA7F02AF1C13B008DB256 /* GetRootHandler.swift */,
 				40BDA7F32AF1C13B008DB256 /* Handler.swift */,
+				404619D12CB9A985003835C7 /* NewSessionHandler.swift */,
 				40BDA7F52AF1C13B008DB256 /* PerformMaintenance.swift */,
 				40BDA7EE2AF1C13B008DB256 /* ResetHandler.swift */,
 				40C7A5622CA4AF5C0053ADCB /* RunQuery.swift */,
@@ -240,8 +247,8 @@
 		40BDA7F82AF1C13B008DB256 /* Middleware */ = {
 			isa = PBXGroup;
 			children = (
-				40BDA7F92AF1C13B008DB256 /* ErrorMiddleware.swift */,
-				40BDA7FA2AF1C13B008DB256 /* HeadersMiddleware.swift */,
+				40BDA7F92AF1C13B008DB256 /* TestServerErrorMiddleware.swift */,
+				40BDA7FA2AF1C13B008DB256 /* TestServerMiddleware.swift */,
 			);
 			path = Middleware;
 			sourceTree = "<group>";
@@ -250,6 +257,7 @@
 			isa = PBXGroup;
 			children = (
 				40BDA80E2AF1C15C008DB256 /* AnyCodable.swift */,
+				40AA34B52CAFB28E004F4D08 /* CertUtil.swift */,
 				40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */,
 				40BDA7632AF1C0AF008DB256 /* DatabaseManager.swift */,
 				40BDA80B2AF1C15C008DB256 /* DocComparison.swift */,
@@ -258,8 +266,8 @@
 				40BDA8092AF1C15C008DB256 /* MutableObjectProtocol.swift */,
 				40AA34A22CAF8C4C004F4D08 /* ReplicationConflictResolverFactory.swift */,
 				40BDA80C2AF1C15C008DB256 /* ReplicationFilterFactory.swift */,
+				4029C49F2CB88E0300C34775 /* SessionManager.swift */,
 				40BDA80A2AF1C15C008DB256 /* Snapshot.swift */,
-				40AA34B52CAFB28E004F4D08 /* CertUtil.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -291,6 +299,7 @@
 				40BDA8D92AF20AAB008DB256 /* DocumentID.swift */,
 				40BDA8D22AF20AAB008DB256 /* DocumentReplication.swift */,
 				40AA34A62CAF9BC8004F4D08 /* GetDocumentRequest.swift */,
+				404619CF2CB9A761003835C7 /* NewSession.swift */,
 				40BDA8D32AF20AAB008DB256 /* PerformMaintenanceConfiguration.swift */,
 				40C7A5662CA4B15B0053ADCB /* QueryResults.swift */,
 				40BDA8DF2AF20AAB008DB256 /* ReplicationCollection.swift */,
@@ -430,7 +439,7 @@
 				40BDA8E22AF20AAB008DB256 /* SnapshotRequest.swift in Sources */,
 				40BDA8132AF1C15C008DB256 /* ReplicationFilterFactory.swift in Sources */,
 				40BDA8EC2AF20AAB008DB256 /* VerifyRequest.swift in Sources */,
-				40BDA8062AF1C13B008DB256 /* HeadersMiddleware.swift in Sources */,
+				40BDA8062AF1C13B008DB256 /* TestServerMiddleware.swift in Sources */,
 				40BDA8F22AF20AAB008DB256 /* ServerInfo.swift in Sources */,
 				40BDA8F42AF20AAB008DB256 /* DatabaseUpdateItem.swift in Sources */,
 				40BDA8002AF1C13B008DB256 /* Handler.swift in Sources */,
@@ -445,6 +454,7 @@
 				40BDA8E02AF20AAB008DB256 /* VerifyResponse.swift in Sources */,
 				40BDA8E32AF20AAB008DB256 /* StartReplicatorRequest.swift in Sources */,
 				40AA349D2CAF6755004F4D08 /* CollectionSpec.swift in Sources */,
+				404619D02CB9A761003835C7 /* NewSession.swift in Sources */,
 				40BDA8F02AF20AAB008DB256 /* Replicator.swift in Sources */,
 				40BDA8E82AF20AAB008DB256 /* DocumentReplication.swift in Sources */,
 				40AA34A12CAF6BE4004F4D08 /* ReplicationConflictResolver.swift in Sources */,
@@ -452,6 +462,7 @@
 				40C7A5672CA4B15B0053ADCB /* QueryResults.swift in Sources */,
 				EACC964D2AF3F8B500999C70 /* CBLVersion.swift in Sources */,
 				40AA34992CAF5D20004F4D08 /* StopReplicator.swift in Sources */,
+				404619D22CB9A985003835C7 /* NewSessionHandler.swift in Sources */,
 				40BDA8E92AF20AAB008DB256 /* PerformMaintenanceConfiguration.swift in Sources */,
 				40BDA8022AF1C13B008DB256 /* PerformMaintenance.swift in Sources */,
 				40BDA8032AF1C13B008DB256 /* GetReplicatorStatus.swift in Sources */,
@@ -461,9 +472,10 @@
 				40AA34A32CAF8C4C004F4D08 /* ReplicationConflictResolverFactory.swift in Sources */,
 				40BDA8E62AF20AAB008DB256 /* Collections.swift in Sources */,
 				40BDA7642AF1C0AF008DB256 /* TestServer.swift in Sources */,
+				4029C4A02CB88E0300C34775 /* SessionManager.swift in Sources */,
 				40BDA80F2AF1C15C008DB256 /* DocumentUpdater.swift in Sources */,
 				40AA34A52CAF94A4004F4D08 /* GetDocument.swift in Sources */,
-				40BDA8052AF1C13B008DB256 /* ErrorMiddleware.swift in Sources */,
+				40BDA8052AF1C13B008DB256 /* TestServerErrorMiddleware.swift in Sources */,
 				40BDA8042AF1C13B008DB256 /* GetAllDocuments.swift in Sources */,
 				40BDA8F12AF20AAB008DB256 /* UpdateRequest.swift in Sources */,
 				40BDA8ED2AF20AAB008DB256 /* TestServerError.swift in Sources */,

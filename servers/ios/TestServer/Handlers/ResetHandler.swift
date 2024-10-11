@@ -9,11 +9,9 @@ import Vapor
 
 extension Handlers {
     static let resetHandler: EndpointHandlerEmptyResponse = { req throws in
-        guard let databaseManager = DatabaseManager.shared else {
-            throw TestServerError.cblDBNotOpen
-        }
+        let dbManager = try req.databaseManager()
         
-        try databaseManager.reset()
+        try dbManager.reset()
         
         if let config = try? req.content.decode(ContentTypes.ResetConfiguration.self), let databases = config.databases {
             for (dbName, spec) in databases {
@@ -22,11 +20,11 @@ extension Handlers {
                 }
                 
                 if let dataset = spec["dataset"]?.value as? String {
-                    try databaseManager.createDatabase(dbName: dbName, dataset: dataset)
+                    try dbManager.createDatabase(dbName: dbName, dataset: dataset)
                 } else if let collections = spec["collections"]?.value as? [String] {
-                    try databaseManager.createDatabase(dbName: dbName, collections: collections)
+                    try dbManager.createDatabase(dbName: dbName, collections: collections)
                 } else {
-                    try databaseManager.createDatabase(dbName: dbName)
+                    try dbManager.createDatabase(dbName: dbName)
                 }
             }
         }

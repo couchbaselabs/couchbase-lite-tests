@@ -12,9 +12,7 @@ typealias Snapshot = Dictionary<String, Document?>
 extension Snapshot {
     static var currentSnapshots: [ UUID : Snapshot ] = [:]
     
-    static func saveSnapshot(dbName: String, docIDs: [ContentTypes.DocumentID]) throws -> UUID {
-        guard let dbManager = DatabaseManager.shared
-        else { throw TestServerError.cblDBNotOpen }
+    static func saveSnapshot(dbManager: DatabaseManager, dbName: String, docIDs: [ContentTypes.DocumentID]) throws -> UUID {
         var newSnapshot = Snapshot()
         for docID in docIDs {
             guard let collection = try dbManager.collection(docID.collection, inDB: dbName)
@@ -33,13 +31,10 @@ extension Snapshot {
         return snapID
     }
     
-    static func verifyChanges(dbName: String, snapshotID: String, changes: [ContentTypes.DatabaseUpdateItem]) throws -> ContentTypes.VerifyResponse {
+    static func verifyChanges(dbManager: DatabaseManager, dbName: String, snapshotID: String,
+                              changes: [ContentTypes.DatabaseUpdateItem]) throws -> ContentTypes.VerifyResponse {
         guard let uuid = UUID(uuidString: snapshotID), let snapshot = currentSnapshots[uuid] else {
             throw TestServerError.badRequest("Snapshot with ID '\(snapshotID)' does not exist.")
-        }
-        
-        guard let dbManager = DatabaseManager.shared else {
-            throw TestServerError.cblDBNotOpen
         }
         
         var verifiedSnapshotDocs: Set<String> = []
