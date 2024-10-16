@@ -35,16 +35,21 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import com.couchbase.lite.BasicAuthenticator;
 import com.couchbase.lite.CollectionConfiguration;
+import com.couchbase.lite.Conflict;
 import com.couchbase.lite.ConflictResolver;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
+import com.couchbase.lite.Document;
 import com.couchbase.lite.DocumentFlag;
 import com.couchbase.lite.DocumentReplication;
+import com.couchbase.lite.MutableArray;
+import com.couchbase.lite.MutableDocument;
 import com.couchbase.lite.ReplicatedDocument;
 import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
@@ -57,7 +62,6 @@ import com.couchbase.lite.URLEndpoint;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
-import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.json.ErrorBuilder;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
@@ -65,6 +69,87 @@ import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.trees.TypedMap;
 import com.couchbase.lite.mobiletest.util.Log;
 
+
+@SuppressWarnings("PMD.ExcessiveImports")
+interface ConfigurableConflictResolver extends ConflictResolver {
+    void configure(@Nullable TypedMap config);
+}
+
+class LocalWinsResolver implements ConfigurableConflictResolver {
+    @Override
+    public void configure(@Nullable TypedMap config) {
+        // no configuration needed
+    }
+
+    @Nullable
+    @Override
+    public Document resolve(@NonNull Conflict conflict) { return conflict.getLocalDocument(); }
+}
+
+class RemoteWinsResolver implements ConfigurableConflictResolver {
+    @Override
+    public void configure(@Nullable TypedMap config) {
+        // no configuration needed
+    }
+
+    @Nullable
+    @Override
+    public Document resolve(@NonNull Conflict conflict) { return conflict.getRemoteDocument(); }
+}
+
+class DeleteResolver implements ConfigurableConflictResolver {
+    @Override
+    public void configure(@Nullable TypedMap config) {
+        // no configuration needed
+    }
+
+    @Nullable
+    @Override
+    public Document resolve(@NonNull Conflict conflict) { return null; }
+}
+
+class MergeResolver implements ConfigurableConflictResolver {
+    private static final String KEY_PROPERTY = "property";
+
+    private static final Set<String> MERGE_RESOLVER_KEYS;
+    static {
+        final Set<String> l = new HashSet<>();
+        l.add(KEY_PROPERTY);
+        MERGE_RESOLVER_KEYS = Collections.unmodifiableSet(l);
+    }
+
+
+    private String docProp;
+
+    @Override
+    public void configure(@Nullable TypedMap config) {
+        if (config == null) { throw new ClientError("Merge resolver requires configuration"); }
+
+        config.validate(MERGE_RESOLVER_KEYS);
+
+        final String prop = config.getString(KEY_PROPERTY);
+        if (prop == null) { throw new ClientError("Merge resolver requires a property name"); }
+
+        docProp = prop;
+    }
+
+    @Nullable
+    @Override
+    public Document resolve(@NonNull Conflict conflict) {
+        final Document localDoc = conflict.getLocalDocument();
+        final Document remoteDoc = conflict.getRemoteDocument();
+        if ((localDoc == null) || (remoteDoc == null)) { return null; }
+
+        final MutableArray mergedVal = new MutableArray();
+        mergedVal.addValue(localDoc.getValue(docProp));
+        mergedVal.addValue(remoteDoc.getValue(docProp));
+
+        final MutableDocument mergedDoc = localDoc.toMutable();
+        mergedDoc.setValue(docProp, mergedVal);
+
+        return mergedDoc;
+    }
+}
 
 public class ReplicatorManager {
     private static final String TAG = "REPL_MGR_V1";
@@ -183,6 +268,16 @@ public class ReplicatorManager {
         final Set<String> l = new HashSet<>();
         l.add(KEY_REPL_ID);
         LEGAL_STOP_KEYS = Collections.unmodifiableSet(l);
+    }
+
+    private static final Map<String, Supplier<ConfigurableConflictResolver>> CONFLICT_RESOLVER_FACTORIES;
+    static {
+        final Map<String, Supplier<ConfigurableConflictResolver>> m = new HashMap<>();
+        m.put("local-wins", LocalWinsResolver::new);
+        m.put("remote-wins", RemoteWinsResolver::new);
+        m.put("delete", DeleteResolver::new);
+        m.put("merge", MergeResolver::new);
+        CONFLICT_RESOLVER_FACTORIES = Collections.unmodifiableMap(m);
     }
 
     @NonNull
@@ -461,8 +556,16 @@ public class ReplicatorManager {
     @NonNull
     private ConflictResolver buildConflictResolver(@NonNull TypedMap spec) {
         final String name = spec.getString(KEY_NAME);
-        if (name == null) { throw new ClientError("Filter doesn't specify a name"); }
-        throw new ServerError("Conflict resolvers not implemented: " + name);
+        if (name == null) { throw new ClientError("No name specified for the conflict resolver"); }
+
+        final Supplier<ConfigurableConflictResolver> resolverFactory
+            = CONFLICT_RESOLVER_FACTORIES.get(name.toLowerCase(Locale.US).trim());
+        if (resolverFactory == null) { throw new ClientError("Unrecognized conflict resolver: " + name); }
+
+        final ConfigurableConflictResolver resolver = resolverFactory.get();
+        resolver.configure(spec.getMap(KEY_PARAMS));
+
+        return resolver;
     }
 
     @NonNull
