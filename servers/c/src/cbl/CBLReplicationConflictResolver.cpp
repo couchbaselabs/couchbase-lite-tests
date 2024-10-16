@@ -59,26 +59,28 @@ namespace ts::cbl {
 
         const CBLDocument *
         resolve(const CBLDocument *localDoc, const CBLDocument *remoteDoc) override {
-            auto baseDoc = remoteDoc ? remoteDoc : localDoc;
-            auto doc = CBLDocument_MutableCopy(baseDoc);
-            
+            if (!localDoc || !remoteDoc) { return nullptr; }
+
+            auto doc = CBLDocument_MutableCopy(remoteDoc);
+
             FLSlice key = FLStr(_property.data());
             auto array = FLMutableArray_New();
-            if (localDoc) {
-                auto prop = CBLDocument_Properties(localDoc);
-                auto value = FLDict_Get(prop, key);
-                if (value) {
-                    FLMutableArray_AppendValue(array, value);
-                }
-            }
-            if (remoteDoc) {
-                auto prop = CBLDocument_Properties(remoteDoc);
-                auto value = FLDict_Get(prop, key);
-                if (value) {
-                    FLMutableArray_AppendValue(array, value);
-                }
+            auto prop = CBLDocument_Properties(localDoc);
+            auto value = FLDict_Get(prop, key);
+            if (value) {
+                FLMutableArray_AppendValue(array, value);
+            } else {
+                FLMutableArray_AppendNull(array);
             }
 
+            prop = CBLDocument_Properties(remoteDoc);
+            value = FLDict_Get(prop, key);
+            if (value) {
+                FLMutableArray_AppendValue(array, value);
+            } else {
+                FLMutableArray_AppendNull(array);
+            }
+            
             auto props = CBLDocument_MutableProperties(doc);
             FLMutableDict_SetArray(props, key, array);
             FLMutableArray_Release(array);
