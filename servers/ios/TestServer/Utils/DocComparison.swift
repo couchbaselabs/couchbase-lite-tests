@@ -32,10 +32,13 @@ struct DocComparison : Content {
         let equal: Bool
         let reason: Reason?
         let keypath: String?
+        let expected: Any?
+        let actual: Any?
         
-        static let success = CompareResult(equal: true, reason: nil, keypath: nil)
-        static func fail(reason: Reason, keypath: String) -> CompareResult {
-            return CompareResult(equal: false, reason: reason, keypath: keypath)
+        
+        static let success = CompareResult(equal: true, reason: nil, keypath: nil, expected: nil, actual: nil)
+        static func fail(reason: Reason, keypath: String, expected: Any?, actual: Any?) -> CompareResult {
+            return CompareResult(equal: false, reason: reason, keypath: keypath, expected: expected, actual: actual)
         }
         
         enum Reason {
@@ -69,46 +72,61 @@ struct DocComparison : Content {
         static func case6(docID: String, qualifiedCollection: String, keypath: String) -> String {
             "Document '\(docID)' in '\(qualifiedCollection)' had non-existing blob at key '\(keypath)'"
         }
-        
     }
     
     private static func isEqual(_ left: Any?, _ right: Any?, keypath: String) throws -> CompareResult {
         switch (left, right) {
         case (nil, nil): return .success
-        case let (left as Bool, right as Bool): return left == right ? .success : .fail(reason: .MismatchedProperty, keypath: keypath)
-        case let (left as Int, right as Int): return left == right ? .success : .fail(reason: .MismatchedProperty, keypath: keypath)
-        case let (left as Double, right as Double): return left == right ? .success : .fail(reason: .MismatchedProperty, keypath: keypath)
-        case let (left as String, right as String): return left == right ? .success : .fail(reason: .MismatchedProperty, keypath: keypath)
+        case let (left as NSNull, right as NSNull): return .success
+        case let (left as Bool, right as Bool): return left == right ? .success : .fail(reason: .MismatchedProperty, keypath: keypath, expected: left, actual: right)
+        case let (left as Int, right as Int): return left == right ? .success : .fail(reason: .MismatchedProperty, keypath: keypath, expected: left, actual: right)
+        case let (left as Double, right as Double): return left == right ? .success : .fail(reason: .MismatchedProperty, keypath: keypath, expected: left, actual: right)
+        case let (left as String, right as String): return left == right ? .success : .fail(reason: .MismatchedProperty, keypath: keypath, expected: left, actual: right)
         case let (left as Array<Any>, right as Array<Any>): return try isEqual(left, right, keypath: keypath)
         case let (left as Dictionary<String, Any>, right as Dictionary<String, Any>): return try isEqual(left, right, keypath: keypath)
         case let (left as Blob, right as Blob): return isEqual(left, right, keypath: keypath)
         default:
-            throw TestServerError(domain: .TESTSERVER, code: 500, message: "Internal error parsing unknown type.")
+            return .fail(reason: .MismatchedProperty, keypath: keypath, expected: left, actual: right)
         }
     }
     
     private static func isEqual(_ left: Blob, _ right: Blob, keypath: String) -> CompareResult {
         // Compare blob properties
-        guard left == right
-        else { return .fail(reason: .MismatchedProperty, keypath: keypath) }
+        guard left == right else {
+            return .fail(reason: .MismatchedProperty, keypath: keypath, expected: left, actual: right)
+        }
         
         // Both blobs content nil is unexpected behaviour
         // It might indicate missing blob files
-        guard left.content != nil || right.content != nil
-        else { return .fail(reason: .MissingBlobFile, keypath: keypath) }
+        guard left.content != nil || right.content != nil else {
+            return .fail(reason: .MissingBlobFile, keypath: keypath, expected: nil, actual: nil)
+        }
         
-        return left.content == right.content ? .success : .fail(reason: .MismatchedProperty, keypath: keypath)
+        return left.content == right.content ? .success : .fail(reason: .MismatchedProperty, keypath: keypath, expected: left, actual: right)
     }
     
     private static func isEqual(_ left: Dictionary<String, Any>, _ right: Dictionary<String, Any>, keypath: String) throws -> CompareResult {
-        for (key, leftValue) in left {
+        var checkedKeys: Set<String> = []
+        
+        for key in left.keys {
+            let path = keypath.isEmpty ? key : keypath + "." + key
+            
             if !right.keys.contains(key) {
-                return .fail(reason: .MismatchedProperty, keypath: keypath + "." + key)
+                return .fail(reason: .MismatchedProperty, keypath: path, expected: left[key]!, actual: nil)
             }
-            let result = try isEqual(leftValue, right[key], keypath: keypath + "." + key)
+            
+            let leftValue = left[key]!
+            
+            let result = try isEqual(leftValue, right[key], keypath: path)
             if !result.equal {
                 return result
             }
+            checkedKeys.insert(key)
+        }
+        
+        for key in right.keys where !checkedKeys.contains(key) {
+            let path = keypath.isEmpty ? key : keypath + "." + key
+            return .fail(reason: .MismatchedProperty, keypath: path, expected: nil, actual: right[key]!)
         }
         
         return .success
@@ -116,7 +134,7 @@ struct DocComparison : Content {
         
     private static func isEqual(_ left: Array<Any>, _ right: Array<Any>, keypath: String) throws -> CompareResult {
         if left.count != right.count {
-            return .fail(reason: .MismatchedProperty, keypath: keypath)
+            return .fail(reason: .MismatchedProperty, keypath: keypath, expected: left, actual: right)
         }
         if left.count > 0 {
             for i in 0...(left.count - 1) {
@@ -133,31 +151,21 @@ struct DocComparison : Content {
         let leftDict = left.toDictionary()
         let rightDict = right.toDictionary()
         
-        for (leftKey, leftVal) in leftDict {
-            if !rightDict.keys.contains(leftKey) {
-                return ContentTypes.VerifyResponse(result: false, description: FailDescriptions.case4(docID: docID, qualifiedCollection: qualifiedCollection, keypath: leftKey), document: try AnyCodable(rightDict), expected: try AnyCodable(leftDict), actual: try AnyCodable(rightDict))
+        let result = try isEqual(leftDict, rightDict, keypath: "")
+        
+        if !result.equal {
+            let description = result.reason == .MissingBlobFile ?
+                FailDescriptions.case6(docID: docID, qualifiedCollection: qualifiedCollection, keypath: result.keypath ?? "??") :
+                FailDescriptions.case4(docID: docID, qualifiedCollection: qualifiedCollection, keypath: result.keypath ?? "??")
+            
+            if (result.keypath!.isEmpty) {
+                print("")
             }
             
-            let result = try isEqual(leftVal, rightDict[leftKey], keypath: leftKey)
-            if !result.equal {
-                var leftCopy = leftDict
-                var rightCopy = rightDict
-                for key in leftCopy.keys {
-                    if(key != leftKey) {
-                        leftCopy.removeValue(forKey: key)
-                    }
-                }
-                
-                for key in rightCopy.keys {
-                    if(key != leftKey) {
-                        rightCopy.removeValue(forKey: key)
-                    }
-                }
-                
-                let description = result.reason == .MissingBlobFile ? FailDescriptions.case6(docID: docID, qualifiedCollection: qualifiedCollection, keypath: result.keypath ?? "") : FailDescriptions.case4(docID: docID, qualifiedCollection: qualifiedCollection, keypath: result.keypath ?? "")
-                
-                return ContentTypes.VerifyResponse(result: false, description: description, document: try AnyCodable(rightDict), expected: try AnyCodable(leftCopy), actual: try AnyCodable(rightCopy))
-            }
+            let expected = result.expected != nil ? try AnyCodable(result.expected!) : nil
+            let actual = result.actual != nil ? try AnyCodable(result.actual!) : nil
+             
+            return ContentTypes.VerifyResponse(result: false, description: description, document: try AnyCodable(rightDict), expected:  expected, actual: actual)
         }
         
         return ContentTypes.VerifyResponse(result: true, description: "Successfully verified changes.")
