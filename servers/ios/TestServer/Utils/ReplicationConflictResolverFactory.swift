@@ -31,20 +31,15 @@ struct ReplicationConflictResolverFactory {
         let property: String
         
         func resolve(conflict: Conflict) -> Document? {
+            if conflict.localDocument == nil || conflict.remoteDocument == nil {
+                return nil
+            }
+            
             let mergedValues = MutableArrayObject()
+            mergedValues.addValue(conflict.localDocument!.value(forKey: property))
+            mergedValues.addValue(conflict.remoteDocument!.value(forKey: property))
             
-            if let doc = conflict.localDocument, let value = doc.value(forKey: property) {
-                mergedValues.addValue(value)
-            }
-            
-            if let doc = conflict.remoteDocument, let value = doc.value(forKey: property) {
-                mergedValues.addValue(value)
-            }
-            
-            let doc = conflict.remoteDocument != nil ?
-                conflict.remoteDocument!.toMutable() :
-                conflict.localDocument!.toMutable()
-            
+            let doc = conflict.remoteDocument!.toMutable()
             return doc.setValue(mergedValues, forKey: property)
         }
     }
