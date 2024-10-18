@@ -294,11 +294,10 @@ class TestFest(CBLTestClass):
             b.upsert_document("_default.tasks", "db1-list1-task1",
                               new_properties=[{"name": "db1 list1 task1"}, {"complete": False},
                                               {"taskList": {"id": "db1-list1", "owner": "user1"}}],
-                              new_blobs={"image": "l5.jpg"})
+                              new_blobs={"image": "s1.jpg"})
             b.upsert_document("_default.tasks", "db1-list1-task2",
                               new_properties=[{"name": "db1 list1 task2"}, {"complete": True},
-                                              {"taskList": {"id": "db1-list1", "owner": "user1"}}],
-                              new_blobs={"image": "l5.jpg"})
+                                              {"taskList": {"id": "db1-list1", "owner": "user1"}}])
 
         self.mark_test_step("Snapshot documents in db1")
         snap1 = await db1.create_snapshot([

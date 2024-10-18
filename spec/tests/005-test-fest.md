@@ -194,7 +194,7 @@ the availability of the test servers.
       * { "_id": "db1-list1", "name": "db1 list1", "owner": "user1" }
    * Create a task document in `_default.tasks` as  
       * { "_id": "db1-list1-task1", "name": "db1 list1 task1", "complete": false,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
-      * Set the `image` key with the `l5.jpg` blob.
+      * Set the `image` key with the `s1.jpg` blob.
    * Create a task document in `_default.tasks` as  
       * { "_id": "db1-list1-task2", "name": "db1 list1 task2", "complete": true,  "image": null, "taskList" : { "id" : "db1-list1", "owner" : "user1" } }
 6. Wait and check the pull document replication events in `db2`
