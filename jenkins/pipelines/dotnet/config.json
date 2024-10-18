@@ -3,5 +3,6 @@
     "test-servers": ["http://localhost:8080"],
     "sync-gateways": [{"hostname": "localhost", "tls": true}],
     "couchbase-servers": [{"hostname": "localhost"}],
-    "api-version": 1
+    "api-version": 1,
+    "logslurp": "localhost:8180"
 }

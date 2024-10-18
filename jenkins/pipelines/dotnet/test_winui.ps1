@@ -4,19 +4,14 @@ param (
     [Parameter(Mandatory=$true)][string]$Build
 )
 
-Write-Host "Build TestServer for WinUI..."
-Push-Location $PSScriptRoot\..\..\..\servers\dotnet\testserver
+$ErrorActionPreference = "Stop" 
 
 $nugetPackageVersion = "$Version-b$($Build.PadLeft(4, '0'))"
 Write-Host "Using NuGet package version $nugetPackageVersion"
-dotnet add .\testserver.csproj package couchbase.lite.enterprise --version $nugetPackageVersion
-dotnet publish .\testserver.csproj -c Release -f net7.0-windows10.0.19041.0
-Pop-Location
+dotnet add $PSScriptRoot\..\..\..\servers\dotnet\testserver.logic\testserver.logic.csproj package couchbase.lite.enterprise --version $nugetPackageVersion
 
-Write-Host "Run TestServer..."
-Push-Location $PSScriptRoot\..\..\..\servers\dotnet
-scripts\run_winui.ps1
-Pop-Location
+& $PSScriptRoot\build_winui.ps1
+& $PSScriptRoot\run_winui.ps1
 
 Write-Host "Start Environment..."
 Push-Location $PSScriptRoot\..\..\..\environment
@@ -28,7 +23,7 @@ Push-Location $PSScriptRoot\..\..\..\tests
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
-Copy-Item $PSScriptRoot\..\..\..\jenkins\pipelines\dotnet\config.json .
+Copy-Item $PSScriptRoot\config.json .
 pytest -v --no-header --config config.json
 deactivate
 Pop-Location
