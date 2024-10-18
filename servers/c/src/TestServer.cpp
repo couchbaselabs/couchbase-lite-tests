@@ -28,7 +28,7 @@ namespace ts {
     void TestServer::init() {
         if (sTestServerInitialized) { return; }
 
-        logger::init(logger::LogLevel::info);
+        logger::init(logger::LogLevel::verbose);
         mg_init_library(0);
         sTestServerInitialized = true;
     }
