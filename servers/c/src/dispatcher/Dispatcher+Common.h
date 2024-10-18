@@ -13,6 +13,7 @@
 #include "Error.h"
 #include "Fleece.h"
 #include "JSON.h"
+#include "Log.h"
 #include "Precondition.h"
 #include "StringUtil.h"
 
@@ -26,6 +27,7 @@ using namespace ts;
 using namespace ts::cbl;
 using namespace ts::support;
 using namespace ts::support::error;
+using namespace ts::support::logger;
 using namespace ts::support::precond;
 using namespace ts::support::json_util;
 using namespace ts::support::str;
