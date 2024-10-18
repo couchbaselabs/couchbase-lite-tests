@@ -25,7 +25,7 @@ pipeline {
             }
             post { 
                 always { 
-                    pwsh 'jenkins\\pipelines\\dotnet\\windows_teardown.ps1'
+                    pwsh 'jenkins\\pipelines\\dotnet\\teardown_winui.ps1'
                 }
             }
         }
