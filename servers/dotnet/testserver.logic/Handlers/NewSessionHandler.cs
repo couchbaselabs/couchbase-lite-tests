@@ -75,6 +75,7 @@ internal static partial class HandlerList
         Session.Create(CBLTestServer.ServiceProvider, newSessionBody.id);
 
         if(newSessionBody.logging == null) {
+            response.WriteEmptyBody(version);
             return Task.CompletedTask;
         }
 

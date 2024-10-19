@@ -11,7 +11,7 @@ namespace LogSlurp
         private const string LogIDHeader = "CBL-Log-ID";
         private const string LogTagHeader = "CBL-Log-Tag";
 
-        private static readonly Dictionary<string, TextWriter> FileLoggers = new();
+        private static readonly Dictionary<string, SerializedStreamWriter> FileLoggers = new();
 
         [Route("/openLogStream")]
         [HttpGet]
@@ -64,7 +64,7 @@ namespace LogSlurp
                 FileAccess.Write,
                 FileShare.Read);
 
-            FileLoggers[body.log_id] = new StreamWriter(stream);
+            FileLoggers[body.log_id] = new SerializedStreamWriter(stream);
         }
 
         [Route("/finishLog")]
@@ -82,7 +82,7 @@ namespace LogSlurp
                 return;
             }
 
-            writer.Dispose();
+            await writer.DisposeAsync();
         }
 
         [Route("/retrieveLog")]
@@ -133,8 +133,7 @@ namespace LogSlurp
             var receiveResult = await ws.ReceiveAsync(buffer, CancellationToken.None);
             while(!receiveResult.CloseStatus.HasValue) {
                 var now = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm:ss,fff");
-                await writer.WriteAsync(String.Format(prologueFormat, now));
-                await writer.WriteLineAsync(buffer.Take(receiveResult.Count).Select(x => (char)x).ToArray());
+                await writer.WriteAsync(String.Format(prologueFormat, now), buffer.Take(receiveResult.Count).Select(x => (char)x).ToArray());
                 receiveResult = await ws.ReceiveAsync(buffer, CancellationToken.None);
             }
 
