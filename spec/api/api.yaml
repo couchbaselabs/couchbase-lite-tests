@@ -44,10 +44,10 @@ info:
       ESCAPE   ::= '\' (! EOP )
 
     Changes
-    0.6.0 (09/27/2025)
+    1.0.0(09/27/2024)
     * Replace setupLogging endpoint with expanded newSession endpoint
 
-    0.5.2 (09/25/2025)
+    0.5.2 (09/25/2024)
     * Split getDocument into database and document key to more closely match other API
 
     0.5.1 (09/24/2024)
@@ -117,7 +117,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 0.6.0
+  version: 1.0.0
 tags:
   - name: API
     description: The API endpoints of the test server

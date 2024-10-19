@@ -28,12 +28,6 @@ namespace TestServer
         {
             using var l = _lock.GetWriteLock();
 
-            foreach (var d in _activeDisposables) {
-                d.Value.Dispose();
-            }
-
-            _activeDisposables.Clear();
-
             foreach (var db in _activeDatabases) {
                 try {
                     db.Value.Delete();
@@ -44,6 +38,14 @@ namespace TestServer
             }
 
             _activeDatabases.Clear();
+
+            foreach (var d in _activeDisposables) {
+                d.Value.Dispose();
+            }
+
+            _activeDisposables.Clear();
+
+            
             _keepAlives.Clear();
         }
 
@@ -72,12 +74,14 @@ namespace TestServer
                     if (datasetName != null) {
                         Database.Copy(Path.Join(FilesDirectory, $"{datasetName}.cblite2"), targetName, dbConfig);
                         _activeDatabases[targetName] = new Database(targetName, dbConfig);
-                    } else if(collections != null) {
+                    } else {
                         var newDb = new Database(targetName, dbConfig);
                         _activeDatabases[targetName] = newDb;
-                        foreach (var c in collections) {
-                            var collSpec = HandlerList.CollectionSpec(c);
-                            using var coll = newDb.CreateCollection(collSpec.name, collSpec.scope);
+                        if (collections != null) {
+                            foreach (var c in collections) {
+                                var collSpec = HandlerList.CollectionSpec(c);
+                                using var coll = newDb.CreateCollection(collSpec.name, collSpec.scope);
+                            }
                         }
                     }
 
