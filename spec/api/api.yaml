@@ -46,6 +46,7 @@ info:
     Changes
     1.0.0(09/27/2024)
     * Replace setupLogging endpoint with expanded newSession endpoint
+    * Add /log endpoint
 
     0.5.2 (09/25/2024)
     * Split getDocument into database and document key to more closely match other API
@@ -707,6 +708,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/QueryResults'
+        '400':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /log:
+    post:
+      tags:
+        - API
+      summary: Log a message to the server log
+      description: Given a message, immediately insert it into the server log stream
+      operationId: log
+      requestBody:
+        description: |-
+          The message to be logged
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['message']
+              properties:
+                message::
+                  type: string
+                  example: 'Client has caught fire'
+      responses:
+        '200':
+          description: Success
         '400':
           $ref: '#/components/responses/Error'
         '500':
