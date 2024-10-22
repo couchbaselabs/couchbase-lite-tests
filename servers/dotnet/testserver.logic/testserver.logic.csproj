@@ -5,17 +5,18 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
-        <AssemblyVersion>0.6.0</AssemblyVersion>
+        <AssemblyVersion>1.0.0</AssemblyVersion>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Couchbase.Lite.Enterprise" Version="4.0.0-b0006" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
         <PackageReference Include="Serilog.Expressions" Version="5.0.0" />
         <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
         <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
         <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
-        <PackageReference Include="sly" Version="2.9.4.7" />
+        <PackageReference Include="sly" Version="3.3.5" />
     </ItemGroup>
 
 </Project>

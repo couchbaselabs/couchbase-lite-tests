@@ -312,31 +312,30 @@ internal static partial class HandlerList
 
             var collection = String.Join('.', components.Take(2));
 
-            using var existing = db.GetCollection(components[0], components[1])?.GetDocument(components[2]);
-            if(entry.Value == null && existing != null) {
+            using var existing = db.GetCollection(components[1], components[0])?.GetDocument(components[2]);
+            if (entry.Value == null && existing != null) {
                 // Case 5 : Document shouldn't exist (null value in the snapshot), but the document does exist.
                 response.WriteBody(new
                 {
                     result = false,
                     description = $"Document '{components[2]}' in '{collection}' should not exist"
                 }, version);
-            }
-
-            if(existing == null) {
+            } else if (entry.Value != null && existing == null) {
                 // Case 1: Document should exist in the collection but it doesn't exist to verify.
                 response.WriteBody(new
                 {
                     result = false,
                     description = $"Document '{components[2]}' in '{collection}' was not found"
                 }, version);
-                return;
-            }
 
-            var compareResult = IsEqual(db, "$", entry.Value, existing);
-            if (!compareResult.Success) {
-                // Case 4 : Document has unexpected properties.
-                HandleCompareFailure(existing, compareResult, response, version);
                 return;
+            } else if (existing != null) {
+                var compareResult = IsEqual(db, "$", entry.Value, existing);
+                if (!compareResult.Success) {
+                    // Case 4 : Document has unexpected properties.
+                    HandleCompareFailure(existing, compareResult, response, version);
+                    return;
+                }
             }
         }
 

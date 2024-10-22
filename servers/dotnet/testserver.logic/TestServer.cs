@@ -17,8 +17,6 @@ namespace TestServer
 
         private static readonly Stream NullStream = new MemoryStream(Array.Empty<byte>());
 
-        private static IServiceProvider _ServiceProvider = default!;
-
         #endregion
 
         public ushort Port { get; set; } = DefaultPort;

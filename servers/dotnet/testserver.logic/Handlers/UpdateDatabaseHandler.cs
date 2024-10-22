@@ -123,11 +123,13 @@ internal static partial class HandlerList
             return;
         }
 
+        // This has to be done here because it is async and can't go inside inBatch()
         var blobUpdate = new Dictionary<string, object>();
         foreach(var update in updateBody.updates.Where(x => x.updatedBlobs != null && x.updatedBlobs.Any())) {
             foreach(var b in update.updatedBlobs!) {
+                var deduplicatedKey = $"{update.collection}/{update.documentID}/{b.Key}";
                 var nextBlob = await session.ObjectManager.LoadBlob(b.Value).ConfigureAwait(false);
-                blobUpdate[b.Key] = new Blob(BlobType(b.Value), nextBlob);
+                blobUpdate[deduplicatedKey] = new Blob(BlobType(b.Value), nextBlob);
             }
         }
 
@@ -165,7 +167,8 @@ internal static partial class HandlerList
 
                             if (entry.updatedBlobs != null) {
                                 UpdateDictionaryProperties(doc, entry.updatedBlobs
-                                        .Select(x => new Dictionary<string, object> { [x.Key] = blobUpdate[x.Key] })
+                                        .Select(x => new Dictionary<string, object> { 
+                                            [x.Key] = blobUpdate[$"{entry.collection}/{entry.documentID}/{x.Key}"] })
                                         .ToList());
                             }
 
