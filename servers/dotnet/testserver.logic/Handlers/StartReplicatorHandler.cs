@@ -9,7 +9,7 @@ using System.Text.Json.Serialization;
 using TestServer.Utilities;
 
 namespace TestServer.Handlers;
-using FilterGenerator = Func<IReadOnlyDictionary<string, object>?, HandlerList.IReplicatorFilter>;
+using FilterGenerator = Func<IReadOnlyDictionary<string, JsonElement>?, HandlerList.IReplicatorFilter>;
 
 internal static partial class HandlerList
 {
@@ -23,7 +23,8 @@ internal static partial class HandlerList
         public static readonly IReadOnlyDictionary<string, FilterGenerator> FilterMap =
             new Dictionary<string, FilterGenerator>
         {
-            ["deletedDocumentsOnly"] = (_) => new ReplicatorDeletedOnlyFilter()
+            ["deletedDocumentsOnly"] = (_) => new ReplicatorDeletedOnlyFilter(),
+            ["documentIDs"] = (args) => new ReplicatorDocumentIDsFilter(args)
         };
     }
 
@@ -32,6 +33,47 @@ internal static partial class HandlerList
         public bool Execute(Document doc, DocumentFlags flags)
         {
             return flags.HasFlag(DocumentFlags.Deleted);
+        }
+    }
+
+    internal sealed class ReplicatorDocumentIDsFilter : IReplicatorFilter
+    {
+        private const string DocumentIDsKey = "documentIDs";
+        private Dictionary<string, IReadOnlySet<string>> _allowedDocumentIDs;
+
+        public ReplicatorDocumentIDsFilter(IReadOnlyDictionary<string, JsonElement>? args)
+        {
+            if(args?.ContainsKey(DocumentIDsKey) == false) {
+                throw new ApplicationStatusException("documentIDs filter is missing documentIDs argument", HttpStatusCode.BadRequest);
+            }
+
+            if (args![DocumentIDsKey].ValueKind != JsonValueKind.Object) {
+                throw new ApplicationStatusException("documentIDs filter documentIDs argument wrong type (expecting dictionary of arrays)",
+                    HttpStatusCode.BadRequest);
+            }
+
+            _allowedDocumentIDs = args[DocumentIDsKey].EnumerateObject().ToDictionary(x => x.Name, x =>
+            {
+                if (x.Value.ValueKind != JsonValueKind.Array) {
+                    throw new ApplicationStatusException($"documentIDs filter documentIDs argument contained invalid list for '{x.Name}'",
+                        HttpStatusCode.BadRequest);
+                }
+
+                return (IReadOnlySet<string>)x.Value.EnumerateArray().Select(x => x.ToString()).ToHashSet();
+            });
+        }
+
+        public bool Execute(Document doc, DocumentFlags flags)
+        {
+            if(doc.Collection == null) {
+                throw new ApplicationStatusException("Document had null collection in filter", HttpStatusCode.InternalServerError);
+            }
+
+            if(!_allowedDocumentIDs.ContainsKey(doc.Collection.FullName)) {
+                return false;
+            }
+
+            return _allowedDocumentIDs[doc.Collection.FullName].Contains(doc.Id);
         }
     }
 
@@ -143,10 +185,10 @@ internal static partial class HandlerList
         public required string name { get; init; }
 
         [JsonPropertyName("params")]
-        public IReadOnlyDictionary<string, object>? parameters { get; init; }
+        public IReadOnlyDictionary<string, JsonElement>? parameters { get; init; }
 
         [JsonConstructor]
-        public StartReplicatorFilter(string name, IReadOnlyDictionary<string, object>? parameters = null)
+        public StartReplicatorFilter(string name, IReadOnlyDictionary<string, JsonElement>? parameters = null)
         {
             this.name = name;
             this.parameters = parameters;
