@@ -71,7 +71,7 @@ pipeline {
                                 echo "PLATFORM: ${platform}"
                                 echo "VERSION: ${version}"
                                 echo "BUILD: ${buildNo}"
-                                echo "SGW_URL": ${sgwUrl}
+                                echo "SGW_URL: ${sgwUrl}"
                                 echo "FORCE: ${force}"
 
                                 // Check if the test has been trigger for the CBL build:
