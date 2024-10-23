@@ -1,6 +1,7 @@
 from datetime import timedelta
 from typing import Dict, List
 from opentelemetry.trace import get_tracer
+from time import sleep
 
 from couchbase.bucket import Bucket
 from couchbase.cluster import Cluster
@@ -10,10 +11,12 @@ from couchbase.management.buckets import CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import CreatePrimaryQueryIndexOptions
 from couchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException, ScopeAlreadyExistsException
-from couchbase.exceptions import CollectionAlreadyExistsException, QueryIndexAlreadyExistsException
+from couchbase.exceptions import CollectionAlreadyExistsException, QueryIndexAlreadyExistsException, DocumentNotFoundException
 
 from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
+from cbltest.logging import cbl_warning
+from cbltest.api.error import CblTestError
 
 class CouchbaseServer:
     """
@@ -56,6 +59,21 @@ class CouchbaseServer:
                             c.create_collection(CollectionSpec(name, scope))
                     except CollectionAlreadyExistsException:
                         pass
+                
+                success = False
+                for _ in range(0, 10):
+                    try:
+                        bucket_obj.scope(scope).collection(name).get("_nonexistent")
+                    except DocumentNotFoundException:
+                        success = True
+                        break
+                    except Exception:
+                        cbl_warning(f"{bucket}.{scope}.{name} appears to not be ready yet, waiting for 1 second...")
+                        sleep(1.0)
+
+                if not success:
+                    raise CblTestError(f"Unable to properly create {bucket}.{scope}.{name} in Couchbase Server")
+
 
     def create_bucket(self, name: str):
         """

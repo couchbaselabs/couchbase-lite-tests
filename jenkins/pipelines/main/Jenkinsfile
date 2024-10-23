@@ -18,6 +18,7 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
                     if (params.CBL_PLATFORM == "all") {
                         currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD} (#${currentBuild.number})"
                     } else {
@@ -37,7 +38,7 @@ pipeline {
                 axes {
                     axis {
                         name 'CBL_PLATFORM'
-                        values 'c', 'android', 'ios'
+                        values 'c', 'android', 'ios', 'dotnet'
                     }
                 }
                 stages {
@@ -47,7 +48,9 @@ pipeline {
                                 def platform = env.CBL_PLATFORM
                                 def version = params.CBL_VERSION
                                 def buildNo = params.CBL_BUILD
+                                def sgwVersion = params.SGW_VERSION
                                 def force = params.FORCE_TRIGGER
+                                def sgwUrl = ""
 
                                 // Lookup latest successful build when CBL_BUILD param is zero:
                                 if (buildNo == "0") {
@@ -58,9 +61,16 @@ pipeline {
                                     }
                                 }
 
+                                try {
+                                    sgwUrl = sh script: "jenkins/pipelines/main/latest_sgw_url.sh ${sgwVersion}", returnStdout: true
+                                } catch(Exception e) {
+                                    error "Cannot get Sync Gateway download URL : ${e} for v${version}"
+                                }
+
                                 echo "PLATFORM: ${platform}"
                                 echo "VERSION: ${version}"
                                 echo "BUILD: ${buildNo}"
+                                echo "SGW_URL": ${sgwUrl}
                                 echo "FORCE: ${force}"
 
                                 // Check if the test has been trigger for the CBL build:
@@ -87,7 +97,8 @@ pipeline {
 
                                     build job: jobName, parameters: [
                                         string(name: "CBL_VERSION", value: version),
-                                        string(name: "CBL_BUILD", value: buildNo)
+                                        string(name: "CBL_BUILD", value: buildNo),
+                                        string(name: "SGW_URL", value: sgwUrl)
                                     ], wait: false
 
                                     // Save CBL build info:

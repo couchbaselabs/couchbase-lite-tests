@@ -4,6 +4,7 @@ pipeline {
         choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
         string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
+        string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
     }
     options {
         timeout(time: 30, unit: 'MINUTES')
@@ -14,6 +15,7 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    if (params.SGW_URL == '') { error "SGW_URL is required" }
                     currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD}-${CBL_EDITION}"
                 }
             }
@@ -21,7 +23,7 @@ pipeline {
         stage('Windows') {
             agent { label 'mob-e2e-win-01' }
             steps {
-                pwsh "jenkins\\pipelines\\dotnet\\winui_test.ps1 -Edition ${params.CBL_EDITION} -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD}"
+                pwsh "jenkins\\pipelines\\dotnet\\test_winui.ps1 -Edition ${params.CBL_EDITION} -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD}" -SgwUrl ${params.SGW_URL}
             }
             post { 
                 always { 

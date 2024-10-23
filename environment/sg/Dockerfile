@@ -1,33 +1,26 @@
 FROM ubuntu:22.04
 
-ARG SG_DEB_ARM64
-ARG SG_DEB_AMD64
-
-RUN [ -z "$SG_DEB_ARM64" ] && echo "SG_DEB_ARM64 is required" && exit 1 || true
-RUN [ -z "$SG_DEB_AMD64" ] && echo "SG_DEB_AMD64 is required" && exit 1 || true
-
+SHELL ["/bin/bash", "-c"]
 RUN apt -yqq update 
-RUN apt -yqq install curl
+RUN apt -yqq install curl systemctl
+RUN mkdir -p /opt/sg
+COPY cert /opt/sg/cert
+COPY config /opt/sg/config
+COPY start-sgw.sh /opt/sg
 
-RUN mkdir -p /opt/sg && \
-    ARCHITECTURE="$(dpkg --print-architecture)" && \
+ARG SG_DEB
+RUN [ -z "$SG_DEB" ] && echo "SG_DEB is required" && exit 1 || true
+RUN ARCHITECTURE="$(dpkg --print-architecture)" && \
     if [ "$ARCHITECTURE" = "amd64" ]; then \
-        curl -o /opt/sg/couchbase-sync-gateway.deb $SG_DEB_AMD64; \
+        curl -o /opt/sg/couchbase-sync-gateway.deb ${SG_DEB/<ARCH>/x86_64}; \
     elif [ "$ARCHITECTURE" = "arm64" ]; then \
-        curl -o /opt/sg/couchbase-sync-gateway.deb $SG_DEB_ARM64; \
+        curl -o /opt/sg/couchbase-sync-gateway.deb ${SG_DEB/<ARCH>/aarch64}; \
     else \
         echo "Unsupported architecture"; \
         exit 1; \
     fi
 
-COPY cert /opt/sg/cert
-COPY config /opt/sg/config
-COPY start-sgw.sh /opt/sg
-
 WORKDIR /opt/sg
-
-RUN apt-get update
-RUN apt -yqq install systemctl
 RUN dpkg -i ./couchbase-sync-gateway.deb
 
 EXPOSE 4984

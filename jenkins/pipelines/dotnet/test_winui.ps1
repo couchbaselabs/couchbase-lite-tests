@@ -1,9 +1,11 @@
 param (
     [Parameter()][string]$Edition = "enterprise",
     [Parameter(Mandatory=$true)][string]$Version,
-    [Parameter(Mandatory=$true)][string]$Build
+    [Parameter(Mandatory=$true)][string]$Build,
+    [Parameter()][string]$SgwUrl = ""
 )
 
+Import-Module $PSScriptRoot/prepare_env.psm1 -Force
 $ErrorActionPreference = "Stop" 
 
 $nugetPackageVersion = "$Version-b$($Build.PadLeft(4, '0'))"
@@ -13,9 +15,15 @@ dotnet add $PSScriptRoot\..\..\..\servers\dotnet\testserver.logic\testserver.log
 & $PSScriptRoot\build_winui.ps1
 & $PSScriptRoot\run_winui.ps1
 
-Write-Host "Start Environment..."
+Banner "Stopping existing environment"
 Push-Location $PSScriptRoot\..\..\..\environment
 docker compose down # Just in case it didn't get shut down cleanly
+if($SgwUrl -ne "") {
+    Banner "Building SGW environment"
+    docker compose build cbl-test-sg --build-arg SG_DEB="$SgwUrl"
+}
+
+Banner "Starting new environment"
 python start_environment.py
 Pop-Location
 
