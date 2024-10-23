@@ -6,7 +6,7 @@ from cbltest.api.database import Database
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.responses import GetRootResponse
-from cbltest.v1.requests import PostResetRequestBody, PostNewSessionRequestBody
+from cbltest.v1.requests import PostResetRequestBody, PostNewSessionRequestBody, PostLogRequestBody
 from cbltest.version import VERSION
 
 
@@ -82,7 +82,17 @@ class TestServer:
     async def cleanup(self) -> None:
         """
         Resets the test server
-       """
+        """
         with self.__tracer.start_as_current_span("create_and_reset_db"):
             request = self.__request_factory.create_request(TestServerRequestType.RESET, PostResetRequestBody())
             await self.__request_factory.send_request(self.__index, request)
+
+    async def log(self, msg: str) -> None:
+        """
+        Sends a message to be logged on the server side.  Useful for debugging.
+        """
+        
+        # I'll exclude this from telemetry since it's not really related to any testing
+        payload = PostLogRequestBody(msg)
+        request = self.__request_factory.create_request(TestServerRequestType.LOG, payload)
+        await self.__request_factory.send_request(self.__index, request)
