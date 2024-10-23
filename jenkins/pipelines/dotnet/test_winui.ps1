@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 
 $nugetPackageVersion = "$Version-b$($Build.PadLeft(4, '0'))"
 Write-Host "Using NuGet package version $nugetPackageVersion"
-dotnet add $PSScriptRoot\..\..\..\servers\dotnet\testserver.logic\testserver.logic.csproj package couchbase.lite.enterprise --version $nugetPackageVersion
+& $env:LOCALAPPDATA\Microsoft\dotnet\dotnet add $PSScriptRoot\..\..\..\servers\dotnet\testserver.logic\testserver.logic.csproj package couchbase.lite.enterprise --version $nugetPackageVersion
 
 & $PSScriptRoot\build_winui.ps1
 & $PSScriptRoot\run_winui.ps1
