@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using TestServer.Services;
@@ -38,8 +39,12 @@ namespace TestServer.Utilities
             ActiveSessions[id] = new Session(serviceProvider, id);
         }
 
-        public static Session For(string id)
+        public static Session For(string? id)
         {
+            if (id == null) {
+                throw new ApplicationStatusException($"Header '{Router.ClientIdHeader}' missing", HttpStatusCode.BadRequest);
+            }
+
             if (!ActiveSessions.TryGetValue(id, out var session)) {
                 throw new BadRequestException($"Session '{id}' never started or already finished!");
             }
