@@ -619,6 +619,29 @@ class PostGetDocumentRequestBody(TestServerRequestBody):
 
     def to_json(self) -> Any:
         return {"database": self.__database, "document": self.__document.to_json()}
+    
+class PostLogRequestBody(TestServerRequestBody):
+    """
+    The body of a POST /log request as specified in version 1 of the 
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+
+    Example Body::
+
+        {
+            "message": "The client is on fire"
+        }
+    """
+
+    @property
+    def message(self) -> str:
+        return self.__message
+
+    def __init__(self, msg: str):
+        super().__init__(1)
+        self.__message = msg
+
+    def to_json(self) -> Any:
+        return {"message": self.__message}
 
 
 # Below this point are all of the concrete test server request types
@@ -728,3 +751,12 @@ class PostGetDocumentRequest(TestServerRequest):
 
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
         super().__init__(1, uuid, "getDocument", PostGetDocumentRequestBody, payload=payload)
+
+class PostLogRequest(TestServerRequest):
+    """
+    A POST /log request as specified in version 1 of the 
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+    """
+
+    def __init__(self, uuid: UUID, payload: TestServerRequestBody):
+        super().__init__(1, uuid, "log", PostLogRequestBody, payload=payload)

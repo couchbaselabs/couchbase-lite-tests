@@ -351,3 +351,10 @@ class PostGetDocumentResponse(TestServerResponse):
         super().__init__(status_code, uuid, 1, body, "getDocument")
         self.__body = body
 
+class PostLogResponse(TestServerResponse):
+    """
+    A POST /log response as specified in version 1 of the 
+    [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
+    """
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "log")

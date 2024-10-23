@@ -32,6 +32,7 @@ class TestServerRequestType(Enum):
     RUN_QUERY = "PostRunQueryRequest"
     GET_DOCUMENT = "PostGetDocumentRequest"
     NEW_SESSION = "PostNewSessionRequest"
+    LOG = "PostLogRequest"
 
     def __str__(self) -> str:
         return self.value
