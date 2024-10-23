@@ -12,6 +12,10 @@ fi
 PLATFORM=${1}
 VERSION=${2}
 
+if [ "$PLATFORM" == "dotnet" ]; then
+    PLATFORM="net"
+fi
+
 BUILD_NO=$(curl -s "http://proget.build.couchbase.com:8080/api/get_version?product=couchbase-lite-${PLATFORM}&version=${VERSION}&ee=true" | jq .BuildNumber)
 if [ "${BUILD_NO}" == "" ]
 then
