@@ -23,7 +23,7 @@ pipeline {
         stage('Windows') {
             agent { label 'mob-e2e-win-01' }
             steps {
-                pwsh "jenkins\\pipelines\\dotnet\\test_winui.ps1 -Edition ${params.CBL_EDITION} -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD}" -SgwUrl ${params.SGW_URL}
+                pwsh "jenkins\\pipelines\\dotnet\\test_winui.ps1 -Edition ${params.CBL_EDITION} -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD} -SgwUrl ${params.SGW_URL}"
             }
             post { 
                 always { 
