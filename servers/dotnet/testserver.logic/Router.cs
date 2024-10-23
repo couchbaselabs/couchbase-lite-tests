@@ -16,7 +16,7 @@ using TestServer.Utilities;
 // and the actual invocation which will transform
 // the clientID into a session IF NEEDED
 using HandlerAction = System.Func<int,
-    System.String,
+    System.String?,
     System.Text.Json.JsonDocument,
     System.Net.HttpListenerResponse,
     System.Threading.Tasks.Task>;
@@ -183,7 +183,7 @@ namespace TestServer
             response.WriteBody(CreateErrorResponse(msg), version, HttpStatusCode.InternalServerError);
         }
 
-        internal static async Task Handle(string clientId, Uri endpoint, Stream body, HttpListenerResponse response, int version)
+        internal static async Task Handle(string? clientId, Uri endpoint, Stream body, HttpListenerResponse response, int version)
         {
             if(version > CBLTestServer.MaxApiVersion) {
                 response.WriteBody("The API version specified is not supported", CBLTestServer.MaxApiVersion, HttpStatusCode.Forbidden);

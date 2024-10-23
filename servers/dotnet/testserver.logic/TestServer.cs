@@ -94,13 +94,7 @@ namespace TestServer
                     int.TryParse(versionHeader, out version);
                 }
 
-                var clientId = nextRequest.Request.Headers.Get(Router.ClientIdHeader);
-                if(clientId == null) {
-                    var response = Router.CreateErrorResponse($"Header '{Router.ClientIdHeader}' missing");
-                    nextRequest.Response.WriteBody(response, version, HttpStatusCode.BadRequest);
-                    continue;
-                }
-                
+                var clientId = nextRequest.Request.Headers.Get(Router.ClientIdHeader);                
                 var _ = Router.Handle(clientId, nextRequest.Request.Url, nextRequest.Request.InputStream ?? NullStream, nextRequest.Response, version)
                     .ContinueWith(t => Serilog.Log.Logger.Warning("Exception caught during router handling: {e}", t.Exception?.InnerException),
                     TaskContinuationOptions.OnlyOnFaulted);
