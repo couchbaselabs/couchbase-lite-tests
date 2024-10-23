@@ -7,7 +7,10 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
-    internal readonly record struct StopReplicatorConfig(string id);
+    internal readonly record struct StopReplicatorConfig
+    {
+        public required string id { get; init; }
+    }
 
     [HttpHandler("stopReplicator")]
     public static Task StopReplicatorHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)

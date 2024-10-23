@@ -9,7 +9,12 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
-    internal readonly record struct GetDocumentBody(string database, DocumentEntry document);
+    internal readonly record struct GetDocumentBody
+    {
+        public required string database { get; init; }
+
+        public required DocumentEntry document { get; init; }
+    }
 
     [HttpHandler("getDocument")]
     public static Task GetDocumentHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
