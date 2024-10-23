@@ -37,13 +37,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.couchbase.lite.Database;
-import com.couchbase.lite.LogDomain;
-import com.couchbase.lite.LogLevel;
 import com.couchbase.lite.TLSIdentity;
+import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
-import com.couchbase.lite.mobiletest.services.LogService;
+import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
@@ -88,13 +86,13 @@ public abstract class TestApp {
     }
 
 
-    protected final String platform;
-
-    private final Map<String, TestContext> testContexts = new HashMap<>();
-
-    private final AtomicReference<LogService> logSvc = new AtomicReference<>();
     private final AtomicReference<DatabaseService> dbSvc = new AtomicReference<>();
     private final AtomicReference<ReplicatorService> replSvc = new AtomicReference<>();
+
+    @Nullable
+    private TestContext session;
+
+    protected final String platform;
 
     protected TestApp(@NonNull String platform) { this.platform = platform; }
 
@@ -142,21 +140,24 @@ public abstract class TestApp {
         return certsList;
     }
 
+    @Nullable
+    public final TestContext getSessionUnchecked() { return session; }
+
     @NonNull
-    public final TestContext getTestContext(@NonNull String client) {
-        TestContext ctxt = testContexts.get(client);
-        if (ctxt != null) { return ctxt; }
-
-        ctxt = new TestContext(client);
-        testContexts.put(client, ctxt);
-
+    public final TestContext getSession(@NonNull String client) {
+        final TestContext ctxt = session;
+        if ((ctxt == null) || !ctxt.getClient().equals(client)) {
+            throw new ClientError("Attempt to access a test context for an unknown client");
+        }
         return ctxt;
     }
 
     @NonNull
-    public final TestContext resetContext(@NonNull String client) {
-        testContexts.remove(client);
-        return getTestContext(client);
+    public final TestContext newSession(@NonNull String client) {
+        final TestContext ctxt = session;
+        session = new TestContext(client);
+        if (ctxt != null) { ctxt.close(); }
+        return session;
     }
 
     @NonNull
@@ -180,16 +181,6 @@ public abstract class TestApp {
     public final ReplicatorService clearReplSvc() { return replSvc.getAndSet(null); }
 
     @NonNull
-    public final LogService getLogSvc() {
-        final LogService mgr = logSvc.get();
-        if (mgr == null) { logSvc.compareAndSet(null, new LogService()); }
-        return logSvc.get();
-    }
-
-    @Nullable
-    public final LogService clearLogSvc() { return logSvc.getAndSet(null); }
-
-    @NonNull
     protected final Date getExpirationTime() {
         final Calendar calendar = Calendar.getInstance();
         calendar.add(Calendar.YEAR, 2);
@@ -211,7 +202,6 @@ public abstract class TestApp {
 
         initCBL();
 
-        Database.log.getConsole().setLevel(LogLevel.DEBUG);
-        Database.log.getConsole().setDomains(LogDomain.ALL_DOMAINS);
+        Log.init();
     }
 }

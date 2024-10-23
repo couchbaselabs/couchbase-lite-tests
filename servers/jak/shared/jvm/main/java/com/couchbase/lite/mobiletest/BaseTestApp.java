@@ -18,11 +18,9 @@ import java.util.UUID;
 
 import com.couchbase.lite.CouchbaseLite;
 import com.couchbase.lite.CouchbaseLiteException;
-import com.couchbase.lite.Database;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
 import com.couchbase.lite.mobiletest.errors.ServerError;
-import com.couchbase.lite.mobiletest.util.Log;
 
 
 /**
@@ -40,10 +38,7 @@ public abstract class BaseTestApp extends TestApp {
     }
 
     @Override
-    protected void initCBL() {
-        CouchbaseLite.init(true);
-        Database.log.setCustom(new Log.CustomLogger());
-    }
+    protected void initCBL() { CouchbaseLite.init(true); }
 
     @NonNull
     @Override
@@ -52,9 +47,6 @@ public abstract class BaseTestApp extends TestApp {
         content.put(KEY_SERVER_VERSION, CBLVersion.VERSION_NAME);
         content.put(KEY_API, LATEST_SUPPORTED_PROTOCOL_VERSION);
         content.put(KEY_CBL, "couchbase-lite-java");
-        content.put(
-            KEY_ADDITIONAL_INFO,
-            platform + " Test Server " + TestServerInfo.SERVER_VERSION + " using " + CBLVersion.getVersionInfo());
 
         final Map<String, Object> device = new HashMap<>();
         device.put(KEY_DEVICE_MODEL, System.getProperty("os.arch"));
@@ -62,6 +54,10 @@ public abstract class BaseTestApp extends TestApp {
         device.put(KEY_DEVICE_SYS_VERSION, System.getProperty("os.version"));
         device.put(KEY_DEVICE_SYS_API, System.getProperty("java.version"));
         content.put(KEY_DEVICE, device);
+
+        content.put(
+            KEY_ADDITIONAL_INFO,
+            platform + " Test Server " + TestServerInfo.SERVER_VERSION + " using " + CBLVersion.getVersionInfo());
 
         return content;
     }

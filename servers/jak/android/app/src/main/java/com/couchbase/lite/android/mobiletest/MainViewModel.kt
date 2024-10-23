@@ -15,9 +15,10 @@
 //
 package com.couchbase.lite.android.mobiletest
 
+import android.net.TrafficStats
 import androidx.lifecycle.ViewModel
 import com.couchbase.lite.mobiletest.Server
-import com.couchbase.lite.mobiletest.util.Log
+import com.couchbase.lite.mobiletest.services.Log
 import com.couchbase.lite.mobiletest.util.NetUtils
 import java.io.IOException
 import java.net.URI

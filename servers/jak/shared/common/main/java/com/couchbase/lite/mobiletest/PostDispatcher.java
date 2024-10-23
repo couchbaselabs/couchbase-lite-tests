@@ -27,56 +27,57 @@ import com.couchbase.lite.mobiletest.endpoints.v1.GetDocument;
 import com.couchbase.lite.mobiletest.endpoints.v1.Logger;
 import com.couchbase.lite.mobiletest.endpoints.v1.PerformMaintenance;
 import com.couchbase.lite.mobiletest.endpoints.v1.ReplicatorManager;
-import com.couchbase.lite.mobiletest.endpoints.v1.Reset;
 import com.couchbase.lite.mobiletest.endpoints.v1.RunQuery;
+import com.couchbase.lite.mobiletest.endpoints.v1.Session;
 import com.couchbase.lite.mobiletest.endpoints.v1.SnapshotDocs;
 import com.couchbase.lite.mobiletest.endpoints.v1.UpdateDb;
 import com.couchbase.lite.mobiletest.endpoints.v1.VerifyDocs;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.json.ReplyBuilder;
 import com.couchbase.lite.mobiletest.json.RequestBuilder;
+import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.trees.TypedMap;
-import com.couchbase.lite.mobiletest.util.Log;
 
 
-// Implements API 0.5.2
-// -- setupLoggging is not implemented
-// -- Replicator conflict resolver is not implemented
+// Implements API 1.0.0
 public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint> {
     private static final String TAG = "POST";
 
     @FunctionalInterface
     interface Endpoint {
         @NonNull
-        Map<String, Object> run(@NonNull TestContext ctxt, @NonNull TypedMap req);
+        Map<String, Object> run(@NonNull String client, @NonNull TypedMap req);
     }
 
     public PostDispatcher(@NonNull TestApp app) {
         super(app);
 
         // build the dispatch table
-        addEndpoint(1, "/reset", (c, r) -> new Reset(app).reset(c, r));
-        addEndpoint(1, "/log", (c, r) -> new Logger(app.getLogSvc()).log(r));
-        addEndpoint(1, "/setupLogging", (c, r) -> new Logger(app.getLogSvc()).setupLogging(r));
-        addEndpoint(1, "/getAllDocuments", (c, r) -> new GetAllDocs(app.getDbSvc()).getAllDocs(c, r));
-        addEndpoint(1, "/updateDatabase", (c, r) -> new UpdateDb(app.getDbSvc()).updateDb(c, r));
-        addEndpoint(1, "/snapshotDocuments", (c, r) -> new SnapshotDocs(app.getDbSvc()).snapshot(c, r));
-        addEndpoint(1, "/verifyDocuments", (c, r) -> new VerifyDocs(app.getDbSvc()).verify(c, r));
-        addEndpoint(1, "/performMaintenance", (c, r) -> new PerformMaintenance(app.getDbSvc()).doMaintenance(c, r));
-        addEndpoint(1, "/runQuery", (c, r) -> new RunQuery(app.getDbSvc()).runQuery(c, r));
-        addEndpoint(1, "/getDocument", (c, r) -> new GetDocument(app.getDbSvc()).getDocument(c, r));
+        addEndpoint(1, "/reset", (c, r) -> new Session(app).reset(c, r));
+        addEndpoint(1, "/getAllDocuments", (c, r) -> new GetAllDocs(app.getDbSvc()).getAllDocs(app.getSession(c), r));
+        addEndpoint(1, "/getDocument", (c, r) -> new GetDocument(app.getDbSvc()).getDocument(app.getSession(c), r));
+        addEndpoint(1, "/updateDatabase", (c, r) -> new UpdateDb(app.getDbSvc()).updateDb(app.getSession(c), r));
         addEndpoint(
             1,
             "/startReplicator",
-            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).createRepl(c, r));
-        addEndpoint(
-            1,
-            "/getReplicatorStatus",
-            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).getReplStatus(c, r));
+            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).createRepl(app.getSession(c), r));
         addEndpoint(
             1,
             "/stopReplicator",
-            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).stopRepl(c, r));
+            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).stopRepl(app.getSession(c), r));
+        addEndpoint(
+            1,
+            "/getReplicatorStatus",
+            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).getReplStatus(app.getSession(c), r));
+        addEndpoint(1, "/snapshotDocuments", (c, r) -> new SnapshotDocs(app.getDbSvc()).snapshot(app.getSession(c), r));
+        addEndpoint(1, "/verifyDocuments", (c, r) -> new VerifyDocs(app.getDbSvc()).verify(app.getSession(c), r));
+        addEndpoint(
+            1,
+            "/performMaintenance",
+            (c, r) -> new PerformMaintenance(app.getDbSvc()).doMaintenance(app.getSession(c), r));
+        addEndpoint(1, "/newSession", (c, r) -> new Session(app).newSession(c, r));
+        addEndpoint(1, "/runQuery", (c, r) -> new RunQuery(app.getDbSvc()).runQuery(app.getSession(c), r));
+        addEndpoint(1, "/log", (c, r) -> new Logger().log(app.getSession(c), r));
     }
 
     // This method returns a Reply.  Be sure to close it!
@@ -88,6 +89,8 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
         @Nullable String contentType,
         @NonNull InputStream req
     ) throws IOException {
+        Log.p(TAG, "Handling POST request: " + path + " v" + version);
+
         if (version < 0) { throw new ClientError("No protocol version specified"); }
         if (client == null) { throw new ClientError("No client specified"); }
         if (!TestApp.CONTENT_TYPE_JSON.equalsIgnoreCase(contentType)) {
@@ -101,11 +104,9 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
             throw new ClientError(msg);
         }
 
-        final Map<String, Object> result
-            = endpoint.run(TestApp.getApp().getTestContext(client), new RequestBuilder(req).buildRequest());
+        final Map<String, Object> result = endpoint.run(client, new RequestBuilder(req).buildRequest());
 
         Log.p(TAG, "Request succeeded");
         return new Reply(new ReplyBuilder(result).buildReply());
     }
 }
-

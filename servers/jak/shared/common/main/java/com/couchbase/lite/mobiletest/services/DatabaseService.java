@@ -21,6 +21,7 @@ import androidx.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +43,6 @@ import com.couchbase.lite.mobiletest.errors.HTTPStatus;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.util.FileUtils;
-import com.couchbase.lite.mobiletest.util.Log;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
@@ -216,17 +216,16 @@ public final class DatabaseService {
     }
 
     @NonNull
-    public String runQuery(@NonNull Database db, @NonNull String query) {
-        final StringBuilder json = new StringBuilder("[");
+    public List<Map<String, Object>> runQuery(@NonNull Database db, @NonNull String query) {
+        final List<Map<String, Object>> results = new ArrayList<>();
         try (ResultSet rs = db.createQuery(query).execute()) {
             for (Result r: rs.allResults()) {
-                if (json.length() > 1) { json.append(','); }
-                json.append(r.toJSON());
+                results.add(r.toMap());
             }
         }
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Query failed: \"" + query + "\"", e); }
 
-        return json.append(']').toString();
+        return results;
     }
 
     // New stream constructors are supported only in API 26+
@@ -243,8 +242,6 @@ public final class DatabaseService {
                 throw new CblApiFailure("Failed creating collection: " + getCollectionFQN(fqn), e);
             }
         }
-
-        ctxt.addDb(dbName, db);
     }
 
     // New stream constructors are supported only in API 26+
@@ -294,7 +291,6 @@ public final class DatabaseService {
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed opening database: " + name, e); }
 
         ctxt.addDb(name, db);
-        Log.p(TAG, "Created database: " + name);
 
         return db;
     }

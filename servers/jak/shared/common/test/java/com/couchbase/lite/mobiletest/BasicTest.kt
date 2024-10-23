@@ -16,7 +16,6 @@
 package com.couchbase.lite.mobiletest
 
 import com.couchbase.lite.mobiletest.errors.ClientError
-import com.couchbase.lite.mobiletest.util.Log
 import com.squareup.moshi.Moshi
 import okio.buffer
 import okio.source
@@ -36,7 +35,7 @@ class BasicTest : BaseTest() {
                 .fromJson(ctxt.content.source().buffer()) as? Map<String, Any>
         }
 
-         Assert.assertTrue(
+        Assert.assertTrue(
             """Test Server \d+\.\d+\.\d+@[abcdef\d]+ on .+ using CouchbaseLite""".toRegex()
                 .containsMatchIn(resp?.get("additionalInfo") as? String ?: "")
         )
@@ -53,8 +52,10 @@ class BasicTest : BaseTest() {
                 ByteArrayInputStream("{}".toByteArray())
             )
         } catch (err: ClientError) {
-            Assert.assertTrue("""Unrecognized post request:.+/reset v97""".toRegex()
-                .containsMatchIn(err.message as String))
+            Assert.assertTrue(
+                """Unrecognized post request:.+/reset v97""".toRegex()
+                    .containsMatchIn(err.message as String)
+            )
         }
     }
 

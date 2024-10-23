@@ -1,5 +1,5 @@
 1. Open settings.gradle in Android studio to sources the project.
-2. MainActivity.java is the launcher activity to launch APP.
+2. MainActivity.kt is the launcher activity to launch APP.
 
 * Simply running the project will launch the app on the emulator or device of your choice.
 * Currently we are not displaying the IP of the emulator/device in app and we are using Port 8080 for
