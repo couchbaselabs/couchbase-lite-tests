@@ -59,7 +59,12 @@ internal static class SerilogExtensions
 
 internal record NewSessionLoggingInfo(string url, string tag);
 
-internal readonly record struct NewSessionBody(string id, NewSessionLoggingInfo? logging);
+internal readonly record struct NewSessionBody
+{
+    public required string id { get; init; }
+
+    public NewSessionLoggingInfo? logging { get; init; }
+}
 
 internal static partial class HandlerList
 {
