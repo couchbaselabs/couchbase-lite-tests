@@ -4,9 +4,8 @@ Import-Module $PSScriptRoot/prepare_dotnet.psm1 -Force
 function Copy-Datasets {
     Banner -Text "Copying dataset resources"
 
-    New-Item -ItemType Directory -Path $PSScriptRoot/../testserver/Resources/Raw -ErrorAction Ignore
-    Push-Location $PSScriptRoot/../testserver/Resources/Raw
-    Copy-Item -Force $PSScriptRoot/../../../dataset/server/dbs/*.zip .
-    Copy-Item -Recurse -Force $PSScriptRoot/../../../dataset/server/blobs .
+    Push-Location $PSScriptRoot/../../../servers/dotnet/testserver/Resources/Raw
+    Copy-Item -Force $PSScriptRoot/../../../dataset/server/dbs/*.zip . -Verbose
+    Copy-Item -Recurse -Force $PSScriptRoot/../../../dataset/server/blobs . -Verbose
     Pop-Location
 }
