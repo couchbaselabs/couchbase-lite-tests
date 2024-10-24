@@ -6,6 +6,7 @@ from couchbase.options import ClusterOptions
 from couchbase.cluster import Cluster
 
 from cbltest.logging import cbl_warning
+from _pytest.reports import TestReport
 
 class GreenboardUploader(object):
     """
@@ -23,24 +24,22 @@ class GreenboardUploader(object):
         self.__pass_count = 0
         self.__overall_fail = False
 
-    @pytest.hookimpl(hookwrapper=True)
+    @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]):
         outcome = yield
-        report = outcome.get_result()
+        report: TestReport = outcome.get_result()
         if report.when != 'call':
-            if report.outcome != "passed":
+            if report.failed:
                 self.__overall_fail = True
             return
         
         if self.__overall_fail:
             return
         
-        if report.outcome == "passed":
+        if report.passed:
             self.__pass_count += 1
-        elif report.outcome == "failed":
+        elif report.failed:
             self.__fail_count += 1
-        elif report.outcome != "skipped":
-            print(f"Unknown outcome {report.outcome}")
 
     def upload(self, platform: str, version: str, sgw_version: str):
         """
