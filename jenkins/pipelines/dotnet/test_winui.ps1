@@ -15,17 +15,7 @@ Write-Host "Using NuGet package version $nugetPackageVersion"
 & $PSScriptRoot\build_winui.ps1
 & $PSScriptRoot\run_winui.ps1
 
-Banner "Stopping existing environment"
-Push-Location $PSScriptRoot\..\..\..\environment
-docker compose down # Just in case it didn't get shut down cleanly
-if($SgwUrl -ne "") {
-    Banner "Building SGW environment"
-    docker compose build cbl-test-sg --build-arg SG_DEB="$SgwUrl"
-}
-
-Banner "Starting new environment"
-python start_environment.py
-Pop-Location
+& $PSScriptRoot\..\shared\setup_backend.ps1
 
 Push-Location $PSScriptRoot\..\..\..\tests
 python -m venv venv
