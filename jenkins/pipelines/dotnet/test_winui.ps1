@@ -15,7 +15,7 @@ Write-Host "Using NuGet package version $nugetPackageVersion"
 & $PSScriptRoot\build_winui.ps1
 & $PSScriptRoot\run_winui.ps1
 
-& $PSScriptRoot\..\shared\setup_backend.ps1
+& $PSScriptRoot\..\shared\setup_backend.ps1 -SgwUrl $SgwUrl
 
 Push-Location $PSScriptRoot\..\..\..\tests
 python -m venv venv

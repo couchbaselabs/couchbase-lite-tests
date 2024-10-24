@@ -1,3 +1,9 @@
+param (
+    [Parameter()]
+    [string]
+    $SgwUrl = ""
+)
+
 function Write-Banner {
     param (
         [Parameter(Mandatory=$true)]
