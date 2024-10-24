@@ -1,6 +1,2 @@
-testserver.log
-session.log
 http_log
 local_config.json
-.pytest_cache
-__pycache__

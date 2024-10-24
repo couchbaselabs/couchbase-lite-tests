@@ -4,7 +4,14 @@
 # python
 __pycache__
 venv
+.mypy_cache
+.pytest_cache
 
 # IDE
 .vscode
 .idea
+
+# TDK artifacts
+testserver.log
+session.log
+http_log
