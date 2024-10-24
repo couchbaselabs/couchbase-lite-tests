@@ -1,6 +1,7 @@
+from abc import ABC, abstractmethod
 from json import dumps, loads
 from pathlib import Path
-from typing import Dict, List, cast, Any, Optional
+from typing import Dict, List, Tuple, cast, Any, Optional
 from urllib.parse import urljoin
 
 from aiohttp import ClientSession, BasicAuth, TCPConnector
@@ -202,6 +203,45 @@ class RemoteDocument(JSONSerializable):
         ret_val["_rev"] = self.__rev
         return ret_val
 
+class CouchbaseVersion(ABC):
+    """
+    A class for holding a version and build number of a product
+    """
+
+    @property
+    def raw(self) -> str:
+        return self.__raw
+    
+    @property
+    def version(self) -> str:
+        return self.__version
+    
+    @property
+    def build_number(self) -> int:
+        return self.__build_number
+    
+    @abstractmethod
+    def parse(self, input: str) -> Tuple[str, int]:
+        pass
+    
+    def __init__(self, input: str):
+        self.__raw = input
+        parsed = self.parse(input)
+        self.__version = parsed[0]
+        self.__build_number = parsed[1]
+
+class SyncGatewayVersion(CouchbaseVersion):
+    """
+    A class for parsing Sync Gateway Version
+    """
+
+    def parse(self, input: str) -> Tuple[str, int]:
+        first_lparen = input.find("(")
+        first_semicol = input.find(";")
+        if first_lparen == -1 or first_semicol == -1:
+            return ("unknown", 0)
+        
+        return (input[0:first_lparen], int(input[first_lparen+1:first_semicol]))
 
 class SyncGateway:
     """
@@ -218,24 +258,29 @@ class SyncGateway:
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__admin_port: int = admin_port
+        self.__admin_session: ClientSession = self._create_session(secure, scheme, url, admin_port, BasicAuth(username, password, "ascii"))
 
+    def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth: Optional[BasicAuth]) -> ClientSession:
         if secure:
             ssl_context = ssl.create_default_context(cadata=self.tls_cert())
             # Disable hostname check so that the pre-generated SG can be used on any machines.
             ssl_context.check_hostname = False
-            self.__admin_session = ClientSession(f"{scheme}{url}:{admin_port}", auth=BasicAuth(username, password, "ascii"), connector=TCPConnector(ssl=ssl_context))
+            return ClientSession(f"{scheme}{url}:{port}", auth=auth, connector=TCPConnector(ssl=ssl_context))
         else:
-            self.__admin_session = ClientSession(f"{scheme}{url}:{admin_port}", auth=BasicAuth(username, password, "ascii"))
+            return ClientSession(f"{scheme}{url}:{port}", auth=auth)
 
     async def _send_request(self, method: str, path: str, payload: Optional[JSONSerializable] = None,
-                            params: Optional[Dict[str, str]] = None) -> Any:
+                            params: Optional[Dict[str, str]] = None, session: Optional[ClientSession] = None) -> Any:
+        if session is None:
+            session = self.__admin_session
+
         with self.__tracer.start_as_current_span(f"send_request",
                                                  attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
             writer.write_begin(f"Sync Gateway [{self.__admin_url}] -> {method.upper()} {path}", data)
-            resp = await self.__admin_session.request(method, path, data=data, headers=headers, params=params)
+            resp = await session.request(method, path, data=data, headers=headers, params=params)
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
                 data = dumps(ret_val, indent=2)
@@ -247,6 +292,17 @@ class SyncGateway:
                 raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}")
 
             return ret_val
+        
+    async def get_version(self) -> CouchbaseVersion:
+        # Telemetry not really important for this call
+        scheme = "https://" if self.__secure else "http://"
+        async with self._create_session(self.__secure, scheme, self.__hostname, 4984, None) as s: 
+            resp = await self._send_request("get", "/", session=s)
+            assert isinstance(resp, dict)
+            resp_dict = cast(dict, resp)
+            raw_version = _get_typed_required(resp_dict, "version", str)
+            assert "/" in raw_version
+            return SyncGatewayVersion(raw_version.split("/")[1])
         
     def tls_cert(self) -> Optional[str]:
         if not self.__secure:

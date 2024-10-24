@@ -42,7 +42,7 @@ class GreenboardUploader(object):
         elif report.outcome != "skipped":
             print(f"Unknown outcome {report.outcome}")
 
-    def upload(self, platform: str, version: str):
+    def upload(self, platform: str, version: str, sgw_version: str):
         """
         Uploads the results using the specified platform and version.  The reason that they
         are specified here is because they are probably unknown at the time that this object
@@ -73,6 +73,7 @@ class GreenboardUploader(object):
         cluster.bucket("greenboard").default_collection().upsert(str(uuid4()), {
             "build": build,
             "version": version,
+            "sgwVersion": sgw_version,
             "failCount": self.__fail_count,
             "passCount": self.__pass_count,
             "platform": platform,

@@ -85,7 +85,8 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     yield
     
     test_server_info = await cblpytest.test_servers[0].get_info()
-    uploader.upload(test_server_info.cbl, test_server_info.library_version)
+    sgw_version = await cblpytest.sync_gateways[0].get_version()
+    uploader.upload(test_server_info.cbl, test_server_info.library_version, f"{sgw_version.version}-{sgw_version.build_number}")
     pytestconfig.pluginmanager.unregister(uploader)
 
 # This is used to inject the full path to the dataset folder

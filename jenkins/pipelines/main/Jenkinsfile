@@ -20,11 +20,6 @@ pipeline {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    if (params.CBL_PLATFORM == "all") {
-                        currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD} (#${currentBuild.number})"
-                    } else {
-                        currentBuild.displayName = "${CBL_PLATFORM}-${params.CBL_VERSION}-${params.CBL_BUILD} (#${currentBuild.number})"
-                    }
                 }
             }
         }
@@ -66,6 +61,13 @@ pipeline {
                                     sgwUrl = sh script: "jenkins/pipelines/main/latest_sgw_url.sh ${sgwVersion}", returnStdout: true
                                 } catch(Exception e) {
                                     error "Cannot get Sync Gateway download URL : ${e} for v${version}"
+                                }
+
+                                
+                                if (params.CBL_PLATFORM == "all") {
+                                    currentBuild.displayName = "${version}-${buildNo}-SGW${sgwVersion} (#${currentBuild.number})"
+                                } else {
+                                    currentBuild.displayName = "${platform}-${version}-${buildNo}-SGW${sgwVersion} (#${currentBuild.number})"
                                 }
 
                                 echo "PLATFORM: ${platform}"
