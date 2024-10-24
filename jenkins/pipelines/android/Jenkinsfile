@@ -4,6 +4,7 @@ pipeline {
         choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
         string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
+        string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
     }
     options { timeout(time: 30, unit: 'MINUTES') }
     stages {
