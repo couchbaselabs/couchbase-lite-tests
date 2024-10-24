@@ -32,6 +32,6 @@ python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
 Copy-Item $PSScriptRoot\config.json .
-pytest -v --no-header --config .\config.json .\test_basic_replication.py -k "test_replicate_non_existing_sg_collections"
+pytest -v --no-header --config config.json
 deactivate
 Pop-Location
