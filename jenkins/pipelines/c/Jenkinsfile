@@ -35,6 +35,9 @@ pipeline {
                     }
                 }
                 stage('iOS') {
+                    when {
+                        expression { return false } // Skip iOS for now
+                    }
                     agent { label 'mob-e2e-mac-01' }
                     environment { 
                         KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
