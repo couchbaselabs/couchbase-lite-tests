@@ -9,6 +9,12 @@ import Foundation
 import Vapor
 
 class TestServerMiddleware : AsyncMiddleware {
+    let kHeaderKeyServerID = "CBLTest-Server-ID"
+    let kHeaderKeyClientID = "CBLTest-Client-ID"
+    let kHeaderKeyAPIVersion = "CBLTest-API-Version"
+    let kHeaderKeyContentType = "content-type"
+    let defaultContentType = "application/json"
+    
     func respond(to request: Vapor.Request, chainingTo next: Vapor.AsyncResponder) async throws -> Vapor.Response {
         TestServer.logger.log(level: .debug, "Received request: \(request.description)")
         
@@ -47,13 +53,18 @@ class TestServerMiddleware : AsyncMiddleware {
     
     func withResponseHeaders(_ response: Response, version: Int) -> Response {
         let resolvedVersion = version != 0 ? version : TestServer.maxAPIVersion
-        response.headers.add(name: "CBLTest-Server-ID", value: TestServer.serverID.uuidString)
-        response.headers.add(name: "CBLTest-API-Version", value: "\(resolvedVersion)")
+        response.headers.add(name: kHeaderKeyServerID, value: TestServer.serverID.uuidString)
+        response.headers.add(name: kHeaderKeyAPIVersion, value: "\(resolvedVersion)")
+        
+        // Python Test client requires content-type:
+        if (!response.headers.contains(name: kHeaderKeyContentType)) {
+            response.headers.add(name: kHeaderKeyContentType, value: defaultContentType)
+        }
         return response
     }
     
     private func getAndVerifyVersion(_ headers: HTTPHeaders) throws -> Int {
-        guard let versionStr = headers.first(name: "CBLTest-API-Version"),
+        guard let versionStr = headers.first(name: kHeaderKeyAPIVersion),
               let version = Int(versionStr) else {
             throw TestServerError(domain: .TESTSERVER, code: 400, message: "Missing CBLTest-API-Version headers")
         }
@@ -64,7 +75,7 @@ class TestServerMiddleware : AsyncMiddleware {
     }
     
     func getClientID(_ headers: HTTPHeaders) throws -> String {
-        guard let id = headers.first(name: "CBLTest-Client-ID") else {
+        guard let id = headers.first(name: kHeaderKeyClientID) else {
             throw TestServerError(domain: .TESTSERVER, code: 400, message: "Missing CBLTest-Client-ID headers")
         }
         return id
