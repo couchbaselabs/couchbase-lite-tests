@@ -12,7 +12,7 @@ from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.api.cbltestclass import CBLTestClass
 
 class TestReplicationBlob(CBLTestClass):
-    @pytest.mark.cbse(14681)
+    @pytest.mark.cbse(14861)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_non_blob_changes_with_delta_sync_and_compact(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
