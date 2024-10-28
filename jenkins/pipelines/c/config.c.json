@@ -3,5 +3,6 @@
     "test-servers": ["http://localhost:8080"],
     "sync-gateways": [{"hostname": "localhost", "tls": true}],
     "couchbase-servers": [{"hostname": "localhost"}],
+    "greenboard": {"hostname": "jenkins.mobiledev.couchbase.com", "username": "writer", "password": "couchbase2" },
     "api-version": 1
 }
