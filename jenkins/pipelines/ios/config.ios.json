@@ -3,5 +3,6 @@
     "test-servers": ["http://10.100.150.123:8080"],
     "sync-gateways": [{"hostname": "10.100.150.142", "tls": true}],
     "couchbase-servers": [{"hostname": "10.100.150.142"}],
+    "greenboard": {"hostname": "jenkins.mobiledev.couchbase.com", "username": "writer", "password": "couchbase2" },
     "api-version": 1
 }
