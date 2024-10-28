@@ -3,9 +3,9 @@
 // Handler Functions For Internal Testing
 
 // TODO: Enable this when 4.0 binary is ready
-//extern "C" {
-//FLString CBLDocument_RevisionHistory(const CBLDocument *doc);
-//}
+extern "C" {
+FLString CBLDocument_GetRevisionHistory(const CBLDocument *doc);
+}
 
 int Dispatcher::handlePOSTGetDocument(Request &request, Session *session) {
     json body = request.jsonBody();
@@ -31,6 +31,6 @@ int Dispatcher::handlePOSTGetDocument(Request &request, Session *session) {
     json["_id"] = docID;
 
     // TODO: Use CBLDocument_RevisionHistory(doc) instead when 4.0 binary is ready.
-    json["_revs"] = STR(CBLDocument_RevisionID(doc));
+    json["_revs"] = STR(CBLDocument_GetRevisionHistory(doc));
     return request.respondWithJSON(json);
 }
