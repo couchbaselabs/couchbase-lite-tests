@@ -28,7 +28,7 @@ pipeline {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run iOS Test"
-                sh "jenkins/pipelines/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}"
+                sh "jenkins/pipelines/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
             }
             post { 
                 always { 
