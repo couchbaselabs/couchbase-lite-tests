@@ -24,7 +24,11 @@ extension ContentTypes {
         let additionalInfo: String?
         
         init() {
-            self.version = CBLVersion.version
+            if CBLVersion.build.isEmpty || CBLVersion.build == "0" {
+                self.version = CBLVersion.version
+            } else {
+                self.version = "\(CBLVersion.version)-\(CBLVersion.build)"
+            }
             self.apiVersion = TestServer.maxAPIVersion
             self.cbl = "couchbase-lite-swift"
             self.device = DeviceInfo(model: UIDevice.current.name, systemName: UIDevice.current.systemName, systemVersion: UIDevice.current.systemVersion, systemApiVersion: nil)

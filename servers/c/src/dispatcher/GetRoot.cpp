@@ -10,7 +10,11 @@
 int Dispatcher::handleGETRoot(Request &request,
                               Session *session) { // NOLINT(readability-convert-member-functions-to-static)
     json result;
-    result["version"] = cbl_info::version();
+    if (cbl_info::build() > 0) {
+        result["version"] = cbl_info::version() + "-" + to_string(cbl_info::build());
+    } else {
+        result["version"] = cbl_info::version();
+    }
     result["apiVersion"] = TestServer::API_VERSION;
     result["cbl"] = TestServer::CBL_PLATFORM_NAME;
 
