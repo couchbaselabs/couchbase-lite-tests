@@ -16,7 +16,7 @@ import org.apache.commons.daemon.DaemonContext;
 import com.couchbase.lite.mobiletest.Server;
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.errors.ServerError;
-import com.couchbase.lite.mobiletest.util.Log;
+import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.util.NetUtils;
 
 

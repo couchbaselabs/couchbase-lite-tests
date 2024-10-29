@@ -20,8 +20,8 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.DocReplListener;
+import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.util.FileUtils;
-import com.couchbase.lite.mobiletest.util.Log;
 
 
 public final class TestContext implements AutoCloseable {
@@ -64,7 +64,7 @@ public final class TestContext implements AutoCloseable {
     @NonNull
     public String getClient() { return client; }
 
-    public void setTestName(@NonNull String testName) { this.testName = testName; }
+    public void setTestName(@Nullable String testName) { this.testName = testName; }
 
     @Nullable
     public String getTestName() { return testName; }
@@ -80,6 +80,7 @@ public final class TestContext implements AutoCloseable {
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
     public void addDb(@NonNull String name, @NonNull Database db) {
+        Log.p(TAG, "Adding database to context: " + name);
         if (openDbs == null) { openDbs = new HashMap<>(); }
         if (openDbs.containsKey(name)) { throw new ClientError("Attempt to replace an open database"); }
         openDbs.put(name, db);
