@@ -15,13 +15,10 @@
 //
 package com.couchbase.lite.mobiletest
 
-import com.couchbase.lite.MutableArray
-import com.couchbase.lite.MutableDictionary
-import com.couchbase.lite.MutableDocument
-import com.couchbase.lite.mobiletest.trees.TreeEach
-import com.couchbase.lite.mobiletest.util.PrintTree
 import com.couchbase.lite.mobiletest.json.ReplyBuilder
 import com.couchbase.lite.mobiletest.json.RequestBuilder
+import com.couchbase.lite.mobiletest.trees.TreeEach
+import com.couchbase.lite.mobiletest.util.PrintTree
 import org.junit.Assert
 import org.junit.Test
 import java.io.ByteArrayInputStream

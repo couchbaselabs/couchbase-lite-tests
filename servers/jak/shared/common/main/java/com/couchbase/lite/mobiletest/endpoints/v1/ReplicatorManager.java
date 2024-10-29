@@ -64,10 +64,10 @@ import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.json.ErrorBuilder;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
+import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.trees.TypedMap;
-import com.couchbase.lite.mobiletest.util.Log;
 
 
 @SuppressWarnings("PMD.ExcessiveImports")
@@ -263,11 +263,11 @@ public class ReplicatorManager {
         DOC_FLAGS = m;
     }
 
-    private static final Set<String> LEGAL_STOP_KEYS;
+    private static final Set<String> LEGAL_REPL_ID_KEYS;
     static {
         final Set<String> l = new HashSet<>();
         l.add(KEY_REPL_ID);
-        LEGAL_STOP_KEYS = Collections.unmodifiableSet(l);
+        LEGAL_REPL_ID_KEYS = Collections.unmodifiableSet(l);
     }
 
     private static final Map<String, Supplier<ConfigurableConflictResolver>> CONFLICT_RESOLVER_FACTORIES;
@@ -320,6 +320,8 @@ public class ReplicatorManager {
 
     @NonNull
     public Map<String, Object> getReplStatus(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+        req.validate(LEGAL_REPL_ID_KEYS);
+
         final String replId = req.getString(KEY_REPL_ID);
         if (replId == null) { throw new ClientError("Replicator id not specified"); }
 
@@ -349,7 +351,7 @@ public class ReplicatorManager {
 
     @NonNull
     public Map<String, Object> stopRepl(@NonNull TestContext ctxt, @NonNull TypedMap req) {
-        req.validate(LEGAL_STOP_KEYS);
+        req.validate(LEGAL_REPL_ID_KEYS);
 
         final String replId = req.getString(KEY_REPL_ID);
         if (replId == null) { throw new ClientError("Replicator id not specified in stopReplicator"); }

@@ -20,10 +20,7 @@ import android.os.Build
 import android.util.Base64
 import com.couchbase.lite.CouchbaseLite
 import com.couchbase.lite.CouchbaseLiteException
-import com.couchbase.lite.Database
 import com.couchbase.lite.KeyStoreUtils
-import com.couchbase.lite.LogDomain
-import com.couchbase.lite.LogLevel
 import com.couchbase.lite.TLSIdentity
 import com.couchbase.lite.internal.core.CBLVersion
 import com.couchbase.lite.mobiletest.TestApp
@@ -36,12 +33,8 @@ import java.util.*
 
 
 class AndroidTestApp(private val context: Context) : TestApp("Android") {
-
     override fun initCBL() {
         CouchbaseLite.init(context, true)
-        val logger = Database.log.console
-        logger.domains = LogDomain.ALL_DOMAINS
-        logger.level = LogLevel.DEBUG
     }
 
     override fun getSystemInfo(): Map<String, Any> {
@@ -49,14 +42,16 @@ class AndroidTestApp(private val context: Context) : TestApp("Android") {
             KEY_SERVER_VERSION to com.couchbase.lite.BuildConfig.VERSION_NAME,
             KEY_API to LATEST_SUPPORTED_PROTOCOL_VERSION,
             KEY_CBL to "couchbase-lite-android",
-            KEY_ADDITIONAL_INFO
-                    to "${platform} Test Server ${BuildConfig.SERVER_VERSION} using ${CBLVersion.getVersionInfo()}",
+
             KEY_DEVICE to mapOf(
                 KEY_DEVICE_MODEL to Build.PRODUCT,
                 KEY_DEVICE_SYS_NAME to "android",
                 KEY_DEVICE_SYS_VERSION to Build.VERSION.RELEASE,
                 KEY_DEVICE_SYS_API to Build.VERSION.SDK_INT
-            )
+            ),
+
+            KEY_ADDITIONAL_INFO
+                    to "${platform} Test Server ${BuildConfig.SERVER_VERSION} using ${CBLVersion.getVersionInfo()}"
         )
     }
 

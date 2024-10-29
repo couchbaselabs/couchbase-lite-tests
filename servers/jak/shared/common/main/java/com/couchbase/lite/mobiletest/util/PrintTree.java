@@ -18,6 +18,7 @@ package com.couchbase.lite.mobiletest.util;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.trees.TreeEach;
 
 

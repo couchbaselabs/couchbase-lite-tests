@@ -33,6 +33,8 @@ import java.util.List;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
+import com.couchbase.lite.mobiletest.services.Log;
+
 
 public final class NetUtils {
     private NetUtils() { }

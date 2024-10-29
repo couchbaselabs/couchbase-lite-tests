@@ -25,6 +25,7 @@ import java.util.Map;
 import com.couchbase.lite.CBLError;
 import com.couchbase.lite.CouchbaseLiteException;
 
+
 // Use this to report a Couchbase API failure (CouchbaseLiteException)
 public class CblApiFailure extends TestError {
     private static final Map<String, String> DOMAINS;

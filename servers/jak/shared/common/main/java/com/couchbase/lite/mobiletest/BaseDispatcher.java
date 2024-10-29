@@ -21,7 +21,7 @@ import androidx.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.couchbase.lite.mobiletest.util.Log;
+import com.couchbase.lite.mobiletest.services.Log;
 
 
 public class BaseDispatcher<T> {

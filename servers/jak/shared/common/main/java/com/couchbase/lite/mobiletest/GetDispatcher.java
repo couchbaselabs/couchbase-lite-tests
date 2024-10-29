@@ -23,7 +23,7 @@ import java.util.Map;
 
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.json.ReplyBuilder;
-import com.couchbase.lite.mobiletest.util.Log;
+import com.couchbase.lite.mobiletest.services.Log;
 
 // Implements API 0.5.2
 public final class GetDispatcher extends BaseDispatcher<GetDispatcher.Endpoint> {
@@ -60,7 +60,7 @@ public final class GetDispatcher extends BaseDispatcher<GetDispatcher.Endpoint> 
             throw new ClientError(msg);
         }
 
-        final Map<String, Object> result = endpoint.run(TestApp.getApp().getTestContext(client));
+        final Map<String, Object> result = endpoint.run(TestApp.getApp().getSession(client));
 
         Log.p(TAG, "Request succeeded");
         return new Reply(new ReplyBuilder(result).buildReply());
