@@ -24,7 +24,7 @@ pipeline {
                 echo "Run Android Tests"
                 sh """
                     #export ANDROID_SERIAL=14151JEC204776
-                    jenkins/pipelines/android/android_tests.sh ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}
+                    jenkins/pipelines/android/android_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
                 """
             }
             post {

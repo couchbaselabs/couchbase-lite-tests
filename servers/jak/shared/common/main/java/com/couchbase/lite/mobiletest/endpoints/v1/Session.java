@@ -47,6 +47,14 @@ public class Session {
     private static final String KEY_URL = "url";
     private static final String KEY_TAG = "tag";
 
+    private static final Set<String> LEGAL_SESSION_KEYS;
+    static {
+        final Set<String> l = new HashSet<>();
+        l.add(KEY_ID);
+        l.add(KEY_LOGGING);
+        LEGAL_SESSION_KEYS = Collections.unmodifiableSet(l);
+    }
+
     private static final Set<String> LEGAL_RESET_KEYS;
     static {
         final Set<String> l = new HashSet<>();
@@ -61,14 +69,6 @@ public class Session {
         l.add(KEY_COLLECTIONS);
         l.add(KEY_DATASET);
         LEGAL_DATABASE_KEYS = Collections.unmodifiableSet(l);
-    }
-
-    private static final Set<String> LEGAL_SESSION_KEYS;
-    static {
-        final Set<String> l = new HashSet<>();
-        l.add(KEY_ID);
-        l.add(KEY_LOGGING);
-        LEGAL_SESSION_KEYS = Collections.unmodifiableSet(l);
     }
 
     private static final Set<String> LEGAL_SETUP_LOGGING_KEYS;
@@ -86,29 +86,6 @@ public class Session {
     public Session(@NonNull TestApp app) { this.app = app; }
 
     @NonNull
-    public final Map<String, Object> reset(@NonNull String client, @NonNull TypedMap req) {
-        req.validate(LEGAL_RESET_KEYS);
-
-        final TestContext oldCtxt = app.getSession(client);
-        String testName = oldCtxt.getTestName();
-        if (testName != null) { Log.p(TAG, "<<<<< END TEST: " + testName); }
-
-        reset(app, oldCtxt);
-
-        testName = req.getString(KEY_TEST_NAME);
-        final TestContext newCtxt = app.newSession(client);
-        newCtxt.setTestName(testName);
-
-        final DatabaseService dbSvc = init(app, newCtxt);
-
-        if (testName != null) { Log.p(TAG, ">>>>> START TEST: " + testName); }
-
-        createDbs(newCtxt, dbSvc, req.getMap(KEY_DATABASES));
-
-        return Collections.emptyMap();
-    }
-
-    @NonNull
     public Map<String, Object> newSession(@NonNull String newClient, @NonNull TypedMap req) {
         req.validate(LEGAL_SESSION_KEYS);
 
@@ -124,11 +101,10 @@ public class Session {
         final String oldClient = (oldCtxt == null) ? null : oldCtxt.getClient();
         if (oldClient != null) { Log.p(TAG, "<<<<<<<<<< END SESSION: " + oldClient); }
 
-        reset(app, oldCtxt);
+        endSession(app);
 
         final TestContext newCtxt = app.newSession(sessionId);
-
-        init(app, newCtxt);
+        startSession(app, newCtxt);
 
         final TypedMap logConfig = req.getMap(KEY_LOGGING);
         if (logConfig == null) { Log.installDefaultLogger(); }
@@ -139,7 +115,29 @@ public class Session {
         return Collections.emptyMap();
     }
 
-    private void setupRemoteLogger(@NonNull String id, @NonNull TypedMap req) {
+    @NonNull
+    public final Map<String, Object> reset(@NonNull String client, @NonNull TypedMap req) {
+        req.validate(LEGAL_RESET_KEYS);
+
+        final TestContext oldCtxt = app.getSession(client);
+        String testName = oldCtxt.getTestName();
+        if (testName != null) { Log.p(TAG, "<<<<< END TEST: " + testName); }
+
+        endSession(app);
+
+        final TestContext newCtxt = app.newSession(client);
+        final DatabaseService dbSvc = startSession(app, newCtxt);
+        testName = req.getString(KEY_TEST_NAME);
+        newCtxt.setTestName(testName);
+
+        if (testName != null) { Log.p(TAG, ">>>>> START TEST: " + testName); }
+
+        createDbs(newCtxt, dbSvc, req.getMap(KEY_DATABASES));
+
+        return Collections.emptyMap();
+    }
+
+    private void setupRemoteLogger(@NonNull String sessionId, @NonNull TypedMap req) {
         req.validate(LEGAL_SETUP_LOGGING_KEYS);
 
         final String url = req.getString(KEY_URL);
@@ -148,7 +146,7 @@ public class Session {
         final String tag = req.getString(KEY_TAG);
         if (tag == null) { throw new ClientError("No log tag in logging config"); }
 
-        Log.installRemoteLogger(id, url, tag);
+        Log.installRemoteLogger(url, sessionId, tag);
     }
 
     private void createDbs(@NonNull TestContext ctxt, @NonNull DatabaseService dbSvc, @Nullable TypedMap databases) {
@@ -211,18 +209,17 @@ public class Session {
         dbSvc.installDataset(ctxt, dataset, dbName);
     }
 
-    private void reset(@NonNull TestApp app, @Nullable TestContext ctxt) {
-        app.clearReplSvc();
-        app.clearDbSvc();
-        if (ctxt != null) { ctxt.close(); }
-    }
-
     @NonNull
-    private DatabaseService init(@NonNull TestApp app, @NonNull TestContext ctxt) {
+    private DatabaseService startSession(@NonNull TestApp app, @NonNull TestContext ctxt) {
         final DatabaseService dbSvc = app.getDbSvc();
         dbSvc.init(ctxt);
         app.getReplSvc().init(ctxt);
         return dbSvc;
+    }
+
+    private void endSession(@NonNull TestApp app) {
+        app.clearReplSvc();
+        app.clearDbSvc();
     }
 }
 

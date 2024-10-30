@@ -25,6 +25,8 @@ ext {
     ETC_DIR = "${ROOT_DIR}/etc"
 
     REPORTS_DIR = "${buildDir}/reports"
+
+    OKHTTP_VERSION = '4.12.0'
 }
 
 // Set -Pverbose to get full console logs for tests
@@ -102,6 +104,8 @@ dependencies {
     implementation 'commons-daemon:commons-daemon:1.2.2'
 
     implementation 'com.squareup.moshi:moshi:1.14.0'
+
+    implementation "com.squareup.okhttp3:okhttp:${OKHTTP_VERSION}"
 
     implementation 'org.nanohttpd:nanohttpd:2.3.2-SNAPSHOT'
 
