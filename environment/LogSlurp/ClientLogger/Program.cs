@@ -8,7 +8,7 @@ const int Port = 5186;
 
 using var httpClient = new HttpClient();
 var log_id = Guid.NewGuid().ToString();
-var response = await httpClient.PostAsync($"http://localhost:{Port}/startNewLog", JsonContent.Create(log_id));
+var response = await httpClient.PostAsync($"http://localhost:{Port}/startNewLog", JsonContent.Create(new { log_id }));
 
 var ws = new ClientWebSocket();
 ws.Options.SetRequestHeader("CBL-Log-ID", log_id);
