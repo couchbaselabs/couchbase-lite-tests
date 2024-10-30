@@ -2,7 +2,7 @@ pipeline {
     agent none
     parameters {
         choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
-        string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
     }
@@ -24,7 +24,7 @@ pipeline {
                 echo "Run Android Tests"
                 sh """
                     #export ANDROID_SERIAL=14151JEC204776
-                    jenkins/pipelines/android/android_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                    jenkins/pipelines/android/android_tests.sh ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}
                 """
             }
             post {

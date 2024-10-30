@@ -2,20 +2,20 @@
 # Build the Java Desktop test server, deploy it, and run the tests
 
 function usage() {
-    echo "Usage: $0 <edition> <version> <build num>"
+    echo "Usage: $0 <version> <build num> [<sg url>]"
     exit 1
 }
 
-if [ "$#" -ne 3 ]; then usage; fi
+if [ "$#" -lt 2 ] | [ "$#" -gt 3 ] ; then usage; fi
 
-EDITION="$1"
-if [ -z "$EDITION" ]; then usage; fi
-
-VERSION="$2"
+VERSION="$1"
 if [ -z "$VERSION" ]; then usage; fi
 
-BUILD_NUMBER="$3"
+BUILD_NUMBER="$2"
 if [ -z "$BUILD_NUMBER" ]; then usage; fi
+
+SG_URL="$3"
+
 
 # Force the Couchbase Lite Java version
 pushd servers/jak > /dev/null
@@ -32,11 +32,9 @@ nohup java -jar ./app/build/libs/CBLTestServer-Java-Desktop-${VERSION}-${BUILD_N
 echo $! > server.pid
 popd > /dev/null
 
-echo "Start Server & SG"
-pushd environment > /dev/null
-./start_environment.py
+echo "Start Environment"
+jenkins/pipelines/shared/setup_backend.sh "${SG_URL}"
 
-popd > /dev/null
 cp -f "jenkins/pipelines/java/desktop/config_java_desktop.json" tests
 
 SERVER_FILE="servers/jak/desktop/server.url"

@@ -1,21 +1,22 @@
 #!/bin/bash
 # Build and run the Java WebService test server, and run the tests
 
+LATESTBUILDS="https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-java"
+
 function usage() {
-    echo "Usage: $0 <edition> <version> <build num>"
+    echo "Usage: $0 <version> <build num> [<sg url>]"
     exit 1
 }
 
-if [ "$#" -ne 3 ]; then usage; fi
+if [ "$#" -lt 2 ] | [ "$#" -gt 3 ] ; then usage; fi
 
-EDITION="$1"
-if [ -z "$EDITION" ]; then usage; fi
-
-VERSION="$2"
+VERSION="$1"
 if [ -z "$VERSION" ]; then usage; fi
 
-BUILD_NUMBER="$3"
+BUILD_NUMBER="$2"
 if [ -z "$BUILD_NUMBER" ]; then usage; fi
+
+SG_URL="$3"
 
 # Force the Couchbase Lite Java version
 pushd servers/jak > /dev/null
@@ -35,12 +36,10 @@ rm -rf server.log app/server.url
 nohup ./gradlew jettyStart -PbuildNumber="${BUILD_NUMBER}" < /dev/null > server.log 2>&1 &
 popd > /dev/null
 
-echo "Start Server & SG"
-pushd environment > /dev/null
-./start_environment.py
+echo "Start Environment"
+jenkins/pipelines/shared/setup_backend.sh "${SG_URL}"
 
 echo "Wait for the Test Server..."
-popd > /dev/null
 SERVER_FILE="servers/jak/webservice/app/server.url"
 SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
 n=0

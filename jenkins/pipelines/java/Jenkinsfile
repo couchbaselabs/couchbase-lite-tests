@@ -2,7 +2,7 @@ pipeline {
     agent none
     parameters {
         choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
-        string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
     }
@@ -29,7 +29,7 @@ pipeline {
                         stage('OSX Desktop Tests') {
                             steps {
                                 sh """
-                                    jenkins/pipelines/java/desktop/osx_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                    jenkins/pipelines/java/desktop/osx_tests.sh ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}
                                 """
                             }
                             post {
@@ -45,7 +45,7 @@ pipeline {
                             when { expression { true } }
                             steps {
                                 sh """
-                                    jenkins/pipelines/java/webservice/osx_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                    jenkins/pipelines/java/webservice/osx_tests.sh ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}
                                 """
                             }
                             post {
@@ -65,7 +65,7 @@ pipeline {
                         stage('Windows Desktop Tests') {
                             steps {
                                 pwsh """
-                                    jenkins/pipelines/java/desktop/win_tests.ps1 ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                    jenkins/pipelines/java/desktop/win_tests.ps1 ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}
                                 """
                             }
                             post {
@@ -81,7 +81,7 @@ pipeline {
                             when { expression { false } }
                             steps {
                                 pwsh """
-                                    jenkins/pipelines/java/webservice/win_tests.ps1 ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                    jenkins/pipelines/java/webservice/win_tests.ps1 ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}
                                 """
                             }
                             post {
@@ -101,7 +101,7 @@ pipeline {
                         stage('Linux Desktop Tests') {
                             steps {
                                 sh """
-                                    jenkins/pipelines/java/desktop/linux_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                    jenkins/pipelines/java/desktop/linux_tests.sh ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}
                                 """
                             }
                             post {
@@ -117,7 +117,7 @@ pipeline {
                             when { expression { false } }
                             steps {
                                 sh """
-                                    jenkins/pipelines/java/webservice/linux_tests.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}
+                                    jenkins/pipelines/java/webservice/linux_tests.sh ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}
                                 """
                             }
                             post {
