@@ -25,7 +25,7 @@ pipeline {
                     agent { label 'mob-e2e-mac-01' }
                     steps {
                         echo "Run macOS Test"
-                        sh "jenkins/pipelines/c/macos_test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}"
+                        sh "jenkins/pipelines/c/macos_test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
                     }
                     post { 
                         always { 
@@ -46,7 +46,7 @@ pipeline {
                         // Unlock keychain:
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "Run iOS Test"
-                        sh "jenkins/pipelines/c/ios_test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}"
+                        sh "jenkins/pipelines/c/ios_test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
                     }
                     post { 
                         always { 
@@ -59,7 +59,7 @@ pipeline {
                     agent { label 'mob-e2e-deb-02' }
                     steps {
                         echo "Run linux Test"
-                        sh "jenkins/pipelines/c/linux_test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD}"
+                        sh "jenkins/pipelines/c/linux_test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
                     }
                     post { 
                         always { 
