@@ -5,20 +5,19 @@ BUILD_TOOLS_VERSION='34.0.0'
 SDK_MGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --channel=1"
 
 function usage() {
-    echo "Usage: $0 <edition> <version> <build num>"
+    echo "Usage: $0 <version> <build num> [<sg url>]"
     exit 1
 }
 
-if [ "$#" -ne 3 ]; then usage; fi
+if [ "$#" -lt 2 ] | [ "$#" -gt 3 ] ; then usage; fi
 
-EDITION="$1"
-if [ -z "$EDITION" ]; then usage; fi
-
-VERSION="$2"
+VERSION="$1"
 if [ -z "$VERSION" ]; then usage; fi
 
-BUILD_NUMBER="$3"
+BUILD_NUMBER="$2"
 if [ -z "$BUILD_NUMBER" ]; then usage; fi
+
+SG_URL="$3"
 
 
 echo "Install Android SDK"
@@ -42,11 +41,9 @@ echo "Start the Test Server"
 adb shell am start -a android.intent.action.MAIN -n com.couchbase.lite.android.mobiletest/.MainActivity
 popd > /dev/null
 
-echo "Start Server/SGW"
-pushd environment > /dev/null
-./start_environment.py
+echo "Start Environment"
+jenkins/pipelines/shared/setup_backend.sh "${SG_URL}"
 
-popd > /dev/null
 cp -f "jenkins/pipelines/android/config.android.json" tests
 
 echo "Configure tests"

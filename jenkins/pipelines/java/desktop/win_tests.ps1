@@ -1,12 +1,12 @@
 param (
     [Parameter(Mandatory=$true)]
-    [string]$edition,
-
-    [Parameter(Mandatory=$true)]
     [string]$version,
 
     [Parameter(Mandatory=$true)]
     [string]$buildNumber
+
+    [Parameter(Mandatory=$false)]
+    [string]$sgUrl,
 )
 
 # Force the Couchbase Lite Java version
@@ -27,13 +27,10 @@ $app = Start-Process java -ArgumentList "-jar .\app\build\libs\CBLTestServer-Jav
 $app.Id | Out-File server.pid
 Pop-Location
 
-Write-Host "Start Server & SG"
-Push-Location environment
-& .\start_environment.py
+Write-Host "Start Environment"
+& .\jenkins\pipelines\shared\setup_backend.ps1 $sgUrl
 
-Pop-Location
-Copy-Item .\jenkins\pipelines\java\desktop\config_java_desktop.json -Destination tests
-
+Write-Host "Wait for the Test Server..."
 $n = 0
 $serverUrl = ""
 $urlFile = .\servers\jak\desktop\app\server.url
@@ -59,6 +56,7 @@ while ($true) {
 }
 
 Write-Host "Configure tests"
+Copy-Item .\jenkins\pipelines\java\desktop\config_java_desktop.json -Destination tests
 Push-Location tests
 Add-Content config_java_desktop.json "    `"test-servers`": [`"$serverUrl`"]"
 Add-Content config_java_desktop.json '}'

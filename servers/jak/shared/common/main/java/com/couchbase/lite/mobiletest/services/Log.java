@@ -21,7 +21,7 @@ public final class Log {
     /**
      * A CustomLogger that can be used to log messages from this test server.
      */
-    public abstract static class TestLogger implements Logger {
+    public abstract static class TestLogger implements Logger, AutoCloseable {
         public static final String LOG_PREFIX = "CBLTEST/";
 
         @Override
@@ -32,6 +32,7 @@ public final class Log {
 
         public abstract void log(LogLevel level, String tag, String msg, Exception err);
 
+        // does not throw
         public abstract void close();
     }
 
@@ -64,15 +65,16 @@ public final class Log {
 
     public static void installDefaultLogger() { installLogger(new DefaultLogger()); }
 
-    public static void installRemoteLogger(@NonNull String id, @NonNull String url, @NonNull String tag) {
+    public static void installRemoteLogger(@NonNull String url, @NonNull String sessionId, @NonNull String tag) {
         Log.err(TAG, "Remote logging not yet supported");
-        final RemoteLogger logger = new RemoteLogger(id, tag, url);
+        final RemoteLogger logger = new RemoteLogger(url, sessionId, tag);
         logger.connect();
         installLogger(logger);
     }
 
     private static void installLogger(@NonNull TestLogger logger) {
-        LOGGER.set(logger);
+        final TestLogger oldLogger = LOGGER.getAndSet(logger);
         Database.log.setCustom(logger);
+        if (oldLogger != null) { oldLogger.close(); }
     }
 }

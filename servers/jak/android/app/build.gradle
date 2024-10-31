@@ -23,6 +23,8 @@ ext {
     ETC_DIR = "${ROOT_DIR}/etc"
 
     REPORTS_DIR = "${buildDir}/reports"
+
+    OKHTTP_VERSION = '4.12.0'
 }
 
 // Set true to use mavenLocal instead of Proget
@@ -31,7 +33,7 @@ def USE_LOCAL_MAVEN = project.hasProperty("useLocalMaven")
 android {
     namespace "com.couchbase.lite.android.mobiletest"
 
-    compileSdkVersion COMPILE_SDK_VERSION
+    compileSdk COMPILE_SDK_VERSION
 
     compileOptions {
         targetCompatibility 1.8
@@ -130,6 +132,8 @@ dependencies {
     implementation 'androidx.databinding:databinding-runtime:8.5.2'
 
     implementation 'com.squareup.moshi:moshi:1.14.0'
+
+    implementation "com.squareup.okhttp3:okhttp:${OKHTTP_VERSION}"
 
     implementation 'org.nanohttpd:nanohttpd:2.3.2-SNAPSHOT'
 
