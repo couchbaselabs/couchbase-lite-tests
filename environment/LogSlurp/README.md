@@ -56,6 +56,37 @@ Note that the log is still retrievable after this call is made.
 CBL-Log-ID: <id from startNewLog>
 ```
 
+## Use in the E2E Test environment
+
+The expected use case for the log slurper looks like this:
+
+- The Python test client creates a new (probably random) session id.
+- The test client calls the slurper `/startNewLog` endpoint supplying the session id.  If the call is successful, the slurper is now awating logs for the new session
+- The test client creates a unique 'tag' for each device involved in the test session. This tag will, essentially, name the device, during the logging session
+- The test client notifies each device of the session id and the tag by which the device will identify itself.  For the TestServers, this is a call to /newSession
+
+```
+{
+    "id": <session id>
+    "logging": {
+        "url": <logslurper hostname:port>  // note that this is NOT a url
+        "tag": <device tag>                // as described above: the "name" of the device, for this session
+    }
+}
+```
+
+- Test devices open a websocket connection to the slurper:
+
+```
+GET ws://<slurper hostname:port>/openLogStream
+CBL-Log-ID: <sessionId>
+CBL-Log-Tag: <tag>
+```
+
+- If this call succeeds, test devices can log by sending simple text messages down the websocket connection
+- At some point, presumeably the end of a test session, the python test client calls `/finishLog`
+- In response to the call to `/finishLog`, the slurper will close all websocket connections for that session, and will refuse any new ones
+
 ## Building
 
 There is a [Dockerfile](./LogSlurp/Dockerfile) that can be used to build an image for this server to be deployed as a service.  The resulting image will be bound to port 8180 (which can be forwarded to any host port with docker commands).
