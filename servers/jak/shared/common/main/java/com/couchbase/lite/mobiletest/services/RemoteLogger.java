@@ -15,13 +15,15 @@
 //
 package com.couchbase.lite.mobiletest.services;
 
-import androidx.annotation.GuardedBy;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -37,7 +39,46 @@ import com.couchbase.lite.mobiletest.errors.ServerError;
 @SuppressWarnings({"PMD.UnusedPrivateField", "PMD.SingularField"})
 public class RemoteLogger extends Log.TestLogger {
     private static final String TAG = "REMLOG";
+    private static final long TIMEOUT_SECS = 30;
 
+    @NonNull
+    private final WebSocketListener listener = new WebSocketListener() {
+        @Override
+        public void onOpen(@NonNull WebSocket socket, @NonNull Response resp) {
+            if (!(resp.isSuccessful() || (resp.code() == 101))) { fail("Failed starting new log: " + resp.code()); }
+            final WebSocket oSocket = webSocket.getAndSet(socket);
+            startLatch.countDown();
+            if (oSocket != null) { fail("Unexpected WebSocket open"); }
+        }
+
+        @Override
+        public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
+            Log.p(TAG, "Unexpected message from LogSlurper: " + text);
+        }
+
+        @Override
+        public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t, @Nullable Response resp) {
+            stopLatch.countDown();
+            startLatch.countDown();
+            fail("WebSocket error", t);
+        }
+
+        @Override
+        public void onClosed(@NonNull WebSocket webSocket, int code, @NonNull String reason) {
+            stopLatch.countDown();
+            startLatch.countDown();
+            close(1000, "Closed");
+        }
+    };
+
+    @NonNull
+    private final CountDownLatch startLatch = new CountDownLatch(1);
+    @NonNull
+    private final CountDownLatch stopLatch = new CountDownLatch(1);
+    @NonNull
+    private final AtomicReference<WebSocket> webSocket = new AtomicReference<>();
+    @NonNull
+    private final AtomicBoolean connected = new AtomicBoolean();
 
     @NonNull
     private final String url;
@@ -46,9 +87,6 @@ public class RemoteLogger extends Log.TestLogger {
     @NonNull
     private final String tag;
 
-    @Nullable
-    @GuardedBy("url")
-    private WebSocket webSocket;
 
     public RemoteLogger(@NonNull String url, @NonNull String sessionId, @NonNull String tag) {
         this.url = url;
@@ -56,40 +94,27 @@ public class RemoteLogger extends Log.TestLogger {
         this.tag = tag;
     }
 
+    // Synchronously open a connection to the remote log server.
     public void connect() {
+        if (connected.getAndSet(true)) { throw new ServerError("Attempt to reused a RemoteLogger"); }
+
         new OkHttpClient.Builder()
             .readTimeout(0, TimeUnit.MILLISECONDS)
             .build()
             .newWebSocket(
                 new Request.Builder()
-                    .url("\"ws://" + url + "/openLogStream")
+                    .url("http://" + url + "/openLogStream")
                     .header("CBL-Log-ID", sessionId)
                     .header("CBL-Log-Tag", tag)
                     .get()
                     .build(),
-                new WebSocketListener() {
-                    @Override
-                    public void onOpen(@NonNull WebSocket socket, @NonNull Response resp) {
-                        if (!resp.isSuccessful()) {
-                            fail("Failed starting new log response: " + resp.code());
-                        }
-                        synchronized (url) { webSocket = socket; }
-                    }
+                listener);
 
-                    @Override
-                    public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
-                        fail("Unexpected message from LogSlurper: " + text);
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t, @Nullable Response resp) {
-                        fail("WebSocket error: " + t.getMessage(), t);
-                        close();
-                    }
-
-                    @Override
-                    public void onClosed(@NonNull WebSocket webSocket, int code, @NonNull String reason) { close(); }
-                });
+        try {
+            if (startLatch.await(10, TimeUnit.SECONDS)) { return; }
+        }
+        catch (InterruptedException ignore) { }
+        fail("Failed opening LogSlurper websocket");
     }
 
     @Override
@@ -99,37 +124,45 @@ public class RemoteLogger extends Log.TestLogger {
 
     @Override
     public void log(LogLevel level, String tag, String msg, Exception err) {
-        final WebSocket socket;
-        synchronized (url) { socket = webSocket; }
-
+        final WebSocket socket = webSocket.get();
         if (socket == null) {
             Log.p(TAG, "RemoteLogger is not connected");
             return;
         }
 
-        final StringBuilder logMsg = new StringBuilder();
-        logMsg.append(tag).append('/').append(level.toString()).append(' ').append(msg);
+        sendLogMessage(socket, new StringBuilder(tag).append('/').append(level).append(' ').append(msg).toString());
 
         if (err != null) {
             final StringWriter sw = new StringWriter();
             err.printStackTrace(new PrintWriter(sw));
-            logMsg.append(System.lineSeparator()).append(sw);
+            sendLogMessage(socket, sw.toString());
         }
-
-        socket.send(logMsg.toString());
     }
 
     @Override
-    public void close() {
-        final WebSocket socket;
-        synchronized (url) { socket = webSocket; }
-        if (socket != null) { socket.close(1000, null); }
+    public void close() { close(1001, "Closed by client"); }
+
+    private void sendLogMessage(@NonNull WebSocket socket, @NonNull String message) {
+        if (!socket.send(message)) { Log.p(TAG, "Failed to send log message"); }
     }
 
     private void fail(String message) { fail(message, null); }
 
     private void fail(String message, Throwable e) {
-        close();
+        close(1011, message);
         throw new ServerError(message, e);
+    }
+
+    // Synchronously close the connection to the remote log server.
+    private void close(int code, @NonNull String reason) {
+        final WebSocket socket = webSocket.getAndSet(null);
+        if (socket == null) { return; }
+
+        socket.close(code, reason);
+        try {
+            if (stopLatch.await(TIMEOUT_SECS, TimeUnit.SECONDS)) { return; }
+        }
+        catch (InterruptedException ignore) { }
+        Log.p(TAG, "Failed closing LogSlurper websocket");
     }
 }
