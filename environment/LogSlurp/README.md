@@ -106,3 +106,13 @@ quit<br />
 <br />
 ==== Retrieved ====<br />
 ClientLogger: 2024-08-12 23:33:34,147 hello
+
+The client logger can be used to test the implementation of a logger.  Do this:
+- Start the log slurper
+- Start the client logger.  It will print the id of the session it started with the slurper
+- When the client logger loops asking for log messages let it sit
+- Run your logger implementation. Use the session id from the client logger and an arbitrary "tag"
+- Log a few things from your implementation.  Maybe type a couple of log messages at the client logger as well
+- When you have enough logs to validate your implementation, type "quit" at the client logger
+- The client logger will display the contents of the session, including the log messages you typed at it, along with the ones sent from your logger implementation, interleaved approprately.
+

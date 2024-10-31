@@ -6,7 +6,7 @@ pipeline {
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
     }
-    options { timeout(time: 30, unit: 'MINUTES') }
+    options { timeout(time: 60, unit: 'MINUTES') }
     stages {
         stage('Init') {
             steps {

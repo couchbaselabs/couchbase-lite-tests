@@ -3,7 +3,7 @@ param (
     [string]$version,
 
     [Parameter(Mandatory=$true)]
-    [string]$buildNumber
+    [string]$buildNumber,
 
     [Parameter(Mandatory=$false)]
     [string]$sgUrl,
