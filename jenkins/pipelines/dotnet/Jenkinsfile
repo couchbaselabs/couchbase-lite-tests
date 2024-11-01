@@ -7,7 +7,7 @@ pipeline {
         string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
     }
     options {
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 120, unit: 'MINUTES')
         ansiColor('xterm')
         timestamps()
     }
@@ -38,31 +38,41 @@ pipeline {
                 stage("Mac Catalyst") {
                     agent { label 'mob-e2e-mac-01' }
                     steps {
-                        pwsh "jenkins\\pipelines\\dotnet\\test_mac.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
+                        shell "jenkins\\pipelines\\dotnet\\test_mac.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
                     }
                     post { 
                         always { 
-                            pwsh 'jenkins\\pipelines\\dotnet\\teardown_mac.sh'
+                            shell 'jenkins\\pipelines\\dotnet\\teardown_mac.sh'
                         }
                     }
                 }
             }
         }
-        stage('Mobile') {
-            parallel {
-                stage("iOS") {
-                    options {
-                        lock("mob-e2e-iphone-01")
-                    }
-                    agent { label 'mob-e2e-mac-01' }
-                    steps {
-                        pwsh "jenkins\\pipelines\\dotnet\\test_ios.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
-                    }
-                    post { 
-                        always { 
-                            pwsh 'jenkins\\pipelines\\dotnet\\teardown_ios.sh'
-                        }
-                    }
+        stage('iOS') {
+            options {
+                lock("mob-e2e-iphone-01")
+            }
+            agent { label 'mob-e2e-mac-01' }
+            steps {
+                shell "jenkins\\pipelines\\dotnet\\test_ios.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
+            }
+            post {
+                always {
+                    shell 'jenkins\\pipelines\\dotnet\\teardown_ios.sh'
+                }
+            }
+        }
+        stage('Android') {
+            options {
+                lock("mob-e2e-android-01")
+            }
+            agent { label 'mob-e2e-mac-01' }
+            steps {
+                shell "jenkins\\pipelines\\dotnet\\test_android.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
+            }
+            post {
+                always {
+                    shell 'jenkins\\pipelines\\dotnet\\teardown_android.sh'
                 }
             }
         }
