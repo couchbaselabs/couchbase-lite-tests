@@ -12,7 +12,7 @@ if [ $# -lt 1 ]; then
     exit 1
 fi
 
-pushd $SCRIPT_DIR/../testserver
+pushd $SCRIPT_DIR/../../../servers/dotnet/testserver
 
 source $SCRIPT_DIR/prepare_env.sh
 apk_location=$(find bin/Release/net8.0-android/publish -name "*.apk")
