@@ -23,7 +23,7 @@
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">11.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">12.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">13.1</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">22.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</SupportedOSPlatformVersion>
@@ -40,6 +40,12 @@
 		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
 		<SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
 		<UseInterpreter Condition="$(TargetFramework.Contains('-ios'))">true</UseInterpreter>
+		<RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm64;android-arm</RuntimeIdentifiers>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
+		<CodesignProvision>Automatic</CodesignProvision>
+   		<EnableCodeSigning>true</EnableCodeSigning>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -62,6 +68,10 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\testserver.logic\testserver.logic.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Makaretu.Dns.Multicast.New" Version="0.37.0" />
 	</ItemGroup>
 
 </Project>

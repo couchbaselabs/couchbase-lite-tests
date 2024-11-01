@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
-SCRIPT_ROOT=$(dirname "$0")
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 if test -t 1; then
     ncolors=$(tput colors)
@@ -32,7 +33,7 @@ if [ $# -eq 1 ]; then
 fi
 
 write-banner "Stopping existing environment"
-pushd $SCRIPT_ROOT/../../../environment
+pushd $SCRIPT_DIR/../../../environment
 docker compose down # Just in case it didn't get shut down cleanly
 
 write-banner "Building Couchbase Server Image"
