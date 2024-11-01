@@ -18,6 +18,9 @@ pipeline {
         }
         stage('Android') {
             agent { label 'mob-e2e-mac-01' }
+            options {
+                lock("mob-e2e-android-01")
+            }
             steps {
                 // Run tests:
                 echo "Run Android Tests"
