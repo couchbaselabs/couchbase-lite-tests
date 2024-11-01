@@ -6,7 +6,6 @@ pipeline {
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
     }
-    options { timeout(time: 60, unit: 'MINUTES') }
     stages {
         stage('Init') {
             steps {
@@ -20,13 +19,12 @@ pipeline {
         stage('Android') {
             agent { label 'mob-e2e-mac-01' }
             options {
+                timeout(time: 45, unit: 'MINUTES')
                 lock("mob-e2e-android-01")
             }
             steps {
-                // Run tests:
                 echo "Run Android Tests"
                 sh """
-                    #export ANDROID_SERIAL=14151JEC204776
                     jenkins/pipelines/android/android_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
                 """
             }
@@ -34,7 +32,6 @@ pipeline {
                 always {
                     echo "Teardown Android Tests"
                     sh '''
-                        #export ANDROID_SERIAL=14151JEC204776
                         jenkins/pipelines/android/android_teardown.sh
                     '''
                 }
