@@ -48,6 +48,24 @@ pipeline {
                 }
             }
         }
+        stage('Mobile') {
+            parallel {
+                stage("iOS") {
+                    options {
+                        lock("mob-e2e-iphone-01")
+                    }
+                    agent { label 'mob-e2e-mac-01' }
+                    steps {
+                        pwsh "jenkins\\pipelines\\dotnet\\test_ios.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
+                    }
+                    post { 
+                        always { 
+                            pwsh 'jenkins\\pipelines\\dotnet\\teardown_ios.sh'
+                        }
+                    }
+                }
+            }
+        }
     }
     post {
         failure {
