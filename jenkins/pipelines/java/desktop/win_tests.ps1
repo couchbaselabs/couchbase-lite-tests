@@ -6,7 +6,7 @@ param (
     [string]$buildNumber,
 
     [Parameter(Mandatory=$false)]
-    [string]$sgUrl,
+    [string]$sgUrl
 )
 
 # Force the Couchbase Lite Java version

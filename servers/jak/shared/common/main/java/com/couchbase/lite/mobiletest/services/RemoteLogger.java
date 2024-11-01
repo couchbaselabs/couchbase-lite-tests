@@ -96,7 +96,7 @@ public class RemoteLogger extends Log.TestLogger {
 
     // Synchronously open a connection to the remote log server.
     public void connect() {
-        if (connected.getAndSet(true)) { throw new ServerError("Attempt to reused a RemoteLogger"); }
+        if (connected.getAndSet(true)) { throw new ServerError("Attempt to reuse a RemoteLogger"); }
 
         new OkHttpClient.Builder()
             .readTimeout(0, TimeUnit.MILLISECONDS)
