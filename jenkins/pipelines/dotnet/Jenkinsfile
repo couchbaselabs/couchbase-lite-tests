@@ -52,6 +52,10 @@ pipeline {
             options {
                 lock("mob-e2e-iphone-01")
             }
+            environment { 
+                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
+                IOS_TEST_SERVER_IP = "10.100.150.123"
+            }
             agent { label 'mob-e2e-mac-01' }
             steps {
                 shell "jenkins\\pipelines\\dotnet\\test_ios.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
