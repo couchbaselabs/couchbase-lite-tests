@@ -59,7 +59,7 @@ Get-Content config_java_webservice.json
 Write-Host "Running tests on desktop test server at $SERVER_URL"
 & python3.10 -m venv venv
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-./venv/Scripts/activate.ps1
+.\venv\Scripts\activate.ps1
 pip install -r requirements.txt
 
 Write-Host "Run tests"
