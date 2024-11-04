@@ -17,164 +17,134 @@ pipeline {
             }
         }
 
-        // Note that there is no fundamental reason that the Desktop and Web Services
-        // builds couldn't run in parallel.  We'd need to figure out how to set
-        // up the environment server and sg at alternate ports, probably, and we'd
-        // need hardware that can support the load.
+        // If Jenkins will actually run things in parallel, we will, at least for now
+        // Need to use locks to protect platform tests from corrupting each other's back ends.
+        // Might as well use them here, for exactly the same purpose.
 
-        stage('Run Desktop Tests') {
+        stage('Tests') {
             parallel {
-                stage('OSX Tests') {
+                stage('OSX Desktop Test') {
                     agent { label 'mob-e2e-mac-01' }
                     options {
-                        timeout(time: 45, unit: 'MINUTES')
+                        // timeout(time: 60, unit: 'MINUTES')
                         lock("mob-e2e-mac-01")
                     }
-                    stages {
-                        stage('OSX Desktop Tests') {
-                            steps {
-                                echo "Run OSX Java Desktop Tests"
-                                sh """
-                                    jenkins/pipelines/java/desktop/osx_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
-                                """
-                            }
-                            post {
-                                always {
-                                    echo "Teardown OSX Java Desktop Tests"
-                                    sh '''
-                                        jenkins/pipelines/java/desktop/osx_teardown.sh
-                                    '''
-                                }
-                            }
+                    steps {
+                        echo "Run OSX Java Desktop Tests"
+                        sh """
+                            jenkins/pipelines/java/desktop/osx_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
+                        """
+                    }
+                    post {
+                        always {
+                            echo "Teardown OSX Java Desktop Tests"
+                            sh '''
+                                jenkins/pipelines/java/desktop/osx_teardown.sh
+                            '''
                         }
                     }
                 }
-                stage('Windows Tests') {
+
+                stage('Windows Desktop Test') {
                     agent { label 'mob-e2e-win-01' }
                     options {
-                        timeout(time: 45, unit: 'MINUTES')
+                        // timeout(time: 60, unit: 'MINUTES')
                         lock("mob-e2e-win-01")
                     }
-                    stages {
-                        stage('Windows Desktop Tests') {
-                            steps {
-                                echo "Run Windows Java Desktop Tests"
-                                pwsh """
-                                    jenkins/pipelines/java/desktop/win_tests.ps1 "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
-                                """
-                            }
-                            post {
-                                always {
-                                    echo "Teardown Windows Java Desktop Tests"
-                                    pwsh '''
-                                        jenkins/pipelines/java/desktop/win_teardown.ps1
-                                    '''
-                                }
-                            }
+                    steps {
+                        echo "Run Windows Java Desktop Tests"
+                        pwsh "jenkins\\pipelines\\java\\desktop\\win_tests.ps1 ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
+                    }
+                    post {
+                        always {
+                            echo "Teardown Windows Java Desktop Tests"
+                            pwsh 'jenkins\\pipelines\\java\\desktop\\win_teardown.ps1'
                         }
                     }
                 }
-                stage('Linux Tests') {
+
+                stage('Linux Desktop Test') {
                     agent { label 'mob-e2e-deb-02' }
                     options {
-                        timeout(time: 45, unit: 'MINUTES')
+                        // timeout(time: 60, unit: 'MINUTES')
                         lock("mob-e2e-deb-02")
                     }
-                    stages {
-                        stage('Linux Desktop Tests') {
-                            steps {
-                                echo "Run Linux Java Desktop Tests"
-                                sh """
-                                    jenkins/pipelines/java/desktop/linux_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
-                                """
-                            }
-                            post {
-                                always {
-                                    echo "Teardown Linux Java Desktop Tests"
-                                    sh '''
-                                        jenkins/pipelines/java/desktop/linux_teardown.sh
-                                    '''
-                                }
-                            }
+                    steps {
+                        echo "Run Linux Java Desktop Tests"
+                        sh """
+                            jenkins/pipelines/java/desktop/linux_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
+                        """
+                    }
+                    post {
+                        always {
+                            echo "Teardown Linux Java Desktop Tests"
+                            sh '''
+                                jenkins/pipelines/java/desktop/linux_teardown.sh
+                            '''
                         }
                     }
                 }
-            }
-        }
-        stage('Run Webservices Tests') {
-            parallel {
-                stage('OSX Tests') {
+
+                stage('OSX Web Service Test') {
                     agent { label 'mob-e2e-mac-01' }
                     options {
-                        timeout(time: 60, unit: 'MINUTES')
+                        // timeout(time: 120, unit: 'MINUTES')
                         lock("mob-e2e-mac-01")
                     }
-                    stages {
-                        stage('OSX Web Services Tests') {
-                            steps {
-                                echo "Run OSX Java Web Services Tests"
-                                sh """
-                                    jenkins/pipelines/java/webservice/osx_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
-                                """
-                            }
-                            post {
-                                always {
-                                    echo "Teardown OSX Web Services Tests"
-                                    sh '''
-                                        jenkins/pipelines/java/webservice/osx_teardown.sh
-                                    '''
-                                }
-                            }
+                    steps {
+                        echo "Run OSX Java Web Service Tests"
+                        sh """
+                            jenkins/pipelines/java/webservice/osx_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
+                        """
+                    }
+                    post {
+                        always {
+                            echo "Teardown OSX Web Service Tests"
+                            sh '''
+                                jenkins/pipelines/java/webservice/osx_teardown.sh
+                            '''
                         }
                     }
                 }
-                stage('Windows Tests') {
+
+                stage('Windows Web Service Test') {
                     agent { label 'mob-e2e-win-01' }
                     options {
-                        timeout(time: 60, unit: 'MINUTES')
+                        // timeout(time: 120, unit: 'MINUTES')
                         lock("mob-e2e-win-01")
                     }
-                    stages {
-                        stage('Windows Web Services Tests') {
-                            steps {
-                                echo "Run Windows Java Web Services Tests"
-                                pwsh """
-                                    jenkins/pipelines/java/webservice/win_tests.ps1 "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
-                                """
-                            }
-                            post {
-                                always {
-                                    echo "Teardown Windows Web Services Tests"
-                                    pwsh '''
-                                        jenkins/pipelines/java/webservice/win_teardown.ps1
-                                    '''
-                                }
-                            }
+                    steps {
+                        echo "Run Windows Java Web Service Tests"
+                        pwsh "jenkins\\pipelines\\java\\webservice\\win_tests.ps1 ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
+                    }
+                    post {
+                        always {
+                            echo "Teardown Windows Web Service Tests"
+                            pwsh '''
+                                jenkins\\pipelines\\java\\webservice\\win_teardown.ps1
+                            '''
                         }
                     }
                 }
-                stage('Linux Tests') {
+
+                stage('Linux Web Service Test') {
                     agent { label 'mob-e2e-deb-02' }
                     options {
-                        timeout(time: 60, unit: 'MINUTES')
+                        // timeout(time: 120, unit: 'MINUTES')
                         lock("mob-e2e-deb-02")
                     }
-                    stages {
-                        stage('Linux Web Services Tests') {
-                            steps {
-                                echo "Run Linux Java Web Services Tests"
-                                sh """
-                                    jenkins/pipelines/java/webservice/linux_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
-                                """
-                            }
-                            post {
-                                always {
-                                    echo "Teardown Linux Web Services Tests"
-                                    sh '''
-                                        jenkins/pipelines/java/webservice/linux_teardown.sh
-                                    '''
-                                }
-                            }
+                    steps {
+                        echo "Run Linux Java Web Service Tests"
+                        sh """
+                            jenkins/pipelines/java/webservice/linux_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
+                        """
+                    }
+                    post {
+                        always {
+                            echo "Teardown Linux Web Service Tests"
+                            sh '''
+                                jenkins/pipelines/java/webservice/linux_teardown.sh
+                            '''
                         }
                     }
                 }

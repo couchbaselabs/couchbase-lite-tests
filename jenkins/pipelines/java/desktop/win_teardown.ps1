@@ -1,7 +1,5 @@
-#!/bin/bash
-# Clean up after running Java Web Services tests
 
-echo "Shutdown Test Server"
+Write-Host "Shutdown Test Server"
 Push-Location servers\jak\desktop
 if (Test-Path -Path .\server.pid){
     $serverId = Get-Content .\server.pid
@@ -9,7 +7,7 @@ if (Test-Path -Path .\server.pid){
 }
 Pop-Location
 
-echo "Shutdown Environment"
+Write-Host "Shutdown Environment"
 Push-Location environment
 & docker compose down
 
