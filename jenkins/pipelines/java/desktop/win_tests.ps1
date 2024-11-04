@@ -33,7 +33,7 @@ Write-Host "Start Environment"
 Write-Host "Wait for the Test Server..."
 $n = 0
 $serverUrl = ""
-$urlFile = .\servers\jak\desktop\app\server.url
+$urlFile = ".\servers\jak\desktop\app\server.url"
 while ($true) {
     if ($n -gt 30) {
         Write-Host "Cannot get server URL: Aborting"
@@ -65,7 +65,7 @@ Get-Content config_java_desktop.json
 Write-Host "Running tests on desktop test server at $serverUrl"
 & python3.10 -m venv venv
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-./venv/Scripts/activate.ps1
+.\venv\Scripts\activate.ps1
 pip install -r requirements.txt
 
 Write-Host "Run tests"
