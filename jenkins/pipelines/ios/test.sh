@@ -6,27 +6,33 @@ BLD_NUM=${3}
 SGW_URL=${4}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SHARED_DIR="${SCRIPT_DIR}/../shared"
 TEST_SERVER_DIR="${SCRIPT_DIR}/../../../servers/ios"
 TESTS_DIR="${SCRIPT_DIR}/../../../tests"
 
-echo "Build Test Server"
+# Find a connected iOS device:
+DEVICE_UDID="$("${SHARED_DIR}/ios_device.sh")"
+if [[ -z "${DEVICE_UDID}" ]]; then
+    echo "No connected device found." && exit 1
+else
+    echo "Device Found: ${DEVICE_UDID}"
+fi
+
+# Build Test Server App:
+echo "Build Test Server App"
 pushd "${TEST_SERVER_DIR}" > /dev/null
 ./scripts/build.sh device ${EDITION} ${VERSION} ${BLD_NUM}
 
+# Install and run Test Server App:
 echo "Run Test Server"
-pushd build > /dev/null
-ios kill com.couchbase.CBLTestServer-iOS || true
-ios install --path=TestServer-iOS.app
-ios launch com.couchbase.CBLTestServer-iOS
+"${SHARED_DIR}/ios_app.sh" start "${DEVICE_UDID}" "./build/TestServer-iOS.app"
 popd > /dev/null
 
-popd > /dev/null
-
+# Start Environment :
 echo "Start environment"
-pushd "${SCRIPT_DIR}/../shared" > /dev/null
-./setup_backend.sh ${SGW_URL}
-popd > /dev/null
+"${SHARED_DIR}/setup_backend.sh" "${SGW_URL}"
 
+# Run Tests :
 echo "Run tests"
 pushd "${TESTS_DIR}"
 python3.10 -m venv venv
