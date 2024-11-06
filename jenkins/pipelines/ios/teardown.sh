@@ -7,7 +7,7 @@ DEVICE_UDID="$("${SHARED_DIR}/ios_device.sh")"
 if [[ -n "${DEVICE_UDID}" ]]; then
     echo "Device Found: ${DEVICE_UDID}"
     echo "Shutdown Test Server"
-    "${SHARED_DIR}/ios_app.sh" stop "${DEVICE_UDID}" "com.couchbase.CBLTestServer-iOS"
+    "${SHARED_DIR}/ios_app.sh" stop "${DEVICE_UDID}" "com.couchbase.ios.testserver"
 fi
 
 echo "Shutdown Environment"
