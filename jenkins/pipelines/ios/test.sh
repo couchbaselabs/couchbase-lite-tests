@@ -15,7 +15,7 @@ DEVICE_UDID="$("${SHARED_DIR}/ios_device.sh")"
 if [[ -z "${DEVICE_UDID}" ]]; then
     echo "No connected device found." && exit 1
 else
-    echo "Device Found: ${DEVICE_UDID}"
+    echo "Connected device found: ${DEVICE_UDID}"
 fi
 
 # Build Test Server App:
