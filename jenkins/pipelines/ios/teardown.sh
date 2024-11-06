@@ -1,10 +1,13 @@
 #!/bin/bash -e
 
-echo "Shutdown Test Server"
-if [ -d "servers/ios/build" ]; then
-    pushd servers/ios/build > /dev/null
-    ios kill com.couchbase.CBLTestServer-iOS || true
-    popd > /dev/null
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SHARED_DIR="${SCRIPT_DIR}/../shared"
+
+DEVICE_UDID="$("${SHARED_DIR}/ios_device.sh")"
+if [[ -n "${DEVICE_UDID}" ]]; then
+    echo "Device Found: ${DEVICE_UDID}"
+    echo "Shutdown Test Server"
+    "${SHARED_DIR}/ios_app.sh" stop "${DEVICE_UDID}" "com.couchbase.CBLTestServer-iOS"
 fi
 
 echo "Shutdown Environment"
