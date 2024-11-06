@@ -20,6 +20,10 @@ namespace ts {
     public:
         explicit Dispatcher(const TestServer *testServer);
 
+        const TestServer *server() const;
+
+        SessionManager *sessionManager() const;
+
         int handle(mg_connection *conn) const;
 
     private:
@@ -66,6 +70,5 @@ namespace ts {
         // Member Variables:
         const TestServer *_testServer{nullptr};
         std::vector<Rule> _rules;
-        std::unique_ptr<ts::SessionManager> _sessionManager;
     };
 }

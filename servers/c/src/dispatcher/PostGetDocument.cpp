@@ -29,8 +29,6 @@ int Dispatcher::handlePOSTGetDocument(Request &request, Session *session) {
     auto props = CBLDocument_Properties(doc);
     auto json = ts_support::fleece::toJSON((FLValue) props);
     json["_id"] = docID;
-
-    // TODO: Use CBLDocument_RevisionHistory(doc) instead when 4.0 binary is ready.
     json["_revs"] = STR(CBLDocument_GetRevisionHistory(doc));
     return request.respondWithJSON(json);
 }

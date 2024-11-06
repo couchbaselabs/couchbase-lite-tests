@@ -14,6 +14,7 @@
 #include <string>
 
 using namespace std;
+using namespace ts::log;
 using namespace ts::support;
 using namespace ts::support::files;
 using namespace ts::support::key;
@@ -27,8 +28,7 @@ static bool sTestServerInitialized = false;
 namespace ts {
     void TestServer::init() {
         if (sTestServerInitialized) { return; }
-
-        logger::init(logger::LogLevel::verbose);
+        Log::init(LogLevel::verbose);
         mg_init_library(0);
         sTestServerInitialized = true;
     }
@@ -42,12 +42,13 @@ namespace ts {
         if (!androidContext()) { throw runtime_error("Android Context is not initialized"); }
 #endif
         _context = {filesDir("CBL-C-TestServer", true), assetsDir()};
-        _dispatcher = new Dispatcher(this);
+        _dispatcher = std::make_unique<Dispatcher>(this);
+        _cblManager = std::make_unique<cbl::CBLManager>(_context.databaseDir, _context.assetsDir);
+        _sessionManager = std::make_unique<SessionManager>(_cblManager.get());
     }
 
     TestServer::~TestServer() {
         stop();
-        delete _dispatcher;
     }
 
     void TestServer::start() {

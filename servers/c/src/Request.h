@@ -11,14 +11,17 @@
 struct mg_connection;
 
 namespace ts {
-    class TestServer;
+    class Dispatcher;
+
+    class Session;
 
     class Request {
     public:
-        explicit Request(mg_connection *conn, const TestServer *server);
+        explicit Request(mg_connection *conn, const Dispatcher *dispatcher);
 
-        // Request:
         [[nodiscard]] mg_connection *connection() const { return _conn; }
+
+        [[nodiscard]] const Dispatcher *dispatcher() const { return _dispatcher; }
 
         [[nodiscard]] std::string method() const { return _method; }
 
@@ -41,15 +44,17 @@ namespace ts {
 
         [[nodiscard]] int respondWithServerError(const char *message) const;
 
-        [[nodiscard]] int respondWithCBLError(const ts::support::error::CBLException &exception) const;
+        [[nodiscard]] int
+        respondWithCBLError(const ts::support::error::CBLException &exception) const;
 
     private:
         void addCommonResponseHeaders() const;
 
-        [[nodiscard]] int respond(int status, const std::optional<std::string> &json = std::nullopt) const;
+        [[nodiscard]] int
+        respond(int status, const std::optional<std::string> &json = std::nullopt) const;
 
         mg_connection *_conn;
-        const TestServer *_server;
+        const Dispatcher *_dispatcher;
 
         std::string _method;
         std::string _path;

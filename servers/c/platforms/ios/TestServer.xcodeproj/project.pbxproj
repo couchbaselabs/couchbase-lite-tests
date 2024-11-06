@@ -156,7 +156,6 @@
 		4076E7312A9EAD04003DD799 /* CBLReplicationFilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E6F92A9EAD04003DD799 /* CBLReplicationFilter.cpp */; };
 		4076E7322A9EAD04003DD799 /* CollectionSpec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E6FF2A9EAD04003DD799 /* CollectionSpec.cpp */; };
 		4076E7332A9EAD04003DD799 /* Fleece.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E7002A9EAD04003DD799 /* Fleece.cpp */; };
-		4076E7342A9EAD04003DD799 /* Log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E7042A9EAD04003DD799 /* Log.cpp */; };
 		4076E7352A9EAD04003DD799 /* Device+Apple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4076E7062A9EAD04003DD799 /* Device+Apple.mm */; };
 		4076E7382A9EAD04003DD799 /* ZipUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E70C2A9EAD04003DD799 /* ZipUtil.cpp */; };
 		4076E7392A9EAD04003DD799 /* Error.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E70F2A9EAD04003DD799 /* Error.cpp */; };
@@ -164,6 +163,49 @@
 		4076E73E2A9EAD04003DD799 /* StringUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E71A2A9EAD04003DD799 /* StringUtil.cpp */; };
 		4076E73F2A9EAD04003DD799 /* Files+Apple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4076E71C2A9EAD04003DD799 /* Files+Apple.mm */; };
 		4076E7402A9EAD04003DD799 /* Dispatcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4076E71F2A9EAD04003DD799 /* Dispatcher.cpp */; };
+		40CAB0192CE410B8001CA3F1 /* RemoteLogger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0172CE410B8001CA3F1 /* RemoteLogger.cpp */; };
+		40CAB01A2CE410B8001CA3F1 /* Log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0152CE410B8001CA3F1 /* Log.cpp */; };
+		40CAB01C2CE4126C001CA3F1 /* SessionManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB01B2CE4126C001CA3F1 /* SessionManager.cpp */; };
+		40CAB01E2CE4128B001CA3F1 /* PostStopReplicator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB01D2CE4128B001CA3F1 /* PostStopReplicator.cpp */; };
+		40CAB0822CE41485001CA3F1 /* IXHttpClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0372CE41485001CA3F1 /* IXHttpClient.cpp */; };
+		40CAB0832CE41485001CA3F1 /* IXStrCaseCompare.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0582CE41485001CA3F1 /* IXStrCaseCompare.cpp */; };
+		40CAB0842CE41485001CA3F1 /* IXGzipCodec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0332CE41485001CA3F1 /* IXGzipCodec.cpp */; };
+		40CAB0852CE41485001CA3F1 /* IXSocketAppleSSL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB04A2CE41485001CA3F1 /* IXSocketAppleSSL.cpp */; };
+		40CAB0862CE41485001CA3F1 /* IXUrlParser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB05D2CE41485001CA3F1 /* IXUrlParser.cpp */; };
+		40CAB0872CE41485001CA3F1 /* IXBench.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0272CE41485001CA3F1 /* IXBench.cpp */; };
+		40CAB0882CE41485001CA3F1 /* IXUserAgent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB05F2CE41485001CA3F1 /* IXUserAgent.cpp */; };
+		40CAB0892CE41485001CA3F1 /* IXWebSocketCloseConstants.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0662CE41485001CA3F1 /* IXWebSocketCloseConstants.cpp */; };
+		40CAB08A2CE41485001CA3F1 /* IXExponentialBackoff.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB02F2CE41485001CA3F1 /* IXExponentialBackoff.cpp */; };
+		40CAB08B2CE41485001CA3F1 /* IXSelectInterruptFactory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0422CE41485001CA3F1 /* IXSelectInterruptFactory.cpp */; };
+		40CAB08C2CE41485001CA3F1 /* IXSocketTLSOptions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0562CE41485001CA3F1 /* IXSocketTLSOptions.cpp */; };
+		40CAB08D2CE41485001CA3F1 /* IXSelectInterruptEvent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0402CE41485001CA3F1 /* IXSelectInterruptEvent.cpp */; };
+		40CAB08E2CE41485001CA3F1 /* IXWebSocketProxyServer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0792CE41485001CA3F1 /* IXWebSocketProxyServer.cpp */; };
+		40CAB08F2CE41485001CA3F1 /* IXSetThreadName.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0462CE41485001CA3F1 /* IXSetThreadName.cpp */; };
+		40CAB0902CE41485001CA3F1 /* IXHttpServer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0392CE41485001CA3F1 /* IXHttpServer.cpp */; };
+		40CAB0912CE41485001CA3F1 /* IXHttp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0352CE41485001CA3F1 /* IXHttp.cpp */; };
+		40CAB0922CE41485001CA3F1 /* IXSocketConnect.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB04C2CE41485001CA3F1 /* IXSocketConnect.cpp */; };
+		40CAB0932CE41485001CA3F1 /* IXGetFreePort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0312CE41485001CA3F1 /* IXGetFreePort.cpp */; };
+		40CAB0942CE41485001CA3F1 /* IXConnectionState.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB02B2CE41485001CA3F1 /* IXConnectionState.cpp */; };
+		40CAB0952CE41485001CA3F1 /* IXDNSLookup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB02D2CE41485001CA3F1 /* IXDNSLookup.cpp */; };
+		40CAB0962CE41485001CA3F1 /* IXSelectInterruptPipe.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0442CE41485001CA3F1 /* IXSelectInterruptPipe.cpp */; };
+		40CAB0972CE41485001CA3F1 /* IXSocketOpenSSL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0522CE41485001CA3F1 /* IXSocketOpenSSL.cpp */; };
+		40CAB0982CE41485001CA3F1 /* IXSocketServer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0542CE41485001CA3F1 /* IXSocketServer.cpp */; };
+		40CAB0992CE41485001CA3F1 /* IXWebSocketHandshake.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB06A2CE41485001CA3F1 /* IXWebSocketHandshake.cpp */; };
+		40CAB09A2CE41485001CA3F1 /* IXWebSocketPerMessageDeflateCodec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0752CE41485001CA3F1 /* IXWebSocketPerMessageDeflateCodec.cpp */; };
+		40CAB09B2CE41485001CA3F1 /* IXSocketFactory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB04E2CE41485001CA3F1 /* IXSocketFactory.cpp */; };
+		40CAB09C2CE41485001CA3F1 /* IXUuid.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0622CE41485001CA3F1 /* IXUuid.cpp */; };
+		40CAB09D2CE41485001CA3F1 /* IXWebSocketPerMessageDeflate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0732CE41485001CA3F1 /* IXWebSocketPerMessageDeflate.cpp */; };
+		40CAB09E2CE41485001CA3F1 /* IXNetSystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB03B2CE41485001CA3F1 /* IXNetSystem.cpp */; };
+		40CAB09F2CE41485001CA3F1 /* IXWebSocketServer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB07D2CE41485001CA3F1 /* IXWebSocketServer.cpp */; };
+		40CAB0A02CE41485001CA3F1 /* IXSocket.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0482CE41485001CA3F1 /* IXSocket.cpp */; };
+		40CAB0A12CE41485001CA3F1 /* IXSocketMbedTLS.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0502CE41485001CA3F1 /* IXSocketMbedTLS.cpp */; };
+		40CAB0A22CE41485001CA3F1 /* IXCancellationRequest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0292CE41485001CA3F1 /* IXCancellationRequest.cpp */; };
+		40CAB0A32CE41485001CA3F1 /* IXWebSocketHttpHeaders.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB06D2CE41485001CA3F1 /* IXWebSocketHttpHeaders.cpp */; };
+		40CAB0A42CE41485001CA3F1 /* IXWebSocket.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0642CE41485001CA3F1 /* IXWebSocket.cpp */; };
+		40CAB0A52CE41485001CA3F1 /* IXUdpSocket.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB05A2CE41485001CA3F1 /* IXUdpSocket.cpp */; };
+		40CAB0A62CE41485001CA3F1 /* IXSelectInterrupt.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB03E2CE41485001CA3F1 /* IXSelectInterrupt.cpp */; };
+		40CAB0A72CE41485001CA3F1 /* IXWebSocketTransport.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB07F2CE41485001CA3F1 /* IXWebSocketTransport.cpp */; };
+		40CAB0A82CE41485001CA3F1 /* IXWebSocketPerMessageDeflateOptions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40CAB0772CE41485001CA3F1 /* IXWebSocketPerMessageDeflateOptions.cpp */; };
 		40D3FAC22CB784DF00696D75 /* PostNewSession.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40D3FAC12CB784DF00696D75 /* PostNewSession.cpp */; };
 		40F0BF3B2C9BE90E00027A7A /* PostRunQuery.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */; };
 		40F0BF402C9CF17400027A7A /* CBLReplicationConflictResolver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40F0BF3E2C9CF17400027A7A /* CBLReplicationConflictResolver.cpp */; };
@@ -375,7 +417,6 @@
 		4076E7002A9EAD04003DD799 /* Fleece.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Fleece.cpp; sourceTree = "<group>"; };
 		4076E7012A9EAD04003DD799 /* CBLReplicationFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLReplicationFilter.h; sourceTree = "<group>"; };
 		4076E7032A9EAD04003DD799 /* Error.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Error.h; sourceTree = "<group>"; };
-		4076E7042A9EAD04003DD799 /* Log.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Log.cpp; sourceTree = "<group>"; };
 		4076E7052A9EAD04003DD799 /* ZipUtil.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ZipUtil.h; sourceTree = "<group>"; };
 		4076E7062A9EAD04003DD799 /* Device+Apple.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = "Device+Apple.mm"; sourceTree = "<group>"; };
 		4076E7072A9EAD04003DD799 /* Device.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Device.h; sourceTree = "<group>"; };
@@ -386,7 +427,6 @@
 		4076E7112A9EAD04003DD799 /* date.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = date.h; sourceTree = "<group>"; };
 		4076E7132A9EAD04003DD799 /* StringUtil.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringUtil.h; sourceTree = "<group>"; };
 		4076E7142A9EAD04003DD799 /* UUID.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = UUID.cpp; sourceTree = "<group>"; };
-		4076E7162A9EAD04003DD799 /* Log.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Log.h; sourceTree = "<group>"; };
 		4076E7172A9EAD04003DD799 /* JSON.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JSON.h; sourceTree = "<group>"; };
 		4076E7192A9EAD04003DD799 /* Defer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Defer.h; sourceTree = "<group>"; };
 		4076E71A2A9EAD04003DD799 /* StringUtil.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StringUtil.cpp; sourceTree = "<group>"; };
@@ -395,6 +435,104 @@
 		4076E71E2A9EAD04003DD799 /* Precondition.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Precondition.h; sourceTree = "<group>"; };
 		4076E71F2A9EAD04003DD799 /* Dispatcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Dispatcher.cpp; sourceTree = "<group>"; };
 		4076E7202A9EAD04003DD799 /* Request.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Request.h; sourceTree = "<group>"; };
+		40CAB0142CE410B8001CA3F1 /* Log.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Log.h; sourceTree = "<group>"; };
+		40CAB0152CE410B8001CA3F1 /* Log.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Log.cpp; sourceTree = "<group>"; };
+		40CAB0162CE410B8001CA3F1 /* RemoteLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RemoteLogger.h; sourceTree = "<group>"; };
+		40CAB0172CE410B8001CA3F1 /* RemoteLogger.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RemoteLogger.cpp; sourceTree = "<group>"; };
+		40CAB01B2CE4126C001CA3F1 /* SessionManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SessionManager.cpp; sourceTree = "<group>"; };
+		40CAB01D2CE4128B001CA3F1 /* PostStopReplicator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PostStopReplicator.cpp; sourceTree = "<group>"; };
+		40CAB0252CE41485001CA3F1 /* IXBase64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXBase64.h; sourceTree = "<group>"; };
+		40CAB0262CE41485001CA3F1 /* IXBench.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXBench.h; sourceTree = "<group>"; };
+		40CAB0272CE41485001CA3F1 /* IXBench.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXBench.cpp; sourceTree = "<group>"; };
+		40CAB0282CE41485001CA3F1 /* IXCancellationRequest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXCancellationRequest.h; sourceTree = "<group>"; };
+		40CAB0292CE41485001CA3F1 /* IXCancellationRequest.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXCancellationRequest.cpp; sourceTree = "<group>"; };
+		40CAB02A2CE41485001CA3F1 /* IXConnectionState.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXConnectionState.h; sourceTree = "<group>"; };
+		40CAB02B2CE41485001CA3F1 /* IXConnectionState.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXConnectionState.cpp; sourceTree = "<group>"; };
+		40CAB02C2CE41485001CA3F1 /* IXDNSLookup.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXDNSLookup.h; sourceTree = "<group>"; };
+		40CAB02D2CE41485001CA3F1 /* IXDNSLookup.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXDNSLookup.cpp; sourceTree = "<group>"; };
+		40CAB02E2CE41485001CA3F1 /* IXExponentialBackoff.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXExponentialBackoff.h; sourceTree = "<group>"; };
+		40CAB02F2CE41485001CA3F1 /* IXExponentialBackoff.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXExponentialBackoff.cpp; sourceTree = "<group>"; };
+		40CAB0302CE41485001CA3F1 /* IXGetFreePort.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXGetFreePort.h; sourceTree = "<group>"; };
+		40CAB0312CE41485001CA3F1 /* IXGetFreePort.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXGetFreePort.cpp; sourceTree = "<group>"; };
+		40CAB0322CE41485001CA3F1 /* IXGzipCodec.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXGzipCodec.h; sourceTree = "<group>"; };
+		40CAB0332CE41485001CA3F1 /* IXGzipCodec.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXGzipCodec.cpp; sourceTree = "<group>"; };
+		40CAB0342CE41485001CA3F1 /* IXHttp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXHttp.h; sourceTree = "<group>"; };
+		40CAB0352CE41485001CA3F1 /* IXHttp.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXHttp.cpp; sourceTree = "<group>"; };
+		40CAB0362CE41485001CA3F1 /* IXHttpClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXHttpClient.h; sourceTree = "<group>"; };
+		40CAB0372CE41485001CA3F1 /* IXHttpClient.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXHttpClient.cpp; sourceTree = "<group>"; };
+		40CAB0382CE41485001CA3F1 /* IXHttpServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXHttpServer.h; sourceTree = "<group>"; };
+		40CAB0392CE41485001CA3F1 /* IXHttpServer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXHttpServer.cpp; sourceTree = "<group>"; };
+		40CAB03A2CE41485001CA3F1 /* IXNetSystem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXNetSystem.h; sourceTree = "<group>"; };
+		40CAB03B2CE41485001CA3F1 /* IXNetSystem.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXNetSystem.cpp; sourceTree = "<group>"; };
+		40CAB03C2CE41485001CA3F1 /* IXProgressCallback.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXProgressCallback.h; sourceTree = "<group>"; };
+		40CAB03D2CE41485001CA3F1 /* IXSelectInterrupt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSelectInterrupt.h; sourceTree = "<group>"; };
+		40CAB03E2CE41485001CA3F1 /* IXSelectInterrupt.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSelectInterrupt.cpp; sourceTree = "<group>"; };
+		40CAB03F2CE41485001CA3F1 /* IXSelectInterruptEvent.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSelectInterruptEvent.h; sourceTree = "<group>"; };
+		40CAB0402CE41485001CA3F1 /* IXSelectInterruptEvent.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSelectInterruptEvent.cpp; sourceTree = "<group>"; };
+		40CAB0412CE41485001CA3F1 /* IXSelectInterruptFactory.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSelectInterruptFactory.h; sourceTree = "<group>"; };
+		40CAB0422CE41485001CA3F1 /* IXSelectInterruptFactory.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSelectInterruptFactory.cpp; sourceTree = "<group>"; };
+		40CAB0432CE41485001CA3F1 /* IXSelectInterruptPipe.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSelectInterruptPipe.h; sourceTree = "<group>"; };
+		40CAB0442CE41485001CA3F1 /* IXSelectInterruptPipe.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSelectInterruptPipe.cpp; sourceTree = "<group>"; };
+		40CAB0452CE41485001CA3F1 /* IXSetThreadName.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSetThreadName.h; sourceTree = "<group>"; };
+		40CAB0462CE41485001CA3F1 /* IXSetThreadName.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSetThreadName.cpp; sourceTree = "<group>"; };
+		40CAB0472CE41485001CA3F1 /* IXSocket.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSocket.h; sourceTree = "<group>"; };
+		40CAB0482CE41485001CA3F1 /* IXSocket.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSocket.cpp; sourceTree = "<group>"; };
+		40CAB0492CE41485001CA3F1 /* IXSocketAppleSSL.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSocketAppleSSL.h; sourceTree = "<group>"; };
+		40CAB04A2CE41485001CA3F1 /* IXSocketAppleSSL.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSocketAppleSSL.cpp; sourceTree = "<group>"; };
+		40CAB04B2CE41485001CA3F1 /* IXSocketConnect.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSocketConnect.h; sourceTree = "<group>"; };
+		40CAB04C2CE41485001CA3F1 /* IXSocketConnect.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSocketConnect.cpp; sourceTree = "<group>"; };
+		40CAB04D2CE41485001CA3F1 /* IXSocketFactory.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSocketFactory.h; sourceTree = "<group>"; };
+		40CAB04E2CE41485001CA3F1 /* IXSocketFactory.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSocketFactory.cpp; sourceTree = "<group>"; };
+		40CAB04F2CE41485001CA3F1 /* IXSocketMbedTLS.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSocketMbedTLS.h; sourceTree = "<group>"; };
+		40CAB0502CE41485001CA3F1 /* IXSocketMbedTLS.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSocketMbedTLS.cpp; sourceTree = "<group>"; };
+		40CAB0512CE41485001CA3F1 /* IXSocketOpenSSL.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSocketOpenSSL.h; sourceTree = "<group>"; };
+		40CAB0522CE41485001CA3F1 /* IXSocketOpenSSL.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSocketOpenSSL.cpp; sourceTree = "<group>"; };
+		40CAB0532CE41485001CA3F1 /* IXSocketServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSocketServer.h; sourceTree = "<group>"; };
+		40CAB0542CE41485001CA3F1 /* IXSocketServer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSocketServer.cpp; sourceTree = "<group>"; };
+		40CAB0552CE41485001CA3F1 /* IXSocketTLSOptions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXSocketTLSOptions.h; sourceTree = "<group>"; };
+		40CAB0562CE41485001CA3F1 /* IXSocketTLSOptions.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXSocketTLSOptions.cpp; sourceTree = "<group>"; };
+		40CAB0572CE41485001CA3F1 /* IXStrCaseCompare.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXStrCaseCompare.h; sourceTree = "<group>"; };
+		40CAB0582CE41485001CA3F1 /* IXStrCaseCompare.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXStrCaseCompare.cpp; sourceTree = "<group>"; };
+		40CAB0592CE41485001CA3F1 /* IXUdpSocket.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXUdpSocket.h; sourceTree = "<group>"; };
+		40CAB05A2CE41485001CA3F1 /* IXUdpSocket.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXUdpSocket.cpp; sourceTree = "<group>"; };
+		40CAB05B2CE41485001CA3F1 /* IXUniquePtr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXUniquePtr.h; sourceTree = "<group>"; };
+		40CAB05C2CE41485001CA3F1 /* IXUrlParser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXUrlParser.h; sourceTree = "<group>"; };
+		40CAB05D2CE41485001CA3F1 /* IXUrlParser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXUrlParser.cpp; sourceTree = "<group>"; };
+		40CAB05E2CE41485001CA3F1 /* IXUserAgent.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXUserAgent.h; sourceTree = "<group>"; };
+		40CAB05F2CE41485001CA3F1 /* IXUserAgent.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXUserAgent.cpp; sourceTree = "<group>"; };
+		40CAB0602CE41485001CA3F1 /* IXUtf8Validator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXUtf8Validator.h; sourceTree = "<group>"; };
+		40CAB0612CE41485001CA3F1 /* IXUuid.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXUuid.h; sourceTree = "<group>"; };
+		40CAB0622CE41485001CA3F1 /* IXUuid.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXUuid.cpp; sourceTree = "<group>"; };
+		40CAB0632CE41485001CA3F1 /* IXWebSocket.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocket.h; sourceTree = "<group>"; };
+		40CAB0642CE41485001CA3F1 /* IXWebSocket.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXWebSocket.cpp; sourceTree = "<group>"; };
+		40CAB0652CE41485001CA3F1 /* IXWebSocketCloseConstants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketCloseConstants.h; sourceTree = "<group>"; };
+		40CAB0662CE41485001CA3F1 /* IXWebSocketCloseConstants.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXWebSocketCloseConstants.cpp; sourceTree = "<group>"; };
+		40CAB0672CE41485001CA3F1 /* IXWebSocketCloseInfo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketCloseInfo.h; sourceTree = "<group>"; };
+		40CAB0682CE41485001CA3F1 /* IXWebSocketErrorInfo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketErrorInfo.h; sourceTree = "<group>"; };
+		40CAB0692CE41485001CA3F1 /* IXWebSocketHandshake.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketHandshake.h; sourceTree = "<group>"; };
+		40CAB06A2CE41485001CA3F1 /* IXWebSocketHandshake.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXWebSocketHandshake.cpp; sourceTree = "<group>"; };
+		40CAB06B2CE41485001CA3F1 /* IXWebSocketHandshakeKeyGen.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketHandshakeKeyGen.h; sourceTree = "<group>"; };
+		40CAB06C2CE41485001CA3F1 /* IXWebSocketHttpHeaders.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketHttpHeaders.h; sourceTree = "<group>"; };
+		40CAB06D2CE41485001CA3F1 /* IXWebSocketHttpHeaders.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXWebSocketHttpHeaders.cpp; sourceTree = "<group>"; };
+		40CAB06E2CE41485001CA3F1 /* IXWebSocketInitResult.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketInitResult.h; sourceTree = "<group>"; };
+		40CAB06F2CE41485001CA3F1 /* IXWebSocketMessage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketMessage.h; sourceTree = "<group>"; };
+		40CAB0702CE41485001CA3F1 /* IXWebSocketMessageType.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketMessageType.h; sourceTree = "<group>"; };
+		40CAB0712CE41485001CA3F1 /* IXWebSocketOpenInfo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketOpenInfo.h; sourceTree = "<group>"; };
+		40CAB0722CE41485001CA3F1 /* IXWebSocketPerMessageDeflate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketPerMessageDeflate.h; sourceTree = "<group>"; };
+		40CAB0732CE41485001CA3F1 /* IXWebSocketPerMessageDeflate.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXWebSocketPerMessageDeflate.cpp; sourceTree = "<group>"; };
+		40CAB0742CE41485001CA3F1 /* IXWebSocketPerMessageDeflateCodec.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketPerMessageDeflateCodec.h; sourceTree = "<group>"; };
+		40CAB0752CE41485001CA3F1 /* IXWebSocketPerMessageDeflateCodec.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXWebSocketPerMessageDeflateCodec.cpp; sourceTree = "<group>"; };
+		40CAB0762CE41485001CA3F1 /* IXWebSocketPerMessageDeflateOptions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketPerMessageDeflateOptions.h; sourceTree = "<group>"; };
+		40CAB0772CE41485001CA3F1 /* IXWebSocketPerMessageDeflateOptions.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXWebSocketPerMessageDeflateOptions.cpp; sourceTree = "<group>"; };
+		40CAB0782CE41485001CA3F1 /* IXWebSocketProxyServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketProxyServer.h; sourceTree = "<group>"; };
+		40CAB0792CE41485001CA3F1 /* IXWebSocketProxyServer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXWebSocketProxyServer.cpp; sourceTree = "<group>"; };
+		40CAB07A2CE41485001CA3F1 /* IXWebSocketSendData.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketSendData.h; sourceTree = "<group>"; };
+		40CAB07B2CE41485001CA3F1 /* IXWebSocketSendInfo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketSendInfo.h; sourceTree = "<group>"; };
+		40CAB07C2CE41485001CA3F1 /* IXWebSocketServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketServer.h; sourceTree = "<group>"; };
+		40CAB07D2CE41485001CA3F1 /* IXWebSocketServer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXWebSocketServer.cpp; sourceTree = "<group>"; };
+		40CAB07E2CE41485001CA3F1 /* IXWebSocketTransport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketTransport.h; sourceTree = "<group>"; };
+		40CAB07F2CE41485001CA3F1 /* IXWebSocketTransport.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IXWebSocketTransport.cpp; sourceTree = "<group>"; };
+		40CAB0802CE41485001CA3F1 /* IXWebSocketVersion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IXWebSocketVersion.h; sourceTree = "<group>"; };
 		40D3FAC12CB784DF00696D75 /* PostNewSession.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PostNewSession.cpp; sourceTree = "<group>"; };
 		40D3FAC32CB784F400696D75 /* SessionManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SessionManager.h; sourceTree = "<group>"; };
 		40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostRunQuery.cpp; sourceTree = "<group>"; };
@@ -470,6 +608,7 @@
 		40348A8A2A8AFBEB002DA787 /* vendor */ = {
 			isa = PBXGroup;
 			children = (
+				40CAB0812CE41485001CA3F1 /* ixwebsocket */,
 				40348B542A8B00A5002DA787 /* libzip */,
 				40348A8B2A8AFBF4002DA787 /* civetweb */,
 			);
@@ -666,11 +805,13 @@
 			children = (
 				4076E6F22A9EAD04003DD799 /* cbl */,
 				4076E6E42A9EAD04003DD799 /* dispatcher */,
+				40CAB0182CE410B8001CA3F1 /* log */,
 				4076E7022A9EAD04003DD799 /* support */,
 				4076E71F2A9EAD04003DD799 /* Dispatcher.cpp */,
 				4076E6F02A9EAD04003DD799 /* Dispatcher.h */,
 				4076E6E32A9EAD04003DD799 /* Request.cpp */,
 				4076E7202A9EAD04003DD799 /* Request.h */,
+				40CAB01B2CE4126C001CA3F1 /* SessionManager.cpp */,
 				40D3FAC32CB784F400696D75 /* SessionManager.h */,
 				4076E6F12A9EAD04003DD799 /* TestServer.cpp */,
 				4076E6E22A9EAD04003DD799 /* TestServer.h */,
@@ -693,6 +834,7 @@
 				40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */,
 				4076E6E82A9EAD04003DD799 /* PostSnapshotDocuments.cpp */,
 				4076E6EC2A9EAD04003DD799 /* PostStartReplicator.cpp */,
+				40CAB01D2CE4128B001CA3F1 /* PostStopReplicator.cpp */,
 				4076E6E92A9EAD04003DD799 /* PostUpdateDatabase.cpp */,
 				4076E6EF2A9EAD04003DD799 /* PostVerifyDocuments.cpp */,
 			);
@@ -736,8 +878,6 @@
 				4076E71B2A9EAD04003DD799 /* Files.h */,
 				4076E71C2A9EAD04003DD799 /* Files+Apple.mm */,
 				4076E7172A9EAD04003DD799 /* JSON.h */,
-				4076E7042A9EAD04003DD799 /* Log.cpp */,
-				4076E7162A9EAD04003DD799 /* Log.h */,
 				4076E71E2A9EAD04003DD799 /* Precondition.h */,
 				4076E71A2A9EAD04003DD799 /* StringUtil.cpp */,
 				4076E7132A9EAD04003DD799 /* StringUtil.h */,
@@ -756,6 +896,117 @@
 			);
 			path = ext;
 			sourceTree = "<group>";
+		};
+		40CAB0182CE410B8001CA3F1 /* log */ = {
+			isa = PBXGroup;
+			children = (
+				40CAB0142CE410B8001CA3F1 /* Log.h */,
+				40CAB0152CE410B8001CA3F1 /* Log.cpp */,
+				40CAB0162CE410B8001CA3F1 /* RemoteLogger.h */,
+				40CAB0172CE410B8001CA3F1 /* RemoteLogger.cpp */,
+			);
+			path = log;
+			sourceTree = "<group>";
+		};
+		40CAB0812CE41485001CA3F1 /* ixwebsocket */ = {
+			isa = PBXGroup;
+			children = (
+				40CAB0252CE41485001CA3F1 /* IXBase64.h */,
+				40CAB0262CE41485001CA3F1 /* IXBench.h */,
+				40CAB0272CE41485001CA3F1 /* IXBench.cpp */,
+				40CAB0282CE41485001CA3F1 /* IXCancellationRequest.h */,
+				40CAB0292CE41485001CA3F1 /* IXCancellationRequest.cpp */,
+				40CAB02A2CE41485001CA3F1 /* IXConnectionState.h */,
+				40CAB02B2CE41485001CA3F1 /* IXConnectionState.cpp */,
+				40CAB02C2CE41485001CA3F1 /* IXDNSLookup.h */,
+				40CAB02D2CE41485001CA3F1 /* IXDNSLookup.cpp */,
+				40CAB02E2CE41485001CA3F1 /* IXExponentialBackoff.h */,
+				40CAB02F2CE41485001CA3F1 /* IXExponentialBackoff.cpp */,
+				40CAB0302CE41485001CA3F1 /* IXGetFreePort.h */,
+				40CAB0312CE41485001CA3F1 /* IXGetFreePort.cpp */,
+				40CAB0322CE41485001CA3F1 /* IXGzipCodec.h */,
+				40CAB0332CE41485001CA3F1 /* IXGzipCodec.cpp */,
+				40CAB0342CE41485001CA3F1 /* IXHttp.h */,
+				40CAB0352CE41485001CA3F1 /* IXHttp.cpp */,
+				40CAB0362CE41485001CA3F1 /* IXHttpClient.h */,
+				40CAB0372CE41485001CA3F1 /* IXHttpClient.cpp */,
+				40CAB0382CE41485001CA3F1 /* IXHttpServer.h */,
+				40CAB0392CE41485001CA3F1 /* IXHttpServer.cpp */,
+				40CAB03A2CE41485001CA3F1 /* IXNetSystem.h */,
+				40CAB03B2CE41485001CA3F1 /* IXNetSystem.cpp */,
+				40CAB03C2CE41485001CA3F1 /* IXProgressCallback.h */,
+				40CAB03D2CE41485001CA3F1 /* IXSelectInterrupt.h */,
+				40CAB03E2CE41485001CA3F1 /* IXSelectInterrupt.cpp */,
+				40CAB03F2CE41485001CA3F1 /* IXSelectInterruptEvent.h */,
+				40CAB0402CE41485001CA3F1 /* IXSelectInterruptEvent.cpp */,
+				40CAB0412CE41485001CA3F1 /* IXSelectInterruptFactory.h */,
+				40CAB0422CE41485001CA3F1 /* IXSelectInterruptFactory.cpp */,
+				40CAB0432CE41485001CA3F1 /* IXSelectInterruptPipe.h */,
+				40CAB0442CE41485001CA3F1 /* IXSelectInterruptPipe.cpp */,
+				40CAB0452CE41485001CA3F1 /* IXSetThreadName.h */,
+				40CAB0462CE41485001CA3F1 /* IXSetThreadName.cpp */,
+				40CAB0472CE41485001CA3F1 /* IXSocket.h */,
+				40CAB0482CE41485001CA3F1 /* IXSocket.cpp */,
+				40CAB0492CE41485001CA3F1 /* IXSocketAppleSSL.h */,
+				40CAB04A2CE41485001CA3F1 /* IXSocketAppleSSL.cpp */,
+				40CAB04B2CE41485001CA3F1 /* IXSocketConnect.h */,
+				40CAB04C2CE41485001CA3F1 /* IXSocketConnect.cpp */,
+				40CAB04D2CE41485001CA3F1 /* IXSocketFactory.h */,
+				40CAB04E2CE41485001CA3F1 /* IXSocketFactory.cpp */,
+				40CAB04F2CE41485001CA3F1 /* IXSocketMbedTLS.h */,
+				40CAB0502CE41485001CA3F1 /* IXSocketMbedTLS.cpp */,
+				40CAB0512CE41485001CA3F1 /* IXSocketOpenSSL.h */,
+				40CAB0522CE41485001CA3F1 /* IXSocketOpenSSL.cpp */,
+				40CAB0532CE41485001CA3F1 /* IXSocketServer.h */,
+				40CAB0542CE41485001CA3F1 /* IXSocketServer.cpp */,
+				40CAB0552CE41485001CA3F1 /* IXSocketTLSOptions.h */,
+				40CAB0562CE41485001CA3F1 /* IXSocketTLSOptions.cpp */,
+				40CAB0572CE41485001CA3F1 /* IXStrCaseCompare.h */,
+				40CAB0582CE41485001CA3F1 /* IXStrCaseCompare.cpp */,
+				40CAB0592CE41485001CA3F1 /* IXUdpSocket.h */,
+				40CAB05A2CE41485001CA3F1 /* IXUdpSocket.cpp */,
+				40CAB05B2CE41485001CA3F1 /* IXUniquePtr.h */,
+				40CAB05C2CE41485001CA3F1 /* IXUrlParser.h */,
+				40CAB05D2CE41485001CA3F1 /* IXUrlParser.cpp */,
+				40CAB05E2CE41485001CA3F1 /* IXUserAgent.h */,
+				40CAB05F2CE41485001CA3F1 /* IXUserAgent.cpp */,
+				40CAB0602CE41485001CA3F1 /* IXUtf8Validator.h */,
+				40CAB0612CE41485001CA3F1 /* IXUuid.h */,
+				40CAB0622CE41485001CA3F1 /* IXUuid.cpp */,
+				40CAB0632CE41485001CA3F1 /* IXWebSocket.h */,
+				40CAB0642CE41485001CA3F1 /* IXWebSocket.cpp */,
+				40CAB0652CE41485001CA3F1 /* IXWebSocketCloseConstants.h */,
+				40CAB0662CE41485001CA3F1 /* IXWebSocketCloseConstants.cpp */,
+				40CAB0672CE41485001CA3F1 /* IXWebSocketCloseInfo.h */,
+				40CAB0682CE41485001CA3F1 /* IXWebSocketErrorInfo.h */,
+				40CAB0692CE41485001CA3F1 /* IXWebSocketHandshake.h */,
+				40CAB06A2CE41485001CA3F1 /* IXWebSocketHandshake.cpp */,
+				40CAB06B2CE41485001CA3F1 /* IXWebSocketHandshakeKeyGen.h */,
+				40CAB06C2CE41485001CA3F1 /* IXWebSocketHttpHeaders.h */,
+				40CAB06D2CE41485001CA3F1 /* IXWebSocketHttpHeaders.cpp */,
+				40CAB06E2CE41485001CA3F1 /* IXWebSocketInitResult.h */,
+				40CAB06F2CE41485001CA3F1 /* IXWebSocketMessage.h */,
+				40CAB0702CE41485001CA3F1 /* IXWebSocketMessageType.h */,
+				40CAB0712CE41485001CA3F1 /* IXWebSocketOpenInfo.h */,
+				40CAB0722CE41485001CA3F1 /* IXWebSocketPerMessageDeflate.h */,
+				40CAB0732CE41485001CA3F1 /* IXWebSocketPerMessageDeflate.cpp */,
+				40CAB0742CE41485001CA3F1 /* IXWebSocketPerMessageDeflateCodec.h */,
+				40CAB0752CE41485001CA3F1 /* IXWebSocketPerMessageDeflateCodec.cpp */,
+				40CAB0762CE41485001CA3F1 /* IXWebSocketPerMessageDeflateOptions.h */,
+				40CAB0772CE41485001CA3F1 /* IXWebSocketPerMessageDeflateOptions.cpp */,
+				40CAB0782CE41485001CA3F1 /* IXWebSocketProxyServer.h */,
+				40CAB0792CE41485001CA3F1 /* IXWebSocketProxyServer.cpp */,
+				40CAB07A2CE41485001CA3F1 /* IXWebSocketSendData.h */,
+				40CAB07B2CE41485001CA3F1 /* IXWebSocketSendInfo.h */,
+				40CAB07C2CE41485001CA3F1 /* IXWebSocketServer.h */,
+				40CAB07D2CE41485001CA3F1 /* IXWebSocketServer.cpp */,
+				40CAB07E2CE41485001CA3F1 /* IXWebSocketTransport.h */,
+				40CAB07F2CE41485001CA3F1 /* IXWebSocketTransport.cpp */,
+				40CAB0802CE41485001CA3F1 /* IXWebSocketVersion.h */,
+			);
+			name = ixwebsocket;
+			path = "vendor/cmake/_deps/ixwebsocket-src/ixwebsocket";
+			sourceTree = SOURCE_ROOT;
 		};
 /* End PBXGroup section */
 
@@ -840,6 +1091,8 @@
 				40348C072A8B0143002DA787 /* zip_get_archive_flag.c in Sources */,
 				40348C3D2A8B0144002DA787 /* zip_error_get_sys_type.c in Sources */,
 				4076E7272A9EAD04003DD799 /* PostUpdateDatabase.cpp in Sources */,
+				40CAB0192CE410B8001CA3F1 /* RemoteLogger.cpp in Sources */,
+				40CAB01A2CE410B8001CA3F1 /* Log.cpp in Sources */,
 				40348C232A8B0144002DA787 /* zip_open.c in Sources */,
 				40348C4B2A8B0144002DA787 /* zip_file_set_external_attributes.c in Sources */,
 				40348BE32A8B0143002DA787 /* zip_source_tell.c in Sources */,
@@ -942,12 +1195,52 @@
 				4076E72B2A9EAD04003DD799 /* PostReset.cpp in Sources */,
 				40348C362A8B0144002DA787 /* zip_get_num_files.c in Sources */,
 				40348BF12A8B0143002DA787 /* zip_source_free.c in Sources */,
+				40CAB0822CE41485001CA3F1 /* IXHttpClient.cpp in Sources */,
+				40CAB0832CE41485001CA3F1 /* IXStrCaseCompare.cpp in Sources */,
+				40CAB0842CE41485001CA3F1 /* IXGzipCodec.cpp in Sources */,
+				40CAB0852CE41485001CA3F1 /* IXSocketAppleSSL.cpp in Sources */,
+				40CAB0862CE41485001CA3F1 /* IXUrlParser.cpp in Sources */,
+				40CAB0872CE41485001CA3F1 /* IXBench.cpp in Sources */,
+				40CAB0882CE41485001CA3F1 /* IXUserAgent.cpp in Sources */,
+				40CAB0892CE41485001CA3F1 /* IXWebSocketCloseConstants.cpp in Sources */,
+				40CAB08A2CE41485001CA3F1 /* IXExponentialBackoff.cpp in Sources */,
+				40CAB08B2CE41485001CA3F1 /* IXSelectInterruptFactory.cpp in Sources */,
+				40CAB08C2CE41485001CA3F1 /* IXSocketTLSOptions.cpp in Sources */,
+				40CAB08D2CE41485001CA3F1 /* IXSelectInterruptEvent.cpp in Sources */,
+				40CAB08E2CE41485001CA3F1 /* IXWebSocketProxyServer.cpp in Sources */,
+				40CAB08F2CE41485001CA3F1 /* IXSetThreadName.cpp in Sources */,
+				40CAB0902CE41485001CA3F1 /* IXHttpServer.cpp in Sources */,
+				40CAB0912CE41485001CA3F1 /* IXHttp.cpp in Sources */,
+				40CAB0922CE41485001CA3F1 /* IXSocketConnect.cpp in Sources */,
+				40CAB0932CE41485001CA3F1 /* IXGetFreePort.cpp in Sources */,
+				40CAB0942CE41485001CA3F1 /* IXConnectionState.cpp in Sources */,
+				40CAB0952CE41485001CA3F1 /* IXDNSLookup.cpp in Sources */,
+				40CAB0962CE41485001CA3F1 /* IXSelectInterruptPipe.cpp in Sources */,
+				40CAB0972CE41485001CA3F1 /* IXSocketOpenSSL.cpp in Sources */,
+				40CAB0982CE41485001CA3F1 /* IXSocketServer.cpp in Sources */,
+				40CAB0992CE41485001CA3F1 /* IXWebSocketHandshake.cpp in Sources */,
+				40CAB09A2CE41485001CA3F1 /* IXWebSocketPerMessageDeflateCodec.cpp in Sources */,
+				40CAB09B2CE41485001CA3F1 /* IXSocketFactory.cpp in Sources */,
+				40CAB09C2CE41485001CA3F1 /* IXUuid.cpp in Sources */,
+				40CAB09D2CE41485001CA3F1 /* IXWebSocketPerMessageDeflate.cpp in Sources */,
+				40CAB09E2CE41485001CA3F1 /* IXNetSystem.cpp in Sources */,
+				40CAB09F2CE41485001CA3F1 /* IXWebSocketServer.cpp in Sources */,
+				40CAB0A02CE41485001CA3F1 /* IXSocket.cpp in Sources */,
+				40CAB0A12CE41485001CA3F1 /* IXSocketMbedTLS.cpp in Sources */,
+				40CAB0A22CE41485001CA3F1 /* IXCancellationRequest.cpp in Sources */,
+				40CAB0A32CE41485001CA3F1 /* IXWebSocketHttpHeaders.cpp in Sources */,
+				40CAB0A42CE41485001CA3F1 /* IXWebSocket.cpp in Sources */,
+				40CAB0A52CE41485001CA3F1 /* IXUdpSocket.cpp in Sources */,
+				40CAB0A62CE41485001CA3F1 /* IXSelectInterrupt.cpp in Sources */,
+				40CAB0A72CE41485001CA3F1 /* IXWebSocketTransport.cpp in Sources */,
+				40CAB0A82CE41485001CA3F1 /* IXWebSocketPerMessageDeflateOptions.cpp in Sources */,
 				4076E7302A9EAD04003DD799 /* Snapshot.cpp in Sources */,
 				40348C5D2A8B0144002DA787 /* zip_source_begin_write.c in Sources */,
 				40348C032A8B0143002DA787 /* zip_source_winzip_aes_encode.c in Sources */,
 				4076E7312A9EAD04003DD799 /* CBLReplicationFilter.cpp in Sources */,
 				40348BED2A8B0143002DA787 /* zip_extra_field.c in Sources */,
 				40348C402A8B0144002DA787 /* zip_file_add.c in Sources */,
+				40CAB01E2CE4128B001CA3F1 /* PostStopReplicator.cpp in Sources */,
 				40348C252A8B0144002DA787 /* zip_source_rollback_write.c in Sources */,
 				40348C372A8B0144002DA787 /* zip_fdopen.c in Sources */,
 				40348A6F2A8AF842002DA787 /* AppDelegate.swift in Sources */,
@@ -979,9 +1272,9 @@
 				4076E73F2A9EAD04003DD799 /* Files+Apple.mm in Sources */,
 				40348C632A8B0255002DA787 /* zip_crypto_commoncrypto.c in Sources */,
 				40348BEE2A8B0143002DA787 /* zip_utf-8.c in Sources */,
+				40CAB01C2CE4126C001CA3F1 /* SessionManager.cpp in Sources */,
 				40348C222A8B0144002DA787 /* zip_fseek.c in Sources */,
 				40348C4A2A8B0144002DA787 /* zip_source_compress.c in Sources */,
-				4076E7342A9EAD04003DD799 /* Log.cpp in Sources */,
 				40348C0D2A8B0143002DA787 /* zip_file_set_mtime.c in Sources */,
 				4076E7352A9EAD04003DD799 /* Device+Apple.mm in Sources */,
 				4076E73B2A9EAD04003DD799 /* UUID.cpp in Sources */,

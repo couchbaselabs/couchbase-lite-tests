@@ -3,7 +3,8 @@ PRODUCT_MODULE_NAME             = TestServer
 
 IPHONEOS_DEPLOYMENT_TARGET      = 13.0
 
-HEADER_SEARCH_PATHS             = $(inherited) $(SRCROOT)/vendor/cmake/_deps/json-src/include $(SRCROOT)/vendor/cmake/_deps/civetweb-src/include $(SRCROOT)/vendor/cmake/_deps/libzip-src/lib $(SRCROOT)/vendor/cmake/_deps/libzip-build
+HEADER_SEARCH_PATHS             = $(inherited) $(SRCROOT)/vendor/cmake/_deps/json-src/include $(SRCROOT)/vendor/cmake/_deps/civetweb-src/include $(SRCROOT)/vendor/cmake/_deps/libzip-src/lib $(SRCROOT)/vendor/cmake/_deps/libzip-build $(SRCROOT)/vendor/cmake/_deps/ixwebsocket-src
+
 
 SWIFT_OBJC_BRIDGING_HEADER      = TestServer/bridge/TestServer-Bridging-Header.h
 

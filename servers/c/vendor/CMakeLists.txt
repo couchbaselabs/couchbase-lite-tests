@@ -52,9 +52,16 @@ FetchContent_Declare(
         GIT_TAG v3.9.1
         GIT_SHALLOW TRUE
 )
-
 message(STATUS "Fetching json...")
 FetchContent_MakeAvailable(json)
+
+FetchContent_Declare(
+        ixwebsocket
+        GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
+        GIT_TAG v11.4.5
+)
+message(STATUS "Fetching IXWebSocket...")
+FetchContent_MakeAvailable(ixwebsocket)
 
 if(MSVC)
     FetchContent_Declare(

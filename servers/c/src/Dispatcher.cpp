@@ -4,7 +4,6 @@
 
 // support
 #include "Error.h"
-#include "JSON.h"
 #include "Log.h"
 
 // lib
@@ -14,24 +13,15 @@ using namespace nlohmann;
 using namespace std;
 
 using namespace ts::cbl;
-using namespace ts::support::logger;
+using namespace ts::log;
 using namespace ts::support::error;
-using namespace ts::support::json_util;
 
 #define HANDLER(h) [this](Request& request, Session* session) -> int { return h(request, session); }
 
-// API Version : 0.6.0
-// - No remote logging support yet
+// API Version : 1.0.0
 namespace ts {
     Dispatcher::Dispatcher(const TestServer *testServer) {
         _testServer = testServer;
-
-        // We may change to have a manager per session with a different database directory
-        // for each session in the future.
-        auto manager = make_shared<CBLManager>(_testServer->context().databaseDir,
-                                               _testServer->context().assetsDir);
-        _sessionManager = make_unique<SessionManager>(manager);
-
         addRule({"GET", "/", HANDLER(handleGETRoot)});
         addRule({"POST", "/newSession", HANDLER(handlePOSTNewSession)});
         addRule({"POST", "/reset", HANDLER(handlePOSTReset)});
@@ -46,10 +36,18 @@ namespace ts {
         addRule({"POST", "/runQuery", HANDLER(handlePOSTRunQuery)});
     }
 
+    const TestServer *Dispatcher::server() const {
+        return _testServer;
+    }
+
+    SessionManager *Dispatcher::sessionManager() const {
+        return _testServer->sessionManager();
+    }
+
     int Dispatcher::handle(mg_connection *conn) const {
-        Request request = Request(conn, _testServer);
+        Request request = Request(conn, this);
         try {
-            log(LogLevel::info, "Request %s", request.name().c_str());
+            Log::log(LogLevel::info, "Request %s", request.name().c_str());
             if (request.path() != "/") {
                 if (request.version() != TestServer::API_VERSION) {
                     return request.respondWithServerError("API Version Mismatched or Missing");
@@ -57,19 +55,14 @@ namespace ts {
             }
 
             shared_ptr<Session> session;
-            if (request.path() == "/") {
-                session = _sessionManager->createTempSession();
-            } else if (request.path() == "/newSession") {
-                json body = request.jsonBody();
-                CheckBody(body);
-                auto id = GetValue<string>(body, "id");
-                session = _sessionManager->createSession(id);
+            if (request.path() == "/" || request.path() == "/newSession") {
+                session = sessionManager()->createTempSession();
             } else {
                 auto id = request.clientID();
                 if (id.empty()) {
                     return request.respondWithServerError("Client ID Missing");
                 }
-                session = _sessionManager->getSession(id);
+                session = sessionManager()->getSession(id);
             }
 
             auto handler = findHandler(request);
