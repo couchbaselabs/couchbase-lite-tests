@@ -9,31 +9,33 @@ param (
     [string]$sgUrl
 )
 
+$ErrorActionPreference = "Stop"
+
 # Force the Couchbase Lite Java version
 Push-Location servers\jak
 "$version" | Out-File cbl-version.txt
 
-Write-Host "Build Java Desktop Test Server"
+Write-Host "Windows Desktop: Build the Test Server"
 Set-Location desktop
 & .\gradlew.bat --no-daemon jar -PbuildNumber="${buildNumber}"
 
-Write-Host "Start the Test Server"
+Write-Host "Windows Desktop: Start the Test Server"
 if (Test-Path -Path .\server.pid){
     $serverId = Get-Content .\server.pid
-    Stop-Process -Id $serverId
+    Stop-Process -Id $serverId -ErrorAction SilentlyContinue
 }
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue server.log, server.url, server.pid
-$app = Start-Process java -ArgumentList "-jar .\app\build\libs\CBLTestServer-Java-Desktop-${version}-${buildNumber}.jar server" -PassThru -NoNewWindow -RedirectStandardOutput server.log  -RedirectStandardError server.err
+$app = Start-Process java -ArgumentList "-jar app\build\libs\CBLTestServer-Java-Desktop-${version}-${buildNumber}.jar server" -PassThru -NoNewWindow -RedirectStandardOutput server.log  -RedirectStandardError server.err
 $app.Id | Out-File server.pid
 Pop-Location
 
-Write-Host "Start Environment"
+Write-Host "Windows Desktop: Start the environment"
 & .\jenkins\pipelines\shared\setup_backend.ps1 $sgUrl
 
-Write-Host "Wait for the Test Server..."
-$n = 0
+Write-Host "Windows Desktop: Wait for the Test Server..."
+$urlFile = "servers\jak\desktop\server.url"
 $serverUrl = ""
-$urlFile = ".\servers\jak\desktop\app\server.url"
+$n = 0
 while ($true) {
     if ($n -gt 30) {
         Write-Host "Cannot get server URL: Aborting"
@@ -55,30 +57,37 @@ while ($true) {
     break
 }
 
-Write-Host "Configure tests"
+Write-Host "Windows Desktop: Configure the tests"
+Remove-Item tests\config_java_desktop.json
 Copy-Item .\jenkins\pipelines\java\desktop\config_java_desktop.json -Destination tests
 Push-Location tests
 Add-Content config_java_desktop.json "    `"test-servers`": [`"$serverUrl`"]"
 Add-Content config_java_desktop.json '}'
 Get-Content config_java_desktop.json
 
-Write-Host "Running tests on desktop test server at $serverUrl"
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue venv
 & python3.10 -m venv venv
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 .\venv\Scripts\activate.ps1
 pip install -r requirements.txt
 
-Write-Host "Run tests"
-& pytest -v --no-header -W ignore::DeprecationWarning --config config_java_desktop.json
+Write-Host "Windows Desktop: Run the tests"
+& pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_desktop.json
+
+Write-Host "Windows Desktop: Tests complete!"
+
+# Shutdown the test server process, otherwise the script will not exit when run from the Jenkins pipeline
+Write-Host "Windows Desktop: Shutdown the Test Server"
 deactivate
 Pop-Location
 
-# Shutdown the test server process, otherwise the script will not exit when calling from Jenkins pipeline
 Push-Location servers\jak\desktop
 if (Test-Path -Path .\server.pid){
     $serverId = Get-Content .\server.pid
-    Stop-Process -Id $serverId -Force
+    Stop-Process -Id $serverId -ErrorAction SilentlyContinue
     Remove-Item server.pid
 }
 Pop-Location
+
+Write-Host "Windows Desktop: Server terminated"
 

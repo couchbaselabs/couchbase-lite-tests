@@ -22,28 +22,28 @@ SG_URL="$3"
 pushd servers/jak > /dev/null
 echo "$VERSION" > cbl-version.txt
 
-echo "Build Java Desktop Test Server"
+echo "Linux Desktop: Build the Test Server"
 cd desktop
 ./gradlew jar -PbuildNumber="${BUILD_NUMBER}"
 
-echo "Download the support libraries"
+echo "Linux Desktop: Download the support libraries"
 rm -rf supportlib
 mkdir supportlib
 curl "${LATESTBUILDS}/${VERSION}/${BUILD_NUMBER}/couchbase-lite-java-linux-supportlibs-${VERSION}-${BUILD_NUMBER}.zip" -o support.zip
 unzip -d supportlib support.zip
 export LD_LIBRARY_PATH="`pwd`/supportlib:${LD_LIBRARY_PATH}"
 
-echo "Start the Test Server"
+echo "Linux Desktop: Start the Test Server"
 if [ -f "server.pid" ]; then kill `cat server.pid`; fi
 rm -rf server.log server.url server.pid
-nohup java -jar ./app/build/libs/CBLTestServer-Java-Desktop-${VERSION}-${BUILD_NUMBER}.jar server > server.log 2>&1 &
+nohup java -jar app/build/libs/CBLTestServer-Java-Desktop-${VERSION}-${BUILD_NUMBER}.jar server > server.log 2>&1 &
 echo $! > server.pid
 popd > /dev/null
 
-echo "Start Environment"
+echo "Linux Desktop: Start the environment"
 jenkins/pipelines/shared/setup_backend.sh "${SG_URL}"
 
-echo "Wait for the Test Server..."
+echo "Linux Desktop: Wait for the Test Server..."
 SERVER_FILE="servers/jak/desktop/server.url"
 SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
 n=0
@@ -57,18 +57,21 @@ while [[ -z "$SERVER_URL" ]]; do
     SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
 done
 
-echo "Configure tests"
+echo "Linux Desktop: Configure the tests"
+rm -rf tests/config_java_desktop.json
 cp -f "jenkins/pipelines/java/desktop/config_java_desktop.json" tests
 pushd tests > /dev/null
 echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config_java_desktop.json
 echo '}' >> config_java_desktop.json
 cat config_java_desktop.json
 
-echo "Running tests on desktop test server at $SERVER_URL"
+rm -rf venv
 python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
 
-echo "Run tests"
-pytest -v --no-header -W ignore::DeprecationWarning --config config_java_desktop.json
+echo "Linux Desktop: Run the tests"
+pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_desktop.json
+
+echo "Linux Desktop: Tests complete!"
 

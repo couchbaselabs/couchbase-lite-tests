@@ -63,4 +63,4 @@ pip install -r requirements.txt
 
 echo "Run tests"
 adb shell input keyevent KEYCODE_WAKEUP
-pytest -v --no-header -W ignore::DeprecationWarning --config config.android.json
+pytest --maxfail=7 -W ignore::DeprecationWarning --config config.android.json

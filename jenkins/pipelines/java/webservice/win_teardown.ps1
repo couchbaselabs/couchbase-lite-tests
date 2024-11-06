@@ -1,11 +1,12 @@
 
-Write-Host "Shutdown Test Server"
+$ErrorActionPreference = "Stop"
+
+Write-Host "Windows Web Service: Shutdown the Test Server"
 Push-Location servers\jak\desktop
 & .\gradlew.bat --no-daemon appStop
-Remove-Item app\server.url
 Pop-Location
 
-Write-Host "Shutdown Environment"
+Write-Host "Windows Web Service: Shutdown the environment"
 Push-Location environment
 & docker compose down
 
