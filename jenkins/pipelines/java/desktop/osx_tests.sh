@@ -16,27 +16,25 @@ if [ -z "$BUILD_NUMBER" ]; then usage; fi
 
 SG_URL="$3"
 
-
 # Force the Couchbase Lite Java version
 pushd servers/jak > /dev/null
 echo "$VERSION" > cbl-version.txt
 
-echo "Build Java Desktop Test Server"
+echo "OSX Desktop: Build the Test Server"
 cd desktop
 ./gradlew jar -PbuildNumber="${BUILD_NUMBER}"
 
-echo "Start the Test Server"
+echo "OSX Desktop: Start the Test Server"
 if [ -f "server.pid" ]; then kill `cat server.pid`; fi
 rm -rf server.log server.url server.pid
-nohup java -jar ./app/build/libs/CBLTestServer-Java-Desktop-${VERSION}-${BUILD_NUMBER}.jar server > server.log 2>&1 &
+nohup java -jar app/build/libs/CBLTestServer-Java-Desktop-${VERSION}-${BUILD_NUMBER}.jar server > server.log 2>&1 &
 echo $! > server.pid
 popd > /dev/null
 
-echo "Start Environment"
+echo "OSX Desktop: Start the environment"
 jenkins/pipelines/shared/setup_backend.sh "${SG_URL}"
 
-cp -f "jenkins/pipelines/java/desktop/config_java_desktop.json" tests
-
+echo "OSX Desktop: Wait for the Test Server..."
 SERVER_FILE="servers/jak/desktop/server.url"
 SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
 n=0
@@ -50,17 +48,21 @@ while [[ -z "$SERVER_URL" ]]; do
     SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
 done
 
-echo "Configure tests"
+echo "OSX Desktop: Configure the tests"
+rm -rf tests/config_java_desktop.json
+cp -f "jenkins/pipelines/java/desktop/config_java_desktop.json" tests
 pushd tests > /dev/null
 echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config_java_desktop.json
 echo '}' >> config_java_desktop.json
 cat config_java_desktop.json
 
-echo "Running tests on desktop test server at $SERVER_URL"
+rm -rf venv
 python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
 
-echo "Run tests"
-pytest -v --no-header -W ignore::DeprecationWarning --config config_java_desktop.json
+echo "OSX Desktop: Run the tests"
+pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_desktop.json
+
+echo "OSX Desktop: Tests complete!"
 
