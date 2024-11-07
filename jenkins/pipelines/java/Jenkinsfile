@@ -30,17 +30,19 @@ pipeline {
                         lock("mob-e2e-mac-01")
                     }
                     steps {
-                        echo "Run OSX Java Desktop Tests"
+                        echo "=== Run OSX Desktop Tests"
                         sh """
                             jenkins/pipelines/java/desktop/osx_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
                         """
+                        echo "=== OSX Desktop Tests Complete"
                     }
                     post {
                         always {
-                            echo "Teardown OSX Java Desktop Tests"
+                            echo "=== Teardown OSX Desktop Tests"
                             sh '''
                                 jenkins/pipelines/java/desktop/osx_teardown.sh
                             '''
+                            echo "=== OSX Desktop Test Teardown Complete"
                         }
                     }
                 }
@@ -52,13 +54,15 @@ pipeline {
                         lock("mob-e2e-win-01")
                     }
                     steps {
-                        echo "Run Windows Java Desktop Tests"
+                        echo "=== Run Windows Desktop Tests"
                         pwsh "jenkins\\pipelines\\java\\desktop\\win_tests.ps1 ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
+                        echo "=== Windows Desktop Tests Complete"
                     }
                     post {
                         always {
-                            echo "Teardown Windows Java Desktop Tests"
+                            echo "=== Teardown Windows Desktop Tests"
                             pwsh 'jenkins\\pipelines\\java\\desktop\\win_teardown.ps1'
+                            echo "=== Windows Desktop Test Teardown Complete"
                         }
                     }
                 }
@@ -70,17 +74,19 @@ pipeline {
                         lock("mob-e2e-deb-02")
                     }
                     steps {
-                        echo "Run Linux Java Desktop Tests"
+                        echo "=== Run Linux Desktop Tests"
                         sh """
                             jenkins/pipelines/java/desktop/linux_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
                         """
+                        echo "=== Linux Desktop Tests Complete"
                     }
                     post {
                         always {
-                            echo "Teardown Linux Java Desktop Tests"
+                            echo "=== Teardown Linux Desktop Tests"
                             sh '''
                                 jenkins/pipelines/java/desktop/linux_teardown.sh
                             '''
+                            echo "=== Linux Desktop Test Teardown Complete"
                         }
                     }
                 }
@@ -92,17 +98,19 @@ pipeline {
                         lock("mob-e2e-mac-01")
                     }
                     steps {
-                        echo "Run OSX Java Web Service Tests"
+                        echo "=== Run OSX Web Service Tests"
                         sh """
                             jenkins/pipelines/java/webservice/osx_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
                         """
+                        echo "=== OSX Web Service Tests Complete"
                     }
                     post {
                         always {
-                            echo "Teardown OSX Web Service Tests"
+                            echo "=== Teardown OSX Web Service Tests"
                             sh '''
                                 jenkins/pipelines/java/webservice/osx_teardown.sh
                             '''
+                            echo "=== OSX Web Service Test Teardown Complete"
                         }
                     }
                 }
@@ -114,15 +122,17 @@ pipeline {
                         lock("mob-e2e-win-01")
                     }
                     steps {
-                        echo "Run Windows Java Web Service Tests"
+                        echo "=== Run Windows Web Service Tests"
                         pwsh "jenkins\\pipelines\\java\\webservice\\win_tests.ps1 ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
+                        echo "=== Windows Web Service Tests Complete"
                     }
                     post {
                         always {
-                            echo "Teardown Windows Web Service Tests"
+                            echo "=== Teardown Windows Web Service Tests"
                             pwsh '''
                                 jenkins\\pipelines\\java\\webservice\\win_teardown.ps1
                             '''
+                            echo "=== Windows Web Service Test Teardown Complete"
                         }
                     }
                 }
@@ -134,17 +144,19 @@ pipeline {
                         lock("mob-e2e-deb-02")
                     }
                     steps {
-                        echo "Run Linux Java Web Service Tests"
+                        echo "=== Run Linux Web Service Tests"
                         sh """
                             jenkins/pipelines/java/webservice/linux_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
                         """
+                        echo "=== Linux Web Service Tests Complete"
                     }
                     post {
                         always {
-                            echo "Teardown Linux Web Service Tests"
+                            echo "=== Teardown Linux Web Service Tests"
                             sh '''
                                 jenkins/pipelines/java/webservice/linux_teardown.sh
                             '''
+                            echo "=== Linux Web Service Test Teardown Complete"
                         }
                     }
                 }

@@ -31,12 +31,12 @@ rm -rf supportlib
 mkdir supportlib
 curl "${LATESTBUILDS}/${VERSION}/${BUILD_NUMBER}/couchbase-lite-java-linux-supportlibs-${VERSION}-${BUILD_NUMBER}.zip" -o support.zip
 unzip -d supportlib support.zip
-export LD_LIBRARY_PATH="`pwd`/supportlib:${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$(pwd)/supportlib:${LD_LIBRARY_PATH}"
 
 echo "Linux Desktop: Start the Test Server"
-if [ -f "server.pid" ]; then kill `cat server.pid`; fi
+if [ -f "server.pid" ]; then kill $(cat server.pid); fi
 rm -rf server.log server.url server.pid
-nohup java -jar app/build/libs/CBLTestServer-Java-Desktop-${VERSION}-${BUILD_NUMBER}.jar server > server.log 2>&1 &
+nohup java -jar "app/build/libs/CBLTestServer-Java-Desktop-${VERSION}-${BUILD_NUMBER}.jar" server > server.log 2>&1 &
 echo $! > server.pid
 popd > /dev/null
 
@@ -45,7 +45,7 @@ jenkins/pipelines/shared/setup_backend.sh "${SG_URL}"
 
 echo "Linux Desktop: Wait for the Test Server..."
 SERVER_FILE="servers/jak/desktop/server.url"
-SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
+SERVER_URL=$(cat $SERVER_FILE 2> /dev/null)
 n=0
 while [[ -z "$SERVER_URL" ]]; do
     if [[ $n -gt 30 ]]; then
@@ -54,7 +54,7 @@ while [[ -z "$SERVER_URL" ]]; do
     fi
     ((++n))
     sleep 1
-    SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
+    SERVER_URL=$(cat $SERVER_FILE 2> /dev/null)
 done
 
 echo "Linux Desktop: Configure the tests"
@@ -74,4 +74,3 @@ echo "Linux Desktop: Run the tests"
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_desktop.json
 
 echo "Linux Desktop: Tests complete!"
-

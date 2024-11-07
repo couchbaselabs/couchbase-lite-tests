@@ -9,8 +9,8 @@ pushd environment > /dev/null
 docker compose down
 
 # kill logcat
-logcat_pid=`cat logcat.pid`
-if [ ! -z "$logcat_pid" ]; then
+logcat_pid=$(cat logcat.pid)
+if [ -n "$logcat_pid" ]; then
    kill $logcat_pid
 fi
 

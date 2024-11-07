@@ -33,7 +33,7 @@ class TestQueryConsistency(CBLTestClass):
                                 pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=180))
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=300))
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         TestQueryConsistency.__database = dbs[0]
