@@ -29,10 +29,9 @@ $SCRIPT_DIR/run_ios.sh $ios_device
 $SCRIPT_DIR/../shared/setup_backend.sh $sgw_url
 
 banner "Resolving Test Server IP"
-if [ "$IOS_TEST_SERVER_IP" != "" ]; then
+test_server_ip=$(dns-sd -t 1 -B _testserver._tcp | tail -1 | awk '{gsub(/-/, ".",  $7)} {print $7}')
+if [ "$test_server_ip" == "" ]; then
     test_server_ip=$IOS_TEST_SERVER_IP
-else
-    test_server_ip=$(dns-sd -t 1 -B _testserver._tcp | tail -1 | awk '{gsub(/-/, ".",  $7)} {print $7}')
 fi
 
 if [ "$test_server_ip" == "" ]; then

@@ -21,7 +21,11 @@ Push-Location $PSScriptRoot\..\..\..\tests
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
-Copy-Item $PSScriptRoot\config.json .
+
+$config_json = $(Get-Content $PSScriptRoot\config.json)
+$config_json = $config_json.Replace("{{test-server-ip}}", "localhost").Replace("{{test-client-ip}}", "localhost")
+Set-Content .\config.json $config_json
+
 pytest -v --no-header --config config.json
 deactivate
 Pop-Location
