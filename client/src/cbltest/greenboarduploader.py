@@ -41,7 +41,7 @@ class GreenboardUploader(object):
         elif report.failed:
             self.__fail_count += 1
 
-    def upload(self, platform: str, version: str, sgw_version: str):
+    def upload(self, platform: str, os_name: str, version: str, sgw_version: str):
         """
         Uploads the results using the specified platform and version.  The reason that they
         are specified here is because they are probably unknown at the time that this object
@@ -76,5 +76,6 @@ class GreenboardUploader(object):
             "failCount": self.__fail_count,
             "passCount": self.__pass_count,
             "platform": platform,
+            "os": os_name, 
             "uploaded": unix_timestamp
         })
