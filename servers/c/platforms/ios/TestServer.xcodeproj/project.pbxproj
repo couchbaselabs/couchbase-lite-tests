@@ -1135,6 +1135,7 @@
 				DEVELOPMENT_TEAM = N2Q372V7W2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TestServer/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "For Advertising Service";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -1145,6 +1146,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.couchbase.c.testserver;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -1164,6 +1166,7 @@
 				DEVELOPMENT_TEAM = N2Q372V7W2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TestServer/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "For Advertising Service";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -1174,6 +1177,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.couchbase.c.testserver;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

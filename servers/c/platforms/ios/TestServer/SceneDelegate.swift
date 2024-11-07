@@ -14,10 +14,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         TSTestServer.shared().start()
+        IPAddress.shared.advertise()
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
         TSTestServer.shared().stop()
+        IPAddress.shared.stop()
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {

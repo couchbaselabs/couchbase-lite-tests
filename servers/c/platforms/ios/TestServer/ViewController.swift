@@ -6,6 +6,6 @@ class ViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        ipLabel.text = IPAddress.address()
+        ipLabel.text = IPAddress.shared.address
     }
 }
