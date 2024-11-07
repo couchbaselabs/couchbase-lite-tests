@@ -32,7 +32,7 @@ jenkins/pipelines/shared/setup_backend.sh "${SG_URL}"
 
 echo "OSX Web Service: Wait for the Test Server..."
 SERVER_FILE="servers/jak/webservice/app/server.url"
-SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
+SERVER_URL=$(cat $SERVER_FILE 2> /dev/null)
 n=0
 while [[ -z "$SERVER_URL" ]]; do
     if [[ $n -gt 30 ]]; then
@@ -41,7 +41,7 @@ while [[ -z "$SERVER_URL" ]]; do
     fi
     ((++n))
     sleep 1
-    SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
+    SERVER_URL=$(cat $SERVER_FILE 2> /dev/null)
 done
 
 echo "OSX Web Service: Configure the tests"
@@ -61,4 +61,3 @@ echo "OSX Web Service: Run the tests"
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_webservice.json
 
 echo "OSX Web Service: Tests complete!"
-

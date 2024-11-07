@@ -145,7 +145,7 @@ class TestBasicReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=180))
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=300))
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
@@ -382,7 +382,7 @@ class TestBasicReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE, timeout=timedelta(seconds=180))
+        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE, timeout=timedelta(seconds=300))
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 

@@ -9,4 +9,3 @@ popd > /dev/null
 echo "OSX Web Service: Shutdown the environment"
 pushd environment > /dev/null
 docker compose down
-

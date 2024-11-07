@@ -25,6 +25,7 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.json.ReplyBuilder;
 import com.couchbase.lite.mobiletest.services.Log;
 
+
 // Implements API 0.5.2
 public final class GetDispatcher extends BaseDispatcher<GetDispatcher.Endpoint> {
     private static final String TAG = "GET";
@@ -32,14 +33,14 @@ public final class GetDispatcher extends BaseDispatcher<GetDispatcher.Endpoint> 
     @FunctionalInterface
     interface Endpoint {
         @NonNull
-        Map<String, Object> run(@NonNull TestContext ctxt);
+        Map<String, Object> run();
     }
 
     public GetDispatcher(@NonNull TestApp app) {
         super(app);
 
         // build the endpoint table
-        addEndpoint(1, "/", (m) -> app.getSystemInfo());
+        addEndpoint(1, "/", app::getSystemInfo);
     }
 
     // This method returns a Reply.  Be sure to close it!
@@ -60,7 +61,7 @@ public final class GetDispatcher extends BaseDispatcher<GetDispatcher.Endpoint> 
             throw new ClientError(msg);
         }
 
-        final Map<String, Object> result = endpoint.run(TestApp.getApp().getSession(client));
+        final Map<String, Object> result = endpoint.run();
 
         Log.p(TAG, "Request succeeded");
         return new Reply(new ReplyBuilder(result).buildReply());

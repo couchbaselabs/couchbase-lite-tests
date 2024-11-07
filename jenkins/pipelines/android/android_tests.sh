@@ -19,20 +19,19 @@ if [ -z "$BUILD_NUMBER" ]; then usage; fi
 
 SG_URL="$3"
 
-
 echo "Install Android SDK"
 yes | ${SDK_MGR} --licenses > /dev/null 2>&1
 ${SDK_MGR} --install "build-tools;${BUILD_TOOLS_VERSION}"
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
 # Get the Android device's IP address
-ANDROID_IP=`adb shell ifconfig | perl -ne 'next unless /inet addr:([\d.]+) /; $ip = $1; next if $ip =~ /^127/; print "$1\n"'`
+ANDROID_IP=$(adb shell ifconfig | perl -ne 'next unless /inet addr:([\d.]+) /; $ip = $1; next if $ip =~ /^127/; print "$1\n"')
 
 # Force the Couchbase Lite Android version
 pushd servers/jak > /dev/null
 echo "$VERSION" > cbl-version.txt
 
-echo "Build Test Server"
+echo "Build the Test Server"
 cd android
 adb uninstall com.couchbase.lite.android.mobiletest 2 >& 1 > /dev/null || true
 ./gradlew installRelease -PbuildNumber="${BUILD_NUMBER}"
@@ -41,26 +40,28 @@ echo "Start the Test Server"
 adb shell am start -a android.intent.action.MAIN -n com.couchbase.lite.android.mobiletest/.MainActivity
 popd > /dev/null
 
-echo "Start Environment"
+echo "Start the environment"
 jenkins/pipelines/shared/setup_backend.sh "${SG_URL}"
 
-cp -f "jenkins/pipelines/android/config.android.json" tests
-
-echo "Configure tests"
+echo "Configure the tests"
+rm -rf tests/config_android.json
+cp -f "jenkins/pipelines/android/config_android.json" tests
 pushd tests
-echo '    "test-servers": ["http://'"$ANDROID_IP"':8080"]' >> config.android.json
-echo '}' >> config.android.json
-cat config.android.json
+echo '    "test-servers": ["http://'"$ANDROID_IP"':8080"]' >> config_android.json
+echo '}' >> config_android.json
+cat config_android.json
+
+rm -rf venv
+python3.10 -m venv venv
+. venv/bin/activate
+pip install -r requirements.txt
 
 echo "Start logcat"
 python3.10 jenkins/pipelines/android/logcat.py 
 echo $! > logcat.pid
 
-echo "Running tests on device $ANDROID_SERIAL at $ANDROID_IP"
-python3.10 -m venv venv
-. venv/bin/activate
-pip install -r requirements.txt
-
-echo "Run tests"
+echo "Run the tests"
 adb shell input keyevent KEYCODE_WAKEUP
-pytest --maxfail=7 -W ignore::DeprecationWarning --config config.android.json
+pytest --maxfail=7 -W ignore::DeprecationWarning --config config_android.json
+
+echo "Tests complete!"

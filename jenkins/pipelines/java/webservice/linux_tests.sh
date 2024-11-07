@@ -27,7 +27,7 @@ rm -rf supportlib
 mkdir supportlib
 curl "${LATESTBUILDS}/${VERSION}/${BUILD_NUMBER}/couchbase-lite-java-linux-supportlibs-${VERSION}-${BUILD_NUMBER}.zip" -o support.zip
 unzip -d supportlib support.zip
-export LD_LIBRARY_PATH="`pwd`/supportlib:${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$(pwd)/supportlib:${LD_LIBRARY_PATH}"
 
 echo "Linux Web Service: Build and start the Test Server"
 cd webservice
@@ -41,7 +41,7 @@ jenkins/pipelines/shared/setup_backend.sh "${SG_URL}"
 
 echo "Linux Web Service: Wait for the Test Server..."
 SERVER_FILE="servers/jak/webservice/app/server.url"
-SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
+SERVER_URL=$(cat $SERVER_FILE 2> /dev/null)
 n=0
 while [[ -z "$SERVER_URL" ]]; do
     if [[ $n -gt 30 ]]; then
@@ -50,7 +50,7 @@ while [[ -z "$SERVER_URL" ]]; do
     fi
     ((++n))
     sleep 1
-    SERVER_URL=`cat $SERVER_FILE 2> /dev/null`
+    SERVER_URL=$(cat $SERVER_FILE 2> /dev/null)
 done
 
 echo "Linux Web Service: Configure the tests"
@@ -70,4 +70,3 @@ echo "Linux Web Service: Run the tests"
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_webservice.json
 
 echo "Linux Web Service: Tests complete"
-
