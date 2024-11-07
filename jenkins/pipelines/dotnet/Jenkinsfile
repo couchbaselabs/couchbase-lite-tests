@@ -50,11 +50,11 @@ pipeline {
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        sh "jenkins\\pipelines\\dotnet\\test_mac.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
+                        sh "jenkins/pipelines/dotnet/test_mac.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
                     }
                     post { 
                         always { 
-                            sh 'jenkins\\pipelines\\dotnet\\teardown_mac.sh'
+                            sh 'jenkins/pipelines/dotnet/teardown_mac.sh'
                         }
                     }
                 }
@@ -73,11 +73,11 @@ pipeline {
             agent { label 'mob-e2e-mac-01' }
             steps {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                sh "jenkins\\pipelines\\dotnet\\test_ios.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
+                sh "jenkins/pipelines/dotnet/test_ios.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
             }
             post {
                 always {
-                    sh 'jenkins\\pipelines\\dotnet\\teardown_ios.sh'
+                    sh 'jenkins/pipelines/dotnet/teardown_ios.sh'
                 }
             }
         }
@@ -87,11 +87,11 @@ pipeline {
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
-                sh "jenkins\\pipelines\\dotnet\\test_android.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
+                sh "jenkins/pipelines/dotnet/test_android.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
             }
             post {
                 always {
-                    sh 'jenkins\\pipelines\\dotnet\\teardown_android.sh'
+                    sh 'jenkins/pipelines/dotnet/teardown_android.sh'
                 }
             }
         }
