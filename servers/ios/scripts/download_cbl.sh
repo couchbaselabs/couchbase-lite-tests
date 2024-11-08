@@ -33,7 +33,7 @@ else
 fi
 
 # Extract the CouchbaseLiteSwift.xcframework:
-unzip ${ZIP_FILENAME}
+unzip -q ${ZIP_FILENAME}
 rm -rf "${FRAMEWORKS_DIR}/CouchbaseLiteSwift.xcframework"
 cp -r CouchbaseLiteSwift.xcframework "${FRAMEWORKS_DIR}"
 

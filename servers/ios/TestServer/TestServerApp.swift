@@ -15,6 +15,7 @@ struct TestServerApp: App {
     init() {
         DatabaseManager.InitializeShared()
         if let databaseManager = DatabaseManager.shared {
+            IPAddress.shared.advertise()
             testServer = TestServer(port: 8080, dbManager: databaseManager)
             Task { [weak testServer] in
                 await testServer?.run()
