@@ -10,6 +10,7 @@
 		4029C4A02CB88E0300C34775 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4029C49F2CB88E0300C34775 /* SessionManager.swift */; };
 		404619D02CB9A761003835C7 /* NewSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619CF2CB9A761003835C7 /* NewSession.swift */; };
 		404619D22CB9A985003835C7 /* NewSessionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619D12CB9A985003835C7 /* NewSessionHandler.swift */; };
+		4055CAA02CDC33A400EDD0CB /* IPAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4055CA9F2CDC33A400EDD0CB /* IPAddress.swift */; };
 		40AA34992CAF5D20004F4D08 /* StopReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34982CAF5D20004F4D08 /* StopReplicator.swift */; };
 		40AA349D2CAF6755004F4D08 /* CollectionSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */; };
 		40AA34A12CAF6BE4004F4D08 /* ReplicationConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A02CAF6BE4004F4D08 /* ReplicationConflictResolver.swift */; };
@@ -94,6 +95,8 @@
 		4029C49F2CB88E0300C34775 /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
 		404619CF2CB9A761003835C7 /* NewSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSession.swift; sourceTree = "<group>"; };
 		404619D12CB9A985003835C7 /* NewSessionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionHandler.swift; sourceTree = "<group>"; };
+		4055CA9F2CDC33A400EDD0CB /* IPAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPAddress.swift; sourceTree = "<group>"; };
+		40A219D62CDC3E790038204C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		40AA34982CAF5D20004F4D08 /* StopReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopReplicator.swift; sourceTree = "<group>"; };
 		40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionSpec.swift; sourceTree = "<group>"; };
 		40AA34A02CAF6BE4004F4D08 /* ReplicationConflictResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplicationConflictResolver.swift; sourceTree = "<group>"; };
@@ -200,6 +203,7 @@
 				40BDA8072AF1C15C008DB256 /* Utils */,
 				40BDA7512AF1BFCC008DB256 /* TestServerApp.swift */,
 				40BDA7532AF1BFCC008DB256 /* ContentView.swift */,
+				40A219D62CDC3E790038204C /* Info.plist */,
 				40BDA7552AF1BFCD008DB256 /* Assets.xcassets */,
 				40BDA7572AF1BFCD008DB256 /* Preview Content */,
 			);
@@ -262,6 +266,7 @@
 				40BDA7632AF1C0AF008DB256 /* DatabaseManager.swift */,
 				40BDA80B2AF1C15C008DB256 /* DocComparison.swift */,
 				40BDA8082AF1C15C008DB256 /* DocumentUpdater.swift */,
+				4055CA9F2CDC33A400EDD0CB /* IPAddress.swift */,
 				40BDA80D2AF1C15C008DB256 /* KeyPathParser.swift */,
 				40BDA8092AF1C15C008DB256 /* MutableObjectProtocol.swift */,
 				40AA34A22CAF8C4C004F4D08 /* ReplicationConflictResolverFactory.swift */,
@@ -482,6 +487,7 @@
 				40BDA8142AF1C15C008DB256 /* KeyPathParser.swift in Sources */,
 				40C7A5652CA4AFB40053ADCB /* RunQueryConfiguration.swift in Sources */,
 				40C7A5632CA4AF5C0053ADCB /* RunQuery.swift in Sources */,
+				4055CAA02CDC33A400EDD0CB /* IPAddress.swift in Sources */,
 				40BDA8EE2AF20AAB008DB256 /* ResetConfiguration.swift in Sources */,
 				40BDA8EB2AF20AAB008DB256 /* ReplicatorConfiguration.swift in Sources */,
 				40BDA8E12AF20AAB008DB256 /* ReplicatorStatus.swift in Sources */,
@@ -625,6 +631,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TestServer/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -636,7 +643,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.couchbase.CBLTestServer-iOS";
+				PRODUCT_BUNDLE_IDENTIFIER = com.couchbase.ios.testserver;
 				PRODUCT_NAME = "TestServer-iOS";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -656,6 +663,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TestServer/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -667,7 +675,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.couchbase.CBLTestServer-iOS";
+				PRODUCT_BUNDLE_IDENTIFIER = com.couchbase.ios.testserver;
 				PRODUCT_NAME = "TestServer-iOS";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

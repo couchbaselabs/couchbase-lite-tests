@@ -13,9 +13,9 @@ TESTS_DIR="${SCRIPT_DIR}/../../../tests"
 # Find a connected iOS device:
 DEVICE_UDID="$("${SHARED_DIR}/ios_device.sh")"
 if [[ -z "${DEVICE_UDID}" ]]; then
-    echo "No connected device found." && exit 1
+    echo "No iOS device found." && exit 1
 else
-    echo "Connected device found: ${DEVICE_UDID}"
+    echo "iOS Device: ${DEVICE_UDID}"
 fi
 
 # Build Test Server App:
@@ -28,19 +28,34 @@ echo "Run Test Server"
 "${SHARED_DIR}/ios_app.sh" start "${DEVICE_UDID}" "./build/TestServer-iOS.app"
 popd > /dev/null
 
-# Start Environment :
+# Start Environment:
 echo "Start environment"
 "${SHARED_DIR}/setup_backend.sh" "${SGW_URL}"
 
 # Run Tests :
-echo "Run tests"
-pushd "${TESTS_DIR}"
+echo "Run tests..."
+
+# Find Test Server IP:
+TEST_SERVER_IP=$(dns-sd -t 1 -B _testserver._tcp | tail -1 | awk '{gsub(/-/, ".",  $7)} {print $7}')
+if [[ -z "${TEST_SERVER_IP}" ]]; then
+    echo "Cannot find Test Server IP" && exit 1
+else
+    echo "Test Server IP: ${TEST_SERVER_IP}"
+fi
+
+# Find Test Client IP:
+TEST_CLIENT_IP=$(ifconfig en0 | grep "inet " | awk '{print $2}')
+if [[ -z "${TEST_CLIENT_IP}" ]]; then
+    echo "Cannot find Test Server IP" && exit 1
+else
+    echo "Test Client IP: ${TEST_CLIENT_IP}"
+fi
+
+pushd "${TESTS_DIR}" > /dev/null
 python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-
-rm -f "config.ios.json" || true
-cp "${SCRIPT_DIR}/config.ios.json" .
-pytest -v --no-header -W ignore::DeprecationWarning --config config.ios.json
+sed "s/{{test-server-ip}}/${TEST_SERVER_IP}/g" $SCRIPT_DIR/config.json | sed "s/{{test-client-ip}}/${TEST_CLIENT_IP}/g" > config.json
+pytest -v --no-header -W ignore::DeprecationWarning --config config.json
 deactivate
-popd
+popd > /dev/null

@@ -77,7 +77,7 @@ struct DocComparison : Content {
     private static func isEqual(_ left: Any?, _ right: Any?, keypath: String) throws -> CompareResult {
         switch (left, right) {
         case (nil, nil): return .success
-        case let (left as NSNull, right as NSNull): return .success
+        case (_ as NSNull, _ as NSNull): return .success
         case let (left as Bool, right as Bool): return left == right ? .success : .fail(reason: .MismatchedProperty, keypath: keypath, expected: left, actual: right)
         case let (left as Int, right as Int): return left == right ? .success : .fail(reason: .MismatchedProperty, keypath: keypath, expected: left, actual: right)
         case let (left as Double, right as Double): return left == right ? .success : .fail(reason: .MismatchedProperty, keypath: keypath, expected: left, actual: right)
