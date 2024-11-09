@@ -27,5 +27,10 @@ $config_json = $config_json.Replace("{{test-server-ip}}", "localhost").Replace("
 Set-Content .\config.json $config_json
 
 pytest -v --no-header --config config.json
+$saved_exit = $LASTEXITCODE
 deactivate
 Pop-Location
+
+if($saved_exit -ne 0) {
+    throw "Testing failed!"
+}
