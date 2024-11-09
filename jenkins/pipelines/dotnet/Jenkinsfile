@@ -45,8 +45,8 @@ pipeline {
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
-                        DEVELOPER_DIR="/Applications/Xcode-16.1.0.app"
-                        MD_APPLE_SDK_ROOT="/Applications/Xcode-16.1.0.app"
+                        DEVELOPER_DIR="/Applications/Xcode.app"
+                        MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
@@ -67,8 +67,8 @@ pipeline {
             environment { 
                 KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
                 IOS_TEST_SERVER_IP = "10.100.150.123"
-                DEVELOPER_DIR="/Applications/Xcode-16.1.0.app"
-                MD_APPLE_SDK_ROOT="/Applications/Xcode-16.1.0.app"
+                DEVELOPER_DIR="/Applications/Xcode.app"
+                MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
