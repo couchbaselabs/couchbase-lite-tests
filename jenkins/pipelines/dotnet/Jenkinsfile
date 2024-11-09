@@ -7,7 +7,6 @@ pipeline {
         string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
     }
     options {
-        timeout(time: 120, unit: 'MINUTES')
         ansiColor('xterm')
         timestamps()
     }
@@ -28,6 +27,7 @@ pipeline {
                     agent { label 'mob-e2e-win-01' }
                     options {
                         lock('mob-e2e-win-01')
+                        timeout(time: 60, unit: 'MINUTES') 
                     }
                     steps {
                         pwsh "jenkins\\pipelines\\dotnet\\test_winui.ps1 -Edition ${params.CBL_EDITION} -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD} -SgwUrl ${params.SGW_URL}"
@@ -42,6 +42,7 @@ pipeline {
                     agent { label 'mob-e2e-mac-01' }
                     options {
                         lock('mob-e2e-mac-01')
+                        timeout(time: 60, unit: 'MINUTES') 
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
@@ -63,6 +64,7 @@ pipeline {
         stage('iOS') {
             options {
                 lock("mob-e2e-mac-01")
+                timeout(time: 60, unit: 'MINUTES') 
             }
             environment { 
                 KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
@@ -84,6 +86,7 @@ pipeline {
         stage('Android') {
             options {
                 lock("mob-e2e-mac-01")
+                timeout(time: 60, unit: 'MINUTES') 
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
