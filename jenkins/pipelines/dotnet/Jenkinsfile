@@ -7,7 +7,6 @@ pipeline {
         string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
     }
     options {
-        timeout(time: 120, unit: 'MINUTES')
         ansiColor('xterm')
         timestamps()
     }
@@ -28,6 +27,7 @@ pipeline {
                     agent { label 'mob-e2e-win-01' }
                     options {
                         lock('mob-e2e-win-01')
+                        timeout(time: 60, unit: 'MINUTES') 
                     }
                     steps {
                         pwsh "jenkins\\pipelines\\dotnet\\test_winui.ps1 -Edition ${params.CBL_EDITION} -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD} -SgwUrl ${params.SGW_URL}"
@@ -42,19 +42,20 @@ pipeline {
                     agent { label 'mob-e2e-mac-01' }
                     options {
                         lock('mob-e2e-mac-01')
+                        timeout(time: 60, unit: 'MINUTES') 
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
-                        DEVELOPER_DIR="/Applications/Xcode-16.1.0.app"
-                        MD_APPLE_SDK_ROOT="/Applications/Xcode-16.1.0.app"
+                        DEVELOPER_DIR="/Applications/Xcode.app"
+                        MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        sh "jenkins\\pipelines\\dotnet\\test_mac.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
+                        sh "jenkins/pipelines/dotnet/test_mac.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
                     }
                     post { 
                         always { 
-                            sh 'jenkins\\pipelines\\dotnet\\teardown_mac.sh'
+                            sh 'jenkins/pipelines/dotnet/teardown_mac.sh'
                         }
                     }
                 }
@@ -63,35 +64,37 @@ pipeline {
         stage('iOS') {
             options {
                 lock("mob-e2e-mac-01")
+                timeout(time: 60, unit: 'MINUTES') 
             }
             environment { 
                 KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
                 IOS_TEST_SERVER_IP = "10.100.150.123"
-                DEVELOPER_DIR="/Applications/Xcode-16.1.0.app"
-                MD_APPLE_SDK_ROOT="/Applications/Xcode-16.1.0.app"
+                DEVELOPER_DIR="/Applications/Xcode.app"
+                MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                sh "jenkins\\pipelines\\dotnet\\test_ios.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
+                sh "jenkins/pipelines/dotnet/test_ios.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
             }
             post {
                 always {
-                    sh 'jenkins\\pipelines\\dotnet\\teardown_ios.sh'
+                    sh 'jenkins/pipelines/dotnet/teardown_ios.sh'
                 }
             }
         }
         stage('Android') {
             options {
                 lock("mob-e2e-mac-01")
+                timeout(time: 60, unit: 'MINUTES') 
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
-                sh "jenkins\\pipelines\\dotnet\\test_android.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
+                sh "jenkins/pipelines/dotnet/test_android.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} '${params.SGW_URL}'"
             }
             post {
                 always {
-                    sh 'jenkins\\pipelines\\dotnet\\teardown_android.sh'
+                    sh 'jenkins/pipelines/dotnet/teardown_android.sh'
                 }
             }
         }
