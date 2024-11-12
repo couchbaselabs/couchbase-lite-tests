@@ -7,13 +7,18 @@ namespace TestServer;
 
 public partial class MainPage : ContentPage
 {
-	public MainPage()
-	{
-		InitializeComponent();
+    private const int PortToUse = 5555;
 
-		var server = new CBLTestServer();
-		server.Start();
-	}
+    public MainPage()
+    {
+        InitializeComponent();
+
+        var server = new CBLTestServer
+        {
+            Port = PortToUse
+        };
+        server.Start();
+    }
 
     private static bool IsInterfaceValid(NetworkInterface ni)
     {
@@ -47,7 +52,7 @@ public partial class MainPage : ContentPage
         var ipAddresses = "Server running at:" +
             Environment.NewLine +
             String.Join(Environment.NewLine, validIPs
-            .Select(x => $"http://{x.Address}:8080"));
+            .Select(x => $"http://{x.Address}:{PortToUse}"));
         _urlLabel.Text = ipAddresses;
     }
 }
