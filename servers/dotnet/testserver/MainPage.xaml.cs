@@ -7,11 +7,16 @@ namespace TestServer;
 
 public partial class MainPage : ContentPage
 {
+    private const int PortToUse = 5555;
+
 	public MainPage()
 	{
 		InitializeComponent();
 
-		var server = new CBLTestServer();
+		var server = new CBLTestServer
+        {
+            Port = PortToUse
+        };
 		server.Start();
 	}
 
@@ -47,7 +52,7 @@ public partial class MainPage : ContentPage
         var ipAddresses = "Server running at:" +
             Environment.NewLine +
             String.Join(Environment.NewLine, validIPs
-            .Select(x => $"http://{x.Address}:8080"));
+            .Select(x => $"http://{x.Address}:{PortToUse}"));
         _urlLabel.Text = ipAddresses;
     }
 }
