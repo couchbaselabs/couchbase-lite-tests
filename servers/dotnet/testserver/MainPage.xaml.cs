@@ -9,16 +9,16 @@ public partial class MainPage : ContentPage
 {
     private const int PortToUse = 5555;
 
-	public MainPage()
-	{
-		InitializeComponent();
+    public MainPage()
+    {
+        InitializeComponent();
 
-		var server = new CBLTestServer
+        var server = new CBLTestServer
         {
             Port = PortToUse
         };
-		server.Start();
-	}
+        server.Start();
+    }
 
     private static bool IsInterfaceValid(NetworkInterface ni)
     {
