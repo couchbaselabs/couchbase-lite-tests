@@ -132,7 +132,7 @@ namespace LogSlurp
             return id;
         }
 
-        private async Task ReadLogs(WebSocket ws, string prologueFormat)
+        private async Task ReadLogs(WebSocket ws, string id, string prologueFormat)
         {
             var buffer = new byte[1024 * 4];
             var receiveResult = await ws.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
