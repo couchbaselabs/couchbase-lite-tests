@@ -10,6 +10,7 @@ param (
 )
 
 $ErrorActionPreference = "Stop"
+$status = 0
 
 # Force the Couchbase Lite Java version
 Push-Location servers\jak
@@ -20,7 +21,12 @@ Set-Location webservice
 & .\gradlew.bat --no-daemon appStop
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue server.log, app\server.url
 $temp = New-TemporaryFile
-Start-Process .\gradlew.bat -ArgumentList "--no-daemon jettyStart -PbuildNumber=${buildNumber}" -RedirectStandardInput $temp -RedirectStandardOutput server.log -RedirectStandardError server.err -NoNewWindow
+# I dunno.  This seems to prevent a hang at the end of this script...
+"" > $temp
+"" >> $temp
+"" >> $temp
+"" >> $temp
+Start-Process .\gradlew.bat -ArgumentList "--no-daemon jettyStart -PbuildNumber=${buildNumber}" -WindowStyle Hidden -RedirectStandardInput $temp -RedirectStandardOutput server.log -RedirectStandardError server.err
 
 try
 {
@@ -74,6 +80,7 @@ try
 
     Write-Host "Windows Web Service: Run the tests"
     & pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_webservice.json
+    $status = $LASTEXITCODE
 
     Write-Host "Windows Web Service: Tests complete!"
     deactivate
@@ -88,6 +95,6 @@ finally
     $childProcesses | Stop-Process -Force
 
     Write-Host "Windows Web Service: Exiting"
-    Exit
+    Exit $status
 }
 

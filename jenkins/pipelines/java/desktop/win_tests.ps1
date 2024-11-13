@@ -10,6 +10,7 @@ param (
 )
 
 $ErrorActionPreference = "Stop"
+$status = 0
 
 # Force the Couchbase Lite Java version
 Push-Location servers\jak
@@ -26,7 +27,7 @@ if (Test-Path -Path .\server.pid)
     Stop-Process -Id $serverId -ErrorAction SilentlyContinue
 }
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue server.log, server.url, server.pid
-$app = Start-Process java -ArgumentList "-jar app\build\libs\CBLTestServer-Java-Desktop-${version}-${buildNumber}.jar server" -PassThru -NoNewWindow -RedirectStandardOutput server.log  -RedirectStandardError server.err
+$app = Start-Process java -ArgumentList "-jar app\build\libs\CBLTestServer-Java-Desktop-${version}-${buildNumber}.jar server" -WindowStyle Hidden -PassThru -RedirectStandardOutput server.log  -RedirectStandardError server.err
 $app.Id | Out-File server.pid
 
 try
@@ -81,6 +82,7 @@ try
 
     Write-Host "Windows Desktop: Run the tests"
     & pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_desktop.json
+    $status = $LASTEXITCODE
 
     Write-Host "Windows Desktop: Tests complete!"
     deactivate
@@ -95,6 +97,6 @@ finally
     $childProcesses | Stop-Process -Force
 
     Write-Host "Windows Desktop: Exiting"
-    Exit
+    Exit $status
 }
 

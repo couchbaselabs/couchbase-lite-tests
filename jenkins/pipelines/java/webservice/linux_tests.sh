@@ -18,6 +18,8 @@ if [ -z "$BUILD_NUMBER" ]; then usage; fi
 
 SG_URL="$3"
 
+STATUS=0
+
 # Force the Couchbase Lite Java version
 pushd servers/jak > /dev/null
 echo "$VERSION" > cbl-version.txt
@@ -68,5 +70,7 @@ pip install -r requirements.txt
 
 echo "Linux Web Service: Run the tests"
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_webservice.json
+STATUS=$?
 
 echo "Linux Web Service: Tests complete"
+exit $STATUS
