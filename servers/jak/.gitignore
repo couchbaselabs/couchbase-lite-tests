@@ -23,3 +23,9 @@ build
 # CBL Temporary files
 CouchbaseLiteTemp
 
+# Server status
+server.url
+server.pid
+server.log
+server.err
+

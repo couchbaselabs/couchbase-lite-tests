@@ -1,0 +1,11 @@
+
+rm -rf local-config.json
+cp -f "../jenkins/pipelines/java/local/local-config.json" .
+
+    "test-servers": ["<url>"]
+}
+
+rm -rf venv; py3 -m venv venv; . venv/bin/activate; pip install -r requirements.txt
+
+rm -rf http_log testserver.log; pytest -x -W ignore::DeprecationWarning --config local-config.json
+

@@ -12,9 +12,7 @@ ext {
     SERVER_VERSION = file("${ROOT_DIR}/version.txt").text.trim()
     SERVER_BUILD  = "${getBuildId()}"
 
-    CBL_VERSION = file("${ROOT_DIR}/cbl-version.txt").text.trim()
-    CBL_BUILD_NUMBER = (project.hasProperty("buildNumber") && buildNumber) ? buildNumber : "SNAPSHOT"
-    COUCHBASE_LITE_VERSION = "${CBL_VERSION}-${CBL_BUILD_NUMBER}"
+    COUCHBASE_LITE_VERSION = (project.hasProperty("cblVersion") && cblVersion) ? cblVersion : ""
 
     SPOTBUGS_VERSION = '4.7.3'
 
@@ -26,9 +24,11 @@ ext {
 
     OKHTTP_VERSION = '4.12.0'
 }
+// Must have a CBL version
+if (COUCHBASE_LITE_VERSION == "") { throw new InvalidUserDataException ("!!! Couchbase lite version not specified") }
 
-// Set true to use mavenLocal instead of Proget
-def USE_LOCAL_MAVEN = project.hasProperty("useLocalMaven")
+// If it is a snapshot, it is in maven local
+def USE_LOCAL_MAVEN = COUCHBASE_LITE_VERSION.endsWith("SNAPSHOT")
 
 android {
     namespace "com.couchbase.lite.android.mobiletest"

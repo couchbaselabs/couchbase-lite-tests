@@ -18,7 +18,7 @@ pipeline {
         }
 
         // If Jenkins will actually run things in parallel, we will, at least for now
-        // Need to use locks to protect platform tests from corrupting each other's back ends.
+        // need to use locks to protect platform tests from corrupting each other's back ends.
         // Might as well use them here, for exactly the same purpose.
 
         stage('Tests') {
@@ -108,7 +108,7 @@ pipeline {
                         always {
                             echo "=== Teardown OSX Web Service Tests"
                             sh '''
-                                jenkins/pipelines/java/webservice/osx_teardown.sh
+                                jenkins/pipelines/java/webservice/osx_teardown.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}"
                             '''
                             echo "=== OSX Web Service Test Teardown Complete"
                         }
@@ -130,7 +130,7 @@ pipeline {
                         always {
                             echo "=== Teardown Windows Web Service Tests"
                             pwsh '''
-                                jenkins\\pipelines\\java\\webservice\\win_teardown.ps1
+                                jenkins\\pipelines\\java\\webservice\\win_teardown.ps1 "${params.CBL_VERSION}" "${params.CBL_BUILD}"
                             '''
                             echo "=== Windows Web Service Test Teardown Complete"
                         }
@@ -154,7 +154,7 @@ pipeline {
                         always {
                             echo "=== Teardown Linux Web Service Tests"
                             sh '''
-                                jenkins/pipelines/java/webservice/linux_teardown.sh
+                                jenkins/pipelines/java/webservice/linux_teardown.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}"
                             '''
                             echo "=== Linux Web Service Test Teardown Complete"
                         }

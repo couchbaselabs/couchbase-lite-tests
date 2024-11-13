@@ -10,20 +10,24 @@ param (
 )
 
 $ErrorActionPreference = "Stop"
+[System.Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\Program Files\Microsoft\jdk-17.0.13.11-hotspot")
+
+$status = 0
+$cblVersion = "${version}-${buildNumber}"
 
 # Force the Couchbase Lite Java version
-Push-Location servers\jak
-"$version" | Out-File cbl-version.txt
+Push-Location servers\jak\webservice
 
-Write-Host "Windows Web Service: Build and start the Test Server"
-Set-Location webservice
-& .\gradlew.bat --no-daemon appStop
-Remove-Item -Recurse -Force -ErrorAction SilentlyContinue server.log, app\server.url
-$temp = New-TemporaryFile
-Start-Process .\gradlew.bat -ArgumentList "--no-daemon jettyStart -PbuildNumber=${buildNumber}" -RedirectStandardInput $temp -RedirectStandardOutput server.log -RedirectStandardError server.err -NoNewWindow
+Write-Host "Windows Web Service: Stop any existing Test Server"
+& .\gradlew.bat --no-daemon appStop -PcblVersion="${cblVersion}"
 
 try
 {
+    $temp = New-TemporaryFile
+    Write-Host "Windows Web Service: Build and start the Test Server"
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue app\build server.log, app\server.url
+    $app = Start-Process .\gradlew.bat -ArgumentList "--no-daemon jettyStart -PcblVersion="${cblVersion}" -PassThru -WindowStyle Hidden -RedirectStandardInput $temp -RedirectStandardOutput server.log -RedirectStandardError server.err
+    Write-Host "Windows Web Service: Server started: $($app.ProcessName), $($app.Id)"
     Pop-Location
 
     Write-Host "Windows Web Service: Start the environment"
@@ -59,14 +63,14 @@ try
     }
 
     Write-Host "Windows Web Service: Configure the tests"
-    Remove-Item -ErrorAction SilentlyContinue tests\config_java_webservice.json
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue tests\config_java_webservice.json
     Copy-Item jenkins\pipelines\java\webservice\config_java_webservice.json -Destination tests
     Push-Location tests
     Add-Content config_java_webservice.json "    `"test-servers`": [`"$serverUrl`"]"
     Add-Content config_java_webservice.json '}'
     Get-Content config_java_webservice.json
 
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue venv
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue venv, http_log, testserver.log
     & python3.10 -m venv venv
     Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
     .\venv\Scripts\activate.ps1
@@ -74,20 +78,31 @@ try
 
     Write-Host "Windows Web Service: Run the tests"
     & pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_webservice.json
+    $status = $LASTEXITCODE
 
-    Write-Host "Windows Web Service: Tests complete!"
     deactivate
+    Write-Host "Windows Web Service: Tests complete"
 }
 
-# Shutdown any child processes
-# If any remain, this script will not exit when run from the Jenkins pipeline
+# Shutdown the server
+# When run from the Jenkins pipeline, his script will not exit
+# if the server is still running
 finally
 {
-    $childProcesses = Get-Process | Where-Object {$_.Parent.Id -eq $PID}
-    Write-Host "Windows Web Service: Killing child processes $childProcesses"
-    $childProcesses | Stop-Process -Force
+    Write-Host "Windows Web Service: Cleaning up ($status)"
+
+    Pop-Location
+    Set-Location servers\jak\webservice
+
+    Write-Host "Windows Web Service: Stopping the server"
+    if ( $app -ne $null )
+    {
+        Stop-Process $app
+    }
+
+    Write-Host "Windows Web Service: Stopping the server"
+    & .\gradlew.bat --no-daemon appStop -PcblVersion="${cblVersion}
 
     Write-Host "Windows Web Service: Exiting"
-    Exit
+    Exit $status
 }
-
