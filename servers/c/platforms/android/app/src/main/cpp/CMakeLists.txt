@@ -14,6 +14,7 @@ set(SHARED_SRC_DIR ${PROJECT_SOURCE_DIR}/shared)
 set(SHARED_SRC
         ${SHARED_SRC_DIR}/Dispatcher.cpp
         ${SHARED_SRC_DIR}/Request.cpp
+        ${SHARED_SRC_DIR}/SessionManager.cpp
         ${SHARED_SRC_DIR}/TestServer.cpp
         ${SHARED_SRC_DIR}/cbl/CBLManager.cpp
         ${SHARED_SRC_DIR}/cbl/CBLReplicationConflictResolver.cpp
@@ -32,13 +33,15 @@ set(SHARED_SRC
         ${SHARED_SRC_DIR}/dispatcher/PostRunQuery.cpp
         ${SHARED_SRC_DIR}/dispatcher/PostSnapshotDocuments.cpp
         ${SHARED_SRC_DIR}/dispatcher/PostStartReplicator.cpp
+        ${SHARED_SRC_DIR}/dispatcher/PostStopReplicator.cpp
         ${SHARED_SRC_DIR}/dispatcher/PostUpdateDatabase.cpp
         ${SHARED_SRC_DIR}/dispatcher/PostVerifyDocuments.cpp
+        ${SHARED_SRC_DIR}/log/Log.cpp
+        ${SHARED_SRC_DIR}/log/RemoteLogger.cpp
         ${SHARED_SRC_DIR}/support/Android.cpp
         ${SHARED_SRC_DIR}/support/Device.cpp
         ${SHARED_SRC_DIR}/support/Error.cpp
         ${SHARED_SRC_DIR}/support/Files.cpp
-        ${SHARED_SRC_DIR}/support/Log.cpp
         ${SHARED_SRC_DIR}/support/StringUtil.cpp
         ${SHARED_SRC_DIR}/support/UUID.cpp
         ${SHARED_SRC_DIR}/support/ZipUtil.cpp)
@@ -68,13 +71,15 @@ target_link_libraries(testserver
         civetweb-c-library
         nlohmann_json::nlohmann_json
         cblite
-        zip)
+        zip
+        ixwebsocket)
 
 target_include_directories(
         testserver PRIVATE
         ${SHARED_SRC_DIR}
         ${SHARED_SRC_DIR}/cbl
         ${SHARED_SRC_DIR}/dispatcher
+        ${SHARED_SRC_DIR}/log
         ${SHARED_SRC_DIR}/support
         ${SHARED_SRC_DIR}/support/ext
         ${civetweb_SOURCE_DIR}/include)

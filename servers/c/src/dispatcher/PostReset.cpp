@@ -9,7 +9,7 @@ int Dispatcher::handlePOSTReset(Request &request, Session *session) {
 
     auto test = GetOptValue<string>(body, "test");
     if (test) {
-        logger::log(LogLevel::info, ">>>>>>>>>> %s <<<<<<<<<<", test->c_str());
+        Log::log(LogLevel::info, ">>>>>>>>>> %s <<<<<<<<<<", test->c_str());
     }
 
     if (body.contains("databases")) {

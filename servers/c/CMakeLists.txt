@@ -15,7 +15,7 @@ add_subdirectory(vendor)
 get_directory_property(civetweb_SOURCE_DIR DIRECTORY vendor DEFINITION civetweb_SOURCE_DIR)
 
 message(STATUS ${CMAKE_LIBRARY_ARCHITECTURE})
-find_package(CouchbaseLite 3.1.0 REQUIRED PATHS lib/libcblite)
+find_package(CouchbaseLite 3.2.1 REQUIRED PATHS lib/libcblite)
 
 if(APPLE)
     set(CMAKE_INSTALL_RPATH "@loader_path")
@@ -27,6 +27,7 @@ set(SOURCE_FILES
         src/main.cpp
         src/Dispatcher.cpp
         src/Request.cpp
+        src/SessionManager.cpp
         src/TestServer.cpp
         src/cbl/CBLManager.cpp
         src/cbl/CBLReplicationConflictResolver.cpp
@@ -48,11 +49,13 @@ set(SOURCE_FILES
         src/dispatcher/PostStopReplicator.cpp
         src/dispatcher/PostUpdateDatabase.cpp
         src/dispatcher/PostVerifyDocuments.cpp
+        src/log/Log.cpp
+        src/log/RemoteLogger.cpp
         src/support/Error.cpp
-        src/support/Log.cpp
         src/support/StringUtil.cpp
         src/support/UUID.cpp
-        src/support/ZipUtil.cpp)
+        src/support/ZipUtil.cpp
+)
 
 add_executable(testserver ${SOURCE_FILES})
 
@@ -76,6 +79,7 @@ target_link_libraries(
         nlohmann_json::nlohmann_json
         cblite
         zip
+        ixwebsocket
 )
 
 target_include_directories(
@@ -83,8 +87,10 @@ target_include_directories(
         src
         src/cbl
         src/dispatcher
+        src/log
         src/support
         src/support/ext
+        src/support/ws
         ${civetweb_SOURCE_DIR}/include
 )
 
