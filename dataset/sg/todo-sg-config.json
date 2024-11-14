@@ -16,7 +16,8 @@
         }
       }
     },
-    "num_index_replicas": 0
+    "num_index_replicas": 0,
+    "import_docs": false
   },
   "users": {
     "user1": {
