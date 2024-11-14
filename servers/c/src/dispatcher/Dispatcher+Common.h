@@ -25,9 +25,9 @@
 using namespace nlohmann;
 using namespace ts;
 using namespace ts::cbl;
+using namespace ts::log;
 using namespace ts::support;
 using namespace ts::support::error;
-using namespace ts::support::logger;
 using namespace ts::support::precond;
 using namespace ts::support::json_util;
 using namespace ts::support::str;

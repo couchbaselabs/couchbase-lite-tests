@@ -10,7 +10,7 @@
 
 using namespace nlohmann;
 using namespace std;
-using namespace ts::support::logger;
+using namespace ts::log;
 using namespace ts::support::error;
 
 namespace ts {
@@ -18,12 +18,12 @@ namespace ts {
     constexpr const int kRequestErrorStatusCode = 400;
     constexpr const int kServerErrorStatusCode = 500;
 
-    Request::Request(mg_connection *conn, const TestServer *server) {
+    Request::Request(mg_connection *conn, const Dispatcher *dispatcher) {
         const mg_request_info *info = mg_get_request_info(conn);
         _method = info->request_method;
         _path = info->request_uri;
         _conn = conn;
-        _server = server;
+        _dispatcher = dispatcher;
     }
 
     int Request::version() const {
@@ -90,9 +90,12 @@ namespace ts {
     }
 
     void Request::addCommonResponseHeaders() const {
-        mg_response_header_add(_conn, "CBLTest-API-Version", to_string(TestServer::API_VERSION).c_str(), -1);
-        mg_response_header_add(_conn, "CBLTest-Server-ID", _server->serverUUID().c_str(), -1);
-        mg_response_header_add(_conn, "Cache-Control", "no-cache, no-store, must-revalidate, private, max-age=0", -1);
+        mg_response_header_add(_conn, "CBLTest-API-Version",
+                               to_string(TestServer::API_VERSION).c_str(), -1);
+        mg_response_header_add(_conn, "CBLTest-Server-ID",
+                               _dispatcher->server()->serverUUID().c_str(), -1);
+        mg_response_header_add(_conn, "Cache-Control",
+                               "no-cache, no-store, must-revalidate, private, max-age=0", -1);
         mg_response_header_add(_conn, "Expires", "0", -1);
         mg_response_header_add(_conn, "Pragma", "no-cache", -1);
     }
@@ -113,13 +116,13 @@ namespace ts {
         }
 
         if (status == kSuccessStatusCode) {
-            log(LogLevel::info, "Response %s : OK (%d)", name().c_str(), status);
+            Log::log(LogLevel::info, "Response %s : OK (%d)", name().c_str(), status);
         } else {
             if (json) {
-                log(LogLevel::info, "Response %s : Error (%d) : %s", name().c_str(), status,
-                    json->c_str());
+                Log::log(LogLevel::info, "Response %s : Error (%d) : %s", name().c_str(), status,
+                         json->c_str());
             } else {
-                log(LogLevel::info, "Response %s : Error (%d)", name().c_str(), status);
+                Log::log(LogLevel::info, "Response %s : Error (%d)", name().c_str(), status);
             }
         }
         return status;
