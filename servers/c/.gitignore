@@ -1,9 +1,10 @@
 #lib
-lib/libcblite
+lib/libcblite*
 
 #Build
 build
 cmake-build-debug
+cblite
 
 # Clion
 .idea

@@ -106,3 +106,34 @@ Go to `platforms/ios` directory and open `TestServer.xcodeproj` using XCode.
 #### Android
 
 Go to `platforms/android` directory and open `settings.gradle` using Android Studio.
+
+### Build with CBL-C and LiteCore Source
+
+This is for debugging purposes with CBL-C and LiteCore.
+
+1. Clone couchbase-lite-c named cblite at c test server directory.
+
+```
+git clone https://github.com/couchbase/couchbase-lite-C.git cblite
+git checkout <your branch>
+cd cblite && git submodule update --init --recursive
+```
+
+2. Update CMakeLists.txt as follows:
+
+```
+ add_subdirectory(vendor)
++add_subdirectory(cblite)
+ 
+-find_package(CouchbaseLite REQUIRED VERSION 3.2.1 PATHS lib/libcblite)
++#find_package(CouchbaseLite REQUIRED VERSION 3.2.1 PATHS lib/libcblite)
+ 
+ if(APPLE)
+     set(CMAKE_INSTALL_RPATH "@loader_path")
+@@ -92,6 +94,7 @@ target_include_directories(
+         src/support/ext
+         src/support/ws
+         ${civetweb_SOURCE_DIR}/include
++       ${CMAKE_BINARY_DIR}/cblite/generated_headers/public
+ )
+```
