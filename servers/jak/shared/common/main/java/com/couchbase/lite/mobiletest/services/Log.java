@@ -22,7 +22,7 @@ public final class Log {
      * A CustomLogger that can be used to log messages from this test server.
      */
     public abstract static class TestLogger implements Logger, AutoCloseable {
-        public static final String LOG_PREFIX = "CBLTEST/";
+        public static final String LOG_PREFIX = " CBLTEST/";
 
         @Override
         @NonNull
@@ -44,6 +44,7 @@ public final class Log {
         consoleLogger.setLevel(LogLevel.DEBUG);
         consoleLogger.setDomains(LogDomain.ALL_DOMAINS);
         Log.installDefaultLogger();
+        Log.p(TAG, "Logging initialized");
     }
 
     public static void p(String tag, String msg) {

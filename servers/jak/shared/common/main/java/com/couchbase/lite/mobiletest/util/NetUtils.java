@@ -101,6 +101,8 @@ public final class NetUtils {
 
             // sort the addresses in each list
             ifaceAddrs.sort(comparator);
+            Log.p(TAG, "Considering interfaces:");
+            for (InetAddress ifaceAddr: ifaceAddrs) { Log.p(TAG, "   > " + ifaceAddr); }
             addrs.add(ifaceAddrs);
         }
 

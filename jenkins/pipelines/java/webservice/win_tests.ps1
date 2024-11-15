@@ -94,9 +94,9 @@ finally
     Pop-Location
     Set-Location servers\jak\webservice
 
-    Write-Host "Windows Web Service: Stopping the server"
     if ( $app -ne $null )
     {
+        Write-Host "Windows Web Service: Stopping process $($app.ProcessName), $($app.Id)"
         Stop-Process $app
     }
 
