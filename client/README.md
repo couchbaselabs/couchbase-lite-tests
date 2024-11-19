@@ -17,6 +17,10 @@ but the basic flow so far is:
 
 ## How to build
 
+To build the client, create a venv using python v7-11 (v13 is known incompatible)
+Activate the venv and use `pip install -r requirements.txt` to assemble the
+required packages.
+
 This module can be installed locally by using `pip install .` from this
 directory.  It can be packaged for deployment using `python -m build .`
 from this directory.
