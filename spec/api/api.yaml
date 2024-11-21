@@ -753,11 +753,14 @@ components:
             type: string
           example: ['catalog.cloths', 'catalog.shoes']
     CollectionDocuments:
+      description: |-
+        Each key is a fully qualified collection name.  The associated  value is a list of objects that must have an "id" key,
+        and a "rev" key which is either a revtree id or a hlv cv
       type: object
       additionalProperties:
         type: string
-      example: { 'catalog.cloths': [{'id': 'c1', 'rev': '1-abc'}, {'id': 'c2', 'rev': '1-9ef'}],
-                 'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1-e0f'}]}
+      example: { 'catalog.cloths': [{'id': 'c1', 'rev': '800@Bob'}, {'id': 'c2', 'rev': '1-9ef'}],
+                 'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1010@Alice}]}
     Document:
       description: |-
         Contains document's properties and the metadata.
