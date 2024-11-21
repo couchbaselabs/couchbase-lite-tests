@@ -12,7 +12,7 @@ extension Handlers {
         guard let requestedReplicator = try? req.content.decode(ContentTypes.Replicator.self)
         else { throw TestServerError.badRequest("Request body does not match the 'Replicator' schema.") }
         
-        let dbManager = try req.databaseManager()
+        let dbManager = req.application.databaseManager
         guard let replStatus = dbManager.replicatorStatus(forID: requestedReplicator.id)
         else { throw TestServerError.badRequest("Replicator with ID '\(requestedReplicator.id)' does not exist.") }
         

@@ -11,22 +11,22 @@ import Vapor
 struct Session {
     let id: String
     let databaseManager: DatabaseManager
-}
-
-struct SessionKey: StorageKey {
-    typealias Value = Session
+    let sessionManager: SessionManager
 }
 
 class SessionManager {
-    static let shared = SessionManager()
+    private let databaseManager: DatabaseManager
     
     private let queue = DispatchQueue(label: "SessionManager", attributes: .concurrent)
     
     private var sessions: [String: Session] = [:]
     
-    private init() { }
+    init(databaseManager: DatabaseManager) {
+        self.databaseManager = databaseManager
+    }
     
-    func createSession(id: String, databaseManager: DatabaseManager) throws -> Session {
+    @discardableResult
+    func createSession(id: String) throws -> Session {
         return try queue.sync(flags: .barrier) {
             if sessions[id] != nil {
                 throw TestServerError.badRequest("Session '\(id)' already exists")
@@ -35,14 +35,15 @@ class SessionManager {
             // We will only maintain one session at a time. This may change in the future
             sessions.removeAll()
             
-            let session = Session(id: id, databaseManager: databaseManager)
+            // Using shared Database manager at least for now.
+            let session = Session(id: id, databaseManager: databaseManager, sessionManager: self)
             sessions[id] = session
             return session
         }
     }
     
-    func createTempSession(databaseManager: DatabaseManager) -> Session {
-        return Session(id: UUID().uuidString, databaseManager: databaseManager)
+    func createTempSession() -> Session {
+        return Session(id: UUID().uuidString, databaseManager: databaseManager, sessionManager: self)
     }
     
     func getSession(id: String) throws -> Session {

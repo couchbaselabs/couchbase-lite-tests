@@ -14,7 +14,7 @@ extension Handlers {
             throw TestServerError.badRequest("Request body does not match the 'Replicator' schema.")
         }
         
-        let dbManager = try req.databaseManager()
+        let dbManager = req.application.databaseManager
         try dbManager.stopReplicator(forID: requestedReplicator.id)
         return Response(status: .ok)
     }

@@ -8,74 +8,63 @@
 import CouchbaseLiteSwift
 import ZipArchive
 
-class DatabaseManager {    
-    public static var shared : DatabaseManager?
-    
+class DatabaseManager {
     private var databases : [ String : Database ] = [:]
     private var replicators : [ UUID : Replicator ] = [:]
     private var replicatorDocuments : [ UUID : [ContentTypes.DocumentReplication] ] = [:]
     
-    public static func InitializeShared() {
-        if shared == nil {
-            shared = DatabaseManager()
-        }
-    }
-    
-//    private init() {
-//        Database.log.console.domains = .all
-//        Database.log.console.level = .verbose
-//    }
+    public init() { }
     
     @discardableResult
     public func addCollection(dbName: String, scope: String, name: String) throws -> Collection {
-        TestServer.logger.log(level: .debug, "Creating collection: \(scope).\(name) in database: \(dbName)")
+        Log.log(level: .debug, message: "Creating collection: \(scope).\(name) in database: \(dbName)")
         guard let database = databases[dbName]
         else {
-            TestServer.logger.log(level: .error, "Failed to create collection, database '\(dbName)' does not exist")
+            Log.log(level: .error, message: "Failed to create collection, database '\(dbName)' does not exist")
             throw TestServerError.cblDBNotOpen
         }
         
         do {
             let coll = try database.createCollection(name: name, scope: scope)
-            TestServer.logger.log(level: .debug, "Collection \(scope).\(name) successfully created in database \(dbName)")
+            Log.log(level: .debug, message: "Collection \(scope).\(name) successfully created in database \(dbName)")
             return coll
         } catch(let error as NSError) {
-            TestServer.logger.log(level: .error, "Failed to create collection due to CBL error: \(error)")
+            Log.log(level: .error, message: "Failed to create collection due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
     
     public func runQuery(dbName: String, queryString: String) throws -> ResultSet {
-        TestServer.logger.log(level: .debug, "Running query: `\(queryString)` in database: \(dbName)")
+        Log.log(level: .debug, message: "Running query: `\(queryString)` in database: \(dbName)")
         guard let database = databases[dbName]
         else {
-            TestServer.logger.log(level: .error, "Failed to run query, database '\(dbName)' does not exist")
+            Log.log(level: .error, message: "Failed to run query, database '\(dbName)' does not exist")
             throw TestServerError.cblDBNotOpen
         }
         
         do {
             let query = try database.createQuery(queryString)
             let result = try query.execute()
-            TestServer.logger.log(level: .debug, "Query successfully executed.")
+            Log.log(level: .debug, message: "Query successfully executed.")
             return result
         } catch(let error as NSError) {
-            TestServer.logger.log(level: .error, "Failed to run query due to CBL error: \(error)")
+            Log.log(level: .error, message: "Failed to run query due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
     
     public func startReplicator(config: ContentTypes.ReplicatorConfiguration, reset: Bool) throws -> UUID {
-        TestServer.logger.log(level: .debug, "Starting Replicator with config: \(config.description)")
+        Log.log(level: .debug, message: "Starting Replicator with config: \(config.description)")
         
         guard let database = databases[config.database]
         else {
-            TestServer.logger.log(level: .error, "Failed to start Replicator, database '\(config.database)' does not exist")
+            Log.log(level: .error, message: "Failed to start Replicator, database '\(config.database)' does not exist")
             throw TestServerError.cblDBNotOpen
         }
         
         guard let endpointURL = URL(string: config.endpoint)
         else {
-            TestServer.logger.log(level: .error, "Failed to start Replicator, invalid endpoint URL.")
+            Log.log(level: .error, message: "Failed to start Replicator, invalid endpoint URL.")
             throw TestServerError.badRequest("Endpoint URL is not a valid URL.")
         }
         
@@ -110,7 +99,7 @@ class DatabaseManager {
                 let collections = try configColl.names.map({ collName in
                     guard let collection = try collection(collName, inDB: database)
                     else {
-                        TestServer.logger.log(level: .error, "Failed to start Replicator, Collection '\(collName)' does not exist in \(config.database).")
+                        Log.log(level: .error, message: "Failed to start Replicator, Collection '\(collName)' does not exist in \(config.database).")
                         throw TestServerError.badRequest("Collection '\(collName)' does not exist in \(config.database).")
                     }
                     return collection
@@ -178,25 +167,25 @@ class DatabaseManager {
         
         replicator.start(reset: reset)
         
-        TestServer.logger.log(level: .debug, "Replicator started successfully with ID \(replicatorID)")
+        Log.log(level: .debug, message: "Replicator started successfully with ID \(replicatorID)")
         
         return replicatorID
     }
     
     public func stopReplicator(forID replID: UUID) throws {
-        TestServer.logger.log(level: .debug, "Stop Replicator for ID \(replID) is requested.")
+        Log.log(level: .debug, message: "Stop Replicator for ID \(replID) is requested.")
         guard let replicator = replicators[replID] else {
             throw TestServerError.badRequest("Replicator with ID '\(replID)' does not exist.")
         }
         replicator.stop()
-        TestServer.logger.log(level: .debug, "Stop Replicator for ID \(replID) is successfully requested.")
+        Log.log(level: .debug, message: "Stop Replicator for ID \(replID) is successfully requested.")
     }
     
     public func replicatorStatus(forID replID: UUID) -> ContentTypes.ReplicatorStatus? {
-        TestServer.logger.log(level: .debug, "Fetching Replicator status for ID \(replID)")
+        Log.log(level: .debug, message: "Fetching Replicator status for ID \(replID)")
         guard let replicator = replicators[replID]
         else {
-            TestServer.logger.log(level: .debug, "Failed to fetch Replicator status, Replicator with ID \(replID) not found.")
+            Log.log(level: .debug, message: "Failed to fetch Replicator status, Replicator with ID \(replID) not found.")
             return nil
         }
         
@@ -234,17 +223,17 @@ class DatabaseManager {
         
         let status = ContentTypes.ReplicatorStatus(activity: activity, progress: progress, documents: documents, error: error)
         
-        TestServer.logger.log(level: .debug, "Succeessfully fetched Replicator status for ID \(replID): \(status.description)")
+        Log.log(level: .debug, message: "Succeessfully fetched Replicator status for ID \(replID): \(status.description)")
         
         return status
     }
     
     public func collection(_ name: String, inDB dbName: String) throws -> Collection? {
-        TestServer.logger.log(level: .debug, "Fetching collecting '\(name)' in database '\(dbName)'")
+        Log.log(level: .debug, message: "Fetching collecting '\(name)' in database '\(dbName)'")
         
         guard let database = databases[dbName]
         else {
-            TestServer.logger.log(level: .error, "Failed to fetch collection, database '\(dbName)' not open.")
+            Log.log(level: .error, message: "Failed to fetch collection, database '\(dbName)' not open.")
             throw TestServerError.cblDBNotOpen
         }
         
@@ -252,20 +241,20 @@ class DatabaseManager {
     }
     
     public func collection(_ name: String, inDB database: Database) throws -> Collection? {
-        TestServer.logger.log(level: .debug, "Fetching collection with DB: \(database.name), collection: \(name)")
+        Log.log(level: .debug, message: "Fetching collection with DB: \(database.name), collection: \(name)")
         do {
             let spec = try CollectionSpec(name)
             let collection = try database.collection(name: spec.collection, scope: spec.scope)
-            TestServer.logger.log(level: .debug, "Fetched collection, result: \(collection.debugDescription)")
+            Log.log(level: .debug, message: "Fetched collection, result: \(collection.debugDescription)")
             return collection
         } catch(let error as NSError) {
-            TestServer.logger.log(level: .error, "Failed to fetch collection due to CBL error: \(error)")
+            Log.log(level: .error, message: "Failed to fetch collection due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
     
     public func getDocument(_ id: String, fromCollection collName: String, inDB dbName: String) throws -> Document? {
-        TestServer.logger.log(level: .debug, "Getting document '\(id)' from collection '\(collName)' in database '\(dbName)'")
+        Log.log(level: .debug, message: "Getting document '\(id)' from collection '\(collName)' in database '\(dbName)'")
         
         guard let collection = try collection(collName, inDB: dbName) else {
             throw TestServerError.badRequest("Cannot find collection '\(collName)' in db '\(dbName)'")
@@ -276,11 +265,11 @@ class DatabaseManager {
     
     // Returns [scope_name.collection_name]
     public func getQualifiedCollections(fromDB dbName: String) throws -> Array<String> {
-        TestServer.logger.log(level: .debug, "Fetching all collection names from DB '\(dbName)'")
+        Log.log(level: .debug, message: "Fetching all collection names from DB '\(dbName)'")
         
         guard let database = databases[dbName]
         else {
-            TestServer.logger.log(level: .error, "Failed to fetch collections, DB \(dbName) not open")
+            Log.log(level: .error, message: "Failed to fetch collections, DB \(dbName) not open")
             throw TestServerError.cblDBNotOpen
         }
         
@@ -291,11 +280,11 @@ class DatabaseManager {
                     result.append("\(scope.name).\(collection.name)")
                 }
             }
-            TestServer.logger.log(level: .debug, "Fetched all collections: \(result)")
+            Log.log(level: .debug, message: "Fetched all collections: \(result)")
             return result
             
         } catch(let error as NSError) {
-            TestServer.logger.log(level: .error, "Failed to fetch collections due to CBL error: \(error)")
+            Log.log(level: .error, message: "Failed to fetch collections due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
@@ -323,10 +312,10 @@ class DatabaseManager {
     }
     
     public func closeDatabase(withName dbName: String) throws {
-        TestServer.logger.log(level: .debug, "Closing database '\(dbName)'")
+        Log.log(level: .debug, message: "Closing database '\(dbName)'")
         guard let database = databases[dbName]
         else {
-            TestServer.logger.log(level: .debug, "Database \(dbName) was already closed.")
+            Log.log(level: .debug, message: "Database \(dbName) was already closed.")
             return
         }
         
@@ -334,15 +323,15 @@ class DatabaseManager {
             try database.close()
             databases.removeValue(forKey: dbName)
         } catch(let error as NSError) {
-            TestServer.logger.log(level: .error, "Failed to close database due to CBL error: \(error)")
+            Log.log(level: .error, message: "Failed to close database due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
         
-        TestServer.logger.log(level: .debug, "Database '\(dbName)' closed successfully.")
+        Log.log(level: .debug, message: "Database '\(dbName)' closed successfully.")
     }
     
     public func createDatabase(dbName: String, dataset: String) throws {
-        TestServer.logger.log(level: .debug, "Create Database \(dbName) with dataset \(dataset)")
+        Log.log(level: .debug, message: "Create Database \(dbName) with dataset \(dataset)")
         
         // For the first time called, reset the temp directory for extracting the dataset
         if databases.isEmpty {
@@ -356,14 +345,14 @@ class DatabaseManager {
         do {
             databases[dbName] = try Database(name: dbName)
         } catch(let error as NSError) {
-            TestServer.logger.log(level: .error, "CBL Error while re-opening DB: \(error)")
+            Log.log(level: .error, message: "CBL Error while re-opening DB: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
-        TestServer.logger.log(level: .debug, "Database '\(dbName)' has been created with the dataset \(dataset).")
+        Log.log(level: .debug, message: "Database '\(dbName)' has been created with the dataset \(dataset).")
     }
     
     public func createDatabase(dbName: String, collections: [String] = []) throws {
-        TestServer.logger.log(level: .debug, "Create Database \(dbName) with collections \(collections)")
+        Log.log(level: .debug, message: "Create Database \(dbName) with collections \(collections)")
         
         // For the first time called, reset the temp directory for extracting the dataset
         if databases.isEmpty {
@@ -384,14 +373,14 @@ class DatabaseManager {
             }
             databases[dbName] = db
         } catch(let error as NSError) {
-            TestServer.logger.log(level: .error, "CBL Error while re-opening DB: \(error)")
+            Log.log(level: .error, message: "CBL Error while re-opening DB: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
-        TestServer.logger.log(level: .debug, "Database '\(dbName)' has been created with the collections \(collections).")
+        Log.log(level: .debug, message: "Database '\(dbName)' has been created with the collections \(collections).")
     }
     
     public func reset() throws {
-        TestServer.logger.log(level: .debug, "Resetting all databases")
+        Log.log(level: .debug, message: "Resetting all databases")
         for dbName in databases.keys {
             try closeDatabase(withName: dbName)
             try? Database.delete(withName: dbName)
@@ -419,14 +408,14 @@ class DatabaseManager {
     }
     
     private static func loadDataset(withName name: String, dbName: String) throws {
-        TestServer.logger.log(level: .debug, "Loading dataset '\(name)' into DB '\(dbName)'")
+        Log.log(level: .debug, message: "Loading dataset '\(name)' into DB '\(dbName)'")
         
         let res = ("dbs" as NSString).appendingPathComponent(name)
         guard let datasetZipURL = Bundle.main.url(forResource: res, withExtension: "cblite2.zip") else {
-            TestServer.logger.log(level: .error, "Failed to load dataset, dataset '\(name)' does not exist.")
+            Log.log(level: .error, message: "Failed to load dataset, dataset '\(name)' does not exist.")
             throw TestServerError(domain: .TESTSERVER, code: 400, message: "Dataset does not exist")
         }
-        TestServer.logger.log(level: .debug, "Found dataset at \(datasetZipURL.absoluteString)")
+        Log.log(level: .debug, message: "Found dataset at \(datasetZipURL.absoluteString)")
         
         // datasetZipURL is "../x.cblite2.zip", datasetURL is "../x.cblite2"
         let fm = FileManager()
@@ -436,11 +425,11 @@ class DatabaseManager {
         let dbFileName = datasetZipURL.deletingPathExtension().lastPathComponent
         let extDatasetPath = (extDir as NSString).appendingPathComponent(dbFileName)
         if(!fm.fileExists(atPath: extDatasetPath)) {
-            TestServer.logger.log(level: .debug, "Unzipping dataset \(datasetZipURL.lastPathComponent)")
+            Log.log(level: .debug, message: "Unzipping dataset \(datasetZipURL.lastPathComponent)")
             // Unzip dataset archive
             guard SSZipArchive.unzipFile(atPath: datasetZipURL.relativePath, toDestination: extDir)
             else {
-                TestServer.logger.log(level: .error, "Error while unzipping dataset at \(datasetZipURL.absoluteString)")
+                Log.log(level: .error, message: "Error while unzipping dataset at \(datasetZipURL.absoluteString)")
                 throw TestServerError(domain: .CBL, code: CBLError.cantOpenFile, message: "Couldn't unzip dataset archive.")
             }
         }
@@ -451,11 +440,11 @@ class DatabaseManager {
         }
         
         do {
-            TestServer.logger.log(level: .debug, "Attempting to copy dataset from \(extDatasetPath)")
+            Log.log(level: .debug, message: "Attempting to copy dataset from \(extDatasetPath)")
             try Database.copy(fromPath: extDatasetPath, toDatabase: dbName, withConfig: nil)
-            TestServer.logger.log(level: .debug, "Dataset '\(name)' successfully copied to DB '\(dbName)'")
+            Log.log(level: .debug, message: "Dataset '\(name)' successfully copied to DB '\(dbName)'")
         } catch(let error as NSError) {
-            TestServer.logger.log(level: .error, "Failed to copy dataset due to CBL error: \(error)")
+            Log.log(level: .error, message: "Failed to copy dataset due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
@@ -473,7 +462,7 @@ class DatabaseManager {
         do {
             try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         } catch(let error as NSError) {
-            TestServer.logger.log(level: .error, "Failed to create temp directory for extracting dataset zip files: \(error)")
+            Log.log(level: .error, message: "Failed to create temp directory for extracting dataset zip files: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }

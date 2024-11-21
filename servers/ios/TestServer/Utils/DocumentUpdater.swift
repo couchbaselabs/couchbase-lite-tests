@@ -9,11 +9,11 @@ import CouchbaseLiteSwift
 
 struct DocumentUpdater {
     public static func processUpdate(dbManager:DatabaseManager, item: ContentTypes.DatabaseUpdateItem, inDB dbName: String) throws {
-        TestServer.logger.log(level: .debug, "Processing /updateDatabase request for database '\(dbName)'")
+        Log.log(level: .debug, message: "Processing /updateDatabase request for database '\(dbName)'")
         
         guard let collection = try dbManager.collection(item.collection, inDB: dbName)
         else {
-            TestServer.logger.log(level: .error, "Failed to perform update, database '\(dbName)' not open.")
+            Log.log(level: .error, message: "Failed to perform update, database '\(dbName)' not open.")
             throw TestServerError.cblDBNotOpen
         }
         
@@ -31,10 +31,10 @@ struct DocumentUpdater {
     
     // This function does not save the updated doc, the caller must do that if desired
     public static func update(doc: MutableDocument, updatedProperties: Array<Dictionary<String, AnyCodable>>?, removedProperties: Array<String>?, updatedBlobs: Dictionary<String, String>?) throws {
-        TestServer.logger.log(level: .debug, "Processing update for document '\(doc.id)'")
+        Log.log(level: .debug, message: "Processing update for document '\(doc.id)'")
         
         if let removedProperties = removedProperties {
-            TestServer.logger.log(level: .debug, "Removing properties of document '\(doc.id)'")
+            Log.log(level: .debug, message: "Removing properties of document '\(doc.id)'")
             for keyPath in removedProperties {
                 var parser = KeyPathParser(input: keyPath)
                 
@@ -42,13 +42,13 @@ struct DocumentUpdater {
                 
                 let parentProperty = try getParentProperty(mutableDoc: doc, keyPathComponents: components)
                 
-                TestServer.logger.log(level: .debug, "Removing property of document '\(doc.id)' at keypath '\(keyPath)'")
+                Log.log(level: .debug, message: "Removing property of document '\(doc.id)' at keypath '\(keyPath)'")
                 remove(parentProperty: parentProperty, propertyKey: components.last!)
             }
         }
         
         if let updatedProperties = updatedProperties {
-            TestServer.logger.log(level: .debug, "Updating properties of document '\(doc.id)'")
+            Log.log(level: .debug, message: "Updating properties of document '\(doc.id)'")
             for updateDict in updatedProperties {
                 for (keyPath, value) in updateDict {
                     var parser = KeyPathParser(input: keyPath)
@@ -57,21 +57,21 @@ struct DocumentUpdater {
                     
                     let parentProperty = try getParentProperty(mutableDoc: doc, keyPathComponents: components)
                     
-                    TestServer.logger.log(level: .debug, "Updating property of document '\(doc.id)' at keypath '\(keyPath)'")
+                    Log.log(level: .debug, message: "Updating property of document '\(doc.id)' at keypath '\(keyPath)'")
                     updateProperty(parentProperty: parentProperty, propertyKey: components.last!, value: value)
                 }
             }
         }
         
         if let updatedBlobs = updatedBlobs {
-            TestServer.logger.log(level: .debug, "Updating blobs of document '\(doc.id)'")
+            Log.log(level: .debug, message: "Updating blobs of document '\(doc.id)'")
             for (keyPath, filename) in updatedBlobs {
                 var parser = KeyPathParser(input: keyPath)
                 let components = try parser.parse()
                 let parentProperty = try getParentProperty(mutableDoc: doc, keyPathComponents: components)
                 let blob = try createBlob(filename: filename)
                 
-                TestServer.logger.log(level: .debug, "Updating property of document '\(doc.id)' at keypath '\(keyPath)' with blob '\(filename)'")
+                Log.log(level: .debug, message: "Updating property of document '\(doc.id)' at keypath '\(keyPath)' with blob '\(filename)'")
                 updateProperty(parentProperty: parentProperty, propertyKey: components.last!, blob: blob)
             }
         }
@@ -80,7 +80,7 @@ struct DocumentUpdater {
     
     // Navigate the KeyPath of the document to find the parent property of the property to be updated / removed
     private static func getParentProperty(mutableDoc: MutableDocument, keyPathComponents: [KeyPathComponent]) throws -> MutableObjectProtocol {
-        TestServer.logger.log(level: .debug, "Navigating KeyPath of document '\(mutableDoc.id)'")
+        Log.log(level: .debug, message: "Navigating KeyPath of document '\(mutableDoc.id)'")
         var current : MutableObjectProtocol = mutableDoc
         
         // Ignore last as we want to return the parent of the target property
@@ -117,7 +117,7 @@ struct DocumentUpdater {
                     guard let arr = current.array(at: index)
                     // If arr doesn't exist, this component was probably a scalar
                     else {
-                        TestServer.logger.log(level: .error, "Failed to navigate KeyPath, KeyPath attempted to index a scalar value")
+                        Log.log(level: .error, message: "Failed to navigate KeyPath, KeyPath attempted to index a scalar value")
                         throw TestServerError.badRequest("Scalar cannot be indexed: \(current)")
                     }
                     current = arr
@@ -125,7 +125,7 @@ struct DocumentUpdater {
                     guard let dict = current.dictionary(at: index)
                     // If dict doesn't exist, this component was probably a scalar
                     else {
-                        TestServer.logger.log(level: .error, "Failed to navigate KeyPath, KeyPath attempted to index a scalar value")
+                        Log.log(level: .error, message: "Failed to navigate KeyPath, KeyPath attempted to index a scalar value")
                         throw TestServerError.badRequest("Scalar cannot be indexed: \(current)")
                     }
                     current = dict
@@ -145,7 +145,7 @@ struct DocumentUpdater {
                     guard let arr = current.array(forKey: name)
                     // If arr doesn't exist, this component was probably a scalar
                     else {
-                        TestServer.logger.log(level: .error, "Failed to navigate KeyPath, KeyPath attempted to access a property of a scalar value")
+                        Log.log(level: .error, message: "Failed to navigate KeyPath, KeyPath attempted to access a property of a scalar value")
                         throw TestServerError.badRequest("Scalar cannot have child properties, value: \(current)")
                     }
                     current = arr
@@ -153,7 +153,7 @@ struct DocumentUpdater {
                     guard let dict = current.dictionary(forKey: name)
                     // If dict doesn't exist, this component was probably a scalar
                     else {
-                        TestServer.logger.log(level: .error, "Failed to navigate KeyPath, KeyPath attempted to access a property of a scalar value")
+                        Log.log(level: .error, message: "Failed to navigate KeyPath, KeyPath attempted to access a property of a scalar value")
                         throw TestServerError.badRequest("Scalar cannot have child properties, value: \(current)")
                     }
                     current = dict
@@ -161,7 +161,7 @@ struct DocumentUpdater {
             }
         }
         
-        TestServer.logger.log(level: .debug, "Navigated KeyPath of document '\(mutableDoc.id)' to reach parent property")
+        Log.log(level: .debug, message: "Navigated KeyPath of document '\(mutableDoc.id)' to reach parent property")
         return current
     }
     
@@ -170,7 +170,7 @@ struct DocumentUpdater {
         
         guard filenameComponents.count == 2
         else {
-            TestServer.logger.log(level: .error, "Invalid filename given for blob")
+            Log.log(level: .error, message: "Invalid filename given for blob")
             throw TestServerError.badRequest("Invalid blob filename '\(filename)'.")
         }
         
@@ -178,7 +178,7 @@ struct DocumentUpdater {
         let res = ("blobs" as NSString).appendingPathComponent(filenameComponents.first!)
         guard let blobURL = Bundle.main.url(forResource: res, withExtension: fileExtension)
         else {
-            TestServer.logger.log(level: .error, "No blob found at given filename")
+            Log.log(level: .error, message: "No blob found at given filename")
             throw TestServerError.badRequest("Blob '\(filename)' not found.")
         }
         
@@ -217,7 +217,7 @@ struct DocumentUpdater {
     }
     
     private static func backfillArray(array: MutableObjectProtocol, uptoInclusive: Int) {
-        TestServer.logger.log(level: .debug, "Backfilling array to index \(uptoInclusive)")
+        Log.log(level: .debug, message: "Backfilling array to index \(uptoInclusive)")
         if uptoInclusive <= array.count {
             return
         }
@@ -227,7 +227,7 @@ struct DocumentUpdater {
                 array.addValue(nil)
             }
         } else {
-            TestServer.logger.log(level: .debug, "Warning: Attempt to call `backfillArray()` on a non-array (dict or scalar)")
+            Log.log(level: .debug, message: "Warning: Attempt to call `backfillArray()` on a non-array (dict or scalar)")
         }
     }
     
