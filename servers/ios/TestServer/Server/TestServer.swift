@@ -10,20 +10,23 @@ import Vapor
 
 class TestServer : ObservableObject {
     var app : Vapor.Application
-    let dbConnection : DatabaseManager
-    public static let logger : os.Logger = os.Logger()
     
     public static let maxAPIVersion = 1
     public static let serverID = UUID()
     
-    init(port: Int, dbManager: DatabaseManager) {
-        self.dbConnection = dbManager
+    init(port: Int) {
         do {
             var env : Environment = .development
             try LoggingSystem.bootstrap(from: &env)
+            Log.initialize()
+            
+            let databaseManager = DatabaseManager()
+            let sessionManager = SessionManager(databaseManager: databaseManager)
             
             app = Application(env)
-            configure(app, port)
+            app.storage[DatabaseManagerKey.self] = databaseManager
+            app.storage[SessionManagerKey.self] = sessionManager
+            configure(port: port)
         } catch {
             fatalError(error.localizedDescription)
         }
@@ -36,25 +39,23 @@ class TestServer : ObservableObject {
         } catch {
             fatalError(error.localizedDescription)
         }
-        
     }
     
-    private func configure(_ app: Application, _ port: Int) {
+    private func configure(port: Int) {
         app.http.server.configuration.hostname = "0.0.0.0"
         app.http.server.configuration.port = port
         
-        TestServer.logger.log(level: .info, "Configuring HTTP server with hostname: 0.0.0.0 and port: \(port)")
+        Log.log(level: .info, message: "Configuring HTTP server with hostname: 0.0.0.0 and port: \(port)")
         
         // Use custom error middleware
         app.middleware = .init()
-        app.middleware.use(TestServerMiddleware())
+        app.middleware.use(TestServerMiddleware(app: app))
         app.middleware.use(TestServerErrorMiddleware())
-
-        setupRoutes(app)
+        setupRoutes()
     }
     
-    /// Implement API v0.5.2
-    private func setupRoutes(_ app: Application) {
+    /// Implement API v1.0.0
+    private func setupRoutes() {
         app.get("", use: Handlers.getRoot)
         app.post("newSession", use: Handlers.newSession)
         app.post("reset", use: Handlers.resetHandler)
@@ -68,7 +69,25 @@ class TestServer : ObservableObject {
         app.post("performMaintenance", use: Handlers.performMaintenance)
         app.post("runQuery", use: Handlers.runQuery)
         
-        TestServer.logger.log(level: .debug, "Server configured with the following routes: \n\(app.routes.description)")
+        Log.log(level: .debug, message: "Server configured with the following routes: \n\(app.routes.description)")
+    }
+}
+
+private struct DatabaseManagerKey: StorageKey {
+    typealias Value = DatabaseManager
+}
+
+private struct SessionManagerKey: StorageKey {
+    typealias Value = SessionManager
+}
+
+extension Vapor.Application {
+    var databaseManager : DatabaseManager {
+        self.storage.get(DatabaseManagerKey.self)!
+    }
+    
+    var sessionManager : SessionManager {
+        return self.storage.get(SessionManagerKey.self)!
     }
 }
 

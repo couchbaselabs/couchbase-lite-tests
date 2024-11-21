@@ -18,6 +18,7 @@
 		40AA34A52CAF94A4004F4D08 /* GetDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A42CAF94A4004F4D08 /* GetDocument.swift */; };
 		40AA34A72CAF9BC8004F4D08 /* GetDocumentRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A62CAF9BC8004F4D08 /* GetDocumentRequest.swift */; };
 		40AA34B62CAFB28E004F4D08 /* CertUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34B52CAFB28E004F4D08 /* CertUtil.swift */; };
+		40BC19012CEAD65200143002 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BC19002CEAD65200143002 /* Log.swift */; };
 		40BDA7522AF1BFCC008DB256 /* TestServerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA7512AF1BFCC008DB256 /* TestServerApp.swift */; };
 		40BDA7542AF1BFCC008DB256 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA7532AF1BFCC008DB256 /* ContentView.swift */; };
 		40BDA7562AF1BFCD008DB256 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 40BDA7552AF1BFCD008DB256 /* Assets.xcassets */; };
@@ -104,6 +105,7 @@
 		40AA34A42CAF94A4004F4D08 /* GetDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetDocument.swift; sourceTree = "<group>"; };
 		40AA34A62CAF9BC8004F4D08 /* GetDocumentRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetDocumentRequest.swift; sourceTree = "<group>"; };
 		40AA34B52CAFB28E004F4D08 /* CertUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertUtil.swift; sourceTree = "<group>"; };
+		40BC19002CEAD65200143002 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		40BDA74E2AF1BFCC008DB256 /* TestServer-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TestServer-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		40BDA7512AF1BFCC008DB256 /* TestServerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestServerApp.swift; sourceTree = "<group>"; };
 		40BDA7532AF1BFCC008DB256 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -273,6 +275,7 @@
 				40BDA80C2AF1C15C008DB256 /* ReplicationFilterFactory.swift */,
 				4029C49F2CB88E0300C34775 /* SessionManager.swift */,
 				40BDA80A2AF1C15C008DB256 /* Snapshot.swift */,
+				40BC19002CEAD65200143002 /* Log.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -475,6 +478,7 @@
 				40BDA8E42AF20AAB008DB256 /* ContentTypes.swift in Sources */,
 				40BDA8152AF1C15C008DB256 /* AnyCodable.swift in Sources */,
 				40AA34A32CAF8C4C004F4D08 /* ReplicationConflictResolverFactory.swift in Sources */,
+				40BC19012CEAD65200143002 /* Log.swift in Sources */,
 				40BDA8E62AF20AAB008DB256 /* Collections.swift in Sources */,
 				40BDA7642AF1C0AF008DB256 /* TestServer.swift in Sources */,
 				4029C4A02CB88E0300C34775 /* SessionManager.swift in Sources */,

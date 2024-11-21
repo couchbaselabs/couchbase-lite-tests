@@ -9,8 +9,7 @@ import Vapor
 
 extension Handlers {
     static let resetHandler: EndpointHandlerEmptyResponse = { req throws in
-        let dbManager = try req.databaseManager()
-        
+        let dbManager = req.application.databaseManager
         try dbManager.reset()
         
         if let config = try? req.content.decode(ContentTypes.ResetConfiguration.self), let databases = config.databases {

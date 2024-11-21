@@ -8,6 +8,10 @@
 import Foundation
 import Vapor
 
+struct SessionKey: StorageKey {
+    typealias Value = Session
+}
+
 class TestServerMiddleware : AsyncMiddleware {
     let kHeaderKeyServerID = "CBLTest-Server-ID"
     let kHeaderKeyClientID = "CBLTest-Client-ID"
@@ -15,8 +19,14 @@ class TestServerMiddleware : AsyncMiddleware {
     let kHeaderKeyContentType = "content-type"
     let defaultContentType = "application/json"
     
+    private let application: Application
+    
+    init(app: Application) {
+        self.application = app
+    }
+    
     func respond(to request: Vapor.Request, chainingTo next: Vapor.AsyncResponder) async throws -> Vapor.Response {
-        TestServer.logger.log(level: .debug, "Received request: \(request.description)")
+        Log.log(level: .debug, message: "Received request: \(request.description)")
         
         let isGetRoot = request.route?.description == "GET /"
         
@@ -24,20 +34,16 @@ class TestServerMiddleware : AsyncMiddleware {
         
         var session: Session
         do {
-            if isGetRoot {
+            if isGetRoot || request.route?.description == "POST /newSession" {
                 session = createNewTempSession()
             } else {
-                if request.route?.description == "POST /newSession" {
-                    session = try createNewSession(request: request)
-                } else {
-                    session = try getSession(clientID: getClientID(request.headers))
-                }
+                session = try getSession(clientID: getClientID(request.headers))
             }
             request.storage[SessionKey.self] = session
         } catch(let error as TestServerError) {
             // This middleware sits before the error middleware,
             // so we have to create this error ourselves
-            TestServer.logger.log(level: .error, "Request failed with error: \(error)")
+            Log.log(level: .error, message: "Request failed with error: \(error)")
             let response = ErrorResponseFactory.CreateErrorResponse(request, error)
             return withResponseHeaders(response, version: version)
         }
@@ -47,7 +53,7 @@ class TestServerMiddleware : AsyncMiddleware {
         let response = try await next.respond(to: request)
         let responseWithHeaders = withResponseHeaders(response, version: version)
         
-        TestServer.logger.log(level: .debug, "Responding with response: \n\(responseWithHeaders)")
+        Log.log(level: .debug, message: "Responding with response: \n\(responseWithHeaders)")
         return responseWithHeaders
     }
     
@@ -82,17 +88,10 @@ class TestServerMiddleware : AsyncMiddleware {
     }
     
     private func createNewTempSession() -> Session {
-        return SessionManager.shared.createTempSession(databaseManager: DatabaseManager.shared!)
-    }
-    
-    private func createNewSession(request: Request) throws -> Session {
-        guard let newSession = try? request.content.decode(ContentTypes.NewSession.self) else {
-            throw TestServerError.badRequest("Request body does not match the 'NewSession' scheme.")
-        }
-        return try SessionManager.shared.createSession(id: newSession.id, databaseManager: DatabaseManager.shared!)
+        return application.sessionManager.createTempSession()
     }
     
     private func getSession(clientID: String) throws -> Session {
-        return try SessionManager.shared.getSession(id: clientID)
+        return try application.sessionManager.getSession(id: clientID)
     }
 }
