@@ -19,7 +19,7 @@ class TestReplicationBehavior(CBLTestClass):
         for row in all_docs.rows:
             name_number = int(row.id[-3:])
             if name_number <= 150:
-                await cblpytest.sync_gateways[0].delete_document(row.id, row.revid, "names")
+                await cblpytest.sync_gateways[0].delete_document(row.id, row.revision, "names")
 
         self.mark_test_step("Reset local database, and load `empty` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])

@@ -1,3 +1,4 @@
+import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
 from pathlib import Path
@@ -15,8 +16,6 @@ from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_warning
 from cbltest.version import VERSION
-
-import ssl
 
 
 class _CollectionMap(JSONSerializable):
@@ -121,14 +120,25 @@ class AllDocumentsResponseRow:
         return self.__id
 
     @property
-    def revid(self) -> str:
+    def revid(self) -> Optional[str]:
         """Gets the revision ID of the row"""
         return self.__revid
 
-    def __init__(self, key: str, id: str, revid: str) -> None:
+    @property
+    def cv(self) -> Optional[str]:
+        """Gets the current version for the row"""
+        return self.__cv
+
+    @property
+    def revision(self) -> str:
+        """Gets the either revid or cv, whichever is populated (at least one must be)"""
+        return cast(str, self.__revid if self.__revid is not None else self.__cv)
+
+    def __init__(self, key: str, id: str, revid: Optional[str], cv: Optional[str]) -> None:
         self.__key = key
         self.__id = id
         self.__revid = revid
+        self.__cv = cv
 
 
 class AllDocumentsResponse:
@@ -148,7 +158,12 @@ class AllDocumentsResponse:
         self.__len = input["total_rows"]
         self.__rows: List[AllDocumentsResponseRow] = []
         for row in cast(List[Dict], input["rows"]):
-            self.__rows.append(AllDocumentsResponseRow(row["key"], row["id"], cast(Dict, row["value"])["rev"]))
+            rev = cast(Dict, row["value"])
+            self.__rows.append(AllDocumentsResponseRow(
+                row["key"],
+                row["id"],
+                cast(str, rev["rev"]) if "rev" in rev else None,
+                cast(str, rev["cv"]) if "cv" in rev else None))
 
 
 class DocumentUpdateEntry(JSONSerializable):
@@ -203,6 +218,7 @@ class RemoteDocument(JSONSerializable):
         ret_val["_rev"] = self.__rev
         return ret_val
 
+
 class CouchbaseVersion(ABC):
     """
     A class for holding a version and build number of a product
@@ -211,24 +227,25 @@ class CouchbaseVersion(ABC):
     @property
     def raw(self) -> str:
         return self.__raw
-    
+
     @property
     def version(self) -> str:
         return self.__version
-    
+
     @property
     def build_number(self) -> int:
         return self.__build_number
-    
+
     @abstractmethod
     def parse(self, input: str) -> Tuple[str, int]:
         pass
-    
+
     def __init__(self, input: str):
         self.__raw = input
         parsed = self.parse(input)
         self.__version = parsed[0]
         self.__build_number = parsed[1]
+
 
 class SyncGatewayVersion(CouchbaseVersion):
     """
@@ -240,8 +257,9 @@ class SyncGatewayVersion(CouchbaseVersion):
         first_semicol = input.find(";")
         if first_lparen == -1 or first_semicol == -1:
             return ("unknown", 0)
-        
-        return (input[0:first_lparen], int(input[first_lparen+1:first_semicol]))
+
+        return input[0:first_lparen], int(input[first_lparen + 1:first_semicol])
+
 
 class SyncGateway:
     """
@@ -258,9 +276,11 @@ class SyncGateway:
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__admin_port: int = admin_port
-        self.__admin_session: ClientSession = self._create_session(secure, scheme, url, admin_port, BasicAuth(username, password, "ascii"))
+        self.__admin_session: ClientSession = self._create_session(secure, scheme, url, admin_port,
+                                                                   BasicAuth(username, password, "ascii"))
 
-    def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth: Optional[BasicAuth]) -> ClientSession:
+    def _create_session(self, secure: bool, scheme: str, url: str, port: int,
+                        auth: Optional[BasicAuth]) -> ClientSession:
         if secure:
             ssl_context = ssl.create_default_context(cadata=self.tls_cert())
             # Disable hostname check so that the pre-generated SG can be used on any machines.
@@ -292,23 +312,23 @@ class SyncGateway:
                 raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}")
 
             return ret_val
-        
+
     async def get_version(self) -> CouchbaseVersion:
         # Telemetry not really important for this call
         scheme = "https://" if self.__secure else "http://"
-        async with self._create_session(self.__secure, scheme, self.__hostname, 4984, None) as s: 
+        async with self._create_session(self.__secure, scheme, self.__hostname, 4984, None) as s:
             resp = await self._send_request("get", "/", session=s)
             assert isinstance(resp, dict)
             resp_dict = cast(dict, resp)
             raw_version = _get_typed_required(resp_dict, "version", str)
             assert "/" in raw_version
             return SyncGatewayVersion(raw_version.split("/")[1])
-        
+
     def tls_cert(self) -> Optional[str]:
         if not self.__secure:
             cbl_warning("Sync Gateway instance not using TLS, returning empty tls_cert...")
             return None
-        
+
         return ssl.get_server_certificate((self.__hostname, self.__admin_port))
 
     def replication_url(self, db_name: str):
@@ -395,7 +415,7 @@ class SyncGateway:
         :param db_name: The name of the Database to add the user to
         :param name: The username to add
         :param password: The password for the user that will be added
-        :param channel_access: The channels that the user will have access to.  This needs to 
+        :param collection_access: The collections that the user will have access to.  This needs to
             be formatted in the way Sync Gateway expects it, so if you are unsure use
             :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
         """
@@ -414,7 +434,6 @@ class SyncGateway:
 
         :param db_name: The name of the Database to add the user to
         :param role: The role to add
-        :param password: The password for the user that will be added
         :param collection_access: The collections to which role members will have access.
             This needs to be formatted in the way Sync Gateway expects it:
             "<scope1>": {
@@ -443,7 +462,6 @@ class SyncGateway:
                     pass
                 else:
                     raise
-
 
     def _analyze_dataset_response(self, response: list) -> None:
         assert isinstance(response, list), "Invalid bulk docs response (not a list)"
@@ -491,7 +509,7 @@ class SyncGateway:
 
             if collected:
                 resp = await self._send_request("post", f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
-                                            JSONDictionary({"docs": collected}))
+                                                JSONDictionary({"docs": collected}))
                 self._analyze_dataset_response(cast(list, resp))
 
     async def get_all_documents(self, db_name: str, scope: str = "_default",
@@ -506,7 +524,7 @@ class SyncGateway:
         with self.__tracer.start_as_current_span("get_all_documents", attributes={"cbl.database.name": db_name,
                                                                                   "cbl.scope.name": scope,
                                                                                   "cbl.collection.name": collection}):
-            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_all_docs")
+            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_all_docs?show_cv=true")
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
 
@@ -570,7 +588,7 @@ class SyncGateway:
                                      JSONDictionary(body))
 
     async def get_document(self, db_name: str, doc_id: str, scope: str = "_default", collection: str = "_default") -> \
-    Optional[RemoteDocument]:
+            Optional[RemoteDocument]:
         """
         Gets a document from Sync Gateway
 
