@@ -13,7 +13,7 @@ extension Handlers {
             throw TestServerError.badRequest("Request body is not a valid Verify Request.")
         }
         
-        let dbManager = try req.databaseManager()
+        let dbManager = req.application.databaseManager
         return try Snapshot.verifyChanges(dbManager: dbManager,
                                           dbName: verifyRequest.database,
                                           snapshotID: verifyRequest.snapshot,

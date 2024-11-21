@@ -14,7 +14,7 @@ extension Handlers {
             throw TestServerError.badRequest("Request body does not match the 'GetDocument' scheme.")
         }
         
-        let dbManager = try req.databaseManager()
+        let dbManager = req.application.databaseManager
         let json = try document(dbManager: dbManager,
                                 id: getDoc.document.id,
                                 collection: getDoc.document.collection,

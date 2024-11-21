@@ -13,7 +13,7 @@ extension Handlers {
             throw TestServerError.badRequest("Request body is not a valid Snapshot Request.")
         }
         
-        let dbManager = try req.databaseManager()
+        let dbManager = req.application.databaseManager
         let snapshotID = try Snapshot.saveSnapshot(dbManager: dbManager,
                                                    dbName: snapshotRequest.database,
                                                    docIDs: snapshotRequest.documents)

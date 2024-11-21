@@ -15,7 +15,7 @@ extension Handlers {
             throw TestServerError.badRequest("Invalid maintenance configuration.")
         }
         
-        let dbManager = try req.databaseManager()
+        let dbManager = req.application.databaseManager
         let maintenaceType: CouchbaseLiteSwift.MaintenanceType = {
             switch maintenanceConfig.maintenanceType {
             case .compact: return .compact

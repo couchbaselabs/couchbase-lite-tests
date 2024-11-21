@@ -13,7 +13,7 @@ extension Handlers {
             throw TestServerError.badRequest("Request body is not a valid startReplicator Request.")
         }
         
-        let dbManager = try req.databaseManager()
+        let dbManager = req.application.databaseManager
         let reset = replStartRq.reset ?? false
         let id = try dbManager.startReplicator(config: replStartRq.config, reset: reset)
         return ContentTypes.Replicator(id: id)
