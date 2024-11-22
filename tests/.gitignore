@@ -1,6 +1,7 @@
 *_log
 *.log
 .idea
+local-config.json
 android-config.json
 java-config.json
 c-config.json

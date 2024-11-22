@@ -16,15 +16,15 @@ if [ -z "$BUILD_NUMBER" ]; then usage; fi
 
 SG_URL="$3"
 
-# Force the Couchbase Lite Java version
-pushd servers/jak > /dev/null
-echo "$VERSION" > cbl-version.txt
+STATUS=0
+CBL_VERSION="${VERSION}-${BUILD_NUMBER}"
 
-echo "OSX Web Service: Build and start the Java Webservice Test Server"
-cd webservice
-./gradlew appStop > /dev/null 2>&1 || true
-rm -rf server.log app/server.url
-nohup ./gradlew jettyStart -PbuildNumber="${BUILD_NUMBER}" < /dev/null > server.log 2>&1 &
+pushd servers/jak/webservice > /dev/null
+
+echo "OSX Web Service: Build and start the Test Server"
+./gradlew appStop -PcblVersion="${CBL_VERSION}" > /dev/null 2>&1 || true
+rm -rf app/build server.log app/server.url
+nohup ./gradlew jettyStart -PcblVersion="${CBL_VERSION}" < /dev/null > server.log 2>&1 &
 popd > /dev/null
 
 echo "OSX Web Service: Start the environment"
@@ -52,12 +52,14 @@ echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config_java_webservice.json
 echo '}' >> config_java_webservice.json
 cat config_java_webservice.json
 
-rm -rf venv
+rm -rf venv http_log testserver.log
 python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
 
 echo "OSX Web Service: Run the tests"
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_webservice.json
+STATUS=$?
 
-echo "OSX Web Service: Tests complete!"
+echo "OSX Web Service: Tests complete"
+exit $STATUS

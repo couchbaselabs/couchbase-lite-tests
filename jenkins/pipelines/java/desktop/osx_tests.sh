@@ -16,18 +16,21 @@ if [ -z "$BUILD_NUMBER" ]; then usage; fi
 
 SG_URL="$3"
 
-# Force the Couchbase Lite Java version
+STATUS=0
+CBL_VERSION="${VERSION}-${BUILD_NUMBER}"
+
 pushd servers/jak > /dev/null
-echo "$VERSION" > cbl-version.txt
+SERVER_VERSION=`cat version.txt`
+cd desktop
 
 echo "OSX Desktop: Build the Test Server"
-cd desktop
-./gradlew jar -PbuildNumber="${BUILD_NUMBER}"
+rm -rf app/build
+./gradlew jar -PcblVersion="${CBL_VERSION}"
 
 echo "OSX Desktop: Start the Test Server"
 if [ -f "server.pid" ]; then kill $(cat server.pid); fi
 rm -rf server.log server.url server.pid
-nohup java -jar "app/build/libs/CBLTestServer-Java-Desktop-${VERSION}-${BUILD_NUMBER}.jar" server > server.log 2>&1 &
+nohup java -jar "app/build/libs/CBLTestServer-Java-Desktop-${SERVER_VERSION}_${CBL_VERSION}.jar" server > server.log 2>&1 &
 echo $! > server.pid
 popd > /dev/null
 
@@ -56,12 +59,14 @@ echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config_java_desktop.json
 echo '}' >> config_java_desktop.json
 cat config_java_desktop.json
 
-rm -rf venv
+rm -rf venv http_log testserver.log
 python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
 
 echo "OSX Desktop: Run the tests"
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_desktop.json
+STATUS=$?
 
-echo "OSX Desktop: Tests complete!"
+echo "OSX Desktop: Tests complete"
+exit $STATUS

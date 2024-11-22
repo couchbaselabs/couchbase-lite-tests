@@ -19,6 +19,8 @@ if [ -z "$BUILD_NUMBER" ]; then usage; fi
 
 SG_URL="$3"
 
+CBL_VERSION="${VERSION}-${BUILD_NUMBER}"
+
 echo "Install Android SDK"
 yes | ${SDK_MGR} --licenses > /dev/null 2>&1
 ${SDK_MGR} --install "build-tools;${BUILD_TOOLS_VERSION}"
@@ -29,12 +31,12 @@ ANDROID_IP=$(adb shell ifconfig | perl -ne 'next unless /inet addr:([\d.]+) /; $
 
 # Force the Couchbase Lite Android version
 pushd servers/jak > /dev/null
-echo "$VERSION" > cbl-version.txt
+cd android
 
 echo "Build the Test Server"
-cd android
 adb uninstall com.couchbase.lite.android.mobiletest 2 >& 1 > /dev/null || true
-./gradlew installRelease -PbuildNumber="${BUILD_NUMBER}"
+rm -rf app/build
+./gradlew installRelease -PcblVersion="${CBL_VERSION}"
 
 echo "Start the Test Server"
 adb shell am start -a android.intent.action.MAIN -n com.couchbase.lite.android.mobiletest/.MainActivity
@@ -51,7 +53,7 @@ echo '    "test-servers": ["http://'"$ANDROID_IP"':8080"]' >> config_android.jso
 echo '}' >> config_android.json
 cat config_android.json
 
-rm -rf venv
+rm -rf venv http_log testserver.log
 python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
