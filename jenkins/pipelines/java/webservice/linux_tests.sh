@@ -18,22 +18,22 @@ if [ -z "$BUILD_NUMBER" ]; then usage; fi
 
 SG_URL="$3"
 
-# Force the Couchbase Lite Java version
-pushd servers/jak > /dev/null
-echo "$VERSION" > cbl-version.txt
+STATUS=0
+CBL_VERSION="${VERSION}-${BUILD_NUMBER}"
+
+pushd servers/jak/webservice > /dev/null
 
 echo "Linux Web Service: Download the support libraries"
 rm -rf supportlib
 mkdir supportlib
-curl "${LATESTBUILDS}/${VERSION}/${BUILD_NUMBER}/couchbase-lite-java-linux-supportlibs-${VERSION}-${BUILD_NUMBER}.zip" -o support.zip
+curl "${LATESTBUILDS}/${VERSION}/${BUILD_NUMBER}/couchbase-lite-java-linux-supportlibs-${CBL_VERSION}.zip" -o support.zip
 unzip -d supportlib support.zip
 export LD_LIBRARY_PATH="$(pwd)/supportlib:${LD_LIBRARY_PATH}"
 
 echo "Linux Web Service: Build and start the Test Server"
-cd webservice
-./gradlew appStop > /dev/null 2>&1 || true
-rm -rf server.log app/server.url
-nohup ./gradlew jettyStart -PbuildNumber="${BUILD_NUMBER}" < /dev/null > server.log 2>&1 &
+./gradlew appStop -PcblVersion="${CBL_VERSION}" > /dev/null 2>&1 || true
+rm -rf app/build server.log app/server.url
+nohup ./gradlew jettyStart -PcblVersion="${CBL_VERSION}" < /dev/null > server.log 2>&1 &
 popd > /dev/null
 
 echo "Linux Web Service: Start the environment"
@@ -61,12 +61,14 @@ echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config_java_webservice.json
 echo '}' >> config_java_webservice.json
 cat config_java_webservice.json
 
-rm -rf venv
+rm -rf venv http_log testserver.log
 python3.10 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
 
 echo "Linux Web Service: Run the tests"
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config_java_webservice.json
+STATUS=$?
 
 echo "Linux Web Service: Tests complete"
+exit $STATUS

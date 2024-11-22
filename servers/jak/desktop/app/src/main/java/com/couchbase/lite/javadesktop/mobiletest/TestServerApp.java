@@ -7,6 +7,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -25,6 +26,7 @@ public class TestServerApp implements Daemon {
 
     private static final AtomicReference<TestServerApp> APP = new AtomicReference<>();
     private static final AtomicReference<Server> SERVER = new AtomicReference<>();
+    private static final AtomicReference<CountDownLatch> STOP_LATCH = new AtomicReference<>();
 
     /**
      * Main method runs as non-service mode for debugging use
@@ -79,17 +81,16 @@ public class TestServerApp implements Daemon {
 
     @SuppressFBWarnings("UW_UNCOND_WAIT")
     private static void waitForStop() {
-        Server server;
-        while ((server = SERVER.get()) != null) {
-            synchronized (server) {
-                try { server.wait(); }
-                catch (InterruptedException ignore) { }
-            }
+        while ((SERVER.get()) != null) {
+            final CountDownLatch stopLatch = new CountDownLatch(1);
+            STOP_LATCH.set(stopLatch);
+            try { stopLatch.await(); }
+            catch (InterruptedException ignore) { }
         }
     }
 
     private static void stopApp() {
-        final TestServerApp app = APP.get();
+        final TestServerApp app = APP.getAndSet(null);
         if (app != null) { app.stop(); }
     }
 
@@ -120,13 +121,13 @@ public class TestServerApp implements Daemon {
     @SuppressFBWarnings("NN_NAKED_NOTIFY")
     @Override
     public void stop() {
-        Log.p(TAG, "Stopping Java Desktop Test Server.");
         final Server server = SERVER.getAndSet(null);
-        if (server != null) {
-            server.stop();
-            synchronized (server) { server.notifyAll(); }
-        }
-        APP.set(null);
+        if (server != null) { server.stop(); }
+
+        final CountDownLatch stopLatch = STOP_LATCH.get();
+        if (stopLatch != null) { stopLatch.countDown(); }
+
+        Log.p(TAG, "Java Desktop Test Server Stopped.");
     }
 
     @Override
