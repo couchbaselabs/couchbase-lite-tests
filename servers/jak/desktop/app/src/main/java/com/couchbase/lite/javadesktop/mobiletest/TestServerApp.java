@@ -1,5 +1,7 @@
 package com.couchbase.lite.javadesktop.mobiletest;
 
+import androidx.annotation.GuardedBy;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -10,6 +12,7 @@ import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.daemon.Daemon;
 import org.apache.commons.daemon.DaemonContext;
@@ -26,7 +29,10 @@ public class TestServerApp implements Daemon {
 
     private static final AtomicReference<TestServerApp> APP = new AtomicReference<>();
     private static final AtomicReference<Server> SERVER = new AtomicReference<>();
-    private static final AtomicReference<CountDownLatch> STOP_LATCH = new AtomicReference<>();
+
+    @Nullable
+    @GuardedBy("TAG")
+    private static CountDownLatch stopLatch;
 
     /**
      * Main method runs as non-service mode for debugging use
@@ -82,8 +88,7 @@ public class TestServerApp implements Daemon {
     @SuppressFBWarnings("UW_UNCOND_WAIT")
     private static void waitForStop() {
         while ((SERVER.get()) != null) {
-            final CountDownLatch stopLatch = new CountDownLatch(1);
-            STOP_LATCH.set(stopLatch);
+            synchronized (TAG) { stopLatch = new CountDownLatch(1); }
             try { stopLatch.await(); }
             catch (InterruptedException ignore) { }
         }
@@ -124,8 +129,9 @@ public class TestServerApp implements Daemon {
         final Server server = SERVER.getAndSet(null);
         if (server != null) { server.stop(); }
 
-        final CountDownLatch stopLatch = STOP_LATCH.get();
-        if (stopLatch != null) { stopLatch.countDown(); }
+        synchronized (TAG) {
+            if (stopLatch != null) { stopLatch.countDown(); }
+        }
 
         Log.p(TAG, "Java Desktop Test Server Stopped.");
     }
