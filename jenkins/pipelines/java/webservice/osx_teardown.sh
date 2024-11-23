@@ -2,7 +2,7 @@
 # Clean up after running Java Web Services tests
 
 function usage() {
-    echo "Usage: $0 <version> <build num> [<sg url>]"
+    echo "Usage: $0 <version> <build num>"
     exit 1
 }
 

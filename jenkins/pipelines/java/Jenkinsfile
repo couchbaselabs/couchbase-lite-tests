@@ -107,9 +107,9 @@ pipeline {
                     post {
                         always {
                             echo "=== Teardown OSX Web Service Tests"
-                            sh '''
+                            sh """
                                 jenkins/pipelines/java/webservice/osx_teardown.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}"
-                            '''
+                            """
                             echo "=== OSX Web Service Test Teardown Complete"
                         }
                     }
@@ -129,9 +129,9 @@ pipeline {
                     post {
                         always {
                             echo "=== Teardown Windows Web Service Tests"
-                            pwsh '''
+                            pwsh """
                                 jenkins\\pipelines\\java\\webservice\\win_teardown.ps1 "${params.CBL_VERSION}" "${params.CBL_BUILD}"
-                            '''
+                            """
                             echo "=== Windows Web Service Test Teardown Complete"
                         }
                     }
@@ -153,9 +153,9 @@ pipeline {
                     post {
                         always {
                             echo "=== Teardown Linux Web Service Tests"
-                            sh '''
+                            sh """
                                 jenkins/pipelines/java/webservice/linux_teardown.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}"
-                            '''
+                            """
                             echo "=== Linux Web Service Test Teardown Complete"
                         }
                     }
