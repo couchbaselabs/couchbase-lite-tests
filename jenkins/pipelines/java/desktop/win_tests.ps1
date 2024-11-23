@@ -12,7 +12,7 @@ param (
 $ErrorActionPreference = "Stop"
 [System.Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\Program Files\Microsoft\jdk-17.0.13.11-hotspot")
 
-$status = 0
+$status = 1
 cblVersion = "${version}-${buildNumber}"
 
 Push-Location servers\jak

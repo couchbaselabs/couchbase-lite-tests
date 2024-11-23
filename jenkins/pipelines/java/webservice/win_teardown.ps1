@@ -3,10 +3,7 @@ param (
     [string]$version,
 
     [Parameter(Mandatory = $true)]
-    [string]$buildNumber,
-
-    [Parameter(Mandatory = $false)]
-    [string]$sgUrl
+    [string]$buildNumber
 )
 
 $ErrorActionPreference = "Stop"
