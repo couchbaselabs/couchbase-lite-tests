@@ -18,7 +18,7 @@ if [ -z "$BUILD_NUMBER" ]; then usage; fi
 
 SG_URL="$3"
 
-STATUS=0
+STATUS=1
 CBL_VERSION="${VERSION}-${BUILD_NUMBER}"
 
 pushd servers/jak > /dev/null
