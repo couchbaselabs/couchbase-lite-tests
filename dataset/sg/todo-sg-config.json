@@ -5,7 +5,7 @@
       "_default": {
         "collections": {
           "lists": {
-            "sync": "function foo(doc,oldDoc,meta){var owner=doc._deleted?oldDoc.owner:doc.owner;requireUser(owner);var listChannel='lists.'+owner+'.'+doc._id;var contributorRole='role:'+listChannel+'.contributor';role(owner,contributorRole);access(contributorRole,listChannel);channel(listChannel)}"
+            "sync": "function foo(doc,oldDoc,meta){var owner=doc._deleted?oldDoc.owner:doc.owner;requireUser(owner);var listChannel='lists.'+owner+'.'+doc._id;var contributorRoleName=listChannel+'.contributor';var contributorRole='role:'+contributorRoleName;requireRole(contributorRoleName);access(contributorRole,listChannel);channel(listChannel)}"
           },
           "tasks": {
             "sync": "function foo(doc,oldDoc,meta){var listId=doc._deleted?oldDoc.taskList.id:doc.taskList.id;var listOwner=doc._deleted?oldDoc.taskList.owner:doc.taskList.owner;var listChannel='lists.'+listOwner+'.'+listId;var contributorRoleName=listChannel+'.contributor';var contributorRole='role:'+contributorRoleName;requireRole(contributorRoleName);var tasksChannel=listChannel+'.tasks';access(contributorRole,tasksChannel);channel(tasksChannel)}"

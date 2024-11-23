@@ -39,6 +39,9 @@ class CouchbaseCloud:
     async def create_role(self, db_name: str, role: str, collection_access: dict) -> None:
         await self.__sync_gateway.add_role(db_name, role, collection_access)
 
+    async def assign_roles(self, db_name: str, name: str, roles: List[str]) -> None:
+        await self.__sync_gateway.assign_roles(db_name, name, roles)
+
     async def configure_dataset(self, dataset_path: Path, dataset_name: str,
                                 sg_config_options: Optional[List[str]] = None) -> None:
         """

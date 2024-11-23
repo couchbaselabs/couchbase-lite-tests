@@ -13,23 +13,32 @@ from cbltest.api.replicator_types import ReplicatorBasicAuthenticator, WaitForDo
 
 
 class TestFest(CBLTestClass):
-    async def setup_test_fest_cloud(self, cblpytest: CBLPyTest, dataset_path: Path,
-                                    roles: Optional[List[str]] = None) -> CouchbaseCloud:
+    async def setup_test_fest_cloud(self, cblpytest: CBLPyTest, dataset_path: Path, 
+                                    roles: Optional[Dict[str, List[str]]] = None) -> CouchbaseCloud:
+        """
+        Sets up the test environment.
+        :param cblpytest: CBLPyTest object.
+        :param dataset_path: Path to the SG dataset.
+        :param roles: A dictionary defining user roles to be created and assigned to the user.
+        """
+
         self.mark_test_step("Reset SG and load todo dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "todo")
 
-        sg_roles = roles if roles is not None else ["lists.user1.db1-list1.contributor"]
-        self.mark_test_step(f"Create SG roles: {', '.join(sg_roles)}")
-        collection_access: Dict[str, Any] = {
-            "_default": {
-                "lists": {"admin_channels": []},
-                "tasks": {"admin_channels": []},
-                "users": {"admin_channels": []}
+        if roles is not None:
+            collection_access: Dict[str, Any] = {
+                "_default": {
+                    "lists": {"admin_channels": []},
+                    "tasks": {"admin_channels": []},
+                    "users": {"admin_channels": []}
+                }
             }
-        }
-        for role in sg_roles:
-            await cloud.create_role("todo", role, collection_access)
+            for user, user_roles in roles.items():
+                self.mark_test_step(f"Create and assign SG roles: {', '.join(user_roles)} for user: {user}")
+                for role in user_roles:
+                    await cloud.create_role("todo", role, collection_access)
+                await cloud.assign_roles("todo", user, user_roles)
 
         return cloud
 
@@ -79,8 +88,9 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_create_tasks(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.setup_test_fest_cloud(cblpytest, dataset_path, ["lists.user1.db1-list1.contributor",
-                                                                   "lists.user1.db2-list1.contributor"])
+        await self.setup_test_fest_cloud(cblpytest, dataset_path, {
+            "user1": ["lists.user1.db1-list1.contributor", "lists.user1.db2-list1.contributor"]
+        })
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cblpytest, (db1, db2))
 
@@ -154,7 +164,9 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_update_task(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.setup_test_fest_cloud(cblpytest, dataset_path)
+        await self.setup_test_fest_cloud(cblpytest, dataset_path, {
+            "user1": ["lists.user1.db1-list1.contributor"]
+        })
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cblpytest, (db1, db2))
 
@@ -164,6 +176,10 @@ class TestFest(CBLTestClass):
             DocumentEntry("_default.tasks", "db1-list1-task1")
         ])
 
+        self.mark_test_step("Start the replicators")
+        await repl1.start()
+        await repl2.start()
+
         self.mark_test_step("Create a list and a task in db1")
         async with db1.batch_updater() as b:
             b.upsert_document("_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}])
@@ -171,16 +187,6 @@ class TestFest(CBLTestClass):
                               new_properties=[{"name": "db1 list1 task1"}, {"complete": False},
                                               {"taskList": {"id": "db1-list1", "owner": "user1"}}],
                               new_blobs={"image": "l5.jpg"})
-
-        self.mark_test_step("Snapshot db1")
-        snap1 = await db1.create_snapshot([
-            DocumentEntry("_default.lists", "db1-list1"),
-            DocumentEntry("_default.tasks", "db1-list1-task1")
-        ])
-
-        self.mark_test_step("Start the replicators")
-        await repl1.start()
-        await repl2.start()
 
         self.mark_test_step("Wait for the new docs to be pulled to db2")
         await repl2.wait_for_all_doc_events({
@@ -199,6 +205,12 @@ class TestFest(CBLTestClass):
         verify_result = await db2.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
+        self.mark_test_step("Snapshot db1")
+        snap1 = await db1.create_snapshot([
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1")
+        ])
+        
         self.mark_test_step("Update the db1-list1-task1 task in db2")
         async with db2.batch_updater() as b:
             b.upsert_document("_default.tasks", "db1-list1-task1",
@@ -223,9 +235,15 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delete_task(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.setup_test_fest_cloud(cblpytest, dataset_path)
+        await self.setup_test_fest_cloud(cblpytest, dataset_path, {
+            "user1": ["lists.user1.db1-list1.contributor"]
+        })
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cblpytest, (db1, db2))
+
+        self.mark_test_step("Start the replicators")
+        await repl1.start()
+        await repl2.start()
 
         self.mark_test_step("Create a list and a task in db1")
         async with db1.batch_updater() as b:
@@ -235,16 +253,6 @@ class TestFest(CBLTestClass):
                                               {"taskList": {"id": "db1-list1", "owner": "user1"}}],
                               new_blobs={"image": "l1.jpg"})
 
-        self.mark_test_step("Snapshot documents in db1")
-        snap1 = await db1.create_snapshot([
-            DocumentEntry("_default.lists", "db1-list1"),
-            DocumentEntry("_default.tasks", "db1-list1-task1")
-        ])
-
-        self.mark_test_step("Start the replicators")
-        await repl1.start()
-        await repl2.start()
-
         self.mark_test_step("Wait for the updated doc to be pulled to db2")
         await repl2.wait_for_all_doc_events({
             WaitForDocumentEventEntry("_default.lists", "db1-list1", ReplicatorType.PULL,
@@ -252,6 +260,12 @@ class TestFest(CBLTestClass):
             WaitForDocumentEventEntry("_default.tasks", "db1-list1-task1", ReplicatorType.PULL,
                                       ReplicatorDocumentFlags.NONE)})
         repl2.clear_document_updates()
+
+        self.mark_test_step("Snapshot documents in db1")
+        snap1 = await db1.create_snapshot([
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1")
+        ])
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot([
@@ -284,9 +298,15 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delete_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.setup_test_fest_cloud(cblpytest, dataset_path)
+        await self.setup_test_fest_cloud(cblpytest, dataset_path, {
+            "user1": ["lists.user1.db1-list1.contributor"]
+        })
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cblpytest, (db1, db2))
+
+        self.mark_test_step("Start the replicators")
+        await repl1.start()
+        await repl2.start()
 
         self.mark_test_step("Create a list and two tasks in db1")
         async with db1.batch_updater() as b:
@@ -299,17 +319,6 @@ class TestFest(CBLTestClass):
                               new_properties=[{"name": "db1 list1 task2"}, {"complete": True},
                                               {"taskList": {"id": "db1-list1", "owner": "user1"}}])
 
-        self.mark_test_step("Snapshot documents in db1")
-        snap1 = await db1.create_snapshot([
-            DocumentEntry("_default.lists", "db1-list1"),
-            DocumentEntry("_default.tasks", "db1-list1-task1"),
-            DocumentEntry("_default.tasks", "db1-list1-task2")
-        ])
-
-        self.mark_test_step("Start the replicators")
-        await repl1.start()
-        await repl2.start()
-
         self.mark_test_step("Wait for the new docs to be pulled to db2")
         await repl2.wait_for_all_doc_events({
             WaitForDocumentEventEntry("_default.lists", "db1-list1", ReplicatorType.PULL,
@@ -319,6 +328,13 @@ class TestFest(CBLTestClass):
             WaitForDocumentEventEntry("_default.tasks", "db1-list1-task2", ReplicatorType.PULL,
                                       ReplicatorDocumentFlags.NONE)})
         repl2.clear_document_updates()
+
+        self.mark_test_step("Snapshot documents in db1")
+        snap1 = await db1.create_snapshot([
+            DocumentEntry("_default.lists", "db1-list1"),
+            DocumentEntry("_default.tasks", "db1-list1-task1"),
+            DocumentEntry("_default.tasks", "db1-list1-task2")
+        ])
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot([
@@ -361,12 +377,18 @@ class TestFest(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def _test_create_tasks_two_users(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.setup_test_fest_cloud(cblpytest, dataset_path, ["lists.user1.db1-list1.contributor",
-                                                                   "lists.user2.db2-list1.contributor"])
+    async def test_create_tasks_two_users(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.setup_test_fest_cloud(cblpytest, dataset_path, {
+            "user1": ["lists.user1.db1-list1.contributor"],
+            "user2": ["lists.user2.db2-list1.contributor"]
+        })
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cblpytest, (db1, db2), ("user1", "user2"))
 
+        self.mark_test_step("Start the replicators")
+        await repl1.start()
+        await repl2.start()
+        
         self.mark_test_step("Create a list and a task in db1")
         async with db1.batch_updater() as b:
             b.upsert_document("_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}])
@@ -399,10 +421,6 @@ class TestFest(CBLTestClass):
             DocumentEntry("_default.tasks", "db2-list1-task1")
         ])
 
-        self.mark_test_step("Start the replicators")
-        await repl1.start()
-        await repl2.start()
-
         self.mark_test_step("Verify that there are no document replication events in db1, for 10 seconds")
         found = await repl1.wait_for_any_doc_event({
             WaitForDocumentEventEntry("_default.lists", "db2-list1", ReplicatorType.PUSH_AND_PULL, None),
@@ -431,9 +449,15 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_share_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.setup_test_fest_cloud(cblpytest, dataset_path, ["lists.user1.db1-list1.contributor"])
+        await self.setup_test_fest_cloud(cblpytest, dataset_path, {
+            "user1": ["lists.user1.db1-list1.contributor"]
+        })
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cblpytest, (db1, db2), ("user1", "user2"))
+
+        self.mark_test_step("Start the replicators")
+        await repl1.start()
+        await repl2.start()
 
         self.mark_test_step("Snapshot documents in db2")
         snap = await db2.create_snapshot([
@@ -442,10 +466,6 @@ class TestFest(CBLTestClass):
             DocumentEntry("_default.tasks", "db1-list1-task2"),
             DocumentEntry("_default.users", "db1-list1-user2")
         ])
-
-        self.mark_test_step("Start the replicators")
-        await repl1.start()
-        await repl2.start()
 
         self.mark_test_step("Create a list and two tasks in db1")
         async with db1.batch_updater() as b:
@@ -502,9 +522,15 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_update_shared_tasks(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.setup_test_fest_cloud(cblpytest, dataset_path, ["lists.user1.db1-list1.contributor"])
+        await self.setup_test_fest_cloud(cblpytest, dataset_path, {
+            "user1": ["lists.user1.db1-list1.contributor"]
+        })
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cblpytest, (db1, db2), ("user1", "user2"))
+
+        self.mark_test_step("Start the replicators")
+        await repl1.start()
+        await repl2.start()
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot([
@@ -531,10 +557,6 @@ class TestFest(CBLTestClass):
             DocumentEntry("_default.tasks", "db1-list1-task1"),
             DocumentEntry("_default.tasks", "db1-list1-task2")
         ])
-
-        self.mark_test_step("Start the replicators")
-        await repl1.start()
-        await repl2.start()
 
         self.mark_test_step("Verify that there are no document replication events in db2, for 10 seconds")
         found = await repl2.wait_for_any_doc_event({
@@ -600,9 +622,15 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_unshare_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.setup_test_fest_cloud(cblpytest, dataset_path, ["lists.user1.db1-list1.contributor"])
+        await self.setup_test_fest_cloud(cblpytest, dataset_path, {
+            "user1": ["lists.user1.db1-list1.contributor"]
+        })
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cblpytest, (db1, db2), ("user1", "user2"))
+
+        self.mark_test_step("Start the replicators")
+        await repl1.start()
+        await repl2.start()
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot([
@@ -611,10 +639,6 @@ class TestFest(CBLTestClass):
             DocumentEntry("_default.tasks", "db1-list1-task2"),
             DocumentEntry("_default.users", "db1-list1-user2")
         ])
-
-        self.mark_test_step("Start the replicators")
-        await repl1.start()
-        await repl2.start()
 
         self.mark_test_step("Create a list and two tasks in db1")
         async with db1.batch_updater() as b:

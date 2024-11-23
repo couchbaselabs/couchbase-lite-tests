@@ -463,6 +463,18 @@ class SyncGateway:
                 else:
                     raise
 
+    async def assign_roles(self, db_name: str, name: str, roles: List[str]) -> None:
+        """
+        Assign the roles to a user.
+
+        :param db_name: The name of the Database.
+        :param name: The username to assign the roles to.
+        :param roles: A list of roles to be assigned.
+        """
+        with self.__tracer.start_as_current_span("assign_role", attributes={"cbl.user.name": name}):
+            body = { "admin_roles": roles }
+            await self._send_request("put", f"/{db_name}/_user/{name}", JSONDictionary(body))
+
     def _analyze_dataset_response(self, response: list) -> None:
         assert isinstance(response, list), "Invalid bulk docs response (not a list)"
         typed_response = cast(list, response)
