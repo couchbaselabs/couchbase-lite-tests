@@ -96,12 +96,9 @@ finally
 
     if ( $null -ne $app )
     {
-        Write-Host "Windows Web Service: Stopping process $($app.ProcessName), $($app.Id)"
-        Stop-Process $app
+        Write-Host "Windows Web Service: Stopping process tree $($app.ProcessName), $($app.Id)"
+        taskkill.exe /f /t /PID $($app.Id)
     }
-
-    Write-Host "Windows Web Service: Stopping the server"
-    & .\gradlew.bat --no-daemon appStop -PcblVersion="${cblVersion}"
 
     Write-Host "Windows Web Service: Exiting"
     Exit $status
