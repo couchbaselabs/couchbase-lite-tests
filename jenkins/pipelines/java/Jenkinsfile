@@ -55,7 +55,9 @@ pipeline {
                     }
                     steps {
                         echo "=== Run Windows Desktop Tests"
-                        pwsh "jenkins\\pipelines\\java\\desktop\\win_tests.ps1 ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
+                        pwsh """
+                            jenkins\\pipelines\\java\\desktop\\win_tests.ps1 "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
+                        """
                         echo "=== Windows Desktop Tests Complete"
                     }
                     post {
@@ -123,7 +125,9 @@ pipeline {
                     }
                     steps {
                         echo "=== Run Windows Web Service Tests"
-                        pwsh "jenkins\\pipelines\\java\\webservice\\win_tests.ps1 ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.SGW_URL}"
+                        pwsh """
+                            jenkins\\pipelines\\java\\webservice\\win_tests.ps1 "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
+                        """
                         echo "=== Windows Web Service Tests Complete"
                     }
                     post {

@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 [System.Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\Program Files\Microsoft\jdk-17.0.13.11-hotspot")
 
 $status = 1
-cblVersion = "${version}-${buildNumber}"
+$cblVersion = "${version}-${buildNumber}"
 
 Push-Location servers\jak
 $serverVersion = Get-Content version.txt
@@ -40,7 +40,7 @@ try
     Pop-Location
 
     Write-Host "Windows Desktop: Start the environment"
-    & .\jenkins\pipelines\shared\setup_backend.ps1 $sgUrl
+    & .\jenkins\pipelines\shared\setup_backend.ps1 "$sgUrl"
 
     Write-Host "Windows Desktop: Wait for the Test Server..."
     $urlFile = "servers\jak\desktop\server.url"

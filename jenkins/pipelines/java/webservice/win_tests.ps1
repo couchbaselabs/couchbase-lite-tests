@@ -31,7 +31,7 @@ try
     Pop-Location
 
     Write-Host "Windows Web Service: Start the environment"
-    & .\jenkins\pipelines\shared\setup_backend.ps1 $sgUrl
+    & .\jenkins\pipelines\shared\setup_backend.ps1 "$sgUrl"
 
     Write-Host "Windows Web Service: Wait for the Test Server..."
     $urlFile = "servers\jak\webservice\app\server.url"
