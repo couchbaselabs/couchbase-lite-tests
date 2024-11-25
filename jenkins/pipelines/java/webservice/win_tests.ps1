@@ -25,7 +25,7 @@ try
 {
     $temp = New-TemporaryFile
     Write-Host "Windows Web Service: Build and start the Test Server"
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue app\build server.log, app\server.url
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue app\build, server.log, app\server.url
     $app = Start-Process .\gradlew.bat -ArgumentList "--no-daemon jettyStart -PcblVersion=${cblVersion}" -PassThru -WindowStyle Hidden -RedirectStandardInput $temp -RedirectStandardOutput server.log -RedirectStandardError server.err
     Write-Host "Windows Web Service: Server started: $($app.ProcessName), $($app.Id)"
     Pop-Location
@@ -96,12 +96,9 @@ finally
 
     if ( $null -ne $app )
     {
-        Write-Host "Windows Web Service: Stopping process $($app.ProcessName), $($app.Id)"
-        Stop-Process $app
+        Write-Host "Windows Web Service: Stopping process tree $($app.ProcessName), $($app.Id)"
+        taskkill.exe /f /t /PID $($app.Id)
     }
-
-    Write-Host "Windows Web Service: Stopping the server"
-    & .\gradlew.bat --no-daemon appStop -PcblVersion="${cblVersion}"
 
     Write-Host "Windows Web Service: Exiting"
     Exit $status
