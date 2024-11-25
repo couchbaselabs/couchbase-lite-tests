@@ -88,6 +88,7 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_create_tasks(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Setup test env and assign SG roles to users")
         await self.setup_test_fest_cloud(cblpytest, dataset_path, {
             "user1": ["lists.user1.db1-list1.contributor", "lists.user1.db2-list1.contributor"]
         })
@@ -164,6 +165,7 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_update_task(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Setup test env and assign SG roles to users")
         await self.setup_test_fest_cloud(cblpytest, dataset_path, {
             "user1": ["lists.user1.db1-list1.contributor"]
         })
@@ -235,6 +237,7 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delete_task(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Setup test env and assign SG roles to users")
         await self.setup_test_fest_cloud(cblpytest, dataset_path, {
             "user1": ["lists.user1.db1-list1.contributor"]
         })
@@ -298,6 +301,7 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delete_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Setup test env and assign SG roles to users")
         await self.setup_test_fest_cloud(cblpytest, dataset_path, {
             "user1": ["lists.user1.db1-list1.contributor"]
         })
@@ -343,7 +347,7 @@ class TestFest(CBLTestClass):
             DocumentEntry("_default.tasks", "db1-list1-task2")
         ])
 
-        self.mark_test_step("Delete the _default.tasks, db1-list1-task1 task in db1")
+        self.mark_test_step("Delete the the list1 and the two tasks in db1")
         async with db1.batch_updater() as b:
             b.delete_document("_default.lists", "db1-list1")
             b.delete_document("_default.tasks", "db1-list1-task1")
@@ -358,7 +362,7 @@ class TestFest(CBLTestClass):
             WaitForDocumentEventEntry("_default.tasks", "db1-list1-task2", ReplicatorType.PULL,
                                       ReplicatorDocumentFlags.DELETED)})
 
-        self.mark_test_step("Verify that _default.tasks.db1-list1-task1 was deleted from db1")
+        self.mark_test_step("Verify that the list and two tasks were deleted from db1")
         snapshot_updater = SnapshotUpdater(snap1)
         snapshot_updater.delete_document("_default.lists", "db1-list1")
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
@@ -366,7 +370,7 @@ class TestFest(CBLTestClass):
         verify_result = await db1.verify_documents(snapshot_updater)
         assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
 
-        self.mark_test_step("Verify that _default.tasks.db1-list1-task1 was deleted from db2")
+        self.mark_test_step("Verify that the list and two tasks were deleted from db2")
         snapshot_updater = SnapshotUpdater(snap2)
         snapshot_updater.delete_document("_default.lists", "db1-list1")
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
@@ -378,6 +382,7 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_create_tasks_two_users(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Setup test env and assign SG roles to users")
         await self.setup_test_fest_cloud(cblpytest, dataset_path, {
             "user1": ["lists.user1.db1-list1.contributor"],
             "user2": ["lists.user2.db2-list1.contributor"]
@@ -449,6 +454,7 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_share_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Setup test env and assign SG roles to users")
         await self.setup_test_fest_cloud(cblpytest, dataset_path, {
             "user1": ["lists.user1.db1-list1.contributor"]
         })
@@ -522,6 +528,7 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_update_shared_tasks(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Setup test env and assign SG roles to users")
         await self.setup_test_fest_cloud(cblpytest, dataset_path, {
             "user1": ["lists.user1.db1-list1.contributor"]
         })
@@ -622,6 +629,7 @@ class TestFest(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_unshare_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Setup test env and assign SG roles to users")
         await self.setup_test_fest_cloud(cblpytest, dataset_path, {
             "user1": ["lists.user1.db1-list1.contributor"]
         })
