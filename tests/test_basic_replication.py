@@ -325,7 +325,7 @@ class TestBasicReplication(CBLTestClass):
         hotels_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "hotels")
         for doc in hotels_all_docs.rows:
             if doc.id == "hotel_400" or doc.id == "hotel_500":
-                await cblpytest.sync_gateways[0].delete_document(doc.id, doc.revision, "travel", "travel", "hotels")
+                await cblpytest.sync_gateways[0].delete_document(doc.id, doc.revid, "travel", "travel", "hotels")
 
         self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_all_doc_events({
@@ -459,7 +459,7 @@ class TestBasicReplication(CBLTestClass):
         hotels_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "hotels")
         for doc in hotels_all_docs.rows:
             if doc.id == "hotel_400" or doc.id == "hotel_500":
-                await cblpytest.sync_gateways[0].delete_document(doc.id, doc.revision, "travel", "travel", "hotels")
+                await cblpytest.sync_gateways[0].delete_document(doc.id, doc.revid, "travel", "travel", "hotels")
 
         self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_all_doc_events({

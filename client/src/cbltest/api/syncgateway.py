@@ -602,6 +602,15 @@ class SyncGateway:
 
             await self._send_request("post", f"/{db_name}.{scope}.{collection}/_bulk_docs",
                                      JSONDictionary(body))
+            
+    @deprecated("Only should be used until 4.0 SGW gets close to GA")
+    async def _replaced_revid(self, doc_id: str, revid: str, db_name: str, scope: str, collection: str) -> None:
+        response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}?show_cv=true")
+        assert isinstance(response, dict)
+        response_dict = cast(dict, response)
+        assert revid == response_dict["_cv"] or revid == response_dict["_rev"]
+        return cast(dict, response)["_rev"]
+
 
     async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "_default",
                               collection: str = "_default") -> None:
@@ -618,8 +627,13 @@ class SyncGateway:
                                                                                 "cbl.scope.name": scope,
                                                                                 "cbl.collection.name": collection,
                                                                                 "cbl.document.id": doc_id}):
+            if "@" in revid:
+                new_rev_id = await self._replaced_revid(doc_id, revid, db_name, scope, collection)
+            else:
+                new_rev_id = revid
+            
             await self._send_request("delete", f"/{db_name}.{scope}.{collection}/{doc_id}",
-                                     params={"rev": revid})
+                                     params={"rev": new_rev_id})
 
     async def purge_document(self, doc_id: str, db_name: str, scope: str = "_default",
                              collection: str = "_default") -> None:
