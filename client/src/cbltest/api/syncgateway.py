@@ -400,7 +400,7 @@ class SyncGateway:
         :param db_name: The name of the Database to delete
         """
         with self.__tracer.start_as_current_span("delete_database", attributes={"cbl.database.name": db_name}):
-            await self._send_request("delete", f"/{db_name}")
+            await self._send_request("delete", f"/{db_name}/")
 
     def create_collection_access_dict(self, input: Dict[str, List[str]]) -> dict:
         """
