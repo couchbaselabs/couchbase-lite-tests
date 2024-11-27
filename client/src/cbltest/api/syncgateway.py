@@ -377,12 +377,14 @@ class SyncGateway:
         """
         with self.__tracer.start_as_current_span("put_database",
                                                  attributes={"cbl.database.name": db_name}) as current_span:
+            retry_count = 0
             try:
-                await self._send_request("put", f"/{db_name}", payload)
+                await self._send_request("put", f"/{db_name}/", payload)
             except CblSyncGatewayBadResponseError as e:
-                if e.code == 500:
+                if e.code == 500 and retry_count < 10:
                     cbl_warning("Sync gateway returned 500 from PUT database call, retrying...")
                     current_span.add_event("SGW returned 500, retry")
+                    retry_count += 1
                     await self.put_database(db_name, payload)
                 else:
                     raise
