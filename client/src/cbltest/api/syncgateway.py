@@ -14,8 +14,10 @@ from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_warning
+from cbltest.logging import cbl_warning, cbl_info
 from cbltest.version import VERSION
+
+from deprecated import deprecated
 
 
 class _CollectionMap(JSONSerializable):
@@ -172,11 +174,37 @@ class DocumentUpdateEntry(JSONSerializable):
     For creating a new document, set revid to None.
     """
 
+    @property
+    @deprecated("Only should be used until 4.0 SGW gets close to GA")
+    def id(self) -> str:
+        """
+        Gets the ID of the entry (NOTE: Will go away after 4.0 SGW gets close to GA)
+        """
+        return cast(str, self.__body["_id"])
+    
+    @property
+    @deprecated("Only should be used until 4.0 SGW gets close to GA")
+    def rev(self) -> Optional[str]:
+        """
+        Gets the rev ID of the entry (NOTE: Will go away after 4.0 SGW gets close to GA)
+        """
+        if not "_rev" in self.__body:
+            return None
+        
+        return cast(str, self.__body["_rev"])
+
     def __init__(self, id: str, revid: Optional[str], body: dict):
         self.__body = body.copy()
         self.__body["_id"] = id
         if revid:
             self.__body["_rev"] = revid
+
+    @deprecated("Only should be used until 4.0 SGW gets close to GA")
+    def swap_rev(self, revid: str) -> None:
+        """
+        Changes the revid to the provided one (NOTE: Will go away after 4.0 SGW gets close to GA)
+        """
+        self.__body["_rev"] = revid
 
     def to_json(self) -> Any:
         return self.__body
@@ -527,6 +555,28 @@ class SyncGateway:
             resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_all_docs?show_cv=true")
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
+        
+    @deprecated("Only should be used until 4.0 SGW gets close to GA")
+    async def _rewrite_rev_ids(self, db_name: str, updates: List[DocumentUpdateEntry],
+                               scope: str, collection: str) -> None:
+        all_docs_body = list(u.id for u in updates if u.rev is not None)
+        all_docs_response = await self._send_request("post", f"/{db_name}.{scope}.{collection}/_all_docs", 
+                                                     JSONDictionary({"keys": all_docs_body}))
+
+        if not isinstance(all_docs_response, dict):
+            raise ValueError("Inappropriate response from sync gateway _all_docs (not JSON dict)")
+        
+        rows = cast(dict, all_docs_response)["rows"]
+        if not isinstance(rows, list):
+            raise ValueError("Inappropriate response from sync gateway _all_docs (rows not a list)")
+        
+        for r in cast(list, rows):
+            next_id = r["id"]
+            found = next((u for u in updates if u.id == next_id), None)
+            assert found != None, f"Unable to find {next_id} in updates!"
+            new_rev_id = r["value"]["rev"]
+            cbl_info(f"For document {found.id}: Swapping revid from {found.rev} to {new_rev_id}")
+            found.swap_rev(new_rev_id)
 
     async def update_documents(self, db_name: str, updates: List[DocumentUpdateEntry],
                                scope: str = "_default", collection: str = "_default") -> None:
@@ -541,6 +591,11 @@ class SyncGateway:
         with self.__tracer.start_as_current_span("update_documents", attributes={"cbl.database.name": db_name,
                                                                                  "cbl.scope.name": scope,
                                                                                  "cbl.collection.name": collection}):
+            
+            await self._rewrite_rev_ids(db_name, updates, scope, collection)
+
+
+
             body = {
                 "docs": list(u.to_json() for u in updates)
             }
