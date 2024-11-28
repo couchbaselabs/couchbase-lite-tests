@@ -4,9 +4,6 @@ SHELL ["/bin/bash", "-c"]
 RUN apt -yqq update 
 RUN apt -yqq install curl systemctl
 RUN mkdir -p /opt/sg
-COPY cert /opt/sg/cert
-COPY config /opt/sg/config
-COPY start-sgw.sh /opt/sg
 
 ARG SG_DEB
 RUN [ -z "$SG_DEB" ] && echo "SG_DEB is required" && exit 1 || true
@@ -20,9 +17,12 @@ RUN ARCHITECTURE="$(dpkg --print-architecture)" && \
         exit 1; \
     fi
 
-WORKDIR /opt/sg
-RUN dpkg -i ./couchbase-sync-gateway.deb
+RUN dpkg -i /opt/sg/couchbase-sync-gateway.deb
+COPY cert /opt/sg/cert
+COPY config /opt/sg/config
+COPY start-sgw.sh /opt/sg
 
+WORKDIR /opt/sg
 EXPOSE 4984
 EXPOSE 4985
 

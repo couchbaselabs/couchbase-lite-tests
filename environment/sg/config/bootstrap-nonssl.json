@@ -15,6 +15,14 @@
       "enabled": true,
       "log_level": "info",
       "log_keys": ["*"]
+    },
+    "log_file_path": "/opt/sg/log",
+    "debug": {
+      "enabled": true,
+      "rotation": {
+        "max_size": 512,
+        "rotated_logs_size_limit": 1024
+      }
     }
   } 
 }
