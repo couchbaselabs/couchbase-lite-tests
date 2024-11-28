@@ -91,6 +91,7 @@ internal static partial class HandlerList
         }
 
         Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Verbose()
             .WriteTo.Logger(Original)
             .WriteTo.LogSlurp(newSessionBody.logging.url, newSessionBody.id, newSessionBody.logging.tag)
             .CreateLogger();

@@ -29,7 +29,7 @@ public static class MauiProgram
 
 		LogFilePath = $"{Path.GetTempFileName()}.txt";
 		var logConfig = new LoggerConfiguration()
-			.MinimumLevel.Debug()
+			.MinimumLevel.Verbose()
 			.WriteTo.File(LogFilePath)
 			.WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Warning);
 
