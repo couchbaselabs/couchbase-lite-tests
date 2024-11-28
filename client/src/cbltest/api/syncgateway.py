@@ -221,14 +221,28 @@ class RemoteDocument(JSONSerializable):
         return self.__id
 
     @property
-    def revid(self) -> str:
+    def revid(self) -> Optional[str]:
         """Gets the revision ID of the document"""
         return self.__rev
+    
+    @property
+    def cv(self) -> Optional[str]:
+        """Gets the CV of the document"""
+        return self.__cv
 
     @property
     def body(self) -> dict:
         """Gets the body of the document"""
         return self.__body
+    
+    @property
+    def revision(self) -> str:
+        """Gets either the CV (preferred) or revid of the document"""
+        if self.__cv is not None:
+            return self.__cv
+        
+        assert self.__rev is not None
+        return self.__rev
 
     def __init__(self, body: dict) -> None:
         if "error" in body:
@@ -236,14 +250,18 @@ class RemoteDocument(JSONSerializable):
 
         self.__body = body.copy()
         self.__id = cast(str, body["_id"])
-        self.__rev = cast(str, body["_rev"])
+        self.__rev = cast(str, body["_rev"]) if "_rev" in body else None
+        self.__cv = cast(str, body["_cv"]) if "_cv" in body else None
         del self.__body["_id"]
         del self.__body["_rev"]
+        if self.__cv is not None:
+            del self.__body["_cv"]
 
     def to_json(self) -> Any:
         ret_val = self.__body.copy()
         ret_val["_id"] = self.__id
         ret_val["_rev"] = self.__rev
+        ret_val["_cv"] = self.__cv
         return ret_val
 
 
@@ -367,6 +385,19 @@ class SyncGateway:
         """
         _assert_not_null(db_name, nameof(db_name))
         return urljoin(self.__replication_url, db_name)
+    
+    async def _put_database(self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0) -> None:
+        with self.__tracer.start_as_current_span("put_database",
+                                                 attributes={"cbl.database.name": db_name}) as current_span:
+            try:
+                await self._send_request("put", f"/{db_name}/", payload)
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 500 and retry_count < 10:
+                    cbl_warning(f"Sync gateway returned 500 from PUT database call, retrying ({retry_count + 1})...")
+                    current_span.add_event("SGW returned 500, retry")
+                    await self._put_database(db_name, retry_count + 1)
+                else:
+                    raise
 
     async def put_database(self, db_name: str, payload: PutDatabasePayload) -> None:
         """
@@ -375,19 +406,7 @@ class SyncGateway:
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
         """
-        with self.__tracer.start_as_current_span("put_database",
-                                                 attributes={"cbl.database.name": db_name}) as current_span:
-            retry_count = 0
-            try:
-                await self._send_request("put", f"/{db_name}/", payload)
-            except CblSyncGatewayBadResponseError as e:
-                if e.code == 500 and retry_count < 10:
-                    cbl_warning("Sync gateway returned 500 from PUT database call, retrying...")
-                    current_span.add_event("SGW returned 500, retry")
-                    retry_count += 1
-                    await self.put_database(db_name, payload)
-                else:
-                    raise
+        await self._put_database(db_name, payload, 0)
 
     async def delete_database(self, db_name: str) -> None:
         """
@@ -672,7 +691,7 @@ class SyncGateway:
                                                                              "cbl.scope.name": scope,
                                                                              "cbl.collection.name": collection,
                                                                              "cbl.document.id": doc_id}):
-            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
+            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}?show_cv=true")
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 

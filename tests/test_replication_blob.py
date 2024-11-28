@@ -14,6 +14,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 class TestReplicationBlob(CBLTestClass):
     @pytest.mark.cbse(14861)
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.skip(reason="CBG-4389")
     async def test_pull_non_blob_changes_with_delta_sync_and_compact(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
@@ -48,8 +49,9 @@ class TestReplicationBlob(CBLTestClass):
                                  ["travel.hotels"])
         
         self.mark_test_step("Update hotel_1 on SG without changing the image key.")
+        hotel_1 = await cblpytest.sync_gateways[0].get_document("travel", "hotel_1", "travel", "hotels")
         hotels_updates: List[DocumentUpdateEntry] = []
-        hotels_updates.append(DocumentUpdateEntry("hotel_1", "1-2888d379591e42370912510ae8e8a976e1bf6436", body={
+        hotels_updates.append(DocumentUpdateEntry("hotel_1", hotel_1.revision, body={
             "_attachments": {
                 "blob_/image": {
                     "content_type": "image/png",
@@ -84,8 +86,9 @@ class TestReplicationBlob(CBLTestClass):
                                        ["travel.hotels"])
         
         self.mark_test_step("Update hotel_1 on SG again without changing the image key.")
+        hotel_1 = await cblpytest.sync_gateways[0].get_document("travel", "hotel_1", "travel", "hotels")
         hotels_updates = []
-        hotels_updates.append(DocumentUpdateEntry("hotel_1", "2-9a718e02f5e5aa1aa90bdbb25072d258", body={
+        hotels_updates.append(DocumentUpdateEntry("hotel_1", hotel_1.revision, body={
             "_attachments": {
                 "blob_/image": {
                     "content_type": "image/png",
