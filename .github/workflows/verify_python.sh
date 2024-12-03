@@ -5,6 +5,7 @@ source venv/bin/activate
 pip install mypy
 pip install pytest
 pip install types-requests
+pip install types-Deprecated
 pip install ./client
 echo "Checking tests files..."
 python -m mypy tests --exclude=venv --ignore-missing-imports
