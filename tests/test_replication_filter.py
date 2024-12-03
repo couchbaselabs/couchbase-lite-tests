@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import List, Set
 from cbltest import CBLPyTest
+from cbltest.utils import assert_not_null
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (ReplicatorCollectionEntry, ReplicatorBasicAuthenticator, ReplicatorType, 
                                           ReplicatorActivityLevel, ReplicatorDocumentEntry, ReplicatorFilter)
@@ -130,13 +131,14 @@ class TestReplicationFilter(CBLTestClass):
 
         remote_landmark_10 = await cblpytest.sync_gateways[0].get_document("travel", "landmark_10", "travel", "landmarks")
         assert remote_landmark_10 is not None, "Missing landmark_10 from sync gateway"
+        landmark_10_revid = assert_not_null(remote_landmark_10.revid, "Missing landmark_10 revid")
         
         updates = [
             DocumentUpdateEntry("airport_1000", None, {"answer": 42}),
             DocumentUpdateEntry("airport_10", remote_airport_10.revid, {"answer": 42})
         ]
         await cblpytest.sync_gateways[0].update_documents("travel", updates, "travel", "airports")
-        await cblpytest.sync_gateways[0].delete_document("landmark_10", remote_landmark_10.revid, "travel", "travel", "landmarks")
+        await cblpytest.sync_gateways[0].delete_document("landmark_10", landmark_10_revid, "travel", "travel", "landmarks")
 
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         replicator.clear_document_updates()
@@ -207,9 +209,11 @@ class TestReplicationFilter(CBLTestClass):
 
         remote_landmark_1 = await cblpytest.sync_gateways[0].get_document("travel", "landmark_1", "travel", "landmarks")
         assert remote_landmark_1 is not None, "Missing landmark_1 from sync gateway"
+        landmark_1_revid = assert_not_null(remote_landmark_1.revid, "Missing landmark_1 revid")
 
         remote_landmark_601 = await cblpytest.sync_gateways[0].get_document("travel", "landmark_601", "travel", "landmarks")
         assert remote_landmark_601 is not None, "Missing landmark_601 from sync gateway"
+        landmark_601_revid = assert_not_null(remote_landmark_601.revid, "Missing landmark_601 revid")
 
         updates = [
             DocumentUpdateEntry("airport_1000", None, {"answer": 42, "channels": ["United Kingdom"]}),
@@ -221,8 +225,8 @@ class TestReplicationFilter(CBLTestClass):
         ]
 
         await cblpytest.sync_gateways[0].update_documents("travel", updates, "travel", "airports")
-        await cblpytest.sync_gateways[0].delete_document("landmark_1", remote_landmark_1.revid, "travel", "travel", "landmarks")
-        await cblpytest.sync_gateways[0].delete_document("landmark_601", remote_landmark_601.revid, "travel", "travel", "landmarks")
+        await cblpytest.sync_gateways[0].delete_document("landmark_1", landmark_1_revid, "travel", "travel", "landmarks")
+        await cblpytest.sync_gateways[0].delete_document("landmark_601", landmark_601_revid, "travel", "travel", "landmarks")
 
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         replicator.clear_document_updates()
@@ -426,13 +430,15 @@ class TestReplicationFilter(CBLTestClass):
 
         remote_name_10 = await cblpytest.sync_gateways[0].get_document("names", "name_105")
         assert remote_name_10 is not None, "Missing name_105 from sync gateway"
+        name_10_revid = assert_not_null(remote_name_10.revid, "Missing name_105 revid")
 
         remote_name_20 = await cblpytest.sync_gateways[0].get_document("names", "name_193")
         assert remote_name_20 is not None, "Missing name_193 from sync gateway"
+        name_20_revid = assert_not_null(remote_name_20.revid, "Missing name_193 revid")
 
         await cblpytest.sync_gateways[0].update_documents("names", updates)
-        await cblpytest.sync_gateways[0].delete_document("name_105", remote_name_10.revid, "names")
-        await cblpytest.sync_gateways[0].delete_document("name_193", remote_name_20.revid, "names")
+        await cblpytest.sync_gateways[0].delete_document("name_105", name_10_revid, "names")
+        await cblpytest.sync_gateways[0].delete_document("name_193", name_20_revid, "names")
 
         self.mark_test_step("Start a replicator with the same config as in step 3.")
         await replicator.start()

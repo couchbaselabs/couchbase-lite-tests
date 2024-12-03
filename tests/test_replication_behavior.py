@@ -1,5 +1,6 @@
 from pathlib import Path
 from cbltest import CBLPyTest
+from cbltest.utils import assert_not_null
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import ReplicatorCollectionEntry, ReplicatorType, \
@@ -19,7 +20,8 @@ class TestReplicationBehavior(CBLTestClass):
         for row in all_docs.rows:
             name_number = int(row.id[-3:])
             if name_number <= 150:
-                await cblpytest.sync_gateways[0].delete_document(row.id, row.revid, "names")
+                revid = assert_not_null(row.revid, f"Missing revid on {row.id}")
+                await cblpytest.sync_gateways[0].delete_document(row.id, revid, "names")
 
         self.mark_test_step("Reset local database, and load `empty` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])

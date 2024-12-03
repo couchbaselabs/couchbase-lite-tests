@@ -16,6 +16,7 @@ from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_warning, cbl_info
 from cbltest.version import VERSION
+from cbltest.utils import assert_not_null
 
 from deprecated import deprecated
 
@@ -395,7 +396,7 @@ class SyncGateway:
                 if e.code == 500 and retry_count < 10:
                     cbl_warning(f"Sync gateway returned 500 from PUT database call, retrying ({retry_count + 1})...")
                     current_span.add_event("SGW returned 500, retry")
-                    await self._put_database(db_name, retry_count + 1)
+                    await self._put_database(db_name, payload, retry_count + 1)
                 else:
                     raise
 
@@ -593,8 +594,8 @@ class SyncGateway:
         
         for r in cast(list, rows):
             next_id = r["id"]
-            found = next((u for u in updates if u.id == next_id), None)
-            assert found != None, f"Unable to find {next_id} in updates!"
+            found = assert_not_null(next((u for u in updates if u.id == next_id), None),
+                                    f"Unable to find {next_id} in updates!")
             new_rev_id = r["value"]["rev"]
             cbl_info(f"For document {found.id}: Swapping revid from {found.rev} to {new_rev_id}")
             found.swap_rev(new_rev_id)
@@ -625,7 +626,7 @@ class SyncGateway:
                                      JSONDictionary(body))
             
     @deprecated("Only should be used until 4.0 SGW gets close to GA")
-    async def _replaced_revid(self, doc_id: str, revid: str, db_name: str, scope: str, collection: str) -> None:
+    async def _replaced_revid(self, doc_id: str, revid: str, db_name: str, scope: str, collection: str) -> str:
         response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}?show_cv=true")
         assert isinstance(response, dict)
         response_dict = cast(dict, response)
