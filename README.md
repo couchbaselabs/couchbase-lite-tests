@@ -30,10 +30,17 @@ The system consists of 4 components:
 1. [Docker](https://www.docker.com/get-started)
 2. [Python 3.9+](https://www.python.org/downloads)
 3. [OpenSSL 1.1 for CBS Python SDK](https://docs.couchbase.com/python-sdk/current/hello-world/start-using-sdk.html)
+4. [Git LFS](https://git-lfs.com)
 
 ### Steps
 
-1. Open a terminal window and start the environment by running the `./start_environment.py` script in the environment folder.
+1. Clone the repository.
+   ```
+   $ git clone https://github.com/couchbaselabs/couchbase-lite-tests.git
+   ```
+   This repository uses Git LFS to store binary dataset files. Ensure that you have [Git LFS](https://git-lfs.com) installed, and run `git lfs install` once to setup the extension hook before cloning the repository.
+
+2. Open a terminal window and start the environment by running the `./start_environment.py` script in the environment folder.
    The script will start CBS and SG in the docker container in the background and wait until SG is successfully started before exiting.
    ```
    cd environment
@@ -41,13 +48,13 @@ The system consists of 4 components:
    ```
    * To shutdown the environment, run `docker compose down`.
    
-2. Build and run the test server of the platform that you want to test.
+3. Build and run the test server of the platform that you want to test.
    * [C](https://github.com/couchbaselabs/couchbase-lite-tests/tree/main/servers/c)
    * Android
    * .Net
    * iOS
      
-3. From the tests directory, set up a python virtual environment:
+4. From the tests directory, set up a python virtual environment:
    ```
    cd tests
    python3 -m venv venv
@@ -58,11 +65,11 @@ The system consists of 4 components:
    * You only need to create the python venv once. To reactivate run `. venv/bin/activate`, and to deactivate run `deactivate`.
    * When you update the repo or the Python TDK code, run `pip install ../client` to update the TDK.
 
-4. Edit the file `config.example.json` with the URL of your Test server started in the Step 2.
+5. Edit the file `config.example.json` with the URL of your Test server started in the Step 2.
    ```
    "test-servers": ["http://192.168.100.104:8080"]
    ```
-5. Run the pytest tests as examples below.
+6. Run the pytest tests as examples below.
    ```
    # Run one test file:
    pytest --config config.example.json test_basic_replication.py
