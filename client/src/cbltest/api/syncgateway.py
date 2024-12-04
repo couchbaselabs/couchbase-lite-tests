@@ -14,8 +14,11 @@ from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_warning
+from cbltest.logging import cbl_warning, cbl_info
 from cbltest.version import VERSION
+from cbltest.utils import assert_not_null
+
+from deprecated import deprecated
 
 
 class _CollectionMap(JSONSerializable):
@@ -172,11 +175,37 @@ class DocumentUpdateEntry(JSONSerializable):
     For creating a new document, set revid to None.
     """
 
+    @property
+    @deprecated("Only should be used until 4.0 SGW gets close to GA")
+    def id(self) -> str:
+        """
+        Gets the ID of the entry (NOTE: Will go away after 4.0 SGW gets close to GA)
+        """
+        return cast(str, self.__body["_id"])
+    
+    @property
+    @deprecated("Only should be used until 4.0 SGW gets close to GA")
+    def rev(self) -> Optional[str]:
+        """
+        Gets the rev ID of the entry (NOTE: Will go away after 4.0 SGW gets close to GA)
+        """
+        if not "_rev" in self.__body:
+            return None
+        
+        return cast(str, self.__body["_rev"])
+
     def __init__(self, id: str, revid: Optional[str], body: dict):
         self.__body = body.copy()
         self.__body["_id"] = id
         if revid:
             self.__body["_rev"] = revid
+
+    @deprecated("Only should be used until 4.0 SGW gets close to GA")
+    def swap_rev(self, revid: str) -> None:
+        """
+        Changes the revid to the provided one (NOTE: Will go away after 4.0 SGW gets close to GA)
+        """
+        self.__body["_rev"] = revid
 
     def to_json(self) -> Any:
         return self.__body
@@ -193,14 +222,28 @@ class RemoteDocument(JSONSerializable):
         return self.__id
 
     @property
-    def revid(self) -> str:
+    def revid(self) -> Optional[str]:
         """Gets the revision ID of the document"""
         return self.__rev
+    
+    @property
+    def cv(self) -> Optional[str]:
+        """Gets the CV of the document"""
+        return self.__cv
 
     @property
     def body(self) -> dict:
         """Gets the body of the document"""
         return self.__body
+    
+    @property
+    def revision(self) -> str:
+        """Gets either the CV (preferred) or revid of the document"""
+        if self.__cv is not None:
+            return self.__cv
+        
+        assert self.__rev is not None
+        return self.__rev
 
     def __init__(self, body: dict) -> None:
         if "error" in body:
@@ -208,14 +251,18 @@ class RemoteDocument(JSONSerializable):
 
         self.__body = body.copy()
         self.__id = cast(str, body["_id"])
-        self.__rev = cast(str, body["_rev"])
+        self.__rev = cast(str, body["_rev"]) if "_rev" in body else None
+        self.__cv = cast(str, body["_cv"]) if "_cv" in body else None
         del self.__body["_id"]
         del self.__body["_rev"]
+        if self.__cv is not None:
+            del self.__body["_cv"]
 
     def to_json(self) -> Any:
         ret_val = self.__body.copy()
         ret_val["_id"] = self.__id
         ret_val["_rev"] = self.__rev
+        ret_val["_cv"] = self.__cv
         return ret_val
 
 
@@ -339,6 +386,19 @@ class SyncGateway:
         """
         _assert_not_null(db_name, nameof(db_name))
         return urljoin(self.__replication_url, db_name)
+    
+    async def _put_database(self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0) -> None:
+        with self.__tracer.start_as_current_span("put_database",
+                                                 attributes={"cbl.database.name": db_name}) as current_span:
+            try:
+                await self._send_request("put", f"/{db_name}/", payload)
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 500 and retry_count < 10:
+                    cbl_warning(f"Sync gateway returned 500 from PUT database call, retrying ({retry_count + 1})...")
+                    current_span.add_event("SGW returned 500, retry")
+                    await self._put_database(db_name, payload, retry_count + 1)
+                else:
+                    raise
 
     async def put_database(self, db_name: str, payload: PutDatabasePayload) -> None:
         """
@@ -347,17 +407,7 @@ class SyncGateway:
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
         """
-        with self.__tracer.start_as_current_span("put_database",
-                                                 attributes={"cbl.database.name": db_name}) as current_span:
-            try:
-                await self._send_request("put", f"/{db_name}", payload)
-            except CblSyncGatewayBadResponseError as e:
-                if e.code == 500:
-                    cbl_warning("Sync gateway returned 500 from PUT database call, retrying...")
-                    current_span.add_event("SGW returned 500, retry")
-                    await self.put_database(db_name, payload)
-                else:
-                    raise
+        await self._put_database(db_name, payload, 0)
 
     async def delete_database(self, db_name: str) -> None:
         """
@@ -370,7 +420,7 @@ class SyncGateway:
         :param db_name: The name of the Database to delete
         """
         with self.__tracer.start_as_current_span("delete_database", attributes={"cbl.database.name": db_name}):
-            await self._send_request("delete", f"/{db_name}")
+            await self._send_request("delete", f"/{db_name}/")
 
     def create_collection_access_dict(self, input: Dict[str, List[str]]) -> dict:
         """
@@ -527,6 +577,28 @@ class SyncGateway:
             resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_all_docs?show_cv=true")
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
+        
+    @deprecated("Only should be used until 4.0 SGW gets close to GA")
+    async def _rewrite_rev_ids(self, db_name: str, updates: List[DocumentUpdateEntry],
+                               scope: str, collection: str) -> None:
+        all_docs_body = list(u.id for u in updates if u.rev is not None)
+        all_docs_response = await self._send_request("post", f"/{db_name}.{scope}.{collection}/_all_docs", 
+                                                     JSONDictionary({"keys": all_docs_body}))
+
+        if not isinstance(all_docs_response, dict):
+            raise ValueError("Inappropriate response from sync gateway _all_docs (not JSON dict)")
+        
+        rows = cast(dict, all_docs_response)["rows"]
+        if not isinstance(rows, list):
+            raise ValueError("Inappropriate response from sync gateway _all_docs (rows not a list)")
+        
+        for r in cast(list, rows):
+            next_id = r["id"]
+            found = assert_not_null(next((u for u in updates if u.id == next_id), None),
+                                    f"Unable to find {next_id} in updates!")
+            new_rev_id = r["value"]["rev"]
+            cbl_info(f"For document {found.id}: Swapping revid from {found.rev} to {new_rev_id}")
+            found.swap_rev(new_rev_id)
 
     async def update_documents(self, db_name: str, updates: List[DocumentUpdateEntry],
                                scope: str = "_default", collection: str = "_default") -> None:
@@ -541,12 +613,26 @@ class SyncGateway:
         with self.__tracer.start_as_current_span("update_documents", attributes={"cbl.database.name": db_name,
                                                                                  "cbl.scope.name": scope,
                                                                                  "cbl.collection.name": collection}):
+            
+            await self._rewrite_rev_ids(db_name, updates, scope, collection)
+
+
+
             body = {
                 "docs": list(u.to_json() for u in updates)
             }
 
             await self._send_request("post", f"/{db_name}.{scope}.{collection}/_bulk_docs",
                                      JSONDictionary(body))
+            
+    @deprecated("Only should be used until 4.0 SGW gets close to GA")
+    async def _replaced_revid(self, doc_id: str, revid: str, db_name: str, scope: str, collection: str) -> str:
+        response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}?show_cv=true")
+        assert isinstance(response, dict)
+        response_dict = cast(dict, response)
+        assert revid == response_dict["_cv"] or revid == response_dict["_rev"]
+        return cast(dict, response)["_rev"]
+
 
     async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "_default",
                               collection: str = "_default") -> None:
@@ -563,8 +649,13 @@ class SyncGateway:
                                                                                 "cbl.scope.name": scope,
                                                                                 "cbl.collection.name": collection,
                                                                                 "cbl.document.id": doc_id}):
+            if "@" in revid:
+                new_rev_id = await self._replaced_revid(doc_id, revid, db_name, scope, collection)
+            else:
+                new_rev_id = revid
+            
             await self._send_request("delete", f"/{db_name}.{scope}.{collection}/{doc_id}",
-                                     params={"rev": revid})
+                                     params={"rev": new_rev_id})
 
     async def purge_document(self, doc_id: str, db_name: str, scope: str = "_default",
                              collection: str = "_default") -> None:
@@ -601,7 +692,7 @@ class SyncGateway:
                                                                              "cbl.scope.name": scope,
                                                                              "cbl.collection.name": collection,
                                                                              "cbl.document.id": doc_id}):
-            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
+            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}?show_cv=true")
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 

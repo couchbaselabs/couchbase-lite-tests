@@ -1,5 +1,5 @@
 import time
-from typing import Any, Callable, Dict, TypeVar, Type, Union
+from typing import Any, Callable, Dict, TypeVar, Type, Union, Optional, cast
 
 from .api.error import CblTimeoutError
 
@@ -27,3 +27,7 @@ def _try_n_times(num_times: int,
                 print(f"Trying {func.__name__} failed (reason='{e}')")
 
     raise CblTimeoutError(f"Failed to call {func.__name__} after {num_times} attempts!")
+
+def assert_not_null(input: Optional[T], msg: str) -> T:
+    assert input is not None, msg
+    return cast(T, input)
