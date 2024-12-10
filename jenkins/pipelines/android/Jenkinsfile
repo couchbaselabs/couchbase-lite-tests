@@ -4,6 +4,7 @@ pipeline {
         choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
         string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '', description: "The dataset version to use")
         string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
     }
     stages {
@@ -12,7 +13,8 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
-                    currentBuild.displayName = "android-${CBL_EDITION}-${params.CBL_VERSION}-${params.CBL_BUILD} (#${currentBuild.number})"
+                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
+                    currentBuild.displayName = "android-${CBL_EDITION} ${params.CBL_VERSION}-${params.CBL_BUILD}/${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
                 }
             }
         }
@@ -24,7 +26,7 @@ pipeline {
             steps {
                 echo "Run Android Tests"
                 sh """
-                    jenkins/pipelines/android/android_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.SGW_URL}"
+                    jenkins/pipelines/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_URL}"
                 """
             }
             post {

@@ -30,8 +30,10 @@ public class TestServerApp implements Daemon {
     private static final AtomicReference<TestServerApp> APP = new AtomicReference<>();
     private static final AtomicReference<Server> SERVER = new AtomicReference<>();
 
+    private static final Object LOCK = new Object();
+
     @Nullable
-    @GuardedBy("TAG")
+    @GuardedBy("LOCK")
     private static CountDownLatch stopLatch;
 
     /**
@@ -88,7 +90,7 @@ public class TestServerApp implements Daemon {
     @SuppressFBWarnings("UW_UNCOND_WAIT")
     private static void waitForStop() {
         while ((SERVER.get()) != null) {
-            synchronized (TAG) { stopLatch = new CountDownLatch(1); }
+            synchronized (LOCK) { stopLatch = new CountDownLatch(1); }
             try { stopLatch.await(); }
             catch (InterruptedException ignore) { }
         }
@@ -129,7 +131,7 @@ public class TestServerApp implements Daemon {
         final Server server = SERVER.getAndSet(null);
         if (server != null) { server.stop(); }
 
-        synchronized (TAG) {
+        synchronized (LOCK) {
             if (stopLatch != null) { stopLatch.countDown(); }
         }
 

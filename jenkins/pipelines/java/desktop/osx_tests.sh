@@ -1,12 +1,13 @@
 #!/bin/bash
 # Build the Java Desktop test server, deploy it, and run the tests
 
+
 function usage() {
-    echo "Usage: $0 <version> <build num> [<sg url>]"
+    echo "Usage: $0 <version> <build num> <dataset version> [<sg url>]"
     exit 1
 }
 
-if [ "$#" -lt 2 ] | [ "$#" -gt 3 ] ; then usage; fi
+if [ "$#" -lt 3 ] | [ "$#" -gt 4 ] ; then usage; fi
 
 VERSION="$1"
 if [ -z "$VERSION" ]; then usage; fi
@@ -14,7 +15,10 @@ if [ -z "$VERSION" ]; then usage; fi
 BUILD_NUMBER="$2"
 if [ -z "$BUILD_NUMBER" ]; then usage; fi
 
-SG_URL="$3"
+DATASET_VERSION="$3"
+if [ -z "$DATASET_VERSION" ]; then usage; fi
+
+SG_URL="$4"
 
 STATUS=1
 CBL_VERSION="${VERSION}-${BUILD_NUMBER}"
@@ -25,7 +29,7 @@ cd desktop
 
 echo "OSX Desktop: Build the Test Server"
 rm -rf app/build
-./gradlew jar -PcblVersion="${CBL_VERSION}"
+./gradlew jar -PcblVersion="${CBL_VERSION}" -PdatasetVersion="${DATASET_VERSION}"
 
 echo "OSX Desktop: Start the Test Server"
 if [ -f "server.pid" ]; then kill $(cat server.pid); fi

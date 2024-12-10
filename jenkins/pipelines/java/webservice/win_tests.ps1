@@ -5,6 +5,9 @@ param (
     [Parameter(Mandatory = $true)]
     [string]$buildNumber,
 
+    [Parameter(Mandatory = $true)]
+    [string]$datasetVersion,
+
     [Parameter(Mandatory = $false)]
     [string]$sgUrl
 )
@@ -19,14 +22,14 @@ $cblVersion = "${version}-${buildNumber}"
 Push-Location servers\jak\webservice
 
 Write-Host "Windows Web Service: Stop any existing Test Server"
-& .\gradlew.bat --no-daemon appStop -PcblVersion="${cblVersion}"
+& .\gradlew.bat --no-daemon appStop -PcblVersion="${cblVersion}" -PdatasetVersion="${DATASET_VERSION}"
 
 try
 {
     $temp = New-TemporaryFile
     Write-Host "Windows Web Service: Build and start the Test Server"
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue app\build, server.log, app\server.url
-    $app = Start-Process .\gradlew.bat -ArgumentList "--no-daemon jettyStart -PcblVersion=${cblVersion}" -PassThru -WindowStyle Hidden -RedirectStandardInput $temp -RedirectStandardOutput server.log -RedirectStandardError server.err
+    $app = Start-Process .\gradlew.bat -ArgumentList "--no-daemon jettyStart -PcblVersion=${cblVersion} -PdatasetVersion=${DATASET_VERSION}" -PassThru -WindowStyle Hidden -RedirectStandardInput $temp -RedirectStandardOutput server.log -RedirectStandardError server.err
     Write-Host "Windows Web Service: Server started: $($app.ProcessName), $($app.Id)"
     Pop-Location
 

@@ -5,21 +5,20 @@ BUILD_TOOLS_VERSION='34.0.0'
 SDK_MGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --channel=1"
 
 function usage() {
-    echo "Usage: $0 <version> <build num> [<sg url>]"
+    echo "Usage: $0 <cbl_version> <dataset version> [<sg url>]"
     exit 1
 }
 
 if [ "$#" -lt 2 ] | [ "$#" -gt 3 ] ; then usage; fi
 
-VERSION="$1"
-if [ -z "$VERSION" ]; then usage; fi
+CBL_VERSION="$1"
+if [ -z "$CBL_VERSION" ]; then usage; fi
 
-BUILD_NUMBER="$2"
-if [ -z "$BUILD_NUMBER" ]; then usage; fi
+DATASET_VERSION="$2"
+if [ -z "$DATASET_VERSION" ]; then usage; fi
 
 SG_URL="$3"
 
-CBL_VERSION="${VERSION}-${BUILD_NUMBER}"
 
 echo "Install Android SDK"
 yes | ${SDK_MGR} --licenses > /dev/null 2>&1
@@ -36,7 +35,7 @@ cd android
 echo "Build the Test Server"
 adb uninstall com.couchbase.lite.android.mobiletest 2 >& 1 > /dev/null || true
 rm -rf app/build
-./gradlew installRelease -PcblVersion="${CBL_VERSION}"
+./gradlew installRelease -PcblVersion="${CBL_VERSION}" -PdatasetVersion="${DATASET_VERSION}"
 
 echo "Start the Test Server"
 adb shell am start -a android.intent.action.MAIN -n com.couchbase.lite.android.mobiletest/.MainActivity
