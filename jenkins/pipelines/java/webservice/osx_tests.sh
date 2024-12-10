@@ -2,11 +2,11 @@
 # Build and run the Java WebService test server, and run the tests
 
 function usage() {
-    echo "Usage: $0 <version> <build num> [<sg url>]"
+    echo "Usage: $0 <version> <build num> <dataset version> [<sg url>]"
     exit 1
 }
 
-if [ "$#" -lt 2 ] | [ "$#" -gt 3 ] ; then usage; fi
+if [ "$#" -lt 3 ] | [ "$#" -gt 4 ] ; then usage; fi
 
 VERSION="$1"
 if [ -z "$VERSION" ]; then usage; fi
@@ -14,7 +14,10 @@ if [ -z "$VERSION" ]; then usage; fi
 BUILD_NUMBER="$2"
 if [ -z "$BUILD_NUMBER" ]; then usage; fi
 
-SG_URL="$3"
+DATASET_VERSION="$3"
+if [ -z "$DATASET_VERSION" ]; then usage; fi
+
+SG_URL="$4"
 
 STATUS=1
 CBL_VERSION="${VERSION}-${BUILD_NUMBER}"
@@ -22,9 +25,9 @@ CBL_VERSION="${VERSION}-${BUILD_NUMBER}"
 pushd servers/jak/webservice > /dev/null
 
 echo "OSX Web Service: Build and start the Test Server"
-./gradlew appStop -PcblVersion="${CBL_VERSION}" > /dev/null 2>&1 || true
+./gradlew appStop -PcblVersion="${CBL_VERSION}" -PdatasetVersion="${DATASET_VERSION}" > /dev/null 2>&1 || true
 rm -rf app/build server.log app/server.url
-nohup ./gradlew jettyStart -PcblVersion="${CBL_VERSION}" < /dev/null > server.log 2>&1 &
+nohup ./gradlew jettyStart -PcblVersion="${CBL_VERSION}" -PdatasetVersion="${DATASET_VERSION}" < /dev/null > server.log 2>&1 &
 popd > /dev/null
 
 echo "OSX Web Service: Start the environment"

@@ -5,6 +5,9 @@ param (
     [Parameter(Mandatory = $true)]
     [string]$buildNumber,
 
+    [Parameter(Mandatory = $true)]
+    [string]$datasetVersion,
+
     [Parameter(Mandatory = $false)]
     [string]$sgUrl
 )
@@ -28,7 +31,7 @@ if (Test-Path -Path .\server.pid)
 
 Write-Host "Windows Desktop: Build the Test Server"
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue app\build
-& .\gradlew.bat --no-daemon jar -PcblVersion="${cblVersion}"
+& .\gradlew.bat --no-daemon jar -PcblVersion="${cblVersion}" -PdatasetVersion="${DATASET_VERSION}"
 
 try
 {
