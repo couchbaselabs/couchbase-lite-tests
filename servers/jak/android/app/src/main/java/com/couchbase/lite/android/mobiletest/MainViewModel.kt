@@ -42,5 +42,5 @@ class MainViewModel(private val server: Server) : ViewModel() {
     fun stopServer() = server.stop()
 
     private fun Server.url(scheme: String = "http", path: String = "") =
-        NetUtils.makeUri(scheme, NetUtils.getLocalAddresses()?.get(0), this.myPort, path)
+        NetUtils.makeUri(scheme, NetUtils.getLocalAddress(), this.myPort, path)
 }
