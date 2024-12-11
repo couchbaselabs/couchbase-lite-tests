@@ -35,6 +35,9 @@ ext {
 
     SHARED_DIR = "${ROOT_DIR}/shared"
     ETC_DIR = "${ROOT_DIR}/etc"
+    ASSETS_ROOT = "${ROOT_DIR}/../../dataset/server"
+    BLOB_ASSETS_DIR = "${ASSETS_ROOT}/blobs"
+
 
     REPORTS_DIR = "${buildDir}/reports"
 
@@ -48,7 +51,7 @@ def USE_LOCAL_MAVEN = COUCHBASE_LITE_VERSION.endsWith("SNAPSHOT")
 
 def DATASET_VERSION = project.hasProperty("datasetVersion") ? datasetVersion : ""
 if (!(DATASET_VERSION  =~ /^\d{1,2}\.\d{1,2}/)) { throw new InvalidUserDataException ("!!! Bad dataset version: ${DATASET_VERSION}") }
-def ASSETS_DIR = "${ROOT_DIR}/../../dataset/server/${DATASET_VERSION}"
+def DB_ASSETS_DIR = "${ASSETS_ROOT}/dbs/${DATASET_VERSION}"
 
 // Set -Pverbose to get full console logs for tests
 def VERBOSE = project.hasProperty("verbose")
@@ -74,7 +77,8 @@ java {
                 "${SHARED_DIR}/jvm/main/java"
             ]
             resources.srcDirs = [
-                ASSETS_DIR,
+                DB_ASSETS_DIR,
+                BLOB_ASSETS_DIR,
                 "${SHARED_DIR}/assets"
             ]
         }
