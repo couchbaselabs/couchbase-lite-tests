@@ -18,10 +18,13 @@ package com.couchbase.lite.mobiletest.util;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.Socket;
 import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -61,16 +64,27 @@ public final class NetUtils {
 
     @SuppressWarnings({"PMD.AvoidReassigningParameters", "PMD.AvoidUsingHardCodedIP"})
     @Nullable
-    public static URI makeUri(@Nullable String scheme, @Nullable InetAddress addr, int port, @Nullable String path) {
+    public static URI makeUri(@Nullable String scheme, @Nullable String addr, int port, @Nullable String path) {
         if (scheme == null) { scheme = "http"; }
-        String addrStr = asString(addr);
-        if (addrStr == null) { addrStr = "0.0.0.0"; }
+        if (addr == null) { addr = "0.0.0.0"; }
         if (port < 0) { port = 8080; }
-        try { return new URI(scheme, null, addrStr, port, path, null, null); }
+        try { return new URI(scheme, null, addr, port, path, null, null); }
         catch (URISyntaxException e) {
-            Log.err(TAG, "Cannot parse URI: " + scheme + "//:" + addrStr + ":" + port + "/" + path);
+            Log.err(TAG, "Cannot parse URI: " + scheme + "//:" + addr + ":" + port + "/" + path);
         }
         return null;
+    }
+
+    @Nullable
+    public static String getLocalAddress() {
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress("google.com", 80));
+            return socket.getLocalAddress().getHostAddress();
+        }
+        catch (IOException e) { return null; }
+// Old version:
+//        final List<InetAddress> addrs = NetUtils.getLocalAddresses();
+//        return (addrs == null) ? null : asString(addrs.get(0));
     }
 
     // Get a list of addresses for this host, sorted by usefulness

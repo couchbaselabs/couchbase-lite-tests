@@ -5,9 +5,7 @@ import androidx.annotation.GuardedBy;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.net.InetAddress;
 import java.net.URI;
-import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -111,10 +109,10 @@ public class TestServerApp implements Daemon {
         final Server server = new Server();
         if (!SERVER.compareAndSet(null, server)) { throw new ServerError("Attempt to restart server"); }
 
-        final List<InetAddress> addrs = NetUtils.getLocalAddresses();
-        if (addrs == null) { throw new ServerError("Cannot get server address"); }
+        final String addr = NetUtils.getLocalAddress();
+        if (addr == null) { throw new ServerError("Cannot get server address"); }
 
-        final URI serverUri = NetUtils.makeUri("http", addrs.get(0), server.myPort, "");
+        final URI serverUri = NetUtils.makeUri("http", addr, server.myPort, "");
         if (serverUri == null) { throw new ServerError("Cannot get server URI"); }
 
         try (PrintWriter writer = new PrintWriter(new FileWriter("server.url"))) { writer.println(serverUri); }

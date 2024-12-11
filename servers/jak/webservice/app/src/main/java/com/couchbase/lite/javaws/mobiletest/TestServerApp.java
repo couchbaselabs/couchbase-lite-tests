@@ -8,10 +8,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.net.InetAddress;
 import java.net.URI;
 import java.util.Collections;
-import java.util.List;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.servlet.annotation.WebServlet;
@@ -54,10 +52,10 @@ public class TestServerApp extends HttpServlet {
         postDispatcher = new PostDispatcher(app);
         Log.p(TAG, "Java Web Service Test Server " + TestApp.getApp().getAppId());
 
-        final List<InetAddress> addrs = NetUtils.getLocalAddresses();
-        if (addrs == null) { throw new ServerError("Cannot get server address"); }
+        final String addr = NetUtils.getLocalAddress();
+        if (addr == null) { throw new ServerError("Cannot get server address"); }
 
-        final URI serverUri = NetUtils.makeUri("http", addrs.get(0), 8080, "");
+        final URI serverUri = NetUtils.makeUri("http", addr, 8080, "");
         if (serverUri == null) { throw new ServerError("Cannot get server URI"); }
 
         try (PrintWriter writer = new PrintWriter(new FileWriter("server.url"))) {
