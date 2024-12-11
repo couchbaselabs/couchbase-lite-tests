@@ -1,19 +1,19 @@
 param(
     [Parameter(Mandatory=$true)][string]$Edition,
     [Parameter(Mandatory=$true)][string]$Version,
-    [Parameter(Mandatory=$false)][string]$BuildNum = ""
+    [Parameter(Mandatory=$true)][string]$BuildNum,
+    [Parameter(Mandatory=$true)][string]$DatasetVersion
 )
 
 $DOWNLOAD_DIR="$PSScriptRoot\..\downloaded"
 $BUILD_DIR="$PSScriptRoot\..\build"
 $LIB_DIR="$PSScriptRoot\..\lib"
 
+# Prepare Environment:
+& $PSScriptRoot\prepare_env.ps1 $DatasetVersion
+
 # Download CBL
-if ($BuildNum -eq "") {
-    & $PSScriptRoot\download_cbl.ps1 $Edition $Version
-} else {
-    & $PSScriptRoot\download_cbl.ps1 $Edition $Version $BuildNum
-}
+& $PSScriptRoot\download_cbl.ps1 $Edition $Version $BuildNum
 
 # Build
 New-Item -ErrorAction Ignore -ItemType Directory $BUILD_DIR

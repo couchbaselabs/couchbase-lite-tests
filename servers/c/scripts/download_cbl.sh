@@ -1,11 +1,11 @@
 #!/bin/bash -e
 
 function usage() {
-    echo "Usage: $0 <platform: macos | linux | ios | android> <edition: enterprise | community> <version> [build num]"
+    echo "Usage: $0 <platform: macos | linux | ios | android> <edition: enterprise | community> <cbl-version> <cbl-build-num>"
     exit 1
 }
 
-if [ "$#" -lt 3 ]; then
+if [ "$#" -lt 4 ]; then
     usage
 fi
 
@@ -24,14 +24,13 @@ ANDROID_CPP_DIR="${SCRIPT_DIR}/../platforms/android/app/src/main/cpp"
 
 # Download CBL:
 
-
 rm -rf "${DOWNLOAD_DIR}" 2> /dev/null
 mkdir -p "${DOWNLOAD_DIR}"
 pushd "${DOWNLOAD_DIR}" > /dev/null
 
 if [ ${PLATFORM} = "macos" ]
 then
-    if [ -z "$BLD_NUM" ]
+    if [ "$BLD_NUM" == "0"]
     then
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-macos.zip
         curl -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
@@ -52,7 +51,7 @@ then
         OS_ARCH="arm64"
     fi
 
-    if [ -z "$BLD_NUM" ]
+    if [ "$BLD_NUM" == "0" ]
     then
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-linux-${OS_ARCH}.tar.gz
         curl -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
@@ -67,7 +66,7 @@ fi
 
 if [ ${PLATFORM} = "ios" ]
 then
-    if [ -z "$BLD_NUM" ]
+    if [ "$BLD_NUM" == "0" ]
     then
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-ios.zip
         curl -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
@@ -88,7 +87,7 @@ fi
 
 if [ ${PLATFORM} = "android" ]
 then
-    if [ -z "${BLD_NUM}" ]
+    if [ "${BLD_NUM}" = "0" ]
     then
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-android.zip
         curl -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
