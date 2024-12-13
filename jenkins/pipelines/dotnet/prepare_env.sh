@@ -14,11 +14,16 @@ fi
 source $PREPARE_DOTNET_SCRIPT
 
 function copy_datasets() {
-    banner "Copying dataset resources"
+    if [ $# -ne 1 ]; then
+        echo "No version provided to copy_datasets!"
+        exit 1
+    fi
+
+    banner "Copying dataset resources v$1"
 
     mkdir -p $SCRIPT_DIR/../../../servers/dotnet/testserver/Resources/Raw
     pushd $SCRIPT_DIR/../../../servers/dotnet/testserver/Resources/Raw
-    cp -fv $SCRIPT_DIR/../../../dataset/server/dbs/*.zip .
+    cp -fv $SCRIPT_DIR/../../../dataset/server/dbs/$1/*.zip .
     cp -Rfv $SCRIPT_DIR/../../../dataset/server/blobs .
     popd
 }

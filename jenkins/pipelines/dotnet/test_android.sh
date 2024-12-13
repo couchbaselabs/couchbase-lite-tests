@@ -4,15 +4,19 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 source $SCRIPT_DIR/test_common.sh
 
-sgw_url="$4"
 if [ $# -lt 3 ]; then
     usage
     exit 1
 fi
 
-prepare_dotnet
+cbl_version=$1
+cbl_build=$2
+dataset_version=$3
+sgw_url="$4"
 
-modify_package $2 $3
+prepare_dotnet $dataset_version
+
+modify_package $cbl_version $cbl_build
 $SCRIPT_DIR/build_android.sh
 
 banner "Looking up connected Android device"

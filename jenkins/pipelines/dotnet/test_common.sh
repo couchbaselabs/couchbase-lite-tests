@@ -3,19 +3,24 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 function usage() {
-    echo "Usage: $0 <edition> <version> <build> [sgw_url]"
-    echo "edition: enterprise or community (currently unused)"
+    echo "Usage: $0 <version> <build> <dataset_version> [sgw_url]"
     echo "version: CBL version (e.g. 3.2.1)"
     echo "build: CBL build number"
+    echo "dataset_version: Version of the Couchbase Lite datasets to use"
     echo "sgw_url: URL of Sync Gateway to download and use"
 }
 
 function prepare_dotnet() {
+    if [ $# -ne 1 ]; then
+        echo "No dataset version provided to prepare_dotnet!"
+        exit 1
+    fi
+
     source $SCRIPT_DIR/prepare_env.sh
     install_dotnet
     install_maui
     install_xharness
-    copy_datasets
+    copy_datasets $1
 }
 
 function modify_package() {

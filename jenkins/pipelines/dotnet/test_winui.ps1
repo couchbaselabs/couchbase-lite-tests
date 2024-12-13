@@ -1,12 +1,16 @@
 param (
-    [Parameter()][string]$Edition = "enterprise",
     [Parameter(Mandatory=$true)][string]$Version,
     [Parameter(Mandatory=$true)][string]$Build,
+    [Parameter(Mandatory=$true)][string]$Dataset,
     [Parameter()][string]$SgwUrl = ""
 )
 
 Import-Module $PSScriptRoot/prepare_env.psm1 -Force
 $ErrorActionPreference = "Stop" 
+
+Install-DotNet
+Install-Maui
+Copy-Datasets -Version $Dataset
 
 $nugetPackageVersion = "$Version-b$($Build.PadLeft(4, '0'))"
 Write-Host "Using NuGet package version $nugetPackageVersion"
