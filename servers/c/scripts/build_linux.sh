@@ -1,17 +1,18 @@
 #!/bin/bash -e
 
 function usage() {
-    echo "Usage: $0 <edition: enterprise | community> <version> [build num]"
+    echo "Usage: $0 <edition: enterprise | community> <cbl-version> <cbl-build-num> <dataset-version>"
     exit 1
 }
 
-if [ "$#" -lt 2 ]; then
+if [ "$#" -lt 4 ]; then
     usage
 fi
 
 EDITION=${1}
 VERSION=${2}
 BLD_NUM=${3}
+DATASET_VERSION=${4}
 
 OS_ARCH=`uname -m`
 if [ ${OS_ARCH} = "aarch64" ]
@@ -23,13 +24,11 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 BUILD_DIR="${SCRIPT_DIR}/../build"
 LIB_DIR="${SCRIPT_DIR}/../lib"
 
+# Prepare Environment:
+"${SCRIPT_DIR}"/prepare_env.sh ${DATASET_VERSION}
+
 # Download CBL:
-if [ -z "$BLD_NUM" ]
-then
-    ${SCRIPT_DIR}/download_cbl.sh linux ${EDITION} ${VERSION}
-else
-    ${SCRIPT_DIR}/download_cbl.sh linux ${EDITION} ${VERSION} ${BLD_NUM}
-fi
+"${SCRIPT_DIR}"/download_cbl.sh linux ${EDITION} ${VERSION} ${BLD_NUM}
 
 # Build
 mkdir -p $BUILD_DIR

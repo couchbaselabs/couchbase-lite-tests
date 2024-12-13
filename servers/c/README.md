@@ -20,20 +20,20 @@
 2. Find you the latest successful build number. Skip this if you have already known a specific build to test.
 
    ```
-   ./jenkins/pipelines/main/latest_successful_build.sh c 3.2.0
+   ./jenkins/pipelines/main/latest_successful_build.sh c 4.0.0
    ```
 
 3. Build and Run
 
    From this directory (`servers/c`), use the platform build script in the `scripts` directory to build and assemble the built artifacts.
-   The build script requires CBL version number and optional build number. Without specifying the build number, the script will download
-   the public release CBL binary. The built artifacts including the TestServer binary or application and the asset folder will be located at
-   `build/out/bin` directory.
+   The build script requires CBL edition, version, build number, and dataset version. When specifying the build number = 0, the script 
+   will download the public release CBL binary. The dataset versions available now are 3.2 and 4.0. The built artifacts including the 
+   TestServer binary or application and the asset folder will be located at `build/out/bin` directory.
 
 ### macOS
 
 ```
-./scripts/build_macos.sh enterprise 3.2.0 28
+./scripts/build_macos.sh enterprise 4.0.0 8 4.0
 cd build/out/bin
 ./testserver
 ```
@@ -41,7 +41,7 @@ cd build/out/bin
 ### linux
 
 ```
-./scripts/build_linux.sh enterprise 3.2.0 28
+./scripts/build_linux.sh enterprise 4.0.0 8 4.0
 cd build/out/bin
 ./testserver
 ```
@@ -49,25 +49,10 @@ cd build/out/bin
 ### iOS
 
 ```
-./scripts/build_ios.sh all enterprise 3.2.0 28
-cd build/out/bin
-ios kill com.couchbase.CBLTestServer
-ios install --path=TestServer.app
-ios launch com.couchbase.CBLTestServer
+./scripts/build_ios.sh all enterprise 4.0.0 8 4.0
+SHARED_DIR="../../jenkins/pipelines/shared"
+"${SHARED_DIR}/ios_app.sh" start "$("${SHARED_DIR}/ios_device.sh")" build/out/bin/TestServer.app
 ```
-
-* The above uses [go-ios](https://github.com/danielpaulus/go-ios) to install and run the TestServer app. 
-* go-ios doesn't support XCode 15 and iOS 17 at the moment. For XCode 15 and iOS 17, use xcrun command.
-  
-  ```
-  xcrun devicectl device install app --device <device uuid|ecid|udid|name> ./TestServer.app
-  xcrun devicectl device process launch --device <device uuid|ecid|udid|name> com.couchbase.CBLTestServer
-  ```
-  
-* To run on the test server on the device, use xcrun simctl command.
-  ```
-  xcrun simctl install booted ./TestServer.app
-  ```
 
 Android and Windows instruction are in progress.
 
@@ -77,20 +62,30 @@ Android and Windows instruction are in progress.
 
 * VSCode with C++/CMake plugin or Jetbrains CLion
 
+### Prepare Dataset
+
+The first step before starting to develop the project is to select and copy the dataset version
+you want to use in your development. The current dataset vesions are 3.2 and 4.0. 
+
+```
+./scripts/prepare_env.sh 4.0
+```
+The powershell script version for Windows is `prepare_env.ps1`.
+
 ### Download Couchbase Lite
 
-The first step before starting to develop the project is to download CBL library.
+The next step is to download CBL library.
 
 #### macOS, iOS, Android, Linux
 
 ```
-./scripts/download_cbl.sh macos enterprise 3.1.1
+./scripts/download_cbl.sh macos enterprise 4.0.0
 ```
 
 #### Windows
 
 ```
-.\scripts\download_cbl.ps1 enterprise 3.1.1
+.\scripts\download_cbl.ps1 enterprise 4.0.0
 ```
 
 ### Development Projects

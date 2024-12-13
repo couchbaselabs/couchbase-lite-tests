@@ -1,9 +1,10 @@
 #!/bin/bash -e
 
 EDITION=${1}
-VERSION=${2}
-BLD_NUM=${3}
-SGW_URL=${4}
+CBL_VERSION=${2}
+CBL_BLD_NUM=${3}
+CBL_DATASET_VERSION=${4}
+SGW_URL=${5}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 TEST_SERVER_DIR="${SCRIPT_DIR}/../../../servers/c"
@@ -11,7 +12,7 @@ TESTS_DIR="${SCRIPT_DIR}/../../../tests"
 
 echo "Build Test Server"
 pushd "${TEST_SERVER_DIR}" > /dev/null
-./scripts/build_macos.sh ${EDITION} ${VERSION} ${BLD_NUM}
+./scripts/build_macos.sh ${EDITION} ${CBL_VERSION} ${CBL_BLD_NUM} ${CBL_DATASET_VERSION}
 
 echo "Run Test Server"
 pushd build/out/bin > /dev/null

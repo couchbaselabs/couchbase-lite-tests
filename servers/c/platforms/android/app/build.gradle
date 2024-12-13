@@ -10,7 +10,6 @@ android {
     ext {
         PROJECT_DIR = "${projectDir}"
         ASSET_DIR = "${PROJECT_DIR}/../../../assets"
-        DATASET_DIR = "${PROJECT_DIR}/../../../../../dataset/server"
     }
 
     defaultConfig {
@@ -67,8 +66,7 @@ android {
     sourceSets {
         main {
             assets.srcDirs = [
-                    ASSET_DIR,
-                    DATASET_DIR
+                    ASSET_DIR
             ]
         }
     }
