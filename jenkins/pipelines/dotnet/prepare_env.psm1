@@ -2,10 +2,13 @@ Invoke-WebRequest https://raw.githubusercontent.com/couchbaselabs/couchbase-mobi
 Import-Module $PSScriptRoot/prepare_dotnet.psm1 -Force
 
 function Copy-Datasets {
-    Banner -Text "Copying dataset resources"
+    param (
+        [Parameter(Mandatory=$true)][string]$Version
+    )
+    Banner -Text "Copying dataset resources v$Version"
 
     Push-Location $PSScriptRoot/../../../servers/dotnet/testserver/Resources/Raw
-    Copy-Item -Force $PSScriptRoot/../../../dataset/server/dbs/*.zip . -Verbose
+    Copy-Item -Force $PSScriptRoot/../../../dataset/server/dbs/$Version/*.zip . -Verbose
     Copy-Item -Recurse -Force $PSScriptRoot/../../../dataset/server/blobs . -Verbose
     Pop-Location
 }

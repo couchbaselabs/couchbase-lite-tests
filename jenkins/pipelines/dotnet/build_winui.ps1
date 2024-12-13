@@ -2,10 +2,6 @@ Import-Module $PSScriptRoot\prepare_env.psm1 -Force
 
 $DOTNET_VERSION = Get-DotnetVersion
 
-Install-DotNet
-Install-Maui
-Copy-Datasets
-
 Banner -Text "Executing build for .NET $DOTNET_VERSION WinUI"
 
 # Build
