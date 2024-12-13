@@ -15,7 +15,6 @@ from cbltest.api.cbltestclass import CBLTestClass
 class TestReplicationBlob(CBLTestClass):
     @pytest.mark.cbse(14861)
     @pytest.mark.asyncio(loop_scope="session")
-    @pytest.mark.skip(reason="CBG-4389")
     async def test_pull_non_blob_changes_with_delta_sync_and_compact(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
