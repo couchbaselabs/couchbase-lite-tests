@@ -24,6 +24,7 @@ services:
         - SG_DEB=${SG_DEB:-https://packages.couchbase.com/releases/couchbase-sync-gateway/3.2.0/couchbase-sync-gateway-enterprise_3.2.0_<ARCH>.deb}
     environment:
       SSL: true
+      CBS_HOSTNAME: cbl-test-cbs
     ports:
       - "4984:4984"
       - "4985:4985"

@@ -1,0 +1,77 @@
+services:
+  cbl-test-cbs1:
+    build:
+      context: ./cbs
+      args:
+        - COUCHBASE_VERSION=${COUCHBASE_VERSION:-7.6.4-5147}
+        - COUCHBASE_CONTAINER_PATH=${COUCHBASE_CONTAINER_PATH:-ghcr.io/cb-vanilla/server:}
+    ports:
+      # expose cbs2 server UI on 18092
+      - "18091:8091"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8093/admin/ping"]
+      interval: 1s
+      timeout: 10s
+      retries: 120
+  cbl-test-sg1:
+    build:
+      context: ./sg
+      args:
+        - SG_DEB=${SG_DEB:-https://packages.couchbase.com/releases/couchbase-sync-gateway/3.2.0/couchbase-sync-gateway-enterprise_3.2.0_<ARCH>.deb}
+    environment:
+      SSL: true
+      CBS_HOSTNAME: cbl-test-cbs1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:4984/_ping"]
+      interval: 1s
+      timeout: 10s
+      retries: 120
+    depends_on:
+      cbl-test-cbs1:
+        condition: service_healthy
+  cbl-test-cbs2:
+    build:
+      context: ./cbs
+      args:
+        - COUCHBASE_VERSION=${COUCHBASE_VERSION:-7.6.4-5147}
+        - COUCHBASE_CONTAINER_PATH=${COUCHBASE_CONTAINER_PATH:-ghcr.io/cb-vanilla/server:}
+    ports:
+      # expose cbs2 server UI on 28092
+      - "28091:8091"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8093/admin/ping"]
+      interval: 1s
+      timeout: 10s
+      retries: 120
+  cbl-test-sg2:
+    build:
+      context: ./sg
+      args:
+        - SG_DEB=${SG_DEB:-https://packages.couchbase.com/releases/couchbase-sync-gateway/3.2.0/couchbase-sync-gateway-enterprise_3.2.0_<ARCH>.deb}
+    environment:
+      SSL: true
+      CBS_HOSTNAME: cbl-test-cbs2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:4984/_ping"]
+      interval: 1s
+      timeout: 10s
+      retries: 120
+    depends_on:
+      cbl-test-cbs2:
+        condition: service_healthy
+  cbl-test-nginx:
+    image: nginx:1-alpine
+    volumes:
+      - ./nginx/nginx-2node.conf:/etc/nginx/nginx.conf
+    ports:
+      - "4984:4984"
+      - "4985:4985"
+    depends_on:
+      cbl-test-cbs1:
+        condition: service_healthy
+      cbl-test-cbs2:
+        condition: service_healthy
+      cbl-test-sg1:
+        condition: service_healthy
+      cbl-test-sg2:
+        condition: service_healthy

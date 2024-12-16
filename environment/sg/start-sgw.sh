@@ -5,6 +5,12 @@ if [ -z $SSL ]; then
   exit 1
 fi
 
+if [ -z "$CBS_HOSTNAME" ]; then
+  echo "Missing CBS_HOSTNAME environment variable, please set it to hostname of couchbase server"
+  exit 1
+fi
+
+
 SCRIPT=$(readlink -f "$0")
 ROOT_DIR=$(dirname "${SCRIPT}")
 CONFIG_DIR="${ROOT_DIR}/config"
@@ -36,7 +42,7 @@ echo "Stopping any running sync-gateway service ..."
 systemctl stop sync_gateway
 
 # Wait for the server to start and settle
-wait_for_uri 200 http://cbl-test-cbs:8093/admin/ping
+wait_for_uri 200 http://${CBS_HOSTNAME}:8093/admin/ping
 echo "Giving the server 10 seconds to settle..."
 sleep 10
 
