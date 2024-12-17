@@ -158,6 +158,18 @@ def create_dinonet():
     """
     Create dinonet that is shared with cbdinocluster, in case that is already running.
     """
+    networks = subprocess.run(
+        [
+            "docker",
+            "network",
+            "ls",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if "dinonet" in networks:
+        return
     colima_addr = subprocess.run(
         [
             "colima",
