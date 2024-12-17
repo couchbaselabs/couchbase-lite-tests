@@ -190,7 +190,7 @@ class CouchbaseServer:
                 return
             raise CblTestError(f"Could not start XDCR: {r.text}")
 
-    def create_remote_cluster(self, to_cbs: Self) -> str:
+    def create_remote_cluster(self, to_cbs) -> str:
         with self.__tracer.start_as_current_span(
             "create_remote_cluster",
         ):
