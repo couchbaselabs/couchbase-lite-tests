@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import Dict, List, Self
+from typing import Dict, List
 from opentelemetry.trace import get_tracer
 from time import sleep
 import requests
@@ -159,7 +159,7 @@ class CouchbaseServer:
 
             return list(dict(result) for result in query_obj.execute())
 
-    def start_xdcr(self, to_cbs: Self, from_bucket: str, to_bucket: str):
+    def start_xdcr(self, to_cbs, from_bucket: str, to_bucket: str):
         """
         Starts an XDCR replication from a bucket on the current cluster to a bucket on another cluster.
 
