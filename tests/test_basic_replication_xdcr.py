@@ -27,6 +27,9 @@ class TestBasicReplicationXDCR(CBLTestClass):
         )
         await cloud1.configure_dataset(dataset_path, dataset)
 
+        session_token = await cblpytest.sync_gateways[0].get_session_token(dataset, "user1")
+        print(f"{session_token=}")
+
         cloud2 = CouchbaseCloud(
             cblpytest.sync_gateways[1], cblpytest.couchbase_servers[1]
         )

@@ -478,6 +478,21 @@ class SyncGateway:
 
             await self._send_request("put", f"/{db_name}/_user/{name}", JSONDictionary(body))
 
+    async def get_session_token(self, db_name: str, username: str) -> str:
+        """
+        Adds the specified user to a Sync Gateway database with the specified channel access
+
+        :param db_name: The name of the Database to add the user to
+        :param username: The username
+        """
+        with self.__tracer.start_as_current_span("get_session_token", attributes={"cbl.user.name": username}):
+            body = {
+                "name": username,
+            }
+
+            return await self._send_request("post", f"/{db_name}/_session", JSONDictionary(body))
+
+
     async def add_role(self, db_name: str, role: str, collection_access: dict) -> None:
         """
         Adds the specified role to a Sync Gateway database with the specified collection access

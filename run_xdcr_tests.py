@@ -75,6 +75,7 @@ def start_couchbase_cluster(xdcr=True):
             "-f",
             filename,
             "up",
+            "--build",
             "--remove-orphans",
             "--detach",
             "--wait",
