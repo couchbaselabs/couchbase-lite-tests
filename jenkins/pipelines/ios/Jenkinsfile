@@ -2,8 +2,9 @@ pipeline {
     agent none
     parameters {
         choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
-        string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
+        string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: "The dataset version to use (e.g. 3.2 or 4.0)")
         string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
     }
     options {
@@ -31,7 +32,7 @@ pipeline {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run iOS Test"
-                sh "jenkins/pipelines/ios/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_URL}'"
+                sh "jenkins/pipelines/ios/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.CBL_DATASET_VERSION}' '${params.SGW_URL}'"
             }
             post { 
                 always { 

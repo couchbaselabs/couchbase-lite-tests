@@ -2,9 +2,10 @@ pipeline {
     agent { label 'mob-e2e-docker-01' }
     parameters {
         choice(name: 'CBL_PLATFORM', choices: ['all', 'c', 'android', 'java', 'ios', 'dotnet'], description: 'CBL Platform')
-        string(name: 'CBL_VERSION', defaultValue: '3.2.1', description: 'CBL Version')
+        string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'CBL Version')
         string(name: 'CBL_BUILD', defaultValue: '0', description: 'CBL Build Number, Use 0 for the latest successful build')
-        string(name: 'SGW_VERSION', defaultValue: '3.2.1', description: 'The version of Sync Gateway to use')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: "The dataset version to use (e.g. 3.2 or 4.0)")
+        string(name: 'SGW_VERSION', defaultValue: '4.0.0', description: 'The version of Sync Gateway to use')
         booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force Triggering Test Job(s)') 
     }
     options {
@@ -44,6 +45,7 @@ pipeline {
                                 def platform = env.CBL_PLATFORM
                                 def version = params.CBL_VERSION
                                 def buildNo = params.CBL_BUILD
+                                def datasetVersion = prams.CBL_DATASET_VERSION
                                 def sgwVersion = params.SGW_VERSION
                                 def force = params.FORCE_TRIGGER
                                 def sgwUrl = ""
@@ -62,7 +64,6 @@ pipeline {
                                 } catch(Exception e) {
                                     error "Cannot get Sync Gateway download URL : ${e} for v${version}"
                                 }
-
                                 
                                 if (params.CBL_PLATFORM == "all") {
                                     currentBuild.displayName = "${version}-${buildNo}-SGW${sgwVersion} (#${currentBuild.number})"
@@ -73,6 +74,7 @@ pipeline {
                                 echo "PLATFORM: ${platform}"
                                 echo "VERSION: ${version}"
                                 echo "BUILD: ${buildNo}"
+                                echo "DATASET_VERSION: ${datasetVersion}""
                                 echo "SGW_URL: ${sgwUrl}"
                                 echo "FORCE: ${force}"
 
@@ -96,11 +98,12 @@ pipeline {
                                 // Trigger Test Job:
                                 if (triggerTestJob) {
                                     def jobName = "staging-e2e-test-${platform}"
-                                    echo "Triggering '${jobName}' job for ${platform} v${version}-${buildNo}"
+                                    echo "Triggering '${jobName}' job for ${platform} v${version}-${buildNo} with dataset ${datasetVersion}"
 
                                     build job: jobName, parameters: [
                                         string(name: "CBL_VERSION", value: version),
                                         string(name: "CBL_BUILD", value: buildNo),
+                                        string(name: "CBL_DATASET_VERSION", value: datasetVersion),
                                         string(name: "SGW_URL", value: sgwUrl)
                                     ], wait: false
 

@@ -1,8 +1,9 @@
 #!/bin/bash -e
 
 EDITION=${1}
-VERSION=${2}
-BLD_NUM=${3}
+CBL_VERSION=${2}
+CBL_BLD_NUM=${3}
+CBL_DATASET_VERSION=${4}
 SGW_URL=${4}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -21,7 +22,7 @@ fi
 # Build Test Server App:
 echo "Build Test Server App"
 pushd "${TEST_SERVER_DIR}" > /dev/null
-./scripts/build.sh device ${EDITION} ${VERSION} ${BLD_NUM}
+./scripts/build.sh device ${EDITION} ${CBL_VERSION} ${CBL_BLD_NUM} ${CBL_DATASET_VERSION}
 
 # Install and run Test Server App:
 echo "Run Test Server"
