@@ -1,3 +1,7 @@
+networks:
+  dinonet:
+    external: true
+
 services:
   cbl-test-cbs1:
     build:
@@ -5,9 +9,20 @@ services:
       args:
         - COUCHBASE_VERSION=${COUCHBASE_VERSION:-7.6.4-5147}
         - COUCHBASE_CONTAINER_PATH=${COUCHBASE_CONTAINER_PATH:-ghcr.io/cb-vanilla/server:}
+    networks:
+      - dinonet
     ports:
-      # expose cbs2 server UI on 18092
-      - "18091:8091"
+      - "8091:8091"
+      - "8092:8092"
+      - "8093:8093"
+      - "8094:8094"
+      - "11207:11207"
+      - "11210:11210"
+      - "11211:11211"
+      - "18091:18091"
+      - "18092:18092"
+      - "18093:18093"
+      - "18094:18094"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8093/admin/ping"]
       interval: 1s
@@ -19,25 +34,41 @@ services:
       args:
         - SG_DEB=${SG_DEB:-https://packages.couchbase.com/releases/couchbase-sync-gateway/3.2.0/couchbase-sync-gateway-enterprise_3.2.0_<ARCH>.deb}
     environment:
-      SSL: true
+      SSL: false
       CBS_HOSTNAME: cbl-test-cbs1
     healthcheck:
-      test: ["CMD", "curl", "-f", "-k", "https://localhost:4984/_ping"]
+      test: ["CMD", "curl", "-f", "-k", "http://localhost:4984/_ping"]
       interval: 1s
       timeout: 10s
       retries: 120
     depends_on:
       cbl-test-cbs1:
         condition: service_healthy
+    networks:
+      - dinonet
+    ports:
+      - "4984:4984"
+      - "4985:4985"
   cbl-test-cbs2:
     build:
       context: ./cbs
       args:
         - COUCHBASE_VERSION=${COUCHBASE_VERSION:-7.6.4-5147}
         - COUCHBASE_CONTAINER_PATH=${COUCHBASE_CONTAINER_PATH:-ghcr.io/cb-vanilla/server:}
+    networks:
+      - dinonet
     ports:
-      # expose cbs2 server UI on 28092
-      - "28091:8091"
+      - "8091:8091"
+      - "8092:8092"
+      - "8093:8093"
+      - "8094:8094"
+      - "11207:11207"
+      - "11210:11210"
+      - "11211:11211"
+      - "18091:18091"
+      - "18092:18092"
+      - "18093:18093"
+      - "18094:18094"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8093/admin/ping"]
       interval: 1s
@@ -49,10 +80,15 @@ services:
       args:
         - SG_DEB=${SG_DEB:-https://packages.couchbase.com/releases/couchbase-sync-gateway/3.2.0/couchbase-sync-gateway-enterprise_3.2.0_<ARCH>.deb}
     environment:
-      SSL: true
+      SSL: false
       CBS_HOSTNAME: cbl-test-cbs2
+    networks:
+      - dinonet
+    ports:
+      - "4984:4984"
+      - "4985:4985"
     healthcheck:
-      test: ["CMD", "curl", "-f", "-k", "https://localhost:4984/_ping"]
+      test: ["CMD", "curl", "-f", "-k", "http://localhost:4984/_ping"]
       interval: 1s
       timeout: 10s
       retries: 120
@@ -63,6 +99,8 @@ services:
     image: nginx:1-alpine
     volumes:
       - ./nginx/nginx-2node.conf:/etc/nginx/nginx.conf
+    networks:
+      - dinonet
     ports:
       - "4984:4984"
       - "4985:4985"

@@ -36,7 +36,12 @@ Note that many of the tests will require increasing Docker's default resource li
 
 ## XDCR environemnt
 
-This environment has two separate clusters of one Couchbase Server and one Sync Gateway node. There is an nginx load balancer that routes traffic to them.
+This environment has two separate clusters of one Couchbase Server and one Sync Gateway node. There is an nginx load balancer that routes traffic to them. This setup only works on Mac OS right now with colima rather than docker desktop. To set up colima on an M1.
+
+```
+brew install colima
+colima start --network-address --cpu 4 --memory 12 --arch aarch64 --vm-type=vz --vz-rosetta
+```
 
 To start the environment, run the following command:
 

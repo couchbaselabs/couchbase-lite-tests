@@ -1,6 +1,6 @@
 from json import dumps, load
 from pathlib import Path
-from typing import List, Optional, cast
+from typing import List, Optional, Self, cast
 
 from opentelemetry.trace import get_tracer
 from varname import nameof
@@ -121,3 +121,18 @@ class CouchbaseCloud:
                                                    user_dict["collection_access"])
 
             await self.__sync_gateway.load_dataset(dataset_name, data_filepath)
+
+    def start_xdcr(self, to_cluster: Self, from_bucket: str, to_bucket: str):
+        with self.__tracer.start_as_current_span(
+            "start_xdcr",
+            attributes={"cbl.from.bucket": from_bucket, "cbl.to.bucket": to_bucket},
+        ):
+            self.__couchbase_server.start_xdcr(
+                to_cluster.__couchbase_server, from_bucket, to_bucket
+            )
+
+    def create_bucket(self, bucket: str) -> None:
+        with self.__tracer.start_as_current_span(
+            "create_bucket", attributes={"cbl.bucket.name": bucket}
+        ):
+            self.__couchbase_server.create_bucket(bucket)

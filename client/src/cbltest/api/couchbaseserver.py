@@ -1,7 +1,8 @@
 from datetime import timedelta
-from typing import Dict, List
+from typing import Dict, List, Self
 from opentelemetry.trace import get_tracer
 from time import sleep
+import requests
 
 from couchbase.bucket import Bucket
 from couchbase.cluster import Cluster
@@ -27,11 +28,15 @@ class CouchbaseServer:
         with self.__tracer.start_as_current_span("connect_to_couchbase_server"):
             if "://" not in url:
                 url = f"couchbase://{url}"
-                
+
             auth = PasswordAuthenticator(username, password)
             opts = ClusterOptions(auth)
             self.__cluster = Cluster(url, opts)
             self.__cluster.wait_until_ready(timedelta(seconds=10))
+            self.__hostname = url.split("://")[1]
+            self.__mgmt_url = f"http://{self.__hostname}:8091"
+            self.__username = username
+            self.__password = password
 
     def create_collections(self, bucket: str, scope: str, names: List[str]) -> None:
         """
@@ -89,6 +94,23 @@ class CouchbaseServer:
             except BucketAlreadyExistsException:
                 pass
 
+            # enableCrossClusterVersioning, this will no-op unless it is Server >= 7.6. This function needs to be retried
+            def enable_cccv():
+                r = requests.post(
+                    f"{self.__mgmt_url}/pools/default/buckets/{name}",
+                    {"enableCrossClusterVersioning": "true"},
+                    auth=(self.__username, self.__password),
+                )
+                if r.status_code == 200:
+                    return
+                elif "Cross cluster versioning already enabled" in r.text:
+                    return
+                raise CblTestError(
+                    f"Could not enable cross cluster versioning ({r.status_code}): {r.text}"
+                    )
+
+            _try_n_times(num_times=10, seconds_between=5, wait_before_first_try=False, func=enable_cccv, ret_type=None)  
+
     def drop_bucket(self, name: str):
         """
         Drops a bucket from the Couchbase cluster
@@ -134,5 +156,67 @@ class CouchbaseServer:
                 self.__cluster.query_indexes().create_primary_index(bucket, CreatePrimaryQueryIndexOptions(scope_name=scope, collection_name=collection))
             except QueryIndexAlreadyExistsException:
                 pass
-            
+
             return list(dict(result) for result in query_obj.execute())
+
+    def start_xdcr(self, to_cbs: Self, from_bucket: str, to_bucket: str):
+        """
+        Starts an XDCR replication from a bucket on the current cluster to a bucket on another cluster.
+
+        :param to_cluster: The CouchbaseServer object to replicate to.
+        :param from_bucket: The name of the bucket to replicate from.
+        :param to_bucket: The name of the bucket to replicate to.
+        """
+        with self.__tracer.start_as_current_span(
+            "start_xdcr",
+            attributes={"cbl.from.bucket": from_bucket, "cbl.to.bucket": to_bucket},
+        ):
+            cluster_name = self.create_remote_cluster(to_cbs)
+            r = requests.post(
+                f"{self.__mgmt_url}/controller/createReplication",
+                {
+                    "name": cluster_name,
+                    "toCluster": cluster_name,
+                    "fromBucket": from_bucket,
+                    "toBucket": to_bucket,
+                    "replicationType": "continuous",
+                    "mobile": "Active",
+                },
+                auth=(self.__username, self.__password),
+            )
+            if r.status_code == 200:
+                return
+            elif "already exists" in r.text:
+                return
+            raise CblTestError(f"Could not start XDCR: {r.text}")
+
+    def create_remote_cluster(self, to_cbs: Self) -> str:
+        with self.__tracer.start_as_current_span(
+            "create_remote_cluster",
+        ):
+            cluster_name = to_cbs.__hostname
+            auth = (self.__username, self.__password)
+            url = f"{self.__mgmt_url}/pools/default/remoteClusters"
+
+            # check if the remote cluster already exists
+            r = requests.get(url, auth=auth)
+            if r.status_code != 200:
+                raise CblTestError(f"Could not get remote clusters via {url}: {r.text}")
+            for cluster in r.json():
+                if cluster_name in cluster["hostname"]:
+                    return cluster_name
+            r = requests.post(
+                url,
+                {
+                    "hostname": to_cbs.__hostname,
+                    "username": to_cbs.__username,
+                    "password": to_cbs.__password,
+                    "name": cluster_name,
+                },
+                auth=auth,
+            )
+            if r.status_code != 200:
+                raise CblTestError(
+                    f"Could not create remote cluster via {url}: {r.text}"
+                )
+            return cluster_name
