@@ -1,3 +1,4 @@
+# IDE
 Packages
 .build
 xcuserdata
@@ -9,5 +10,10 @@ Package.resolved
 IDEWorkspaceChecks.plist
 project.xcworkspace
 
+#Assets
+Assets/dbs
+Assets/blobs
+
+#Build
 Frameworks/CouchbaseLiteSwift.xcframework
 TestServer/Server/CBLVersion.swift

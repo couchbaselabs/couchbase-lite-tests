@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 function usage() {
-    echo "Usage: $0 <edition: enterprise | community> <version> [build num]"
+    echo "Usage: $0 <edition: enterprise | community> <version> <build num>"
     exit 1
 }
 
@@ -22,7 +22,7 @@ rm -rf "${DOWNLOAD_DIR}" 2> /dev/null
 mkdir -p "${DOWNLOAD_DIR}"
 pushd "${DOWNLOAD_DIR}" > /dev/null
 
-if [ -z "$BLD_NUM" ]
+if [ "$BLD_NUM" == "0"]
 then
     ZIP_FILENAME=couchbase-lite-swift_xc_${EDITION}_${VERSION}.zip
     curl -O https://packages.couchbase.com/releases/couchbase-lite-ios/${VERSION}/${ZIP_FILENAME}

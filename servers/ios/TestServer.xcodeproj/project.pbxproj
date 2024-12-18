@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4009847F2D11F9F60029F26E /* blobs in Resources */ = {isa = PBXBuildFile; fileRef = 4009847E2D11F9F60029F26E /* blobs */; };
+		400984812D11FA0B0029F26E /* dbs in Resources */ = {isa = PBXBuildFile; fileRef = 400984802D11FA0B0029F26E /* dbs */; };
 		4029C4A02CB88E0300C34775 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4029C49F2CB88E0300C34775 /* SessionManager.swift */; };
 		404619D02CB9A761003835C7 /* NewSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619CF2CB9A761003835C7 /* NewSession.swift */; };
 		404619D22CB9A985003835C7 /* NewSessionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619D12CB9A985003835C7 /* NewSessionHandler.swift */; };
@@ -48,8 +50,6 @@
 		40BDA81D2AF1C311008DB256 /* CouchbaseLiteSwift.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 40BDA81B2AF1C311008DB256 /* CouchbaseLiteSwift.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		40BDA8212AF1C401008DB256 /* Vapor in Frameworks */ = {isa = PBXBuildFile; productRef = 40BDA8202AF1C401008DB256 /* Vapor */; };
 		40BDA8242AF1C4A3008DB256 /* ZipArchive in Frameworks */ = {isa = PBXBuildFile; productRef = 40BDA8232AF1C4A3008DB256 /* ZipArchive */; };
-		40BDA8C52AF1C831008DB256 /* dbs in Resources */ = {isa = PBXBuildFile; fileRef = 40BDA8C32AF1C831008DB256 /* dbs */; };
-		40BDA8C62AF1C831008DB256 /* blobs in Resources */ = {isa = PBXBuildFile; fileRef = 40BDA8C42AF1C831008DB256 /* blobs */; };
 		40BDA8E02AF20AAB008DB256 /* VerifyResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8CA2AF20AAB008DB256 /* VerifyResponse.swift */; };
 		40BDA8E12AF20AAB008DB256 /* ReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8CB2AF20AAB008DB256 /* ReplicatorStatus.swift */; };
 		40BDA8E22AF20AAB008DB256 /* SnapshotRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BDA8CC2AF20AAB008DB256 /* SnapshotRequest.swift */; };
@@ -93,6 +93,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		4009847E2D11F9F60029F26E /* blobs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = blobs; path = ../../Assets/blobs; sourceTree = "<group>"; };
+		400984802D11FA0B0029F26E /* dbs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = dbs; path = ../../Assets/dbs; sourceTree = "<group>"; };
 		4029C49F2CB88E0300C34775 /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
 		404619CF2CB9A761003835C7 /* NewSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSession.swift; sourceTree = "<group>"; };
 		404619D12CB9A985003835C7 /* NewSessionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionHandler.swift; sourceTree = "<group>"; };
@@ -133,8 +135,6 @@
 		40BDA80D2AF1C15C008DB256 /* KeyPathParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KeyPathParser.swift; sourceTree = "<group>"; };
 		40BDA80E2AF1C15C008DB256 /* AnyCodable.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AnyCodable.swift; sourceTree = "<group>"; };
 		40BDA81B2AF1C311008DB256 /* CouchbaseLiteSwift.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = CouchbaseLiteSwift.xcframework; path = Frameworks/CouchbaseLiteSwift.xcframework; sourceTree = "<group>"; };
-		40BDA8C32AF1C831008DB256 /* dbs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = dbs; path = ../../../dataset/server/dbs; sourceTree = "<group>"; };
-		40BDA8C42AF1C831008DB256 /* blobs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = blobs; path = ../../../dataset/server/blobs; sourceTree = "<group>"; };
 		40BDA8CA2AF20AAB008DB256 /* VerifyResponse.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VerifyResponse.swift; sourceTree = "<group>"; };
 		40BDA8CB2AF20AAB008DB256 /* ReplicatorStatus.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReplicatorStatus.swift; sourceTree = "<group>"; };
 		40BDA8CC2AF20AAB008DB256 /* SnapshotRequest.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SnapshotRequest.swift; sourceTree = "<group>"; };
@@ -177,6 +177,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		4009844B2D11F3710029F26E /* Assets */ = {
+			isa = PBXGroup;
+			children = (
+				4009847E2D11F9F60029F26E /* blobs */,
+				400984802D11FA0B0029F26E /* dbs */,
+			);
+			path = Assets;
+			sourceTree = "<group>";
+		};
 		40BDA7452AF1BFCC008DB256 = {
 			isa = PBXGroup;
 			children = (
@@ -197,7 +206,7 @@
 		40BDA7502AF1BFCC008DB256 /* TestServer */ = {
 			isa = PBXGroup;
 			children = (
-				40BDA8C22AF1C7DA008DB256 /* Assets */,
+				4009844B2D11F3710029F26E /* Assets */,
 				40BDA8C92AF20AAB008DB256 /* ContentTypes */,
 				40BDA7ED2AF1C13B008DB256 /* Handlers */,
 				40BDA7F82AF1C13B008DB256 /* Middleware */,
@@ -286,15 +295,6 @@
 				40BDA81B2AF1C311008DB256 /* CouchbaseLiteSwift.xcframework */,
 			);
 			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		40BDA8C22AF1C7DA008DB256 /* Assets */ = {
-			isa = PBXGroup;
-			children = (
-				40BDA8C42AF1C831008DB256 /* blobs */,
-				40BDA8C32AF1C831008DB256 /* dbs */,
-			);
-			name = Assets;
 			sourceTree = "<group>";
 		};
 		40BDA8C92AF20AAB008DB256 /* ContentTypes */ = {
@@ -399,10 +399,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				40BDA8C52AF1C831008DB256 /* dbs in Resources */,
+				400984812D11FA0B0029F26E /* dbs in Resources */,
+				4009847F2D11F9F60029F26E /* blobs in Resources */,
 				40BDA7592AF1BFCD008DB256 /* Preview Assets.xcassets in Resources */,
 				40BDA7562AF1BFCD008DB256 /* Assets.xcassets in Resources */,
-				40BDA8C62AF1C831008DB256 /* blobs in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -417,7 +417,7 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(SRCROOT)/scripts/gen_cbl_version.sh",
+				"$(SRCROOT)/Scripts/gen_cbl_version.sh",
 				"$(SRCROOT)/Frameworks/CouchbaseLiteSwift.xcframework",
 			);
 			name = "Generate CBLVersion.swift";

@@ -1,11 +1,11 @@
 #!/bin/bash -e
 
 function usage() {
-    echo "Usage: $0 <binary type: all | simulator | device> <edition: enterprise | community> <version> [build num]"
+    echo "Usage: $0 <binary type: all | simulator | device> <edition: enterprise | community> <cbl-version> <cbl-build-num> <dataset-version>"
     exit 1
 }
 
-if [ "$#" -lt 3 ]; then
+if [ "$#" -lt 5 ]; then
     usage
 fi
 
@@ -13,6 +13,7 @@ BIN_TYPE=${1}
 EDITION=${2}
 VERSION=${3}
 BLD_NUM=${4}
+DATASET_VERSION=${5}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
@@ -21,13 +22,11 @@ PROJECT_DIR="${SCRIPT_DIR}/.."
 BUILD_SIMULATOR_DIR="${PROJECT_DIR}/build_simulator"
 BUILD_DEVICE_DIR="${PROJECT_DIR}/build_device"
 
+# Prepare Environment:
+"${SCRIPT_DIR}"/prepare_env.sh ${DATASET_VERSION}
+
 # Download CBL:
-if [ -z "$BLD_NUM" ]
-then
-    ${SCRIPT_DIR}/download_cbl.sh ${EDITION} ${VERSION}
-else
-    ${SCRIPT_DIR}/download_cbl.sh ${EDITION} ${VERSION} ${BLD_NUM}
-fi
+"${SCRIPT_DIR}"/download_cbl.sh ${EDITION} ${VERSION} ${BLD_NUM}
 
 # Go to iOS project directory:
 pushd "${PROJECT_DIR}" > /dev/null
