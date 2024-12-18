@@ -3,7 +3,7 @@ services:
     build:
       context: ./cbs
       args:
-        - COUCHBASE_VERSION=${COUCHBASE_VERSION:-7.6.3}
+        - COUCHBASE_VERSION=${COUCHBASE_VERSION:-7.6.4}
     ports:
       - "8091:8091"
       - "8092:8092"

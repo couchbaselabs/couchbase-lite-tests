@@ -22,8 +22,7 @@
         }
       }
     },
-    "num_index_replicas": 0,
-    "import_docs": false
+    "num_index_replicas": 0
   },
   "config_options": {
     "delta_sync": {
