@@ -46,7 +46,7 @@ def main():
             str(config),
             "tests/test_basic_replication_xdcr.py",
             "-k",
-            "test_pull_with_xdcr",
+            "test_push_with_xdcr",
             "-s",
             "-x",
             "-o",
@@ -118,15 +118,16 @@ def write_pytest_config(*, xdcr=True) -> pathlib.Path:
         cbs2_ip = get_ip("environment-cbl-test-cbs2-1")
         sg1_ip = get_ip("environment-cbl-test-sg1-1")
         sg2_ip = get_ip("environment-cbl-test-sg2-1")
+        nginx_ip = get_ip('environment-cbl-test-nginx-1')
 
         print(f"Created cluster1 with CBS: {cbs1_ip} and SG: {sg1_ip}")
         print(f"Created cluster2 with CBS: {cbs2_ip} and SG: {sg2_ip}")
         print(
-            f"Created load balancer with IP: {get_ip('environment-cbl-test-nginx-1')}"
+            f"Created load balancer with IP: {nginx_ip}"
         )
         cbs_hostnames = [cbs1_ip, cbs2_ip]
-        sg_hostnames = [sg1_ip, sg2_ip]
-        config["sg-load-balancer"] = get_ip("environment-cbl-test-nginx-1")
+        sg_hostnames = [sg1_ip, sg2_ip, nginx_ip]
+        config["sg-load-balancer"] = nginx_ip
 
     for cbs_hostname in cbs_hostnames:
         config["couchbase-servers"].append(
@@ -149,7 +150,7 @@ def write_pytest_config(*, xdcr=True) -> pathlib.Path:
             }
         )
 
-    filename = SCRIPT_DIR / "xdcr_config.json"
+    filename = SCRIPT_DIR / "tests/xdcr_config.json"
     with open(filename, "w") as f:
         json.dump(config, f, indent=4)
     return filename
