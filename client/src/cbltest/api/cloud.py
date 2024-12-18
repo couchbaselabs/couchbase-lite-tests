@@ -40,7 +40,8 @@ class CouchbaseCloud:
         await self.__sync_gateway.add_role(db_name, role, collection_access)
 
     async def configure_dataset(self, dataset_path: Path, dataset_name: str,
-                                sg_config_options: Optional[List[str]] = None) -> None:
+                                sg_config_options: Optional[List[str]] = None,
+                                loadDataset: bool = True) -> None:
         """
         Creates a database, ensuring that it is in an empty state when finished
 
@@ -120,7 +121,8 @@ class CouchbaseCloud:
                 await self.__sync_gateway.add_user(dataset_name, user, user_dict["password"],
                                                    user_dict["collection_access"])
 
-            await self.__sync_gateway.load_dataset(dataset_name, data_filepath)
+            if loadDataset:
+                await self.__sync_gateway.load_dataset(dataset_name, data_filepath)
 
     def start_xdcr(self, to_cluster, from_bucket: str, to_bucket: str):
         with self.__tracer.start_as_current_span(

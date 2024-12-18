@@ -1,7 +1,6 @@
 {
   "bootstrap": {
-    "server": "couchbase://${CBS_HOSTNAME}",
-    "use_tls_server": false,
+    "server": "couchbases://${CBS_HOSTNAME}",
     "server_tls_skip_verify": true,
     "username": "admin",
     "password": "password"

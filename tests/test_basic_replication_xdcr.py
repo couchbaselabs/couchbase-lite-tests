@@ -37,7 +37,7 @@ class TestBasicReplicationXDCR(CBLTestClass):
         cloud2 = CouchbaseCloud(
             cblpytest.sync_gateways[1], cblpytest.couchbase_servers[1]
         )
-        await cloud2.configure_dataset(dataset_path, dataset)
+        await cloud2.configure_dataset(dataset_path, dataset, loadDataset=False)
 
         self.mark_test_step("Setup XDCR cbs1->cbs2.")
         cloud1.start_xdcr(cloud2, bucket_name, bucket_name)
