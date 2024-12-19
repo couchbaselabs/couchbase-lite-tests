@@ -13,7 +13,7 @@ from cbltest.api.replicator import (
     ReplicatorActivityLevel,
 )
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
-from cbltest.api.syncgateway import DocumentUpdateEntry, RemoteDocument
+from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.api.cbltestclass import CBLTestClass
 
@@ -199,7 +199,7 @@ class TestReplicationBlob(CBLTestClass):
         )
         verify_result = await db.verify_documents(snapshot_updater)
         assert (
-            verify_result.result == True
+            verify_result.result is True
         ), f"The verification failed: {verify_result.description}"
 
         await cblpytest.test_servers[0].cleanup()

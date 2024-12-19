@@ -5,7 +5,6 @@ from typing import Final, List, cast, Optional
 from .jsonhelper import (
     _assert_contains_string_list,
     _get_int_or_default,
-    _get_string_list,
     _assert_string_entry,
     _get_str_or_default,
     _get_bool_or_default,

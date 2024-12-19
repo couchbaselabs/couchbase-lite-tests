@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-import sys, time
+import sys
+import time
 import subprocess
 from json import loads
 
@@ -50,7 +51,7 @@ def start_environment():
         for line in output:
             if "Sync Gateway is up" in line:
                 which = line.split()[0]
-                if not which in seen:
+                if which not in seen:
                     seen.add(which)
                     sg_count -= 1
                     print("")

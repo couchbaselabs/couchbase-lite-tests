@@ -703,7 +703,7 @@ class TestFest(CBLTestClass):
             max_retries=10,
         )
         assert found is None, (
-            f"There were unexpected replication events on replicator #1: "
+            "There were unexpected replication events on replicator #1: "
             "{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
@@ -725,7 +725,7 @@ class TestFest(CBLTestClass):
             max_retries=10,
         )
         assert found is None, (
-            f"There were unexpected replication events on replicator #2: "
+            "There were unexpected replication events on replicator #2: "
             "{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
@@ -818,7 +818,7 @@ class TestFest(CBLTestClass):
             max_retries=10,
         )
         assert found is None, (
-            f"There were unexpected replication events on replicator #2: "
+            "There were unexpected replication events on replicator #2: "
             "{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
@@ -986,7 +986,7 @@ class TestFest(CBLTestClass):
             max_retries=10,
         )
         assert found is None, (
-            f"There were unexpected replication events on replicator #2: "
+            "There were unexpected replication events on replicator #2: "
             "{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
@@ -1184,7 +1184,7 @@ class TestFest(CBLTestClass):
             max_retries=10,
         )
         assert found is None, (
-            f"There were unexpected replication events on replicator #2: "
+            "There were unexpected replication events on replicator #2: "
             "{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 

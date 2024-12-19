@@ -574,7 +574,7 @@ class TestReplicationFilter(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         def repl_filter(x):
-            return (x.error == None) or (
+            return (x.error is None) or (
                 (x.error.domain == "CouchbaseLite") and (x.error.code == 10403)
             )
 

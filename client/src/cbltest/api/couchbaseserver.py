@@ -56,7 +56,7 @@ class CouchbaseServer:
         with self.__tracer.start_as_current_span(
             "Create Scope",
             attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket},
-        ) as current_span:
+        ):
             bucket_obj = _try_n_times(
                 10, 1, False, self.__cluster.bucket, Bucket, bucket
             )

@@ -198,7 +198,7 @@ class DocumentUpdateEntry(JSONSerializable):
         """
         Gets the rev ID of the entry (NOTE: Will go away after 4.0 SGW gets close to GA)
         """
-        if not "_rev" in self.__body:
+        if "_rev" not in self.__body:
             return None
 
         return cast(str, self.__body["_rev"])
@@ -370,7 +370,7 @@ class SyncGateway:
             session = self.__admin_session
 
         with self.__tracer.start_as_current_span(
-            f"send_request", attributes={"http.method": method, "http.path": path}
+            "send_request", attributes={"http.method": method, "http.path": path}
         ):
             headers = (
                 {"Content-Type": "application/json"} if payload is not None else None

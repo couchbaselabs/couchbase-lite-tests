@@ -2,9 +2,9 @@ from typing import Any, List, Type, cast, Optional, TypeVar
 import sys
 
 if sys.version_info >= (3, 10):
-    from typing import get_args, get_origin
+    from typing import get_origin
 else:
-    from typing_extensions import get_args, get_origin
+    from typing_extensions import get_origin
 
 from .logging import cbl_warning
 
@@ -132,7 +132,7 @@ def json_equivalent(left: Any, right: Any) -> bool:
         left_dict = cast(dict, left)
         right_dict = cast(dict, right)
         for key in left_dict:
-            if not key in right_dict:
+            if key not in right_dict:
                 return False
 
             if not json_equivalent(left_dict[key], right_dict[key]):

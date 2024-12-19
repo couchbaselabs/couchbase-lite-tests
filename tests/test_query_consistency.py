@@ -13,7 +13,8 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
 )
 from datetime import timedelta
-import pytest, pytest_asyncio
+import pytest
+import pytest_asyncio
 
 
 class TestQueryConsistency(CBLTestClass):

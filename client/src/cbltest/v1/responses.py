@@ -294,7 +294,7 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
 
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "getReplicatorStatus")
-        if not self.__activity_key in body:
+        if self.__activity_key not in body:
             return
 
         self.__activity = ReplicatorActivityLevel[
@@ -353,7 +353,7 @@ class PostRunQueryResponse(TestServerResponse):
 
     def __init__(self, status_code: int, uuid: str, body: Dict):
         super().__init__(status_code, uuid, 1, body, "runQuery")
-        if not self.__results_key in body:
+        if self.__results_key not in body:
             return
 
         results = _get_typed_required(body, self.__results_key, list)

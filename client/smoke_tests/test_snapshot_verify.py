@@ -67,7 +67,7 @@ class TestSnapshotVerify:
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert (
-            verify_result.result == True
+            verify_result.result is True
         ), f"The verification failed: {verify_result.description}"
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
         assert (
@@ -92,7 +92,7 @@ class TestSnapshotVerify:
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert (
-            verify_result.result == True
+            verify_result.result is True
         ), f"The verification failed: {verify_result.description}"
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
         assert (
@@ -117,7 +117,7 @@ class TestSnapshotVerify:
 
         snapshot_updater.delete_document("_default._default", "name_2")
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.result is False, "The verification passed"
         assert (
             verify_result.description is not None
         ), "Response should contain a description"
@@ -144,7 +144,7 @@ class TestSnapshotVerify:
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert (
-            verify_result.result == True
+            verify_result.result is True
         ), f"The verification failed: {verify_result.description}"
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
         assert (
@@ -169,7 +169,7 @@ class TestSnapshotVerify:
 
         snapshot_updater.purge_document("_default._default", "name_2")
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.result is False, "The verification passed"
         assert (
             verify_result.description is not None
         ), "Response should contain a description"
@@ -198,7 +198,7 @@ class TestSnapshotVerify:
             "_default._default", "name_1", [{"name.first": "bad_value"}]
         )
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.result is False, "The verification passed"
         assert (
             verify_result.description is not None
         ), "Response should contain a description"
@@ -234,7 +234,7 @@ class TestSnapshotVerify:
             "_default._default", "name_1", [{"contact.email[0]": "foo@baz.com"}]
         )
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.result is False, "The verification passed"
         assert (
             verify_result.description is not None
         ), "Response should contain a description"
@@ -270,7 +270,7 @@ class TestSnapshotVerify:
             "_default._default", "name_1", [{"contact.email[1]": "foo@bar.com"}]
         )
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.result is False, "The verification passed"
         assert (
             verify_result.description is not None
         ), "Response should contain a description"
@@ -306,7 +306,7 @@ class TestSnapshotVerify:
             "_default._default", "name_1", [{"contact.email[1]": "foo@bar.com"}]
         )
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.result is False, "The verification passed"
         assert (
             verify_result.description is not None
         ), "Response should contain a description"
@@ -340,7 +340,7 @@ class TestSnapshotVerify:
             "_default._default", "name_1", removed_properties=["contact.email"]
         )
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.result is False, "The verification passed"
         assert (
             verify_result.description is not None
         ), "Response should contain a description"
@@ -387,7 +387,7 @@ class TestSnapshotVerify:
             )
 
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.result is False, "The verification passed"
         assert (
             verify_result.description is not None
         ), "Response should contain a description"
@@ -415,7 +415,7 @@ class TestSnapshotVerify:
             b.delete_document("_default._default", "name_1")
 
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.result is False, "The verification passed"
         assert (
             verify_result.description is not None
         ), "Response should contain a description"
@@ -446,7 +446,7 @@ class TestSnapshotVerify:
             b.delete_document("_default._default", "name_1")
 
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.result is False, "The verification passed"
         assert (
             verify_result.description is not None
         ), "Response should contain a description"
@@ -478,7 +478,7 @@ class TestSnapshotVerify:
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert (
-            verify_result.result == True
+            verify_result.result is True
         ), f"The verification failed: {verify_result.description}"
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
         assert (
@@ -508,5 +508,5 @@ class TestSnapshotVerify:
         )
 
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result == False, f"The verification passed"
+        assert verify_result.result is False, "The verification passed"
         assert verify_result.document is not None, "Response should contain 'document'"

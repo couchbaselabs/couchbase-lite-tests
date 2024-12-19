@@ -1,4 +1,3 @@
-from datetime import timedelta
 from typing import Optional
 from cbltest import CBLPyTest
 from cbltest.api.error import CblTestServerBadResponseError

@@ -1,8 +1,7 @@
 from enum import Enum
-from json import loads
 from logging import *
 from sys import stdout
-from typing import Optional, cast
+from typing import Optional
 
 from .version import VERSION
 from websocket import create_connection

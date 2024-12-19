@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, List, Type, cast, Any, Optional
+from typing import Dict, List, cast, Any, Optional
 from uuid import UUID
 
 from varname import nameof
