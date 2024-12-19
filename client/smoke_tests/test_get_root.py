@@ -2,6 +2,7 @@ from cbltest import CBLPyTest
 from cbltest.globals import CBLPyTestGlobal
 import pytest
 
+
 class TestGetRoot:
     def setup_method(self, method):
         # If writing a new test do not forget this step or the test server
@@ -18,4 +19,6 @@ class TestGetRoot:
         assert info.library_version is not None, "library_version is empty"
         assert isinstance(info.library_version, str), "library_version is not string"
         if info.additional_info is not None:
-            assert isinstance(info.additional_info, str), "additional_info is not string"
+            assert isinstance(
+                info.additional_info, str
+            ), "additional_info is not string"

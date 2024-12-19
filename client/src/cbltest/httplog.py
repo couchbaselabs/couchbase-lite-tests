@@ -5,6 +5,7 @@ from cbltest.globals import CBLPyTestGlobal
 
 _http_num = count(1)
 
+
 class _HttpLogWriter:
     __record_path: Path = Path("http_log")
     __fname_prefix: str
@@ -36,4 +37,4 @@ class _HttpLogWriter:
 
 
 def get_next_writer() -> _HttpLogWriter:
-    return _HttpLogWriter(next(_http_num))        
+    return _HttpLogWriter(next(_http_num))

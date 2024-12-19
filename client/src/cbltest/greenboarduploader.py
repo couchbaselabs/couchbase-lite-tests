@@ -8,11 +8,12 @@ from couchbase.cluster import Cluster
 from cbltest.logging import cbl_warning
 from _pytest.reports import TestReport
 
+
 class GreenboardUploader(object):
     """
     A class for uploading results to a specified greenboard server bucket
     """
-     
+
     def __init__(self, url: str, username: str, password: str):
         if "://" not in url:
             url = f"couchbase://{url}"
@@ -28,14 +29,14 @@ class GreenboardUploader(object):
     def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]):
         outcome = yield
         report: TestReport = outcome.get_result()
-        if report.when != 'call':
+        if report.when != "call":
             if report.failed:
                 self.__overall_fail = True
             return
-        
+
         if self.__overall_fail:
             return
-        
+
         if report.passed:
             self.__pass_count += 1
         elif report.failed:
@@ -53,29 +54,34 @@ class GreenboardUploader(object):
         if self.__overall_fail:
             cbl_warning("Overall result is failure, skipping upload...")
             return
-        
-        version_components = version.split('-')
+
+        version_components = version.split("-")
         if len(version_components) != 2:
             version = "0.0.0"
             build = 0
         else:
             version = version_components[0]
-            build = int(version_components[1].lstrip('b'))
-            
+            build = int(version_components[1].lstrip("b"))
+
         auth = PasswordAuthenticator(self.__username, self.__password)
         opts = ClusterOptions(auth)
         cluster = Cluster(self.__url, opts)
         cluster.wait_until_ready(timedelta(seconds=10))
 
-        unix_timestamp = (datetime.now(timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds()
+        unix_timestamp = (
+            datetime.now(timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
+        ).total_seconds()
 
-        cluster.bucket("greenboard").default_collection().upsert(str(uuid4()), {
-            "build": build,
-            "version": version,
-            "sgwVersion": sgw_version,
-            "failCount": self.__fail_count,
-            "passCount": self.__pass_count,
-            "platform": platform,
-            "os": os_name, 
-            "uploaded": unix_timestamp
-        })
+        cluster.bucket("greenboard").default_collection().upsert(
+            str(uuid4()),
+            {
+                "build": build,
+                "version": version,
+                "sgwVersion": sgw_version,
+                "failCount": self.__fail_count,
+                "passCount": self.__pass_count,
+                "platform": platform,
+                "os": os_name,
+                "uploaded": unix_timestamp,
+            },
+        )

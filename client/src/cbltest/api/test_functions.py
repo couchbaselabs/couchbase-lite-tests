@@ -25,7 +25,7 @@ def _compare_revisions(cbl_rev: str, sg_rev: List[Optional[str]]):
         sg_cv = sg_rev[1]
         if sg_cv is None:
             return False
-        i = sg_cv.find('@')
+        i = sg_cv.find("@")
         if i < 1:
             return False
         return cbl_rev[:-2] == sg_cv[0:i]
@@ -33,7 +33,7 @@ def _compare_revisions(cbl_rev: str, sg_rev: List[Optional[str]]):
 
 class DocsCompareResult:
     """
-    A simple class to hold whether or not a list of documents 
+    A simple class to hold whether or not a list of documents
     matches another, and if not then the first reason why it
     does not.
     """
@@ -59,22 +59,28 @@ class DocsCompareResult:
 _test_function_tracer = get_tracer("test_functions", VERSION)
 
 
-def compare_doc_results(local: List[AllDocumentsEntry], remote: List[AllDocumentsResponseRow],
-                        mode: ReplicatorType) -> DocsCompareResult:
+def compare_doc_results(
+    local: List[AllDocumentsEntry],
+    remote: List[AllDocumentsResponseRow],
+    mode: ReplicatorType,
+) -> DocsCompareResult:
     """
-        Checks for consistency between a list of local documents and a list of remote documents, accounting
-        for the mode of replication that was run.  For PUSH_AND_PULL, the document count must match exactly,
-        along with the contents.  For PUSH, the local list is consulted and the remote list is checked,
-        and vice-versa for PULL (to account for other pre-existing documents that have not been synced
-        due to the non bi-directional mode)
+    Checks for consistency between a list of local documents and a list of remote documents, accounting
+    for the mode of replication that was run.  For PUSH_AND_PULL, the document count must match exactly,
+    along with the contents.  For PUSH, the local list is consulted and the remote list is checked,
+    and vice-versa for PULL (to account for other pre-existing documents that have not been synced
+    due to the non bi-directional mode)
 
-        :param local: The list of documents from the local side (Couchbase Lite)
-        :param remote: The list of documents from the remote side (Sync Gateway)
-        :param mode: The mode of replication that was run.
-        """
+    :param local: The list of documents from the local side (Couchbase Lite)
+    :param remote: The list of documents from the remote side (Sync Gateway)
+    :param mode: The mode of replication that was run.
+    """
     with _test_function_tracer.start_as_current_span("compare_doc_results"):
         if mode == ReplicatorType.PUSH_AND_PULL and len(local) != len(remote):
-            return DocsCompareResult(False, f"Local count {len(local)} did not match remote count {len(remote)}")
+            return DocsCompareResult(
+                False,
+                f"Local count {len(local)} did not match remote count {len(remote)}",
+            )
 
         local_dict: Dict[str, str] = {}
         remote_dict: Dict[str, List[Optional[str]]] = {}
@@ -100,17 +106,26 @@ def compare_doc_results(local: List[AllDocumentsEntry], remote: List[AllDocument
 
         for id in source:
             if id not in dest:
-                return DocsCompareResult(False, f"Doc '{id}' present in {source_name} but not {dest_name}")
+                return DocsCompareResult(
+                    False, f"Doc '{id}' present in {source_name} but not {dest_name}"
+                )
 
             if not _compare_revisions(local_dict[id], remote_dict[id]):
-                return DocsCompareResult(False,
-                                         f"Doc '{id}' mismatched revid ({source_name}: {source[id]}, {dest_name}: {dest[id]})")
+                return DocsCompareResult(
+                    False,
+                    f"Doc '{id}' mismatched revid ({source_name}: {source[id]}, {dest_name}: {dest[id]})",
+                )
 
         return DocsCompareResult(True)
 
 
-async def compare_local_and_remote(local: Database, remote: SyncGateway, mode: ReplicatorType, bucket: str,
-                                   collections: List[str]) -> None:
+async def compare_local_and_remote(
+    local: Database,
+    remote: SyncGateway,
+    mode: ReplicatorType,
+    bucket: str,
+    collections: List[str],
+) -> None:
     """
     Checks the specified collections for consistency between local and remote, using the
     :func:`compare_doc_results()<cbltest.api.test_functions.compare_doc_results>` function
@@ -121,7 +136,11 @@ async def compare_local_and_remote(local: Database, remote: SyncGateway, mode: R
 
         for collection in collections:
             split = collection.split(".")
-            assert len(split) == 2, f"Invalid collection name in compare_local_and_remote: {collection}"
+            assert (
+                len(split) == 2
+            ), f"Invalid collection name in compare_local_and_remote: {collection}"
             sg_all_docs = await remote.get_all_documents(bucket, split[0], split[1])
-            compare_result = compare_doc_results(lite_all_docs[collection], sg_all_docs.rows, mode)
+            compare_result = compare_doc_results(
+                lite_all_docs[collection], sg_all_docs.rows, mode
+            )
             assert compare_result.success, f"{compare_result.message} ({collection})"
