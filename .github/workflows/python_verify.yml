@@ -13,12 +13,21 @@ jobs:
     strategy:
       fail-fast: false
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v2
-
-    - name: mypy validation
-      working-directory: ${{github.workspace}}
-      shell: bash
-      run: .github/workflows/verify_python.sh
-      
+      - uses: actions/checkout@v4
+      - name: mypy validation
+        working-directory: ${{github.workspace}}
+        shell: bash
+        run: .github/workflows/verify_python.sh
+  python-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: chartboost/ruff-action@v1
+        with:
+          args: 'format --check'
+  python-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: chartboost/ruff-action@v1

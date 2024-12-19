@@ -1,20 +1,21 @@
 import os
 from pathlib import Path
-from cbltest import CBLPyTest
-from cbltest.version import VERSION
-from cbltest.greenboarduploader import GreenboardUploader
-from cbltest.logging import cbl_info
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.resources import Resource, SERVICE_NAME
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry import trace
 
 import pytest
 import pytest_asyncio
+from cbltest import CBLPyTest
+from cbltest.greenboarduploader import GreenboardUploader
+from cbltest.logging import cbl_info
+from cbltest.version import VERSION
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 # This file can be used as a template if you need to create a new suite of tests
 # I will add comments into each function here to detail what it does
+
 
 # If you are not going to use OpenTelemetry, this is not needed.  This will
 # Automatically set up an OpenTelemetry span per test run that will show
@@ -25,16 +26,17 @@ def span_generation(request: pytest.FixtureRequest):
     otel_endpoint = request.config.getoption("--otel-endpoint")
     if otel_endpoint is not None:
         tracer = trace.get_tracer("cbltest", VERSION)
-        test_name = os.environ.get('PYTEST_CURRENT_TEST')
+        test_name = os.environ.get("PYTEST_CURRENT_TEST")
         if test_name is None:
             test_name = "unknown"
         else:
-            test_name = test_name.split(':')[-1].split(' ')[0]
+            test_name = test_name.split(":")[-1].split(" ")[0]
 
         with tracer.start_as_current_span(test_name) as current_span:
             yield current_span
     else:
         yield None
+
 
 @pytest_asyncio.fixture(scope="session")
 async def cblpytest(request: pytest.FixtureRequest):
@@ -45,36 +47,41 @@ async def cblpytest(request: pytest.FixtureRequest):
     if otel_endpoint is not None:
         # This section is all about setting up the OpenTelemetry report
         # and can be ignored if not using OpenTelemetry.
-        resource = Resource(attributes={
-            SERVICE_NAME: "Python Test Client"
-        })
-        
+        resource = Resource(attributes={SERVICE_NAME: "Python Test Client"})
+
         provider = TracerProvider(resource=resource)
-        processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=f"http://{otel_endpoint}:4317", timeout=5))
+        processor = BatchSpanProcessor(
+            OTLPSpanExporter(endpoint=f"http://{otel_endpoint}:4317", timeout=5)
+        )
         provider.add_span_processor(processor)
         trace.set_tracer_provider(provider)
-    
+
     cblpytest = await CBLPyTest.create(config, log_level, test_props)
     return cblpytest
+
 
 # This function will set up an object that will track the result
 # of the test run and then upload them to Greenboard.
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
-    if (cblpytest.config.greenboard_username is None or 
-        cblpytest.config.greenboard_password is None or 
-        cblpytest.config.greenboard_url is None):
+    if (
+        cblpytest.config.greenboard_username is None
+        or cblpytest.config.greenboard_password is None
+        or cblpytest.config.greenboard_url is None
+    ):
         yield
         return
-    
+
     if pytestconfig.getoption("--no-result-upload"):
         cbl_info("Greenboard uploading disabled by flag")
         yield
         return
-    
-    uploader = GreenboardUploader(cblpytest.config.greenboard_url, 
-                                  cblpytest.config.greenboard_username, 
-                                  cblpytest.config.greenboard_password)
+
+    uploader = GreenboardUploader(
+        cblpytest.config.greenboard_url,
+        cblpytest.config.greenboard_username,
+        cblpytest.config.greenboard_password,
+    )
     pytestconfig.pluginmanager.register(uploader)
 
     # This is a pytest-ism.  You may have noticed it in other tests.  The
@@ -83,12 +90,22 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     # will happen, and then return back to this point.  Since the scope here
     # is 'session' it basically means "before and after the run"
     yield
-    
+
     test_server_info = await cblpytest.test_servers[0].get_info()
     sgw_version = await cblpytest.sync_gateways[0].get_version()
-    os_name = test_server_info.device["systemName"] if "systemName" in test_server_info.device else ""
-    uploader.upload(test_server_info.cbl, os_name, test_server_info.library_version, f"{sgw_version.version}-{sgw_version.build_number}")
+    os_name = (
+        test_server_info.device["systemName"]
+        if "systemName" in test_server_info.device
+        else ""
+    )
+    uploader.upload(
+        test_server_info.cbl,
+        os_name,
+        test_server_info.library_version,
+        f"{sgw_version.version}-{sgw_version.build_number}",
+    )
     pytestconfig.pluginmanager.unregister(uploader)
+
 
 # This is used to inject the full path to the dataset folder
 # into tests that need it.
@@ -96,6 +113,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
 def dataset_path() -> Path:
     script_path = os.path.abspath(os.path.dirname(__file__))
     return Path(script_path, "..", "dataset", "sg")
+
 
 # This is one of the pytest "magic" functions that gets run by virtue
 # of being named this way.  In this case, it is a setup method for
@@ -105,21 +123,46 @@ def pytest_runtest_setup(item: pytest.Function) -> None:
     specified_cbse = item.config.getoption("--cbse")
     if specified_cbse is None:
         return
-    
+
     cbse_nums = [mark.args[0] for mark in item.iter_markers(name="cbse")]
     if not cbse_nums or int(specified_cbse) not in cbse_nums:
         pytest.skip(f"Unrelated to CBSE-{specified_cbse}")
+
 
 # This is another "magic" function that adds command line options to pytest itself
 # in the same manner as countless other python programs do with argparse.
 def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("CBL E2E Testing")
-    group.addoption("--config", metavar="PATH", help="The path to the JSON configuration for CBLPyTest", required=True)
-    group.addoption("--cbl-log-level", metavar="LEVEL", 
-                    choices=["error", "warning", "info", "verbose", "debug"], 
-                    help="The log level output for the test run",
-                    default="warning")
-    group.addoption("--test-props", metavar="PATH", help="The path to read extra test properties from")
-    group.addoption("--otel-endpoint", metavar="HOST", help="The IP address or host name running OTEL collector")
-    group.addoption("--cbse", metavar="ticket_num", help="If specified, only run the test(s) for a specific CBSE ticket")
-    group.addoption("--no-result-upload", action="store_true", help="Don't upload results to greenboard")
+    group.addoption(
+        "--config",
+        metavar="PATH",
+        help="The path to the JSON configuration for CBLPyTest",
+        required=True,
+    )
+    group.addoption(
+        "--cbl-log-level",
+        metavar="LEVEL",
+        choices=["error", "warning", "info", "verbose", "debug"],
+        help="The log level output for the test run",
+        default="warning",
+    )
+    group.addoption(
+        "--test-props",
+        metavar="PATH",
+        help="The path to read extra test properties from",
+    )
+    group.addoption(
+        "--otel-endpoint",
+        metavar="HOST",
+        help="The IP address or host name running OTEL collector",
+    )
+    group.addoption(
+        "--cbse",
+        metavar="ticket_num",
+        help="If specified, only run the test(s) for a specific CBSE ticket",
+    )
+    group.addoption(
+        "--no-result-upload",
+        action="store_true",
+        help="Don't upload results to greenboard",
+    )

@@ -3,6 +3,7 @@ from abc import ABC
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.logging import cbl_info, cbl_warning
 
+
 class CBLTestClass(ABC):
     def setup_method(self, method) -> None:
         CBLPyTestGlobal.running_test_name = method.__name__
@@ -11,7 +12,9 @@ class CBLTestClass(ABC):
 
     def teardown_method(self, method) -> None:
         if self.__step == 1:
-            cbl_warning(f"No test steps marked in {method.__name__}, did you forget to use self.mark_test_step()?")
+            cbl_warning(
+                f"No test steps marked in {method.__name__}, did you forget to use self.mark_test_step()?"
+            )
 
     def mark_test_step(self, description: str) -> None:
         """

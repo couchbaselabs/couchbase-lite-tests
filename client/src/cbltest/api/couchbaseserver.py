@@ -1,33 +1,41 @@
 from datetime import timedelta
-from typing import Dict, List
-from opentelemetry.trace import get_tracer
 from time import sleep
+from typing import Dict, List
 
+from couchbase.auth import PasswordAuthenticator
 from couchbase.bucket import Bucket
 from couchbase.cluster import Cluster
-from couchbase.options import ClusterOptions
-from couchbase.auth import PasswordAuthenticator
+from couchbase.exceptions import (
+    BucketAlreadyExistsException,
+    BucketDoesNotExistException,
+    CollectionAlreadyExistsException,
+    DocumentNotFoundException,
+    QueryIndexAlreadyExistsException,
+    ScopeAlreadyExistsException,
+)
 from couchbase.management.buckets import CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import CreatePrimaryQueryIndexOptions
-from couchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException, ScopeAlreadyExistsException
-from couchbase.exceptions import CollectionAlreadyExistsException, QueryIndexAlreadyExistsException, DocumentNotFoundException
+from couchbase.options import ClusterOptions
+from opentelemetry.trace import get_tracer
 
+from cbltest.api.error import CblTestError
+from cbltest.logging import cbl_warning
 from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
-from cbltest.logging import cbl_warning
-from cbltest.api.error import CblTestError
+
 
 class CouchbaseServer:
     """
     A class that interacts with a Couchbase Server cluster
     """
+
     def __init__(self, url: str, username: str, password: str):
         self.__tracer = get_tracer(__name__, VERSION)
         with self.__tracer.start_as_current_span("connect_to_couchbase_server"):
             if "://" not in url:
                 url = f"couchbase://{url}"
-                
+
             auth = PasswordAuthenticator(username, password)
             opts = ClusterOptions(auth)
             self.__cluster = Cluster(url, opts)
@@ -43,8 +51,13 @@ class CouchbaseServer:
                       if it doesn't already exist, unless it is the default scope
         :param names: The names of the collections to create
         """
-        with self.__tracer.start_as_current_span("Create Scope", attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket}) as current_span:
-            bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, Bucket, bucket)
+        with self.__tracer.start_as_current_span(
+            "Create Scope",
+            attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket},
+        ):
+            bucket_obj = _try_n_times(
+                10, 1, False, self.__cluster.bucket, Bucket, bucket
+            )
             c = bucket_obj.collections()
             try:
                 if scope != "_default":
@@ -53,13 +66,20 @@ class CouchbaseServer:
                 pass
 
             for name in names:
-                with self.__tracer.start_as_current_span("Create Collection", attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket, "cbl.collection.name": name}):
+                with self.__tracer.start_as_current_span(
+                    "Create Collection",
+                    attributes={
+                        "cbl.scope.name": scope,
+                        "cbl.bucket.name": bucket,
+                        "cbl.collection.name": name,
+                    },
+                ):
                     try:
                         if name != "_default":
                             c.create_collection(CollectionSpec(name, scope))
                     except CollectionAlreadyExistsException:
                         pass
-                
+
                 success = False
                 for _ in range(0, 10):
                     try:
@@ -68,12 +88,15 @@ class CouchbaseServer:
                         success = True
                         break
                     except Exception:
-                        cbl_warning(f"{bucket}.{scope}.{name} appears to not be ready yet, waiting for 1 second...")
+                        cbl_warning(
+                            f"{bucket}.{scope}.{name} appears to not be ready yet, waiting for 1 second..."
+                        )
                         sleep(1.0)
 
                 if not success:
-                    raise CblTestError(f"Unable to properly create {bucket}.{scope}.{name} in Couchbase Server")
-
+                    raise CblTestError(
+                        f"Unable to properly create {bucket}.{scope}.{name} in Couchbase Server"
+                    )
 
     def create_bucket(self, name: str):
         """
@@ -81,9 +104,13 @@ class CouchbaseServer:
 
         :param name: The name of the bucket to create
         """
-        with self.__tracer.start_as_current_span("create_bucket", attributes={"cbl.bucket.name": name}):
+        with self.__tracer.start_as_current_span(
+            "create_bucket", attributes={"cbl.bucket.name": name}
+        ):
             mgr = self.__cluster.buckets()
-            settings = CreateBucketSettings(name=name, flush_enabled=True, ram_quota_mb=512)
+            settings = CreateBucketSettings(
+                name=name, flush_enabled=True, ram_quota_mb=512
+            )
             try:
                 mgr.create_bucket(settings)
             except BucketAlreadyExistsException:
@@ -95,7 +122,9 @@ class CouchbaseServer:
 
         :param name: The name of the bucket to drop
         """
-        with self.__tracer.start_as_current_span("drop_bucket", attributes={"cbl.bucket.name": name}):
+        with self.__tracer.start_as_current_span(
+            "drop_bucket", attributes={"cbl.bucket.name": name}
+        ):
             try:
                 mgr = self.__cluster.buckets()
                 mgr.drop_bucket(name)
@@ -108,12 +137,20 @@ class CouchbaseServer:
 
         :param bucket: The bucket to check for indexes
         """
-        with self.__tracer.start_as_current_span("indexes_count", attributes={"cbl.bucket.name": bucket}):
+        with self.__tracer.start_as_current_span(
+            "indexes_count", attributes={"cbl.bucket.name": bucket}
+        ):
             index_mgr = self.__cluster.query_indexes()
             indexes = list(index_mgr.get_all_indexes(bucket))
             return len(indexes)
-    
-    def run_query(self, query: str, bucket: str, scope: str = "_default", collection: str = "_default") -> List[Dict]:
+
+    def run_query(
+        self,
+        query: str,
+        bucket: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> List[Dict]:
         """
         Runs the specified query on the server.  The query may be formatted in a special way.
 
@@ -128,11 +165,18 @@ class CouchbaseServer:
             format at execution time.
         """
         actual_query = query.format(f"{bucket}.{scope}.{collection}")
-        with self.__tracer.start_as_current_span("run_query", attributes={"cbl.query.name": actual_query}):
+        with self.__tracer.start_as_current_span(
+            "run_query", attributes={"cbl.query.name": actual_query}
+        ):
             query_obj = self.__cluster.query(actual_query)
             try:
-                self.__cluster.query_indexes().create_primary_index(bucket, CreatePrimaryQueryIndexOptions(scope_name=scope, collection_name=collection))
+                self.__cluster.query_indexes().create_primary_index(
+                    bucket,
+                    CreatePrimaryQueryIndexOptions(
+                        scope_name=scope, collection_name=collection
+                    ),
+                )
             except QueryIndexAlreadyExistsException:
                 pass
-            
+
             return list(dict(result) for result in query_obj.execute())

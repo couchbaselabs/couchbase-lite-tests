@@ -318,5 +318,5 @@ uk_and_france_doc_ids: Set[str] = {
     "landmark_897",
     "landmark_898",
     "landmark_899",
-    "landmark_900"
+    "landmark_900",
 }

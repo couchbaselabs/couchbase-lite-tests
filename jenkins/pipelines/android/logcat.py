@@ -9,7 +9,7 @@ def adb_logcat(adb_path, device_serial):
     test_start = re.compile(">>>>>>>>>> (\\w+)")
     test_name = None
     out_file = None
-    
+
     cmd = [adb_path]
     if device_serial:
         cmd = cmd + ["-s", device_serial]
@@ -41,10 +41,10 @@ def adb_logcat(adb_path, device_serial):
                     out_file.write(line)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Logcat')
-    parser.add_argument('-a', '--android', type=str, help='Android HOME')
-    parser.add_argument('-s', '--serial', help='Device serial number')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Logcat")
+    parser.add_argument("-a", "--android", type=str, help="Android HOME")
+    parser.add_argument("-s", "--serial", help="Device serial number")
 
     args = parser.parse_args()
 
@@ -53,5 +53,5 @@ if __name__ == '__main__':
     log_dir = f"logs_{int(time.time())}"
     os.mkdir(log_dir)
     os.chdir(log_dir)
-    
+
     adb_logcat(adb_path, args.serial)
