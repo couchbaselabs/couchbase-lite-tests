@@ -3,7 +3,7 @@
 python3 -m venv venv
 source ./venv/bin/activate
 pip install mypy
-pip install pytest
+pip install pytest pytest-asyncio
 pip install types-requests
 pip install types-Deprecated
 pip install ./client
