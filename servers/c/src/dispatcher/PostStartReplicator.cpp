@@ -14,10 +14,6 @@ namespace ts {
         }
     );
 
-    enum class AuthType {
-        basic, session
-    };
-
     static auto AuthTypeEnum = StringEnum<AuthType>(
         {
             "basic",
@@ -55,11 +51,18 @@ int Dispatcher::handlePOSTStartReplicator(Request &request, Session *session) {
         auto authType = AuthTypeEnum.value(authTypeValue);
         if (authType == AuthType::basic) {
             ReplicationAuthenticator auth;
+            auth.type = authType;
             auth.username = GetValue<string>(authObject, "username");
             auth.password = GetValue<string>(authObject, "password");
             params.authenticator = auth;
+        } else if (authType == AuthType::session) {
+            ReplicationAuthenticator auth;
+            auth.type = authType;
+            auth.sessionID = GetValue<string>(authObject, "sessionID");
+            auth.cookieName = GetValue<string>(authObject, "cookieName", "");
+            params.authenticator = auth;
         } else {
-            throw RequestError("Not support session authenticator");
+            throw RequestError("Unsupported authenticator");
         }
     }
 

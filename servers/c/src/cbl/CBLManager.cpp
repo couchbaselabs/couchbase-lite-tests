@@ -351,8 +351,17 @@ namespace ts::cbl {
         checkCBLError(error);
 
         if (params.authenticator) {
-            auth = CBLAuth_CreatePassword(FLS(params.authenticator->username),
-                                          FLS(params.authenticator->password));
+            auto authParam = params.authenticator;
+            if (authParam) {
+                if (authParam->type == AuthType::basic) {
+                    auth = CBLAuth_CreatePassword(FLS(params.authenticator->username),
+                                                  FLS(params.authenticator->password));
+                } else {
+                    auto cookieName = authParam->cookieName.empty() ? kFLSliceNull :
+                                      FLS(authParam->cookieName);
+                    auth = CBLAuth_CreateSession(FLS(authParam->sessionID), cookieName);
+                }
+            }
         }
 
         CBLReplicatorConfiguration config{};

@@ -12,9 +12,16 @@
 namespace ts::cbl {
     struct ReplicationCollection;
 
+    enum class AuthType {
+        basic, session
+    };
+
     struct ReplicationAuthenticator {
+        AuthType type;
         std::string username;
         std::string password;
+        std::string sessionID;
+        std::string cookieName;
     };
 
     struct ReplicatorParams {
