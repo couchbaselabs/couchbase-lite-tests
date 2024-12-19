@@ -478,7 +478,7 @@ class SyncGateway:
 
             await self._send_request("put", f"/{db_name}/_user/{name}", JSONDictionary(body))
 
-    async def get_session_token(self, db_name: str, username: str) -> str:
+    async def get_session_token(self, db_name: str, username: str) -> dict:
         """
         Adds the specified user to a Sync Gateway database with the specified channel access
 
