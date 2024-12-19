@@ -1,22 +1,22 @@
-from pathlib import Path
-from typing import Dict, List, Optional, cast
+from json import dumps
+from sys import version_info
+from typing import Dict, List, Optional
 
-from .requests import RequestFactory
-from .logging import LogLevel, cbl_setLogLevel, cbl_log_init
-from .extrapropsparser import _parse_extra_props
+from varname import nameof
+
+from .api.couchbaseserver import CouchbaseServer
+from .api.syncgateway import SyncGateway
+from .api.testserver import TestServer
+from .assertions import _assert_not_null
 from .configparser import (
     CouchbaseServerInfo,
     ParsedConfig,
     SyncGatewayInfo,
     _parse_config,
 )
-from .assertions import _assert_not_null
-from .api.testserver import TestServer
-from .api.syncgateway import SyncGateway
-from .api.couchbaseserver import CouchbaseServer
-from varname import nameof
-from sys import version_info
-from json import dumps
+from .extrapropsparser import _parse_extra_props
+from .logging import LogLevel, cbl_log_init, cbl_setLogLevel
+from .requests import RequestFactory
 
 if version_info < (3, 9):
     raise RuntimeError("Python must be at least v3.9!")

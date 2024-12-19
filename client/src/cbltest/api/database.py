@@ -1,35 +1,35 @@
 from __future__ import annotations
-from json import dumps
 
-from typing import Dict, Final, List, cast, Any, Optional
+from json import dumps
+from typing import Any, Dict, Final, List, Optional, cast
+
 from opentelemetry.trace import get_tracer
 
-from cbltest.requests import TestServerRequestType
-from cbltest.v1.responses import (
-    PostGetAllDocumentsResponse,
-    PostGetAllDocumentsEntry,
-    PostSnapshotDocumentsResponse,
-    PostVerifyDocumentsResponse,
-    ValueOrMissing,
-    PostRunQueryResponse,
-    PostGetDocumentResponse,
-)
+from cbltest.api.database_types import MaintenanceType
+from cbltest.api.error import CblTestError
+from cbltest.logging import cbl_error, cbl_trace
+from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.v1.requests import (
     DatabaseUpdateEntry,
     DatabaseUpdateType,
-    PostGetAllDocumentsRequestBody,
-    PostUpdateDatabaseRequestBody,
     DocumentEntry,
-    PostSnapshotDocumentsRequestBody,
-    PostVerifyDocumentsRequestBody,
+    PostGetAllDocumentsRequestBody,
+    PostGetDocumentRequestBody,
     PostPerformMaintenanceRequestBody,
     PostRunQueryRequestBody,
-    PostGetDocumentRequestBody,
+    PostSnapshotDocumentsRequestBody,
+    PostUpdateDatabaseRequestBody,
+    PostVerifyDocumentsRequestBody,
 )
-from cbltest.logging import cbl_error, cbl_trace
-from cbltest.requests import RequestFactory
-from cbltest.api.error import CblTestError
-from cbltest.api.database_types import MaintenanceType
+from cbltest.v1.responses import (
+    PostGetAllDocumentsEntry,
+    PostGetAllDocumentsResponse,
+    PostGetDocumentResponse,
+    PostRunQueryResponse,
+    PostSnapshotDocumentsResponse,
+    PostVerifyDocumentsResponse,
+    ValueOrMissing,
+)
 from cbltest.version import VERSION
 
 

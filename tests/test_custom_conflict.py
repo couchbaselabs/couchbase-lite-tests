@@ -2,22 +2,21 @@ from pathlib import Path
 from typing import Callable
 
 import pytest
-
 from cbltest import CBLPyTest
-from cbltest.api.replicator import Replicator
-from cbltest.api.replicator_types import (
-    ReplicatorCollectionEntry,
-    ReplicatorType,
-    ReplicatorBasicAuthenticator,
-    ReplicatorActivityLevel,
-    ReplicatorConflictResolver,
-)
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
-from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.api.database import SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry
+from cbltest.api.replicator import Replicator
+from cbltest.api.replicator_types import (
+    ReplicatorActivityLevel,
+    ReplicatorBasicAuthenticator,
+    ReplicatorCollectionEntry,
+    ReplicatorConflictResolver,
+    ReplicatorType,
+)
 from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.api.test_functions import compare_local_and_remote
 
 
 class TestCustomConflict(CBLTestClass):

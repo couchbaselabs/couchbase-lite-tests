@@ -1,16 +1,17 @@
 from pathlib import Path
+
+import pytest
 from cbltest import CBLPyTest
-from cbltest.utils import assert_not_null
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
+    ReplicatorActivityLevel,
+    ReplicatorBasicAuthenticator,
     ReplicatorCollectionEntry,
     ReplicatorType,
-    ReplicatorBasicAuthenticator,
-    ReplicatorActivityLevel,
 )
-from cbltest.api.cbltestclass import CBLTestClass
-import pytest
+from cbltest.utils import assert_not_null
 
 
 class TestReplicationBehavior(CBLTestClass):

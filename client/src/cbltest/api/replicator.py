@@ -2,7 +2,7 @@ import asyncio
 from datetime import timedelta
 from itertools import islice
 from time import time
-from typing import List, cast, Optional, Set
+from typing import List, Optional, Set, cast
 
 from opentelemetry.trace import get_tracer
 
@@ -12,9 +12,9 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorAuthenticator,
     ReplicatorCollectionEntry,
-    ReplicatorType,
-    ReplicatorStatus,
     ReplicatorDocumentEntry,
+    ReplicatorStatus,
+    ReplicatorType,
     WaitForDocumentEventEntry,
 )
 from cbltest.logging import cbl_error, cbl_trace

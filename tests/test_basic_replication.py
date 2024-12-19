@@ -9,9 +9,9 @@ from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.error_types import ErrorDomain
 from cbltest.api.replicator import (
     Replicator,
-    ReplicatorType,
-    ReplicatorCollectionEntry,
     ReplicatorActivityLevel,
+    ReplicatorCollectionEntry,
+    ReplicatorType,
     WaitForDocumentEventEntry,
 )
 from cbltest.api.replicator_types import (

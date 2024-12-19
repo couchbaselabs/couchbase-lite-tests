@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import Any, List
 
 
 def _assert_not_null(arg: Any, name: str) -> Any:

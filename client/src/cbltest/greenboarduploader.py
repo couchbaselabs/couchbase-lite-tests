@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
+
 import pytest
+from _pytest.reports import TestReport
 from couchbase.auth import PasswordAuthenticator
-from couchbase.options import ClusterOptions
 from couchbase.cluster import Cluster
+from couchbase.options import ClusterOptions
 
 from cbltest.logging import cbl_warning
-from _pytest.reports import TestReport
 
 
 class GreenboardUploader(object):

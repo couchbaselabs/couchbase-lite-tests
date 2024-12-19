@@ -1,9 +1,10 @@
-from cbltest import CBLPyTest
-from cbltest.globals import CBLPyTestGlobal
-from cbltest.logging import _cbl_log, LogSlurpHandler
+import time
+
 import pytest
 import requests
-import time
+from cbltest import CBLPyTest
+from cbltest.globals import CBLPyTestGlobal
+from cbltest.logging import LogSlurpHandler, _cbl_log
 
 
 class TestLogEndpoint:

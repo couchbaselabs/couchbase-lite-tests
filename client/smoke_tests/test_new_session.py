@@ -1,9 +1,9 @@
-from cbltest import CBLPyTest
-from cbltest.globals import CBLPyTestGlobal
-from cbltest.logging import _cbl_log, LogSlurpHandler
-from cbltest.api.error import CblTestServerBadResponseError
 import pytest
 import requests
+from cbltest import CBLPyTest
+from cbltest.api.error import CblTestServerBadResponseError
+from cbltest.globals import CBLPyTestGlobal
+from cbltest.logging import LogSlurpHandler, _cbl_log
 
 
 class TestLogSlurp:

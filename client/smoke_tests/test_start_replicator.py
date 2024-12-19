@@ -1,5 +1,8 @@
 from typing import Optional
+
+import pytest
 from cbltest import CBLPyTest
+from cbltest.api.database import Database
 from cbltest.api.error import CblTestServerBadResponseError
 from cbltest.api.error_types import ErrorDomain
 from cbltest.api.replicator import Replicator
@@ -8,9 +11,7 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorConflictResolver,
 )
-from cbltest.api.database import Database
 from cbltest.globals import CBLPyTestGlobal
-import pytest
 
 
 class TestStartReplicator:

@@ -1,17 +1,17 @@
 import os
 from pathlib import Path
-from cbltest import CBLPyTest
-from cbltest.version import VERSION
-from cbltest.greenboarduploader import GreenboardUploader
-from cbltest.logging import cbl_info
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.resources import Resource, SERVICE_NAME
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry import trace
 
 import pytest
 import pytest_asyncio
+from cbltest import CBLPyTest
+from cbltest.greenboarduploader import GreenboardUploader
+from cbltest.logging import cbl_info
+from cbltest.version import VERSION
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 # This file can be used as a template if you need to create a new suite of tests
 # I will add comments into each function here to detail what it does

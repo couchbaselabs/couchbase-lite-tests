@@ -1,10 +1,10 @@
 from typing import Optional
+
+import pytest
 from cbltest import CBLPyTest
+from cbltest.api.database import Database
 from cbltest.api.error import CblTestServerBadResponseError
 from cbltest.globals import CBLPyTestGlobal
-import pytest
-
-from cbltest.api.database import Database
 
 
 class TestUpdateDatabase:

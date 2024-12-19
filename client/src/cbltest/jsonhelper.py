@@ -1,5 +1,5 @@
-from typing import Any, List, Type, cast, Optional, TypeVar
 import sys
+from typing import Any, List, Optional, Type, TypeVar, cast
 
 if sys.version_info >= (3, 10):
     from typing import get_origin

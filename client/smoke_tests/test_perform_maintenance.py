@@ -1,7 +1,6 @@
+import pytest
 from cbltest import CBLPyTest
 from cbltest.api.database_types import MaintenanceType
-
-import pytest
 
 
 class TestPerformMaintenance:

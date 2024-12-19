@@ -1,23 +1,24 @@
 from __future__ import annotations
+
 from abc import abstractmethod
 from enum import Enum
+from importlib import import_module
 from pathlib import Path
 from shutil import rmtree
-from typing import cast, Optional, Type
+from typing import Any, Optional, Type, cast
 from urllib.parse import urljoin
 from uuid import UUID, uuid4
-from aiohttp import ClientSession, ClientResponse
-from importlib import import_module
-from typing import Any
 
+from aiohttp import ClientResponse, ClientSession
+
+from .api.error import CblTestError, CblTestServerBadResponseError
+from .api.jsonserializable import JSONSerializable
 from .configparser import ParsedConfig
+from .globals import CBLPyTestGlobal
+from .httplog import get_next_writer
 from .logging import cbl_error, cbl_info, cbl_trace, cbl_warning
 from .responses import GetRootResponse, TestServerResponse
 from .version import available_api_version
-from .httplog import get_next_writer
-from .api.jsonserializable import JSONSerializable
-from .api.error import CblTestError, CblTestServerBadResponseError
-from .globals import CBLPyTestGlobal
 
 
 class TestServerRequestType(Enum):

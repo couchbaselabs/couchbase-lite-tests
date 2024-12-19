@@ -9,13 +9,13 @@ from cbltest.api.database import SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
-    ReplicatorCollectionEntry,
-    ReplicatorBasicAuthenticator,
-    ReplicatorType,
-    WaitForDocumentEventEntry,
     ReplicatorActivityLevel,
+    ReplicatorBasicAuthenticator,
+    ReplicatorCollectionEntry,
     ReplicatorDocumentFlags,
     ReplicatorFilter,
+    ReplicatorType,
+    WaitForDocumentEventEntry,
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 

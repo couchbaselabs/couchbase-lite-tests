@@ -1,4 +1,4 @@
-from typing import List, cast, Optional
+from typing import List, Optional, cast
 
 from opentelemetry.trace import get_tracer
 
@@ -7,9 +7,9 @@ from cbltest.globals import CBLPyTestGlobal
 from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.responses import GetRootResponse
 from cbltest.v1.requests import (
-    PostResetRequestBody,
-    PostNewSessionRequestBody,
     PostLogRequestBody,
+    PostNewSessionRequestBody,
+    PostResetRequestBody,
 )
 from cbltest.version import VERSION
 

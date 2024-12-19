@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from enum import Enum, Flag, auto
-from typing import Any, Dict, Final, List, cast, Optional
+from typing import Any, Dict, Final, List, Optional, cast
 
 from varname import nameof
 

@@ -1,24 +1,24 @@
 from pathlib import Path
 from typing import List, Set
+
+import pytest
 from cbltest import CBLPyTest
-from cbltest.utils import assert_not_null
-from cbltest.api.replicator import Replicator
-from cbltest.api.replicator_types import (
-    ReplicatorCollectionEntry,
-    ReplicatorBasicAuthenticator,
-    ReplicatorType,
-    ReplicatorActivityLevel,
-    ReplicatorDocumentEntry,
-    ReplicatorFilter,
-)
-from cbltest.api.syncgateway import DocumentUpdateEntry
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database import SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry
-
-from test_replication_filter_data import *
-import pytest
+from cbltest.api.replicator import Replicator
+from cbltest.api.replicator_types import (
+    ReplicatorActivityLevel,
+    ReplicatorBasicAuthenticator,
+    ReplicatorCollectionEntry,
+    ReplicatorDocumentEntry,
+    ReplicatorFilter,
+    ReplicatorType,
+)
+from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.utils import assert_not_null
+from test_replication_filter_data import uk_and_france_doc_ids
 
 
 class TestReplicationFilter(CBLTestClass):

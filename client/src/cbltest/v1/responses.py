@@ -1,12 +1,12 @@
-from typing import Any, Dict, Final, List, cast, Optional
-from cbltest.responses import ErrorResponseBody, TestServerResponse
+from typing import Any, Dict, Final, List, Optional, cast
+
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorDocumentEntry,
     ReplicatorProgress,
 )
-
 from cbltest.jsonhelper import _assert_string_entry, _get_typed, _get_typed_required
+from cbltest.responses import ErrorResponseBody, TestServerResponse
 
 # Like the requests file, this file also follows the convention that all of the
 # received responses are classes that end in 'Response'.  However, unlike the

@@ -1,17 +1,17 @@
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
-from cbltest.api.database import SnapshotUpdater, Database
+from cbltest.api.database import Database, SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry
-from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry
+from cbltest.api.replicator import Replicator, ReplicatorCollectionEntry, ReplicatorType
 from cbltest.api.replicator_types import (
     ReplicatorBasicAuthenticator,
-    WaitForDocumentEventEntry,
     ReplicatorDocumentFlags,
+    WaitForDocumentEventEntry,
 )
 
 

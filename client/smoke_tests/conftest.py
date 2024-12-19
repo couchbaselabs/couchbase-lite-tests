@@ -1,9 +1,9 @@
 import os
 from pathlib import Path
-from cbltest import CBLPyTest
 
 import pytest
 import pytest_asyncio
+from cbltest import CBLPyTest
 
 
 @pytest_asyncio.fixture(scope="session")

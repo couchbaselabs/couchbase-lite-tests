@@ -1,30 +1,28 @@
 from datetime import timedelta
-from typing import Dict, List
-from opentelemetry.trace import get_tracer
 from time import sleep
+from typing import Dict, List
 
+from couchbase.auth import PasswordAuthenticator
 from couchbase.bucket import Bucket
 from couchbase.cluster import Cluster
-from couchbase.options import ClusterOptions
-from couchbase.auth import PasswordAuthenticator
-from couchbase.management.buckets import CreateBucketSettings
-from couchbase.management.collections import CollectionSpec
-from couchbase.management.options import CreatePrimaryQueryIndexOptions
 from couchbase.exceptions import (
     BucketAlreadyExistsException,
     BucketDoesNotExistException,
+    CollectionAlreadyExistsException,
+    DocumentNotFoundException,
+    QueryIndexAlreadyExistsException,
     ScopeAlreadyExistsException,
 )
-from couchbase.exceptions import (
-    CollectionAlreadyExistsException,
-    QueryIndexAlreadyExistsException,
-    DocumentNotFoundException,
-)
+from couchbase.management.buckets import CreateBucketSettings
+from couchbase.management.collections import CollectionSpec
+from couchbase.management.options import CreatePrimaryQueryIndexOptions
+from couchbase.options import ClusterOptions
+from opentelemetry.trace import get_tracer
 
+from cbltest.api.error import CblTestError
+from cbltest.logging import cbl_warning
 from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
-from cbltest.logging import cbl_warning
-from cbltest.api.error import CblTestError
 
 
 class CouchbaseServer:

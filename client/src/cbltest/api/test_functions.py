@@ -1,11 +1,10 @@
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from opentelemetry.trace import get_tracer
 
-from cbltest.api.database import AllDocumentsEntry
-from cbltest.api.database import Database
+from cbltest.api.database import AllDocumentsEntry, Database
 from cbltest.api.replicator_types import ReplicatorType
-from cbltest.api.syncgateway import SyncGateway, AllDocumentsResponseRow
+from cbltest.api.syncgateway import AllDocumentsResponseRow, SyncGateway
 from cbltest.version import VERSION
 
 

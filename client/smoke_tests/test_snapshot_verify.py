@@ -1,10 +1,11 @@
 from typing import Any, Dict, List, Optional, Union
+
+import pytest
 from cbltest import CBLPyTest
+from cbltest.api.database import DatabaseUpdater, SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry
-from cbltest.api.database import SnapshotUpdater, DatabaseUpdater
 from cbltest.api.error import CblTestServerBadResponseError
 from cbltest.globals import CBLPyTestGlobal
-import pytest
 
 
 class TestSnapshotVerify:

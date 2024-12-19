@@ -1,21 +1,22 @@
 from pathlib import Path
 from typing import List
+
 import pytest
 from cbltest import CBLPyTest
-from cbltest.utils import assert_not_null
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database import SnapshotUpdater
-from cbltest.api.database_types import MaintenanceType, DocumentEntry
+from cbltest.api.database_types import DocumentEntry, MaintenanceType
 from cbltest.api.replicator import (
     Replicator,
-    ReplicatorType,
-    ReplicatorCollectionEntry,
     ReplicatorActivityLevel,
+    ReplicatorCollectionEntry,
+    ReplicatorType,
 )
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.utils import assert_not_null
 
 
 class TestReplicationBlob(CBLTestClass):

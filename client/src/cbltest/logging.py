@@ -1,11 +1,22 @@
 from enum import Enum
-from logging import *
+from logging import (
+    DEBUG,
+    ERROR,
+    INFO,
+    WARN,
+    FileHandler,
+    Formatter,
+    Handler,
+    StreamHandler,
+    getLogger,
+)
 from sys import stdout
 from typing import Optional
 
-from .version import VERSION
-from websocket import create_connection
 import requests
+from websocket import create_connection
+
+from .version import VERSION
 
 
 class LogSlurpHandler(Handler):

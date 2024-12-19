@@ -1,6 +1,6 @@
+import pytest
 from cbltest import CBLPyTest
 from cbltest.globals import CBLPyTestGlobal
-import pytest
 
 
 class TestResetDb:

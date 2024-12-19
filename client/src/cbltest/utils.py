@@ -1,5 +1,5 @@
 import time
-from typing import Any, Callable, Dict, TypeVar, Type, Union, Optional, cast
+from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union, cast
 
 from .api.error import CblTimeoutError
 

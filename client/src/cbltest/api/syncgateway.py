@@ -2,23 +2,22 @@ import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
 from pathlib import Path
-from typing import Dict, List, Tuple, cast, Any, Optional
+from typing import Any, Dict, List, Optional, Tuple, cast
 from urllib.parse import urljoin
 
-from aiohttp import ClientSession, BasicAuth, TCPConnector
+from aiohttp import BasicAuth, ClientSession, TCPConnector
+from deprecated import deprecated
 from opentelemetry.trace import get_tracer
 from varname import nameof
 
 from cbltest.api.error import CblSyncGatewayBadResponseError
-from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
+from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_warning, cbl_info
-from cbltest.version import VERSION
+from cbltest.logging import cbl_info, cbl_warning
 from cbltest.utils import assert_not_null
-
-from deprecated import deprecated
+from cbltest.version import VERSION
 
 
 class _CollectionMap(JSONSerializable):
