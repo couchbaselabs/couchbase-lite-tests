@@ -33,12 +33,9 @@ ext {
 
     SPOTBUGS_VERSION = '4.7.3'
 
-    ASSETS_DIR = "${ROOT_DIR}/../../dataset/server"
     SHARED_DIR = "${ROOT_DIR}/shared"
     ETC_DIR = "${ROOT_DIR}/etc"
-    ASSETS_ROOT = "${ROOT_DIR}/../../dataset/server"
-    BLOB_ASSETS_DIR = "${ASSETS_ROOT}/blobs"
-
+    ASSETS_ROOT = "${ROOT_DIR}/assets"
 
     REPORTS_DIR = "${buildDir}/reports"
 
@@ -52,7 +49,7 @@ def USE_LOCAL_MAVEN = COUCHBASE_LITE_VERSION.endsWith("SNAPSHOT")
  
 def DATASET_VERSION = project.hasProperty("datasetVersion") ? datasetVersion : ""
 if (!(DATASET_VERSION  =~ /^\d{1,2}\.\d{1,2}/)) { throw new InvalidUserDataException ("!!! Bad dataset version: ${DATASET_VERSION}") }
-def DB_ASSETS_DIR = "${ASSETS_ROOT}/dbs/${DATASET_VERSION}"
+def ASSETS_DIR = "${ASSETS_ROOT}/${DATASET_VERSION}"
 
 // Set -Pverbose to get full console logs for tests
 def VERBOSE = project.hasProperty("verbose")
@@ -79,8 +76,7 @@ java {
                 "${SHARED_DIR}/server/main/java"
             ]
             resources.srcDirs = [
-                DB_ASSETS_DIR,
-                BLOB_ASSETS_DIR,
+                ASSETS_DIR,
                 "${SHARED_DIR}/assets"
             ]
         }

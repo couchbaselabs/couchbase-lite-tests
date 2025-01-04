@@ -24,7 +24,11 @@ STATUS=1
 CBL_VERSION="${VERSION}-${BUILD_NUMBER}"
 
 pushd servers/jak > /dev/null
+
+# Set up assets directory
+etc/jenkins/copy_assets.sh ../../dataset/server assets
 SERVER_VERSION=`cat version.txt`
+
 cd desktop
 
 echo "OSX Desktop: Build the Test Server"

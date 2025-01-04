@@ -18,8 +18,11 @@ $ErrorActionPreference = "Stop"
 $status = 1
 $cblVersion = "${version}-${buildNumber}"
 
-# Force the Couchbase Lite Java version
-Push-Location servers\jak\webservice
+Push-Location servers\jak
+
+& .\etc\jenkins\copy_assets.ps1 ..\..\dataset\server assets
+
+Set-Location webservice
 
 Write-Host "Windows Web Service: Stop any existing Test Server"
 & .\gradlew.bat --no-daemon appStop -PcblVersion="${cblVersion}" -PdatasetVersion="${DATASET_VERSION}"

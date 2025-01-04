@@ -29,3 +29,6 @@ server.pid
 server.log
 server.err
 
+# Assets
+assets
+

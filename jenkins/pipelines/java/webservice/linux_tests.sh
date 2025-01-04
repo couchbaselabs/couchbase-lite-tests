@@ -24,7 +24,12 @@ SG_URL="$4"
 STATUS=1
 CBL_VERSION="${VERSION}-${BUILD_NUMBER}"
 
-pushd servers/jak/webservice > /dev/null
+pushd servers/jak > /dev/null
+
+# Set up assets directory
+etc/jenkins/copy_assets.sh ../../dataset/server assets
+
+cd webservice
 
 echo "Linux Web Service: Download the support libraries"
 rm -rf supportlib

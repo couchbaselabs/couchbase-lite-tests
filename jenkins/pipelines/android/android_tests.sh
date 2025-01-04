@@ -28,8 +28,11 @@ PATH="${PATH}:$ANDROID_HOME/platform-tools"
 # Get the Android device's IP address
 ANDROID_IP=$(adb shell ifconfig | perl -ne 'next unless /inet addr:([\d.]+) /; $ip = $1; next if $ip =~ /^127/; print "$1\n"')
 
-# Force the Couchbase Lite Android version
 pushd servers/jak > /dev/null
+
+# Set up assets directory
+etc/jenkins/copy_assets.sh ../../dataset/server assets
+
 cd android
 
 echo "Build the Test Server"

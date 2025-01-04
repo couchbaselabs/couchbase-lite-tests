@@ -19,7 +19,9 @@ $status = 1
 $cblVersion = "${version}-${buildNumber}"
 
 Push-Location servers\jak
+& .\etc\jenkins\copy_assets.ps1 ..\..\dataset\server assets
 $serverVersion = Get-Content version.txt
+
 Set-Location desktop
 
 Write-Host "Windows Desktop: Stop any existing Test Server"
