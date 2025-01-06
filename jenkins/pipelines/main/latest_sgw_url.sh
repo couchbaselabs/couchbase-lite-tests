@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 
 function usage() {
     echo "Usage: $0 <version>"
@@ -10,14 +10,13 @@ if [ "$#" -ne 1 ]; then
 fi
 
 VERSION=${1}
-ARCH=${2}
 
 RESPONSE=$(curl -s "http://proget.build.couchbase.com:8080/api/get_version?product=sync_gateway&version=${VERSION}")
-IS_RELEASE=$(echo -n $RESPONSE | jq .IsRelease)
-BUILD_NO=$(echo -n $RESPONSE | jq .BuildNumber)
-if [ "${BUILD_NO}" == "" ]
+IS_RELEASE=$(echo -n $RESPONSE | jq .IsRelease  2>/dev/null)
+BUILD_NO=$(echo -n $RESPONSE | jq .BuildNumber 2>/dev/null)
+if [[ -z "${BUILD_NO}" ]] || [[ -z "${IS_RELEASE}" ]]
 then
-    echo "No latest successful build found for v${VERSION}"
+    echo "Could not find a successful build for version '${VERSION}'"
     exit 3
 fi
 
