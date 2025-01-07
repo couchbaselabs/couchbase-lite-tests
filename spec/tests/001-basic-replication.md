@@ -222,7 +222,10 @@ Test pull replication with the default collection.
 
 ### Description
 
-Test that when the push replicator starts with its checkpoint reset, the push replication starts from the beginning again.
+Test that when the push replicator starts with its checkpoint reset, the push replication starts 
+from the beginning, but the purged doc on SG will not be re-pushed. Note that the test only
+verify that the already pushed docs are not pushed to SG again, but there is no method to verify 
+that the sequence starts from zero.
 
 ### Steps
 
@@ -242,13 +245,16 @@ Test that when the push replicator starts with its checkpoint reset, the push re
 9. Check that the purged airline doc doesn't exist on SG.
 10. Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.
 11. Wait until the replicator is stopped.
-12. Check that the purged airline doc is pushed back to SG
+12. Check that there were no docs pushed.
+13. Check that the purged airline doc was not pushed back to SG.
 
 ## #12 test_reset_checkpoint_pull
 
 ### Description
 
-Test that when the pull replicator starts with its checkpoint reset, the pull replication starts from the beginning again.
+Test that when the pull replicator starts with its checkpoint reset, the pull replication starts from 
+the beginning  and re-pulls the purged doc. Note that the test only verify that the only purged doc
+is pulled back again, but there is no method to verify that the sequence starts from zero.
 
 ### Steps
 
@@ -268,4 +274,5 @@ Test that when the pull replicator starts with its checkpoint reset, the pull re
 9. Check that the purged airport doc doesn't exist in CBL database.
 10. Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`.
 11. Wait until the replicator is stopped.
-12. Check that the purged airport doc is pulled back in CBL database.
+12. Check that there was only one doc pulled.
+13. Check that the purged airport doc is pulled back in CBL database.

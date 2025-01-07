@@ -599,7 +599,6 @@ class TestBasicReplication(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
-    @pytest.mark.skip(reason="CBL-4805")
     @pytest.mark.asyncio(loop_scope="session")
     async def test_reset_checkpoint_push(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `travel` dataset.")
@@ -658,6 +657,7 @@ class TestBasicReplication(CBLTestClass):
                                 replicator_type=ReplicatorType.PUSH,
                                 authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
                                 reset=True,
+                                enable_document_listener=True,
                                 pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
@@ -666,14 +666,12 @@ class TestBasicReplication(CBLTestClass):
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("Check that the purged airline doc is pushed back to SG")
-        sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents("travel", "travel", "airlines")
-        found_doc = False
+        self.mark_test_step("Check that there were no docs pushed.")
+        assert len(replicator.document_updates) == 0, f"Should be no docs pushed, but {len(replicator.document_updates)} docs were pushed"
+
+        self.mark_test_step("Check that the purged airline doc was not pushed back to SG")
         for doc in sg_all_docs.rows:
-            if doc.id == sg_purged_doc_id:
-                found_doc = True
-                break
-        assert found_doc, f"{sg_purged_doc_id} was not pushed back to SG after reset checkpoint"
+            assert doc.id != sg_purged_doc_id, f"Unexpected purged document found in SG: {doc.id}"
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -736,6 +734,7 @@ class TestBasicReplication(CBLTestClass):
                                 replicator_type=ReplicatorType.PULL,
                                 authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
                                 reset=True,
+                                enable_document_listener=True,
                                 pinned_server_cert=cblpytest.sync_gateways[0].tls_cert())
         await replicator.start()
 
@@ -743,6 +742,10 @@ class TestBasicReplication(CBLTestClass):
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+
+        self.mark_test_step("Check that there was only one doc pulled.")
+        assert len(replicator.document_updates) == 1, f"Should be one doc pulled, but {len(replicator.document_updates)} docs were pulled"
+        assert replicator.document_updates[0].document_id == lite_purged_doc_id, f"Unexpected doc '{replicator.document_updates[0].document_id}' was pulled"
 
         self.mark_test_step("Check that the purged airport doc is pulled back in CBL database.")
         lite_all_docs = await db.get_all_documents("travel.airports")
