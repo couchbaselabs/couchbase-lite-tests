@@ -61,9 +61,9 @@ class TestReplicationBlob(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -117,9 +117,9 @@ class TestReplicationBlob(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -179,9 +179,9 @@ class TestReplicationBlob(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -201,8 +201,8 @@ class TestReplicationBlob(CBLTestClass):
             "travel.hotels", "hotel_1", removed_properties=["description"]
         )
         verify_result = await db.verify_documents(snapshot_updater)
-        assert (
-            verify_result.result is True
-        ), f"The verification failed: {verify_result.description}"
+        assert verify_result.result is True, (
+            f"The verification failed: {verify_result.description}"
+        )
 
         await cblpytest.test_servers[0].cleanup()

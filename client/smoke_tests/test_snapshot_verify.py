@@ -67,13 +67,13 @@ class TestSnapshotVerify:
             )
 
         verify_result = await db.verify_documents(snapshot_updater)
-        assert (
-            verify_result.result is True
-        ), f"The verification failed: {verify_result.description}"
+        assert verify_result.result is True, (
+            f"The verification failed: {verify_result.description}"
+        )
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
-        assert (
-            not verify_result.expected.exists
-        ), "Response should not contain 'expected'"
+        assert not verify_result.expected.exists, (
+            "Response should not contain 'expected'"
+        )
         assert verify_result.document is None, "Response should not contain 'document'"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -92,13 +92,13 @@ class TestSnapshotVerify:
             self.delete_multiple([b, snapshot_updater], "_default._default", "name_1")
 
         verify_result = await db.verify_documents(snapshot_updater)
-        assert (
-            verify_result.result is True
-        ), f"The verification failed: {verify_result.description}"
+        assert verify_result.result is True, (
+            f"The verification failed: {verify_result.description}"
+        )
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
-        assert (
-            not verify_result.expected.exists
-        ), "Response should not contain 'expected'"
+        assert not verify_result.expected.exists, (
+            "Response should not contain 'expected'"
+        )
         assert verify_result.document is None, "Response should not contain 'document'"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -119,13 +119,13 @@ class TestSnapshotVerify:
         snapshot_updater.delete_document("_default._default", "name_2")
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
-        assert (
-            verify_result.description is not None
-        ), "Response should contain a description"
+        assert verify_result.description is not None, (
+            "Response should contain a description"
+        )
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
-        assert (
-            not verify_result.expected.exists
-        ), "Response should not contain 'expected'"
+        assert not verify_result.expected.exists, (
+            "Response should not contain 'expected'"
+        )
         assert verify_result.document is None, "Response should not contain 'document'"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -144,13 +144,13 @@ class TestSnapshotVerify:
             self.purge_multiple([b, snapshot_updater], "_default._default", "name_1")
 
         verify_result = await db.verify_documents(snapshot_updater)
-        assert (
-            verify_result.result is True
-        ), f"The verification failed: {verify_result.description}"
+        assert verify_result.result is True, (
+            f"The verification failed: {verify_result.description}"
+        )
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
-        assert (
-            not verify_result.expected.exists
-        ), "Response should not contain 'expected'"
+        assert not verify_result.expected.exists, (
+            "Response should not contain 'expected'"
+        )
         assert verify_result.document is None, "Response should not contain 'document'"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -171,13 +171,13 @@ class TestSnapshotVerify:
         snapshot_updater.purge_document("_default._default", "name_2")
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
-        assert (
-            verify_result.description is not None
-        ), "Response should contain a description"
+        assert verify_result.description is not None, (
+            "Response should contain a description"
+        )
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
-        assert (
-            not verify_result.expected.exists
-        ), "Response should not contain 'expected'"
+        assert not verify_result.expected.exists, (
+            "Response should not contain 'expected'"
+        )
         assert verify_result.document is None, "Response should not contain 'document'"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -200,19 +200,19 @@ class TestSnapshotVerify:
         )
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
-        assert (
-            verify_result.description is not None
-        ), "Response should contain a description"
-        assert (
-            verify_result.actual.exists and verify_result.actual.value == "Value"
-        ), "Incorrect 'actual' in response"
+        assert verify_result.description is not None, (
+            "Response should contain a description"
+        )
+        assert verify_result.actual.exists and verify_result.actual.value == "Value", (
+            "Incorrect 'actual' in response"
+        )
         assert (
             verify_result.expected.exists
             and verify_result.expected.value == "bad_value"
         ), "Incorrect 'expected' in response"
-        assert (
-            verify_result.document is not None
-        ), "Missing document property in response"
+        assert verify_result.document is not None, (
+            "Missing document property in response"
+        )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_single_array_update(self, cblpytest: CBLPyTest) -> None:
@@ -236,9 +236,9 @@ class TestSnapshotVerify:
         )
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
-        assert (
-            verify_result.description is not None
-        ), "Response should contain a description"
+        assert verify_result.description is not None, (
+            "Response should contain a description"
+        )
         assert (
             verify_result.actual.exists and verify_result.actual.value == "foo@bar.com"
         ), "Incorrect 'actual' in response"
@@ -246,9 +246,9 @@ class TestSnapshotVerify:
             verify_result.expected.exists
             and verify_result.expected.value == "foo@baz.com"
         ), "Incorrect 'expected' in response"
-        assert (
-            verify_result.document is not None
-        ), "Missing document property in response"
+        assert verify_result.document is not None, (
+            "Missing document property in response"
+        )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_array_order_update(self, cblpytest: CBLPyTest) -> None:
@@ -272,9 +272,9 @@ class TestSnapshotVerify:
         )
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
-        assert (
-            verify_result.description is not None
-        ), "Response should contain a description"
+        assert verify_result.description is not None, (
+            "Response should contain a description"
+        )
         assert (
             verify_result.actual.exists and verify_result.actual.value == "foo@bar.com"
         ), "Incorrect 'actual' in response"
@@ -282,9 +282,9 @@ class TestSnapshotVerify:
             verify_result.expected.exists
             and verify_result.expected.value == "shawna.matheney@nosql-matters.org"
         ), "Incorrect 'expected' in response"
-        assert (
-            verify_result.document is not None
-        ), "Missing document property in response"
+        assert verify_result.document is not None, (
+            "Missing document property in response"
+        )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_nonexistent_property(self, cblpytest: CBLPyTest) -> None:
@@ -308,17 +308,17 @@ class TestSnapshotVerify:
         )
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
-        assert (
-            verify_result.description is not None
-        ), "Response should contain a description"
+        assert verify_result.description is not None, (
+            "Response should contain a description"
+        )
         assert not verify_result.actual.exists, "'actual' should be missing"
         assert verify_result.expected.exists and verify_result.expected.value == [
             "shawna.matheney@nosql-matters.org",
             "foo@bar.com",
         ], "Incorrect 'expected' in response"
-        assert (
-            verify_result.document is not None
-        ), "Missing document property in response"
+        assert verify_result.document is not None, (
+            "Missing document property in response"
+        )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_remove_property(self, cblpytest: CBLPyTest) -> None:
@@ -342,17 +342,17 @@ class TestSnapshotVerify:
         )
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
-        assert (
-            verify_result.description is not None
-        ), "Response should contain a description"
+        assert verify_result.description is not None, (
+            "Response should contain a description"
+        )
         assert verify_result.actual.exists and verify_result.actual.value == [
             "shawna.matheney@nosql-matters.org",
             "foo@bar.com",
         ], "Incorrect 'expected' in response"
         assert not verify_result.expected.exists, "'expected' should be missing"
-        assert (
-            verify_result.document is not None
-        ), "Missing document property in response"
+        assert verify_result.document is not None, (
+            "Missing document property in response"
+        )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_snapshot(self, cblpytest: CBLPyTest) -> None:
@@ -389,9 +389,9 @@ class TestSnapshotVerify:
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
-        assert (
-            verify_result.description is not None
-        ), "Response should contain a description"
+        assert verify_result.description is not None, (
+            "Response should contain a description"
+        )
         assert (
             not verify_result.actual.exists
             and not verify_result.actual.exists
@@ -417,9 +417,9 @@ class TestSnapshotVerify:
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
-        assert (
-            verify_result.description is not None
-        ), "Response should contain a description"
+        assert verify_result.description is not None, (
+            "Response should contain a description"
+        )
         assert (
             not verify_result.actual.exists
             and not verify_result.actual.exists
@@ -448,9 +448,9 @@ class TestSnapshotVerify:
 
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
-        assert (
-            verify_result.description is not None
-        ), "Response should contain a description"
+        assert verify_result.description is not None, (
+            "Response should contain a description"
+        )
         assert (
             not verify_result.actual.exists
             and not verify_result.actual.exists
@@ -478,13 +478,13 @@ class TestSnapshotVerify:
             )
 
         verify_result = await db.verify_documents(snapshot_updater)
-        assert (
-            verify_result.result is True
-        ), f"The verification failed: {verify_result.description}"
+        assert verify_result.result is True, (
+            f"The verification failed: {verify_result.description}"
+        )
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
-        assert (
-            not verify_result.expected.exists
-        ), "Response should not contain 'expected'"
+        assert not verify_result.expected.exists, (
+            "Response should not contain 'expected'"
+        )
         assert verify_result.document is None, "Response should not contain 'document'"
 
     @pytest.mark.asyncio(loop_scope="session")
