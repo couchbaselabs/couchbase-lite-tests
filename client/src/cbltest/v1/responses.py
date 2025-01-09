@@ -1,10 +1,14 @@
-from typing import Any, Dict, Final, List, cast, Optional
-from cbltest.responses import ErrorResponseBody, TestServerResponse
-from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorDocumentEntry, ReplicatorProgress
+from typing import Any, Dict, Final, List, Optional, cast
 
+from cbltest.api.replicator_types import (
+    ReplicatorActivityLevel,
+    ReplicatorDocumentEntry,
+    ReplicatorProgress,
+)
 from cbltest.jsonhelper import _assert_string_entry, _get_typed, _get_typed_required
+from cbltest.responses import ErrorResponseBody, TestServerResponse
 
-# Like the requests file, this file also follows the convention that all of the 
+# Like the requests file, this file also follows the convention that all of the
 # received responses are classes that end in 'Response'.  However, unlike the
 # requests, there is no need to have a separate body class since the response
 # bodies are immutable.  Their properties are just added to the class itself.
@@ -13,13 +17,16 @@ from cbltest.jsonhelper import _assert_string_entry, _get_typed, _get_typed_requ
 # replaced with 'Response'.  For example, PostResetRequest will have a response
 # type of PostResetResponse.
 
+
 class PostResetResponse(TestServerResponse):
     """
-    A POST /reset response as specified in version 1 of the 
+    A POST /reset response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
-    def __init__(self, status_code: int, uuid:str, body: dict):
+
+    def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "reset")
+
 
 class PostGetAllDocumentsEntry:
     __id_key: Final[str] = "id"
@@ -28,19 +35,22 @@ class PostGetAllDocumentsEntry:
     @property
     def id(self) -> str:
         return self.__id
-    
+
     @property
     def rev(self) -> str:
         return self.__rev
 
     def __init__(self, body: dict):
-        assert isinstance(body, dict), "Invalid PostGetAllDocumentsEntry received (not an object)"
+        assert isinstance(body, dict), (
+            "Invalid PostGetAllDocumentsEntry received (not an object)"
+        )
         self.__id = _assert_string_entry(body, self.__id_key)
         self.__rev = _assert_string_entry(body, self.__rev_key)
-    
+
+
 class PostGetAllDocumentsResponse(TestServerResponse):
     """
-    A POST /getAllDocuments response as specified in version 1 of the 
+    A POST /getAllDocuments response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
 
     Example Body::
@@ -73,15 +83,17 @@ class PostGetAllDocumentsResponse(TestServerResponse):
     def collection_keys(self) -> List[str]:
         """Gets all the collections that are specified in the response"""
         return list(self.__payload.keys())
-    
-    def documents_for_collection(self, collection: str) -> List[PostGetAllDocumentsEntry]:
+
+    def documents_for_collection(
+        self, collection: str
+    ) -> List[PostGetAllDocumentsEntry]:
         """
         Gets the documents contained in the specified collection
 
         :param collection: The collection to return documents from
         """
         return cast(List[PostGetAllDocumentsEntry], self.__payload.get(collection))
-    
+
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "getAllDocuments")
         self.__payload: Dict[str, List[PostGetAllDocumentsEntry]] = {}
@@ -91,17 +103,20 @@ class PostGetAllDocumentsResponse(TestServerResponse):
             for entry in v:
                 self.__payload[k].append(PostGetAllDocumentsEntry(entry))
 
+
 class PostUpdateDatabaseResponse(TestServerResponse):
     """
-    A POST /updateDatabase response as specified in version 1 of the 
+    A POST /updateDatabase response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
+
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "updateDatabase")
-    
+
+
 class PostSnapshotDocumentsResponse(TestServerResponse):
     """
-    A POST /snapshotDocuments response as specified in version 1 of the 
+    A POST /snapshotDocuments response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
 
     Example Body::
@@ -121,15 +136,17 @@ class PostSnapshotDocumentsResponse(TestServerResponse):
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "snapshotDocuments")
         self.__snapshot_id = cast(str, body.get(self.__id_key))
-    
+
+
 class ValueOrMissing:
     def __init__(self, value: Optional[Any] = None, exists: bool = False):
         self.value = value
         self.exists = exists if value is None else True
 
+
 class PostVerifyDocumentsResponse(TestServerResponse):
     """
-    A POST /verifyDocuments response as specified in version 1 of the 
+    A POST /verifyDocuments response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
 
     Example Body::
@@ -139,6 +156,7 @@ class PostVerifyDocumentsResponse(TestServerResponse):
             "description": "What went wrong if false"
         }
     """
+
     __result_key: Final[str] = "result"
     __description_key: Final[str] = "description"
     __expected_key: Final[str] = "expected"
@@ -149,49 +167,50 @@ class PostVerifyDocumentsResponse(TestServerResponse):
     def result(self) -> bool:
         """Gets the result of the verification"""
         return self.__result
-    
+
     @property
     def description(self) -> Optional[str]:
         """Gets the description of what went wrong if result is false"""
         return self.__description
-    
+
     @property
     def expected(self) -> ValueOrMissing:
         """Gets the expected value of the faulty keypath, if applicable"""
         return self.__expected
-    
+
     @property
     def actual(self) -> ValueOrMissing:
         """Gets the actual value of the faulty keypath, if applicable"""
         return self.__actual
-    
+
     @property
     def document(self) -> Optional[Dict[str, Any]]:
         """Gets the document body of the document with the faulty keypath, if applicable"""
         return self.__document
-    
+
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "verifyDocuments")
         if self.__result_key not in body:
             return
-        
+
         self.__result = _get_typed_required(body, self.__result_key, bool)
         self.__description = _get_typed(body, self.__description_key, str)
         if self.__expected_key not in body:
             self.__expected = ValueOrMissing()
         else:
             self.__expected = ValueOrMissing(body.get(self.__expected_key), True)
-            
+
         if self.__actual_key not in body:
             self.__actual = ValueOrMissing()
         else:
             self.__actual = ValueOrMissing(body.get(self.__actual_key), True)
 
         self.__document = _get_typed(body, self.__document_key, Dict[str, Any])
-    
+
+
 class PostStartReplicatorResponse(TestServerResponse):
     """
-    A POST /startReplicator response as specified in version 1 of the 
+    A POST /startReplicator response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
 
     Example Body::
@@ -202,7 +221,7 @@ class PostStartReplicatorResponse(TestServerResponse):
     """
 
     __id_key: Final[str] = "id"
-    
+
     @property
     def replicator_id(self) -> str:
         """Gets the ID of the replicator that was started"""
@@ -212,9 +231,10 @@ class PostStartReplicatorResponse(TestServerResponse):
         super().__init__(status_code, uuid, 1, body, "startReplicator")
         self.__replicator_id = cast(str, body.get(self.__id_key))
 
+
 class PostGetReplicatorStatusResponse(TestServerResponse):
     """
-    A POST /getReplicatorStatus response as specified in version 1 of the 
+    A POST /getReplicatorStatus response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
 
     Example Body::
@@ -255,17 +275,17 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
     def activity(self) -> ReplicatorActivityLevel:
         """Gets the activity level of the replicator"""
         return self.__activity
-    
+
     @property
     def progress(self) -> ReplicatorProgress:
         """Gets the current progress of the replicator"""
         return self.__progress
-    
+
     @property
     def replicator_error(self) -> Optional[ErrorResponseBody]:
         """Gets the error that occurred during replication, if any"""
         return self.__replicator_error
-    
+
     @property
     def documents(self) -> List[ReplicatorDocumentEntry]:
         """Gets the unseen list of documents replicated previously.  Note
@@ -274,34 +294,45 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
 
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "getReplicatorStatus")
-        if not self.__activity_key in body:
+        if self.__activity_key not in body:
             return
-        
-        self.__activity = ReplicatorActivityLevel[cast(str, body.get(self.__activity_key)).upper()]
+
+        self.__activity = ReplicatorActivityLevel[
+            cast(str, body.get(self.__activity_key)).upper()
+        ]
         self.__progress = ReplicatorProgress(cast(dict, body.get(self.__progress_key)))
-        self.__replicator_error = ErrorResponseBody.create(body.get(self.__replicator_error_key))
+        self.__replicator_error = ErrorResponseBody.create(
+            body.get(self.__replicator_error_key)
+        )
         docs = _get_typed(body, self.__documents_key, list)
-        self.__documents = [ReplicatorDocumentEntry(d) for d in docs] if docs is not None else []
+        self.__documents = (
+            [ReplicatorDocumentEntry(d) for d in docs] if docs is not None else []
+        )
+
 
 class PostPerformMaintenanceResponse(TestServerResponse):
     """
-    A POST /performMaintenance response as specified in version 1 of the 
+    A POST /performMaintenance response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
+
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "performMaintenance")
 
+
 class PostNewSessionResponse(TestServerResponse):
     """
-    A POST /newSession response as specified in version 1 of the 
+    A POST /newSession response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
+
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "newSession")
 
+
 class PostRunQueryResponse(TestServerResponse):
     """
-    A POST /runQuery response as specified in version 1 of the 
+    A POST /runQuery response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
 
     Example Body::
@@ -322,15 +353,16 @@ class PostRunQueryResponse(TestServerResponse):
 
     def __init__(self, status_code: int, uuid: str, body: Dict):
         super().__init__(status_code, uuid, 1, body, "runQuery")
-        if not self.__results_key in body:
+        if self.__results_key not in body:
             return
-        
+
         results = _get_typed_required(body, self.__results_key, list)
         self.__results = [dict(e) for e in results] if results is not None else []
 
+
 class PostGetDocumentResponse(TestServerResponse):
     """
-    A POST /getDocument response as specified in version 1 of the 
+    A POST /getDocument response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
 
     Example Body::
@@ -346,15 +378,17 @@ class PostGetDocumentResponse(TestServerResponse):
     def raw_body(self) -> Dict:
         """The raw return value from the server (containing id, revs, and body)"""
         return self.__body
-    
+
     def __init__(self, status_code: int, uuid: str, body: Dict):
         super().__init__(status_code, uuid, 1, body, "getDocument")
         self.__body = body
 
+
 class PostLogResponse(TestServerResponse):
     """
-    A POST /log response as specified in version 1 of the 
+    A POST /log response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
+
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "log")

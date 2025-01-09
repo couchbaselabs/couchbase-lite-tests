@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from typing import Final, Optional
+
 
 class ErrorDomain:
     """An enum representing the domain of an error returned by the server"""
@@ -23,6 +25,7 @@ class ErrorDomain:
     def equal(cls, val: str, expected: str) -> bool:
         return val.upper() == expected
 
+
 class ErrorResponseBody:
     """A class representing an error condition returned from the server"""
 
@@ -34,29 +37,37 @@ class ErrorResponseBody:
     def domain(self) -> str:
         """Gets the domain of the returned error"""
         return self.__domain
-    
+
     @property
     def code(self) -> int:
         """Gets the code of the returned error"""
         return self.__code
-    
+
     @property
     def message(self) -> str:
         """Gets the message of the returned error"""
         return self.__message
-    
+
     @classmethod
     def create(c, body: Optional[dict]) -> Optional[ErrorResponseBody]:
         """
         Creates an :class:`ErrorResponseBody` if the provided body contains the appropriate
         content, or returns `None` otherwise
-        
+
         :param body: A dict potentially containing error keys
         """
-        if body is not None and c.__error_domain_key in body and c.__error_code_key in body \
-            and c.__error_msg_key in body:
-            return ErrorResponseBody(body[c.__error_domain_key], body[c.__error_code_key], body[c.__error_msg_key])
-        
+        if (
+            body is not None
+            and c.__error_domain_key in body
+            and c.__error_code_key in body
+            and c.__error_msg_key in body
+        ):
+            return ErrorResponseBody(
+                body[c.__error_domain_key],
+                body[c.__error_code_key],
+                body[c.__error_msg_key],
+            )
+
         return None
 
     def __init__(self, domain: str, code: int, message: str):

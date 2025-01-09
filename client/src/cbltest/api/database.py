@@ -1,20 +1,35 @@
 from __future__ import annotations
-from json import dumps
 
-from typing import Dict, Final, List, cast, Any, Optional
+from json import dumps
+from typing import Any, Dict, Final, List, Optional, cast
+
 from opentelemetry.trace import get_tracer
 
-from cbltest.requests import TestServerRequestType
-from cbltest.v1.responses import (PostGetAllDocumentsResponse, PostGetAllDocumentsEntry, PostSnapshotDocumentsResponse,
-                                  PostVerifyDocumentsResponse, ValueOrMissing, PostRunQueryResponse, PostGetDocumentResponse)
-from cbltest.v1.requests import (DatabaseUpdateEntry, DatabaseUpdateType, PostGetAllDocumentsRequestBody,
-                                 PostUpdateDatabaseRequestBody, DocumentEntry, PostSnapshotDocumentsRequestBody,
-                                 PostVerifyDocumentsRequestBody, PostPerformMaintenanceRequestBody, PostRunQueryRequestBody,
-                                 PostGetDocumentRequestBody)
-from cbltest.logging import cbl_error, cbl_trace
-from cbltest.requests import RequestFactory
-from cbltest.api.error import CblTestError
 from cbltest.api.database_types import MaintenanceType
+from cbltest.api.error import CblTestError
+from cbltest.logging import cbl_error, cbl_trace
+from cbltest.requests import RequestFactory, TestServerRequestType
+from cbltest.v1.requests import (
+    DatabaseUpdateEntry,
+    DatabaseUpdateType,
+    DocumentEntry,
+    PostGetAllDocumentsRequestBody,
+    PostGetDocumentRequestBody,
+    PostPerformMaintenanceRequestBody,
+    PostRunQueryRequestBody,
+    PostSnapshotDocumentsRequestBody,
+    PostUpdateDatabaseRequestBody,
+    PostVerifyDocumentsRequestBody,
+)
+from cbltest.v1.responses import (
+    PostGetAllDocumentsEntry,
+    PostGetAllDocumentsResponse,
+    PostGetDocumentResponse,
+    PostRunQueryResponse,
+    PostSnapshotDocumentsResponse,
+    PostVerifyDocumentsResponse,
+    ValueOrMissing,
+)
 from cbltest.version import VERSION
 
 
@@ -30,7 +45,9 @@ class SnapshotUpdater:
         :param collection: The collection to which the document belongs (scope-qualified)
         :param id: The ID of the document to delete
         """
-        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id))
+        self._updates.append(
+            DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id)
+        )
 
     def purge_document(self, collection: str, id: str):
         """
@@ -39,16 +56,24 @@ class SnapshotUpdater:
         :param collection: The collection to which the document belongs (scope-qualified)
         :param id: The ID of the document to purge
         """
-        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id))
+        self._updates.append(
+            DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id)
+        )
 
-    def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None,
-                        removed_properties: Optional[List[str]] = None, new_blobs: Optional[Dict[str, str]] = None):
+    def upsert_document(
+        self,
+        collection: str,
+        id: str,
+        new_properties: Optional[List[Dict[str, Any]]] = None,
+        removed_properties: Optional[List[str]] = None,
+        new_blobs: Optional[Dict[str, str]] = None,
+    ):
         """
         Updates or inserts a document using the given new and/or removed properties
 
         :param collection: The collection to which the document belongs or will be added to (scope-qualified)
         :param id: The ID of the document to upsert
-        :param new_properties: A list of dictionaries, each containing keypaths to set and values to use for the set.  
+        :param new_properties: A list of dictionaries, each containing keypaths to set and values to use for the set.
                                The updates will be applied in the order specified in the list
         :param removed_properties: A list of keypaths to remove from the document
         :param new_blobs: A dictionary containing keypaths to add blobs to, valued as a valid blob name according
@@ -57,12 +82,20 @@ class SnapshotUpdater:
         .. note:: A keypath is a JSON keypath like $.foo[0].bar ($. is optional)
         """
         if new_properties is not None:
-            assert isinstance(new_properties, list), \
+            assert isinstance(new_properties, list), (
                 "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
+            )
 
         self._updates.append(
-            DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties,
-                                new_blobs))
+            DatabaseUpdateEntry(
+                DatabaseUpdateType.UPDATE,
+                collection,
+                id,
+                new_properties,
+                removed_properties,
+                new_blobs,
+            )
+        )
 
 
 class DatabaseUpdater:
@@ -71,7 +104,9 @@ class DatabaseUpdater:
     """
 
     def __init__(self, db_name: str, request_factory: RequestFactory, index: int):
-        assert request_factory.version == 1, "This version of the CBLTest API requires request API v1"
+        assert request_factory.version == 1, (
+            "This version of the CBLTest API requires request API v1"
+        )
         self._db_name = db_name
         self._updates: List[DatabaseUpdateEntry] = []
         self.__request_factory = request_factory
@@ -89,7 +124,9 @@ class DatabaseUpdater:
                 raise CblTestError(self.__error)
 
             payload = PostUpdateDatabaseRequestBody(self._db_name, self._updates)
-            request = self.__request_factory.create_request(TestServerRequestType.UPDATE_DB, payload)
+            request = self.__request_factory.create_request(
+                TestServerRequestType.UPDATE_DB, payload
+            )
             resp = await self.__request_factory.send_request(self.__index, request)
             if resp.error is not None:
                 cbl_error("Failed to update database (see trace log for details)")
@@ -104,7 +141,9 @@ class DatabaseUpdater:
         :param collection: The collection to which the document belongs (scope-qualified)
         :param id: The ID of the document to delete
         """
-        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id))
+        self._updates.append(
+            DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id)
+        )
 
     def purge_document(self, collection: str, id: str):
         """
@@ -113,16 +152,24 @@ class DatabaseUpdater:
         :param collection: The collection to which the document belongs (scope-qualified)
         :param id: The ID of the document to purge
         """
-        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id))
+        self._updates.append(
+            DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id)
+        )
 
-    def upsert_document(self, collection: str, id: str, new_properties: Optional[List[Dict[str, Any]]] = None,
-                        removed_properties: Optional[List[str]] = None, new_blobs: Optional[Dict[str, str]] = None):
+    def upsert_document(
+        self,
+        collection: str,
+        id: str,
+        new_properties: Optional[List[Dict[str, Any]]] = None,
+        removed_properties: Optional[List[str]] = None,
+        new_blobs: Optional[Dict[str, str]] = None,
+    ):
         """
         Updates or inserts a document using the given new and/or removed properties
 
         :param collection: The collection to which the document belongs or will be added to (scope-qualified)
         :param id: The ID of the document to upsert
-        :param new_properties: A list of dictionaries, each containing keypaths to set and values to use for the set.  
+        :param new_properties: A list of dictionaries, each containing keypaths to set and values to use for the set.
                                The updates will be applied in the order specified in the list
         :param removed_properties: A list of keypaths to remove from the document
         :param new_blobs: A dictionary containing keypaths to add blobs to, valued as a valid blob name according
@@ -135,8 +182,15 @@ class DatabaseUpdater:
             return
 
         self._updates.append(
-            DatabaseUpdateEntry(DatabaseUpdateType.UPDATE, collection, id, new_properties, removed_properties,
-                                new_blobs))
+            DatabaseUpdateEntry(
+                DatabaseUpdateType.UPDATE,
+                collection,
+                id,
+                new_properties,
+                removed_properties,
+                new_blobs,
+            )
+        )
 
 
 class AllDocumentsEntry:
@@ -242,7 +296,9 @@ class GetDocumentResult:
         return self.__body
 
     def __init__(self, raw: Dict[str, Any]) -> None:
-        assert self.__id_key in raw and self.__revs_key in raw, "Malformed raw dict in GetDocumentResult"
+        assert self.__id_key in raw and self.__revs_key in raw, (
+            "Malformed raw dict in GetDocumentResult"
+        )
         self.__id = raw[self.__id_key]
         self.__revs = raw[self.__revs_key]
         raw.pop(self.__id_key)
@@ -282,21 +338,32 @@ class Database:
         """
         return DatabaseUpdater(self.__name, self.__request_factory, self.__index)
 
-    async def get_all_documents(self, *collections: str) -> Dict[str, List[AllDocumentsEntry]]:
+    async def get_all_documents(
+        self, *collections: str
+    ) -> Dict[str, List[AllDocumentsEntry]]:
         """
         Performs a getAllDocumentIDs request for the given collections
 
         :param collections: A variadic list of collection names
         """
-        with self.__tracer.start_as_current_span("get_all_documents", attributes={"cbl.database.name": self.__name,
-                                                                                  "cbl.collection.names": collections}):
+        with self.__tracer.start_as_current_span(
+            "get_all_documents",
+            attributes={
+                "cbl.database.name": self.__name,
+                "cbl.collection.names": collections,
+            },
+        ):
             payload = PostGetAllDocumentsRequestBody(self.__name, *collections)
-            req = self.__request_factory.create_request(TestServerRequestType.ALL_DOC_IDS, payload)
+            req = self.__request_factory.create_request(
+                TestServerRequestType.ALL_DOC_IDS, payload
+            )
             resp = await self.__request_factory.send_request(self.__index, req)
             cast_resp = cast(PostGetAllDocumentsResponse, resp)
             ret_val: Dict[str, List[AllDocumentsEntry]] = {}
             for c in cast_resp.collection_keys:
-                ret_val[c] = list(AllDocumentsEntry(d) for d in cast_resp.documents_for_collection(c))
+                ret_val[c] = list(
+                    AllDocumentsEntry(d) for d in cast_resp.documents_for_collection(c)
+                )
 
             return ret_val
 
@@ -306,11 +373,18 @@ class Database:
 
         :param document: The collection and ID of a document to be retrieved
         """
-        with self.__tracer.start_as_current_span("get_document", attributes={"cbl.database.name": self.__name,
-                                                                             "cbl.collection.name": document.collection,
-                                                                             "cbl.document.id": document.id}):
+        with self.__tracer.start_as_current_span(
+            "get_document",
+            attributes={
+                "cbl.database.name": self.__name,
+                "cbl.collection.name": document.collection,
+                "cbl.document.id": document.id,
+            },
+        ):
             payload = PostGetDocumentRequestBody(self.__name, document)
-            req = self.__request_factory.create_request(TestServerRequestType.GET_DOCUMENT, payload)
+            req = self.__request_factory.create_request(
+                TestServerRequestType.GET_DOCUMENT, payload
+            )
             resp = await self.__request_factory.send_request(self.__index, req)
             cast_resp = cast(PostGetDocumentResponse, resp)
             return GetDocumentResult(cast_resp.raw_body)
@@ -323,7 +397,9 @@ class Database:
         """
         with self.__tracer.start_as_current_span("create_snapshot"):
             payload = PostSnapshotDocumentsRequestBody(self.__name, documents)
-            req = self.__request_factory.create_request(TestServerRequestType.SNAPSHOT_DOCS, payload)
+            req = self.__request_factory.create_request(
+                TestServerRequestType.SNAPSHOT_DOCS, payload
+            )
             resp = await self.__request_factory.send_request(self.__index, req)
             return cast(PostSnapshotDocumentsResponse, resp).snapshot_id
 
@@ -335,8 +411,12 @@ class Database:
         :param updater: The id and expected updates
         """
         with self.__tracer.start_as_current_span("verify_documents"):
-            payload = PostVerifyDocumentsRequestBody(self.__name, updater._id, updater._updates)
-            req = self.__request_factory.create_request(TestServerRequestType.VERIFY_DOCS, payload)
+            payload = PostVerifyDocumentsRequestBody(
+                self.__name, updater._id, updater._updates
+            )
+            req = self.__request_factory.create_request(
+                TestServerRequestType.VERIFY_DOCS, payload
+            )
             resp = await self.__request_factory.send_request(self.__index, req)
             return VerifyResult(cast(PostVerifyDocumentsResponse, resp))
 
@@ -348,7 +428,9 @@ class Database:
         """
         with self.__tracer.start_as_current_span("perform_maintenance"):
             payload = PostPerformMaintenanceRequestBody(self.__name, str(type))
-            req = self.__request_factory.create_request(TestServerRequestType.PERFORM_MAINTENANCE, payload)
+            req = self.__request_factory.create_request(
+                TestServerRequestType.PERFORM_MAINTENANCE, payload
+            )
             await self.__request_factory.send_request(self.__index, req)
 
     async def run_query(self, query: str) -> List[Dict]:
@@ -359,6 +441,8 @@ class Database:
         """
         with self.__tracer.start_as_current_span("run_query"):
             payload = PostRunQueryRequestBody(self.__name, query)
-            req = self.__request_factory.create_request(TestServerRequestType.RUN_QUERY, payload)
+            req = self.__request_factory.create_request(
+                TestServerRequestType.RUN_QUERY, payload
+            )
             resp = await self.__request_factory.send_request(self.__index, req)
             return cast(PostRunQueryResponse, resp).results

@@ -2,19 +2,31 @@ import asyncio
 from datetime import timedelta
 from itertools import islice
 from time import time
-from typing import List, cast, Optional, Set
+from typing import List, Optional, Set, cast
 
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.database import Database
 from cbltest.api.error import CblTestError, CblTimeoutError
 from cbltest.api.replicator_types import (
-    ReplicatorActivityLevel, ReplicatorAuthenticator, ReplicatorCollectionEntry,
-    ReplicatorType, ReplicatorStatus, ReplicatorDocumentEntry, WaitForDocumentEventEntry)
+    ReplicatorActivityLevel,
+    ReplicatorAuthenticator,
+    ReplicatorCollectionEntry,
+    ReplicatorDocumentEntry,
+    ReplicatorStatus,
+    ReplicatorType,
+    WaitForDocumentEventEntry,
+)
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import TestServerRequestType
-from cbltest.v1.requests import PostGetReplicatorStatusRequestBody, PostStartReplicatorRequestBody
-from cbltest.v1.responses import PostGetReplicatorStatusResponse, PostStartReplicatorResponse
+from cbltest.v1.requests import (
+    PostGetReplicatorStatusRequestBody,
+    PostStartReplicatorRequestBody,
+)
+from cbltest.v1.responses import (
+    PostGetReplicatorStatusResponse,
+    PostStartReplicatorResponse,
+)
 from cbltest.version import VERSION
 
 
@@ -42,21 +54,31 @@ class Replicator:
     def document_updates(self) -> List[ReplicatorDocumentEntry]:
         """
         Gets the list of document updates received from the server and caches them.
-        
+
         ... note:: These entries will persist indefinitely until
             :func:`clear_document_entries()<cbltest.api.replicator.Replicator.clear_document_entries>`
             is called
 
-        
+
         """
         return self.__document_updates
 
-    def __init__(self, database: Database, endpoint: str,
-                 replicator_type: ReplicatorType = ReplicatorType.PUSH_AND_PULL,
-                 continuous: bool = False, authenticator: Optional[ReplicatorAuthenticator] = None, reset: bool = False,
-                 collections: Optional[List[ReplicatorCollectionEntry]] = None, enable_document_listener: bool = False,
-                 enable_auto_purge: bool = True, pinned_server_cert: Optional[str] = None):
-        assert database._request_factory.version == 1, "This version of the cbl test API requires request API v1"
+    def __init__(
+        self,
+        database: Database,
+        endpoint: str,
+        replicator_type: ReplicatorType = ReplicatorType.PUSH_AND_PULL,
+        continuous: bool = False,
+        authenticator: Optional[ReplicatorAuthenticator] = None,
+        reset: bool = False,
+        collections: Optional[List[ReplicatorCollectionEntry]] = None,
+        enable_document_listener: bool = False,
+        enable_auto_purge: bool = True,
+        pinned_server_cert: Optional[str] = None,
+    ):
+        assert database._request_factory.version == 1, (
+            "This version of the cbl test API requires request API v1"
+        )
         self.__database = database
         self.__index = database._index
         self.__request_factory = database._request_factory
@@ -76,7 +98,9 @@ class Replicator:
         self.reset: bool = reset
         """Whether or not to restart the replicator from the beginning"""
 
-        self.collections: List[ReplicatorCollectionEntry] = collections if collections is not None else []
+        self.collections: List[ReplicatorCollectionEntry] = (
+            collections if collections is not None else []
+        )
         """The collections to use in this replication"""
 
         self.enable_document_listener: bool = enable_document_listener
@@ -102,7 +126,9 @@ class Replicator:
         Sends a replicatorStart request to the remote server
         """
         with self.__tracer.start_as_current_span("start_replicator"):
-            payload = PostStartReplicatorRequestBody(self.__database.name, self.__endpoint)
+            payload = PostStartReplicatorRequestBody(
+                self.__database.name, self.__endpoint
+            )
             payload.replicatorType = self.replicator_type
             payload.continuous = self.continuous
             payload.authenticator = self.authenticator
@@ -111,7 +137,9 @@ class Replicator:
             payload.pinnedServerCert = self.pinned_server_cert
             payload.reset = self.reset
             payload.collections = self.collections
-            req = self.__request_factory.create_request(TestServerRequestType.START_REPLICATOR, payload)
+            req = self.__request_factory.create_request(
+                TestServerRequestType.START_REPLICATOR, payload
+            )
             resp = await self.__request_factory.send_request(self.__index, req)
             if resp.error is not None:
                 cbl_error("Failed to start replicator (see trace log for details)")
@@ -128,14 +156,22 @@ class Replicator:
                 raise CblTestError("Replicator start call has not completed!")
 
             payload = PostGetReplicatorStatusRequestBody(self.__id)
-            req = self.__request_factory.create_request(TestServerRequestType.REPLICATOR_STATUS, payload)
+            req = self.__request_factory.create_request(
+                TestServerRequestType.REPLICATOR_STATUS, payload
+            )
             resp = await self.__request_factory.send_request(self.__index, req)
             cast_resp = cast(PostGetReplicatorStatusResponse, resp)
             self.__document_updates.extend(cast_resp.documents)
-            return ReplicatorStatus(cast_resp.progress, cast_resp.activity, cast_resp.replicator_error)
+            return ReplicatorStatus(
+                cast_resp.progress, cast_resp.activity, cast_resp.replicator_error
+            )
 
-    async def wait_for(self, activity: ReplicatorActivityLevel, interval: timedelta = timedelta(seconds=1),
-                       timeout: timedelta = timedelta(seconds=30)) -> ReplicatorStatus:
+    async def wait_for(
+        self,
+        activity: ReplicatorActivityLevel,
+        interval: timedelta = timedelta(seconds=1),
+        timeout: timedelta = timedelta(seconds=30),
+    ) -> ReplicatorStatus:
         """
         Waits for a given timeout, polling at a set interval, until the Replicator changes to a desired state
 
@@ -144,8 +180,12 @@ class Replicator:
         :param timeout: The time limit to wait for the state change (default 30s)
         """
         with self.__tracer.start_as_current_span("wait_for"):
-            assert interval.total_seconds() > 0.0, "Zero interval makes no sense, try again"
-            assert timeout.total_seconds() >= 1.0, "Timeout too short, must be at least 1 second"
+            assert interval.total_seconds() > 0.0, (
+                "Zero interval makes no sense, try again"
+            )
+            assert timeout.total_seconds() >= 1.0, (
+                "Timeout too short, must be at least 1 second"
+            )
 
             status_matches = False
             start = time()
@@ -161,8 +201,11 @@ class Replicator:
 
             return next_status
 
-    async def wait_for_doc_events(self, events: Set[WaitForDocumentEventEntry],
-                                  interval: timedelta = timedelta(seconds=0.5)) -> bool:
+    async def wait_for_doc_events(
+        self,
+        events: Set[WaitForDocumentEventEntry],
+        interval: timedelta = timedelta(seconds=0.5),
+    ) -> bool:
         """
         This function will wait until it has seen all the events in 'events'
         or the replicator stops.  It returns True if all the events were seen, and False otherwise
@@ -170,10 +213,16 @@ class Replicator:
         :param events: The events to check for on the replicator
         :param interval: The interval at which to ping for the replicator state (default is half a second)
         """
-        with ((self.__tracer.start_as_current_span("wait_for_doc_events"))):
-            assert interval.total_seconds() > 0.0, "Zero interval makes no sense, try again"
-            assert not self.continuous, "wait_for_doc_events not applicable for a continuous replicator"
-            assert self.enable_document_listener, "Can't wait for documents unless the listener is enabled"
+        with self.__tracer.start_as_current_span("wait_for_doc_events"):
+            assert interval.total_seconds() > 0.0, (
+                "Zero interval makes no sense, try again"
+            )
+            assert not self.continuous, (
+                "wait_for_doc_events not applicable for a continuous replicator"
+            )
+            assert self.enable_document_listener, (
+                "Can't wait for documents unless the listener is enabled"
+            )
 
             events = events.copy()
             processed = 0
@@ -181,7 +230,9 @@ class Replicator:
             while True:
                 status = await self.get_status()
                 repl_err = status.error
-                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                assert repl_err is None, (
+                    f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                )
 
                 # Skip the ones we previously looked at to save time
                 for event in islice(self.document_updates, processed, None):
@@ -192,7 +243,8 @@ class Replicator:
                         event.direction,
                         event.flags,
                         doc_err.domain if doc_err is not None else None,
-                        doc_err.code if doc_err is not None else None)
+                        doc_err.code if doc_err is not None else None,
+                    )
                     if entry in events:
                         events.remove(entry)
 
@@ -206,9 +258,13 @@ class Replicator:
 
                 await asyncio.sleep(interval.total_seconds())
 
-    async def wait_for_all_doc_events(self, events: Set[WaitForDocumentEventEntry], max_retries: int = 5,
-                                      ping_interval: timedelta = timedelta(seconds=1),
-                                      idle_timeout: timedelta = timedelta(seconds=30)) -> ReplicatorStatus:
+    async def wait_for_all_doc_events(
+        self,
+        events: Set[WaitForDocumentEventEntry],
+        max_retries: int = 5,
+        ping_interval: timedelta = timedelta(seconds=1),
+        idle_timeout: timedelta = timedelta(seconds=30),
+    ) -> ReplicatorStatus:
         """
         This function will wait for a continuous replicator to become idle and then check for document
         replication events.  It will return when it has seen all the events in 'events'
@@ -226,17 +282,25 @@ class Replicator:
         :param idle_timeout: The timeout to use when waiting for the next idle state (default 30s)
         """
         with self.__tracer.start_as_current_span("wait_for_all_doc_events"):
-            assert self.continuous, "wait_for_all_doc_events not applicable for a non-continuous replicator"
-            assert self.enable_document_listener, "Can't wait for documents unless the listener is enabled"
+            assert self.continuous, (
+                "wait_for_all_doc_events not applicable for a non-continuous replicator"
+            )
+            assert self.enable_document_listener, (
+                "Can't wait for documents unless the listener is enabled"
+            )
 
             events = events.copy()
             processed = 0
 
             iteration = 0
             while iteration < max_retries:
-                status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
+                status = await self.wait_for(
+                    ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout
+                )
                 repl_err = status.error
-                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                assert repl_err is None, (
+                    f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                )
 
                 # Skip the ones we previously looked at to save time
                 for event in islice(self.document_updates, processed, None):
@@ -247,7 +311,8 @@ class Replicator:
                         event.direction,
                         event.flags,
                         doc_err.domain if doc_err is not None else None,
-                        doc_err.code if doc_err is not None else None)
+                        doc_err.code if doc_err is not None else None,
+                    )
                     if entry in events:
                         events.remove(entry)
 
@@ -261,10 +326,13 @@ class Replicator:
 
             raise CblTimeoutError("Timeout waiting for document update events")
 
-    async def wait_for_any_doc_event(self, events: Set[WaitForDocumentEventEntry], max_retries: int = 10,
-                                     ping_interval: timedelta = timedelta(seconds=1),
-                                     idle_timeout: timedelta = timedelta(seconds=10)) \
-            -> Optional[WaitForDocumentEventEntry]:
+    async def wait_for_any_doc_event(
+        self,
+        events: Set[WaitForDocumentEventEntry],
+        max_retries: int = 10,
+        ping_interval: timedelta = timedelta(seconds=1),
+        idle_timeout: timedelta = timedelta(seconds=10),
+    ) -> Optional[WaitForDocumentEventEntry]:
         """
         This function will poll a continuous replicator every 'ping_interval seconds, waiting for it to become idle,
         until it sees one of the events in 'events'.  It will return the first event it sees, or None
@@ -279,21 +347,34 @@ class Replicator:
         :param idle_timeout: The timeout to use when waiting for the next idle state (default 10s)
         """
         with self.__tracer.start_as_current_span("wait_for_any_doc_events"):
-            assert self.continuous, "wait_for_any_doc_events not applicable for a non-continuous replicator"
-            assert self.enable_document_listener, "Can't wait for documents unless the listener is enabled"
+            assert self.continuous, (
+                "wait_for_any_doc_events not applicable for a non-continuous replicator"
+            )
+            assert self.enable_document_listener, (
+                "Can't wait for documents unless the listener is enabled"
+            )
 
             events = events.copy()
             processed = 0
 
             iteration = 0
             while iteration < max_retries:
-                status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
+                status = await self.wait_for(
+                    ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout
+                )
                 repl_err = status.error
-                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                assert repl_err is None, (
+                    f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                )
 
                 # Skip the ones we looked at, previously, to save time
                 for event in islice(self.document_updates, processed, None):
-                    entry = WaitForDocumentEventEntry(event.collection, event.document_id, event.direction, event.flags)
+                    entry = WaitForDocumentEventEntry(
+                        event.collection,
+                        event.document_id,
+                        event.direction,
+                        event.flags,
+                    )
                     if entry in events:
                         return entry
 

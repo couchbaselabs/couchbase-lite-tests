@@ -1,16 +1,19 @@
 from enum import Enum
-from typing import Dict, List, Type, cast, Any, Optional
+from typing import Any, Dict, List, Optional, cast
 from uuid import UUID
 
 from varname import nameof
 
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.jsonserializable import JSONSerializable
-from cbltest.api.replicator_types import ReplicatorAuthenticator, ReplicatorCollectionEntry, ReplicatorType
+from cbltest.api.replicator_types import (
+    ReplicatorAuthenticator,
+    ReplicatorCollectionEntry,
+    ReplicatorType,
+)
 from cbltest.assertions import _assert_not_null
 from cbltest.logging import cbl_warning
 from cbltest.requests import TestServerRequest, TestServerRequestBody
-
 
 # Some conventions that are followed in this file are that all request classes that
 # will be sent to the test server are classes that end in 'Request'.  Their bodies
@@ -20,9 +23,10 @@ from cbltest.requests import TestServerRequest, TestServerRequestBody
 
 # All other classes support the RequestBody classes
 
+
 class PostResetRequestBody(TestServerRequestBody):
     """
-    The body of a POST /reset request as specified in version 1 of the 
+    The body of a POST /reset request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -55,9 +59,11 @@ class PostResetRequestBody(TestServerRequestBody):
         :param result_db_names: A list of databases to populate with the data from the dataset
         """
         for db_name in result_db_names:
-            self.__databases[db_name] = { "dataset": name }
+            self.__databases[db_name] = {"dataset": name}
 
-    def add_empty(self, result_db_names: List[str], collections: Optional[List[str]] = None):
+    def add_empty(
+        self, result_db_names: List[str], collections: Optional[List[str]] = None
+    ):
         """
         Add an empty database entry to the :class`PostResetRequestBody`
 
@@ -65,20 +71,20 @@ class PostResetRequestBody(TestServerRequestBody):
         :param collections: Collections to add to the databases after creation
         """
         for db_name in result_db_names:
-            entry = {} if collections is None else { "collections" : collections }
+            entry = {} if collections is None else {"collections": collections}
             self.__databases[db_name] = entry
 
     def to_json(self) -> Dict[str, Any]:
         json: Dict[str, Any] = {"databases": self.__databases}
         if self.__test_name:
             json["test"] = self.__test_name
-            
+
         return json
 
 
 class PostGetAllDocumentsRequestBody(TestServerRequestBody):
     """
-    The body of a POST /getAllDocuments request as specified in version 1 of the 
+    The body of a POST /getAllDocuments request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -135,17 +141,28 @@ class DatabaseUpdateEntry(JSONSerializable):
     can be passed via :class:`PostUpdateDatabaseRequestBody` to perform batch operations
     """
 
-    def __init__(self, type: DatabaseUpdateType, collection: str, document_id: str,
-                 updated_properties: Optional[List[Dict[str, Any]]] = None,
-                 removed_properties: Optional[List[str]] = None,
-                 new_blobs: Optional[Dict[str, str]] = None) -> None:
-        self.type: DatabaseUpdateEntry = cast(DatabaseUpdateEntry, _assert_not_null(type, nameof(type)))
+    def __init__(
+        self,
+        type: DatabaseUpdateType,
+        collection: str,
+        document_id: str,
+        updated_properties: Optional[List[Dict[str, Any]]] = None,
+        removed_properties: Optional[List[str]] = None,
+        new_blobs: Optional[Dict[str, str]] = None,
+    ) -> None:
+        self.type: DatabaseUpdateEntry = cast(
+            DatabaseUpdateEntry, _assert_not_null(type, nameof(type))
+        )
         """The type of update to be performed"""
 
-        self.collection: str = cast(str, _assert_not_null(collection, nameof(collection)))
+        self.collection: str = cast(
+            str, _assert_not_null(collection, nameof(collection))
+        )
         """The collection to that the document to be modified belongs to"""
 
-        self.document_id: str = cast(str, _assert_not_null(document_id, nameof(document_id)))
+        self.document_id: str = cast(
+            str, _assert_not_null(document_id, nameof(document_id))
+        )
         """The ID of the document to be modified"""
 
         self.updated_properties: Optional[List[Dict[str, Any]]] = updated_properties
@@ -183,7 +200,11 @@ class DatabaseUpdateEntry(JSONSerializable):
         if self.new_blobs is not None:
             return len(self.new_blobs) > 0
 
-        return len(self.removed_properties) > 0 if self.removed_properties is not None else False
+        return (
+            len(self.removed_properties) > 0
+            if self.removed_properties is not None
+            else False
+        )
 
     def to_json(self) -> Any:
         if not self.is_valid():
@@ -192,7 +213,7 @@ class DatabaseUpdateEntry(JSONSerializable):
         raw = {
             "type": str(self.type),
             "collection": self.collection,
-            "documentID": self.document_id
+            "documentID": self.document_id,
         }
 
         if self.type != DatabaseUpdateType.UPDATE:
@@ -212,11 +233,15 @@ class DatabaseUpdateEntry(JSONSerializable):
 
 class PostUpdateDatabaseRequestBody(TestServerRequestBody):
     """
-    The body of a POST /updateDatabase request as specified in version 1 of the 
+    The body of a POST /updateDatabase request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
-    def __init__(self, database: Optional[str] = None, updates: Optional[List[DatabaseUpdateEntry]] = None):
+    def __init__(
+        self,
+        database: Optional[str] = None,
+        updates: Optional[List[DatabaseUpdateEntry]] = None,
+    ):
         super().__init__(1)
         self.database = database
         """The database that the updates will be applied to once executed"""
@@ -228,9 +253,7 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
         """
 
     def to_json(self) -> Any:
-        raw: Dict[str, Any] = {
-            "database": self.database
-        }
+        raw: Dict[str, Any] = {"database": self.database}
 
         raw_entries = []
 
@@ -238,7 +261,9 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
             for e in cast(List[DatabaseUpdateEntry], self.updates):
                 raw_entry = e.to_json()
                 if raw_entry is None:
-                    cbl_warning("Skipping invalid DatabaseUpdateEntry in body serialization!")
+                    cbl_warning(
+                        "Skipping invalid DatabaseUpdateEntry in body serialization!"
+                    )
                     continue
 
                 raw_entries.append(raw_entry)
@@ -249,7 +274,7 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
 
 class PostSnapshotDocumentsRequestBody(TestServerRequestBody):
     """
-    The body of a POST /snapshotDocuments request as specified in version 1 of the 
+    The body of a POST /snapshotDocuments request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -283,13 +308,13 @@ class PostSnapshotDocumentsRequestBody(TestServerRequestBody):
     def to_json(self) -> Any:
         return {
             "database": self.__database,
-            "documents": [e.to_json() for e in self.__entries]
+            "documents": [e.to_json() for e in self.__entries],
         }
 
 
 class PostVerifyDocumentsRequestBody(TestServerRequestBody):
     """
-    The body of a POST /verifyDocuments request as specified in version 1 of the 
+    The body of a POST /verifyDocuments request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -325,7 +350,12 @@ class PostVerifyDocumentsRequestBody(TestServerRequestBody):
         """Gets the database that will be used to retrieve the current state"""
         return self.__database
 
-    def __init__(self, database: str, snapshot: str, changes: Optional[List[DatabaseUpdateEntry]] = None):
+    def __init__(
+        self,
+        database: str,
+        snapshot: str,
+        changes: Optional[List[DatabaseUpdateEntry]] = None,
+    ):
         super().__init__(1)
         self.__snapshot = snapshot
         self.__database = database
@@ -336,13 +366,15 @@ class PostVerifyDocumentsRequestBody(TestServerRequestBody):
         return {
             "snapshot": self.__snapshot,
             "database": self.__database,
-            "changes": [c.to_json() for c in self.changes] if self.changes is not None else []
+            "changes": [c.to_json() for c in self.changes]
+            if self.changes is not None
+            else [],
         }
 
 
 class PostStartReplicatorRequestBody(TestServerRequestBody):
     """
-    The body of a POST /startReplicator request as specified in version 1 of the 
+    The body of a POST /startReplicator request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -439,7 +471,7 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
             "continuous": self.continuous,
             "enableDocumentListener": self.enableDocumentListener,
             "enableAutoPurge": self.enableAutoPurge,
-            "pinnedServerCert": self.pinnedServerCert
+            "pinnedServerCert": self.pinnedServerCert,
         }
 
         if self.collections is not None:
@@ -448,17 +480,14 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
         if self.authenticator is not None:
             raw["authenticator"] = self.authenticator.to_json()
 
-        ret_val = {
-            "config": raw,
-            "reset": self.reset
-        }
+        ret_val = {"config": raw, "reset": self.reset}
 
         return ret_val
 
 
 class PostGetReplicatorStatusRequestBody(TestServerRequestBody):
     """
-    The body of a POST /getReplicatorStatus request as specified in version 1 of the 
+    The body of a POST /getReplicatorStatus request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -484,7 +513,7 @@ class PostGetReplicatorStatusRequestBody(TestServerRequestBody):
 
 class PostPerformMaintenanceRequestBody(TestServerRequestBody):
     """
-    The body of a POST /performMaintenance request as specified in version 1 of the 
+    The body of a POST /performMaintenance request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -512,10 +541,11 @@ class PostPerformMaintenanceRequestBody(TestServerRequestBody):
 
     def to_json(self) -> Any:
         return {"database": self.__db, "maintenanceType": self.__type}
-    
+
+
 class PostNewSessionRequestBody(TestServerRequestBody):
     """
-    The body of a POST /newSession request as specified in version 1 of the 
+    The body of a POST /newSession request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -533,12 +563,12 @@ class PostNewSessionRequestBody(TestServerRequestBody):
     def url(self) -> Optional[str]:
         """Returns the URL of the LogSlurp server"""
         return self.__url
-    
+
     @property
     def id(self) -> str:
         """Returns the ID of the log to interact with on the LogSlurp server"""
         return self.__id
-    
+
     @property
     def tag(self) -> Optional[str]:
         """Returns the tag to use to print in log statements from this particular remote"""
@@ -556,10 +586,11 @@ class PostNewSessionRequestBody(TestServerRequestBody):
             json["logging"] = {"url": self.__url, "tag": self.__tag}
 
         return json
-    
+
+
 class PostRunQueryRequestBody(TestServerRequestBody):
     """
-    The body of a POST /runQuery request as specified in version 1 of the 
+    The body of a POST /runQuery request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -577,7 +608,7 @@ class PostRunQueryRequestBody(TestServerRequestBody):
     @property
     def query(self) -> str:
         return self.__query
-    
+
     def __init__(self, database: str, query: str):
         super().__init__(1)
         self.__db = database
@@ -585,10 +616,11 @@ class PostRunQueryRequestBody(TestServerRequestBody):
 
     def to_json(self) -> Any:
         return {"database": self.__db, "query": self.__query}
-    
+
+
 class PostGetDocumentRequestBody(TestServerRequestBody):
     """
-    The body of a POST /getDocument request as specified in version 1 of the 
+    The body of a POST /getDocument request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -606,12 +638,12 @@ class PostGetDocumentRequestBody(TestServerRequestBody):
     def database(self) -> str:
         """Gets the database to retrieve the document from"""
         return self.__database
-    
+
     @property
     def document(self) -> DocumentEntry:
         """Gets the document information to use to retrieve the document"""
         return self.__document
-    
+
     def __init__(self, database: str, document: DocumentEntry):
         super().__init__(1)
         self.__database = database
@@ -619,10 +651,11 @@ class PostGetDocumentRequestBody(TestServerRequestBody):
 
     def to_json(self) -> Any:
         return {"database": self.__database, "document": self.__document.to_json()}
-    
+
+
 class PostLogRequestBody(TestServerRequestBody):
     """
-    The body of a POST /log request as specified in version 1 of the 
+    The body of a POST /log request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
 
     Example Body::
@@ -648,7 +681,7 @@ class PostLogRequestBody(TestServerRequestBody):
 # Remember the note from the top of this file about the actual type of the payload
 class PostResetRequest(TestServerRequest):
     """
-    A POST /reset request as specified in version 1 of the 
+    A POST /reset request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
@@ -658,103 +691,137 @@ class PostResetRequest(TestServerRequest):
 
 class PostGetAllDocumentsRequest(TestServerRequest):
     """
-    A POST /getAllDocuments request as specified in version 1 of the 
+    A POST /getAllDocuments request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
-        super().__init__(1, uuid, "getAllDocuments", PostGetAllDocumentsRequestBody, payload=payload)
+        super().__init__(
+            1, uuid, "getAllDocuments", PostGetAllDocumentsRequestBody, payload=payload
+        )
 
 
 class PostUpdateDatabaseRequest(TestServerRequest):
     """
-    A POST /updateDatabase request as specified in version 1 of the 
+    A POST /updateDatabase request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
-        super().__init__(1, uuid, "updateDatabase", PostUpdateDatabaseRequestBody, payload=payload)
+        super().__init__(
+            1, uuid, "updateDatabase", PostUpdateDatabaseRequestBody, payload=payload
+        )
 
 
 class PostSnapshotDocumentsRequest(TestServerRequest):
     """
-    A POST /snapshotDocuments request as specified in version 1 of the 
+    A POST /snapshotDocuments request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
-        super().__init__(1, uuid, "snapshotDocuments", PostSnapshotDocumentsRequestBody, payload=payload)
+        super().__init__(
+            1,
+            uuid,
+            "snapshotDocuments",
+            PostSnapshotDocumentsRequestBody,
+            payload=payload,
+        )
 
 
 class PostVerifyDocumentsRequest(TestServerRequest):
     """
-    A POST /verifyDocuments request as specified in version 1 of the 
+    A POST /verifyDocuments request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
-        super().__init__(1, uuid, "verifyDocuments", PostVerifyDocumentsRequestBody, payload=payload)
+        super().__init__(
+            1, uuid, "verifyDocuments", PostVerifyDocumentsRequestBody, payload=payload
+        )
 
 
 class PostStartReplicatorRequest(TestServerRequest):
     """
-    A POST /startReplicator request as specified in version 1 of the 
+    A POST /startReplicator request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
-        super().__init__(1, uuid, "startReplicator", PostStartReplicatorRequestBody, payload=payload)
+        super().__init__(
+            1, uuid, "startReplicator", PostStartReplicatorRequestBody, payload=payload
+        )
 
 
 class PostGetReplicatorStatusRequest(TestServerRequest):
     """
-    A POST /getReplicatorStatus request as specified in version 1 of the 
+    A POST /getReplicatorStatus request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
-        super().__init__(1, uuid, "getReplicatorStatus", PostGetReplicatorStatusRequestBody, payload=payload)
+        super().__init__(
+            1,
+            uuid,
+            "getReplicatorStatus",
+            PostGetReplicatorStatusRequestBody,
+            payload=payload,
+        )
 
 
 class PostPerformMaintenanceRequest(TestServerRequest):
     """
-    A POST /performMaintenance request as specified in version 1 of the 
+    A POST /performMaintenance request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
-        super().__init__(1, uuid, "performMaintenance", PostPerformMaintenanceRequestBody, payload=payload)
+        super().__init__(
+            1,
+            uuid,
+            "performMaintenance",
+            PostPerformMaintenanceRequestBody,
+            payload=payload,
+        )
+
 
 class PostNewSessionRequest(TestServerRequest):
     """
-    A POST /newSession request as specified in version 1 of the 
+    A POST /newSession request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
-    
+
     def __init__(self, uuid: UUID, payload: PostNewSessionRequestBody):
-        super().__init__(1, uuid, "newSession", PostNewSessionRequestBody, payload=payload)
+        super().__init__(
+            1, uuid, "newSession", PostNewSessionRequestBody, payload=payload
+        )
+
 
 class PostRunQueryRequest(TestServerRequest):
     """
-    A POST /runQuery request as specified in version 1 of the 
+    A POST /runQuery request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
-    
+
     def __init__(self, uuid: UUID, payload: PostRunQueryRequestBody):
         super().__init__(1, uuid, "runQuery", PostRunQueryRequestBody, payload=payload)
 
+
 class PostGetDocumentRequest(TestServerRequest):
     """
-    A POST /getDocument request as specified in version 1 of the 
+    A POST /getDocument request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
-        super().__init__(1, uuid, "getDocument", PostGetDocumentRequestBody, payload=payload)
+        super().__init__(
+            1, uuid, "getDocument", PostGetDocumentRequestBody, payload=payload
+        )
+
 
 class PostLogRequest(TestServerRequest):
     """
-    A POST /log request as specified in version 1 of the 
+    A POST /log request as specified in version 1 of the
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
