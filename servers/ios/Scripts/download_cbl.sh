@@ -22,7 +22,7 @@ rm -rf "${DOWNLOAD_DIR}" 2> /dev/null
 mkdir -p "${DOWNLOAD_DIR}"
 pushd "${DOWNLOAD_DIR}" > /dev/null
 
-if [ "$BLD_NUM" == "0"]
+if [ "$BLD_NUM" == "0" ]
 then
     ZIP_FILENAME=couchbase-lite-swift_xc_${EDITION}_${VERSION}.zip
     curl -O https://packages.couchbase.com/releases/couchbase-lite-ios/${VERSION}/${ZIP_FILENAME}

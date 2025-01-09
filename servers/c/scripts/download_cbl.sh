@@ -30,7 +30,7 @@ pushd "${DOWNLOAD_DIR}" > /dev/null
 
 if [ ${PLATFORM} = "macos" ]
 then
-    if [ "$BLD_NUM" == "0"]
+    if [ "$BLD_NUM" == "0" ]
     then
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-macos.zip
         curl -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
