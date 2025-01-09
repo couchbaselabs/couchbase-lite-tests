@@ -25,9 +25,9 @@ class TestServer:
         return self.__url
 
     def __init__(self, request_factory: RequestFactory, index: int, url: str):
-        assert (
-            request_factory.version == 1
-        ), "This version of the CBLTest API requires request API v1"
+        assert request_factory.version == 1, (
+            "This version of the CBLTest API requires request API v1"
+        )
         self.__index = index
         self.__url = url
         self.__request_factory = request_factory
@@ -58,9 +58,9 @@ class TestServer:
         :param collections: The name of the collections to add after creating the database.  Cannot
                             be combined with dataset.
         """
-        assert (
-            collections is None or dataset is None
-        ), "dataset and collections cannot both be specified"
+        assert collections is None or dataset is None, (
+            "dataset and collections cannot both be specified"
+        )
 
         with self.__tracer.start_as_current_span("create_and_reset_db"):
             payload = PostResetRequestBody(CBLPyTestGlobal.running_test_name)

@@ -61,23 +61,23 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Verify that the all the docs to which the user has access were pulled"
         )
         lite_all_docs = await db.get_all_documents("_default.posts")
         n_docs = len(lite_all_docs["_default.posts"])
-        assert (
-            n_docs == 5
-        ), f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
+        assert n_docs == 5, (
+            f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
+        )
         expected_docs = {"post_1", "post_2", "post_3", "post_4", "post_5"}
         for doc in lite_all_docs["_default.posts"]:
-            assert (
-                doc.id in expected_docs
-            ), f"Unexpected document found after initial replication: {doc.id}"
+            assert doc.id in expected_docs, (
+                f"Unexpected document found after initial replication: {doc.id}"
+            )
 
         self.mark_test_step("""
             Update docs on SG:
@@ -113,9 +113,9 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator stops")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("""
             Check the local documents:
@@ -124,14 +124,14 @@ class TestReplicationAutoPurge(CBLTestClass):
                 * `post_4` was deleted.
         """)
         lite_all_docs = await db.get_all_documents("_default.posts")
-        assert (
-            len(lite_all_docs["_default.posts"]) == 3
-        ), "Incorrect number of documents after second replication"
+        assert len(lite_all_docs["_default.posts"]) == 3, (
+            "Incorrect number of documents after second replication"
+        )
         expected_docs = {"post_2", "post_3", "post_5"}
         for doc in lite_all_docs["_default.posts"]:
-            assert (
-                doc.id in expected_docs
-            ), f"Unexpected document found after initial replication: {doc.id}"
+            assert doc.id in expected_docs, (
+                f"Unexpected document found after initial replication: {doc.id}"
+            )
 
         self.mark_test_step("""
             Check document replications:
@@ -141,21 +141,21 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         for update in replicator.document_updates:
             if update.document_id == "post_1":
-                assert (
-                    update.flags & ReplicatorDocumentFlags.ACCESS_REMOVED
-                ), "Access removed flag missing from post_1"
+                assert update.flags & ReplicatorDocumentFlags.ACCESS_REMOVED, (
+                    "Access removed flag missing from post_1"
+                )
             elif update.document_id == "post_2" or update.document_id == "post_3":
-                assert (
-                    update.flags == ReplicatorDocumentFlags.NONE
-                ), f"Stray flags on {update.document_id} ({update.flags})"
+                assert update.flags == ReplicatorDocumentFlags.NONE, (
+                    f"Stray flags on {update.document_id} ({update.flags})"
+                )
             elif update.document_id == "post_4":
-                assert (
-                    update.flags & ReplicatorDocumentFlags.DELETED
-                ), "Deleted flag missing from post_4"
+                assert update.flags & ReplicatorDocumentFlags.DELETED, (
+                    "Deleted flag missing from post_4"
+                )
             else:
-                assert (
-                    False
-                ), f"Stray document update present in list ({update.document_id})"
+                assert False, (
+                    f"Stray document update present in list ({update.document_id})"
+                )
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -199,22 +199,22 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator stops")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Verify that the docs to which the user has access, are all pulled"
         )
         lite_all_docs = await db.get_all_documents("_default.posts")
-        assert (
-            len(lite_all_docs["_default.posts"]) == 5
-        ), "Incorrect number of initial documents replicated"
+        assert len(lite_all_docs["_default.posts"]) == 5, (
+            "Incorrect number of initial documents replicated"
+        )
         expected_docs = {"post_1", "post_2", "post_3", "post_4", "post_5"}
         for doc in lite_all_docs["_default.posts"]:
-            assert (
-                doc.id in expected_docs
-            ), f"Unexpected document found after initial replication: {doc.id}"
+            assert doc.id in expected_docs, (
+                f"Unexpected document found after initial replication: {doc.id}"
+            )
 
         self.mark_test_step("""
             Update user1's access to channels on SG:
@@ -233,38 +233,38 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator stops")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("""
             Check local documents:
                 * `post_4` and `post_5` were purged.
         """)
         lite_all_docs = await db.get_all_documents("_default.posts")
-        assert (
-            len(lite_all_docs["_default.posts"]) == 3
-        ), "Incorrect number of documents after second replication"
+        assert len(lite_all_docs["_default.posts"]) == 3, (
+            "Incorrect number of documents after second replication"
+        )
         expected_docs = {"post_1", "post_2", "post_3"}
         for doc in lite_all_docs["_default.posts"]:
-            assert (
-                doc.id in expected_docs
-            ), f"Unexpected document found after initial replication: {doc.id}"
+            assert doc.id in expected_docs, (
+                f"Unexpected document found after initial replication: {doc.id}"
+            )
 
         self.mark_test_step("""
             Check document replications:
                 * `post_4` and `post_5` have access-removed flag set.
         """)
-        assert (
-            len(replicator.document_updates) == 2
-        ), f"Expected 2 replicator document updates but found {len(replicator.document_updates)}"
+        assert len(replicator.document_updates) == 2, (
+            f"Expected 2 replicator document updates but found {len(replicator.document_updates)}"
+        )
         for update in replicator.document_updates:
-            assert (
-                update.document_id == "post_4" or update.document_id == "post_5"
-            ), f"Unexpected document update found for {update.document_id}"
-            assert (
-                update.flags == ReplicatorDocumentFlags.ACCESS_REMOVED
-            ), f"Invalid flags on document update (expected ACCESS_REMOVED): {update.flags}"
+            assert update.document_id == "post_4" or update.document_id == "post_5", (
+                f"Unexpected document update found for {update.document_id}"
+            )
+            assert update.flags == ReplicatorDocumentFlags.ACCESS_REMOVED, (
+                f"Invalid flags on document update (expected ACCESS_REMOVED): {update.flags}"
+            )
 
         self.mark_test_step("""
             Restore user1's access to channels on SG:
@@ -283,38 +283,38 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator stops")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("""
             Check local documents:
                 * `post_4` and `post_5` are back.
         """)
         lite_all_docs = await db.get_all_documents("_default.posts")
-        assert (
-            len(lite_all_docs["_default.posts"]) == 5
-        ), "Incorrect number of documents after third replication"
+        assert len(lite_all_docs["_default.posts"]) == 5, (
+            "Incorrect number of documents after third replication"
+        )
         expected_docs = {"post_1", "post_2", "post_3", "post_4", "post_5"}
         for doc in lite_all_docs["_default.posts"]:
-            assert (
-                doc.id in expected_docs
-            ), f"Unexpected document found after initial replication: {doc.id}"
+            assert doc.id in expected_docs, (
+                f"Unexpected document found after initial replication: {doc.id}"
+            )
 
         self.mark_test_step("""
             Check document replications:
                 * `post_4` and `post_5` have events with no flags set.
         """)
-        assert (
-            len(replicator.document_updates) == 2
-        ), f"Expected 2 replicator document updates but found {len(replicator.document_updates)}"
+        assert len(replicator.document_updates) == 2, (
+            f"Expected 2 replicator document updates but found {len(replicator.document_updates)}"
+        )
         for update in replicator.document_updates:
-            assert (
-                update.document_id == "post_4" or update.document_id == "post_5"
-            ), f"Unexpected document update found for {update.document_id}"
-            assert (
-                update.flags == ReplicatorDocumentFlags.NONE
-            ), f"Invalid flags on document update (expected NONE): {update.flags}"
+            assert update.document_id == "post_4" or update.document_id == "post_5", (
+                f"Unexpected document update found for {update.document_id}"
+            )
+            assert update.flags == ReplicatorDocumentFlags.NONE, (
+                f"Invalid flags on document update (expected NONE): {update.flags}"
+            )
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -358,23 +358,23 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator stops")
         status = await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Verify that the all the docs to which the user has access were pulled."
         )
         lite_all_docs = await db.get_all_documents("_default.posts")
         n_docs = len(lite_all_docs["_default.posts"])
-        assert (
-            n_docs == 5
-        ), f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
+        assert n_docs == 5, (
+            f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
+        )
         expected_docs = {"post_1", "post_2", "post_3", "post_4", "post_5"}
         for doc in lite_all_docs["_default.posts"]:
-            assert (
-                doc.id in expected_docs
-            ), f"Unexpected document found after initial replication: {doc.id}"
+            assert doc.id in expected_docs, (
+                f"Unexpected document found after initial replication: {doc.id}"
+            )
 
         self.mark_test_step("Snapshot the database")
         snap = await db.create_snapshot(
@@ -461,9 +461,9 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         lite_all_docs = await db.get_all_documents("_default.posts")
         n_docs = len(lite_all_docs["_default.posts"])
-        assert (
-            n_docs == 5
-        ), f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
+        assert n_docs == 5, (
+            f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
+        )
 
         snapshot_updater = SnapshotUpdater(snap)
         snapshot_updater.upsert_document(
@@ -479,9 +479,9 @@ class TestReplicationAutoPurge(CBLTestClass):
             removed_properties=["collection", "content", "owner", "scope", "title"],
         )
         verify_result = await db.verify_documents(snapshot_updater)
-        assert (
-            verify_result.result is True
-        ), f"Local docs are not as expected: {verify_result.description}"
+        assert verify_result.result is True, (
+            f"Local docs are not as expected: {verify_result.description}"
+        )
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -525,22 +525,22 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator stops")
         status = await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Verify that the all the docs to which the user has access were pulled."
         )
         lite_all_docs = await db.get_all_documents("_default.posts")
-        assert (
-            len(lite_all_docs["_default.posts"]) == 5
-        ), "Incorrect number of initial documents replicated"
+        assert len(lite_all_docs["_default.posts"]) == 5, (
+            "Incorrect number of initial documents replicated"
+        )
         expected_docs = {"post_1", "post_2", "post_3", "post_4", "post_5"}
         for doc in lite_all_docs["_default.posts"]:
-            assert (
-                doc.id in expected_docs
-            ), f"Unexpected document found after initial replication: {doc.id}"
+            assert doc.id in expected_docs, (
+                f"Unexpected document found after initial replication: {doc.id}"
+            )
 
         self.mark_test_step("""
             Update user1's access to channels on SG:
@@ -606,9 +606,9 @@ class TestReplicationAutoPurge(CBLTestClass):
         assert n == 5, f"Incorrect number of documents after second replication: {n}"
         expected_docs = {"post_1", "post_2", "post_3", "post_4", "post_5"}
         for doc in lite_all_docs["_default.posts"]:
-            assert (
-                doc.id in expected_docs
-            ), f"Unexpected document found after initial replication: {doc.id}"
+            assert doc.id in expected_docs, (
+                f"Unexpected document found after initial replication: {doc.id}"
+            )
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -652,24 +652,24 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator stops")
         status = await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Verify that the all the docs to which the user has access were pulled"
         )
         lite_all_docs = await db.get_all_documents("_default.posts")
-        assert (
-            len(lite_all_docs["_default.posts"]) == 5
-        ), "Incorrect number of initial documents replicated"
+        assert len(lite_all_docs["_default.posts"]) == 5, (
+            "Incorrect number of initial documents replicated"
+        )
         expected_docs = {"post_1", "post_2", "post_3", "post_4", "post_5"}
         rev_ids = {}
         for doc in lite_all_docs["_default.posts"]:
             doc_id = doc.id
-            assert (
-                doc_id in expected_docs
-            ), f"Unexpected document found after initial replication: {doc_id}"
+            assert doc_id in expected_docs, (
+                f"Unexpected document found after initial replication: {doc_id}"
+            )
             rev_ids[doc_id] = doc.rev
 
         self.mark_test_step("Snapshot the database")
@@ -759,15 +759,15 @@ class TestReplicationAutoPurge(CBLTestClass):
        """)
         lite_all_docs = await db.get_all_documents("_default.posts")
         n_docs = len(lite_all_docs["_default.posts"])
-        assert (
-            n_docs == 4
-        ), f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
+        assert n_docs == 4, (
+            f"Incorrect number of initial documents replicated (expected 5; got {n_docs}"
+        )
 
         snapshot_updater = SnapshotUpdater(snap)
         snapshot_updater.delete_document("_default.posts", "post_1")
         verify_result = await db.verify_documents(snapshot_updater)
-        assert (
-            verify_result.result is True
-        ), f"Local docs are not as expected: {verify_result.description}"
+        assert verify_result.result is True, (
+            f"Local docs are not as expected: {verify_result.description}"
+        )
 
         await cblpytest.test_servers[0].cleanup()

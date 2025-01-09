@@ -78,9 +78,9 @@ class TestServerRequest:
         # For those subclassing this, usually all you need to do is call this constructor
         # filling out the appropriate information via args
         if payload is not None and payload_type is not None:
-            assert isinstance(
-                payload, payload_type
-            ), f"Incorrect payload type for request (expecting '{payload_type}')"
+            assert isinstance(payload, payload_type), (
+                f"Incorrect payload type for request (expecting '{payload_type}')"
+            )
 
         self.__version = available_api_version(version)
         self.__uuid = uuid

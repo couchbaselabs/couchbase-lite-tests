@@ -82,9 +82,9 @@ class SnapshotUpdater:
         .. note:: A keypath is a JSON keypath like $.foo[0].bar ($. is optional)
         """
         if new_properties is not None:
-            assert isinstance(
-                new_properties, list
-            ), "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
+            assert isinstance(new_properties, list), (
+                "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
+            )
 
         self._updates.append(
             DatabaseUpdateEntry(
@@ -104,9 +104,9 @@ class DatabaseUpdater:
     """
 
     def __init__(self, db_name: str, request_factory: RequestFactory, index: int):
-        assert (
-            request_factory.version == 1
-        ), "This version of the CBLTest API requires request API v1"
+        assert request_factory.version == 1, (
+            "This version of the CBLTest API requires request API v1"
+        )
         self._db_name = db_name
         self._updates: List[DatabaseUpdateEntry] = []
         self.__request_factory = request_factory
@@ -296,9 +296,9 @@ class GetDocumentResult:
         return self.__body
 
     def __init__(self, raw: Dict[str, Any]) -> None:
-        assert (
-            self.__id_key in raw and self.__revs_key in raw
-        ), "Malformed raw dict in GetDocumentResult"
+        assert self.__id_key in raw and self.__revs_key in raw, (
+            "Malformed raw dict in GetDocumentResult"
+        )
         self.__id = raw[self.__id_key]
         self.__revs = raw[self.__revs_key]
         raw.pop(self.__id_key)

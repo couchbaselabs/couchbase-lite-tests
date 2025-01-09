@@ -41,9 +41,9 @@ class PostGetAllDocumentsEntry:
         return self.__rev
 
     def __init__(self, body: dict):
-        assert isinstance(
-            body, dict
-        ), "Invalid PostGetAllDocumentsEntry received (not an object)"
+        assert isinstance(body, dict), (
+            "Invalid PostGetAllDocumentsEntry received (not an object)"
+        )
         self.__id = _assert_string_entry(body, self.__id_key)
         self.__rev = _assert_string_entry(body, self.__rev_key)
 

@@ -57,9 +57,9 @@ class TestCustomConflict(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -121,15 +121,15 @@ class TestCustomConflict(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(verify_description)
         verify_result = await db.verify_documents(snapshot_updater)
-        assert (
-            verify_result.result is True
-        ), f"Conflict resolution resulted in bad data: {verify_result.description}"
+        assert verify_result.result is True, (
+            f"Conflict resolution resulted in bad data: {verify_result.description}"
+        )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_custom_conflict_local_wins(

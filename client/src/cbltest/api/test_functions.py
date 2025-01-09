@@ -135,9 +135,9 @@ async def compare_local_and_remote(
 
         for collection in collections:
             split = collection.split(".")
-            assert (
-                len(split) == 2
-            ), f"Invalid collection name in compare_local_and_remote: {collection}"
+            assert len(split) == 2, (
+                f"Invalid collection name in compare_local_and_remote: {collection}"
+            )
             sg_all_docs = await remote.get_all_documents(bucket, split[0], split[1])
             compare_result = compare_doc_results(
                 lite_all_docs[collection], sg_all_docs.rows, mode

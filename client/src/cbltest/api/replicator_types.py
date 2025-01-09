@@ -238,13 +238,13 @@ class ReplicatorProgress:
         return self.__completed
 
     def __init__(self, body: dict) -> None:
-        assert isinstance(
-            body, dict
-        ), "Invalid replicator progress value received (not an object)"
+        assert isinstance(body, dict), (
+            "Invalid replicator progress value received (not an object)"
+        )
         self.__completed = cast(bool, body.get(self.__completed_key))
-        assert isinstance(
-            self.__completed, bool
-        ), "Invalid replicator progress value received ('completed' not a boolean)"
+        assert isinstance(self.__completed, bool), (
+            "Invalid replicator progress value received ('completed' not a boolean)"
+        )
 
 
 class ReplicatorDocumentFlags(Flag):
@@ -264,9 +264,9 @@ class ReplicatorDocumentFlags(Flag):
 
         :param input: The string representing the flag (e.g. DELETED), case-insensitive
         """
-        assert isinstance(
-            input, str
-        ), f"Non-string input to ReplicatorDocumentFlags {input}"
+        assert isinstance(input, str), (
+            f"Non-string input to ReplicatorDocumentFlags {input}"
+        )
         upper = input.upper()
         if upper == "NONE":
             return ReplicatorDocumentFlags.NONE
@@ -349,13 +349,13 @@ class ReplicatorDocumentEntry:
         return self.__error
 
     def __init__(self, body: dict) -> None:
-        assert isinstance(
-            body, dict
-        ), "Invalid replicator document received (not an object)"
+        assert isinstance(body, dict), (
+            "Invalid replicator document received (not an object)"
+        )
         self.__collection = _get_typed_required(body, self.__collection_key, str)
-        assert (
-            self.__collection is not None
-        ), "Null collection on replicator document received"
+        assert self.__collection is not None, (
+            "Null collection on replicator document received"
+        )
         self.__document_id = _get_typed_required(body, self.__document_id_key, str)
         assert self.__document_id is not None, "Null ID on replicator document received"
         self.__is_push = _get_typed_required(body, self.__is_push_key, bool)
@@ -404,9 +404,9 @@ class WaitForDocumentEventEntry:
         err_domain: Optional[str] = None,
         err_code: Optional[int] = None,
     ):
-        assert isinstance(
-            collection, str
-        ), "WaitForDocumentEventEntry: collection not a string"
+        assert isinstance(collection, str), (
+            "WaitForDocumentEventEntry: collection not a string"
+        )
         assert isinstance(id, str), "WaitForDocumentEventEntry: id not a string"
         self.__collection = collection
         self.__id = id

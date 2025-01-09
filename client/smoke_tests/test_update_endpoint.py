@@ -71,7 +71,7 @@ class TestUpdateDatabase:
             "test2.\\.",
             "test2.foo\\[",
             "test2.foo\\]",
-            "test2.foo\\." "test2.foo\\[bar",
+            "test2.foo\\.test2.foo\\[bar",
             "test2.foo\\]bar",
             "test2.foo\\.bar",
             # Add a new root key that contains an array of size 4

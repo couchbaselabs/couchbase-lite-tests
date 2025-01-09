@@ -76,9 +76,9 @@ class Replicator:
         enable_auto_purge: bool = True,
         pinned_server_cert: Optional[str] = None,
     ):
-        assert (
-            database._request_factory.version == 1
-        ), "This version of the cbl test API requires request API v1"
+        assert database._request_factory.version == 1, (
+            "This version of the cbl test API requires request API v1"
+        )
         self.__database = database
         self.__index = database._index
         self.__request_factory = database._request_factory
@@ -180,12 +180,12 @@ class Replicator:
         :param timeout: The time limit to wait for the state change (default 30s)
         """
         with self.__tracer.start_as_current_span("wait_for"):
-            assert (
-                interval.total_seconds() > 0.0
-            ), "Zero interval makes no sense, try again"
-            assert (
-                timeout.total_seconds() >= 1.0
-            ), "Timeout too short, must be at least 1 second"
+            assert interval.total_seconds() > 0.0, (
+                "Zero interval makes no sense, try again"
+            )
+            assert timeout.total_seconds() >= 1.0, (
+                "Timeout too short, must be at least 1 second"
+            )
 
             status_matches = False
             start = time()
@@ -214,15 +214,15 @@ class Replicator:
         :param interval: The interval at which to ping for the replicator state (default is half a second)
         """
         with self.__tracer.start_as_current_span("wait_for_doc_events"):
-            assert (
-                interval.total_seconds() > 0.0
-            ), "Zero interval makes no sense, try again"
-            assert (
-                not self.continuous
-            ), "wait_for_doc_events not applicable for a continuous replicator"
-            assert (
-                self.enable_document_listener
-            ), "Can't wait for documents unless the listener is enabled"
+            assert interval.total_seconds() > 0.0, (
+                "Zero interval makes no sense, try again"
+            )
+            assert not self.continuous, (
+                "wait_for_doc_events not applicable for a continuous replicator"
+            )
+            assert self.enable_document_listener, (
+                "Can't wait for documents unless the listener is enabled"
+            )
 
             events = events.copy()
             processed = 0
@@ -230,9 +230,9 @@ class Replicator:
             while True:
                 status = await self.get_status()
                 repl_err = status.error
-                assert (
-                    repl_err is None
-                ), f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                assert repl_err is None, (
+                    f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                )
 
                 # Skip the ones we previously looked at to save time
                 for event in islice(self.document_updates, processed, None):
@@ -282,12 +282,12 @@ class Replicator:
         :param idle_timeout: The timeout to use when waiting for the next idle state (default 30s)
         """
         with self.__tracer.start_as_current_span("wait_for_all_doc_events"):
-            assert (
-                self.continuous
-            ), "wait_for_all_doc_events not applicable for a non-continuous replicator"
-            assert (
-                self.enable_document_listener
-            ), "Can't wait for documents unless the listener is enabled"
+            assert self.continuous, (
+                "wait_for_all_doc_events not applicable for a non-continuous replicator"
+            )
+            assert self.enable_document_listener, (
+                "Can't wait for documents unless the listener is enabled"
+            )
 
             events = events.copy()
             processed = 0
@@ -298,9 +298,9 @@ class Replicator:
                     ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout
                 )
                 repl_err = status.error
-                assert (
-                    repl_err is None
-                ), f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                assert repl_err is None, (
+                    f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                )
 
                 # Skip the ones we previously looked at to save time
                 for event in islice(self.document_updates, processed, None):
@@ -347,12 +347,12 @@ class Replicator:
         :param idle_timeout: The timeout to use when waiting for the next idle state (default 10s)
         """
         with self.__tracer.start_as_current_span("wait_for_any_doc_events"):
-            assert (
-                self.continuous
-            ), "wait_for_any_doc_events not applicable for a non-continuous replicator"
-            assert (
-                self.enable_document_listener
-            ), "Can't wait for documents unless the listener is enabled"
+            assert self.continuous, (
+                "wait_for_any_doc_events not applicable for a non-continuous replicator"
+            )
+            assert self.enable_document_listener, (
+                "Can't wait for documents unless the listener is enabled"
+            )
 
             events = events.copy()
             processed = 0
@@ -363,9 +363,9 @@ class Replicator:
                     ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout
                 )
                 repl_err = status.error
-                assert (
-                    repl_err is None
-                ), f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                assert repl_err is None, (
+                    f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                )
 
                 # Skip the ones we looked at, previously, to save time
                 for event in islice(self.document_updates, processed, None):

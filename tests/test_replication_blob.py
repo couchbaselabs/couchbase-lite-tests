@@ -39,14 +39,16 @@ class TestReplicationBlob(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Start a replicator:
                 * endpoint: `/travel`
                 * collections : `travel.hotels`
                 * type: push_and_pull
                 * continuous: false
                 * credentials: user1/pass
-        """)
+        """
+        )
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),

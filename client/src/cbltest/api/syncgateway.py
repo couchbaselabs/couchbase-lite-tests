@@ -55,9 +55,9 @@ class PutDatabasePayload(JSONSerializable):
 
     def __init__(self, dataset_or_config: dict):
         _assert_not_null(dataset_or_config, nameof(dataset_or_config))
-        assert isinstance(
-            dataset_or_config, dict
-        ), "Invalid dataset_or_config passed to PutDatabasePayload"
+        assert isinstance(dataset_or_config, dict), (
+            "Invalid dataset_or_config passed to PutDatabasePayload"
+        )
         self.__config: dict = dataset_or_config
         if "config" in dataset_or_config:
             self.__config = _get_typed_required(dataset_or_config, "config", dict)
@@ -581,9 +581,9 @@ class SyncGateway:
         typed_response = cast(list, response)
         for r in typed_response:
             info = cast(dict, r)
-            assert isinstance(
-                info, dict
-            ), "Invalid item inside bulk docs response list (not an object)"
+            assert isinstance(info, dict), (
+                "Invalid item inside bulk docs response list (not an object)"
+            )
             if "error" in info:
                 raise CblSyncGatewayBadResponseError(
                     info["status"],

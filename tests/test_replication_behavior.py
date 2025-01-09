@@ -59,9 +59,9 @@ class TestReplicationBehavior(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Check that only the 50 non deleted documents were replicated"
@@ -69,6 +69,6 @@ class TestReplicationBehavior(CBLTestClass):
         assert len(replicator.document_updates) == 50
         for entry in replicator.document_updates:
             name_number = int(entry.document_id[-3:])
-            assert (
-                name_number > 150 and name_number <= 200
-            ), f"Unexpected document found in replication: {entry.document_id}"
+            assert name_number > 150 and name_number <= 200, (
+                f"Unexpected document found in replication: {entry.document_id}"
+            )

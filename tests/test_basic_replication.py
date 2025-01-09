@@ -9,9 +9,9 @@ from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.error_types import ErrorDomain
 from cbltest.api.replicator import (
     Replicator,
-    ReplicatorType,
-    ReplicatorCollectionEntry,
     ReplicatorActivityLevel,
+    ReplicatorCollectionEntry,
+    ReplicatorType,
     WaitForDocumentEventEntry,
 )
 from cbltest.api.replicator_types import (
@@ -108,9 +108,9 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -161,9 +161,9 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -222,9 +222,9 @@ class TestBasicReplication(CBLTestClass):
         status = await replicator.wait_for(
             ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=300)
         )
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -286,9 +286,9 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is idle.")
         status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -422,9 +422,9 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is idle.")
         status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -628,9 +628,9 @@ class TestBasicReplication(CBLTestClass):
         status = await replicator.wait_for(
             ReplicatorActivityLevel.IDLE, timeout=timedelta(seconds=300)
         )
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -893,9 +893,9 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -943,9 +943,9 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -993,9 +993,9 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -1044,9 +1044,9 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -1068,18 +1068,18 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that the purged airline doc doesn't exist on SG.")
         sg_all_docs = await cblpytest.sync_gateways[0].get_all_documents(
             "travel", "travel", "airlines"
         )
         for doc in sg_all_docs.rows:
-            assert (
-                doc.id != sg_purged_doc_id
-            ), f"Unexpected purged document found in SG: {doc.id}"
+            assert doc.id != sg_purged_doc_id, (
+                f"Unexpected purged document found in SG: {doc.id}"
+            )
 
         self.mark_test_step(
             "Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`."
@@ -1098,22 +1098,22 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that there were no docs pushed.")
-        assert (
-            len(replicator.document_updates) == 0
-        ), f"Should be no docs pushed, but {len(replicator.document_updates)} docs were pushed"
+        assert len(replicator.document_updates) == 0, (
+            f"Should be no docs pushed, but {len(replicator.document_updates)} docs were pushed"
+        )
 
         self.mark_test_step(
             "Check that the purged airline doc was not pushed back to SG"
         )
         for doc in sg_all_docs.rows:
-            assert (
-                doc.id != sg_purged_doc_id
-            ), f"Unexpected purged document found in SG: {doc.id}"
+            assert doc.id != sg_purged_doc_id, (
+                f"Unexpected purged document found in SG: {doc.id}"
+            )
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -1153,9 +1153,9 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -1178,18 +1178,18 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Check that the purged airport doc doesn't exist in CBL database."
         )
         lite_all_docs = await db.get_all_documents("travel.airports")
         for doc in lite_all_docs["travel.airports"]:
-            assert (
-                doc.id != lite_purged_doc_id
-            ), f"Unexpected purged document found in local database: {doc.id}"
+            assert doc.id != lite_purged_doc_id, (
+                f"Unexpected purged document found in local database: {doc.id}"
+            )
 
         self.mark_test_step(
             "Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`."
@@ -1208,17 +1208,17 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that there was only one doc pulled.")
-        assert (
-            len(replicator.document_updates) == 1
-        ), f"Should be one doc pulled, but {len(replicator.document_updates)} docs were pulled"
-        assert (
-            replicator.document_updates[0].document_id == lite_purged_doc_id
-        ), f"Unexpected doc '{replicator.document_updates[0].document_id}' was pulled"
+        assert len(replicator.document_updates) == 1, (
+            f"Should be one doc pulled, but {len(replicator.document_updates)} docs were pulled"
+        )
+        assert replicator.document_updates[0].document_id == lite_purged_doc_id, (
+            f"Unexpected doc '{replicator.document_updates[0].document_id}' was pulled"
+        )
 
         self.mark_test_step(
             "Check that the purged airport doc is pulled back in CBL database."
@@ -1229,6 +1229,8 @@ class TestBasicReplication(CBLTestClass):
             if doc.id == lite_purged_doc_id:
                 found_doc = True
                 break
-        assert found_doc, f"{lite_purged_doc_id} was not pulled back to local database after reset checkpoint"
+        assert found_doc, (
+            f"{lite_purged_doc_id} was not pulled back to local database after reset checkpoint"
+        )
 
         await cblpytest.test_servers[0].cleanup()

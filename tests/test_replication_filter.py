@@ -26,14 +26,14 @@ class TestReplicationFilter(CBLTestClass):
         self, expected: Set[str], actual: List[ReplicatorDocumentEntry]
     ) -> None:
         for update in actual:
-            assert (
-                update.document_id in expected
-            ), f"Unexpected document update not in filter: {update.document_id}"
+            assert update.document_id in expected, (
+                f"Unexpected document update not in filter: {update.document_id}"
+            )
             expected.remove(update.document_id)
 
-        assert (
-            len(expected) == 0
-        ), f"Not all document updates were found (e.g. {next(iter(expected))})"
+        assert len(expected) == 0, (
+            f"Not all document updates were found (e.g. {next(iter(expected))})"
+        )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_document_ids_filter(
@@ -51,7 +51,8 @@ class TestReplicationFilter(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Start a replicator: 
                 * collections : 
                 * `travel.airlines`
@@ -62,7 +63,8 @@ class TestReplicationFilter(CBLTestClass):
                 * type: push
                 * continuous: false
                 * credentials: user1/pass
-        """)
+        """
+        )
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -84,9 +86,9 @@ class TestReplicationFilter(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Check that only docs specified in the documentIDs filters are replicated except `travel.airline`.`airline_1000`"
@@ -94,12 +96,14 @@ class TestReplicationFilter(CBLTestClass):
         expected_ids = {"airline_10", "airline_20", "route_10", "route_20"}
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Update docs in the local database
                 * Add `airline_1000` in `travel.airlines`
                 * Update `airline_10` in `travel.airlines`
                 * Remove `route_10` in `travel.routes`
-        """)
+        """
+        )
         async with db.batch_updater() as b:
             b.upsert_document("travel.airlines", "airline_1000", [{"new_doc": True}])
             b.upsert_document("travel.airlines", "airline_10", [{"new_doc": False}])
@@ -109,9 +113,9 @@ class TestReplicationFilter(CBLTestClass):
         replicator.clear_document_updates()
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Check that only changes for docs in the specified documentIDs filters are replicated."
@@ -137,7 +141,8 @@ class TestReplicationFilter(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Start a replicator: 
                 * collections : 
                 * `travel.airports`
@@ -148,7 +153,8 @@ class TestReplicationFilter(CBLTestClass):
                 * type: pull
                 * continuous: false
                 * credentials: user1/pass
-        """)
+        """
+        )
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -170,9 +176,9 @@ class TestReplicationFilter(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Check that only docs specified in the documentIDs filters are replicated except `travel.airline`.`airline_1000`"
@@ -180,12 +186,14 @@ class TestReplicationFilter(CBLTestClass):
         expected_ids = {"airport_10", "airport_20", "landmark_10", "landmark_20"}
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Update docs on SG
                 * Add `airport_1000` in `travel.airports`
                 * Update `airport_10` in `travel.airports`
                 * Remove `landmark_10`, in `travel.landmarks`
-        """)
+        """
+        )
         remote_airport_10 = await cblpytest.sync_gateways[0].get_document(
             "travel", "airport_10", "travel", "airports"
         )
@@ -214,9 +222,9 @@ class TestReplicationFilter(CBLTestClass):
         replicator.clear_document_updates()
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Check that only changes for docs in the specified documentIDs filters are replicated."
@@ -242,7 +250,8 @@ class TestReplicationFilter(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Start a replicator: 
                 * collections : 
                 * `travel.airports`
@@ -253,7 +262,8 @@ class TestReplicationFilter(CBLTestClass):
                 * type: pull
                 * continuous: false
                 * credentials: user1/pass
-        """)
+        """
+        )
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -272,22 +282,24 @@ class TestReplicationFilter(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that only docs in the filtered channels are pulled.")
         expected_ids = uk_and_france_doc_ids
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Update docs on SG
                 * Add `airport_1000` with channels = ["United Kingdom"], `airport_2000` with channels = ["France"] 
                     and `airport_3000` with channels = ["United States"] in `travel.airports`
                 * Update `airport_11` with channels = ["United States"], `airport_1` with channels = ["France"], 
                     `airport_17` with channels = ["United States"] in `travel.airports`
                 * Remove `landmark_1` channels = ["United Kingdom"], `landmark_2001` channels = ["France"] in `travel.landmarks`
-        """)
+        """
+        )
         remote_airport_11 = await cblpytest.sync_gateways[0].get_document(
             "travel", "airport_11", "travel", "airports"
         )
@@ -360,9 +372,9 @@ class TestReplicationFilter(CBLTestClass):
         replicator.clear_document_updates()
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Check that only changes in the filtered channels are pulled."
@@ -396,12 +408,14 @@ class TestReplicationFilter(CBLTestClass):
         )
         snapshot_updater = SnapshotUpdater(snapshot_id)
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Add a document to SG
                 * id: test_public
                 * channels: `!`
                 * content: `{"hello": "world"}`
-        """)
+        """
+        )
         sgw = cblpytest.sync_gateways[0]
         await sgw.update_documents(
             "names",
@@ -417,13 +431,15 @@ class TestReplicationFilter(CBLTestClass):
             [{"hello": "world"}, {"channels": ["!"]}],
         )
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Start a replicator: 
                 * endpoint: `/names`
                 * type: pull
                 * continuous: false
                 * credentials: user2/pass
-        """)
+        """
+        )
         replicator = Replicator(
             db,
             sgw.replication_url("names"),
@@ -435,9 +451,9 @@ class TestReplicationFilter(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that only test_public was pulled")
         all_docs = await db.get_all_documents("_default._default")
@@ -448,22 +464,26 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Verify test_public contents")
         await db.verify_documents(snapshot_updater)
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Update test_public locally
                 * body: `{"see you later": "world"}`
-        """)
+        """
+        )
         async with db.batch_updater() as b:
             b.upsert_document(
                 "_default._default", "test_public", [{"see you later": "world"}]
             )
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Start a replicator: 
                 * endpoint: `/names`
                 * type: push
                 * continuous: false
                 * credentials: user2/pass
-        """)
+        """
+        )
         replicator = Replicator(
             db,
             sgw.replication_url("names"),
@@ -475,19 +495,19 @@ class TestReplicationFilter(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Verify that the document on Sync Gateway was updated")
         sgw_doc = await sgw.get_document("names", "test_public")
         assert sgw_doc is not None, "test_public missing from SGW"
-        assert (
-            "see you later" in sgw_doc.body
-        ), "updated key missing from test_public in SGW"
-        assert (
-            sgw_doc.body["see you later"] == "world"
-        ), "incorrect data in updated key from test_public in SGW"
+        assert "see you later" in sgw_doc.body, (
+            "updated key missing from test_public in SGW"
+        )
+        assert sgw_doc.body["see you later"] == "world", (
+            "incorrect data in updated key from test_public in SGW"
+        )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_custom_push_filter(
@@ -505,7 +525,8 @@ class TestReplicationFilter(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Start a replicator: 
                 * collections : 
                 * `_default._default`
@@ -516,7 +537,8 @@ class TestReplicationFilter(CBLTestClass):
                 * type: push
                 * continuous: false
                 * credentials: user1/pass
-        """)
+        """
+        )
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("names"),
@@ -535,20 +557,22 @@ class TestReplicationFilter(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that no docs are replicated.")
-        assert (
-            len(replicator.document_updates) == 0
-        ), f"{len(replicator.document_updates)} documents replicated even though they should be filtered"
+        assert len(replicator.document_updates) == 0, (
+            f"{len(replicator.document_updates)} documents replicated even though they should be filtered"
+        )
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
             Update docs in the local database
                 * Add `name_10000`
                 * Remove `name_10` and `name_20`
-        """)
+        """
+        )
         async with db.batch_updater() as b:
             b.upsert_document("_default._default", "name_10000", [{"answer": 42}])
             b.delete_document("_default._default", "name_10")
@@ -557,9 +581,9 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Check that only changes passed the push filters are replicated."
@@ -590,7 +614,8 @@ class TestReplicationFilter(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
         Start a replicator:
             * collections :
             * `_default._default`
@@ -601,7 +626,8 @@ class TestReplicationFilter(CBLTestClass):
             * type: pull
             * continuous: false
             * credentials: user1/pass
-        """)
+        """
+        )
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("names"),
@@ -620,23 +646,25 @@ class TestReplicationFilter(CBLTestClass):
 
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Pull replication failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Pull replication failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step("Check that no docs are replicated.")
         successful_replications1 = list(
             filter(repl_filter, replicator.document_updates)
         )
-        assert (
-            len(successful_replications1) == 0
-        ), f"{len(successful_replications1)} documents were replicated even though they should have been filtered"
+        assert len(successful_replications1) == 0, (
+            f"{len(successful_replications1)} documents were replicated even though they should have been filtered"
+        )
 
-        self.mark_test_step("""
+        self.mark_test_step(
+            """
         Update docs on SG
             * Add `name_10000`
             * Remove `name_10` and `name_20`
-        """)
+        """
+        )
         updates = [DocumentUpdateEntry("name_1000", None, {"answer": 42})]
 
         remote_name_10 = await cblpytest.sync_gateways[0].get_document(
@@ -662,9 +690,9 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Start a replicator with the same config as in step 3.")
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is None
-        ), f"Pull replication failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Pull replication failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
 
         self.mark_test_step(
             "Check that only changes passed the push filters are replicated."

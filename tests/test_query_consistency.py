@@ -59,9 +59,9 @@ class TestQueryConsistency(CBLTestClass):
         status = await replicator.wait_for(
             ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=300)
         )
-        assert (
-            status.error is None
-        ), f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
         TestQueryConsistency.__database = dbs[0]
 
     async def _test_query(
@@ -72,9 +72,9 @@ class TestQueryConsistency(CBLTestClass):
         sort: Optional[Callable[[Dict], str]] = None,
         comparison: Callable[[Any, Any], bool] = json_equivalent,
     ):
-        assert (
-            TestQueryConsistency.__database is not None
-        ), "Weird...setup not finished?"
+        assert TestQueryConsistency.__database is not None, (
+            "Weird...setup not finished?"
+        )
 
         query_for_logging = query.format(f"travel.{collection}")
         self.mark_test_step(f"Run '{query_for_logging}' on test server")
