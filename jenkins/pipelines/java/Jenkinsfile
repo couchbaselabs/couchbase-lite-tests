@@ -137,7 +137,7 @@ pipeline {
                         always {
                             echo "=== Teardown Windows Web Service Tests"
                             pwsh """
-                                jenkins\\pipelines\\java\\webservice\\win_teardown.ps1 "${params.CBL_VERSION}" "${params.CBL_DATASET_VERSION}" "${params.SGW_URL}"
+                                jenkins\\pipelines\\java\\webservice\\win_teardown.ps1 "${params.CBL_VERSION}" "${params.CBL_BUILD}"
                             """
                             echo "=== Windows Web Service Test Teardown Complete"
                         }
@@ -161,7 +161,7 @@ pipeline {
                         always {
                             echo "=== Teardown Linux Web Service Tests"
                             sh """
-                                jenkins/pipelines/java/webservice/linux_teardown.sh "${params.CBL_VERSION}" "${params.CBL_DATASET_VERSION}" "${params.SGW_URL}"
+                                jenkins/pipelines/java/webservice/linux_teardown.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}"
                             """
                             echo "=== Linux Web Service Test Teardown Complete"
                         }
