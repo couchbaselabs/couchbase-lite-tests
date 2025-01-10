@@ -45,7 +45,7 @@ pipeline {
                                 def platform = env.CBL_PLATFORM
                                 def version = params.CBL_VERSION
                                 def buildNo = params.CBL_BUILD
-                                def datasetVersion = prams.CBL_DATASET_VERSION
+                                def datasetVersion = params.CBL_DATASET_VERSION
                                 def sgwVersion = params.SGW_VERSION
                                 def force = params.FORCE_TRIGGER
                                 def sgwUrl = ""
