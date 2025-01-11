@@ -6,7 +6,10 @@ from cbltest.api.database import AllDocumentsEntry, Database
 from cbltest.api.replicator_types import ReplicatorType
 from cbltest.api.syncgateway import AllDocumentsResponseRow, SyncGateway
 from cbltest.version import VERSION
-
+import os
+import signal
+import subprocess
+import paramiko
 
 def _compare_revisions(cbl_rev: str, sg_rev: list[str | None]):
     """
@@ -195,3 +198,71 @@ async def compare_local_and_remote(
 
             compare_result = compare_doc_results(lite_docs, sg_docs, mode)
             assert compare_result.success, f"{compare_result.message} ({collection})"
+
+class RemoteShellConnection:
+    def __init__(self, host: str,port:int=59840, username:str="root",password:str="couchbase"):
+        self._host = host
+        self._port=port
+        ssh_client= paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            self._ssh_client.connect(hostname=host, username=username, password=password)
+        except paramiko.AuthenticationException:
+            log.info("Authentication failed for {0}".format(self._host))
+            exit(1)
+        except paramiko.BadHostKeyException:
+            log.info("Invalid Host key for {0}".format(self._host))
+            exit(1)
+        except Exception:
+            log.info("Can't establish SSH session with {0}".format(self._host))
+            exit(1)
+        self._ssh_client = ssh_client
+
+    def kill_edge_server(self) -> bool:
+        try:
+            command = ["lsof", "-i:", f"{self._port}"]
+            stdin, stdout, stderr = ssh_client.exec_command(command)
+            output = stdout.read().decode()
+            if not output.strip():
+                return False
+
+            # Parse the output to extract PIDs
+            lines = output.strip().split("\n")
+            pids = set()
+            for line in lines[1:]:  # Skip the header line
+                parts = line.split()
+                if len(parts) > 1:
+                    pids.add(parts[1])  # PID is in the second column
+            for pid in pids:
+                self._ssh_client.kill(int(pid), signal.SIGKILL)
+            return True
+
+        except Exception as e:
+            return False
+
+    def start_edge_server(self,secure,config_file,certfile,keyfile) -> bool:
+        try:
+            start_command=[]
+            if secure:
+                start_command = [
+                    "./couchbase-lite-edgeserver",
+                    "--verbose",
+                    "--create-cert", "CN=localhost",
+                    "--cert", certfile,
+                    "--key", keyfile,
+                    "--config", config_file
+                ]
+            else:
+                start_command = ["./couchbase-lite-edgeserver",
+                    "--verbose",
+                    "--create-cert", "CN=localhost",
+                    "--config", config_file]
+            ssh_client.exec_command(start_command)
+            return True
+        except Exception as e:
+            return False
+    def close(self):
+        self._ssh_client.close()
+
+
+
