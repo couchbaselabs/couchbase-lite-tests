@@ -19,6 +19,8 @@ if [ -z "$DATASET_VERSION" ]; then usage; fi
 
 SG_URL="$3"
 
+$STATUS=0
+
 
 echo "Install Android SDK"
 yes | ${SDK_MGR} --licenses > /dev/null 2>&1
@@ -67,5 +69,8 @@ echo $! > logcat.pid
 echo "Run the tests"
 adb shell input keyevent KEYCODE_WAKEUP
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config_android.json
+$STATUS=$?
 
-echo "Tests complete!"
+echo "Tests complete: $STATUS"
+exit $STATUS
+
