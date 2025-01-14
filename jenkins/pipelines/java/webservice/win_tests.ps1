@@ -25,7 +25,7 @@ Push-Location servers\jak
 Set-Location webservice
 
 Write-Host "Windows Web Service: Stop any existing Test Server"
-& .\gradlew.bat --no-daemon appStop -PcblVersion="${cblVersion}" -PdatasetVersion="${DATASET_VERSION}"
+& .\gradlew.bat --no-daemon appStop -PcblVersion="${cblVersion}" -PdatasetVersion="${datasetVersion}"
 
 try
 {

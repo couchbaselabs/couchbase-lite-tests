@@ -33,7 +33,7 @@ if (Test-Path -Path .\server.pid)
 
 Write-Host "Windows Desktop: Build the Test Server"
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue app\build
-& .\gradlew.bat --no-daemon jar -PcblVersion="${cblVersion}" -PdatasetVersion="${DATASET_VERSION}"
+& .\gradlew.bat --no-daemon jar -PcblVersion="${cblVersion}" -PdatasetVersion="${datasetVersion}"
 
 try
 {
