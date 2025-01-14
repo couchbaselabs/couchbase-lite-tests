@@ -1,0 +1,47 @@
+{
+    "test-servers": [
+        "http://localhost:8080"
+    ],
+    "sync-gateways": [
+        {
+            "hostname": "192.168.64.130",
+            "port": 4984,
+            "admin_port": 4985,
+            "rbac_user": "Administrator",
+            "rbac_password": "password",
+            "tls": false
+        },
+        {
+            "hostname": "192.168.64.131",
+            "port": 4984,
+            "admin_port": 4985,
+            "rbac_user": "Administrator",
+            "rbac_password": "password",
+            "tls": false
+        },
+        {
+            "hostname": "192.168.64.132",
+            "port": 4984,
+            "admin_port": 4985,
+            "rbac_user": "Administrator",
+            "rbac_password": "password",
+            "tls": false
+        }
+    ],
+    "couchbase-servers": [
+        {
+            "hostname": "192.168.64.129",
+            "admin_user": "Administrator",
+            "admin_password": "password",
+            "tls": false
+        },
+        {
+            "hostname": "192.168.64.128",
+            "admin_user": "Administrator",
+            "admin_password": "password",
+            "tls": false
+        }
+    ],
+    "api-version": 1,
+    "sg-load-balancer": "192.168.64.132"
+}

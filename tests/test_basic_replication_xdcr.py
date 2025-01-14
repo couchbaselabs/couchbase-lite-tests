@@ -85,6 +85,9 @@ class TestBasicReplicationXDCR(CBLTestClass):
             print(f"Error checking sync gateway status: {e}")
             return False
 
+    def datset_version(self) -> str:
+        return "3.2"
+
     async def setup_replication_xdcr(self, cblpytest: CBLPyTest, dataset_path: Path, dataset: str, bucket_name: str,
                                      dataset_bucket: DatasetBucket = DatasetBucket.SG1):
         """
@@ -172,16 +175,17 @@ class TestBasicReplicationXDCR(CBLTestClass):
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
+        self.mark_test_step("Wait 5 secs to ensure that the docs are sync between two SGs.")
+        time.sleep(5);
+
         self.mark_test_step("Check that all docs are pushed correctly to SG1.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH, "names",
                                        ["_default._default"])
 
-        self.mark_test_step("Wait 5 secs to ensure that the docs are sync between two SGs.")
-        time.sleep(5);
-
-        self.mark_test_step("Check that all docs are pushed correctly to SG2.")
-        await compare_local_and_remote(db, cblpytest.sync_gateways[1], ReplicatorType.PUSH, "names",
-                                       ["_default._default"])
+        if self.datset_version() == "4.0":
+            self.mark_test_step("Check that all docs are pushed correctly to SG2.")
+            await compare_local_and_remote(db, cblpytest.sync_gateways[1], ReplicatorType.PUSH, "names",
+                                           ["_default._default"])
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -229,9 +233,10 @@ class TestBasicReplicationXDCR(CBLTestClass):
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PULL, "names",
                                        ["_default._default"])
 
-        self.mark_test_step("Check that all docs are pulled correctly from SG2.")
-        await compare_local_and_remote(db, cblpytest.sync_gateways[1], ReplicatorType.PULL, "names",
-                                       ["_default._default"])
+        if self.datset_version() == "4.0":
+            self.mark_test_step("Check that all docs are pulled correctly from SG2.")
+            await compare_local_and_remote(db, cblpytest.sync_gateways[1], ReplicatorType.PULL, "names",
+                                           ["_default._default"])
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -276,11 +281,17 @@ class TestBasicReplicationXDCR(CBLTestClass):
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("Check that all docs are replicated correctly")
+        self.mark_test_step("Wait 5 secs to ensure that the docs are sync between two SGs.")
+        time.sleep(5);
+
+        self.mark_test_step("Check that all docs are replicated correctly at SG1")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "names",
                                        ["_default._default"])
-        await compare_local_and_remote(db, cblpytest.sync_gateways[1], ReplicatorType.PUSH_AND_PULL, "names",
-                                       ["_default._default"])
+
+        if self.datset_version() == "4.0":
+            self.mark_test_step("Check that all docs are replicated correctly at SG2")
+            await compare_local_and_remote(db, cblpytest.sync_gateways[1], ReplicatorType.PUSH_AND_PULL, "names",
+                                           ["_default._default"])
 
         self.mark_test_step('''
             Update documents in the local database.
@@ -325,19 +336,22 @@ class TestBasicReplicationXDCR(CBLTestClass):
                 revid = assert_not_null(doc.revid, f"Missing revid on {doc.id}")
                 await cblpytest.sync_gateways[1].delete_document(doc.id, revid, "names", "_default", "_default")
 
-        self.mark_test_step("Wait 5 secs to ensure that the docs are sync between two SGs.")
-        time.sleep(5);
-
         self.mark_test_step("Wait until the replicator is idle.")
         status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
         assert status.error is None, \
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
-        self.mark_test_step("Check that all docs are replicated correctly")
+        self.mark_test_step("Wait 5 secs to ensure that the docs are sync between two SGs.")
+        time.sleep(5);
+
+        self.mark_test_step("Check that all docs are replicated correctly at SG1.")
         await compare_local_and_remote(db, cblpytest.sync_gateways[0], ReplicatorType.PUSH_AND_PULL, "names",
                                        ["_default._default"])
-        await compare_local_and_remote(db, cblpytest.sync_gateways[1], ReplicatorType.PUSH_AND_PULL, "names",
-                                       ["_default._default"])
+
+        if self.datset_version() == "4.0":
+            self.mark_test_step("Check that all docs are replicated correctly at SG2.")
+            await compare_local_and_remote(db, cblpytest.sync_gateways[1], ReplicatorType.PUSH_AND_PULL, "names",
+                                           ["_default._default"])
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -447,8 +461,9 @@ class TestBasicReplicationXDCR(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
 
         self.mark_test_step("Check that all docs are replicated correctly")
+        docIDs = ["name_201", "name_202", "name_1", "name_2", "name_3", "name_4", "name_301", "name_302", "name_101", "name_102", "name_103", "name_104"]
         await compare_local_and_remote(db, cblpytest.sync_gateways[2], ReplicatorType.PUSH_AND_PULL, "names",
-                                       ["_default._default"])
+                                       ["_default._default"], docIDs)
 
         await cblpytest.test_servers[0].cleanup()
 

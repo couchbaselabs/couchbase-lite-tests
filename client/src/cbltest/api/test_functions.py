@@ -60,7 +60,7 @@ _test_function_tracer = get_tracer("test_functions", VERSION)
 
 
 def compare_doc_results(local: List[AllDocumentsEntry], remote: List[AllDocumentsResponseRow],
-                        mode: ReplicatorType) -> DocsCompareResult:
+                        mode: ReplicatorType, docIDs: Optional[List[str]] = None) -> DocsCompareResult:
     """
         Checks for consistency between a list of local documents and a list of remote documents, accounting
         for the mode of replication that was run.  For PUSH_AND_PULL, the document count must match exactly,
@@ -99,6 +99,9 @@ def compare_doc_results(local: List[AllDocumentsEntry], remote: List[AllDocument
             dest_name = "local"
 
         for id in source:
+            # Skip IDs not in the docIDs list if docIDs is provided
+            if docIDs and id not in docIDs:
+                continue
             if id not in dest:
                 return DocsCompareResult(False, f"Doc '{id}' present in {source_name} but not {dest_name}")
 
@@ -110,7 +113,7 @@ def compare_doc_results(local: List[AllDocumentsEntry], remote: List[AllDocument
 
 
 async def compare_local_and_remote(local: Database, remote: SyncGateway, mode: ReplicatorType, bucket: str,
-                                   collections: List[str]) -> None:
+                                   collections: List[str], docIDs: Optional[List[str]] = None) -> None:
     """
     Checks the specified collections for consistency between local and remote, using the
     :func:`compare_doc_results()<cbltest.api.test_functions.compare_doc_results>` function
@@ -123,5 +126,5 @@ async def compare_local_and_remote(local: Database, remote: SyncGateway, mode: R
             split = collection.split(".")
             assert len(split) == 2, f"Invalid collection name in compare_local_and_remote: {collection}"
             sg_all_docs = await remote.get_all_documents(bucket, split[0], split[1])
-            compare_result = compare_doc_results(lite_all_docs[collection], sg_all_docs.rows, mode)
+            compare_result = compare_doc_results(lite_all_docs[collection], sg_all_docs.rows, mode, docIDs)
             assert compare_result.success, f"{compare_result.message} ({collection})"

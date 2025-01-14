@@ -12,8 +12,8 @@
   "logging": {
     "console": {
       "enabled": true,
-      "log_level": "info",
-      "log_keys": ["*"]
+      "log_level": "trace",
+      "log_keys": ["WS", "WSFrame", "Sync", "CRUD", "Cache", "Changes", "SyncMsg","HTTP","Javascript"]
     },
     "log_file_path": "/opt/sg/log",
     "debug": {
