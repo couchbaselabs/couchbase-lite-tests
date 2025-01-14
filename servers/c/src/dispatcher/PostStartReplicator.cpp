@@ -54,12 +54,15 @@ int Dispatcher::handlePOSTStartReplicator(Request &request, Session *session) {
         auto authTypeValue = GetValue<string>(authObject, "type");
         auto authType = AuthTypeEnum.value(authTypeValue);
         if (authType == AuthType::basic) {
-            ReplicationAuthenticator auth;
-            auth.username = GetValue<string>(authObject, "username");
-            auth.password = GetValue<string>(authObject, "password");
-            params.authenticator = auth;
+            auto username = GetValue<string>(authObject, "username");
+            auto password = GetValue<string>(authObject, "password");
+            params.authenticator = make_unique<BasicAuthenticator>(username, password);
+        } else if (authType == AuthType::session) {
+            auto sessionID = GetValue<string>(authObject, "sessionID");
+            auto cookieName = GetValue<string>(authObject, "cookieName");
+            params.authenticator = make_unique<SessionAuthenticator>(sessionID, cookieName);
         } else {
-            throw RequestError("Not support session authenticator");
+            throw RequestError("Unsupported authenticator");
         }
     }
 
