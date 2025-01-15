@@ -24,12 +24,22 @@ set up to always return the local document.
 8. Start a replicator:
     * endpoint: `/names`
     * collections : `_default._default`
-    * type: push/pull
+    * type: pull
     * continuous: false
     * credentials: user1/pass
     * conflictResolver: 'local-wins'
 9. Wait until the replicator is stopped.
 10. Check that the name_101 document `name.last` == 'Smith'
+11. Start a replicator:
+    * endpoint: `/names`
+    * collections : `_default._default`
+    * type: push
+    * continuous: false
+    * credentials: user1/pass
+    * conflictResolver: 'local-wins'
+12. Wait until the replicator is stopped.
+13. Check that all docs are replicated correctly.
+
 
 ## #2 test_custom_conflict_remote_wins
 
@@ -55,12 +65,22 @@ set up to always return the remote document.
 8. Start a replicator:
     * endpoint: `/names`
     * collections : `_default._default`
-    * type: push/pull
+    * type: pull
     * continuous: false
     * credentials: user1/pass
     * conflictResolver: 'remote-wins'
 9. Wait until the replicator is stopped.
 10. Check that the name_101 document `name.last` == 'Jones'
+11. Start a replicator:
+    * endpoint: `/names`
+    * collections : `_default._default`
+    * type: push
+    * continuous: false
+    * credentials: user1/pass
+    * conflictResolver: 'local-wins'
+12. Wait until the replicator is stopped.
+13. Check that all docs are replicated correctly.
+
 
 ## #3 test_custom_conflict_delete
 
@@ -86,12 +106,21 @@ set up to always return a deletion
 8. Start a replicator:
     * endpoint: `/names`
     * collections : `_default._default`
-    * type: push/pull
+    * type: pull
     * continuous: false
     * credentials: user1/pass
     * conflictResolver: 'delete'
 9. Wait until the replicator is stopped.
 10. Check that the name_101 document doesn't exist
+11. Start a replicator:
+    * endpoint: `/names`
+    * collections : `_default._default`
+    * type: push
+    * continuous: false
+    * credentials: user1/pass
+    * conflictResolver: 'local-wins'
+12. Wait until the replicator is stopped.
+13. Check that all docs are replicated correctly.
 
 ## #4 test_custom_conflict_merge
 
@@ -117,9 +146,18 @@ set up to merge the "name" property
 8. Start a replicator:
     * endpoint: `/names`
     * collections : `_default._default`
-    * type: push/pull
+    * type: pull
     * continuous: false
     * credentials: user1/pass
     * conflictResolver: 'merge' / {'property': 'name'}
 9. Wait until the replicator is stopped.
 10. Check that the name_101 document `name` property contains `[{'first': 'Davis', 'last': 'Smith'},{'first': 'Davis', 'last': 'Jones'}]
+11. Start a replicator:
+    * endpoint: `/names`
+    * collections : `_default._default`
+    * type: push
+    * continuous: false
+    * credentials: user1/pass
+    * conflictResolver: 'local-wins'
+12. Wait until the replicator is stopped.
+13. Check that all docs are replicated correctly.

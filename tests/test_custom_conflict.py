@@ -100,7 +100,7 @@ class TestCustomConflict(CBLTestClass):
             Start a replicator:
                 * endpoint: `/names`
                 * collections : `_default._default`
-                * type: push/pull
+                * type: pull
                 * continuous: false
                 * credentials: user1/pass
                 * conflictResolver: '{conflict_resolver.name}'{resolver_params}
@@ -129,6 +129,44 @@ class TestCustomConflict(CBLTestClass):
         verify_result = await db.verify_documents(snapshot_updater)
         assert verify_result.result is True, (
             f"Conflict resolution resulted in bad data: {verify_result.description}"
+        )
+
+        self.mark_test_step(f"""
+            Start a replicator:
+                * endpoint: `/names`
+                * collections : `_default._default`
+                * type: push
+                * continuous: false
+                * credentials: user1/pass
+                * conflictResolver: '{conflict_resolver.name}'{resolver_params}
+        """)
+        replicator = Replicator(
+            db,
+            cblpytest.sync_gateways[0].replication_url("names"),
+            replicator_type=ReplicatorType.PUSH,
+            collections=[
+                ReplicatorCollectionEntry(
+                    ["_default._default"], conflict_resolver=conflict_resolver
+                )
+            ],
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator is stopped")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        self.mark_test_step("Check that all docs are replicated correctly.")
+        await compare_local_and_remote(
+            db,
+            cblpytest.sync_gateways[0],
+            ReplicatorType.PUSH,
+            "names",
+            ["_default._default"],
         )
 
     @pytest.mark.asyncio(loop_scope="session")
