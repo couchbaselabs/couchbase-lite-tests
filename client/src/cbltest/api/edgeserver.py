@@ -1,5 +1,6 @@
 import ssl
 from abc import ABC, abstractmethod
+import json
 from json import dumps, loads
 from operator import truediv
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import Dict, List, Tuple, cast, Any, Optional
 from urllib.parse import urljoin
 
 from aiohttp import ClientSession, BasicAuth, TCPConnector
+from couchbase.pycbc_core import result
 from opentelemetry.trace import get_tracer
 from setuptools.command.setopt import config_file
 from varname import nameof
@@ -22,12 +24,10 @@ from cbltest.logging import cbl_error, cbl_trace
 from cbltest.version import VERSION
 from cbltest.utils import assert_not_null
 from cbltest.api.syncgateway import AllDocumentsResponseRow, AllDocumentsResponse, DocumentUpdateEntry, RemoteDocument, CouchbaseVersion
-from cbltest.v1.requests import PostGetReplicatorStatusRequestBody, PostStartReplicatorRequestBody
-from cbltest.v1.responses import PostGetReplicatorStatusResponse, PostStartReplicatorResponse
 from deprecated import deprecated
 
-from client.src.cbltest.api.error import CblTestError
-from client.src.cbltest.api.test_functions import RemoteShellConnection
+from cbltest.api.error import CblTestError
+from cbltest.api.test_functions import RemoteShellConnection
 
 
 class EdgeServerVersion(CouchbaseVersion):
@@ -66,27 +66,81 @@ class BulkDocOperation(JSONSerializable):
     @property
     def body(self) -> dict:
         return self._body
+    def to_json(self):
+        return self._body
 
 class EdgeServer:
     """
     A class for interacting with a given Edge Server instance
     """
 
-    def __init__(self, url: str, username: str, password: str,config_file:str, port: int = 59840,
-                 secure: bool = False,certfile:str=None,keyfile:str=None):
-        scheme = "https://" if secure else "http://"
-        ws_scheme = "wss://" if secure else "ws://"
+    def __init__(self, url: str,config_file:str):
         self.__tracer = get_tracer(__name__, VERSION)
+        port,secure,certfile,keyfile,admin_user,databases,is_anonymous_auth=self._decode_config_file(config_file)
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__port: int = port
         self.__certfile:str=certfile
         self.__keyfile:str=keyfile
+        self.__admin_user:str=admin_user
+        self.__databases:dict=databases
+        self.__anonymous_auth: bool=is_anonymous_auth
         self.__config_file:str=config_file
-        if secure and not (self.__certfile and self.__keyfile):
-            raise CblTestError("Missing certificate and keyfile")
-        self.__session: ClientSession = self._create_session(secure, scheme, url, port,
-                                                                   BasicAuth(username, password, "ascii"))
+        # if not session:
+        scheme = "https://" if secure else "http://"
+        if self.__anonymous_auth:
+            self.__session: ClientSession = self._create_session(secure, scheme, url, port,None)
+        else:
+            self.__session: ClientSession = self._create_session(secure, scheme, url, port,BasicAuth(admin_user[0].get("user"), admin_user[0].get("password"), "ascii"))
+        # else:
+        #     self.__session = session
+
+    def _decode_config_file(self,config_file:str):
+        with open(config_file, 'r',encoding='utf-8') as file:
+            config_content = file.read()
+            try:
+                config = json.loads(config_content)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON in configuration file: {e}")
+
+        # Validate and extract top-level keys
+        databases = config.get("databases")
+        if not databases or not isinstance(databases, dict):
+            raise ValueError("Missing or invalid 'databases' configuration.")
+
+        https = config.get("https", {})
+        interface = config.get("interface", "0.0.0.0:59840")
+        port = interface.split(":")[1]
+        # logging_config = config.get("logging", {})
+        users = config.get("users", "")
+        enable_anonymous_users = config.get("enable_anonymous_users", False)
+        # replications = config.get("replications", [])
+        cert_path,key_path="",""
+        # Validate HTTPS configuration
+        if https:
+            cert_path = https.get("tls_cert_path")
+            key_path = https.get("tls_key_path")
+            if not cert_path or not key_path:
+                raise ValueError("HTTPS configuration must include 'tls_cert_path' and 'tls_key_path'.")
+        result=[]
+        if len(users)>0:
+            with open(users, 'r', encoding='utf-8') as file:
+                user_content = file.read()
+                try:
+                    config = json.loads(user_content)
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"Invalid JSON in configuration file: {e}")
+                for username, details in users.items():
+                    if "admin" in details.get("roles", []):
+                        result.append({
+                            "user": username,
+                            "password": details["password"]
+                        })
+
+
+
+        # Return parsed configuration as a tuple
+        return port, https,cert_path,key_path, result,databases, enable_anonymous_users
 
     def _create_session(self, secure: bool, scheme: str, url: str, port: int,
                         auth: Optional[BasicAuth]) -> ClientSession:
@@ -184,18 +238,18 @@ class EdgeServer:
                                                 JSONDictionary({"docs": collected}))
                 self._analyze_dataset_response(cast(list, resp))
 
-    async def get_all_documents(self, db_name: str, scope: str = "_default",
-                                collection: str = "_default") -> AllDocumentsResponse:
+    async def get_all_documents(self, db_name: str, scope: str = "",
+                                collection: str = "") -> AllDocumentsResponse:
         with self.__tracer.start_as_current_span("get_all_documents", attributes={"cbl.database.name": db_name,
                                                                                   "cbl.scope.name": scope,
                                                                                   "cbl.collection.name": collection}):
-            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_all_docs?show_cv=true")
+            resp = await self._send_request("get", f"/{db_name}{scope}{collection}/_all_docs")
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
 
 
-    async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "_default",
-                              collection: str = "_default") -> None:
+    async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "",
+                              collection: str = "") -> None:
 
         with self.__tracer.start_as_current_span("delete_document", attributes={"cbl.database.name": db_name,
                                                                                 "cbl.scope.name": scope,
@@ -206,17 +260,17 @@ class EdgeServer:
             else:
                 new_rev_id = revid
 
-            await self._send_request("delete", f"/{db_name}.{scope}.{collection}/{doc_id}",
+            await self._send_request("delete", f"/{db_name}{scope}{collection}/{doc_id}",
                                      params={"rev": new_rev_id})
 
 
-    async def get_document(self, db_name: str, doc_id: str, scope: str = "_default", collection: str = "_default") -> \
+    async def get_document(self, db_name: str, doc_id: str, scope: str = "", collection: str = "") -> \
             Optional[RemoteDocument]:
         with self.__tracer.start_as_current_span("get_document", attributes={"cbl.database.name": db_name,
                                                                              "cbl.scope.name": scope,
                                                                              "cbl.collection.name": collection,
                                                                              "cbl.document.id": doc_id}):
-            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}?show_cv=true")
+            response = await self._send_request("get", f"/{db_name}{scope}{collection}/{doc_id}?show_cv=true")
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server get /doc (not JSON)")
 
@@ -233,8 +287,8 @@ class EdgeServer:
     async def get_all_dbs(self) -> Dict:
         with self.__tracer.start_as_current_span("get all database"):
             response= await self._send_request("get","/_all_dbs")
-            if not isinstance(response, dict):
-                raise ValueError("Inappropriate response from edge server get /_all_dbs (not JSON)")
+            if not isinstance(response, list):
+                raise ValueError("Inappropriate response from edge server get /_all_dbs (not list)")
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(500,
@@ -252,11 +306,11 @@ class EdgeServer:
                                                     f"get all active tasks from edge server had error '{cast_resp['reason']}'")
             return cast_resp
 
-    async def get_db_info(self, db_name:str,scope:str="_default",collection:str="_default") -> Dict:
+    async def get_db_info(self, db_name:str,scope:str="",collection:str="") -> Dict:
         with self.__tracer.start_as_current_span("get database info", attributes={"cbl.database.name": db_name,
                                                                                   "cbl.scope.name": scope,
                                                                                   "cbl.collection.name": collection}):
-            response= await self._send_request("get",f"/{db_name}.{scope}.{collection}")
+            response= await self._send_request("get",f"/{db_name}{scope}{collection}")
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server get /  (not JSON)")
             cast_resp = cast(dict, response)
@@ -356,7 +410,7 @@ class EdgeServer:
                                                     f"stop replication  with Edge Server had error '{cast_resp['reason']}'")
 
 
-    async def changes_feed(self,db_name:str,scope:str="_default",collection:str="_default",since: Optional[str] = "0",feed: Optional[str] = "normal",limit: Optional[int] = None,filter_type: Optional[str] = None,doc_ids: Optional[List[str]] = None,
+    async def changes_feed(self,db_name:str,scope:str="",collection:str="",since: Optional[int] = 0,feed: Optional[str] = "normal",limit: Optional[int] = None,filter_type: Optional[str] = None,doc_ids: Optional[List[str]] = None,
             include_docs: Optional[bool] = False,active_only: Optional[bool] = False,descending: Optional[bool] = False,heartbeat: Optional[int] = None,timeout: Optional[int] = None )-> dict:
         with self.__tracer.start_as_current_span("Changes feed", attributes={"cbl.database.name": db_name,
                                                                                   "cbl.scope.name": scope,
@@ -374,42 +428,39 @@ class EdgeServer:
                 "timeout": timeout,
             }
             payload= {k: v for k, v in body.items() if v is not None}
-            response = await self._send_request("post", f"{db_name}.{scope}.{collection}/_changes", payload=JSONDictionary(payload))
+            response = await self._send_request("post", f"{db_name}{scope}{collection}/_changes", payload=JSONDictionary(payload))
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server post /_changes (not JSON)")
-
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(500,
                                                     f"get changes feed with Edge Server had error '{cast_resp['reason']}'")
             return cast_resp
-
-
-    async def named_query(self,db_name:str,scope:str="_default",collection:str="_default",name:str=None,params:Dict=None)->dict:
+    async def named_query(self,db_name:str,scope:str="",collection:str="",name:str=None,params:Dict=None)->dict:
         with self.__tracer.start_as_current_span("Named query", attributes={"cbl.database.name": db_name,
                                                                                   "cbl.scope.name": scope,
                                                                                   "cbl.collection.name": collection}):
             payload={"name":name}
             if params is not None:
                 payload["params"]=params
-            response = await self._send_request("post",f"{db_name}.{scope}.{collection}/_query",payload=JSONDictionary(payload))
+            response = await self._send_request("post",f"{db_name}{scope}{collection}/_query",payload=JSONDictionary(payload))
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server post   /_query (not JSON)")
 
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(500,
-                                                    f"named query with Edge Server had error '{cast_resp['reason']}'")
+                                        f"named query with Edge Server had error '{cast_resp['reason']}'")
             return cast_resp
 
-    async def adhoc_query(self,db_name:str,scope:str="_default",collection:str="_default",query:str=None,params:Dict=None)->dict:
+    async def adhoc_query(self,db_name:str,scope:str="",collection:str="",query:str=None,params:Dict=None)->dict:
         with self.__tracer.start_as_current_span("Adhoc query", attributes={"cbl.database.name": db_name,
                                                                                   "cbl.scope.name": scope,
                                                                                   "cbl.collection.name": collection}):
             payload={"query":query}
             if params is not None:
                 payload["params"]=params
-            response = await self._send_request("post",f"{db_name}.{scope}.{collection}/_query",payload=JSONDictionary(payload))
+            response = await self._send_request("post",f"{db_name}{scope}{collection}/_query",payload=JSONDictionary(payload))
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server adhoc query (not JSON)")
             cast_resp = cast(dict, response)
@@ -433,11 +484,11 @@ class EdgeServer:
             ssh_client.close()
             return success
 
-    async def add_document_auto_id(self,document: dict,db_name:str,scope:str="_default",collection:str="_default")->dict:
+    async def add_document_auto_id(self,document: dict,db_name:str,scope:str="",collection:str="")->dict:
         with self.__tracer.start_as_current_span("add document with auto ID", attributes={"cbl.database.name": db_name,
                                                                                   "cbl.scope.name": scope,
                                                                                   "cbl.collection.name": collection}):
-            response = await self._send_request("post",f"{db_name}.{scope}.{collection}/",payload=JSONDictionary(document))
+            response = await self._send_request("post",f"{db_name}{scope}{collection}/",payload=JSONDictionary(document))
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server add doc auto ID (not JSON)")
             cast_resp = cast(dict, response)
@@ -446,11 +497,11 @@ class EdgeServer:
                                                     f"add document with auto ID Edge Server had error '{cast_resp['reason']}'")
             return cast_resp
 
-    async def add_document_with_id(self,document: dict,id:str,db_name:str,scope:str="_default",collection:str="_default")->dict:
+    async def add_document_with_id(self,document: dict,id:str,db_name:str,scope:str="",collection:str="")->dict:
         with self.__tracer.start_as_current_span("add document with ID", attributes={"cbl.database.name": db_name,
                                                                                   "cbl.scope.name": scope,
                                                                                   "cbl.collection.name": collection}):
-            response = await self._send_request("put",f"{db_name}.{scope}.{collection}/{id}",payload=JSONDictionary(document))
+            response = await self._send_request("put",f"{db_name}{scope}{collection}/{id}",payload=JSONDictionary(document))
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server add doc (not JSON)")
             cast_resp = cast(dict, response)
@@ -459,7 +510,7 @@ class EdgeServer:
                                                     f"add document with ID Edge Server had error '{cast_resp['reason']}'")
             return cast_resp
 
-    async def delete_sub_document(self, id:str,revid:str,key:str,db_name: str, scope: str = "_default", collection: str = "_default") -> dict:
+    async def delete_sub_document(self, id:str,revid:str,key:str,db_name: str, scope: str = "", collection: str = "") -> dict:
         with self.__tracer.start_as_current_span("delete sub-document", attributes={
             "cbl.database.name": db_name,
             "cbl.scope.name": scope,
@@ -467,7 +518,7 @@ class EdgeServer:
         }):
             # Perform the DELETE request to the edge server
             response = await self._send_request(
-                "delete", f"{db_name}.{scope}.{collection}/{id}/{key}?revid={revid}"
+                "delete", f"{db_name}{scope}{collection}/{id}/{key}?revid={revid}"
             )
 
             if not isinstance(response, dict):
@@ -478,7 +529,7 @@ class EdgeServer:
                                                     f"delete sub-document Edge Server had error '{cast_resp['reason']}'")
             return cast_resp
 
-    async def put_sub_document(self, id:str,revid:str,key:str,db_name: str, scope: str = "_default", collection: str = "_default") -> dict:
+    async def put_sub_document(self, id:str,revid:str,key:str,db_name: str, scope: str = "", collection: str = "") -> dict:
         with self.__tracer.start_as_current_span("put sub-document", attributes={
             "cbl.database.name": db_name,
             "cbl.scope.name": scope,
@@ -486,7 +537,7 @@ class EdgeServer:
         }):
 
             response = await self._send_request(
-                "put", f"{db_name}.{scope}.{collection}/{id}/{key}?revid={revid}"
+                "put", f"{db_name}{scope}{collection}/{id}/{key}?revid={revid}"
             )
 
             if not isinstance(response, dict):
@@ -497,7 +548,7 @@ class EdgeServer:
                                                     f"put sub-document Edge Server had error '{cast_resp['reason']}'")
             return cast_resp
 
-    async def get_sub_document(self, id:str,key:str,db_name: str, scope: str = "_default", collection: str = "_default") -> dict:
+    async def get_sub_document(self, id:str,key:str,db_name: str, scope: str = "", collection: str = "") -> dict:
         with self.__tracer.start_as_current_span("get sub-document", attributes={
             "cbl.database.name": db_name,
             "cbl.scope.name": scope,
@@ -505,24 +556,25 @@ class EdgeServer:
         }):
 
             resp = await self._send_request(
-                "get", f"{db_name}.{scope}.{collection}/{id}/{key}"
+                "get", f"{db_name}{scope}{collection}/{id}/{key}"
             )
 
-            if not isinstance(resp, dict):
-                raise ValueError("Inappropriate response from edge server get sub-document (not JSON)")
-            cast_resp = cast(dict, resp)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(500,
-                                                    f"get sub-document Edge Server had error '{cast_resp['reason']}'")
-            return cast_resp
+            if isinstance(resp, dict):
+                cast_resp = cast(dict, resp)
+                if "error" in cast_resp:
+                    raise CblEdgeServerBadResponseError(500,
+                                                        f"get sub-document Edge Server had error '{cast_resp['reason']}'")
+                return cast_resp
+            else:
+                return resp
 
 
-    async def bulk_doc_op(self,docs:List[BulkDocOperation],db_name: str, scope: str = "_default", collection: str = "_default",new_edits:bool=True,) -> dict:
+    async def bulk_doc_op(self,docs:List[BulkDocOperation],db_name: str, scope: str = "", collection: str = "",new_edits:bool=True) -> dict:
         with self.__tracer.start_as_current_span("bulk_documents_operation", attributes={"cbl.database.name": db_name,
                                                                                  "cbl.scope.name": scope,
                                                                                "cbl.collection.name": collection}):
             body = {"docs": list(u.body for u in docs), "new_edits": new_edits}
-            resp=await self._send_request("post", f"/{db_name}.{scope}.{collection}/_bulk_docs",
+            resp=await self._send_request("post", f"/{db_name}{scope}{collection}/_bulk_docs",
                                      JSONDictionary(body))
             if not isinstance(resp, dict):
                 raise ValueError("Inappropriate response from edge server  bulk doc op (not JSON)")
@@ -533,7 +585,7 @@ class EdgeServer:
                                                     f"bulk_documents_operation Edge Server had error '{cast_resp['reason']}'")
             return cast_resp
 
-    async def blip_sync(self,db_name: str, scope: str = "_default", collection: str = "_default"):
+    async def blip_sync(self,db_name: str, scope: str = "", collection: str = ""):
         with self.__tracer.start_as_current_span("get web socket connection for client ", attributes={
             "cbl.database.name": db_name,
             "cbl.scope.name": scope,
@@ -541,7 +593,7 @@ class EdgeServer:
         }):
 
             resp = await self._send_request(
-                "get", f"{db_name}.{scope}.{collection}/_blipsync"
+                "get", f"{db_name}{scope}{collection}/_blipsync"
             )
 
             if resp and not isinstance(resp, dict) :

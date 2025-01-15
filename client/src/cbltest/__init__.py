@@ -1,10 +1,11 @@
 from pathlib import Path
 from typing import Dict, List, Optional, cast
 
+from .api.edgeserver import EdgeServer
 from .requests import RequestFactory
 from .logging import LogLevel, cbl_setLogLevel, cbl_log_init
 from .extrapropsparser import _parse_extra_props
-from .configparser import CouchbaseServerInfo, ParsedConfig, SyncGatewayInfo, _parse_config
+from .configparser import CouchbaseServerInfo, ParsedConfig, SyncGatewayInfo, _parse_config, EdgeServerInfo
 from .assertions import _assert_not_null
 from .api.testserver import TestServer
 from .api.syncgateway import SyncGateway
@@ -53,6 +54,10 @@ class CBLPyTest:
     @property
     def couchbase_servers(self) -> List[CouchbaseServer]:
         return self.__couchbase_servers
+
+    @property
+    def edge_servers(self)-> List[EdgeServer]:
+        return self.__edge_servers
     
     @staticmethod
     async def create(config_path: str, log_level: LogLevel = LogLevel.VERBOSE, extra_props_path: Optional[str] = None, 
@@ -98,6 +103,13 @@ class CBLPyTest:
             for cbs in self.__config.couchbase_servers:
                 cbs_info = CouchbaseServerInfo(cbs)
                 self.__couchbase_servers.append(CouchbaseServer(cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password))
+
+        self.__edge_servers:List[EdgeServer] = []
+        if not test_server_only:
+            for es in self.__config.edge_servers:
+                es_info = EdgeServerInfo(es)
+                self.__edge_servers.append(
+                    EdgeServer(es_info.hostname,es_info.config_file))
 
 
     def __str__(self) -> str:
