@@ -152,12 +152,16 @@ Test continuous push and pull replication with multiple collections.
 6. Clear current document replication events.
 7. Update documents in the local database.
    * Add 2 airports in `travel.airports`.
-   * Update 2 new airlines in `travel.airlines`.
-   * Remove 2 hotels in `travel.hotels`.
+   * Update 2 CBL new airlines in `travel.airlines`.
+   * Update 2 SG hotels in `travel.hotels`.
+   * Remove 2 CBL hotels in `travel.hotels`.
+   * Remove 2 SG hotels in `travel.hotels`.
 8. Update documents on SG.
    * Add 2 routes in `travel.routes`.
-   * Update 2 landmarks in `travel.landmarks`.
-   * Remove 2 hotels in `travel.hotels`.
+   * Update 2 SG landmarks in `travel.landmarks`.
+   * Update 2 CBL hotels in `travel.hotels`.
+   * Remove 2 SG hotels in `travel.hotels`.
+   * Remove 2 CBL hotels in `travel.hotels`.
 9. Wait until receiving all document replication events.
 10. Check that all updates are replicated correctly.
 

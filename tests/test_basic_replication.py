@@ -598,7 +598,7 @@ class TestBasicReplication(CBLTestClass):
                 * endpoint: `/travel`
                 * collections : `travel.airlines`, `travel.airports`, `travel.hotels`, `travel.landmarks`, `travel.routes`
                 * type: push-and-pull
-                * continuous: false
+                * continuous: true
                 * enableDocumentListener: true
                 * credentials: user1/pass
         """)
@@ -653,8 +653,10 @@ class TestBasicReplication(CBLTestClass):
         self.mark_test_step("""
             Update documents in the local database.
                 * Add 2 airports in travel.airports.
-                * Update 2 new airlines in travel.airlines.
-                * Remove 2 hotels in travel.hotels.
+                * Update 2 CBL airlines in travel.airlines.
+                * Update 2 SG hotels in travel.hotels.
+                * Remove 2 CBL hotels in travel.hotels.
+                * Remove 2 SG hotels in travel.hotels.
         """)
         async with db.batch_updater() as b:
             b.upsert_document(
@@ -673,14 +675,20 @@ class TestBasicReplication(CBLTestClass):
             b.upsert_document(
                 "travel.airlines", "airline_2", removed_properties=["country"]
             )
+            b.upsert_document("travel.hotels", "hotel_361", [{"non_smoking": True}])
+            b.upsert_document("travel.hotels", "hotel_362", [{"non_smoking": True}])
             b.delete_document("travel.hotels", "hotel_1")
             b.delete_document("travel.hotels", "hotel_2")
+            b.delete_document("travel.hotels", "hotel_371")
+            b.delete_document("travel.hotels", "hotel_372")
 
         self.mark_test_step("""
             Update documents on SG.
                 * Add 2 routes in `travel.routes`.
-                * Update 2 landmarks in `travel.landmarks`.
-                * Remove 2 hotels in `travel.hotels`.
+                * Update 2 SG landmarks in `travel.landmarks`.
+                * Update 2 CBL hotels in `travel.hotels`.
+                * Remove 2 SG hotels in `travel.hotels`.
+                * Remove 2 CBL hotels in `travel.hotels`.
         """)
         # Add 2 routes in `travel.routes`
         routes_updates: List[DocumentUpdateEntry] = [
@@ -711,7 +719,7 @@ class TestBasicReplication(CBLTestClass):
             "travel", routes_updates, "travel", "routes"
         )
 
-        # Update 2 landmarks in `travel.landmarks`
+        # Update 2 SG landmarks in `travel.landmarks`
         landmarks_updates: List[DocumentUpdateEntry] = []
         landmarks_all_docs = await cblpytest.sync_gateways[0].get_all_documents(
             "travel", "travel", "landmarks"
@@ -751,12 +759,69 @@ class TestBasicReplication(CBLTestClass):
             "travel", landmarks_updates, "travel", "landmarks"
         )
 
-        # Remove 2 hotels in `travel.hotels`
+        # Update 2 CBL hotels in `travel.landmarks`
+        hotels_updates: List[DocumentUpdateEntry] = []
         hotels_all_docs = await cblpytest.sync_gateways[0].get_all_documents(
             "travel", "travel", "hotels"
         )
         for doc in hotels_all_docs.rows:
-            if doc.id == "hotel_400" or doc.id == "hotel_500":
+            if doc.id == "hotel_51":
+                hotels_updates.append(
+                    DocumentUpdateEntry(
+                        doc.id,
+                        doc.revid,
+                        {
+                            "name": "Mountain Hotel 51",
+                            "channels": ["United States"],
+                            "address": "1 Snow st",
+                            "city": "Tahoe City",
+                            "state": "CA",
+                            "country": "United States",
+                            "non_smoking": True,
+                            "free_breakfast": True,
+                            "free_internet": True,
+                            "free_parking": True,
+                            "collection": "hotels",
+                            "scope": "travel",
+                        },
+                    )
+                )
+            elif doc.id == "hotel_52":
+                hotels_updates.append(
+                    DocumentUpdateEntry(
+                        doc.id,
+                        doc.revid,
+                        {
+                            "name": "Mountain Hotel 52",
+                            "channels": ["United States"],
+                            "address": "2 Snow st",
+                            "city": "Tahoe City",
+                            "state": "CA",
+                            "country": "United States",
+                            "non_smoking": True,
+                            "free_breakfast": True,
+                            "free_internet": True,
+                            "free_parking": True,
+                            "collection": "hotels",
+                            "scope": "travel",
+                        },
+                    )
+                )
+        await cblpytest.sync_gateways[0].update_documents(
+            "travel", hotels_updates, "travel", "hotels"
+        )
+
+        # Remove 2 SG and 2 CBL hotels in `travel.hotels`
+        hotels_all_docs = await cblpytest.sync_gateways[0].get_all_documents(
+            "travel", "travel", "hotels"
+        )
+        for doc in hotels_all_docs.rows:
+            if (
+                doc.id == "hotel_61"
+                or doc.id == "hotel_62"
+                or doc.id == "hotel_400"
+                or doc.id == "hotel_500"
+            ):
                 revid = assert_not_null(doc.revid, f"Missing revid on {doc.id}")
                 await cblpytest.sync_gateways[0].delete_document(
                     doc.id, revid, "travel", "travel", "hotels"
@@ -791,6 +856,18 @@ class TestBasicReplication(CBLTestClass):
                 ),
                 WaitForDocumentEventEntry(
                     "travel.hotels",
+                    "hotel_361",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.NONE,
+                ),
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_362",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.NONE,
+                ),
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
                     "hotel_1",
                     ReplicatorType.PUSH,
                     ReplicatorDocumentFlags.DELETED,
@@ -798,6 +875,18 @@ class TestBasicReplication(CBLTestClass):
                 WaitForDocumentEventEntry(
                     "travel.hotels",
                     "hotel_2",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.DELETED,
+                ),
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_371",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.DELETED,
+                ),
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_372",
                     ReplicatorType.PUSH,
                     ReplicatorDocumentFlags.DELETED,
                 ),
@@ -824,6 +913,30 @@ class TestBasicReplication(CBLTestClass):
                     "landmark_200",
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.NONE,
+                ),
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_51",
+                    ReplicatorType.PULL,
+                    ReplicatorDocumentFlags.NONE,
+                ),
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_52",
+                    ReplicatorType.PULL,
+                    ReplicatorDocumentFlags.NONE,
+                ),
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_61",
+                    ReplicatorType.PULL,
+                    ReplicatorDocumentFlags.DELETED,
+                ),
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_62",
+                    ReplicatorType.PULL,
+                    ReplicatorDocumentFlags.DELETED,
                 ),
                 WaitForDocumentEventEntry(
                     "travel.hotels",
