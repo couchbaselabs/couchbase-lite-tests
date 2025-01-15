@@ -11,7 +11,8 @@ TEST_COMPONENTS_MAPPING = {
     "sample_test": {
         "test-servers": 0,
         "sync-gateways": 1,
-        "couchbase-servers": 1
+        "couchbase-servers": 1,
+        "edge-servers":0
     },
 }
 
@@ -38,6 +39,7 @@ def generate_config(test_name, available_ips):
         "test-servers": [],
         "sync-gateways": [],
         "couchbase-servers": [],
+        "edge-servers": [],
         "api-version": 1
     }
 
@@ -51,6 +53,8 @@ def generate_config(test_name, available_ips):
 
     # Assign couchbase-servers
     config["couchbase-servers"] = [{"hostname": ip} for ip in available_ips[:mapping["couchbase-servers"]]]
+
+    config["edge-servers"] = [{"hostname": ip} for ip in available_ips[:mapping["edge-servers"]]]
     
     return config
 

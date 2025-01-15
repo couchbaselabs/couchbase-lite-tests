@@ -1,6 +1,7 @@
 from json import dumps
 
 from .api.couchbaseserver import CouchbaseServer
+from .api.edgeserver import EdgeServer
 from .api.syncgateway import SyncGateway
 from .api.testserver import TestServer
 from .assertions import _assert_not_null
@@ -62,6 +63,11 @@ class CBLPyTest:
     def load_balancers(self) -> list[str]:
         """Gets the list of Load Balancers available"""
         return self.__config.load_balancers
+
+
+    @property
+    def edge_servers(self)-> List[EdgeServer]:
+        return self.__edge_servers
 
     @staticmethod
     async def create(
@@ -140,6 +146,12 @@ class CBLPyTest:
                         cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password
                     )
                 )
+        self.__edge_servers: list[EdgeServer] = []
+        if not test_server_only:
+            for es in self.__config.edge_servers:
+                es_info = EdgeServerInfo(es)
+                self.__edge_servers.append(
+                    EdgeServer(es_info.hostname, es_info.config_file))
 
     async def close(self) -> None:
         """
@@ -148,6 +160,7 @@ class CBLPyTest:
         await self.request_factory.close()
         for sg in self.__sync_gateways:
             await sg.close()
+
 
     def __str__(self) -> str:
         ret_val = (
