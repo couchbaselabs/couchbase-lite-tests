@@ -351,8 +351,7 @@ namespace ts::cbl {
         checkCBLError(error);
 
         if (params.authenticator) {
-            auth = CBLAuth_CreatePassword(FLS(params.authenticator->username),
-                                          FLS(params.authenticator->password));
+            auth = params.authenticator->toCBLAuth();
         }
 
         CBLReplicatorConfiguration config{};
