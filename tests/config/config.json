@@ -1,9 +1,14 @@
 {
     "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
-    "test-servers": ["http://10.100.150.156:8080"],
+    "test-servers": ["http://172.23.96.59:8080"],
+    "edge-servers": [
+        {
+            "hostname": "172.23.96.81"
+        }
+    ],
     "sync-gateways": [
         {
-            "hostname": "10.100.150.156"
+            "hostname": "172.23.96.121"
         }
     ],
     "couchbase-servers": [
