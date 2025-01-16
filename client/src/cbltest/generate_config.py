@@ -53,7 +53,9 @@ def generate_config(test_name, available_ips):
 
     # Assign couchbase-servers
     config["couchbase-servers"] = [{"hostname": ip} for ip in available_ips[:mapping["couchbase-servers"]]]
+    available_ips = available_ips[mapping["couchbase-servers"]:]
 
+    # Assign edge-servers
     config["edge-servers"] = [{"hostname": ip} for ip in available_ips[:mapping["edge-servers"]]]
     
     return config
