@@ -1,0 +1,4 @@
+paramiko
+tdqm
+termcolor
+requests
