@@ -296,23 +296,28 @@ class TestCustomConflict(CBLTestClass):
             ["_default._default"],
         )
 
-        self.mark_test_step("Update name_101 document with `name.last` = 'Jackson' in SG")
+        self.mark_test_step(
+            "Update name_101 document with `name.last` = 'Jackson' in SG"
+        )
         name_101_sg = await cblpytest.sync_gateways[0].get_document("names", "name_101")
-        assert name_101_sg is not None, f"Missing name_101 on remote"
+        assert name_101_sg is not None, "Missing name_101 on remote"
         newBody = name_101_sg.body
         newBody["name"]["last"] = "Jackson"
-        await cblpytest.sync_gateways[0].update_documents("names", [DocumentUpdateEntry("name_101", name_101_sg.revid, newBody)])
+        await cblpytest.sync_gateways[0].update_documents(
+            "names", [DocumentUpdateEntry("name_101", name_101_sg.revid, newBody)]
+        )
 
-        self.mark_test_step("Update name_102 document with `name.last` = 'Johnson' and purge name_103 in CBL")
+        self.mark_test_step(
+            "Update name_102 document with `name.last` = 'Johnson' and purge name_103 in CBL"
+        )
         async with db.batch_updater() as b:
-            update_id = "name_101"
+            update_id = "name_102"
             snapshot_updater.upsert_document(
                 update_coll, update_id, [{"name.last": "Johnson"}]
             )
-
             b.upsert_document(update_coll, update_id, [{"name.last": "Johnson"}])
             b.purge_document(update_coll, "name_103")
-        
+
         self.mark_test_step("""
             Start a replicator:
                 * endpoint: `/names`
