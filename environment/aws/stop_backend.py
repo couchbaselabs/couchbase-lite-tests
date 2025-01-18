@@ -12,7 +12,6 @@ if __name__ == "__main__":
 
     header("Starting terraform destroy")
     command = ["terraform", "destroy", f"-var=key_name={args.public_key_name}", "-auto-approve"]
-    print(command)
     result = subprocess.run(command, capture_output=False, text=True)
 
     if result.returncode != 0:

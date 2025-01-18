@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from time import sleep
 from typing import List, cast
 from sgw_setup.setup_sgw import main as sgw_main
 from server_setup.setup_server import main as server_main
@@ -73,6 +74,10 @@ if __name__ == "__main__":
         raise Exception(f"Command '{' '.join(sgw_command)}' failed with exit status {result.returncode}: {result.stderr}")
     
     sgw_ips = cast(List[str], json.loads(result.stdout))
+
+    # The machines won't be ready immediately, so we need to wait a bit
+    # before SSH access succeeds
+    sleep(5)
 
     server_main(cbs_ips, args.cbs_version, args.private_key)
     sgw_main(sgw_ips, args.sgw_version, args.sgw_build, args.private_key)
