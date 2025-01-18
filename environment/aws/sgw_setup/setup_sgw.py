@@ -70,7 +70,7 @@ def setup_config():
     
     start_sgw_content = start_sgw_content.replace("{{server-ip}}", json_output[0])
     
-    with open(SCRIPT_DIR / "start-sgw.sh", "w") as file:
+    with open(SCRIPT_DIR / "start-sgw.sh", "w", newline="\n") as file:
         file.write(start_sgw_content)
 
     
