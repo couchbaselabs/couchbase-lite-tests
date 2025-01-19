@@ -126,7 +126,6 @@ class TransportType(Enum):
 
 class EdgeServerInfo:
     __hostname_key: Final[str] = "hostname"
-    __config_file:Final[str] = "config"
     __admin_user_key: Final[str] = "admin_user"
     __admin_password_key: Final[str] = "admin_password"
 
@@ -134,9 +133,6 @@ class EdgeServerInfo:
     def hostname(self) -> str:
         """Gets the hostname of the Edge Server instance"""
         return self.__hostname
-    @property
-    def config_file(self) -> str:
-        return self.__config_file
     @property
     def admin_user(self) -> str:
         return self.__admin_user
@@ -146,7 +142,6 @@ class EdgeServerInfo:
 
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
-        self.__config_file:str = _get_str_or_default(data, self.__config_file, "/opt/couchbase-edge-server/config/config.json")
         self.__admin_user =_get_str_or_default(data, self.__admin_user_key, "Administrator")
         self.__admin_password = _get_str_or_default(data, self.__admin_password_key, "password")
 

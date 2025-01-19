@@ -74,8 +74,9 @@ class EdgeServer:
     A class for interacting with a given Edge Server instance
     """
 
-    def __init__(self, url: str,config_file:str):
+    def __init__(self, url: str):
         self.__tracer = get_tracer(__name__, VERSION)
+        config_file="./environment/edge_server/config/config.json"
         port,secure,certfile,keyfile,admin_user,databases,is_anonymous_auth=self._decode_config_file(config_file)
         self.__secure: bool = secure
         self.__hostname: str = url
