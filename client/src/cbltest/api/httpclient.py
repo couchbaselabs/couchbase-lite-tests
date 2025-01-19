@@ -343,7 +343,7 @@ class ClientFactory:
             responses[method] = response
         return responses
 
-    async def cleanup_clients(self):
+    async def disconnect(self):
         """Closes all SSH connections."""
         tasks = [client.disconnect() for client in self.clients.values()]
         await asyncio.gather(*tasks)
