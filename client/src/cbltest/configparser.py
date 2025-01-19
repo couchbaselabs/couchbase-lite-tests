@@ -132,7 +132,7 @@ class EdgeServerInfo:
 
     @property
     def hostname(self) -> str:
-        """Gets the hostname of the Sync Gateway instance"""
+        """Gets the hostname of the Edge Server instance"""
         return self.__hostname
     @property
     def config_file(self) -> str:
@@ -146,9 +146,19 @@ class EdgeServerInfo:
 
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
-        self.__config_file:str = _get_str_or_default(data, self.__config_file, "./environment/es/config/config.json")
+        self.__config_file:str = _get_str_or_default(data, self.__config_file, "/opt/couchbase-edge-server/config/config.json")
         self.__admin_user =_get_str_or_default(data, self.__admin_user_key, "Administrator")
         self.__admin_password = _get_str_or_default(data, self.__admin_password_key, "password")
+
+class HTTPClientInfo:
+    __hostname_key: Final[str] = "hostname"
+
+    @property
+    def hostname(self) -> str:
+        """Gets the hostname of the Http Client instance"""
+        return self.__hostname
+    def __init__(self, data: dict):
+        self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
 
 class ParsedConfig:
     """The parsed result of the JSON config file provided to the SDK"""
@@ -158,6 +168,7 @@ class ParsedConfig:
     __cbs_key: Final[str] = "couchbase-servers"
     __lb_key: Final[str] = "load-balancers"
     __es_key: Final[str] = "edge-servers"
+    __http_client_key: Final[str] = "http-clients"
     __greenboard_key: Final[str] = "greenboard"
     __api_version_key: Final[str] = "api-version"
     __logslurp_key: Final[str] = "logslurp"
@@ -182,6 +193,10 @@ class ParsedConfig:
     @property
     def edge_servers(self) -> list[dict]:
         return self.__edge_servers
+
+    @property
+    def http_clients(self) -> List[dict]:
+        return self.__http_clients
 
     @property
     def load_balancers(self) -> list[str]:
@@ -235,6 +250,7 @@ class ParsedConfig:
             json, self.__cbs_key, list[dict], []
         )
         self.__edge_servers = _get_typed_nonnull(json, self.__es_key, list[dict], [])
+        self.__http_clients = _get_typed_nonnull(json, self.__http_client_key, list[dict], [])
         self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, list[str], [])
         self.__api_version = _get_int_or_default(json, self.__api_version_key, 1)
         self.__greenboard = _get_typed(json, self.__greenboard_key, dict[str, str])
@@ -273,6 +289,8 @@ class ParsedConfig:
             + (self.__greenboard["url"] if self.__greenboard is not None else "")
             + "Edge Servers: "
             + dumps(self.__edge_servers)
+            + "HTTP Clients: "
+            + dumps(self.__http_clients)
         )
 
         return ret_val
