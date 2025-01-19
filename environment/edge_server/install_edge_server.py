@@ -70,7 +70,7 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build):
 
     # Start Couchbase Edge Server with the config file
     print(f"Starting Couchbase Edge Server with config file {config_file_path}...")
-    run_remote_command(edge_server_ip, f"nohup /opt/couchbase-edge-server/bin/couchbase-edge-server --verbose --config {config_file_path} > /tmp/edge_server.log 2>&1 & echo $! > /tmp/edge_server.pid")
+    run_remote_command(edge_server_ip, f"nohup /opt/couchbase-edge-server/bin/couchbase-edge-server --verbose {config_file_path} > /tmp/edge_server.log 2>&1 & echo $! > /tmp/edge_server.pid")
 
     time.sleep(15)
 
