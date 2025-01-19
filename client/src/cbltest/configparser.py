@@ -87,7 +87,7 @@ class EdgeServerInfo:
 
     @property
     def hostname(self) -> str:
-        """Gets the hostname of the Sync Gateway instance"""
+        """Gets the hostname of the Edge Server instance"""
         return self.__hostname
     @property
     def config_file(self) -> str:
@@ -101,9 +101,19 @@ class EdgeServerInfo:
 
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
-        self.__config_file:str = _get_str_or_default(data, self.__config_file, "./environment/es/config/config.json")
+        self.__config_file:str = _get_str_or_default(data, self.__config_file, "/opt/couchbase-edge-server/config/config.json")
         self.__admin_user =_get_str_or_default(data, self.__admin_user_key, "Administrator")
         self.__admin_password = _get_str_or_default(data, self.__admin_password_key, "password")
+
+class HTTPClientInfo:
+    __hostname_key: Final[str] = "hostname"
+
+    @property
+    def hostname(self) -> str:
+        """Gets the hostname of the Http Client instance"""
+        return self.__hostname
+    def __init__(self, data: dict):
+        self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
 
 class ParsedConfig:
     """The parsed result of the JSON config file provided to the SDK"""
@@ -112,6 +122,7 @@ class ParsedConfig:
     __sgw_key: Final[str] = "sync-gateways"
     __cbs_key: Final[str] = "couchbase-servers"
     __es_key: Final[str] = "edge-servers"
+    __http_client_key: Final[str] = "http-clients"
     __greenboard_key: Final[str] = "greenboard"
     __api_version_key: Final[str] = "api-version"
     __logslurp_key: Final[str] = "logslurp"
@@ -134,6 +145,9 @@ class ParsedConfig:
     @property
     def edge_servers(self) -> List[dict]:
         return self.__edge_servers
+    @property
+    def http_clients(self) -> List[dict]:
+        return self.__http_clients
     
     @property
     def greenboard_url(self) -> Optional[str]:
@@ -177,6 +191,7 @@ class ParsedConfig:
         self.__sync_gateways = json[self.__sgw_key]
         self.__couchbase_servers = json[self.__cbs_key]
         self.__edge_servers = json[self.__es_key]
+        self.__http_clients = json[self.__http_client_key]
         self.__api_version = _get_int_or_default(json, self.__api_version_key, 1)
         self.__greenboard = cast(dict, json.get(self.__greenboard_key))
         if self.__greenboard is not None and ("hostname" not in self.__greenboard or 
@@ -194,6 +209,7 @@ class ParsedConfig:
             "Sync Gateways: " + dumps(self.__sync_gateways)  + "\n" + \
             "Couchbase Servers: " + dumps(self.__couchbase_servers) + "\n" + \
             "Edge Servers: " + dumps(self.__edge_servers) + \
+            "\n" + "HTTP Clients: " + dumps(self.__http_clients) + \
             "Greenboard: " + (self.__greenboard["url"] if self.__greenboard is not None else "")
          
         return ret_val

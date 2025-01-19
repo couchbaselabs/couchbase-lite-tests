@@ -2,10 +2,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, cast
 
 from .api.edgeserver import EdgeServer
+from .api.httpclient import HTTPClient
 from .requests import RequestFactory
 from .logging import LogLevel, cbl_setLogLevel, cbl_log_init
 from .extrapropsparser import _parse_extra_props
-from .configparser import CouchbaseServerInfo, ParsedConfig, SyncGatewayInfo, _parse_config, EdgeServerInfo
+from .configparser import CouchbaseServerInfo, ParsedConfig, SyncGatewayInfo, _parse_config, EdgeServerInfo, \
+    HTTPClientInfo
 from .assertions import _assert_not_null
 from .api.testserver import TestServer
 from .api.syncgateway import SyncGateway
@@ -58,6 +60,9 @@ class CBLPyTest:
     @property
     def edge_servers(self)-> List[EdgeServer]:
         return self.__edge_servers
+    @property
+    def http_clients(self) -> List[str]:
+        return self.__http_clients
     
     @staticmethod
     async def create(config_path: str, log_level: LogLevel = LogLevel.VERBOSE, extra_props_path: Optional[str] = None, 
@@ -110,6 +115,11 @@ class CBLPyTest:
                 es_info = EdgeServerInfo(es)
                 self.__edge_servers.append(
                     EdgeServer(es_info.hostname,es_info.config_file))
+        self.__http_clients: List[str] = []
+        if not test_server_only:
+            for http in self.__config.http_clients:
+                 h_info= HTTPClientInfo(http)
+                 self.__http_clients.append(h_info.hostname)
 
 
     def __str__(self) -> str:
