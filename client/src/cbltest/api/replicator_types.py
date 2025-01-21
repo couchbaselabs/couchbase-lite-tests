@@ -4,12 +4,11 @@ from abc import abstractmethod
 from enum import Enum, Flag, auto
 from typing import Any, Dict, Final, List, Optional, cast
 
-from varname import nameof
-
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.assertions import _assert_not_empty
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.responses import ErrorResponseBody
+from cbltest.utils import nameof
 
 
 class ReplicatorFilter(JSONSerializable):
