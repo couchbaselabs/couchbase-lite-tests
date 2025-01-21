@@ -37,11 +37,6 @@ class CouchbaseCloud:
     def _wait_for_all_indexed_removed(self, bucket: str) -> None:
         _try_n_times(10, 2, True, self._check_all_indexes_removed, type(None), bucket)
 
-    async def create_role(
-        self, db_name: str, role: str, collection_access: dict
-    ) -> None:
-        await self.__sync_gateway.add_role(db_name, role, collection_access)
-
     async def configure_dataset(
         self,
         dataset_path: Path,

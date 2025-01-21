@@ -517,12 +517,12 @@ class SyncGateway:
         self,
         db_name: str,
         name: str,
-        password: str,
-        collection_access: dict,
+        password: Optional[str] = None,
+        collection_access: Optional[dict] = None,
         admin_roles: Optional[List[str]] = None,
     ) -> None:
         """
-        Adds the specified user to a Sync Gateway database with the specified channel access
+        Adds or updates the specified user to a Sync Gateway database with the specified channel access
 
         :param db_name: The name of the Database to add the user to
         :param name: The username to add
@@ -530,15 +530,20 @@ class SyncGateway:
         :param collection_access: The collections that the user will have access to.  This needs to
             be formatted in the way Sync Gateway expects it, so if you are unsure use
             :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
+        :param admin_roles: The admin roles
         """
         with self.__tracer.start_as_current_span(
             "add_user", attributes={"cbl.user.name": name}
         ):
-            body = {
+            body: Dict[str, Any] = {
                 "name": name,
-                "password": password,
-                "collection_access": collection_access,
             }
+
+            if password is not None:
+                body["password"] = password
+
+            if collection_access is not None:
+                body["collection_access"] = collection_access
 
             if admin_roles is not None:
                 body["admin_roles"] = admin_roles
