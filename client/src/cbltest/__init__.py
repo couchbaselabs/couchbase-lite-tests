@@ -2,8 +2,6 @@ from json import dumps
 from sys import version_info
 from typing import Dict, List, Optional
 
-from varname import nameof
-
 from .api.couchbaseserver import CouchbaseServer
 from .api.syncgateway import SyncGateway
 from .api.testserver import TestServer
@@ -17,6 +15,7 @@ from .configparser import (
 from .extrapropsparser import _parse_extra_props
 from .logging import LogLevel, cbl_log_init, cbl_setLogLevel
 from .requests import RequestFactory
+from .utils import nameof
 
 if version_info < (3, 9):
     raise RuntimeError("Python must be at least v3.9!")

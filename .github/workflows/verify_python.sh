@@ -5,7 +5,6 @@ source ./venv/bin/activate
 pip install mypy
 pip install pytest pytest-asyncio
 pip install types-requests types-Deprecated
-pip install varname
 pip install ./client
 echo "Checking tests files..."
 python -m mypy tests --exclude=venv

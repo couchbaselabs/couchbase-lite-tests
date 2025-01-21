@@ -8,7 +8,6 @@ from urllib.parse import urljoin
 from aiohttp import BasicAuth, ClientSession, TCPConnector
 from deprecated import deprecated
 from opentelemetry.trace import get_tracer
-from varname import nameof
 
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
@@ -16,7 +15,7 @@ from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_info, cbl_warning
-from cbltest.utils import assert_not_null
+from cbltest.utils import assert_not_null, nameof
 from cbltest.version import VERSION
 
 

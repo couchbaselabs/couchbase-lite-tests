@@ -3,14 +3,13 @@ from pathlib import Path
 from typing import List, Optional, cast
 
 from opentelemetry.trace import get_tracer
-from varname import nameof
 
 from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.syncgateway import PutDatabasePayload, SyncGateway
 from cbltest.assertions import _assert_not_null
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.utils import _try_n_times
+from cbltest.utils import _try_n_times, nameof
 from cbltest.version import VERSION
 
 

@@ -2,8 +2,6 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, cast
 from uuid import UUID
 
-from varname import nameof
-
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.api.replicator_types import (
@@ -14,6 +12,7 @@ from cbltest.api.replicator_types import (
 from cbltest.assertions import _assert_not_null
 from cbltest.logging import cbl_warning
 from cbltest.requests import TestServerRequest, TestServerRequestBody
+from cbltest.utils import nameof
 
 # Some conventions that are followed in this file are that all request classes that
 # will be sent to the test server are classes that end in 'Request'.  Their bodies
