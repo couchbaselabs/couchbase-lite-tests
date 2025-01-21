@@ -514,7 +514,12 @@ class SyncGateway:
         return ret_val
 
     async def add_user(
-        self, db_name: str, name: str, password: str, collection_access: dict
+        self,
+        db_name: str,
+        name: str,
+        password: str,
+        collection_access: dict,
+        admin_roles: Optional[List[str]] = None,
     ) -> None:
         """
         Adds the specified user to a Sync Gateway database with the specified channel access
@@ -534,6 +539,9 @@ class SyncGateway:
                 "password": password,
                 "collection_access": collection_access,
             }
+
+            if admin_roles is not None:
+                body["admin_roles"] = admin_roles
 
             await self._send_request(
                 "put", f"/{db_name}/_user/{name}", JSONDictionary(body)
