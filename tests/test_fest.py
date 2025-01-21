@@ -30,7 +30,7 @@ class TestFest(CBLTestClass):
                 f"Assign roles '{', '.join(user_roles)}' to the user '{user}'"
             )
             for role in user_roles:
-                await cloud.create_role(
+                await cblpytest.sync_gateways[0].add_role(
                     "todo",
                     role,
                     {
@@ -41,7 +41,9 @@ class TestFest(CBLTestClass):
                         }
                     },
                 )
-            await cloud.add_user("todo", user, admin_roles=user_roles)
+            await cblpytest.sync_gateways[0].add_user(
+                "todo", user, admin_roles=user_roles
+            )
 
         return cloud
 
