@@ -36,7 +36,7 @@ ext {
 }
 
 def COUCHBASE_LITE_VERSION = project.hasProperty("cblVersion") ? cblVersion : ""
-if (!(COUCHBASE_LITE_VERSION =~ /^\d{1,2}\.\d{1,2}\.\d{1,2}-/)) { throw new InvalidUserDataException ("!!! Bad Couchbase version: ${COUCHBASE_LITE_VERSION}") }
+if (!(COUCHBASE_LITE_VERSION =~ /^\d{1,2}\.\d{1,2}\.\d{1,2}([ab.]\d)?-/)) { throw new InvalidUserDataException ("!!! Bad Couchbase version: ${COUCHBASE_LITE_VERSION}") }
 
 // If it is a snapshot, it is in maven local
 def USE_LOCAL_MAVEN = COUCHBASE_LITE_VERSION.endsWith("SNAPSHOT")
