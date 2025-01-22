@@ -307,6 +307,23 @@ class TestFest(CBLTestClass):
         await repl2.start()
 
         self.mark_test_step("Wait for the new docs to be pulled to db2")
+        await repl1.wait_for_all_doc_events(
+            {
+                WaitForDocumentEventEntry(
+                    "_default.lists",
+                    "db1-list1",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.NONE,
+                ),
+                WaitForDocumentEventEntry(
+                    "_default.tasks",
+                    "db1-list1-task1",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.NONE,
+                ),
+            }
+        )
+
         await repl2.wait_for_all_doc_events(
             {
                 WaitForDocumentEventEntry(
@@ -357,6 +374,16 @@ class TestFest(CBLTestClass):
             )
 
         self.mark_test_step("Wait for the new doc to be pulled to db1")
+        await repl2.wait_for_all_doc_events(
+            {
+                WaitForDocumentEventEntry(
+                    "_default.tasks",
+                    "db1-list1-task1",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.NONE,
+                )
+            }
+        )
         await repl1.wait_for_all_doc_events(
             {
                 WaitForDocumentEventEntry(
@@ -425,6 +452,22 @@ class TestFest(CBLTestClass):
         await repl2.start()
 
         self.mark_test_step("Wait for the updated doc to be pulled to db2")
+        await repl1.wait_for_all_doc_events(
+            {
+                WaitForDocumentEventEntry(
+                    "_default.lists",
+                    "db1-list1",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.NONE,
+                ),
+                WaitForDocumentEventEntry(
+                    "_default.tasks",
+                    "db1-list1-task1",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.NONE,
+                ),
+            }
+        )
         await repl2.wait_for_all_doc_events(
             {
                 WaitForDocumentEventEntry(
@@ -538,6 +581,29 @@ class TestFest(CBLTestClass):
         await repl2.start()
 
         self.mark_test_step("Wait for the new docs to be pulled to db2")
+        await repl1.wait_for_all_doc_events(
+            {
+                WaitForDocumentEventEntry(
+                    "_default.lists",
+                    "db1-list1",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.NONE,
+                ),
+                WaitForDocumentEventEntry(
+                    "_default.tasks",
+                    "db1-list1-task1",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.NONE,
+                ),
+                WaitForDocumentEventEntry(
+                    "_default.tasks",
+                    "db1-list1-task2",
+                    ReplicatorType.PUSH,
+                    ReplicatorDocumentFlags.NONE,
+                ),
+            }
+        )
+
         await repl2.wait_for_all_doc_events(
             {
                 WaitForDocumentEventEntry(
