@@ -438,7 +438,7 @@ class SyncGateway:
             try:
                 await self._send_request("put", f"/{db_name}/", payload)
             except CblSyncGatewayBadResponseError as e:
-                if e.code == 500 and retry_count < 10:
+                if e.code == 500 and retry_count < 3:
                     cbl_warning(
                         f"Sync gateway returned 500 from PUT database call, retrying ({retry_count + 1})..."
                     )
