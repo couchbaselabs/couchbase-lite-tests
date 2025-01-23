@@ -4,7 +4,7 @@ EDITION=${1}
 CBL_VERSION=${2}
 CBL_BLD_NUM=${3}
 CBL_DATASET_VERSION=${4}
-SGW_URL=${4}
+SGW_URL=${5}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 SHARED_DIR="${SCRIPT_DIR}/../shared"

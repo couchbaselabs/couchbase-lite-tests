@@ -18,6 +18,7 @@ pipeline {
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
                     if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
                     currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD}-${CBL_EDITION} (#${currentBuild.number})"
+                    currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION}"
                 }
             }
         }
