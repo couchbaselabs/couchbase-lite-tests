@@ -119,7 +119,7 @@ def main(hostnames: List[str], version: str, build: int, private_key: Optional[s
         sftp_progress_bar(sftp, SCRIPT_DIR / "cert" / "sg_key.pem", "/home/ec2-user/cert/sg_key.pem")
         sftp.close()
 
-        #remote_exec(ssh, f"sudo rpm -i /tmp/{sgw_filename}", f"Installing Couchbase SGW {version}-{build_no}")
+        remote_exec(ssh, f"sudo rpm -i /tmp/{sgw_filename}", f"Installing Couchbase SGW {version}-{build_no}")
         remote_exec(ssh, "bash /home/ec2-user/start-sgw.sh", "Starting SGW")
 
         ssh.close()

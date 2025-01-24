@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
+import sys
 from time import sleep
-from typing import List, cast
+from typing import IO, List, Optional, cast
 from sgw_setup.setup_sgw import main as sgw_main
 from server_setup.setup_server import main as server_main
 from common.output import header
@@ -19,8 +20,8 @@ def terraform_apply(public_key_name: str):
 
     header("Done!")
 
-def write_config(config_file: str):
-    header(f"Writing TDK configuration based on {config_file}...")
+def write_config(in_config_file: str, output: IO[str]):
+    header(f"Writing TDK configuration based on {in_config_file}...")
     cbs_command = ["terraform", "output", "-json", "couchbase_instance_public_ips"]
     result = subprocess.run(cbs_command, capture_output=True, text=True)
     if result.returncode != 0:
@@ -33,22 +34,21 @@ def write_config(config_file: str):
         raise Exception(f"Command '{' '.join(sgw_command)}' failed with exit status {result.returncode}: {result.stderr}")
     
     sgw_ips = cast(List[str], json.loads(result.stdout))
-    with open(config_file, "r") as fin:
-        with open("config.json", "w") as fout:
-            input = fin.read()
-            i = 1
-            for ip in cbs_ips:
-                next_arg = f"{{{{cbs-ip{i}}}}}"
-                print(f"{next_arg} -> {ip}")
-                input = input.replace(next_arg, ip)
+    with open(in_config_file, "r") as fin:
+        input = fin.read()
+        i = 1
+        for ip in cbs_ips:
+            next_arg = f"{{{{cbs-ip{i}}}}}"
+            print(f"{next_arg} -> {ip}")
+            input = input.replace(next_arg, ip)
 
-            i = 1
-            for ip in sgw_ips:
-                next_arg = f"{{{{sgw-ip{i}}}}}"
-                print(f"{next_arg} -> {ip}")
-                input = input.replace(next_arg, ip)
-            
-            fout.write(input)
+        i = 1
+        for ip in sgw_ips:
+            next_arg = f"{{{{sgw-ip{i}}}}}"
+            print(f"{next_arg} -> {ip}")
+            input = input.replace(next_arg, ip)
+        
+        output.write(input)
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Run a script over an SSH connection.")
@@ -56,8 +56,10 @@ if __name__ == "__main__":
     parser.add_argument("--sgw-version", default="4.0.0", help="The version of Sync Gateway to install.")
     parser.add_argument("--sgw-build", default=-1, type=int, help="The build number of Sync Gateway to install (latest good by default)")
     parser.add_argument("--private-key", help="The private key to use for the SSH connection (if not default)")
-    parser.add_argument("--public-key-name", help="The public key stored in AWS that pairs with the private key", required=True)
-    parser.add_argument("--tdk-config", help="The path to the TDK configuration file", required=True)
+    parser.add_argument("--tdk-config-out", help="The path to the write the resulting TDK configuration file (stdout if empty)")
+    required = parser.add_argument_group("required arguments")
+    required.add_argument("--public-key-name", help="The public key stored in AWS that pairs with the private key", required=True)
+    required.add_argument("--tdk-config-in", help="The path to the input TDK configuration file", required=True)
     args = parser.parse_args()
 
     terraform_apply(args.public_key_name)
@@ -79,6 +81,10 @@ if __name__ == "__main__":
     # before SSH access succeeds
     sleep(5)
 
-    server_main(cbs_ips, args.cbs_version, args.private_key)
-    sgw_main(sgw_ips, args.sgw_version, args.sgw_build, args.private_key)
-    write_config(args.tdk_config)
+    #server_main(cbs_ips, args.cbs_version, args.private_key)
+    #sgw_main(sgw_ips, args.sgw_version, args.sgw_build, args.private_key)
+    if args.tdk_config_out is not None:
+        with open(args.tdk_config_out, "w") as fout:
+            write_config(args.tdk_config_in, fout)
+    else:
+        write_config(args.tdk_config_in, sys.stdout)
