@@ -55,14 +55,6 @@ FetchContent_Declare(
 message(STATUS "Fetching json...")
 FetchContent_MakeAvailable(json)
 
-FetchContent_Declare(
-        ixwebsocket
-        GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
-        GIT_TAG v11.4.5
-)
-message(STATUS "Fetching IXWebSocket...")
-FetchContent_MakeAvailable(ixwebsocket)
-
 if(MSVC)
     FetchContent_Declare(
             zlib
@@ -73,14 +65,25 @@ if(MSVC)
 
     message(STATUS "Fetching zlib...")
     FetchContent_MakeAvailable(zlib)
+
     if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/Debug/zlibstaticd.lib)
     else()
         set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/${CMAKE_BUILD_TYPE}/zlibstatic.lib)
     endif()
+    
     set(ZLIB_INCLUDE_DIR ${zlib_SOURCE_DIR})
-    target_include_directories(zlibstatic PRIVATE ${zlib_BINARY_DIR})
+    list(APPEND ZLIB_INCLUDE_DIR ${zlib_BINARY_DIR})
+    target_include_directories(zlibstatic PRIVATE ${ZLIB_INCLUDE_DIR})
 endif()
+
+FetchContent_Declare(
+        ixwebsocket
+        GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
+        GIT_TAG v11.4.5
+)
+message(STATUS "Fetching IXWebSocket...")
+FetchContent_MakeAvailable(ixwebsocket)
 
 FetchContent_Declare(
         libzip
