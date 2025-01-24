@@ -7,7 +7,8 @@ import subprocess
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Run a script over an SSH connection.")
-    parser.add_argument("--public-key-name", help="The public key stored in AWS that pairs with the private key", required=True)
+    required = parser.add_argument_group("required arguments")
+    required.add_argument("--public-key-name", help="The public key stored in AWS that pairs with the private key", required=True)
     args = parser.parse_args()
 
     header("Starting terraform destroy")
