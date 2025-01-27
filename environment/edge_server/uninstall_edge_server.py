@@ -46,7 +46,7 @@ def uninstall_edge_server(ip, password="couchbase"):
     print("Removing Couchbase Edge Server package and related files...")
     run_remote_command(
         ip,
-        "sudo apt-get remove --purge couchbase-edge-server -y && sudo rm -rf /opt/couchbase-edge-server /tmp/couchbase-edge-server.deb /home/couchbase/"
+        "sudo apt-get remove --purge couchbase-edge-server -y && sudo rm -rf *.cblite2 /opt/couchbase-edge-server /tmp/couchbase-edge-server.deb /home/couchbase/"
     )
 
     # Remove unnecessary files and directories

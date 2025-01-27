@@ -39,11 +39,11 @@ def uninstall_sync_gateway(ip):
     run_remote_command(ip, "sudo systemctl disable sync_gateway")
 
     # Remove Sync Gateway package
-    run_remote_command(ip, "sudo apt-get remove --purge sync-gateway && rm -rf /home/sync_gateway/ /opt/couchbase-sync-gateway/ /opt/sg/ /tmp/couchbase-sync-gateway-enterprise_x86_64.deb")
+    run_remote_command(ip, "sudo apt-get remove --purge sync-gateway && rm -rf /home/sync_gateway/ /opt/couchbase-sync-gateway/ /opt/sg/ /tmp/couchbase-sync-gateway-enterprise_x86_64.deb || true")
 
     # Remove unnecessary files and directories
     run_remote_command(ip, "sudo rm -rf /etc/sync_gateway /var/lib/sync_gateway /var/log/sync_gateway /tmp/sg_logs /var/tmp/sglogs")
-    run_remote_command(ip, "sudo apt-get autoremove -y && sudo apt-get clean")
+    run_remote_command(ip, "sudo apt-get autoremove -y && sudo apt-get clean || true")
 
     # Remove systemd service file
     run_remote_command(ip, "sudo rm -f /usr/lib/systemd/system/sync_gateway.service")

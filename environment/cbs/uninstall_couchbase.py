@@ -40,8 +40,8 @@ def uninstall_couchbase_server(ips):
             # Stop Couchbase service and kill any remaining processes
             stop_couchbase_service(ip)
 
-            # Delete the .deb file
-            delete_file = "sudo rm -r /tmp/couchbase-server.deb"
+            # Delete the .deb file and config file
+            delete_file = "sudo rm -r /tmp/couchbase-server.deb /var/couchbase-configured /var/log/couchbase-setup.log /opt/configure-cluster.sh /opt/configure-node.sh || true"
             run_remote_command(ip, delete_file)
 
             # Remove Couchbase Server package
