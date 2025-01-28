@@ -92,3 +92,32 @@ The version and build properties should be self explanatory but the others are a
 - public key name: The name of the key created in step 0
 - private key: The path to the private key created in step 0 (you didn't lose it right?)
 - TDK config in: A template TDK compatible config file.  
+- TDK config out: An optional file to write the resulting TDK config file to (otherwise it will go to stdout)
+
+:exclamation: It is important to understand how the template system works for the TDK config in.  This system is capable of creating any number of couchbase server and sync gateway instances, and once it does it will begin to replace the following templates with actual IP addresses:  `\{\{cbs-ip\d+\}\}` / `\{\{sgw-ip\d+\}\}`.  So `{{cbs-ip1}}` will receive the IP address of the first created Couchbase Server, and correspondingly `{{sgw-ip1}}` will receive the IP address of the first created Sync Gateway, and so on.  A simple template case would look like this:
+
+```json5
+{
+    //...
+    "sync-gateways": [{"hostname": "{{sgw-ip1}}", "tls": true}],
+    "couchbase-servers": [{"hostname": "{{cbs-ip1}}"}],
+    //...
+}
+```
+
+### Stopping
+
+```
+usage: stop_backend.py [-h] --public-key-name PUBLIC_KEY_NAME
+
+Run a script over an SSH connection.
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+required arguments:
+  --public-key-name PUBLIC_KEY_NAME
+                        The public key stored in AWS that pairs with the private key
+```
+
+The stop script only has one argument that is required, and is only required as what seems to be a quirk of Terraform.  Since the Terraform config declares a variable to be used, it must be specified in all commands (which includes destroy), so the public key name from step 0 of this README should be used here as well.  
