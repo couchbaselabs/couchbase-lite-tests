@@ -359,6 +359,7 @@ class SyncGateway:
                 data = await resp.text()
                 ret_val = data
             writer.write_end(f"Sync Gateway [{self.__admin_url}] <- {method.upper()} {path} {resp.status}", data)
+
             if not resp.ok:
                 raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}")
 
@@ -709,3 +710,58 @@ class SyncGateway:
                                                      f"Get doc from sync gateway had error '{cast_resp['reason']}'")
 
             return RemoteDocument(cast_resp)
+
+    async def create_document(self, db_name: str, doc_id: str, document: dict, scope: str = "_default", collection: str = "_default"):
+        """
+        Creates a document in Sync Gateway
+
+        :param db_name: The name of the DB endpoint where the document should be created
+        :param doc_id: The document ID to create
+        :param document: The document data to be created (as a dictionary)
+        :param scope: The scope where the document should be created (default '_default')
+        :param collection: The collection where the document should be created (default '_default')
+        :return: The response from the Sync Gateway (or None if document creation fails)
+        """
+        with self.__tracer.start_as_current_span("create_document", attributes={"cbl.database.name": db_name,
+                                                                                "cbl.scope.name": scope,
+                                                                                "cbl.collection.name": collection,
+                                                                                "cbl.document.id": doc_id}):
+            document["_id"] = doc_id
+            response = await self._send_request("PUT", f"/{db_name}.{scope}.{collection}/{doc_id}",
+                                                payload=JSONDictionary(document))
+            # Check for response structure
+            if not response or "error" in response:
+                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}")
+
+            return response
+
+    async def update_document(self, db_name: str, doc_id: str, document: dict, rev: str, 
+                          scope: str = "_default", collection: str = "_default") -> dict:
+        """
+        Updates a document in Sync Gateway.
+
+        :param db_name: The name of the DB endpoint where the document exists
+        :param doc_id: The document ID to update
+        :param document: The updated document data (as a dictionary)
+        :param rev: The current revision ID of the document
+        :param scope: The scope where the document exists (default '_default')
+        :param collection: The collection where the document exists (default '_default')
+        :return: The response from the Sync Gateway
+        """
+        with self.__tracer.start_as_current_span("update_document", attributes={"cbl.database.name": db_name,
+                                                                                "cbl.scope.name": scope,
+                                                                                "cbl.collection.name": collection,
+                                                                                "cbl.document.id": doc_id}):
+
+            document["_id"] = doc_id
+            document["_rev"] = rev
+
+            params = {"new_edits": "true", "rev": rev}
+
+            response = await self._send_request("PUT", f"/{db_name}.{scope}.{collection}/{doc_id}", 
+                                                payload=JSONDictionary(document), params=params)
+            
+            if not response or "error" in response:
+                raise CblSyncGatewayBadResponseError(500, f"Failed to update document {doc_id} with rev {rev}")
+            
+            return response

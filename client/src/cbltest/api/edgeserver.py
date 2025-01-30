@@ -192,6 +192,8 @@ class EdgeServer:
                 data = await resp.text()
                 ret_val = data
             writer.write_end(f"Edge Server [{self.__hostname}] <- {method.upper()} {path} {resp.status}", data)
+
+
             if not resp.ok:
                 raise CblEdgeServerBadResponseError(resp.status, f"{method} {path} returned {resp.status}")
 
