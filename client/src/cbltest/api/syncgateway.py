@@ -192,12 +192,16 @@ class AllDocumentsResponse:
     def rows(self) -> list[AllDocumentsResponseRow]:
         """Gets the entries of the response"""
         return self.__rows
+    @property
+    def input(self):
+        return self.__input
 
     def __len__(self) -> int:
         return self.__len
 
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
+        self.__input = input
         self.__rows: list[AllDocumentsResponseRow] = []
         for row in cast(list[dict], input["rows"]):
             rev = cast(dict, row["value"])

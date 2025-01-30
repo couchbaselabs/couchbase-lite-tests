@@ -3,9 +3,10 @@ from typing import Dict, List, Optional, Any
 import asyncssh
 import logging
 import signal
-
+import subprocess
 from cbltest.version import VERSION
 from opentelemetry.trace import get_tracer
+
 
 _remote_shell_tracer = get_tracer("remote_shell", VERSION)
 
@@ -35,44 +36,33 @@ class RemoteShellConnection:
 
     async def kill_edge_server(self) -> bool:
         try:
-            command = f"lsof -i:{self._port}"
-            result = await self.ssh_client.run(command, check=True)
-            output = result.stdout.strip()
-
-            if not output:
+            command = 'pgrep -f /opt/couchbase-edge-server/bin/couchbase-edge-server'
+            result=await self.ssh_client.run(command, check=True)
+            if result.stderr.strip():
                 return False
-
-            # Parse the output to extract PIDs
-            lines = output.split("\n")
-            pids = set()
-            for line in lines[1:]:  # Skip the header line
-                parts = line.split()
-                if len(parts) > 1:
-                    pids.add(parts[1])  # PID is in the second column
-
-            for pid in pids:
-                kill_command = f"kill -{signal.SIGKILL} {pid}"
-                await self.ssh_client.run(kill_command, check=True)
-
+            if result.stdout.strip():
+                run_remote_command(ip, "sudo kill $(cat /tmp/edge_server.pid) && sudo rm -f /tmp/edge_server.pid")
             return True
-
         except Exception as e:
             return False
 
-    async def start_edge_server(self, secure: bool, config_file: str, certfile: str, keyfile: str) -> bool:
+    async def start_edge_server(self, config_file: str) -> bool:
         try:
-            if secure:
-                start_command = (
-                    f"./couchbase-lite-edgeserver --verbose --create-cert CN=localhost "
-                    f"--cert {certfile} --key {keyfile} --config {config_file}"
-                )
-            else:
-                start_command = (
-                    f"./couchbase-lite-edgeserver --verbose --create-cert CN=localhost "
-                    f"--config {config_file}"
-                )
+            command=f"nohup /opt/couchbase-edge-server/bin/couchbase-edge-server --verbose {config_file} > /tmp/edge_server.log 2>&1 & echo $! > /tmp/edge_server.pid"
+            result=await self.ssh_client.run(command, check=True)
+            if result.stderr.strip():
+                return False
+            return True
+        except Exception as e:
+            return False
 
-            await self.ssh_client.run(start_command, check=True)
+    async def move_file(self,local_path,dest_path)->bool:
+        try:
+            await self.ssh_client.run(f"rm -r {dest_path}")
+            subprocess.run(
+                ["sshpass", "-p", "couchbase", "scp", local_path, f"root@{self._host}:{dest_path}"],check=True)
+            await self.ssh_client.run(f"sudo chmod 644 {dest_path}")
+            await self.ssh_client.run( f"sudo chown -R couchbase:couchbase {dest_path}")
             return True
         except Exception as e:
             return False

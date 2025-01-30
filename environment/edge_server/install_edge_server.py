@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import time
+from distutils.command.build import build
 
 
 # Function to run SSH commands on remote machine with password prompt handling
@@ -25,12 +26,13 @@ def get_ips_from_config(config_path, key):
     return [entry["hostname"] for entry in config_data.get(key, [])]
 
 
-def install_edge_server(edge_server_ip, edge_server_config, version, build):
+def install_edge_server(edge_server_ip, edge_server_config, version, build,create_cert,database_path):
     """Installs and configures Edge Server on the given IP."""
     # Define file paths
     package_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-edge-server/{version}/{build}/couchbase-edge-server_{version}-{build}_amd64.deb"
     package_file = "/tmp/couchbase-edge-server.deb"
     config_file_path = "/opt/couchbase-edge-server/config/config.json"
+    data_file_path = "/opt/couchbase-edge-server/database/db.cblite2.zip"
     log_dir = "/tmp/EdgeServerLog"
 
     # SSH into the VM
@@ -52,6 +54,24 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build):
     print("Setting up config directory...")
     run_remote_command(edge_server_ip, "sudo mkdir -p /opt/couchbase-edge-server/config")
     run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/config")
+
+    if create_cert:
+        print("Setting up certificates directory...")
+        run_remote_command(edge_server_ip, "sudo mkdir -p /opt/couchbase-edge-server/cert")
+        run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/cert")
+        print(f"Creating client certificate on {edge_server_ip}...")
+        command = f"/opt/couchbase-edge-server/bin/couchbase-edge-server --create-cert CN={edge_server_ip} /opt/couchbase-edge-server/cert/certfile /opt/couchbase-edge-server/cert/keyfile"
+        run_remote_command(edge_server_ip, command)
+
+    if database_path is not None:
+        print("Setting up database directory...")
+        run_remote_command(edge_server_ip, "sudo mkdir -p /opt/couchbase-edge-server/database")
+        run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/database")
+        print(f"Copying database file to {data_file_path}...")
+        subprocess.run(
+            ["sshpass", "-p", "couchbase", "scp", database_path, f"root@{edge_server_ip}:{data_file_path}"],
+            check=True)
+        run_remote_command(edge_server_ip, f"unzip -o {data_file_path}")
 
     # Copy the configuration file to the remote VM
     print(f"Copying config file to {config_file_path}...")
@@ -90,7 +110,9 @@ def main():
     parser.add_option("-e", "--edge-server-config", dest="edge_server_config", help="Path to the Edge server config JSON file", metavar="EDGE_SERVER_CONFIG", default=None)
     parser.add_option("-v", "--version", dest="version", help="Edge Server version", metavar="VERSION", default=None)
     parser.add_option("-b", "--build", dest="build", help="Edge Server build number", metavar="BUILD", default=None)
-
+    parser.add_option("-d", "--database", dest="database", help="Edge Server database", metavar="DATABASE", default=None)
+    parser.add_option("--create-cert", dest="create_cert", action="store_true",
+                      help="Create a client certificate", default=False)
     (options, args) = parser.parse_args()
 
     if not options.cluster_config or not options.edge_server_config or not options.version or not options.build:
@@ -99,9 +121,8 @@ def main():
 
     # Fetch edge server IPs from the cluster config
     edge_server_ips = get_ips_from_config(options.cluster_config, "edge-servers")
-
     for edge_server_ip in edge_server_ips:
-        install_edge_server(edge_server_ip, options.edge_server_config, options.version, options.build)
+        install_edge_server(edge_server_ip, options.edge_server_config, options.version, options.build,options.create_cert,options.database)
 
 
 if __name__ == "__main__":
