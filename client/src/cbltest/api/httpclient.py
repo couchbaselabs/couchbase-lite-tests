@@ -5,7 +5,7 @@ from future.backports.http.client import responses
 import concurrent.futures
 import json
 from typing import Dict, List, Optional
-
+from cbltest.api.syncgateway import AllDocumentsResponseRow, AllDocumentsResponse, DocumentUpdateEntry, RemoteDocument, CouchbaseVersion
 from cbltest.api.edgeserver import EdgeServer,BulkDocOperation
 from cbltest.api.remoteshell import RemoteShellConnection
 from cbltest.api.error import CblEdgeServerBadResponseError
@@ -23,8 +23,8 @@ class HTTPClient:
         await self.remote_shell.connect()
 
     async def get_all_documents(self,  db_name: str, scope: str = "",
-                                collection: str = ""):
-        curl=await self.edge_server.get_all_documents(db_name, scope, collection,curl=True)
+                                collection: str = "",descending=False,endkey=None,keys=None,startkey=None,):
+        curl=await self.edge_server.get_all_documents(db_name, scope, collection,curl=True,descending=descending,endkey=endkey,keys=keys,startkey=startkey)
         response=await self.remote_shell.run_command(curl)
         try:
             response_dict=json.loads(response)
@@ -33,7 +33,7 @@ class HTTPClient:
             return AllDocumentsResponse(response_dict)
         except:
             raise CblEdgeServerBadResponseError(500,
-                                                f"Get all doc from edge server had error '{cast_resp['reason']}'")
+                                                f"Get all doc from edge server had error '{response_dict['reason']}'")
 
     async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "", collection: str = ""):
         curl = await self.edge_server.delete_document(doc_id, revid, db_name, scope, collection, curl=True)
@@ -46,8 +46,9 @@ class HTTPClient:
         except:
             raise CblEdgeServerBadResponseError(500, f"Delete document from edge server had error '{response}'")
 
-    async def get_document(self, db_name: str, doc_id: str, scope: str = "", collection: str = ""):
-        curl = await self.edge_server.get_document(db_name, doc_id, scope, collection, curl=True)
+    async def get_document(self, db_name: str, doc_id: str, scope: str = "", collection: str = "",revid:str=None):
+        curl = await self.edge_server.get_document(db_name, doc_id, scope, collection, curl=True,revid=revid)
+        print(curl)
         response = await self.remote_shell.run_command(curl)
         try:
             response_dict = json.loads(response)
@@ -196,8 +197,8 @@ class HTTPClient:
         except:
             raise CblEdgeServerBadResponseError(500, f"Add document with auto ID had error '{response}'")
 
-    async def add_document_with_id(self, document: dict, doc_id: str, db_name: str, scope: str = "", collection: str = "") -> dict:
-        curl_command = await self.edge_server.add_document_with_id(document, doc_id, db_name, scope, collection, curl=True)
+    async def put_document_with_id(self, document: dict, doc_id: str, db_name: str, scope: str = "", collection: str = "",rev:str=None) -> dict:
+        curl_command = await self.edge_server.put_document_with_id(document, doc_id, db_name, scope, collection, curl=True,rev=rev)
         
         response = await self.remote_shell.run_command(curl_command)
         try:
@@ -246,7 +247,7 @@ class HTTPClient:
 
     async def bulk_doc_op(self, docs: List[BulkDocOperation], db_name: str, scope: str = "", collection: str = "", new_edits: bool = True):
         curl_command = await self.edge_server.bulk_doc_op(docs, db_name, scope, collection, new_edits, curl=True)
-        
+        print(curl_command)
         response = await self.remote_shell.run_command(curl_command)
         try:
             response_dict = json.loads(response)
@@ -334,14 +335,34 @@ class ClientFactory:
     # response: method: {1:resp,3:resp}
     async def make_unique_client_request(self,methods:dict,*args, **kwargs):
         responses={}
+        error = {}
+        failed = []
         for method,idx in methods.items():
             tasks = [self.make_request(self.clients.get(id), method, args, kwargs) for id in idx]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             response={}
             for client_id, result in zip(idx, results):
-                response[client_id] = result
+                if isinstance(result, Exception):
+                    error[client_id] = str(result)
+                    failed.append(client_id)
+                else:
+                    response[client_id] = result
             responses[method] = response
-        return responses
+        return responses,error,failed
+    # {client_id:{method:"",params:{key:value}}}
+    async def make_unique_params_client_request(self,methods:dict):
+        error = {}
+        failed = []
+        tasks=[self.make_request(self.clients.get(idx), method_dict.get("method"), **method_dict.get("params")) for idx,method_dict in methods.items()]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        response={}
+        for client_id, result in zip(methods.keys(), results):
+            if isinstance(result, Exception):
+                error[client_id] = str(result)
+                failed.append(client_id)
+            else:
+                response[client_id] = result
+        return response,error,failed
 
     async def disconnect(self):
         """Closes all SSH connections."""
