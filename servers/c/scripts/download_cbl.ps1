@@ -20,9 +20,9 @@ if ($BuildNum -eq "0") {
 }
 
 Push-Location $DOWNLOAD_DIR
-7z x -y $ZIP_FILENAME
 Remove-Item -Recurse -Force -ErrorAction Ignore "$LIB_DIR\libcblite"
-Copy-Item -ErrorAction Ignore -Recurse libcblite-${Version} "$LIB_DIR\libcblite"
+Expand-Archive -Path "$DOWNLOAD_DIR\$ZIP_FILENAME" -DestinationPath "$LIB_DIR" -Force
+Rename-Item -Path "$LIB_DIR\libcblite-${Version}" -NewName "libcblite"
 Pop-Location
 
 Remove-Item -Recurse -Force -ErrorAction Ignore "$DOWNLOAD_DIR"

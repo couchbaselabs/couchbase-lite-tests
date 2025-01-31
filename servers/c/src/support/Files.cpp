@@ -18,7 +18,8 @@ using namespace ts::support::android;
 namespace ts::support {
     string files::filesDir(const string &subdir, bool create) {
 #ifdef WIN32
-        string dir = subdir.empty() ? "C:\\tmp" : "C:\\tmp\\" + subdir;
+        auto curPath = filesystem::current_path();
+        string dir = subdir.empty() ? curPath.string() : (curPath / subdir).string();
 #else
 #ifdef __ANDROID__
         string dir = subdir.empty() ? androidContext()->filesDir : androidContext()->filesDir + "/" + subdir;
@@ -38,6 +39,6 @@ namespace ts::support {
         return androidContext()->assetsDir;
 #endif
         auto current = filesystem::current_path() / "assets";
-        return current.generic_string();
+        return current.string();
     }
 }

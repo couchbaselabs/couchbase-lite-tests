@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$Edition,
     [Parameter(Mandatory=$true)][string]$Version,
-    [Parameter(Mandatory=$true)][string]$BuildNum,
+    [Parameter(Mandatory=$true)][string]$Build,
     [Parameter(Mandatory=$true)][string]$DatasetVersion
 )
 
@@ -13,13 +13,13 @@ $LIB_DIR="$PSScriptRoot\..\lib"
 & $PSScriptRoot\prepare_env.ps1 $DatasetVersion
 
 # Download CBL
-& $PSScriptRoot\download_cbl.ps1 $Edition $Version $BuildNum
+& $PSScriptRoot\download_cbl.ps1 $Edition $Version $Build
 
 # Build
 New-Item -ErrorAction Ignore -ItemType Directory $BUILD_DIR
 Push-Location $BUILD_DIR
 try {
-    & "C:\Program Files\CMake\bin\cmake.exe" -A x64 -DCMAKE_PREFIX_PATH="${DOWNLOAD_DIR}/libcblite-${Version}" -DCMAKE_BUILD_TYPE=Release ..
+    & "C:\Program Files\CMake\bin\cmake.exe" -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="${DOWNLOAD_DIR}/libcblite-${Version}" -DCMAKE_BUILD_TYPE=Release ..
     if($LASTEXITCODE -ne 0) {
         throw "Cmake failed!"
     } 
