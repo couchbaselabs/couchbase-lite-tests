@@ -28,32 +28,35 @@ class RemoteShellConnection:
                 known_hosts=None
             )
 
-
-
     @property
     def ssh_client(self):
         return self._ssh_client
 
     async def kill_edge_server(self) -> bool:
         try:
-            command = 'pgrep -f /opt/couchbase-edge-server/bin/couchbase-edge-server'
-            result=await self.ssh_client.run(command, check=True)
-            if result.stderr.strip():
-                return False
-            if result.stdout.strip():
-                run_remote_command(ip, "sudo kill $(cat /tmp/edge_server.pid) && sudo rm -f /tmp/edge_server.pid")
-            return True
+            result = await self.ssh_client.run("pgrep -f /opt/couchbase-edge-server/bin/couchbase-edge-server", check=True)
+            pid = result.stdout.strip()
+            if pid:
+                await self.ssh_client.run(f"kill {pid} && rm /tmp/edge_server.pid", check=True)
+                return True
         except Exception as e:
             return False
 
     async def start_edge_server(self, config_file: str) -> bool:
         try:
             command=f"nohup /opt/couchbase-edge-server/bin/couchbase-edge-server --verbose {config_file} > /tmp/edge_server.log 2>&1 & echo $! > /tmp/edge_server.pid"
-            result=await self.ssh_client.run(command, check=True)
-            if result.stderr.strip():
-                return False
-            return True
+            await self.ssh_client.run(command, check=True)
+            if await self.is_edge_server_running():
+                return True
+            return False
         except Exception as e:
+            return False
+
+    async def is_edge_server_running(self) -> bool:
+        try:
+            result = await self.ssh_client.run("pgrep -F /tmp/edge_server.pid", check=True)
+            return bool(result.stdout.strip())
+        except Exception:
             return False
 
     async def move_file(self,local_path,dest_path)->bool:
@@ -66,6 +69,9 @@ class RemoteShellConnection:
             return True
         except Exception as e:
             return False
+    async def add_user(self,name,password, role):
+        command=f"/opt/couchbase-edge-server/bin/couchbase-edge-server --add-user /opt/couchbase-edge-server/users/users.json {name} --create --role {role} --password {password}"
+        await self.ssh_client.run(command, check=True)
 
     async def run_command(self, curl_command: str):
         try:
@@ -79,3 +85,4 @@ class RemoteShellConnection:
             self._ssh_client.close()
             await self._ssh_client.wait_closed()
             self._ssh_client = None
+

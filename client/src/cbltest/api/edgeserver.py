@@ -7,7 +7,8 @@ from pathlib import Path
 from symbol import raise_stmt
 from typing import Dict, List, Tuple, cast, Any, Optional
 from urllib.parse import urljoin
-
+import pyjson5 as json5
+import os
 from aiohttp import ClientSession, BasicAuth, TCPConnector
 from couchbase.pycbc_core import result
 from opentelemetry.trace import get_tracer
@@ -74,12 +75,16 @@ class EdgeServer:
     A class for interacting with a given Edge Server instance
     """
 
-    def __init__(self, url: str,username:str=None,password:str=None):
+    def __init__(self, url: str,username:str=None,password:str=None,config_file=None):
         self.__tracer\
             = get_tracer(__name__, VERSION)
-        config_file="/Users/barkha.goyal/Desktop/couchbase-lite-tests/environment/edge_server/config/config.json"
-        port,secure,certfile,keyfile,admin_user,databases,is_anonymous_auth=self._decode_config_file(config_file)
+        if config_file is None:
+            repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+            config_file = str(repo_root / "environment" / "edge_server" / "config" / "config.json")
+            # config_file= file_path + "/" + "environment/edge_server/config/config.json"
+        port,secure,mtls,certfile,keyfile,is_auth,databases,is_anonymous_auth=self._decode_config_file(config_file)
         self.__secure: bool = secure
+        self.__mtls: bool = mtls
         self.__hostname: str = url
         self.__port: int = port
         self.__certfile:str=certfile
@@ -88,29 +93,34 @@ class EdgeServer:
         self.__anonymous_auth: bool=is_anonymous_auth
         self.__config_file:str=config_file
         self.__ssh_client=RemoteShellConnection(url, port)
+        self.__auth_name="admin_user"
+        self.__auth_password="password"
+        self.__auth=is_auth
         # if not session:
-        scheme = "https://" if secure else "http://"
+        self.scheme = "https://" if secure else "http://"
         if self.__anonymous_auth:
-            self.__session: ClientSession = self._create_session(secure, scheme, url, port,None)
+            self.__session: ClientSession = self._create_session(secure, self.scheme, url, port,None)
         else:
-            self.__session: ClientSession = self._create_session(secure, scheme, url, port,BasicAuth(username,password, "ascii"))
+            self.__session: ClientSession = self._create_session(secure, self.scheme, url, port,BasicAuth( self.__auth_name,self.__auth_password, "ascii"))
         # else:
         #     self.__session = session
+
+    @property
+    def hostname(self) -> str:
+        return self.__hostname
 
     def _decode_config_file(self,config_file:str):
         with open(config_file, 'r',encoding='utf-8') as file:
             config_content = file.read()
-            try:
-                config = json.loads(config_content)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON in configuration file: {e}")
+        config = json5.loads(config_content)
+
 
         # Validate and extract top-level keys
         databases = config.get("databases")
         if not databases or not isinstance(databases, dict):
             raise ValueError("Missing or invalid 'databases' configuration.")
 
-        https = config.get("https", {})
+        https = config.get("https", False)
         interface = config.get("interface", "0.0.0.0:59840")
         port = interface.split(":")[1]
         # logging_config = config.get("logging", {})
@@ -119,43 +129,36 @@ class EdgeServer:
         # replications = config.get("replications", [])
         cert_path,key_path="",""
         # Validate HTTPS configuration
+        mtls=False
         if https:
             cert_path = https.get("tls_cert_path")
             key_path = https.get("tls_key_path")
             if not cert_path or not key_path:
                 raise ValueError("HTTPS configuration must include 'tls_cert_path' and 'tls_key_path'.")
-        result=[]
-        if len(users)>0:
-            with open(users, 'r', encoding='utf-8') as file:
-                user_content = file.read()
-                try:
-                    config = json.loads(user_content)
-                except json.JSONDecodeError as e:
-                    raise ValueError(f"Invalid JSON in configuration file: {e}")
-                for username, details in users.items():
-                    if "admin" in details.get("roles", []):
-                        result.append({
-                            "user": username,
-                            "password": details["password"]
-                        })
-
-
-
+            client_cert_path=https.get("client_cert_path",False)
+            if client_cert_path:
+                mtls = True
+            https=True
+        users = True if config.get("users", False) else False
         # Return parsed configuration as a tuple
-        return port, https,cert_path,key_path, result,databases, enable_anonymous_users
+        return port, https,mtls,cert_path,key_path, users,databases, enable_anonymous_users
 
     def _create_session(self, secure: bool, scheme: str, url: str, port: int,
                         auth: Optional[BasicAuth]) -> ClientSession:
-        if secure:
-            ssl_context = ssl.create_default_context(cadata=self.tls_cert())
-            ssl_context.check_hostname = False
-            return ClientSession(f"{scheme}{url}:{port}", auth=auth, connector=TCPConnector(ssl=ssl_context))
-        else:
             return ClientSession(f"{scheme}{url}:{port}", auth=auth)
+
 
     def _build_curl_command(self, method: str, path: str, headers: Optional[Dict[str, str]] = None,
                             data: Optional[Dict] = None, params: Optional[Dict[str, str]] = None) -> str:
-        curl_command = f"curl -X {method.upper()} {self.__hostname}:{self.__port}{path}"
+        curl_command = f"curl -X {method.upper()} "
+        if self.__mtls:
+            curl_command+=f"--cert /opt/clientcert --key /opt/clientkey"
+            curl_command += f" --cacert /opt/rootcert "
+        elif self.__secure:
+            curl_command+=f" --cacert /opt/certfile "
+        if self.__auth:
+            curl_command+=f" -u {self.__auth_name}:{self.__auth_password} "
+        curl_command+= f"{self.scheme}{self.__hostname}:{self.__port}{path}"
         if headers:
             for key, value in headers.items():
                 curl_command += f" -H \"{key}: {value}\""
@@ -169,6 +172,7 @@ class EdgeServer:
         if params:
             curl_command += f" {' '.join([f'--{k}={v}' for k, v in params.items()])}"
 
+        print(curl_command)
         return curl_command
 
     async def _send_request(self, method: str, path: str, payload: Optional[JSONSerializable] = None,
@@ -199,11 +203,12 @@ class EdgeServer:
 
             return ret_val
     def keyspace_builder(self,db_name:str="",scope:str="",collection:str=""):
-        if len(scope)>0:
-            scope='.'.join(scope)
-        if len(collection)>0:
-            collection='.'.join(collection)
-        return db_name+scope+collection
+        keyspace = db_name
+        if scope:
+            keyspace += f".{scope}"
+        if collection:
+            keyspace += f".{collection}"
+        return keyspace
 
     async def get_version(self,curl:bool=False) -> CouchbaseVersion:
         scheme = "https://" if self.__secure else "http://"
@@ -217,12 +222,6 @@ class EdgeServer:
             assert "/" in raw_version
             return EdgeServerVersion(raw_version.split("/")[1])
 
-    def tls_cert(self) -> Optional[str]:
-        if not self.__secure:
-            cbl_warning("Edge Server instance not using TLS, returning empty tls_cert...")
-            return None
-
-        return ssl.get_server_certificate((self.__hostname, self.__port))
 
 
     async def get_all_documents(self, db_name: str, scope: str = "",
@@ -371,7 +370,7 @@ class EdgeServer:
             if tls_client_cert_key:
                 payload["tls_client_cert_key"] = tls_client_cert_key
 
-            response = await self._send_request("post","_replicate",JSONDictionary(payload),curl=curl)
+            response = await self._send_request("post","/_replicate",JSONDictionary(payload),curl=curl)
             if curl:
                 return response
             if not isinstance(response, dict):
@@ -386,7 +385,7 @@ class EdgeServer:
     async def replication_status(self, replicator_id:str,curl:bool=False):
         with self.__tracer.start_as_current_span("get replication status with Edge Server", attributes={"cbl.replicator.id": replicator_id}):
 
-            response = await self._send_request("get",f"_replicate{replicator_id}",curl=curl)
+            response = await self._send_request("get",f"/_replicate/{replicator_id}",curl=curl)
             if curl:
                 return response
             if not isinstance(response, dict):
@@ -401,7 +400,7 @@ class EdgeServer:
     async def all_replication_status(self,curl:bool=False):
         with self.__tracer.start_as_current_span("All Replication status with Edge Server"):
 
-            response = await self._send_request("get","_replicate",curl=curl)
+            response = await self._send_request("get","/_replicate",curl=curl)
             if curl:
                 return response
             if not isinstance(response, dict):
@@ -416,7 +415,7 @@ class EdgeServer:
     async def stop_replication(self, replicator_id:str,curl:bool=False):
         with self.__tracer.start_as_current_span("Stop Replication with Edge Server", attributes={"cbl.replicator.id": replicator_id}):
 
-            response = await self._send_request("post","_replicate",payload=JSONDictionary({"cancel":replicator_id}))
+            response = await self._send_request("post","/_replicate",payload=JSONDictionary({"cancel":replicator_id}))
             if curl:
                 return response
             if response and not isinstance(response, dict) :
@@ -518,7 +517,7 @@ class EdgeServer:
             keyspace = self.keyspace_builder(db_name, scope, collection)
             if rev:
                 document["_rev"] = rev
-            response = await self._send_request("put",f"{keyspace}/{id}",payload=JSONDictionary(document),curl=curl)
+            response = await self._send_request("put",f"/{keyspace}/{id}",payload=JSONDictionary(document),curl=curl)
             if curl:
                 return response
             if not isinstance(response, dict):
@@ -642,7 +641,7 @@ class EdgeServer:
         with self.__tracer.start_as_current_span("start edge server"):
             await self.__ssh_client.connect()
             if config_file is None:
-                config_file=self.__config_file
+                config_file='/opt/couchbase-edge-server/config/config.json'
             success = await self.__ssh_client.start_edge_server(config_file=config_file)
             await self.__ssh_client.close()
             return success
@@ -652,6 +651,28 @@ class EdgeServer:
         await self.__ssh_client.connect()
         await self.__ssh_client.move_file(config_file_path,dest_path)
         await self.start_server(dest_path)
+        return EdgeServer(self.__hostname,config_file=config_file_path)
+
+    async def add_user(self,name, password,role="admin"):
+        await self.kill_server()
+        await self.__ssh_client.connect()
+        await self.__ssh_client.add_user(name,password,role)
+        await self.start_server()
+
+    async def set_user(self,name,password):
+        self.__auth_name=name
+        self.__auth_password=password
+
+    # async def add_database(self,config_file_path,db_name,db_path,create=False,enable_client_writes=True,enable_client_sync=True,
+    #                        queries=None,):
+    #     await self.kill_server()
+    #     await self.__ssh_client.connect()
+    #     with open(config_file_path, 'r', encoding='utf-8') as file:
+    #         config_content = file.read()
+    #     config = json5.loads(config_content)
+    #     config["databases"][dbname]
+
+
 
 
 
