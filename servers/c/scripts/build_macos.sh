@@ -25,6 +25,7 @@ LIB_DIR="${SCRIPT_DIR}/../lib"
 "${SCRIPT_DIR}"/download_cbl.sh macos ${EDITION} ${VERSION} ${BLD_NUM}
 
 # Build
+rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
 pushd "${BUILD_DIR}" > /dev/null
 cmake -DCMAKE_BUILD_TYPE=Release ..

@@ -16,6 +16,7 @@ $LIB_DIR="$PSScriptRoot\..\lib"
 & $PSScriptRoot\download_cbl.ps1 $Edition $Version $Build
 
 # Build
+Remove-Item -Recurse -Force $BUILD_DIR -ErrorAction SilentlyContinue
 New-Item -ErrorAction Ignore -ItemType Directory $BUILD_DIR
 Push-Location $BUILD_DIR
 try {

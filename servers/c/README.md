@@ -94,6 +94,14 @@ The next step is to download CBL library.
 
 Open the project from this directory which has the CMakeLists.txt file using VSCode with C++/CMake plugin or CLion.
 
+#### CLion
+
+1. Open the c test server directory with CLion.
+
+2. CLion will load the CMake Project and create `cmake-build-debug` directory for building.
+
+3. If you switch the dataset and CBL version, ensure to clean `cmake-build-debug` the directory either by removing the directory or find an option to clean it from the CLion.
+
 #### iOS
 
 Go to `platforms/ios` directory and open `TestServer.xcodeproj` using XCode.
