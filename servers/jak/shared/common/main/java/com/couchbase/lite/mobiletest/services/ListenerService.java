@@ -17,24 +17,29 @@
 package com.couchbase.lite.mobiletest.services;
 
 import androidx.annotation.NonNull;
+
 import java.util.UUID;
 
+import com.couchbase.lite.URLEndpointListener;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.ClientError;
-import com.couchbase.lite.URLEndpointListener;
+
 
 public class ListenerService {
-    @NonNull
-    public String addListener(@NonNull TestContext ctxt, @NonNull URLEndpointListener listener) {
-        final String listenerId = UUID.randomUUID().toString();
-        ctxt.addListener(listenerId, listener);
-        return listenerId;
+    public void init(@NonNull TestContext ignore1) {
+        // nothing to do here...
     }
 
     @NonNull
-    private URLEndpointListener getListener(@NonNull TestContext ctxt, @NonNull String listenerId) {
-        final URLEndpointListener listener = ctxt.getListener(listenerId);
+    public String addListener(@NonNull TestContext ctxt, @NonNull URLEndpointListener listener) {
+        final String listenerId = UUID.randomUUID().toString();
+        ctxt.addEndptListener(listenerId, listener);
+        return listenerId;
+    }
+
+    public void stopListener(@NonNull TestContext ctxt, @NonNull String listenerId) {
+        final URLEndpointListener listener = ctxt.getEndptListener(listenerId);
         if (listener == null) { throw new ClientError("No such listener: " + listenerId); }
-        return listener;
+        listener.stop();
     }
 }

@@ -3,3 +3,6 @@
     "sync-gateways": [{"hostname": "localhost", "tls": true}],
     "couchbase-servers": [{"hostname": "localhost"}],
     "api-version": 1,
+    "test-servers": ["http://localhost:8080"]
+}
+

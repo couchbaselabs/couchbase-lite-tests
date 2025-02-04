@@ -214,11 +214,13 @@ public class Session {
         final DatabaseService dbSvc = app.getDbSvc();
         dbSvc.init(ctxt);
         app.getReplSvc().init(ctxt);
+        app.getListenerService().init(ctxt);
         return dbSvc;
     }
 
     private void endSession(@NonNull TestApp app) {
         app.clearReplSvc();
+        app.clearListenerService();
         app.clearDbSvc();
     }
 }
