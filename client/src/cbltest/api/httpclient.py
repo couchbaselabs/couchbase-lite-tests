@@ -9,9 +9,12 @@ from cbltest.api.syncgateway import AllDocumentsResponseRow, AllDocumentsRespons
 from cbltest.api.edgeserver import EdgeServer,BulkDocOperation
 from cbltest.api.remoteshell import RemoteShellConnection
 from cbltest.api.error import CblEdgeServerBadResponseError
+from gevent.testing.travis import command
+
 
 class HTTPClient:
-    def __init__(self, client_id: int, vm_ip: str,edge_server:EdgeServer, user: str="root", password: str="couchbase",):
+    def __init__(self, vm_ip: str, edge_server: EdgeServer, client_id: int=0, user: str = "root",
+                 password: str = "couchbase"):
         self.client_id = client_id
         self.vm_ip = vm_ip
         self.user = user
@@ -22,6 +25,20 @@ class HTTPClient:
     async def connect(self):
         await self.remote_shell.connect()
 
+    async def get_version(self):
+        curl = await self.edge_server.get_version(curl=True)
+        print(curl)
+        response = await self.remote_shell.run_command(curl)
+        print(response)
+        try:
+            response_dict = json.loads(response)
+            if "error" in response_dict:
+                raise CblEdgeServerBadResponseError(500, f"Get version had error '{response_dict['reason']}'")
+            return response_dict
+        except Exception as e:
+            raise CblEdgeServerBadResponseError(500,
+                                                f"Get version from edge server had error '{str(e)}'")
+
     async def get_all_documents(self,  db_name: str, scope: str = "",
                                 collection: str = "",descending=False,endkey=None,keys=None,startkey=None,):
         curl=await self.edge_server.get_all_documents(db_name, scope, collection,curl=True,descending=descending,endkey=endkey,keys=keys,startkey=startkey)
@@ -31,9 +48,9 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Get all doc had error '{response_dict['reason']}'")
             return AllDocumentsResponse(response_dict)
-        except:
+        except Exception as e:
             raise CblEdgeServerBadResponseError(500,
-                                                f"Get all doc from edge server had error '{response_dict['reason']}'")
+                                                f"Get all doc from edge server had error '{str(e)}', {response}")
 
     async def delete_document(self, doc_id: str, revid: str, db_name: str, scope: str = "", collection: str = ""):
         curl = await self.edge_server.delete_document(doc_id, revid, db_name, scope, collection, curl=True)
@@ -271,6 +288,34 @@ class HTTPClient:
     async def disconnect(self):
         self.remote_shell.close()
 
+    async def create_certificate(self):
+        try:
+            command="openssl genrsa -out /opt/clientkey 2048"
+            print(await self.remote_shell.run_command(command))
+            command=f'openssl req -new -key /opt/clientkey -out /opt/client.csr -subj "/CN={self.vm_ip}"'
+            await self.remote_shell.run_command(command)
+            command=f"sshpass -p couchbase scp root@{self.edge_server.hostname}:/opt/couchbase-edge-server/cert/rootkey /opt"
+            await self.remote_shell.run_command(command)
+            command="openssl x509 -req -in /opt/client.csr -signkey /opt/rootkey -out /opt/clientcert -days 365"
+            await self.remote_shell.run_command(command)
+            command=f"sshpass -p couchbase scp /opt/clientcert root@{self.edge_server.hostname}:/opt/couchbase-edge-server/cert  "
+            await self.remote_shell.run_command(command)
+            command=f"sshpass -p couchbase scp /opt/clientkey root@{self.edge_server.hostname}:/opt/couchbase-edge-server/cert "
+            await self.remote_shell.run_command(command)
+        except Exception as e:
+            raise CblEdgeServerBadResponseError(500, str(e))
+
+    async def get_tls_certificate(self):
+        try:
+            command=f"sshpass -p couchbase scp root@{self.edge_server.hostname}:/opt/couchbase-edge-server/cert/certfile /opt"
+            print(command)
+            await self.remote_shell.run_command(command)
+        except Exception as e:
+            raise CblEdgeServerBadResponseError(500, str(e))
+
+
+
+
 
 class ClientFactory:
 
@@ -285,22 +330,29 @@ class ClientFactory:
         self.lock = asyncio.Lock()  # Lock to manage client creation and respawning concurrently
 
     async def create_clients(self):
-        tasks = []
-        for vm in self.vms:
-            for _ in range(self.num_clients_per_vm):
-                tasks.append(self.create_client_for_vm(vm))
-        await asyncio.gather(*tasks)
+        try:
+            tasks = []
+            for vm in self.vms:
+                for _ in range(self.num_clients_per_vm):
+                    tasks.append(self.create_client_for_vm(vm))
+            await asyncio.gather(*tasks)
+        except Exception as e:
+            print(e)
 
     async def create_client_for_vm(self, vm):
         """
         Creates a client for a specific VM.
         """
-        async with self.lock:
-            client_id = self.client_counter
-            self.client_counter += 1
-            client = HTTPClient(client_id=client_id, vm_ip=vm, user=self.user, password=self.password,edge_server= self.edge_server)
-            await client.connect()
-            self.clients[client_id] = client
+        try:
+            async with self.lock:
+                client_id = self.client_counter
+                self.client_counter += 1
+                client = HTTPClient(vm_ip=vm, edge_server=self.edge_server, client_id=client_id, user=self.user,
+                                    password=self.password)
+                await client.connect()
+                self.clients[client_id] = client
+        except Exception as e:
+            print(e)
 
     async def make_request(self, client: HTTPClient,method:str,*args, **kwargs):
         try:
@@ -331,7 +383,8 @@ class ClientFactory:
                 responses[client_id] = result
         return responses,error,failed
     # takes in a dict of type REST API: [client_id]
-    # eg: method={"get_all_documents":[1,3,5]} etc
+    # eg: method={"get_all_documents":[1,3,
+    # 5]} etc
     # response: method: {1:resp,3:resp}
     async def make_unique_client_request(self,methods:dict,*args, **kwargs):
         responses={}

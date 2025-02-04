@@ -26,7 +26,7 @@ def get_ips_from_config(config_path, key):
     return [entry["hostname"] for entry in config_data.get(key, [])]
 
 
-def install_edge_server(edge_server_ip, edge_server_config, version, build,create_cert,database_path):
+def install_edge_server(edge_server_ip, edge_server_config, version, build,create_cert,database_path,mtls,user):
     """Installs and configures Edge Server on the given IP."""
     # Define file paths
     package_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-edge-server/{version}/{build}/couchbase-edge-server_{version}-{build}_amd64.deb"
@@ -62,6 +62,18 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
         print(f"Creating client certificate on {edge_server_ip}...")
         command = f"/opt/couchbase-edge-server/bin/couchbase-edge-server --create-cert CN={edge_server_ip} /opt/couchbase-edge-server/cert/certfile /opt/couchbase-edge-server/cert/keyfile"
         run_remote_command(edge_server_ip, command)
+        # copying cert to host
+        subprocess.run(
+            ["sshpass", "-p", "couchbase", "scp", f"root@{edge_server_ip}:/opt/couchbase-edge-server/cert/certfile", "./config"],
+            check=True)
+        if mtls:
+            mtls_key_path="/opt/couchbase-edge-server/cert/rootkey"
+            mtls_cert_path="/opt/couchbase-edge-server/cert/rootcert"
+            print(f"Creating root certificate on {edge_server_ip}...")
+            command = f"openssl genrsa -out {mtls_key_path} 2048"
+            run_remote_command(edge_server_ip, command)
+            command=f"openssl req -x509 -new -nodes -key {mtls_key_path} -sha256 -days 365 -out {mtls_cert_path} -subj '/CN=Root'"
+            run_remote_command(edge_server_ip, command)
 
     if database_path is not None:
         print("Setting up database directory...")
@@ -71,8 +83,14 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
         subprocess.run(
             ["sshpass", "-p", "couchbase", "scp", database_path, f"root@{edge_server_ip}:{data_file_path}"],
             check=True)
-        run_remote_command(edge_server_ip, f"unzip -o {data_file_path}")
+        run_remote_command(edge_server_ip, f"unzip -o {data_file_path} -d /opt/couchbase-edge-server/database")
 
+    if user:
+        print(f"Creating users.json  on {edge_server_ip}...")
+        run_remote_command(edge_server_ip, "sudo mkdir -p /opt/couchbase-edge-server/users")
+        run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/users")
+        command = f"/opt/couchbase-edge-server/bin/couchbase-edge-server --add-user /opt/couchbase-edge-server/users/users.json  admin_user --create --role admin --password password"
+        run_remote_command(edge_server_ip, command)
     # Copy the configuration file to the remote VM
     print(f"Copying config file to {config_file_path}...")
     subprocess.run(["sshpass", "-p", "couchbase", "scp", edge_server_config, f"root@{edge_server_ip}:{config_file_path}"], check=True)
@@ -112,7 +130,12 @@ def main():
     parser.add_option("-b", "--build", dest="build", help="Edge Server build number", metavar="BUILD", default=None)
     parser.add_option("-d", "--database", dest="database", help="Edge Server database", metavar="DATABASE", default=None)
     parser.add_option("--create-cert", dest="create_cert", action="store_true",
-                      help="Create a client certificate", default=False)
+                      help="Create a server certificate", default=False)
+    parser.add_option("--mtls", dest="mtls", action="store_true",
+                      help="Create a root certificate", default=False)
+    # by default: admin_user:password.
+    parser.add_option("-u", "--user", dest="user", help="Create default admin user", action="store_true",
+                      default=False)
     (options, args) = parser.parse_args()
 
     if not options.cluster_config or not options.edge_server_config or not options.version or not options.build:
@@ -122,7 +145,7 @@ def main():
     # Fetch edge server IPs from the cluster config
     edge_server_ips = get_ips_from_config(options.cluster_config, "edge-servers")
     for edge_server_ip in edge_server_ips:
-        install_edge_server(edge_server_ip, options.edge_server_config, options.version, options.build,options.create_cert,options.database)
+        install_edge_server(edge_server_ip, options.edge_server_config, options.version, options.build,options.create_cert,options.database,options.mtls,options.user)
 
 
 if __name__ == "__main__":
