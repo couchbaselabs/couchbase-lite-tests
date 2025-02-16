@@ -20,6 +20,8 @@ from cbltest.utils import assert_not_null
 
 from deprecated import deprecated
 
+from cbltest.api.remoteshell import RemoteShellConnection
+
 
 class _CollectionMap(JSONSerializable):
     @property
@@ -156,6 +158,9 @@ class AllDocumentsResponse:
     @property
     def input(self):
         return self.__input
+    @property
+    def revmap(self):
+        return self.__revmap
 
     def __len__(self) -> int:
         return self.__len
@@ -164,6 +169,7 @@ class AllDocumentsResponse:
         self.__len = input["total_rows"]
         self.__rows: List[AllDocumentsResponseRow] = []
         self.__input=input
+        self.__revmap=dict()
         for row in cast(List[Dict], input["rows"]):
             rev = cast(Dict, row["value"])
             self.__rows.append(AllDocumentsResponseRow(
@@ -171,6 +177,7 @@ class AllDocumentsResponse:
                 row["id"],
                 cast(str, rev["rev"]) if "rev" in rev else None,
                 cast(str, rev["cv"]) if "cv" in rev else None))
+            self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
 
 
 class DocumentUpdateEntry(JSONSerializable):
@@ -327,6 +334,7 @@ class SyncGateway:
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__admin_port: int = admin_port
+        self.__ssh_client:RemoteShellConnection=RemoteShellConnection(host=url)
         self.__admin_session: ClientSession = self._create_session(secure, scheme, url, admin_port,
                                                                    BasicAuth(username, password, "ascii"))
 
@@ -765,3 +773,17 @@ class SyncGateway:
                 raise CblSyncGatewayBadResponseError(500, f"Failed to update document {doc_id} with rev {rev}")
             
             return response
+
+    async def kill_server(self):
+        with self.__tracer.start_as_current_span("kill sync gateway"):
+            await self.__ssh_client.connect()
+            resp= await self.__ssh_client.kill_sgw()
+            await self.__ssh_client.disconnect()
+            return resp
+
+    async def start_server(self):
+        with self.__tracer.start_as_current_span("start sync gateway"):
+            await self.__ssh_client.connect()
+            resp= await self.__ssh_client.start_sgw()
+            await self.__ssh_client.disconnect()
+            return resp

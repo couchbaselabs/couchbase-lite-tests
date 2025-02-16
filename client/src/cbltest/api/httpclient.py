@@ -1,4 +1,6 @@
 import asyncio
+import time
+
 import requests
 from couchbase.pycbc_core import exception
 from future.backports.http.client import responses
@@ -27,9 +29,7 @@ class HTTPClient:
 
     async def get_version(self):
         curl = await self.edge_server.get_version(curl=True)
-        print(curl)
         response = await self.remote_shell.run_command(curl)
-        print(response)
         try:
             response_dict = json.loads(response)
             if "error" in response_dict:
@@ -292,11 +292,14 @@ class HTTPClient:
         try:
             command="openssl genrsa -out /opt/clientkey 2048"
             print(await self.remote_shell.run_command(command))
-            command=f'openssl req -new -key /opt/clientkey -out /opt/client.csr -subj "/CN={self.vm_ip}"'
+            command=f'openssl req -new -key /opt/clientkey -out /opt/client.csr -subj "/CN={self.edge_server}"'
             await self.remote_shell.run_command(command)
-            command=f"sshpass -p couchbase scp root@{self.edge_server.hostname}:/opt/couchbase-edge-server/cert/rootkey /opt"
+            command=f"sshpass -p couchbase scp -o StrictHostKeyChecking=no root@{self.edge_server.hostname}:/opt/couchbase-edge-server/cert/rootkey /opt"
             await self.remote_shell.run_command(command)
-            command="openssl x509 -req -in /opt/client.csr -signkey /opt/rootkey -out /opt/clientcert -days 365"
+            command = f"sshpass -p couchbase scp -o StrictHostKeyChecking=no root@{self.edge_server.hostname}:/opt/couchbase-edge-server/cert/rootcert /opt"
+            await self.remote_shell.run_command(command)
+            time.sleep(60)
+            command="openssl x509 -req -in /opt/client.csr -CA /opt/rootcert -CAkey /opt/rootkey -CAcreateserial -out /opt/clientcert -days 365"
             await self.remote_shell.run_command(command)
             command=f"sshpass -p couchbase scp /opt/clientcert root@{self.edge_server.hostname}:/opt/couchbase-edge-server/cert  "
             await self.remote_shell.run_command(command)

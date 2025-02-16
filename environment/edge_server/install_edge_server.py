@@ -66,14 +66,21 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
         subprocess.run(
             ["sshpass", "-p", "couchbase", "scp", f"root@{edge_server_ip}:/opt/couchbase-edge-server/cert/certfile", "./config"],
             check=True)
-        if mtls:
-            mtls_key_path="/opt/couchbase-edge-server/cert/rootkey"
-            mtls_cert_path="/opt/couchbase-edge-server/cert/rootcert"
-            print(f"Creating root certificate on {edge_server_ip}...")
-            command = f"openssl genrsa -out {mtls_key_path} 2048"
-            run_remote_command(edge_server_ip, command)
-            command=f"openssl req -x509 -new -nodes -key {mtls_key_path} -sha256 -days 365 -out {mtls_cert_path} -subj '/CN=Root'"
-            run_remote_command(edge_server_ip, command)
+    if mtls:
+        mtls_key_path="/opt/couchbase-edge-server/cert/rootkey"
+        mtls_cert_path="/opt/couchbase-edge-server/cert/rootcert"
+        print(f"Creating root certificate on {edge_server_ip}...")
+        command = f"openssl genrsa -out {mtls_key_path} 2048"
+        run_remote_command(edge_server_ip, command)
+        command=f"openssl req -x509 -new -nodes -key {mtls_key_path} -sha256 -days 365 -out {mtls_cert_path} -subj '/CN=Root'"
+        run_remote_command(edge_server_ip, command)
+        command="openssl genrsa -out /opt/couchbase-edge-server/cert/keyfile 2048"
+        run_remote_command(edge_server_ip, command)
+        command=f"openssl req -new -key  /opt/couchbase-edge-server/cert/keyfile -out  /opt/couchbase-edge-server/cert/server_csr -subj '/CN={edge_server_ip}'"
+        run_remote_command(edge_server_ip, command)
+        command=f"openssl x509 -req -in /opt/couchbase-edge-server/cert/server_csr -CA {mtls_cert_path} -CAkey {mtls_key_path} -CAcreateserial -out /opt/couchbase-edge-server/cert/certfile -days 365"
+        run_remote_command(edge_server_ip, command)
+
 
     if database_path is not None:
         print("Setting up database directory...")
@@ -83,6 +90,8 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
         subprocess.run(
             ["sshpass", "-p", "couchbase", "scp", database_path, f"root@{edge_server_ip}:{data_file_path}"],
             check=True)
+        cmd_check_unzip = "command -v unzip || sudo apt-get update && sudo apt-get install -y unzip"
+        run_remote_command(edge_server_ip,cmd_check_unzip)
         run_remote_command(edge_server_ip, f"unzip -o {data_file_path} -d /opt/couchbase-edge-server/database")
 
     if user:
@@ -141,6 +150,9 @@ def main():
     if not options.cluster_config or not options.edge_server_config or not options.version or not options.build:
         print("Usage: python install_edge_server.py -c CLUSTER_CONFIG -e EDGE_SERVER_CONFIG -v VERSION -b BUILD_NUMBER")
         sys.exit(1)
+
+    if options.mtls:
+        options.create_cert=True
 
     # Fetch edge server IPs from the cluster config
     edge_server_ips = get_ips_from_config(options.cluster_config, "edge-servers")

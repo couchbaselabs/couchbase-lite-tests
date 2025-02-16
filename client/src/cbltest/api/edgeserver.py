@@ -1,4 +1,5 @@
 import ssl
+import uuid
 from abc import ABC, abstractmethod
 import json
 from json import dumps, loads
@@ -14,7 +15,7 @@ from couchbase.pycbc_core import result
 from opentelemetry.trace import get_tracer
 from setuptools.command.setopt import config_file
 from varname import nameof
-
+import random
 from cbltest.api.error import CblEdgeServerBadResponseError
 from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 from cbltest.assertions import _assert_not_null
@@ -47,9 +48,12 @@ class EdgeServerVersion(CouchbaseVersion):
 class BulkDocOperation(JSONSerializable):
     # optype should be  "create", "update" or "delete". by default it is create
     def __init__(self,body:dict,_id:str=None,rev:str=None,optype:str="create"):
+        if _id is None:
+            _id= body.get("_id")
         if optype == "update":
             if _id is None:
                 optype = "create"
+                _id = uuid.uuid4()
             if rev is None:
                 raise CblTestError("Update cannot be performed without rev id")
             body["_rev"]=rev
@@ -96,12 +100,14 @@ class EdgeServer:
         self.__auth_name="admin_user"
         self.__auth_password="password"
         self.__auth=is_auth
+        ws_scheme = "wss://" if secure else "ws://"
+        self.__replication_url=f"{ws_scheme}{url}:{port}"
         # if not session:
         self.scheme = "https://" if secure else "http://"
         if self.__anonymous_auth:
-            self.__session: ClientSession = self._create_session(secure, self.scheme, url, port,None)
+            self.__session: ClientSession = self._create_session(self.scheme, url, port,None)
         else:
-            self.__session: ClientSession = self._create_session(secure, self.scheme, url, port,BasicAuth( self.__auth_name,self.__auth_password, "ascii"))
+            self.__session: ClientSession = self._create_session( self.scheme, url, port,BasicAuth( self.__auth_name,self.__auth_password, "ascii"))
         # else:
         #     self.__session = session
 
@@ -143,7 +149,7 @@ class EdgeServer:
         # Return parsed configuration as a tuple
         return port, https,mtls,cert_path,key_path, users,databases, enable_anonymous_users
 
-    def _create_session(self, secure: bool, scheme: str, url: str, port: int,
+    def _create_session(self, scheme: str, url: str, port: int,
                         auth: Optional[BasicAuth]) -> ClientSession:
             return ClientSession(f"{scheme}{url}:{port}", auth=auth)
 
@@ -158,7 +164,10 @@ class EdgeServer:
             curl_command+=f" --cacert /opt/certfile "
         if self.__auth:
             curl_command+=f" -u {self.__auth_name}:{self.__auth_password} "
-        curl_command+= f"{self.scheme}{self.__hostname}:{self.__port}{path}"
+        if '?' in path:
+            path = path.replace('?','\?')
+
+        curl_command+= f"{self.scheme}{self.__hostname}:{self.__port}{path} "
         if headers:
             for key, value in headers.items():
                 curl_command += f" -H \"{key}: {value}\""
@@ -212,7 +221,7 @@ class EdgeServer:
 
     async def get_version(self,curl:bool=False) -> CouchbaseVersion:
         scheme = "https://" if self.__secure else "http://"
-        async with self._create_session(self.__secure, scheme, self.__hostname, self.__port, None) as s:
+        async with self._create_session( scheme, self.__hostname, self.__port, None) as s:
             resp = await self._send_request("get", "/", session=s, curl=curl)
             if curl:
                 return resp
@@ -266,11 +275,9 @@ class EdgeServer:
                                                                              "cbl.scope.name": scope,
                                                                              "cbl.collection.name": collection,
                                                                              "cbl.document.id": doc_id}):
-            query=""
-            if revid is not None:
-                query="&rev="+revid
+
             keyspace = self.keyspace_builder(db_name, scope, collection)
-            response = await self._send_request("get", f"/{keyspace}/{doc_id}?show_cv=true{query}",curl=curl)
+            response = await self._send_request("get", f"/{keyspace}/{doc_id}",curl=curl)
             if curl:
                 return response
             if not isinstance(response, dict):
@@ -425,6 +432,10 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(500,
                                                     f"stop replication  with Edge Server had error '{cast_resp['reason']}'")
+
+    def replication_url(self, db_name: str):
+        _assert_not_null(db_name, nameof(db_name))
+        return urljoin(self.__replication_url, db_name)
 
 
     async def changes_feed(self,db_name:str,scope:str="",collection:str="",since: Optional[int] = 0,feed: Optional[str] = "normal",limit: Optional[int] = None,filter_type: Optional[str] = None,doc_ids: Optional[List[str]] = None,
@@ -602,10 +613,10 @@ class EdgeServer:
                                      JSONDictionary(body),curl=curl)
             if curl:
                 return resp
-            if not isinstance(resp, dict):
-                raise ValueError("Inappropriate response from edge server  bulk doc op (not JSON)")
+            if not isinstance(resp, list):
+                raise ValueError(f"Inappropriate response from edge server  bulk doc op (not JSON), response:{resp}")
 
-            cast_resp = cast(dict, resp)
+            cast_resp = cast(list, resp)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(500,
                                                     f"bulk_documents_operation Edge Server had error '{cast_resp['reason']}'")
@@ -659,25 +670,11 @@ class EdgeServer:
         await self.__ssh_client.add_user(name,password,role)
         await self.start_server()
 
-    async def set_user(self,name,password):
+    async def set_auth(self,auth:bool=True, name="admin_user", password="password"):
+        if not auth:
+            self.__auth=False
         self.__auth_name=name
         self.__auth_password=password
-
-    # async def add_database(self,config_file_path,db_name,db_path,create=False,enable_client_writes=True,enable_client_sync=True,
-    #                        queries=None,):
-    #     await self.kill_server()
-    #     await self.__ssh_client.connect()
-    #     with open(config_file_path, 'r', encoding='utf-8') as file:
-    #         config_content = file.read()
-    #     config = json5.loads(config_content)
-    #     config["databases"][dbname]
-
-
-
-
-
-
-
 
 
 

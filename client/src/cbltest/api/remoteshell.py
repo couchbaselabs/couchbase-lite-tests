@@ -5,6 +5,7 @@ import logging
 import signal
 import subprocess
 from cbltest.version import VERSION
+from gevent.testing.travis import command
 from opentelemetry.trace import get_tracer
 
 
@@ -34,11 +35,18 @@ class RemoteShellConnection:
 
     async def kill_edge_server(self) -> bool:
         try:
-            result = await self.ssh_client.run("pgrep -f /opt/couchbase-edge-server/bin/couchbase-edge-server", check=True)
-            pid = result.stdout.strip()
-            if pid:
-                await self.ssh_client.run(f"kill {pid} && rm /tmp/edge_server.pid", check=True)
-                return True
+            result1 = await self.ssh_client.run("pgrep -f /opt/couchbase-edge-server/bin/couchbase-edge-server", check=True)
+            pid1 = result1.stdout.strip()
+            result2=await self.ssh_client.run(f"lsof -t -i :{self._port}", check=True)
+            pid2 = result2.stdout.strip()
+            result3=await self.ssh_client.run("cat /tmp/edge_server.pid", check=True)
+            pid3 = result3.stdout.strip()
+            pid_set= {pid1, pid2, pid3}
+            for pid in pid_set:
+                result= await self.ssh_client.run(f"kill {pid}", check=True)
+                print(f"{pid} killed with result: {result}")
+            await self.ssh_client.run(f"rm /tmp/edge_server.pid",check=True)
+            return True
         except Exception as e:
             return False
 
@@ -52,6 +60,23 @@ class RemoteShellConnection:
         except Exception as e:
             return False
 
+    async def kill_sgw(self):
+        try:
+            command=" systemctl stop sync_gateway"
+            await self.ssh_client.run(command, check=True)
+            return True
+        except Exception as e:
+            return False
+
+    async def start_sgw(self, config_file: str) -> bool:
+        try:
+            command="systemctl restart sync_gateway"
+            await self.ssh_client.run(command, check=True)
+            return True
+        except Exception as e:
+            return False
+
+
     async def is_edge_server_running(self) -> bool:
         try:
             result = await self.ssh_client.run("pgrep -F /tmp/edge_server.pid", check=True)
@@ -64,8 +89,8 @@ class RemoteShellConnection:
             await self.ssh_client.run(f"rm -r {dest_path}")
             subprocess.run(
                 ["sshpass", "-p", "couchbase", "scp", local_path, f"root@{self._host}:{dest_path}"],check=True)
-            await self.ssh_client.run(f"sudo chmod 644 {dest_path}")
-            await self.ssh_client.run( f"sudo chown -R couchbase:couchbase {dest_path}")
+            await self.ssh_client.run(f" chmod 644 {dest_path}")
+            await self.ssh_client.run( f" chown -R couchbase:couchbase {dest_path}")
             return True
         except Exception as e:
             return False
