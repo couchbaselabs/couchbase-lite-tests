@@ -20,6 +20,8 @@ from cbltest.logging import cbl_info, cbl_warning
 from cbltest.utils import assert_not_null
 from cbltest.version import VERSION
 
+from cbltest.api.remoteshell import RemoteShellConnection
+
 # This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
 # So if that file ever changes, change this too.
 _SGW_CA_CERT: str = """-----BEGIN CERTIFICATE-----
@@ -195,6 +197,9 @@ class AllDocumentsResponse:
     @property
     def input(self):
         return self.__input
+    @property
+    def revmap(self):
+        return self.__revmap
 
     def __len__(self) -> int:
         return self.__len
@@ -202,17 +207,17 @@ class AllDocumentsResponse:
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
         self.__input = input
-        self.__rows: list[AllDocumentsResponseRow] = []
-        for row in cast(list[dict], input["rows"]):
-            rev = cast(dict, row["value"])
-            self.__rows.append(
-                AllDocumentsResponseRow(
-                    row["key"],
-                    row["id"],
-                    cast(str, rev["rev"]) if "rev" in rev else None,
-                    cast(str, rev["cv"]) if "cv" in rev else None,
-                )
-            )
+        self.__rows: List[AllDocumentsResponseRow] = []
+        self.__input=input
+        self.__revmap=dict()
+        for row in cast(List[Dict], input["rows"]):
+            rev = cast(Dict, row["value"])
+            self.__rows.append(AllDocumentsResponseRow(
+                row["key"],
+                row["id"],
+                cast(str, rev["rev"]) if "rev" in rev else None,
+                cast(str, rev["cv"]) if "cv" in rev else None))
+            self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
 
 
 class ChangesResponseEntry:
@@ -432,6 +437,7 @@ class SyncGateway:
         self.__admin_session: ClientSession = self._create_session(
             secure, scheme, url, admin_port, BasicAuth(username, password, "ascii")
         )
+        self.__ssh_client:RemoteShellConnection=RemoteShellConnection(host=url)
 
     @property
     def hostname(self) -> str:
@@ -1438,3 +1444,17 @@ def scan_logs_for_untagged_sensitive_data(
                     f"Untagged '{pattern}' at position {start_pos}: ...{context}..."
                 )
     return violations
+
+    async def kill_server(self):
+        with self.__tracer.start_as_current_span("kill sync gateway"):
+            await self.__ssh_client.connect()
+            resp= await self.__ssh_client.kill_sgw()
+            await self.__ssh_client.disconnect()
+            return resp
+
+    async def start_server(self):
+        with self.__tracer.start_as_current_span("start sync gateway"):
+            await self.__ssh_client.connect()
+            resp= await self.__ssh_client.start_sgw()
+            await self.__ssh_client.disconnect()
+            return resp
