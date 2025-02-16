@@ -27,7 +27,7 @@ from cbltest.version import VERSION
 from cbltest.utils import assert_not_null
 from cbltest.api.syncgateway import AllDocumentsResponseRow, AllDocumentsResponse, DocumentUpdateEntry, RemoteDocument, CouchbaseVersion
 from deprecated import deprecated
-
+import urllib.parse
 from cbltest.api.error import CblTestError
 from cbltest.api.remoteshell import RemoteShellConnection
 
@@ -239,20 +239,19 @@ class EdgeServer:
                                                                                   "cbl.scope.name": scope,
                                                                                   "cbl.collection.name": collection}):
             keyspace = self.keyspace_builder(db_name,scope,collection)
-            request_url="?"
+            query_params = []
             if descending:
-                request_url+="descending=true&"
+                query_params.append("descending=true")
             if endkey:
-                request_url+="endkey="+endkey+"&"
+                query_params.append(f"endkey={urllib.parse.quote(endkey)}")
             if keys:
-                request_url+=f"keys={keys}"+"&"
+                keys_json = json.dumps(keys)  # Convert to JSON
+                encoded_keys = urllib.parse.quote(keys_json)  # URL-encode
+                query_params.append(f"keys={encoded_keys}")
             if startkey:
-                request_url+="startkey="+startkey+"&"
-            if len(request_url)==1:
-                request_url = ""
-            else:
-                request_url = request_url[:-1]
-            resp = await self._send_request("get", f"/{keyspace}/_all_docs{request_url}",curl=curl)
+                query_params.append(f"startkey={urllib.parse.quote(startkey)}")
+            request_url = f"?{'&'.join(query_params)}" if query_params else ""
+            resp = await self._send_request("get", f"/{keyspace}/_all_docs{request_url}", curl=curl)
             if curl:
                 return resp
             assert isinstance(resp, dict)
