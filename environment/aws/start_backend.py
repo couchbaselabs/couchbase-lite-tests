@@ -81,8 +81,8 @@ if __name__ == "__main__":
     # before SSH access succeeds
     sleep(5)
 
-    #server_main(cbs_ips, args.cbs_version, args.private_key)
-    #sgw_main(sgw_ips, args.sgw_version, args.sgw_build, args.private_key)
+    server_main(cbs_ips, args.cbs_version, args.private_key)
+    sgw_main(sgw_ips, args.sgw_version, args.sgw_build, args.private_key)
     if args.tdk_config_out is not None:
         with open(args.tdk_config_out, "w") as fout:
             write_config(args.tdk_config_in, fout)
