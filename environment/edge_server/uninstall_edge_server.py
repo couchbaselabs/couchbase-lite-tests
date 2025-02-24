@@ -38,7 +38,9 @@ def uninstall_edge_server(ip, password="couchbase"):
     if result.stdout.strip():
         print("Couchbase Edge Server is running. Stopping the process...")
         # Stop the process using the PID stored in /tmp
-        run_remote_command(ip, "sudo kill $(cat /tmp/edge_server.pid) && sudo rm -f /tmp/edge_server.pid")
+        # run_remote_command(ip, "sudo kill $(sudo pgrep couchbase) && sudo rm -f /tmp/edge_server.pid")
+        run_remote_command(ip, "sudo systemctl stop couchbase-edge-server")
+        run_remote_command(ip, "sudo systemctl disable couchbase-edge-server")
     else:
         print("Couchbase Edge Server process is not running.")
 

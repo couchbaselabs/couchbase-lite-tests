@@ -31,7 +31,7 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
     # Define file paths
     package_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-edge-server/{version}/{build}/couchbase-edge-server_{version}-{build}_amd64.deb"
     package_file = "/tmp/couchbase-edge-server.deb"
-    config_file_path = "/opt/couchbase-edge-server/config/config.json"
+    config_file_path = "/opt/couchbase-edge-server/etc/config.json"
     data_file_path = "/opt/couchbase-edge-server/database/db.cblite2.zip"
     log_dir = "/tmp/EdgeServerLog"
 
@@ -46,14 +46,37 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
     print(f"Installing Couchbase Edge Server package {package_file}...")
     run_remote_command(edge_server_ip, f"sudo dpkg -i {package_file}")
 
-    # Make the server executable
-    print("Making Couchbase Edge Server binary executable...")
-    run_remote_command(edge_server_ip, "sudo chmod +x /opt/couchbase-edge-server/bin/couchbase-edge-server")
+    # Stop running Couchbase Edge Server processes
+    print("Stopping Couchbase Edge Server service...")
+    run_remote_command(edge_server_ip, "sudo systemctl stop couchbase-edge-server")
 
-    # Create and set permissions for config directory
-    print("Setting up config directory...")
-    run_remote_command(edge_server_ip, "sudo mkdir -p /opt/couchbase-edge-server/config")
-    run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/config")
+    time.sleep(15)
+
+    # Verify that Couchbase Edge Server is stopped
+    print("Checking if Couchbase Edge Server is stopped...")
+    edge_server_status = subprocess.run(["sshpass", "-p", "couchbase", "ssh", f"root@{edge_server_ip}", "lsof -i :59840"], capture_output=True, text=True)
+    if edge_server_status.stdout:
+        print("Couchbase Edge Server is still running. Exiting...")
+        sys.exit(1)
+
+    # # Make the server executable
+    # print("Making Couchbase Edge Server binary executable...")
+    # run_remote_command(edge_server_ip, "sudo chmod +x /opt/couchbase-edge-server/bin/couchbase-edge-server")
+
+    # # Create and set permissions for config directory
+    # print("Setting up config directory...")
+    # run_remote_command(edge_server_ip, "sudo mkdir -p /opt/couchbase-edge-server/config")
+    # run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/config")
+
+    # # Copy the configuration file to the remote VM
+    # print(f"Copying config file to {config_file_path}...")
+    # subprocess.run(["sshpass", "-p", "couchbase", "scp", edge_server_config, f"root@{edge_server_ip}:{config_file_path}"], check=True)
+
+    # Writing the configuration file to the remote machine
+    print(f"Writing config to {config_file_path}...")
+    subprocess.run(["sshpass", "-p", "couchbase", "scp", edge_server_config, f"root@{edge_server_ip}:{config_file_path}"], check=True)
+
+    time.sleep(15)
 
     if create_cert:
         print("Setting up certificates directory...")
@@ -115,9 +138,13 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
     run_remote_command(edge_server_ip, f"sudo chmod 755 {log_dir}")
     run_remote_command(edge_server_ip, f"sudo chown -R couchbase:couchbase {log_dir}")
 
-    # Start Couchbase Edge Server with the config file
-    print(f"Starting Couchbase Edge Server with config file {config_file_path}...")
-    run_remote_command(edge_server_ip, f"nohup /opt/couchbase-edge-server/bin/couchbase-edge-server --verbose {config_file_path} > /tmp/edge_server.log 2>&1 & echo $! > /tmp/edge_server.pid")
+    # # Start Couchbase Edge Server with the config file
+    # print(f"Starting Couchbase Edge Server with config file {config_file_path}...")
+    # run_remote_command(edge_server_ip, f"nohup /opt/couchbase-edge-server/bin/couchbase-edge-server --verbose {config_file_path} > /tmp/edge_server.log 2>&1 & echo $! > /tmp/edge_server.pid")
+
+    # Start Couchbase Edge Server
+    print("Starting Couchbase Edge Server...")
+    run_remote_command(edge_server_ip, "sudo systemctl restart couchbase-edge-server")
 
     time.sleep(15)
 
