@@ -12,8 +12,14 @@ TEST_COMPONENTS_MAPPING = {
         "test-servers": 0,
         "sync-gateways": 1,
         "couchbase-servers": 1,
-        "edge-servers":0
+        "edge-servers": 0
     },
+    "test_end_to_end": {
+        "test-servers": 0,
+        "sync-gateways": 1,
+        "couchbase-servers": 1,
+        "edge-servers": 1
+    }
 }
 
 def load_pool_data():
