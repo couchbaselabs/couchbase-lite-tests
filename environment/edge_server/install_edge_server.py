@@ -46,6 +46,8 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
     print(f"Installing Couchbase Edge Server package {package_file}...")
     run_remote_command(edge_server_ip, f"sudo dpkg -i {package_file}")
 
+    print("Stopping Couchbase Edge Server service...")
+    run_remote_command(edge_server_ip, "sudo systemctl stop couchbase-edge-server")
     # Stop running Couchbase Edge Server processes
     print("Stopping Couchbase Edge Server service...")
     run_remote_command(edge_server_ip, "sudo systemctl stop couchbase-edge-server")
@@ -68,6 +70,7 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
     # run_remote_command(edge_server_ip, "sudo mkdir -p /opt/couchbase-edge-server/config")
     # run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/config")
 
+    time.sleep(15)
     # # Copy the configuration file to the remote VM
     # print(f"Copying config file to {config_file_path}...")
     # subprocess.run(["sshpass", "-p", "couchbase", "scp", edge_server_config, f"root@{edge_server_ip}:{config_file_path}"], check=True)
@@ -78,16 +81,19 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
 
     time.sleep(15)
 
-    if create_cert:
+    if create_cert or mtls:
         print("Setting up certificates directory...")
         run_remote_command(edge_server_ip, "sudo mkdir -p /opt/couchbase-edge-server/cert")
         run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/cert")
+        run_remote_command(edge_server_ip, f"sudo chown -R couchbase:couchbase /opt/couchbase-edge-server/cert")
+
+    if create_cert:
         print(f"Creating client certificate on {edge_server_ip}...")
-        command = f"/opt/couchbase-edge-server/bin/couchbase-edge-server --create-cert CN={edge_server_ip} /opt/couchbase-edge-server/cert/certfile /opt/couchbase-edge-server/cert/keyfile"
+        command = f"/opt/couchbase-edge-server/bin/couchbase-edge-server --create-cert CN={edge_server_ip} /opt/couchbase-edge-server/cert/certfile_tls /opt/couchbase-edge-server/cert/keyfile_tls"
         run_remote_command(edge_server_ip, command)
         # copying cert to host
         subprocess.run(
-            ["sshpass", "-p", "couchbase", "scp", f"root@{edge_server_ip}:/opt/couchbase-edge-server/cert/certfile", "./config"],
+            ["sshpass", "-p", "couchbase", "scp", f"root@{edge_server_ip}:/opt/couchbase-edge-server/cert/certfile_tls", "./config"],
             check=True)
     if mtls:
         mtls_key_path="/opt/couchbase-edge-server/cert/rootkey"
@@ -109,7 +115,10 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
         print("Setting up database directory...")
         run_remote_command(edge_server_ip, "sudo mkdir -p /opt/couchbase-edge-server/database")
         run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/database")
+        run_remote_command(edge_server_ip, f"sudo chown -R couchbase:couchbase /opt/couchbase-edge-server/database")
         print(f"Copying database file to {data_file_path}...")
+        cmd_check_sshpass = "command -v sshpass || sudo apt-get update && sudo apt-get install -y sshpass"
+        run_remote_command(edge_server_ip, cmd_check_sshpass)
         subprocess.run(
             ["sshpass", "-p", "couchbase", "scp", database_path, f"root@{edge_server_ip}:{data_file_path}"],
             check=True)
@@ -123,9 +132,7 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
         run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/users")
         command = f"/opt/couchbase-edge-server/bin/couchbase-edge-server --add-user /opt/couchbase-edge-server/users/users.json  admin_user --create --role admin --password password"
         run_remote_command(edge_server_ip, command)
-    # Copy the configuration file to the remote VM
-    print(f"Copying config file to {config_file_path}...")
-    subprocess.run(["sshpass", "-p", "couchbase", "scp", edge_server_config, f"root@{edge_server_ip}:{config_file_path}"], check=True)
+
 
     # Set permissions for the configuration file
     print("Setting permissions for the config file...")
@@ -150,8 +157,10 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build,creat
 
     # Verify that Couchbase Edge Server is running on port 59840
     print("Checking if Couchbase Edge Server is running on port 59840...")
-    edge_server_status = subprocess.run(["sshpass", "-p", "couchbase", "ssh", f"root@{edge_server_ip}", "lsof -i :59840"], capture_output=True, text=True)
-    if edge_server_status.stdout:
+    edge_server_status = subprocess.run(
+        ["sshpass", "-p", "couchbase", "ssh", f"root@{edge_server_ip}", "systemctl status couchbase-edge-server"], capture_output=True,
+        text=True)
+    if "Started couchbase-edge-server.service"in edge_server_status.stdout:
         print(f"Couchbase Edge Server is running successfully on {edge_server_ip}.")
     else:
         print(f"Couchbase Edge Server failed to start on {edge_server_ip}. Exiting...")

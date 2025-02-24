@@ -25,12 +25,13 @@ class TestAuthentication(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_valid_tls(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_valid_tls")
-        edge_server_primary = cblpytest.edge_servers[0]
+        edge_server = cblpytest.edge_servers[0]
+        await edge_server.reset_db()
         file_path=os.path.abspath(os.path.dirname(__file__))
         file_path=str(Path(file_path, ".."))
-        edge_server_primary=await edge_server_primary.set_config(f"{file_path}/environment/edge_server/config/test_tls_config.json","/opt/couchbase-edge-server/config/config.json")
+        edge_server=await edge_server.set_config(f"{file_path}/environment/edge_server/config/test_tls_config.json","/opt/couchbase-edge-server/etc/config.json")
         self.mark_test_step("get server information")
-        client = HTTPClient(cblpytest.http_clients[0], edge_server_primary)
+        client = HTTPClient(cblpytest.http_clients[0], edge_server)
         await client.connect()
         await client.get_tls_certificate()
         version = await client.get_version()
@@ -41,6 +42,7 @@ class TestAuthentication(CBLTestClass):
     async def test_verify_mtls(self, cblpytest: CBLPyTest) -> None:
         self.mark_test_step("test_verify_mtls")
         edge_server = cblpytest.edge_servers[0]
+        await edge_server.reset_db()
         file_path = os.path.abspath(os.path.dirname(__file__))
         file_path = str(Path(file_path, ".."))
         client=HTTPClient(cblpytest.http_clients[0],edge_server)
@@ -48,7 +50,7 @@ class TestAuthentication(CBLTestClass):
         await client.create_certificate()
         edge_server_new=await edge_server.set_config(
             f"{file_path}/environment/edge_server/config/test_mtls_config.json",
-            "/opt/couchbase-edge-server/config/config.json")
+            "/opt/couchbase-edge-server/etc/config.json")
 
         self.mark_test_step("get server information")
         client.edge_server=edge_server_new
@@ -60,11 +62,12 @@ class TestAuthentication(CBLTestClass):
     async def test_basic_auth(self, cblpytest: CBLPyTest) -> None:
         self.mark_test_step("test_basic_auth")
         edge_server = cblpytest.edge_servers[0]
+        await edge_server.reset_db()
         file_path = os.path.abspath(os.path.dirname(__file__))
         file_path = str(Path(file_path, ".."))
         edge_server_new = await edge_server.set_config(
             f"{file_path}/environment/edge_server/config/test_basic_auth.json",
-            "/opt/couchbase-edge-server/config/config.json")
+            "/opt/couchbase-edge-server/etc/config.json")
         valid_auth = ("username", "password")
         invalid_auth = ("invalid_user", "wrong_password")
 

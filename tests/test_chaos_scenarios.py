@@ -39,6 +39,10 @@ class TestEdgeServerChaos(CBLTestClass):
         edge_server2 = cblpytest.edge_servers[1]
         edge_server3 = cblpytest.edge_servers[2]
 
+        await edge_server1.reset_db()
+        await edge_server2.reset_db()
+        await edge_server3.reset_db()
+
         sgw = cblpytest.sync_gateways[0]
 
         http_clients = cblpytest.http_clients[0]
@@ -62,7 +66,7 @@ class TestEdgeServerChaos(CBLTestClass):
             json.dump(config, file, indent=4)
         edge_server1 = await edge_server1.set_config(
             config_path,
-            "/opt/couchbase-edge-server/config/config.json"
+            "/opt/couchbase-edge-server/etc/config.json"
         )
 
         # setup edge 2
@@ -79,7 +83,7 @@ class TestEdgeServerChaos(CBLTestClass):
             json.dump(config, file, indent=4)
         edge_server2 = await edge_server2.set_config(
             config_path2,
-            "/opt/couchbase-edge-server/config/config.json"
+            "/opt/couchbase-edge-server/etc/config.json"
         )
 
         # set up edge server3
@@ -96,7 +100,7 @@ class TestEdgeServerChaos(CBLTestClass):
             json.dump(config, file, indent=4)
         edge_server3 = await edge_server3.set_config(
             config_path,
-            "/opt/couchbase-edge-server/config/config.json"
+            "/opt/couchbase-edge-server/etc/config.json"
         )
 
 
@@ -205,6 +209,7 @@ class TestEdgeServerChaos(CBLTestClass):
     async def test_edge_server_with_multiple_rest_clients(self, cblpytest, dataset_path) -> None:
         self.mark_test_step("Edge Server with 25 REST Clients Performing Reads/Writes")
         edge_server = cblpytest.edge_servers[0]
+        await edge_server.reset_db()
         http_clients = cblpytest.http_clients
         # setup  config
         file_path = os.path.abspath(os.path.dirname(__file__))
@@ -212,7 +217,7 @@ class TestEdgeServerChaos(CBLTestClass):
         config_path = f"{file_path}/environment/edge_server/config/test_edge_server_with_multiple_rest_clients.json"
         edge_server = await edge_server.set_config(
             config_path,
-            "/opt/couchbase-edge-server/config/config.json"
+            "/opt/couchbase-edge-server/etc/config.json"
         )
 
         factory = ClientFactory(vms=http_clients, edge_server=edge_server, num_clients_per_vm=5)
@@ -296,7 +301,9 @@ class TestEdgeServerChaos(CBLTestClass):
         edge_server2 = cblpytest.edge_servers[1]
         edge_server3 = cblpytest.edge_servers[2]
 
-        http_clients = cblpytest.http_clients[0]
+        await edge_server1.reset_db()
+        await edge_server2.reset_db()
+        await edge_server3.reset_db()
 
         # 1. Configure Edge Server2 with replication to edge 1
         file_path = os.path.abspath(os.path.dirname(__file__))
@@ -317,7 +324,7 @@ class TestEdgeServerChaos(CBLTestClass):
             json.dump(config, file, indent=4)
         edge_server2 = await edge_server2.set_config(
             config_path,
-            "/opt/couchbase-edge-server/config/config.json"
+            "/opt/couchbase-edge-server/etc/config.json"
         )
 
         # setup edge 3
@@ -329,7 +336,7 @@ class TestEdgeServerChaos(CBLTestClass):
             json.dump(config, file, indent=4)
         edge_server3 = await edge_server3.set_config(
             config_path,
-            "/opt/couchbase-edge-server/config/config.json"
+            "/opt/couchbase-edge-server/etc/config.json"
         )
 
         # set up edge server1
@@ -341,7 +348,7 @@ class TestEdgeServerChaos(CBLTestClass):
             json.dump(config, file, indent=4)
         edge_server1 = await edge_server1.set_config(
             config_path,
-            "/opt/couchbase-edge-server/config/config.json"
+            "/opt/couchbase-edge-server/etc/config.json"
         )
         #     Empty the travel.hotels collection
         all_docs = await edge_server1.get_all_documents(db_name="travel", collection="travel.hotels")
@@ -401,6 +408,7 @@ class TestEdgeServerChaos(CBLTestClass):
 
         # Get infrastructure components
         edge_server = cblpytest.edge_servers[0]
+        await edge_server.reset_db()
         sgw = cblpytest.sync_gateways[0]
         http_client = cblpytest.http_clients[0]
 
@@ -422,7 +430,7 @@ class TestEdgeServerChaos(CBLTestClass):
             json.dump(config, file, indent=4)
         edge_server = await edge_server.set_config(
             config_path,
-            "/opt/couchbase-edge-server/config/config.json"
+            "/opt/couchbase-edge-server/etc/config.json"
         )
 
         client = HTTPClient(http_client, edge_server)
