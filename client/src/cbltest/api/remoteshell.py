@@ -34,47 +34,55 @@ class RemoteShellConnection:
         return self._ssh_client
 
     async def kill_edge_server(self) -> bool:
+        # try:
+        #     command = 'pgrep -f /opt/couchbase-edge-server/bin/couchbase-edge-server'
+        #     result=await self.ssh_client.run(command, check=True)
+        #     if result.stderr.strip():
+        #         return False
+        #     if result.stdout.strip():
+        #         run_remote_command(ip, "sudo kill $(sudo pgrep couchbase)")
+        #     return True
+        # except Exception as e:
+        #     return False
         try:
-            result1 = await self.ssh_client.run("pgrep -f /opt/couchbase-edge-server/bin/couchbase-edge-server", check=True)
-            pid1 = result1.stdout.strip()
-            result2=await self.ssh_client.run(f"lsof -t -i :{self._port}", check=True)
-            pid2 = result2.stdout.strip()
-            result3=await self.ssh_client.run("cat /tmp/edge_server.pid", check=True)
-            pid3 = result3.stdout.strip()
-            pid_set= {pid1, pid2, pid3}
-            for pid in pid_set:
-                result= await self.ssh_client.run(f"kill {pid}", check=True)
-                print(f"{pid} killed with result: {result}")
-            await self.ssh_client.run(f"rm /tmp/edge_server.pid",check=True)
+            # command=f"nohup /opt/couchbase-edge-server/bin/couchbase-edge-server --verbose {config_file}"
+            command = "sudo systemctl stop couchbase-edge-server"
+            result=await self.ssh_client.run(command, check=True)
+            if result.stderr.strip():
+                return False
             return True
         except Exception as e:
             return False
 
     async def start_edge_server(self, config_file: str) -> bool:
         try:
-            command=f"nohup /opt/couchbase-edge-server/bin/couchbase-edge-server --verbose {config_file} > /tmp/edge_server.log 2>&1 & echo $! > /tmp/edge_server.pid"
-            await self.ssh_client.run(command, check=True)
-            if await self.is_edge_server_running():
-                return True
-            return False
-        except Exception as e:
-            return False
-
-    async def kill_sgw(self):
-        try:
-            command=" systemctl stop sync_gateway"
-            await self.ssh_client.run(command, check=True)
+            # command=f"nohup /opt/couchbase-edge-server/bin/couchbase-edge-server --verbose {config_file}"
+            command = "sudo systemctl restart couchbase-edge-server"
+            result=await self.ssh_client.run(command, check=True)
+            if result.stderr.strip():
+                return False
             return True
         except Exception as e:
             return False
 
-    async def start_sgw(self, config_file: str) -> bool:
+    async def reset_db_uuid(self, db_name: str) -> bool:
         try:
-            command="systemctl restart sync_gateway"
-            await self.ssh_client.run(command, check=True)
+            command = f"/opt/couchbase-edge-server/bin/couchbase-edge-server --reset-uuid /opt/couchbase-edge-server/etc/{db_name}.cblite2"
+            result=await self.ssh_client.run(command, check=True)
+            if result.stderr.strip():
+                return False
             return True
         except Exception as e:
             return False
+
+    async def check_log(self, search_string: str, log_file: str) -> List[str]:
+        try:
+            command = f"grep '{search_string}' {log_file}"
+            result = await self.ssh_client.run(command, check=True)
+            matching_lines = result.stdout.strip().splitlines()
+            return matching_lines
+        except Exception as e:
+            return []
 
 
     async def is_edge_server_running(self) -> bool:
@@ -84,7 +92,7 @@ class RemoteShellConnection:
         except Exception:
             return False
 
-    async def move_file(self,local_path,dest_path)->bool:
+    async def move_file(self,local_path, dest_path)->bool:
         try:
             await self.ssh_client.run(f"rm -r {dest_path}")
             subprocess.run(
@@ -105,6 +113,7 @@ class RemoteShellConnection:
             return response
         except Exception as e:
             return e
+
     async def close(self):
         if self._ssh_client:
             self._ssh_client.close()
