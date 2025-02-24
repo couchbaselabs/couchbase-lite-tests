@@ -39,47 +39,50 @@ class TestEndtoEnd(CBLTestClass):
 
         self.mark_test_step("Creating a bucket in Couchbase Server and adding 10 documents.")
         bucket_name = "bucket-1"
-        # server.create_bucket(bucket_name)
-        # for i in range(1, 11):
-        #     doc = {
-        #         "id": f"doc_{i}",
-        #         "channels": ["public"],
-        #         "timestamp": datetime.utcnow().isoformat()
-        #     }
-        #     server.add_document(bucket_name, doc["id"], doc)
+        server.create_bucket(bucket_name)
+        for i in range(1, 11):
+            doc = {
+                "id": f"doc_{i}",
+                "channels": ["public"],
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            server.add_document(bucket_name, doc["id"], doc)
         logger.info("10 documents created in Couchbase Server.")
 
         self.mark_test_step("Creating a database in Sync Gateway and adding a user and role.")
         sg_db_name = "db-1"
-        # config = {
-        #     "bucket": "bucket-1",
-        #     "scopes": {
-        #         "_default": {
-        #             "collections": {
-        #                 "_default": {
-        #                     "sync": "function(doc){channel(doc.channels);}"
-        #                 }
-        #             }
-        #         }
-        #     },
-        #     "num_index_replicas": 0
-        # }
-        # payload = PutDatabasePayload(config)
+        config = {
+            "bucket": "bucket-1",
+            "scopes": {
+                "_default": {
+                    "collections": {
+                        "_default": {
+                            "sync": "function(doc){channel(doc.channels);}"
+                        }
+                    }
+                }
+            },
+            "num_index_replicas": 0
+        }
+        payload = PutDatabasePayload(config)
         # await sync_gateway.put_database(sg_db_name, payload)
         logger.info(f"Database created in Sync Gateway and linked to {bucket_name}.")
 
-        # input_data = {
-        #     "_default._default": ["public"]
-        # }
-        # access_dict = sync_gateway.create_collection_access_dict(input_data)
-        # await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
-        # await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
+        input_data = {
+            "_default._default": ["public"]
+        }
+        access_dict = sync_gateway.create_collection_access_dict(input_data)
+        await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
+        await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
         logger.info("User and role added to Sync Gateway.")
 
         self.mark_test_step("Creating a database in Edge Server.")
         es_db_name = "db"
         edge_server = cblpytest.edge_servers[0]
+
+        await edge_server.kill_server()
+        await edge_server.start_server()
 
         logger.info("Created a database in Edge Server.")
 
@@ -90,17 +93,19 @@ class TestEndtoEnd(CBLTestClass):
         response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
 
         self.mark_test_step("Check that Sync Gateway has 10 documents")
-        # assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Sync Gateway initially.")
+
+        time.sleep(15)
 
         logger.info("Checking initial document sync from Sync Gateway to Edge Server...")
         response = await edge_server.get_all_documents(es_db_name)
 
         self.mark_test_step("Check that Edge Server has 10 documents")
-        # assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Edge Server initially.")
 
-        doc_counter = 38 # Initialize the document counter
+        doc_counter = 11 # Initialize the document counter
 
         # Run until 30 minutes have passed
         while datetime.now() < end_time:
@@ -122,6 +127,8 @@ class TestEndtoEnd(CBLTestClass):
             print(response)
             assert response is not None, f"Failed to create document {doc_id} via Sync Gateway."
             logger.info(f"Document {doc_id} created via Sync Gateway.")
+
+            time.sleep(5)
             
             # Step 2: Validate Document on Edge Server
             logger.info(f"Step 2: Validating document {doc_id} on Edge Server.")
@@ -137,23 +144,34 @@ class TestEndtoEnd(CBLTestClass):
 
             # Storing the revision ID
             rev_id = document.revid
-            print(rev_id)
+            # print(rev_id)
 
-            # # Step 3: Update Document via Edge Server
-            # self.mark_test_step(f"Checking documents updated Edge Server get synced up to Sync Gateway")
-            # logger.info(f"Step 3: Updating document by adding a 'changed' sub document in {doc_id} via Edge Server.")
-            # response = await edge_server.put_sub_document(doc_id, rev_id, {"changed": "yes"}, es_db_name)
-            # assert response is not None, f"Failed to update document {doc_id} via Edge Server."
+            # Step 3: Update Document via Edge Server
+            self.mark_test_step(f"Checking documents updated Edge Server get synced up to Sync Gateway")
+            logger.info(f"Step 3: Updating document by adding a 'changed' sub document in {doc_id} via Edge Server.")
 
-            # logger.info(f"Document {doc_id} updated via Edge Server.")
+            updated_doc = {
+                "id": doc_id,
+                "channels": ["public"],
+                "timestamp": datetime.utcnow().isoformat(),
+                "changed": "yes"
+            }
+
+            response = await edge_server.put_document_with_id(updated_doc, doc_id, es_db_name, rev=rev_id)
+
+            assert response is not None, f"Failed to update document {doc_id} via Edge Server"
+
+            logger.info(f"Document {doc_id} updated via Edge Server")
+
+            time.sleep(5)
             
-            # # Step 4: Validate Update on Sync Gateway
-            # logger.info(f"Step 4: Validating update for {doc_id} on Sync Gateway.")
+            # Step 4: Validate Update on Sync Gateway
+            logger.info(f"Validating update for {doc_id} on Sync Gateway")
             response = await sync_gateway.get_document(sg_db_name, doc_id)
             # print(response)
-            # assert response.get("changed") == "yes", f"Document {doc_id} update not reflected on Sync Gateway."
+            assert rev_id != response.revid, f"Document {doc_id} update not reflected on Sync Gateway"
 
-            # logger.info(f"Document {doc_id} update reflected on Sync Gateway.")
+            logger.info(f"Document {doc_id} update reflected on Sync Gateway")
 
             # Storing the revision ID
             rev_id = response.revid
@@ -165,6 +183,8 @@ class TestEndtoEnd(CBLTestClass):
             assert response is None, f"Failed to delete document {doc_id} via Sync Gateway."
 
             logger.info(f"Document {doc_id} deleted via Sync Gateway.")
+
+            time.sleep(5)
             
             # Step 6: Validate Deletion on Edge Server
             logger.info(f"Step 6: Validating deletion of {doc_id} on Edge Server.")
@@ -192,15 +212,17 @@ class TestEndtoEnd(CBLTestClass):
                 "timestamp": datetime.utcnow().isoformat()
             }
 
-            response = await edge_server.add_document_with_id(doc, doc_id, es_db_name)
+            response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
             assert response is not None, f"Failed to create document {doc_id} via Edge Server."
 
             logger.info(f"Document {doc_id} created via Edge Server.")
+
+            time.sleep(5)
             
             # Step 8: Validate Document on Sync Gateway
             logger.info(f"Step 8: Validating document {doc_id} on Sync Gateway.")
             response = await sync_gateway.get_document(sg_db_name, doc_id)
-            print(response)
+            # print(response)
             assert response is not None, f"Document {doc_id} does not exist on the sync gateway."
             assert response.id == doc_id, f"Document ID mismatch: {document.id}"
             # assert "rev" in response, "Revision ID (_rev) missing in the document"
@@ -223,12 +245,14 @@ class TestEndtoEnd(CBLTestClass):
             assert response is not None, f"Failed to update document {doc_id} via Sync Gateway."
 
             logger.info(f"Document {doc_id} updated via Sync Gateway.")
+
+            time.sleep(5)
             
             # Step 10: Validate Update on Edge Server
             logger.info(f"Step 10: Validating update for {doc_id} on Edge Server.")
 
             document = await edge_server.get_document(es_db_name, doc_id)
-            print(document)
+            # print(document)
 
             assert document is not None, f"Document {doc_id} does not exist on the edge server."
             assert document.id == doc_id, f"Document ID mismatch: {document.id}"
@@ -238,7 +262,7 @@ class TestEndtoEnd(CBLTestClass):
 
             # Storing the revision ID
             rev_id = document.revid
-            print(rev_id)
+            # print(rev_id)
             
             # Step 11: Delete Document via Edge Server
             self.mark_test_step(f"Checking documents deleted at Edge Server get synced up to Sync Gateway")
@@ -246,9 +270,11 @@ class TestEndtoEnd(CBLTestClass):
 
             response = await edge_server.delete_document(doc_id, rev_id, es_db_name)
 
-            assert response is None, f"Failed to delete document {doc_id} via Edge Server."
+            assert response.get("ok"), f"Failed to delete document {doc_id} via Edge Server."
 
             logger.info(f"Document {doc_id} deleted via Edge Server.")
+
+            time.sleep(5)
             
             # Step 12: Validate Deletion on Sync Gateway
             logger.info(f"Step 12: Validating deletion of {doc_id} on Sync Gateway.")
