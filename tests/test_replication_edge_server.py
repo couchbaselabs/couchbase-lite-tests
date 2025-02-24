@@ -52,7 +52,7 @@ class TestEdgeServerSync(CBLTestClass):
             json.dump(config, file, indent=4)
         edge_server=await edge_server.set_config(
             config_path,
-            "/opt/couchbase-edge-server/config/config.json"
+            "/opt/couchbase-edge-server/etc/config.json"
         )
         await edge_server.add_user("admin","password")
         edge_server.set_auth("admin", "password")
@@ -122,7 +122,7 @@ class TestEdgeServerSync(CBLTestClass):
         config_path1 = f"{file_path}/environment/edge_server/config/test_primary_edge.json"
         edge_server1 = await edge_server1.set_config(
             config_path1,
-            "/opt/couchbase-edge-server/config/config.json"
+            "/opt/couchbase-edge-server/etc/config.json"
         )
         source_db = edge_server1.replication_url('travel')
         config_path = f"{file_path}/environment/edge_server/config/test_edge_to_edge_server.json"
@@ -138,7 +138,7 @@ class TestEdgeServerSync(CBLTestClass):
 
         edge_server2 = await edge_server2.set_config(
             config_path,
-            "/opt/couchbase-edge-server/config/config.json"
+            "/opt/couchbase-edge-server/etc/config.json"
         )
 
         client = HTTPClient(http_client, edge_server2)

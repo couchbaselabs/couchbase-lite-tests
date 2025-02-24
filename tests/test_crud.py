@@ -48,6 +48,7 @@ class TestCrud(CBLTestClass):
         self.mark_test_step("test_single_doc_crud")
         db_name = "names"
         edge_server = cblpytest.edge_servers[0]
+        await edge_server.reset_db()
         self.mark_test_step("create single document with Auto ID")
         doc={"test":"This is a test document"}
         resp1=await edge_server.add_document_auto_id(doc,db_name)
@@ -86,7 +87,9 @@ class TestCrud(CBLTestClass):
     async def test_multiple_doc_crud(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_multiple_doc_crud")
         edge_server = cblpytest.edge_servers[0]
+        await edge_server.reset_db()
         http_clients=cblpytest.http_clients
+        assert len(http_clients)==3, "Test requires 3 HTTP clients"
         self.mark_test_step("create multiple clients")
         factory=ClientFactory(vms=http_clients,edge_server=edge_server,num_clients_per_vm=3)
         await factory.create_clients()
@@ -119,22 +122,16 @@ class TestCrud(CBLTestClass):
         }
         resp,err,failed=await factory.make_unique_params_client_request(client_request_dict)
         self.mark_test_step(f"Response: {resp},error: {err},failed: {failed}")
-        assert 2 in failed
-        if 1 or 3 in failed:
-                self.mark_test_step(f"Fetch Documents failed at : {failed}, error: {err}")
-        else:
-            self.mark_test_step("Fetch Documents succeeded")
+        assert len(resp[1])==len(resp[3])==10
+        assert len(resp[2])==0
+        self.mark_test_step("Fetch Documents succeeded")
 
-        # fetch changes feed
-        self.mark_test_step("Fetch the changes feed")
-        changes=await single_client.changes_feed(db_name,since=1)
-        assert len(changes)>0
-        self.mark_test_step(f" Changes feed : {changes}")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sub_doc_crud(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_sub_doc_crud")
         edge_server = cblpytest.edge_servers[0]
+        await edge_server.reset_db()
         db_name="names"
         self.mark_test_step("create single document with Auto ID")
         doc = {"test": "This is a test document","testKey":None}

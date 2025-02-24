@@ -29,12 +29,18 @@ def uninstall_edge_server(ip, password="couchbase"):
     """ Uninstalls Edge Server and removes all configuration files for it on the given IP."""
 
     # Check if the Couchbase Edge Server is running
+    result = subprocess.run(f"sshpass -p couchbase ssh root@{ip} 'sudo systemctl status couchbase-edge-server'", shell=True,
+                           capture_output=True, text=True)
+    if "Unit couchbase-edge-server.service could not be found." in result.stderr:
+        print(f"Edge server not found as a process on {ip}")
+        return
+
     print("Checking if Couchbase Edge Server is running...")
     result = subprocess.run(
         f"sshpass -p {password} ssh root@{ip} 'pgrep -f /opt/couchbase-edge-server/bin/couchbase-edge-server'",
         shell=True, capture_output=True, text=True
     )
-    
+
     if result.stdout.strip():
         print("Couchbase Edge Server is running. Stopping the process...")
         # Stop the process using the PID stored in /tmp

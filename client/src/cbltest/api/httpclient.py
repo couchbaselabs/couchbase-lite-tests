@@ -310,7 +310,9 @@ class HTTPClient:
 
     async def get_tls_certificate(self):
         try:
-            command=f"sshpass -p couchbase scp root@{self.edge_server.hostname}:/opt/couchbase-edge-server/cert/certfile /opt"
+            cmd_check_sshpass = "command -v sshpass || sudo apt-get update && sudo apt-get install -y sshpass"
+            await self.remote_shell.run_command(cmd_check_sshpass)
+            command=f"sshpass -p couchbase scp -o StrictHostKeyChecking=no root@{self.edge_server.hostname}:/opt/couchbase-edge-server/cert/certfile_tls /opt"
             print(command)
             await self.remote_shell.run_command(command)
         except Exception as e:

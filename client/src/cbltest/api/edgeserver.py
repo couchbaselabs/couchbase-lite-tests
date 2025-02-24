@@ -161,7 +161,7 @@ class EdgeServer:
             curl_command+=f"--cert /opt/clientcert --key /opt/clientkey"
             curl_command += f" --cacert /opt/rootcert "
         elif self.__secure:
-            curl_command+=f" --cacert /opt/certfile "
+            curl_command+=f" --cacert /opt/certfile_tls "
         if self.__auth:
             curl_command+=f" -u {self.__auth_name}:{self.__auth_password} "
         if '?' in path:
@@ -177,6 +177,7 @@ class EdgeServer:
             else:
                 json_data=json.dumps(data)
             json_data = json_data.replace('"', '\\"')
+            json_data = json_data.replace("$", "\$")
             curl_command += f" -d \"{json_data}\""
         if params:
             curl_command += f" {' '.join([f'--{k}={v}' for k, v in params.items()])}"
@@ -470,10 +471,11 @@ class EdgeServer:
         with self.__tracer.start_as_current_span("Named query", attributes={"cbl.database.name": db_name,
                                                                                   "cbl.scope.name": scope,
                                                                                   "cbl.collection.name": collection}):
-            payload={"name":name}
+            keyspace=self.keyspace_builder(db_name,scope,collection)
+            payload={}
             if params is not None:
                 payload["params"]=params
-            response = await self._send_request("post",f"{keyspace}/_query",payload=JSONDictionary(payload),curl=curl)
+            response = await self._send_request("post",f"{keyspace}/_query/{name}",payload=JSONDictionary(payload),curl=curl)
             if curl:
                 return response
             if not isinstance(response, dict):
@@ -493,12 +495,12 @@ class EdgeServer:
             if params is not None:
                 payload["params"]=params
             keyspace = self.keyspace_builder(db_name, scope, collection)
-            response = await self._send_request("post",f"{keyspace}/_query",payload=JSONDictionary(payload),curl=curl)
+            response = await self._send_request("post",f"/{keyspace}/_query",payload=JSONDictionary(payload),curl=curl)
             if curl:
                 return response
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server adhoc query (not JSON)")
-            cast_resp = cast(dict, response)
+            cast_resp = cast(list, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(500,
                                                     f"adhoc query with Edge Server had error '{cast_resp['reason']}'")
@@ -647,12 +649,10 @@ class EdgeServer:
             await self.__ssh_client.close()
             return success
 
-    async def start_server(self,config_file=None) -> bool:
+    async def start_server(self) -> bool:
         with self.__tracer.start_as_current_span("start edge server"):
             await self.__ssh_client.connect()
-            if config_file is None:
-                config_file='/opt/couchbase-edge-server/config/config.json'
-            success = await self.__ssh_client.start_edge_server(config_file=config_file)
+            success = await self.__ssh_client.start_edge_server()
             await self.__ssh_client.close()
             return success
 
@@ -660,7 +660,7 @@ class EdgeServer:
         await self.kill_server()
         await self.__ssh_client.connect()
         await self.__ssh_client.move_file(config_file_path,dest_path)
-        await self.start_server(dest_path)
+        await self.start_server()
         return EdgeServer(self.__hostname,config_file=config_file_path)
 
     async def add_user(self,name, password,role="admin"):
@@ -674,6 +674,13 @@ class EdgeServer:
             self.__auth=False
         self.__auth_name=name
         self.__auth_password=password
+
+    # if local_config_path is None, it doesn't copy the cblite2.zip file to the database directory on Edge server VM
+    async def reset_db(self,local_db_path=None):
+        await self.kill_server()
+        await self.__ssh_client.connect()
+        await self.__ssh_client.reset_db(local_db_path)
+        await self.start_server()
 
 
 
