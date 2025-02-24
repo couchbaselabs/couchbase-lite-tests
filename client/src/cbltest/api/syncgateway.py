@@ -1308,21 +1308,35 @@ class SyncGateway:
         :param collection: The collection where the document should be created (default '_default')
         :return: The response from the Sync Gateway (or None if document creation fails)
         """
-        with self.__tracer.start_as_current_span("create_document", attributes={"cbl.database.name": db_name,
-                                                                                "cbl.scope.name": scope,
-                                                                                "cbl.collection.name": collection,
-                                                                                "cbl.document.id": doc_id}):
-            document["_id"] = doc_id
+        with self.__tracer.start_as_current_span("create_document", attributes={
+            "cbl.database.name": db_name,
+            "cbl.scope.name": scope,
+            "cbl.collection.name": collection,
+            "cbl.document.id": doc_id
+        }):
+            document["_id"] = doc_id  # Ensure document has _id before sending
             response = await self._send_request("PUT", f"/{db_name}.{scope}.{collection}/{doc_id}",
                                                 payload=JSONDictionary(document))
+
             # Check for response structure
             if not response or "error" in response:
                 raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}")
 
-            return response
+            # Convert response to match expected format
+            cast_resp = cast(dict, response)
 
-    async def update_document(self, db_name: str, doc_id: str, document: dict, rev: str,
-                          scope: str = "_default", collection: str = "_default") -> dict:
+            # Ensure RemoteDocument fields exist
+            if "id" in cast_resp:
+                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
+            if "rev" in cast_resp:
+                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
+            if "cv" in cast_resp:
+                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
+
+            return RemoteDocument(cast_resp)
+
+    async def update_document(self, db_name: str, doc_id: str, document: dict, rev: str, 
+                          scope: str = "_default", collection: str = "_default") -> RemoteDocument:
         """
         Updates a document in Sync Gateway.
 
@@ -1332,12 +1346,14 @@ class SyncGateway:
         :param rev: The current revision ID of the document
         :param scope: The scope where the document exists (default '_default')
         :param collection: The collection where the document exists (default '_default')
-        :return: The response from the Sync Gateway
+        :return: The updated document as a RemoteDocument object
         """
-        with self.__tracer.start_as_current_span("update_document", attributes={"cbl.database.name": db_name,
-                                                                                "cbl.scope.name": scope,
-                                                                                "cbl.collection.name": collection,
-                                                                                "cbl.document.id": doc_id}):
+        with self.__tracer.start_as_current_span("update_document", attributes={
+            "cbl.database.name": db_name,
+            "cbl.scope.name": scope,
+            "cbl.collection.name": collection,
+            "cbl.document.id": doc_id
+        }):
 
             document["_id"] = doc_id
             document["_rev"] = rev
@@ -1350,7 +1366,19 @@ class SyncGateway:
             if not response or "error" in response:
                 raise CblSyncGatewayBadResponseError(500, f"Failed to update document {doc_id} with rev {rev}")
 
-            return response
+            # Convert response to match expected format
+            cast_resp = cast(dict, response)
+
+            # Ensure RemoteDocument fields exist
+            if "id" in cast_resp:
+                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
+            if "rev" in cast_resp:
+                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
+            if "cv" in cast_resp:
+                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
+
+            return RemoteDocument(cast_resp)
+
 
     async def fetch_log_file(
         self,
