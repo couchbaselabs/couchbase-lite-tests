@@ -16,6 +16,44 @@ from tqdm import tqdm
 SCRIPT_DIR = Path(__file__).resolve().parent
 current_ssh = ""
 
+class SgwDownloadInfo:
+    @property
+    def is_release(self) -> bool:
+        return self.__build_no == 0
+    
+    @property
+    def local_filename(self) -> str:
+        return self.__local_filename
+    
+    @property
+    def version(self) -> str:
+        return self.__version
+    
+    @property
+    def build_no(self) -> int:
+        return self.__build_no
+    
+    @property
+    def url(self) -> str:  
+        return self.__url
+    
+    def _parse_release_url(self, download_url: str):
+        self.__local_filename = download_url.split("/")[-1]
+        self.__version = download_url.split("/")[-2]
+        self.__build_no = 0
+        self.__url = download_url
+
+    def _parse_internal_url(self, download_url: str):
+        self.__local_filename = download_url.split("/")[-1]
+        self.__version = download_url.split("/")[-3]
+        self.__build_no = int(download_url.split("/")[-2])
+        self.__url = download_url
+
+    def __init__(self, download_url: str):
+        if "latestbuilds" in download_url:
+            self._parse_internal_url(download_url)
+        else:
+            self._parse_release_url(download_url)
 
 def lookup_sgw_build(version: str) -> int:
     url = f"http://proget.build.couchbase.com:8080/api/get_version?product=sync_gateway&version={version}"
@@ -23,20 +61,19 @@ def lookup_sgw_build(version: str) -> int:
     r.raise_for_status()
     return cast(int, r.json()["BuildNumber"])
 
-
-def download_sgw_package(version: str, build: int) -> str:
-    local_filename = (
-        SCRIPT_DIR / f"couchbase-sync-gateway-enterprise_{version}-{build}_x86_64.rpm"
+def download_sgw_package(download_info: SgwDownloadInfo) -> None:
+    local_path = (
+        SCRIPT_DIR / download_info.local_filename
     )
-    url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/sync_gateway/{version}/{build}/{local_filename.name}"
-    if not os.path.exists(local_filename):
-        header(f"Downloading {url} to {local_filename.name}")
-        with requests.get(url, stream=True) as r:
+    
+    if not os.path.exists(local_path):
+        header(f"Downloading {download_info.url} to {download_info.local_filename}")
+        with requests.get(download_info.url, stream=True) as r:
             r.raise_for_status()
             with (
-                open(local_filename, "wb") as f,
+                open(local_path, "wb") as f,
                 tqdm(
-                    desc=local_filename.name,
+                    desc=download_info.local_filename,
                     total=int(r.headers.get("content-length", 0)),
                     unit="iB",
                     unit_scale=True,
@@ -47,9 +84,7 @@ def download_sgw_package(version: str, build: int) -> str:
                     size = f.write(chunk)
                     bar.update(size)
     else:
-        print(f"File {local_filename} already exists, skipping download.")
-
-    return local_filename.name
+        print(f"File {download_info.local_filename} already exists, skipping download.")
 
 
 def setup_config():
@@ -95,7 +130,7 @@ def sftp_progress_bar(sftp: paramiko.SFTP, local_path: Path, remote_path: str):
         sftp.put(local_path, remote_path, callback=callback)
 
 
-def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str):
+def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True):
     header(desc)
 
     _, stdout, stderr = ssh.exec_command(command, get_pty=True)
@@ -103,7 +138,7 @@ def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str):
         print(colored(f"[{current_ssh}] {line}", "light_grey"), end="")
 
     exit_status = stdout.channel.recv_exit_status()
-    if exit_status != 0:
+    if fail_on_error and exit_status != 0:
         print(stderr.read().decode())
         raise Exception(f"Command '{command}' failed with exit status {exit_status}")
 
@@ -112,13 +147,17 @@ def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str):
 
 
 def main(
-    hostnames: List[str], version: str, build: int, private_key: Optional[str] = None
+    hostnames: List[str], download_url: str, private_key: Optional[str] = None
 ):
-    build_no = lookup_sgw_build(version) if build == -1 else build
-    sgw_filename = download_sgw_package(version, build_no)
+    sgw_info = SgwDownloadInfo(download_url)
+    download_sgw_package(sgw_info)
     setup_config()
     for hostname in hostnames:
-        print(f"Setting up server {hostname} with SGW {version}-{build_no}")
+        if sgw_info.is_release:
+            print(f"Setting up server {hostname} with SGW {sgw_info.version}")
+        else:
+            print(f"Setting up server {hostname} with SGW {sgw_info.version}-{sgw_info.build_no}")
+
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         pkey: paramiko.Ed25519Key = (
@@ -135,7 +174,7 @@ def main(
             sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
         )
         remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
-        sftp_progress_bar(sftp, SCRIPT_DIR / sgw_filename, f"/tmp/{sgw_filename}")
+        sftp_progress_bar(sftp, SCRIPT_DIR / sgw_info.local_filename, f"/tmp/{sgw_info.local_filename}")
         sftp_progress_bar(
             sftp, SCRIPT_DIR / "start-sgw.sh", "/home/ec2-user/start-sgw.sh"
         )
@@ -152,8 +191,15 @@ def main(
 
         remote_exec(
             ssh,
-            f"sudo rpm -i /tmp/{sgw_filename}",
-            f"Installing Couchbase SGW {version}-{build_no}",
+            f"sudo rpm -e couchbase-sync-gateway",
+            f"Uninstalling Couchbase SGW",
+            fail_on_error=False
+        )
+
+        remote_exec(
+            ssh,
+            f"sudo rpm -i /tmp/{sgw_info.local_filename}",
+            "Installing Sync Gateway",
         )
         remote_exec(ssh, "bash /home/ec2-user/start-sgw.sh", "Starting SGW")
 

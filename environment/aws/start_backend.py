@@ -14,6 +14,12 @@ from sgw_setup.setup_sgw import main as sgw_main
 
 def terraform_apply(public_key_name: str):
     header("Starting terraform apply")
+    result = subprocess.run(["terraform", "init"], capture_output=False, text=True)
+    if result.returncode != 0:
+        raise Exception(
+            f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
+        )
+    
     command = [
         "terraform",
         "apply",
@@ -73,13 +79,9 @@ if __name__ == "__main__":
         help="The version of Couchbase Server to install.",
     )
     parser.add_argument(
-        "--sgw-version", default="4.0.0", help="The version of Sync Gateway to install."
-    )
-    parser.add_argument(
-        "--sgw-build",
-        default=-1,
-        type=int,
-        help="The build number of Sync Gateway to install (latest good by default)",
+        "--sgw-url",
+        help="The URL of Sync Gateway to install.",
+        required=True
     )
     parser.add_argument(
         "--private-key",
@@ -126,7 +128,7 @@ if __name__ == "__main__":
     sleep(5)
 
     server_main(cbs_ips, args.cbs_version, args.private_key)
-    sgw_main(sgw_ips, args.sgw_version, args.sgw_build, args.private_key)
+    sgw_main(sgw_ips, args.sgw_url, args.private_key)
     if args.tdk_config_out is not None:
         with open(args.tdk_config_out, "w") as fout:
             write_config(args.tdk_config_in, fout)
