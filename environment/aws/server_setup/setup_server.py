@@ -24,7 +24,9 @@ def sftp_progress_bar(sftp: paramiko.SFTP, local_path: Path, remote_path: str):
         sftp.put(local_path, remote_path, callback=callback)
 
 
-def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True):
+def remote_exec(
+    ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True
+):
     header(desc)
 
     _, stdout, stderr = ssh.exec_command(command)
@@ -78,9 +80,9 @@ def main(hostnames: List[str], version: str, private_key: Optional[str] = None):
         )
         remote_exec(
             ssh,
-            f"sudo rpm -e couchbase-server",
-            f"Uninstalling Couchbase Server",
-            fail_on_error=False
+            "sudo rpm -e couchbase-server",
+            "Uninstalling Couchbase Server",
+            fail_on_error=False,
         )
         remote_exec(
             ssh,

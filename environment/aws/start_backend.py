@@ -19,7 +19,7 @@ def terraform_apply(public_key_name: str):
         raise Exception(
             f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
         )
-    
+
     command = [
         "terraform",
         "apply",
@@ -79,9 +79,7 @@ if __name__ == "__main__":
         help="The version of Couchbase Server to install.",
     )
     parser.add_argument(
-        "--sgw-url",
-        help="The URL of Sync Gateway to install.",
-        required=True
+        "--sgw-url", help="The URL of Sync Gateway to install.", required=True
     )
     parser.add_argument(
         "--private-key",
