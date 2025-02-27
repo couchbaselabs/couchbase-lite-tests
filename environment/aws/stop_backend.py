@@ -6,7 +6,9 @@ from argparse import ArgumentParser
 from common.output import header
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="Run a script over an SSH connection.")
+    parser = ArgumentParser(
+        description="Tear down a previously created E2E AWS EC2 testing backend"
+    )
     required = parser.add_argument_group("required arguments")
     required.add_argument(
         "--public-key-name",

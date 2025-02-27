@@ -61,20 +61,15 @@ For Sync Gateway:
 ### Starting
 
 ```
-usage: start_backend.py [-h] [--cbs-version CBS_VERSION] [--sgw-version SGW_VERSION] [--sgw-build SGW_BUILD]
-                        [--private-key PRIVATE_KEY] [--tdk-config-out TDK_CONFIG_OUT] --public-key-name
-                        PUBLIC_KEY_NAME --tdk-config-in TDK_CONFIG_IN
+usage: start_backend.py [-h] [--cbs-version CBS_VERSION] [--private-key PRIVATE_KEY] [--tdk-config-out TDK_CONFIG_OUT] --public-key-name PUBLIC_KEY_NAME --tdk-config-in TDK_CONFIG_IN
+                        --sgw-url SGW_URL
 
-Run a script over an SSH connection.
+Prepare an AWS EC2 environment for running E2E tests
 
 optional arguments:
   -h, --help            show this help message and exit
   --cbs-version CBS_VERSION
                         The version of Couchbase Server to install.
-  --sgw-version SGW_VERSION
-                        The version of Sync Gateway to install.
-  --sgw-build SGW_BUILD
-                        The build number of Sync Gateway to install (latest good by default)
   --private-key PRIVATE_KEY
                         The private key to use for the SSH connection (if not default)
   --tdk-config-out TDK_CONFIG_OUT
@@ -85,9 +80,10 @@ required arguments:
                         The public key stored in AWS that pairs with the private key
   --tdk-config-in TDK_CONFIG_IN
                         The path to the input TDK configuration file
+  --sgw-url SGW_URL     The URL of Sync Gateway to install.
 ```
 
-The version and build properties should be self explanatory but the others are as follows:
+The Sync Gateway URL and Couchbase Server version properties should be self explanatory but the others are as follows:
 
 - public key name: The name of the key created in step 0
 - private key: The path to the private key created in step 0 (you didn't lose it right?)
@@ -110,7 +106,7 @@ The version and build properties should be self explanatory but the others are a
 ```
 usage: stop_backend.py [-h] --public-key-name PUBLIC_KEY_NAME
 
-Run a script over an SSH connection.
+Tear down a previously created E2E AWS EC2 testing backend
 
 optional arguments:
   -h, --help            show this help message and exit

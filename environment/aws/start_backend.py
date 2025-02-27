@@ -72,14 +72,13 @@ def write_config(in_config_file: str, output: IO[str]):
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="Run a script over an SSH connection.")
+    parser = ArgumentParser(
+        description="Prepare an AWS EC2 environment for running E2E tests"
+    )
     parser.add_argument(
         "--cbs-version",
         default="7.6.4",
         help="The version of Couchbase Server to install.",
-    )
-    parser.add_argument(
-        "--sgw-url", help="The URL of Sync Gateway to install.", required=True
     )
     parser.add_argument(
         "--private-key",
@@ -99,6 +98,9 @@ if __name__ == "__main__":
         "--tdk-config-in",
         help="The path to the input TDK configuration file",
         required=True,
+    )
+    required.add_argument(
+        "--sgw-url", help="The URL of Sync Gateway to install.", required=True
     )
     args = parser.parse_args()
 
