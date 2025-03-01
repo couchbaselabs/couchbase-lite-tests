@@ -17,6 +17,13 @@ Next, you will need to run `terraform init` inside of this folder in order to se
 
 Next, you need to make sure that the [python prerequisites](./requirements.txt) are installed in whatever environment you are using
 
+Next, you will need to add a section to your machine SSH config (`$HOME/.ssh/config`) to ensure that public keys from AWS are automatically added to the system known hosts.  This is because the hostname will be changing every time and docker remote deploy requires an unmolested SSH connection in order to function (without adding to known_hosts you will get an interactive prompt to add the remote host to the known hosts).  To accomplish this add the following section to your SSH config:
+
+```
+Host *.amazonaws.com
+    StrictHostKeyChecking accept-new
+```
+
 Finally, you will need to set up your Amazon AWS credentials so that terraform can use them.  As a Couchbase Employee the easiest way to do this is to set them up as described on the AWS SSO page that can be accessed via the Okta landing page.  The easiest result (option 2 on the resulting page) looks something like the following added to `$HOME/.aws/credentials`
 
 ```

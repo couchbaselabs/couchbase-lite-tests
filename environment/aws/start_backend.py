@@ -8,6 +8,7 @@ from time import sleep
 from typing import IO, List, cast
 
 from common.output import header
+from logslurp_setup.setup_logslurp import main as logslurp_main
 from server_setup.setup_server import main as server_main
 from sgw_setup.setup_sgw import main as sgw_main
 
@@ -129,6 +130,7 @@ if __name__ == "__main__":
 
     server_main(cbs_ips, args.cbs_version, args.private_key)
     sgw_main(sgw_ips, args.sgw_url, args.private_key)
+    logslurp_main(cbs_ips[0], args.private_key)
     if args.tdk_config_out is not None:
         with open(args.tdk_config_out, "w") as fout:
             write_config(args.tdk_config_in, fout)
