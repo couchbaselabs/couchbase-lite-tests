@@ -8,9 +8,9 @@ from time import sleep
 from typing import IO, List, cast
 
 from common.output import header
+from logslurp_setup.setup_logslurp import main as logslurp_main
 from server_setup.setup_server import main as server_main
 from sgw_setup.setup_sgw import main as sgw_main
-from logslurp_setup.setup_logslurp import main as logslurp_main
 
 
 def terraform_apply(public_key_name: str):
