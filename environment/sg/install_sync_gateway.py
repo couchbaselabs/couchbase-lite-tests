@@ -35,7 +35,7 @@ def install_sync_gateway(sync_gateway_ip, sync_config, version, build):
     # SSH into the VM to perform setup tasks before downloading
     print(f"\nSSHing into {sync_gateway_ip} to prepare environment...")
 
-    client = asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None)
+    client = await asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None)
     client.run("command -v sshpass || sudo apt-get update && sudo apt-get install -y sshpass")
     
     # Download the Sync Gateway package

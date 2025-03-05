@@ -132,7 +132,7 @@ def install_couchbase_server(version, build, ips):
             check_service_command = "curl -s http://localhost:8091"
 
             # Run commands on remote server
-            client = asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None)
+            client = await asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None)
             client.run("command -v sshpass || sudo apt-get update && sudo apt-get install -y sshpass")
             run_remote_command(ip, download_command)
             run_remote_command(ip, install_command)
