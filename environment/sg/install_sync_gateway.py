@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import time
+import asyncssh
 
 
 # Function to run SSH commands on remote machine with password prompt handling
@@ -33,6 +34,9 @@ def install_sync_gateway(sync_gateway_ip, sync_config, version, build):
     
     # SSH into the VM to perform setup tasks before downloading
     print(f"\nSSHing into {sync_gateway_ip} to prepare environment...")
+
+    client = asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None)
+    client.run("command -v sshpass || sudo apt-get update && sudo apt-get install -y sshpass")
     
     # Download the Sync Gateway package
     print(f"Downloading Sync Gateway package from {sg_package_url}...")
