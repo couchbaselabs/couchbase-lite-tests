@@ -10,6 +10,7 @@ from typing import IO, List, cast
 from common.output import header
 from server_setup.setup_server import main as server_main
 from sgw_setup.setup_sgw import main as sgw_main
+from logslurp_setup.setup_logslurp import main as logslurp_main
 from topology_setup.setup_topology import TopologyConfig
 
 
@@ -39,7 +40,7 @@ def terraform_apply(public_key_name: str, topology: TopologyConfig):
             f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
         )
 
-    header("Done!")
+    header("Done, sleeping for 5s")
 
 
 def write_config(in_config_file: str, output: IO[str]):
@@ -75,9 +76,22 @@ def write_config(in_config_file: str, output: IO[str]):
             print(f"{next_arg} -> {ip}")
             input = input.replace(next_arg, ip)
             i += 1
+        
+        logslurp_ip = get_logslurp_ip()
+        print(f"ls-ip -> {logslurp_ip}")
+        input = input.replace("{{ls-ip}}", logslurp_ip)
 
         output.write(input)
 
+def get_logslurp_ip():
+    logslurp_command = ["terraform", "output", "-json", "logslurp_instance_public_ip"]
+    result = subprocess.run(logslurp_command, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise Exception(
+            f"Command '{' '.join(logslurp_command)}' failed with exit status {result.returncode}: {result.stderr}"
+        )
+
+    return cast(str, json.loads(result.stdout))
 
 if __name__ == "__main__":
     parser = ArgumentParser(
@@ -130,7 +144,7 @@ if __name__ == "__main__":
     topology.dump()
     server_main(args.cbs_version, topology, args.private_key)
     sgw_main(args.sgw_url, topology, args.private_key)
-    # logslurp_main(cbs_ips[0], args.private_key)
+    logslurp_main(get_logslurp_ip(), args.private_key)
     if args.tdk_config_out is not None:
         with open(args.tdk_config_out, "w") as fout:
             write_config(args.tdk_config_in, fout)

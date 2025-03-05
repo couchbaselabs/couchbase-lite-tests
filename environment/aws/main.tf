@@ -262,6 +262,22 @@ resource "aws_instance" "sync_gateway" {
     }
 }
 
+# And the machine that will run LogSlurp
+resource "aws_instance" "log_slurp" {
+    ami = "ami-05576a079321f21f8"
+    instance_type = "m5.large"
+    key_name = var.key_name
+
+    subnet_id = aws_subnet.main.id
+    vpc_security_group_ids = [aws_security_group.main.id]
+    associate_public_ip_address = true
+
+    tags = {
+        Name = "ls"
+        Type = "logslurp"
+    }
+}
+
 # This is a variable that needs to be specified and it specifies
 # the name (in AWS) of the public key that will be allowed SSH access
 variable "key_name" {
@@ -293,4 +309,8 @@ output "sync_gateway_instance_public_ips" {
 
 output "couchbase_instance_private_ips" {
     value = aws_instance.couchbaseserver[*].private_ip
+}
+
+output "logslurp_instance_public_ip" {
+    value = aws_instance.log_slurp.public_ip
 }

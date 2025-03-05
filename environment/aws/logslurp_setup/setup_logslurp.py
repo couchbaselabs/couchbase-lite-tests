@@ -93,6 +93,7 @@ def check_aws_key_checking() -> None:
 
 
 def main(hostname: str, private_key: Optional[str] = None):
+    header("Setting up logslurp")
     check_aws_key_checking()
     ec2_hostname = get_ec2_hostname(hostname)
     ssh = paramiko.SSHClient()

@@ -6,6 +6,13 @@ The summary of what is created with this area is in this diagram:
 
 The details of how this works in terms of infrastructure are in comments in the [Terraform Config File](./main.tf).  There is a lot to cover in this README so let's go section by section.  These sections are all handled automatically by the start and stop backend scripts, but this will provide some context as to what they are doing.
 
+For more information on the specifics see the following sub README:
+
+- [Couchbase Server Setup](./server_setup/README.md)
+- [Sync Gateway Setup](./sgw_setup/README.md)
+- [Log Slurp Setup](./logslurp_setup/README.md)
+- [Topology Setup](./topology_setup/README.md)
+
 ## Step 0: Prerequisites
 
 One of the core principles of making this backend work is SSH key access.  This requires that as part of deploying containers into EC2, a public key must be set up for SSH access to the various machines.  The process for doing this is [documented by Amazon](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/create-key-pairs.html) but the summary is that as part of this two very important things happen.
@@ -81,6 +88,7 @@ optional arguments:
                         The private key to use for the SSH connection (if not default)
   --tdk-config-out TDK_CONFIG_OUT
                         The path to the write the resulting TDK configuration file (stdout if empty)
+  --topology TOPOLOGY   The path to the topology configuration file
 
 required arguments:
   --public-key-name PUBLIC_KEY_NAME
@@ -96,6 +104,7 @@ The Sync Gateway URL and Couchbase Server version properties should be self expl
 - private key: The path to the private key created in step 0 (you didn't lose it right?)
 - TDK config in: A template TDK compatible config file.  
 - TDK config out: An optional file to write the resulting TDK config file to (otherwise it will go to stdout)
+- Topology is the toplogy JSON file that will describe how to set up AWS instances (see the [topology README](./topology_setup/README.md) for more information.)
 
 :exclamation: It is important to understand how the template system works for the TDK config in.  This system is capable of creating any number of couchbase server and sync gateway instances, and once it does it will begin to replace the following templates with actual IP addresses:  `\{\{cbs-ip\d+\}\}` / `\{\{sgw-ip\d+\}\}`.  So `{{cbs-ip1}}` will receive the IP address of the first created Couchbase Server, and correspondingly `{{sgw-ip1}}` will receive the IP address of the first created Sync Gateway, and so on.  A simple template case would look like this:
 
