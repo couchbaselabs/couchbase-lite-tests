@@ -143,8 +143,6 @@ def main(hostname: str, private_key: Optional[str] = None):
             ]
         )
 
-    os.chdir(SCRIPT_DIR / ".." / "..")
-
     header(f"Building and starting logslurp on {hostname}")
     env = os.environ.copy()
     env["DOCKER_CONTEXT"] = "aws"
@@ -152,6 +150,7 @@ def main(hostname: str, private_key: Optional[str] = None):
         ["docker", "compose", "up", "-d", "--build", "cbl-test-logslurp"],
         check=True,
         env=env,
+        cwd=SCRIPT_DIR / ".." / "..",
     )
 
 
