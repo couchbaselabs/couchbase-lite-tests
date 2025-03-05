@@ -37,7 +37,7 @@ async def install_sync_gateway(sync_gateway_ip, sync_config, version, build):
     print(f"\nSSHing into {sync_gateway_ip} to prepare environment...")
 
     client = await asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None)
-    client.run("command -v sshpass || sudo apt-get update && sudo apt-get install -y sshpass")
+    await client.run("command -v sshpass || sudo apt-get update && sudo apt-get install -y sshpass")
     
     # Download the Sync Gateway package
     print(f"Downloading Sync Gateway package from {sg_package_url}...")
