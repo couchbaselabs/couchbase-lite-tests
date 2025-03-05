@@ -118,7 +118,7 @@ def run_remote_command(ip, command, password="couchbase"):
 
 
 # Function to install Couchbase Server
-def install_couchbase_server(version, build, ips):
+async def install_couchbase_server(version, build, ips):
     for ip in ips:
         try:
             download_url = get_download_url(version, build)
@@ -182,6 +182,6 @@ if __name__ == "__main__":
     
     # Install Couchbase Server
     if options.version:
-        install_couchbase_server(options.version, options.build, ips)
+        await install_couchbase_server(options.version, options.build, ips)
     else:
         install_couchbase_server("7.6.2", "3721", ips)

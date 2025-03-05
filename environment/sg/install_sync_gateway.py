@@ -26,7 +26,7 @@ def get_ips_from_config(config_path, key):
     return [entry["hostname"] for entry in config_data.get(key, [])]
 
 
-def install_sync_gateway(sync_gateway_ip, sync_config, version, build):
+async def install_sync_gateway(sync_gateway_ip, sync_config, version, build):
     """Installs and configures Sync Gateway on the given IP."""
     # Define file paths
     sg_package_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/sync_gateway/{version}/{build}/couchbase-sync-gateway-enterprise_{version}-{build}_x86_64.deb"
@@ -113,7 +113,7 @@ def main():
     sync_gateway_ips = get_ips_from_config(options.cluster_config, "sync-gateways")
 
     for sync_gateway_ip in sync_gateway_ips:
-        install_sync_gateway(sync_gateway_ip, options.sync_config, options.version, options.build)
+        await install_sync_gateway(sync_gateway_ip, options.sync_config, options.version, options.build)
 
 
 if __name__ == "__main__":
