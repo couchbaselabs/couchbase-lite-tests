@@ -1,0 +1,188 @@
+import json
+import subprocess
+from pathlib import Path
+from typing import Dict, Final, List, Optional, cast
+
+from common.output import header
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+
+class ClusterConfig:
+    @property
+    def public_hostnames(self) -> List[str]:
+        return self.__public_hostnames
+
+    @property
+    def internal_hostnames(self) -> List[str]:
+        return self.__internal_hostnames
+
+    def __init__(self, public_hostnames: List[str], internal_hostnames: List[str]):
+        self.__public_hostnames = public_hostnames
+        self.__internal_hostnames = internal_hostnames
+
+
+class ClusterInput:
+    __server_count_key: Final[str] = "server_count"
+
+    @property
+    def server_count(self) -> List[int]:
+        return self.__server_count
+
+    def __init__(self, config: Optional[Dict] = None):
+        if config is not None:
+            if self.__server_count_key not in config:
+                raise ValueError(
+                    f"Missing required key '{self.__server_count_key}' in cluster configuration"
+                )
+
+            self.__server_count: int = int(config[self.__server_count_key])
+
+    def create_config(
+        self, public_hostnames: List[str], internal_hostnames: List[str]
+    ) -> ClusterConfig:
+        return ClusterConfig(public_hostnames, internal_hostnames)
+
+
+class SyncGatewayInput:
+    @property
+    def cluster_index(self) -> int:
+        return self.__cluster_index
+
+    def __init__(self, cluster_index: int):
+        self.__cluster_index = cluster_index
+
+
+class SyncGatewayConfig:
+    @property
+    def hostname(self) -> str:
+        return self.__hostname
+
+    @property
+    def cluster_hostname(self) -> str:
+        return self.__cluster_hostname
+
+    def __init__(self, hostname: str, cluster_hostname: str):
+        self.__hostname = hostname
+        self.__cluster_hostname = cluster_hostname
+
+
+class TopologyConfig:
+    __clusters_key: Final[str] = "clusters"
+    __sync_gateways_key: Final[str] = "sync_gateways"
+    __cluster_key: Final[str] = "cluster"
+
+    @property
+    def total_cbs_count(self) -> int:
+        return sum([cluster.server_count for cluster in self.__cluster_inputs])
+
+    @property
+    def total_sgw_count(self) -> int:
+        return len(self.__sync_gateway_inputs)
+
+    @property
+    def clusters(self) -> List[ClusterConfig]:
+        return self.__clusters
+
+    @property
+    def sync_gateways(self) -> List[SyncGatewayConfig]:
+        return self.__sync_gateways
+
+    def read_from_terraform(self):
+        cbs_command = ["terraform", "output", "-json", "couchbase_instance_public_ips"]
+        result = subprocess.run(cbs_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(
+                f"Command '{' '.join(cbs_command)}' failed with exit status {result.returncode}: {result.stderr}"
+            )
+
+        cbs_ips = cast(List[str], json.loads(result.stdout))
+
+        cbs_command = ["terraform", "output", "-json", "couchbase_instance_private_ips"]
+        result = subprocess.run(cbs_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(
+                f"Command '{' '.join(cbs_command)}' failed with exit status {result.returncode}: {result.stderr}"
+            )
+
+        cbs_internal_ips = cast(List[str], json.loads(result.stdout))
+        self.apply_server_hostnames(cbs_ips, cbs_internal_ips)
+
+        sgw_command = [
+            "terraform",
+            "output",
+            "-json",
+            "sync_gateway_instance_public_ips",
+        ]
+        result = subprocess.run(sgw_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(
+                f"Command '{' '.join(sgw_command)}' failed with exit status {result.returncode}: {result.stderr}"
+            )
+
+        sgw_ips = cast(List[str], json.loads(result.stdout))
+        self.apply_sgw_hostnames(sgw_ips)
+
+    def apply_sgw_hostnames(self, hostnames: List[str]):
+        for sgw_input in self.__sync_gateway_inputs:
+            cluster = self.__clusters[sgw_input.cluster_index]
+            sgw = SyncGatewayConfig(hostnames.pop(0), cluster.internal_hostnames[0])
+            self.__sync_gateways.append(sgw)
+
+    def apply_server_hostnames(
+        self, server_hostnames: List[str], server_internal_hostnames: List[str]
+    ):
+        i = 0
+        for cluster_input in self.__cluster_inputs:
+            hostnames = server_hostnames[i : i + cluster_input.server_count]
+            internal_hostnames = server_internal_hostnames[
+                i : i + cluster_input.server_count
+            ]
+            cluster = ClusterConfig(hostnames, internal_hostnames)
+            self.__clusters.append(cluster)
+            i += cluster_input.server_count
+
+    def dump(self):
+        header("Resulting topology")
+        i = 1
+        for cluster in self.__clusters:
+            print(f"Cluster {i}:")
+            for i in range(0, len(cluster.public_hostnames)):
+                print(
+                    f"\t{cluster.public_hostnames[i]} / {cluster.internal_hostnames[i]}"
+                )
+
+            i += 1
+
+        print()
+        i = 1
+        for sgw in self.__sync_gateways:
+            print(f"Sync Gateway {i}: {sgw.hostname} -> {sgw.cluster_hostname}")
+            i += 1
+
+        print()
+
+    def __init__(self, config_file: Optional[str] = None):
+        if config_file is None:
+            config_file = SCRIPT_DIR / "default_topology.json"
+
+        self.__clusters: List[ClusterConfig] = []
+        self.__sync_gateways: List[SyncGatewayConfig] = []
+        self.__sync_gateway_inputs: List[SyncGatewayInput] = []
+        self.__cluster_inputs: List[ClusterInput] = []
+
+        with open(config_file, "r") as fin:
+            config = cast(Dict, json.load(fin))
+            if self.__clusters_key in config:
+                raw_clusters = cast(List[Dict], config[self.__clusters_key])
+                for raw_cluster in raw_clusters:
+                    self.__cluster_inputs.append(ClusterInput(raw_cluster))
+
+            if self.__sync_gateways_key in config:
+                raw_entry = cast(List[Dict], config[self.__sync_gateways_key])
+                for raw_server in raw_entry:
+                    cluster_index = int(raw_server[self.__cluster_key])
+                    if cluster_index < 0 or cluster_index >= len(self.__cluster_inputs):
+                        raise ValueError(f"Invalid cluster index '{cluster_index}'")
+
+                    self.__sync_gateway_inputs.append(SyncGatewayInput(cluster_index))

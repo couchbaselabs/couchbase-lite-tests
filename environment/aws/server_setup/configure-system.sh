@@ -33,3 +33,5 @@ if [[ $tmp != "1" ]]; then
   echo "Failed to set swappiness to 1"
   exit 1
 fi
+
+rm -f /home/ec2-user/container-configured

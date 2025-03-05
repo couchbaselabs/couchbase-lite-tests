@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 
-import argparse
 import json
 import os
-import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional, cast
+from typing import Dict, Optional, cast
 
 import paramiko
 import requests
 from common.output import header
 from termcolor import colored
+from topology_setup.setup_topology import TopologyConfig
 from tqdm import tqdm
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -65,6 +64,9 @@ def lookup_sgw_build(version: str) -> int:
 
 
 def download_sgw_package(download_info: SgwDownloadInfo) -> None:
+    if download_info.is_release:
+        return
+
     local_path = SCRIPT_DIR / download_info.local_filename
 
     if not os.path.exists(local_path):
@@ -88,34 +90,18 @@ def download_sgw_package(download_info: SgwDownloadInfo) -> None:
         print(f"File {download_info.local_filename} already exists, skipping download.")
 
 
-def setup_config():
-    command = ["terraform", "output", "-json", "couchbase_instance_private_ips"]
-    result = subprocess.run(command, capture_output=True, text=True)
-
-    if result.returncode != 0:
-        raise Exception(
-            f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
-        )
-
-    try:
-        json_output = cast(List[str], json.loads(result.stdout))
-    except json.JSONDecodeError as e:
-        raise Exception(f"Failed to parse JSON output: {e}")
-
-    if len(json_output) == 0:
-        raise Exception("No server IPs found in Terraform output")
-
-    header(f"Writing {json_output[0]} to bootstrap.json as CBS IP")
+def setup_config(server_hostname: str):
+    header(f"Writing {server_hostname} to bootstrap.json as CBS IP")
     with open(SCRIPT_DIR / "config" / "bootstrap.json", "r") as fin:
         with open(SCRIPT_DIR / "bootstrap.json", "w") as fout:
             config_content = cast(Dict, json.load(fin))
-            config_content["bootstrap"]["server"] = f"couchbases://{json_output[0]}"
+            config_content["bootstrap"]["server"] = f"couchbases://{server_hostname}"
             json.dump(config_content, fout, indent=4)
 
     with open(SCRIPT_DIR / "start-sgw.sh.in", "r") as file:
         start_sgw_content = file.read()
 
-    start_sgw_content = start_sgw_content.replace("{{server-ip}}", json_output[0])
+    start_sgw_content = start_sgw_content.replace("{{server-ip}}", server_hostname)
 
     with open(SCRIPT_DIR / "start-sgw.sh", "w", newline="\n") as file:
         file.write(start_sgw_content)
@@ -149,88 +135,89 @@ def remote_exec(
     print()
 
 
-def main(hostnames: List[str], download_url: str, private_key: Optional[str] = None):
-    sgw_info = SgwDownloadInfo(download_url)
-    download_sgw_package(sgw_info)
-    setup_config()
-    for hostname in hostnames:
-        if sgw_info.is_release:
-            print(f"Setting up server {hostname} with SGW {sgw_info.version}")
-        else:
-            print(
-                f"Setting up server {hostname} with SGW {sgw_info.version}-{sgw_info.build_no}"
-            )
-
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        pkey: paramiko.Ed25519Key = (
-            paramiko.Ed25519Key.from_private_key_file(private_key)
-            if private_key
-            else None
+def setup_server(hostname: str, pkey: paramiko.Ed25519Key, sgw_info: SgwDownloadInfo):
+    if sgw_info.is_release:
+        print(f"Setting up server {hostname} with SGW {sgw_info.version}")
+    else:
+        print(
+            f"Setting up server {hostname} with SGW {sgw_info.version}-{sgw_info.build_no}"
         )
-        ssh.connect(hostname, username="ec2-user", pkey=pkey)
 
-        global current_ssh
-        current_ssh = hostname
-        sftp = ssh.open_sftp()
-        sftp_progress_bar(
-            sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(hostname, username="ec2-user", pkey=pkey)
+
+    global current_ssh
+    current_ssh = hostname
+    sftp = ssh.open_sftp()
+    sftp_progress_bar(
+        sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
+    )
+    remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
+
+    if sgw_info.is_release:
+        remote_exec(
+            ssh,
+            f"wget {sgw_info.url} -nc -O /tmp/{sgw_info.local_filename}",
+            "Downloading Sync Gateway",
+            fail_on_error=False,
         )
-        remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
+    else:
         sftp_progress_bar(
             sftp,
             SCRIPT_DIR / sgw_info.local_filename,
             f"/tmp/{sgw_info.local_filename}",
         )
-        sftp_progress_bar(
-            sftp, SCRIPT_DIR / "start-sgw.sh", "/home/ec2-user/start-sgw.sh"
-        )
-        sftp_progress_bar(
-            sftp, SCRIPT_DIR / "bootstrap.json", "/home/ec2-user/config/bootstrap.json"
-        )
-        sftp_progress_bar(
-            sftp, SCRIPT_DIR / "cert" / "sg_cert.pem", "/home/ec2-user/cert/sg_cert.pem"
-        )
-        sftp_progress_bar(
-            sftp, SCRIPT_DIR / "cert" / "sg_key.pem", "/home/ec2-user/cert/sg_key.pem"
-        )
-        sftp.close()
 
-        remote_exec(
-            ssh,
-            "sudo rpm -e couchbase-sync-gateway",
-            "Uninstalling Couchbase SGW",
-            fail_on_error=False,
-        )
-
-        remote_exec(
-            ssh,
-            f"sudo rpm -i /tmp/{sgw_info.local_filename}",
-            "Installing Sync Gateway",
-        )
-        remote_exec(ssh, "bash /home/ec2-user/start-sgw.sh", "Starting SGW")
-
-        ssh.close()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run a script over an SSH connection.")
-    parser.add_argument(
-        "hostnames", nargs="+", help="The hostname or IP address of the server."
+    sftp_progress_bar(sftp, SCRIPT_DIR / "start-sgw.sh", "/home/ec2-user/start-sgw.sh")
+    sftp_progress_bar(
+        sftp, SCRIPT_DIR / "bootstrap.json", "/home/ec2-user/config/bootstrap.json"
     )
-    parser.add_argument(
-        "--version", default="4.0.0", help="The version of Sync Gateway to install."
+    sftp_progress_bar(
+        sftp, SCRIPT_DIR / "cert" / "sg_cert.pem", "/home/ec2-user/cert/sg_cert.pem"
     )
-    parser.add_argument(
-        "--build",
-        default=-1,
-        type=int,
-        help="The build number of Sync Gateway to install (latest good by default)",
+    sftp_progress_bar(
+        sftp, SCRIPT_DIR / "cert" / "sg_key.pem", "/home/ec2-user/cert/sg_key.pem"
     )
-    parser.add_argument(
-        "--private-key",
-        help="The private key to use for the SSH connection (if not default)",
-    )
-    args = parser.parse_args()
+    sftp.close()
 
-    main(args.hostnames, args.version, args.build, args.private_key)
+    remote_exec(
+        ssh,
+        "sudo rpm -e couchbase-sync-gateway",
+        "Uninstalling Couchbase SGW",
+        fail_on_error=False,
+    )
+
+    remote_exec(
+        ssh,
+        f"sudo rpm -i /tmp/{sgw_info.local_filename}",
+        "Installing Sync Gateway",
+    )
+    remote_exec(ssh, "bash /home/ec2-user/start-sgw.sh", "Starting SGW")
+
+    ssh.close()
+
+
+def setup_topology(
+    pkey: paramiko.Ed25519Key, sgw_info: SgwDownloadInfo, topology: TopologyConfig
+):
+    if len(topology.sync_gateways) == 0:
+        return
+
+    i = 0
+    for sgw in topology.sync_gateways:
+        setup_config(sgw.cluster_hostname)
+        setup_server(sgw.hostname, pkey, sgw_info)
+        i += 1
+
+
+def main(
+    download_url: str, topology: TopologyConfig, private_key: Optional[str] = None
+):
+    sgw_info = SgwDownloadInfo(download_url)
+    download_sgw_package(sgw_info)
+    pkey: paramiko.Ed25519Key = (
+        paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
+    )
+
+    setup_topology(pkey, sgw_info, topology)

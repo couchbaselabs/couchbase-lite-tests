@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-import argparse
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import paramiko
 from common.output import header
 from termcolor import colored
+from topology_setup.setup_topology import TopologyConfig
 from tqdm import tqdm
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -42,73 +42,79 @@ def remote_exec(
     print()
 
 
-def main(hostnames: List[str], version: str, private_key: Optional[str] = None):
+def setup_node(
+    hostname: str,
+    pkey: paramiko.Ed25519Key,
+    version: str,
+    cluster: Optional[str] = None,
+):
     couchbase_filename = f"couchbase-server-enterprise-{version}-linux.x86_64.rpm"
     couchbase_url = (
         f"http://packages.couchbase.com/releases/{version}/{couchbase_filename}"
     )
-    for hostname in hostnames:
-        header(f"Setting up server {hostname} with version {version}")
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        pkey: paramiko.Ed25519Key = (
-            paramiko.Ed25519Key.from_private_key_file(private_key)
-            if private_key
-            else None
-        )
-        ssh.connect(hostname, username="ec2-user", pkey=pkey)
 
-        sftp = ssh.open_sftp()
-        sftp_progress_bar(
-            sftp, SCRIPT_DIR / "configure-node.sh", "/tmp/configure-node.sh"
-        )
-        sftp_progress_bar(
-            sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
-        )
-        sftp_progress_bar(
-            sftp, SCRIPT_DIR / "disable-thp.service", "/tmp/disable-thp.service"
-        )
-        sftp.close()
+    header(f"Setting up server {hostname} with version {version}")
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        global current_ssh
-        current_ssh = hostname
-        remote_exec(ssh, "sudo bash /tmp/configure-system.sh", "Setting up machine")
-        remote_exec(
-            ssh,
-            f"wget -O /tmp/{couchbase_filename} {couchbase_url} 2>&1",
-            f"Downloading Couchbase Server {version}",
-        )
-        remote_exec(
-            ssh,
-            "sudo rpm -e couchbase-server",
-            "Uninstalling Couchbase Server",
-            fail_on_error=False,
-        )
-        remote_exec(
-            ssh,
-            f"sudo rpm -i /tmp/{couchbase_filename}",
-            f"Installing Couchbase Server {version}",
-        )
-        remote_exec(
-            ssh, "sudo systemctl start couchbase-server", "Starting Couchbase Server"
-        )
-        remote_exec(ssh, "bash /tmp/configure-node.sh", "Setting up node")
+    ssh.connect(hostname, username="ec2-user", pkey=pkey)
 
-        ssh.close()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run a script over an SSH connection.")
-    parser.add_argument(
-        "hostnames", nargs="+", help="The hostname or IP address of the server."
+    sftp = ssh.open_sftp()
+    sftp_progress_bar(sftp, SCRIPT_DIR / "configure-node.sh", "/tmp/configure-node.sh")
+    sftp_progress_bar(
+        sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
     )
-    parser.add_argument(
-        "--version", default="7.6.4", help="The version of Couchbase Server to install."
+    sftp_progress_bar(
+        sftp, SCRIPT_DIR / "disable-thp.service", "/tmp/disable-thp.service"
     )
-    parser.add_argument(
-        "--private-key",
-        help="The private key to use for the SSH connection (if not default)",
-    )
-    args = parser.parse_args()
+    sftp.close()
 
-    main(args.hostnames, args.version, args.private_key)
+    global current_ssh
+    current_ssh = hostname
+
+    remote_exec(ssh, "sudo bash /tmp/configure-system.sh", "Setting up machine")
+    remote_exec(
+        ssh,
+        f"wget -nc -O /tmp/{couchbase_filename} {couchbase_url} 2>&1",
+        f"Downloading Couchbase Server {version}",
+        fail_on_error=False,
+    )
+    remote_exec(
+        ssh,
+        "sudo rpm -e couchbase-server",
+        "Uninstalling Couchbase Server",
+        fail_on_error=False,
+    )
+    remote_exec(
+        ssh,
+        f"sudo rpm -i /tmp/{couchbase_filename}",
+        f"Installing Couchbase Server {version}",
+    )
+    remote_exec(
+        ssh, "sudo systemctl start couchbase-server", "Starting Couchbase Server"
+    )
+
+    config_command = "bash /tmp/configure-node.sh"
+    if cluster is not None:
+        config_command += f" {cluster}"
+    remote_exec(ssh, config_command, "Setting up node")
+
+    ssh.close()
+
+
+def setup_topology(pkey: paramiko.Ed25519Key, version: str, topology: TopologyConfig):
+    if len(topology.clusters) == 0:
+        return
+
+    for cluster_config in topology.clusters:
+        setup_node(cluster_config.public_hostnames[0], pkey, version)
+        for server in cluster_config.public_hostnames[1:]:
+            setup_node(server, pkey, version, cluster_config.public_hostnames[0])
+
+
+def main(version: str, topology: TopologyConfig, private_key: Optional[str] = None):
+    pkey: paramiko.Ed25519Key = (
+        paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
+    )
+
+    setup_topology(pkey, version, topology)

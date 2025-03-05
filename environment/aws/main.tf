@@ -220,6 +220,7 @@ resource "aws_security_group" "main" {
 
 # Finally we get to the machine that will run Couchbase Server
 resource "aws_instance" "couchbaseserver" {
+    count = var.server_count
     ami = "ami-05576a079321f21f8"
     instance_type = "m5.xlarge"
     key_name = var.key_name
@@ -241,7 +242,8 @@ resource "aws_instance" "couchbaseserver" {
 
 # And the machine that will run Sync Gateway
 resource "aws_instance" "sync_gateway" {
-  ami = "ami-05576a079321f21f8"
+    count = var.sgw_count
+    ami = "ami-05576a079321f21f8"
     instance_type = "m5.xlarge"
     key_name = var.key_name
 
@@ -265,6 +267,18 @@ resource "aws_instance" "sync_gateway" {
 variable "key_name" {
     description = "The name of the EC2 key pair to use"
     type        = string
+}
+
+variable "server_count" {
+    description = "The number of Couchbase Server instances to create"
+    type        = number
+    default     = 1
+}
+
+variable "sgw_count" {
+    description = "The number of Sync Gateway instances to create"
+    type        = number
+    default     = 1
 }
 
 # These outputs are convenient for scripts to use for writing various IPs

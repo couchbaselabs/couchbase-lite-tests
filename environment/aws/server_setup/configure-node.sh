@@ -1,23 +1,19 @@
 #!/bin/sh
 
-# Log all subsequent commands to logfile. FD 3 is now the console
-# for things we want to show up in "docker logs".
-LOGFILE=/home/ec2-user/logs/container-startup.log
 mkdir -p /home/ec2-user/logs
-exec 3>&1 1>>${LOGFILE} 2>&1
 
 CONFIG_DONE_FILE=/home/ec2-user/container-configured
 config_done() {
   touch ${CONFIG_DONE_FILE}
   echo "Couchbase Admin UI: http://localhost:8091" \
-     "\nLogin credentials: Administrator / password" | tee /dev/fd/3
+     "\nLogin credentials: Administrator / password"
 }
 
 if [ -e ${CONFIG_DONE_FILE} ]; then
-  echo "Container previously configured." | tee /dev/fd/3
+  echo "Container previously configured."
   config_done
 else
-  echo "Configuring Couchbase Server.  Please wait (~60 sec)..." | tee /dev/fd/3
+  echo "Configuring Couchbase Server.  Please wait (~60 sec)..."
 fi
 
 export PATH=/opt/couchbase/bin:${PATH}
@@ -39,16 +35,12 @@ wait_for_uri() {
 }
 
 panic() {
-  cat <<EOF 1>&3
+  cat <<EOF
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-Error during initial configuration - aborting container
-Here's the log of the configuration attempt:
+Error during initial configuration - aborting
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 EOF
-  cat $LOGFILE 1>&3
-  echo 1>&3
-  kill -HUP 1
   exit
 }
 
@@ -71,12 +63,23 @@ curl_check() {
 }
 
 wait_for_uri 200 http://localhost:8091/ui/index.html
-echo "Couchbase Server up!" | tee /dev/fd/3
+echo "Couchbase Server up!"
 
-echo "Set up the cluster"
-couchbase_cli_check cluster-init -c localhost --cluster-name couchbase-lite-test --cluster-username Administrator \
-  --cluster-password password --services data,index,query --cluster-ramsize 8192 --cluster-index-ramsize 2048 --index-storage-setting default
-echo
+if [[ ! -z $1 ]]; then
+  my_ip=$(ifconfig | grep "inet 10" | awk '{print $2}')
+  echo "Adding node to cluster"
+  couchbase_cli_check server-add -c $1 -u Administrator -p password --server-add  $my_ip \
+    --server-add-username Administrator --server-add-password password --services data,index,query
+  echo
+  echo "Rebalancing cluster"
+  couchbase_cli_check rebalance -c $1 -u Administrator -p password 
+  echo
+else 
+  echo "Set up the cluster"
+  couchbase_cli_check cluster-init -c localhost --cluster-name couchbase-lite-test --cluster-username Administrator \
+    --cluster-password password --services data,index,query --cluster-ramsize 8192 --cluster-index-ramsize 2048 --index-storage-setting default
+  echo
+fi
 
 echo "Verify credentials"
 curl_check http://localhost:8091/settings/web -d port=8091 -d username=Administrator -d password=password -u Administrator:password
@@ -90,6 +93,6 @@ couchbase_cli_check user-manage --set \
   --roles 'sync_gateway_dev_ops,sync_gateway_configurator[*],mobile_sync_gateway[*],bucket_full_access[*],bucket_admin[*]'
 echo
 
-echo "Couchbase Server configured" | tee /dev/fd/3
+echo "Couchbase Server configured"
 
 config_done

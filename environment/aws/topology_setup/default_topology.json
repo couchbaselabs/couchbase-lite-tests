@@ -1,0 +1,13 @@
+{
+    "$schema": "./topology_schema.json",
+    "clusters": [
+        {
+            "server_count": 1
+        }
+    ],
+    "sync_gateways": [
+        {
+            "cluster": 0
+        }
+    ]
+}
