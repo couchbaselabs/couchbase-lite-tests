@@ -5,6 +5,7 @@ import subprocess
 import sys
 import time
 import asyncssh
+import asyncio
 
 
 # Function to run SSH commands on remote machine with password prompt handling
@@ -96,7 +97,7 @@ async def install_sync_gateway(sync_gateway_ip, sync_config, version, build):
         sys.exit(1)
 
 
-def main():
+async def main():
     parser = optparse.OptionParser()
     parser.add_option("-c", "--cluster-config", dest="cluster_config", help="Path to the cluster config JSON file", metavar="CLUSTER_CONFIG", default=None)
     parser.add_option("-s", "--sync-config", dest="sync_config", help="Path to the Sync Gateway config JSON file", metavar="SYNC_CONFIG", default=None)
@@ -117,4 +118,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

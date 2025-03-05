@@ -6,6 +6,7 @@ import time
 from bs4 import BeautifulSoup
 from optparse import OptionParser
 import asyncssh
+import asyncio
 
 LATESTBUILDS_BASE_URL = "http://latestbuilds.service.couchbase.com/builds"
 
@@ -174,7 +175,7 @@ def load_ips_from_config(config_path):
     return [server["hostname"] for server in config.get("couchbase-servers", [])]
 
 
-if __name__ == "__main__":
+async def main():
     options = parse_args()
 
     # Load IPs from config file
@@ -184,4 +185,7 @@ if __name__ == "__main__":
     if options.version:
         await install_couchbase_server(options.version, options.build, ips)
     else:
-        install_couchbase_server("7.6.2", "3721", ips)
+        await install_couchbase_server("7.6.2", "3721", ips)
+
+if __name__ == "__main__":
+    asyncio.run(main())
