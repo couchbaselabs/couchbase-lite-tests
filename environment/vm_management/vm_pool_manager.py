@@ -89,7 +89,7 @@ def reserve_nodes(opts):
             return pool_list
 
     # Not able to allocate all the requested nodes, hence release the node back to the pool
-    release_node(pool_list, opts.job_name)
+    release_nodes(pool_list, opts.job_name)
     raise Exception("Not enough free node/s available to satisfy the request")
 
 
