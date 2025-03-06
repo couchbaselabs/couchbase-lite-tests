@@ -105,6 +105,19 @@ def get_download_url(version=None, build=None):
             print(f"Error fetching the latest build page: {e}")
             raise
 
+async def ensure_sshpass(ip):
+    """Ensure sshpass is installed on the remote machine using asyncssh."""
+    print(f"Checking if sshpass is installed on {ip}...")
+    
+    async with asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None) as client:
+        result = await client.run("command -v sshpass || (sudo apt-get update && sudo apt-get install -y sshpass)")
+        if result.exit_status == 0:
+            print(f"sshpass is now installed on {ip}.")
+        else:
+            print(f"Failed to install sshpass on {ip}: {result.stderr}")
+            return False
+    return True
+
 
 # Function to run SSH commands on remote machine with password prompt handling
 def run_remote_command(ip, command, password="couchbase"):
@@ -133,10 +146,8 @@ async def install_couchbase_server(version, build, ips):
             check_service_command = "curl -s http://localhost:8091"
 
             # Run commands on remote server
-            print(f"Checking if sshpass is installed on {ip}...")
-            client = await asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None)
-            await client.run("if ! command -v sshpass; then sudo apt-get update && sudo apt-get install -y sshpass; fi")
-            run_remote_command(ip, download_command)
+            if await ensure_sshpass(ip):
+                run_remote_command(ip, download_command)
             run_remote_command(ip, install_command)
             
             # Check if Couchbase is running
