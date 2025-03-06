@@ -108,14 +108,21 @@ def get_download_url(version=None, build=None):
 async def ensure_sshpass(ip):
     """Ensure sshpass is installed on the remote machine using asyncssh."""
     print(f"Checking if sshpass is installed on {ip}...")
-    
+
     async with asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None) as client:
-        result = await client.run("command -v sshpass || (sudo apt-get update && sudo apt-get install -y sshpass)")
+        result = await client.run(
+            "if ! command -v sshpass; then "
+            "sudo apt-get update && sudo apt-get install -y sshpass && "
+            "hash -r && exec bash; "
+            "fi"
+        )
+        
         if result.exit_status == 0:
             print(f"sshpass is now installed on {ip}.")
         else:
             print(f"Failed to install sshpass on {ip}: {result.stderr}")
             return False
+
     return True
 
 
