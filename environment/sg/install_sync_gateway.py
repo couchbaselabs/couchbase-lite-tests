@@ -11,14 +11,21 @@ import asyncio
 async def ensure_sshpass(ip):
     """Ensure sshpass is installed on the remote machine using asyncssh."""
     print(f"Checking if sshpass is installed on {ip}...")
-    
+
     async with asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None) as client:
-        result = await client.run("command -v sshpass || (sudo apt-get update && sudo apt-get install -y sshpass)")
+        result = await client.run(
+            "if ! command -v sshpass; then "
+            "sudo apt-get update && sudo apt-get install -y sshpass && "
+            "hash -r && exec bash; "
+            "fi"
+        )
+        
         if result.exit_status == 0:
             print(f"sshpass is now installed on {ip}.")
         else:
             print(f"Failed to install sshpass on {ip}: {result.stderr}")
             return False
+
     return True
 
 
@@ -51,7 +58,7 @@ async def install_sync_gateway(sync_gateway_ip, sync_config, version, build):
     print(f"\nSSHing into {sync_gateway_ip} to prepare environment...")
 
     await ensure_sshpass(ip)
-    
+
     # Download the Sync Gateway package
     print(f"Downloading Sync Gateway package from {sg_package_url}...")
     run_remote_command(sync_gateway_ip, f"wget {sg_package_url} -O {sg_package_file}")
