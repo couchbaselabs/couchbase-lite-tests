@@ -54,6 +54,10 @@ namespace ts {
 
         int handlePOSTStopReplicator(Request &request, Session *session);
 
+        int handlePOSTStartListener(Request &request, Session *session);
+
+        int handlePOSTStopListener(Request &request, Session *session);
+
         int handlePOSTGetReplicatorStatus(Request &request, Session *session);
 
         int handlePOSTSnapshotDocuments(Request &request, Session *session);
