@@ -32,7 +32,7 @@ async def ensure_sshpass(ip):
 # Function to run SSH commands on remote machine with password prompt handling
 def run_remote_command(ip, command, password="couchbase"):
     """SSH into a remote machine and run the given command."""
-    ssh_command = f"sshpass -p {password} ssh root@{ip} '{command}'"
+    ssh_command = f"/usr/bin/sshpass -p {password} ssh root@{ip} '{command}'"
     print(f"Running command on {ip}: {command}")
     result = subprocess.run(ssh_command, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
