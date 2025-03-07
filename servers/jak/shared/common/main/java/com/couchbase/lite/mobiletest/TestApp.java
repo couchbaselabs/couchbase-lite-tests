@@ -21,6 +21,7 @@ import androidx.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.http.WebSocket.Listener;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
@@ -41,6 +42,7 @@ import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
+import com.couchbase.lite.mobiletest.services.ListenerService;
 import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.util.StringUtils;
@@ -88,6 +90,7 @@ public abstract class TestApp {
 
     private final AtomicReference<DatabaseService> dbSvc = new AtomicReference<>();
     private final AtomicReference<ReplicatorService> replSvc = new AtomicReference<>();
+    private final AtomicReference<ListenerService> listenerSvc = new AtomicReference<>();
 
     @Nullable
     private TestContext session;
@@ -179,6 +182,16 @@ public abstract class TestApp {
 
     @Nullable
     public final ReplicatorService clearReplSvc() { return replSvc.getAndSet(null); }
+
+    @NonNull
+    public final ListenerService getListenerService() {
+        final ListenerService mgr = listenerSvc.get();
+        if (mgr == null) { listenerSvc.compareAndSet(null, new ListenerService()); }
+        return listenerSvc.get();
+    }
+
+    @Nullable
+    public final ListenerService clearListenerService() { return listenerSvc.getAndSet(null); }
 
     @NonNull
     protected final Date getExpirationTime() {

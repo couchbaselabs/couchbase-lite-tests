@@ -44,7 +44,10 @@ info:
       ESCAPE   ::= '\' (! EOP )
 
     Changes
-    1.0.0(09/27/2024)
+    1.1.0 (03/05/2025)
+    * Add /startListener and /stopListener endpoint
+
+    1.0.0 (09/27/2024)
     * Replace setupLogging endpoint with expanded newSession endpoint
     * Add /log endpoint
 
@@ -118,7 +121,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 1.0.0
+  version: 1.1.0
 tags:
   - name: API
     description: The API endpoints of the test server
@@ -738,6 +741,82 @@ paths:
           $ref: '#/components/responses/Error'
         '500':
           $ref: '#/components/responses/Error'
+  /startListener:
+    post:
+      tags:
+        - API
+      summary: Starts a P2P listener
+      description: |-
+        Starts a P2P listener so that the device can act as the passive side of a P2P replication.
+      operationId: startListener
+      requestBody:
+        description: |-
+          The request object containing the collections to share and, optionally, the port to listen on.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['database', 'collections']
+              properties:
+                database: 
+                  type: string
+                  example: 'db1'
+                collections:
+                  type: array
+                  items:
+                    type: string
+                    example: 'store.cloths'
+                port:
+                  type: integer
+                  example: 12345
+        required: true
+      responses:
+        '200':
+          description: |-
+            Success
+
+            The response body is an object containing the ID of the listener, and the port
+            it is listening on.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartListenerResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /stopListener:
+    post:
+      tags:
+        - API
+      summary: Stops a P2P listener
+      description: |-
+        Stops a previously started P2P listener.
+      operationId: stopListener
+      requestBody:
+        description: |-
+          The request object containing the listener to stop.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['id']
+              properties:
+                id: 
+                  type: string
+                  format: uuid
+                  example: '123e4567-e89b-12d3-a456-426614174000'
+        required: true
+      responses:
+        '200':
+          description: |-
+            Success
+        '400':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
 components:
   schemas:
     Collections:
@@ -1161,6 +1240,19 @@ components:
         results:
           description: 'The JSON serialized results of the query run'
           type: object
+    StartListenerResponse:
+      type: object
+      required: ['id', 'port']
+      properties:
+        id:
+          description: 'The ID of the listener'
+          type: string
+          format: uuid
+          example: '123e4567-e89b-12d3-a456-426614174000'
+        port:
+          description: 'The port the listener is listening on'
+          type: integer
+          example: 12345
   responses:
     Error:
       description: |-

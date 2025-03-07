@@ -92,6 +92,22 @@ public final class TestContext implements AutoCloseable {
     @Nullable
     public Database removeDb(@NonNull String name) { return (openDbs == null) ? null : openDbs.remove(name); }
 
+    public void addListener(@NonNull String id, @NonNull URLEndpointListener listener) {
+        // TODO: implement
+        throw new UnsupportedOperationException("Not implemented");
+    }
+
+    public void removeListener(@NonNull String id) {
+        // TODO: implement
+        throw new UnsupportedOperationException("Not implemented");
+    }
+
+    @Nullable
+    public URLEndpointListener getListener(@NonNull String id) {
+        // TODO: implement
+        throw new UnsupportedOperationException("Not implemented");
+    }
+
     @Nullable
     public Collection getOpenCollection(@NonNull String collFqn) {
         return (openCollections == null) ? null : openCollections.get(collFqn);
