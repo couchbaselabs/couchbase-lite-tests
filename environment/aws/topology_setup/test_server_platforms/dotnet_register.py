@@ -21,7 +21,6 @@ else:
     DOTNET_PATH = Path.home() / ".dotnet" / "dotnet"
 
 class WinUIBridge(PlatformBridge):
-    __install_command : Final[str] = "Import-Module Microsoft.PowerShell.Security; "
     def __init__(self, app_name: str, app_id: str, install_path: str):
         self.__app_name = app_name
         self.__app_id = app_id
@@ -101,7 +100,7 @@ class DotnetTestServer(TestServer):
         header(f"Building .NET test server for {self.platform}")
         args = [DOTNET_PATH, verb, csproj_path, "-f", self.dotnet_framework, "-c", "Release", "-v", "n"]
         if self.extra_args:
-            args += self.extra_args
+            args.append(self.extra_args)
 
         subprocess.run(args, check=True, capture_output=False)
 
@@ -120,15 +119,11 @@ class DotnetTestServer_iOS(DotnetTestServer):
         return False
     
     @property
-    def app_path(self) -> str:
-        return str(DOTNET_TEST_SERVER_DIR / "testserver" / "bin" / "Release" / "net8.0-ios" / "ios-arm64" / "testserver.app")
-    
-    @property
-    def app_id(self) -> str:
-        return "com.couchbase.testserver"
+    def extra_args(self) -> Optional[str]:
+        return "-p:RuntimeIdentifier=ios-arm64"
     
     def create_bridge(self) -> PlatformBridge:
-        return iOSBridge()
+        return iOSBridge(str(DOTNET_TEST_SERVER_DIR / "testserver" / "bin" / "Release" / "net8.0-ios" / "ios-arm64" / "testserver.app"), False)
     
 @TestServer.register("dotnet_android")
 class DotnetTestServer_Android(DotnetTestServer):
@@ -178,19 +173,11 @@ class DotnetTestServer_macOS(DotnetTestServer):
     
     @property
     def dotnet_framework(self) -> str:
-        return "net8.0-macos"
+        return "net8.0-maccatalyst"
     
     @property
     def publish(self) -> bool:
         return False
     
-    @property
-    def app_path(self) -> str:
-        return str(DOTNET_TEST_SERVER_DIR / "testserver" / "bin" / "Release" / "net8.0-macos" / "testserver.app")
-    
-    @property
-    def app_id(self) -> str:
-        return "com.couchbase.testserver"
-    
     def create_bridge(self) -> PlatformBridge:
-        return macOSBridge()
+        return macOSBridge(str(DOTNET_TEST_SERVER_DIR / "testserver" / "bin" / "Release" / "net8.0-maccatalyst" / "maccatalyst-x64" / "testserver.app"))

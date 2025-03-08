@@ -6,6 +6,7 @@ import subprocess
 
 class AndroidBridge(PlatformBridge):
     __potential_adb_locations: List[str] = [
+        "/opt/homebrew/share/android-commandlinetools/platform-tools/",
         "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools"
     ]
     
