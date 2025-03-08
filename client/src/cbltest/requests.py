@@ -35,6 +35,8 @@ class TestServerRequestType(Enum):
     GET_DOCUMENT = "PostGetDocumentRequest"
     NEW_SESSION = "PostNewSessionRequest"
     LOG = "PostLogRequest"
+    START_LISTENER = "PostStartListenerRequest"
+    STOP_LISTENER = "PostStopListenerRequest"
 
     def __str__(self) -> str:
         return self.value
