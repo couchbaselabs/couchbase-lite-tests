@@ -51,7 +51,7 @@ def fix_hostname(ip):
     result = run_remote_command(ip, hostname_cmd)
 
     if result:
-        hostname = result.strip()
+        hostname = result
         add_host_cmd = f"echo '127.0.1.1 {hostname}' >> /etc/hosts"
         run_remote_command(ip, add_host_cmd)
 
