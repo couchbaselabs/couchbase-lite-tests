@@ -5,8 +5,7 @@ import sys
 import time
 from bs4 import BeautifulSoup
 from optparse import OptionParser
-import asyncssh
-import asyncio
+import paramiko
 
 LATESTBUILDS_BASE_URL = "http://latestbuilds.service.couchbase.com/builds"
 
@@ -105,72 +104,151 @@ def get_download_url(version=None, build=None):
             print(f"Error fetching the latest build page: {e}")
             raise
 
-async def ensure_sshpass(ip):
-    """Ensure sshpass is installed on the remote machine using asyncssh."""
-    print(f"Checking if sshpass is installed on {ip}...")
+def fix_hostname(ip):
+    """Ensure the remote machine has the correct hostname entry in /etc/hosts."""
+    hostname_cmd = "hostname"
+    result = run_remote_command(ip, hostname_cmd)
 
-    async with asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None) as client:
-        result = await client.run(
-            "if ! command -v sshpass; then "
-            "sudo apt-get update && sudo apt-get install -y sshpass && "
-            "hash -r && exec bash; "
-            "fi"
-        )
-        
-        if result.exit_status == 0:
-            print(f"sshpass is now installed on {ip}.")
-        else:
-            print(f"Failed to install sshpass on {ip}: {result.stderr}")
-            return False
+    if result:
+        hostname = result.strip()
+        add_host_cmd = f"echo '127.0.1.1 {hostname}' >> /etc/hosts"
+        run_remote_command(ip, add_host_cmd)
 
-    return True
+# async def ensure_sshpass(ip):
+#     """Ensure sshpass is installed on the remote machine using asyncssh."""
+#     print(f"Checking if sshpass is installed on {ip}...")
 
+#     async with asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None) as client:
+#         result = await client.run(
+#             "if ! command -v sshpass; then "
+#             "sudo -n apt-get update && "
+#             "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -y sshpass; "
+#             "fi",
+#             check=True
+#         )
 
-# Function to run SSH commands on remote machine with password prompt handling
+#         if result.exit_status == 0:
+#             print(f"✅ sshpass is now installed on {ip}.")
+#             return True
+#         else:
+#             print(f"❌ Failed to install sshpass on {ip}: {result.stderr}")
+#             return False
+
+# def find_sshpass(ip, password="couchbase"):
+#     """Find sshpass dynamically on the remote machine."""
+#     ssh_command = f"/usr/bin/sshpass -p {password} ssh -o StrictHostKeyChecking=no root@{ip} 'export PATH=$PATH:/usr/local/bin:/usr/bin && which sshpass'"
+
+#     remote_check = subprocess.run(ssh_command, shell=True, capture_output=True, text=True)
+#     if remote_check.returncode == 0 and remote_check.stdout.strip():
+#         remote_sshpass = remote_check.stdout.strip()
+#         print(f"✅ Found sshpass on {ip} at: {remote_sshpass}")
+#         return remote_sshpass
+#     else:
+#         print(f"❌ sshpass not found on {ip}. STDERR:\n{remote_check.stderr}")
+#         sys.exit(1)
+
+# def find_sshpass(ip):
+#     """Finds the path of sshpass dynamically."""
+#     result = subprocess.run(f"sshpass -p couchbase ssh root@{ip} command -v sshpass", shell=True, capture_output=True, text=True)
+#     if result.returncode == 0:
+#         return result.stdout.strip()  # Return the sshpass path
+#     return None
+
 def run_remote_command(ip, command, password="couchbase"):
-    # Use 'sshpass' to provide password for SSH commands
-    ssh_command = f"/usr/bin/sshpass -p {password} ssh root@{ip} '{command}'"
+    """
+    Executes a command on a remote machine using paramiko.
+    """
     print(f"Running command on {ip}: {command}")
-    result = subprocess.run(ssh_command, shell=True, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"Error executing command on {ip}: {result.stderr}")
+
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(ip, username="root", password=password, timeout=10)
+
+        stdin, stdout, stderr = client.exec_command(command)
+        output = stdout.read().decode().strip()
+        error = stderr.read().decode().strip()
+
+        client.close()
+
+        if error:
+            if "Created symlink" in error:
+                print(f"Warning: {error}")
+            else:
+                print(f"Error executing command on {ip}: {error}")
+                sys.exit(1)
+        
+        # print(output)
+        return output
+
+    except Exception as e:
+        print(f"Error executing command on {ip}: {e}")
         sys.exit(1)
-    print(result.stdout)
+
+# # Function to run SSH commands on remote machine with password prompt handling
+# def run_remote_command(ip, command, password="couchbase"):
+#     # Use 'sshpass' to provide password for SSH commands
+#     sshpass_path = find_sshpass() or "/usr/bin/sshpass"
+#     ssh_command = f"{sshpass_path} -p {password} ssh root@{ip} '{command}'"
+#     print(f"Running command on {ip}: {command}")
+#     result = subprocess.run(ssh_command, shell=True, capture_output=True, text=True)
+#     if result.returncode != 0:
+#         print(f"Error executing command on {ip}: {result.stderr}")
+#         sys.exit(1)
+#     print(result.stdout)
 
 
 # Function to install Couchbase Server
-async def install_couchbase_server(version, build, ips):
+def install_couchbase_server(version, build, ips):
     for ip in ips:
         try:
+            fix_hostname(ip)
             download_url = get_download_url(version, build)
             print(f"Download URL: {download_url}")
             
             # Commands to run on remote machine
-            download_command = f"wget {download_url} -O /tmp/couchbase-server.deb"
+            download_command = f"wget -q {download_url} -O /tmp/couchbase-server.deb  && echo 'Done'"
+            fix_dependencies = "sudo apt-get install -f"
             install_command = "sudo dpkg -i /tmp/couchbase-server.deb"
             check_process_command = "ps aux | grep couchbase"
             start_service_command = "sudo systemctl start couchbase-server"
             check_service_command = "curl -s http://localhost:8091"
 
             # Run commands on remote server
-            if await ensure_sshpass(ip):
-                run_remote_command(ip, download_command)
+            # if await ensure_sshpass(ip):
+            run_remote_command(ip, download_command)
+            run_remote_command(ip, fix_dependencies)
             run_remote_command(ip, install_command)
-            
+
             # Check if Couchbase is running
-            result = subprocess.run(f"sshpass -p couchbase ssh root@{ip} '{check_process_command}'", shell=True, capture_output=True, text=True)
-            if "couchbase" not in result.stdout:
+            result = run_remote_command(ip, check_process_command)
+            if result is None or "couchbase" not in result:
                 print(f"Couchbase not found as a process on {ip}, starting the service...")
                 run_remote_command(ip, start_service_command)
 
             time.sleep(15)
-            
+
             # Check if Couchbase UI is accessible
-            result = subprocess.run(f"sshpass -p couchbase ssh root@{ip} '{check_service_command}'", shell=True, capture_output=True, text=True)
-            if result.returncode == 0:
+            result = run_remote_command(ip, check_service_command)
+            if result:
                 print(f"Couchbase successfully installed and running on {ip}")
             else:
                 print(f"Failed to access Couchbase UI on {ip}.")
+            
+            # # Check if Couchbase is running
+            # result = subprocess.run(f"sshpass -p couchbase ssh root@{ip} '{check_process_command}'", shell=True, capture_output=True, text=True)
+            # if "couchbase" not in result.stdout:
+            #     print(f"Couchbase not found as a process on {ip}, starting the service...")
+            #     run_remote_command(ip, start_service_command)
+
+            # time.sleep(15)
+            
+            # # Check if Couchbase UI is accessible
+            # result = subprocess.run(f"sshpass -p couchbase ssh root@{ip} '{check_service_command}'", shell=True, capture_output=True, text=True)
+            # if result.returncode == 0:
+            #     print(f"Couchbase successfully installed and running on {ip}")
+            # else:
+            #     print(f"Failed to access Couchbase UI on {ip}.")
         except Exception as e:
             print(f"Error on {ip}: {e}")
 
@@ -194,7 +272,7 @@ def load_ips_from_config(config_path):
     return [server["hostname"] for server in config.get("couchbase-servers", [])]
 
 
-async def main():
+def main():
     options = parse_args()
 
     # Load IPs from config file
@@ -202,9 +280,9 @@ async def main():
     
     # Install Couchbase Server
     if options.version:
-        await install_couchbase_server(options.version, options.build, ips)
+        install_couchbase_server(options.version, options.build, ips)
     else:
-        await install_couchbase_server("7.6.2", "3721", ips)
+        install_couchbase_server("7.6.2", "3721", ips)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
