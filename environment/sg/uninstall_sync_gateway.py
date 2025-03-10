@@ -45,6 +45,15 @@ import paramiko
 #         sys.exit(1)
 #     print(result.stdout)
 
+def fix_hostname(ip):
+    """Ensure the remote machine has the correct hostname entry in /etc/hosts."""
+    hostname_cmd = "hostname"
+    result = run_remote_command(ip, hostname_cmd)
+
+    if result:
+        hostname = result.strip()
+        add_host_cmd = f"echo '127.0.1.1 {hostname}' >> /etc/hosts"
+        run_remote_command(ip, add_host_cmd)
 
 def get_ips_from_config(config_path, key):
     """Reads IPs from the config file."""
@@ -108,6 +117,8 @@ def run_remote_command(ip, command):
 
 def uninstall_sync_gateway(ip):
     """Uninstalls Sync Gateway and removes all configuration files from the given IP."""
+
+    fix_hostname(ip)
 
     # Check if Sync Gateway service exists
     output, error = run_remote_command(ip, "systemctl list-unit-files --type=service | grep sync_gateway")

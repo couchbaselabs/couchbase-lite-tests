@@ -79,6 +79,16 @@ def get_ips_from_config(config_path, key):
 #     else:
 #         print("Couchbase Edge Server process is still present. Uninstallation may not be complete.")
 
+def fix_hostname(ip):
+    """Ensure the remote machine has the correct hostname entry in /etc/hosts."""
+    hostname_cmd = "hostname"
+    result = run_remote_command(ip, hostname_cmd)
+
+    if result:
+        hostname = result.strip()
+        add_host_cmd = f"echo '127.0.1.1 {hostname}' >> /etc/hosts"
+        run_remote_command(ip, add_host_cmd)
+
 def run_remote_command(ip, command, password="couchbase"):
     """Executes a command on the remote machine using SSH."""
     client = paramiko.SSHClient()
@@ -98,6 +108,8 @@ def run_remote_command(ip, command, password="couchbase"):
 def uninstall_edge_server(ip, password="couchbase"):
     """ Uninstalls Edge Server and removes all configuration files for it on the given IP. """
     
+    fix_hostname(ip)
+
     # Check if Couchbase Edge Server is installed
     result = run_remote_command(ip, "sudo systemctl status couchbase-edge-server", password)
     if "could not be found" in result:

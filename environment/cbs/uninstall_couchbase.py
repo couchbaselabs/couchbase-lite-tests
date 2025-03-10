@@ -65,6 +65,15 @@ import paramiko
 #         except Exception as e:
 #             print(f"Error on {ip}: {e}")
 
+def fix_hostname(ip):
+    """Ensure the remote machine has the correct hostname entry in /etc/hosts."""
+    hostname_cmd = "hostname"
+    result = run_remote_command(ip, hostname_cmd)
+
+    if result:
+        hostname = result.strip()
+        add_host_cmd = f"echo '127.0.1.1 {hostname}' >> /etc/hosts"
+        run_remote_command(ip, add_host_cmd)
 
 def run_remote_command(ip, command):
     """Runs a command on a remote server via SSH and returns output & error."""
@@ -102,6 +111,7 @@ def uninstall_couchbase_server(ips):
     """Uninstalls Couchbase Server from a list of remote machines."""
     for ip in ips:
         try:
+            fix_hostname(ip)
             print(f"Checking if Couchbase is running on {ip}...")
             output = run_remote_command(ip, "ps aux | grep -v grep | grep couchbase")
             
