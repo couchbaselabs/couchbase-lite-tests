@@ -65,7 +65,7 @@ class TestEndtoEnd(CBLTestClass):
             "num_index_replicas": 0
         }
         payload = PutDatabasePayload(config)
-        # await sync_gateway.put_database(sg_db_name, payload)
+        await sync_gateway.put_database(sg_db_name, payload)
         logger.info(f"Database created in Sync Gateway and linked to {bucket_name}.")
 
         input_data = {
