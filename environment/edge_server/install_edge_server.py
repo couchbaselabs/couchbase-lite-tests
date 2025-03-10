@@ -7,6 +7,15 @@ import time
 import paramiko
 from distutils.command.build import build
 
+def fix_hostname(ip):
+    """Ensure the remote machine has the correct hostname entry in /etc/hosts."""
+    hostname_cmd = "hostname"
+    result = run_remote_command(ip, hostname_cmd)
+
+    if result:
+        hostname = result
+        add_host_cmd = f"echo '127.0.1.1 {hostname}' >> /etc/hosts"
+        run_remote_command(ip, add_host_cmd)
 
 # # Function to run SSH commands on remote machine with password prompt handling
 # def run_remote_command(ip, command, password="couchbase"):
@@ -209,6 +218,9 @@ def copy_file_to_remote(ip, local_path, remote_path, username="root", password="
 
 def install_edge_server(edge_server_ip, edge_server_config, version, build, create_cert, database_path, mtls, user):
     """Installs and configures Edge Server on the given IP."""
+
+    fix_hostname(edge_server_ip)
+
     package_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-edge-server/{version}/{build}/couchbase-edge-server_{version}-{build}_amd64.deb"
     package_file = "/tmp/couchbase-edge-server.deb"
     config_file_path = "/opt/couchbase-edge-server/etc/config.json"
