@@ -7,8 +7,8 @@ COUCHBASE_BIN="/opt/couchbase/bin"
 ADMIN_USERNAME="Administrator"
 ADMIN_PASSWORD="password"
 CLUSTER_NAME="vm-cluster"
-RAMSIZE=2560
-INDEX_RAMSIZE=560
+RAMSIZE=2000
+INDEX_RAMSIZE=512
 SERVICES="data,index,query"
 
 # Redirect stdout and stderr to the log file
