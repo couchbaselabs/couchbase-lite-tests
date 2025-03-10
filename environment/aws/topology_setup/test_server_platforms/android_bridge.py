@@ -1,15 +1,18 @@
+import subprocess
 from pathlib import Path
 from typing import List
-from .platform_bridge import PlatformBridge
+
 from common.output import header
-import subprocess
+
+from .platform_bridge import PlatformBridge
+
 
 class AndroidBridge(PlatformBridge):
     __potential_adb_locations: List[str] = [
         "/opt/homebrew/share/android-commandlinetools/platform-tools/",
-        "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools"
+        "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools",
     ]
-    
+
     def __init__(self, app_path: str, app_id: str, activity: str = "MainActivity"):
         self.__app_path = app_path
         self.__app_id = app_id
@@ -27,18 +30,59 @@ class AndroidBridge(PlatformBridge):
         if self.__adb_location is None:
             raise RuntimeError("adb not found")
 
+    def validate(self, location):
+        result = subprocess.run(
+            [str(self.__adb_location), "-s", location, "get-state"],
+            check=False,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"Device {location} not found!")
+
     def install(self, location: str) -> None:
         header(f"Installing {self.__app_path} to {location}")
-        subprocess.run([str(self.__adb_location), "-s", location, "install", self.__app_path], check=True, capture_output=False)
+        subprocess.run(
+            [str(self.__adb_location), "-s", location, "install", self.__app_path],
+            check=True,
+            capture_output=False,
+        )
 
     def run(self, location: str) -> None:
         header(f"Running {self.__app_id} on {location}")
-        subprocess.run([str(self.__adb_location), "-s", location, "shell", "am", "start", f"{self.__app_id}/{self.__app_id}.{self.__activity}"], check=True, capture_output=False)
+        subprocess.run(
+            [
+                str(self.__adb_location),
+                "-s",
+                location,
+                "shell",
+                "am",
+                "start",
+                f"{self.__app_id}/{self.__app_id}.{self.__activity}",
+            ],
+            check=True,
+            capture_output=False,
+        )
 
     def stop(self, location: str) -> None:
         header(f"Stopping {self.__app_id} on {location}")
-        subprocess.run([str(self.__adb_location), "-s", location, "shell", "am", "force-stop", self.__app_id], check=True, capture_output=False)
+        subprocess.run(
+            [
+                str(self.__adb_location),
+                "-s",
+                location,
+                "shell",
+                "am",
+                "force-stop",
+                self.__app_id,
+            ],
+            check=True,
+            capture_output=False,
+        )
 
     def uninstall(self, location: str) -> None:
         header(f"Uninstalling {self.__app_id} from {location}")
-        subprocess.run([str(self.__adb_location), "-s", location, "uninstall", self.__app_id], check=True, capture_output=False)
+        subprocess.run(
+            [str(self.__adb_location), "-s", location, "uninstall", self.__app_id],
+            check=True,
+            capture_output=False,
+        )

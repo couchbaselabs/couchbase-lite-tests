@@ -8,9 +8,9 @@ from time import sleep
 from typing import IO, List, cast
 
 from common.output import header
+from logslurp_setup.setup_logslurp import main as logslurp_main
 from server_setup.setup_server import main as server_main
 from sgw_setup.setup_sgw import main as sgw_main
-from logslurp_setup.setup_logslurp import main as logslurp_main
 from topology_setup.setup_topology import TopologyConfig
 
 
@@ -76,12 +76,13 @@ def write_config(in_config_file: str, output: IO[str]):
             print(f"{next_arg} -> {ip}")
             input = input.replace(next_arg, ip)
             i += 1
-        
+
         logslurp_ip = get_logslurp_ip()
         print(f"ls-ip -> {logslurp_ip}")
         input = input.replace("{{ls-ip}}", logslurp_ip)
 
         output.write(input)
+
 
 def get_logslurp_ip():
     logslurp_command = ["terraform", "output", "-json", "logslurp_instance_public_ip"]
@@ -92,6 +93,7 @@ def get_logslurp_ip():
         )
 
     return cast(str, json.loads(result.stdout))
+
 
 if __name__ == "__main__":
     parser = ArgumentParser(

@@ -46,6 +46,25 @@
                 "required": ["cluster"],
                 "additionalProperties": false
             }
+        },
+        "test_servers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string"
+                    },
+                    "cbl_version": {
+                        "type": "string"
+                    },
+                    "platform": {
+                        "type": "string"
+                    }
+                },
+                "required": ["location", "cbl_version", "platform"],
+                "additionalProperties": false
+            }
         }
     }
 }

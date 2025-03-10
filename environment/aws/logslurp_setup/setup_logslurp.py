@@ -15,7 +15,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 current_ssh = ""
 
 
-def sftp_progress_bar(sftp: paramiko.SFTP, local_path: Path, remote_path: str):
+def sftp_progress_bar(sftp: paramiko.SFTPClient, local_path: Path, remote_path: str):
     file_size = os.path.getsize(local_path)
     with tqdm(total=file_size, unit="B", unit_scale=True, desc=local_path.name) as bar:
 
@@ -98,7 +98,7 @@ def main(hostname: str, private_key: Optional[str] = None):
     ec2_hostname = get_ec2_hostname(hostname)
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    pkey: paramiko.Ed25519Key = (
+    pkey: Optional[paramiko.Ed25519Key] = (
         paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
     )
     ssh.connect(ec2_hostname, username="ec2-user", pkey=pkey)

@@ -1,6 +1,11 @@
 from abc import ABC, abstractmethod
 
+
 class PlatformBridge(ABC):
+    @abstractmethod
+    def validate(self, location: str) -> None:
+        pass
+
     @abstractmethod
     def install(self, location: str) -> None:
         pass

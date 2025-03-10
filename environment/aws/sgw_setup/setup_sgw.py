@@ -107,7 +107,7 @@ def setup_config(server_hostname: str):
         file.write(start_sgw_content)
 
 
-def sftp_progress_bar(sftp: paramiko.SFTP, local_path: Path, remote_path: str):
+def sftp_progress_bar(sftp: paramiko.SFTPClient, local_path: Path, remote_path: str):
     file_size = os.path.getsize(local_path)
     with tqdm(total=file_size, unit="B", unit_scale=True, desc=local_path.name) as bar:
 
@@ -135,7 +135,9 @@ def remote_exec(
     print()
 
 
-def setup_server(hostname: str, pkey: paramiko.Ed25519Key, sgw_info: SgwDownloadInfo):
+def setup_server(
+    hostname: str, pkey: Optional[paramiko.Ed25519Key], sgw_info: SgwDownloadInfo
+):
     if sgw_info.is_release:
         print(f"Setting up server {hostname} with SGW {sgw_info.version}")
     else:
@@ -199,7 +201,9 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, sgw_info: SgwDownload
 
 
 def setup_topology(
-    pkey: paramiko.Ed25519Key, sgw_info: SgwDownloadInfo, topology: TopologyConfig
+    pkey: Optional[paramiko.Ed25519Key],
+    sgw_info: SgwDownloadInfo,
+    topology: TopologyConfig,
 ):
     if len(topology.sync_gateways) == 0:
         return
@@ -216,7 +220,7 @@ def main(
 ):
     sgw_info = SgwDownloadInfo(download_url)
     download_sgw_package(sgw_info)
-    pkey: paramiko.Ed25519Key = (
+    pkey = (
         paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
     )
 

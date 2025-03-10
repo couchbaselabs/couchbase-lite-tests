@@ -14,7 +14,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 current_ssh = ""
 
 
-def sftp_progress_bar(sftp: paramiko.SFTP, local_path: Path, remote_path: str):
+def sftp_progress_bar(sftp: paramiko.SFTPClient, local_path: Path, remote_path: str):
     file_size = os.path.getsize(local_path)
     with tqdm(total=file_size, unit="B", unit_scale=True, desc=local_path.name) as bar:
 
@@ -44,7 +44,7 @@ def remote_exec(
 
 def setup_node(
     hostname: str,
-    pkey: paramiko.Ed25519Key,
+    pkey: Optional[paramiko.Ed25519Key],
     version: str,
     cluster: Optional[str] = None,
 ):
@@ -102,7 +102,9 @@ def setup_node(
     ssh.close()
 
 
-def setup_topology(pkey: paramiko.Ed25519Key, version: str, topology: TopologyConfig):
+def setup_topology(
+    pkey: Optional[paramiko.Ed25519Key], version: str, topology: TopologyConfig
+):
     if len(topology.clusters) == 0:
         return
 
@@ -113,7 +115,7 @@ def setup_topology(pkey: paramiko.Ed25519Key, version: str, topology: TopologyCo
 
 
 def main(version: str, topology: TopologyConfig, private_key: Optional[str] = None):
-    pkey: paramiko.Ed25519Key = (
+    pkey = (
         paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
     )
 

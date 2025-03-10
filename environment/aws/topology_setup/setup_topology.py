@@ -5,6 +5,8 @@ from typing import Dict, Final, List, Optional, cast
 
 from common.output import header
 
+from .test_server import TestServer
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
@@ -26,7 +28,7 @@ class ClusterInput:
     __server_count_key: Final[str] = "server_count"
 
     @property
-    def server_count(self) -> List[int]:
+    def server_count(self) -> int:
         return self.__server_count
 
     def __init__(self, config: Optional[Dict] = None):
@@ -67,10 +69,49 @@ class SyncGatewayConfig:
         self.__cluster_hostname = cluster_hostname
 
 
+class TestServerInput:
+    @property
+    def location(self) -> str:
+        return self.__location
+
+    @property
+    def cbl_version(self) -> str:
+        return self.__cbl_version
+
+    @property
+    def platform(self) -> str:
+        return self.__platform
+
+    def __init__(self, location: str, cbl_version: str, platform: str):
+        self.__location = location
+        self.__cbl_version = cbl_version
+        self.__platform = platform
+
+
+class TestServerConfig:
+    @property
+    def ip_address(self) -> str:
+        return self.__ip_address
+
+    @property
+    def cbl_version(self) -> str:
+        return self.__cbl_version
+
+    @property
+    def platform(self) -> str:
+        return self.__platform
+
+    def __init__(self, ip_address: str, cbl_version: str, platform: str):
+        self.__ip_address = ip_address
+        self.__cbl_version = cbl_version
+        self.__platform = platform
+
+
 class TopologyConfig:
     __clusters_key: Final[str] = "clusters"
     __sync_gateways_key: Final[str] = "sync_gateways"
     __cluster_key: Final[str] = "cluster"
+    __test_servers_key: Final[str] = "test_servers"
 
     @property
     def total_cbs_count(self) -> int:
@@ -87,6 +128,10 @@ class TopologyConfig:
     @property
     def sync_gateways(self) -> List[SyncGatewayConfig]:
         return self.__sync_gateways
+
+    @property
+    def test_servers(self) -> List[TestServerConfig]:
+        return self.__test_servers
 
     def read_from_terraform(self):
         cbs_command = ["terraform", "output", "-json", "couchbase_instance_public_ips"]
@@ -122,6 +167,21 @@ class TopologyConfig:
 
         sgw_ips = cast(List[str], json.loads(result.stdout))
         self.apply_sgw_hostnames(sgw_ips)
+
+    def deploy_test_servers(self):
+        for test_server_input in self.__test_server_inputs:
+            test_server = TestServer.create(test_server_input.platform)
+            bridge = test_server.create_bridge()
+            bridge.validate(test_server_input.location)
+
+            test_server.build(test_server_input.cbl_version)
+            bridge.install(test_server_input.location)
+            bridge.run(test_server_input.location)
+            self.__test_servers.append(
+                TestServerConfig(
+                    "", test_server_input.cbl_version, test_server_input.platform
+                )
+            )
 
     def apply_sgw_hostnames(self, hostnames: List[str]):
         for sgw_input in self.__sync_gateway_inputs:
@@ -161,15 +221,26 @@ class TopologyConfig:
             i += 1
 
         print()
+        i = 1
+        for test_server in self.__test_servers:
+            print(f"Test Server {i}:")
+            print(f"\tPlatform: {test_server.platform}")
+            print(f"\tCBL Version: {test_server.cbl_version}")
+            print(f"\tIP Address: {test_server.ip_address}")
+            i += 1
+
+        print()
 
     def __init__(self, config_file: Optional[str] = None):
         if config_file is None:
-            config_file = SCRIPT_DIR / "default_topology.json"
+            config_file = str((SCRIPT_DIR / "default_topology.json").resolve())
 
         self.__clusters: List[ClusterConfig] = []
         self.__sync_gateways: List[SyncGatewayConfig] = []
         self.__sync_gateway_inputs: List[SyncGatewayInput] = []
         self.__cluster_inputs: List[ClusterInput] = []
+        self.__test_server_inputs: List[TestServerInput] = []
+        self.__test_servers: List[TestServerConfig] = []
 
         with open(config_file, "r") as fin:
             config = cast(Dict, json.load(fin))
@@ -186,3 +257,16 @@ class TopologyConfig:
                         raise ValueError(f"Invalid cluster index '{cluster_index}'")
 
                     self.__sync_gateway_inputs.append(SyncGatewayInput(cluster_index))
+
+            if self.__test_servers_key in config:
+                raw_servers = cast(
+                    List[Dict[str, str]], config[self.__test_servers_key]
+                )
+                for raw_server in raw_servers:
+                    self.__test_server_inputs.append(
+                        TestServerInput(
+                            raw_server["location"],
+                            raw_server["cbl_version"],
+                            raw_server["platform"],
+                        )
+                    )
