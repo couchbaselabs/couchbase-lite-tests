@@ -22,5 +22,7 @@ requests
 types-Deprecated==1.2.15.20241117
 typing_extensions==4.12.2
 urllib3==2.3.0
+pyjson5
+gevent
 
 ../client
