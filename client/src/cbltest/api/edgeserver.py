@@ -83,8 +83,9 @@ class EdgeServer:
         self.__tracer\
             = get_tracer(__name__, VERSION)
         if config_file is None:
-            repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
-            config_file = str(repo_root / "environment" / "edge_server" / "config" / "config.json")
+            # repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+            # config_file = str(repo_root / "environment" / "edge_server" / "config" / "config.json")
+            config_file = "././environment/edge_server/config/config.json"
             # config_file= file_path + "/" + "environment/edge_server/config/config.json"
         port,secure,mtls,certfile,keyfile,is_auth,databases,is_anonymous_auth=self._decode_config_file(config_file)
         self.__secure: bool = secure
