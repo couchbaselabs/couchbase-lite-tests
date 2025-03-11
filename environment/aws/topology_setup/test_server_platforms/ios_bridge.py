@@ -58,19 +58,8 @@ class iOSBridge(PlatformBridge):
         print("iOS app uninstall deliberately not implemented")
 
     def __validate_xharness(self, location: str) -> None:
-        result = subprocess.run(
-            [
-                str(XHARNESS_PATH),
-                "apple",
-                "device",
-                "ios-device",
-                f"--device={location}",
-            ],
-            check=False,
-            capture_output=True,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"Device {location} not found!")
+        # XHarness is not reliable enough to do this...
+        pass
 
     def __validate_devicectl(self, location: str) -> None:
         pass
@@ -150,3 +139,6 @@ class iOSBridge(PlatformBridge):
     def __verify_xharness(self) -> None:
         if not XHARNESS_PATH.is_file():
             raise RuntimeError(f"XHarness not found at {XHARNESS_PATH}, aborting...")
+
+    def get_ip(self, location: str) -> str:
+        return ""  # Not implemented

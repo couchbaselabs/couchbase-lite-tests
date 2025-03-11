@@ -30,3 +30,6 @@ class macOSBridge(PlatformBridge):
     def uninstall(self, location: str) -> None:
         self.validate(location)
         print("No action needed for uninstalling macOS app")
+
+    def get_ip(self, location):
+        return "localhost"

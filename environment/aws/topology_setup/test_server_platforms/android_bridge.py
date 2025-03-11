@@ -86,3 +86,28 @@ class AndroidBridge(PlatformBridge):
             check=True,
             capture_output=False,
         )
+
+    def get_ip(self, location: str) -> str:
+        result = subprocess.run(
+            [
+                str(self.__adb_location),
+                "-s",
+                location,
+                "shell",
+                "ip",
+                "-f",
+                "inet",
+                "addr",
+                "show",
+                "wlan0",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        for line in result.stdout.split("\n"):
+            print(line)
+            if "inet" in line:
+                return line.lstrip().split(" ")[1].split("/")[0]
+
+        raise RuntimeError(f"Could not determine IP address of '{location}'")

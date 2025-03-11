@@ -95,7 +95,6 @@ class WinUIBridge(PlatformBridge):
             check=True,
             capture_output=False,
         )
-        pass
 
     def uninstall(self, location: str) -> None:
         self.validate(location)
@@ -111,7 +110,9 @@ class WinUIBridge(PlatformBridge):
             check=True,
             capture_output=False,
         )
-        pass
+
+    def get_ip(self, location: str) -> str:
+        return "localhost"
 
 
 class DotnetTestServer(TestServer):

@@ -21,3 +21,7 @@ class PlatformBridge(ABC):
     @abstractmethod
     def uninstall(self, location: str) -> None:
         pass
+
+    @abstractmethod
+    def get_ip(self, location: str) -> str:
+        pass

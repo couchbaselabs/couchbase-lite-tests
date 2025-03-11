@@ -12,6 +12,7 @@ from logslurp_setup.setup_logslurp import main as logslurp_main
 from server_setup.setup_server import main as server_main
 from sgw_setup.setup_sgw import main as sgw_main
 from topology_setup.setup_topology import TopologyConfig
+from topology_setup.setup_topology import main as topology_main
 
 
 def terraform_apply(public_key_name: str, topology: TopologyConfig):
@@ -143,10 +144,12 @@ if __name__ == "__main__":
     sleep(5)
 
     topology.read_from_terraform()
+    topology.resolve_test_servers()
     topology.dump()
     server_main(args.cbs_version, topology, args.private_key)
     sgw_main(args.sgw_url, topology, args.private_key)
     logslurp_main(get_logslurp_ip(), args.private_key)
+    topology_main(topology)
     if args.tdk_config_out is not None:
         with open(args.tdk_config_out, "w") as fout:
             write_config(args.tdk_config_in, fout)

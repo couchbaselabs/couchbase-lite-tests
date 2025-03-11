@@ -168,20 +168,26 @@ class TopologyConfig:
         sgw_ips = cast(List[str], json.loads(result.stdout))
         self.apply_sgw_hostnames(sgw_ips)
 
-    def deploy_test_servers(self):
+    def resolve_test_servers(self):
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(test_server_input.platform)
             bridge = test_server.create_bridge()
             bridge.validate(test_server_input.location)
-
-            test_server.build(test_server_input.cbl_version)
-            bridge.install(test_server_input.location)
-            bridge.run(test_server_input.location)
             self.__test_servers.append(
                 TestServerConfig(
-                    "", test_server_input.cbl_version, test_server_input.platform
+                    bridge.get_ip(test_server_input.location),
+                    test_server_input.cbl_version,
+                    test_server_input.platform,
                 )
             )
+
+    def run_test_servers(self):
+        for test_server_input in self.__test_server_inputs:
+            test_server = TestServer.create(test_server_input.platform)
+            test_server.build(test_server_input.cbl_version)
+            bridge = test_server.create_bridge()
+            bridge.install(test_server_input.location)
+            bridge.run(test_server_input.location)
 
     def apply_sgw_hostnames(self, hostnames: List[str]):
         for sgw_input in self.__sync_gateway_inputs:
@@ -270,3 +276,7 @@ class TopologyConfig:
                             raw_server["platform"],
                         )
                     )
+
+
+def main(toplogy: TopologyConfig):
+    toplogy.run_test_servers()
