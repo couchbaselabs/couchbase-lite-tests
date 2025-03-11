@@ -12,13 +12,15 @@ TEST_COMPONENTS_MAPPING = {
         "test-servers": 0,
         "sync-gateways": 1,
         "couchbase-servers": 1,
-        "edge-servers": 0
+        "edge-servers": 0,
+        "http-clients": 0
     },
     "test_end_to_end": {
         "test-servers": 0,
         "sync-gateways": 1,
         "couchbase-servers": 1,
-        "edge-servers": 1
+        "edge-servers": 1,
+        "http-clients": 0
     }
 }
 
@@ -43,9 +45,10 @@ def generate_config(test_name, available_ips):
     config = {
         "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
         "test-servers": [],
+        "edge-servers": [],
         "sync-gateways": [],
         "couchbase-servers": [],
-        "edge-servers": [],
+        "http-clients": [],
         "api-version": 1
     }
 
@@ -63,6 +66,10 @@ def generate_config(test_name, available_ips):
 
     # Assign edge-servers
     config["edge-servers"] = [{"hostname": ip} for ip in available_ips[:mapping["edge-servers"]]]
+    available_ips = available_ips[mapping["edge-servers"]:]
+
+    # Assign http-clients
+    config["http-clients"] = [{"hostname": ip} for ip in available_ips[:mapping["http-clients"]]]
     
     return config
 
