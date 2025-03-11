@@ -113,6 +113,7 @@ class TopologyConfig:
     __cluster_key: Final[str] = "cluster"
     __test_servers_key: Final[str] = "test_servers"
     __logslurp_key: Final[str] = "logslurp"
+    __include_key: Final[str] = "include"
 
     @property
     def total_cbs_count(self) -> int:
@@ -133,11 +134,11 @@ class TopologyConfig:
     @property
     def test_servers(self) -> List[TestServerConfig]:
         return self.__test_servers
-    
+
     @property
     def wants_logslurp(self) -> bool:
-        return self.__wants_logslurp
-    
+        return self._wants_logslurp is not None and self._wants_logslurp
+
     @property
     def logslurp(self) -> Optional[str]:
         return self.__logslurp
@@ -177,7 +178,7 @@ class TopologyConfig:
         sgw_ips = cast(List[str], json.loads(result.stdout))
         self.apply_sgw_hostnames(sgw_ips)
 
-        if self.__wants_logslurp:
+        if self._wants_logslurp:
             logslurp_command = ["terraform", "output", "logslurp_instance_public_ip"]
             result = subprocess.run(logslurp_command, capture_output=True, text=True)
             if result.returncode != 0:
@@ -186,8 +187,6 @@ class TopologyConfig:
                 )
 
             self.__logslurp = cast(str, json.loads(result.stdout))
-
-
 
     def resolve_test_servers(self):
         for test_server_input in self.__test_server_inputs:
@@ -249,7 +248,7 @@ class TopologyConfig:
 
         print()
 
-        if self.__wants_logslurp:
+        if self._wants_logslurp:
             print(f"Logslurp: {self.__logslurp}")
 
         print()
@@ -274,8 +273,7 @@ class TopologyConfig:
         self.__cluster_inputs: List[ClusterInput] = []
         self.__test_server_inputs: List[TestServerInput] = []
         self.__test_servers: List[TestServerConfig] = []
-        self.__wants_logslurp: bool = False
-        self.__logslurp: Optional[str] = None
+        self._wants_logslurp: Optional[bool] = None
 
         with open(config_file, "r") as fin:
             config = cast(Dict, json.load(fin))
@@ -307,8 +305,16 @@ class TopologyConfig:
                     )
 
             if self.__logslurp_key in config:
-                self.__wants_logslurp = cast(bool, config[self.__logslurp_key])
-                print(self.__wants_logslurp)
+                self._wants_logslurp = cast(bool, config[self.__logslurp_key])
+
+            if self.__include_key in config:
+                include_file = str((SCRIPT_DIR / config[self.__include_key]).resolve())
+                sub_config = TopologyConfig(include_file)
+                self.__cluster_inputs.extend(sub_config.__cluster_inputs)
+                self.__sync_gateway_inputs.extend(sub_config.__sync_gateway_inputs)
+                self.__test_server_inputs.extend(sub_config.__test_server_inputs)
+                if self._wants_logslurp is None:
+                    self._wants_logslurp = sub_config._wants_logslurp
 
 
 def main(toplogy: TopologyConfig):

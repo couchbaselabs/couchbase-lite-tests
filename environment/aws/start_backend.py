@@ -5,7 +5,7 @@ import subprocess
 import sys
 from argparse import ArgumentParser
 from time import sleep
-from typing import IO, Dict, List, cast
+from typing import IO, Dict, cast
 
 from common.output import header
 from logslurp_setup.setup_logslurp import main as logslurp_main
@@ -33,7 +33,7 @@ def terraform_apply(public_key_name: str, topology: TopologyConfig):
         f"-var=key_name={public_key_name}",
         f"-var=server_count={cbs_count}",
         f"-var=sgw_count={sgw_count}",
-        f"-var=logslurp={wants_logslurp}", 
+        f"-var=logslurp={wants_logslurp}",
         "-auto-approve",
     ]
     result = subprocess.run(command, capture_output=False, text=True)
@@ -69,16 +69,16 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
                 sgw_instances.append({"hostname": sgw.hostname, "tls": True})
 
             config_json["sync-gateways"] = sgw_instances
-            
+
         if topology.logslurp is not None:
             config_json["logslurp"] = f"{topology.logslurp}:8180"
-        
+
         if len(topology.test_servers) > 0:
             test_servers = []
             for ts in topology.test_servers:
                 port = 5555 if ts.platform.startswith("dotnet") else 8080
                 test_servers.append(f"http://{ts.ip_address}:{port}")
-            
+
             config_json["test-servers"] = test_servers
 
         json.dump(config_json, output, indent=2)

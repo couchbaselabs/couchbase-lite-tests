@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import argparse
 import os
 import subprocess
 from pathlib import Path
@@ -9,8 +8,8 @@ from typing import Optional
 import paramiko
 from common.output import header
 from termcolor import colored
-from tqdm import tqdm
 from topology_setup.setup_topology import TopologyConfig
+from tqdm import tqdm
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 current_ssh = ""
@@ -96,7 +95,7 @@ def check_aws_key_checking() -> None:
 def main(topology: TopologyConfig, private_key: Optional[str] = None):
     if topology.logslurp is None:
         return
-    
+
     header("Setting up logslurp")
     check_aws_key_checking()
     ec2_hostname = get_ec2_hostname(topology.logslurp)

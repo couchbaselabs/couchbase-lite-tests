@@ -319,5 +319,5 @@ output "couchbase_instance_private_ips" {
 }
 
 output "logslurp_instance_public_ip" {
-    value = aws_instance.log_slurp["log_slurp"].public_ip
+    value = var.logslurp ? aws_instance.log_slurp["log_slurp"].public_ip : null
 }

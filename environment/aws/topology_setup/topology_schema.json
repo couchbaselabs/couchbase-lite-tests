@@ -68,6 +68,9 @@
         },
         "logslurp": {
             "type": "boolean"
+        },
+        "include": {
+            "type": "string"
         }
     }
 }

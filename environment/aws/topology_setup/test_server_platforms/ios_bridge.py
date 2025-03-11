@@ -2,10 +2,10 @@ import platform
 import re
 import shutil
 import subprocess
-import netifaces
 from os import environ
 from pathlib import Path
 
+import netifaces
 from common.output import header
 
 from .platform_bridge import PlatformBridge
@@ -61,7 +61,9 @@ class iOSBridge(PlatformBridge):
 
     def __validate_libimobiledevice(self, location: str) -> None:
         self.__verify_libimobiledevice()
-        result = subprocess.run(["ideviceinfo", "-u", location], check=False, capture_output=True)
+        result = subprocess.run(
+            ["ideviceinfo", "-u", location], check=False, capture_output=True
+        )
         if result.returncode != 0:
             raise RuntimeError(f"Device {location} not found!")
 
@@ -143,11 +145,11 @@ class iOSBridge(PlatformBridge):
     def __verify_xharness(self) -> None:
         if not XHARNESS_PATH.is_file():
             raise RuntimeError(f"XHarness not found at {XHARNESS_PATH}, aborting...")
-        
+
     def __verify_libimobiledevice(self) -> None:
         if shutil.which("ideviceinfo") is None:
             raise RuntimeError("ideviceinfo not found, aborting...")
-        
+
     def __broadcast_ping_request(self) -> None:
         for interface in netifaces.interfaces():
             if interface == "lo":
@@ -160,7 +162,9 @@ class iOSBridge(PlatformBridge):
 
                 ip = addr[netifaces.AF_INET][0]["broadcast"]
                 print(f"Broadcasting ping request on {interface} ({ip})")
-                subprocess.run(["ping", ip, "-c", "3"], check=True, capture_output=True, text=True)
+                subprocess.run(
+                    ["ping", ip, "-c", "3"], check=True, capture_output=True, text=True
+                )
 
     def get_ip(self, location: str) -> str:
         # Apple provides no sane way to do this so the following dance is performed:
@@ -169,16 +173,25 @@ class iOSBridge(PlatformBridge):
         #       responds and has an ARP table entry
         #    3. Retrieve the ARP table and find the IP address that corresponds to the MAC address
         self.__verify_libimobiledevice()
-        result = subprocess.run(["ideviceinfo", "-u", location, "-k", "WiFiAddress"], check=True, capture_output=True, text=True)
+        result = subprocess.run(
+            ["ideviceinfo", "-u", location, "-k", "WiFiAddress"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         mac_address = result.stdout.strip()
-        stripped_mac_parts = [part.lstrip('0') or '0' for part in mac_address.split(':')]
-        mac_address = ':'.join(stripped_mac_parts)
+        stripped_mac_parts = [
+            part.lstrip("0") or "0" for part in mac_address.split(":")
+        ]
+        mac_address = ":".join(stripped_mac_parts)
 
         self.__broadcast_ping_request()
-        
-        result = subprocess.run(["arp", "-an"], check=True, capture_output=True, text=True)
+
+        result = subprocess.run(
+            ["arp", "-an"], check=True, capture_output=True, text=True
+        )
         for line in result.stdout.split("\n"):
             if mac_address in line:
                 return line.split(" ")[1].strip("()")
-            
+
         raise RuntimeError(f"Could not determine IP address of '{location}'")
