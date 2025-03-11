@@ -65,6 +65,9 @@
                 "required": ["location", "cbl_version", "platform"],
                 "additionalProperties": false
             }
+        },
+        "logslurp": {
+            "type": "boolean"
         }
     }
 }

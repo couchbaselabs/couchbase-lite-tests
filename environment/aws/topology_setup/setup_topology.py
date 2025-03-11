@@ -112,6 +112,7 @@ class TopologyConfig:
     __sync_gateways_key: Final[str] = "sync_gateways"
     __cluster_key: Final[str] = "cluster"
     __test_servers_key: Final[str] = "test_servers"
+    __logslurp_key: Final[str] = "logslurp"
 
     @property
     def total_cbs_count(self) -> int:
@@ -132,6 +133,14 @@ class TopologyConfig:
     @property
     def test_servers(self) -> List[TestServerConfig]:
         return self.__test_servers
+    
+    @property
+    def wants_logslurp(self) -> bool:
+        return self.__wants_logslurp
+    
+    @property
+    def logslurp(self) -> Optional[str]:
+        return self.__logslurp
 
     def read_from_terraform(self):
         cbs_command = ["terraform", "output", "-json", "couchbase_instance_public_ips"]
@@ -167,6 +176,18 @@ class TopologyConfig:
 
         sgw_ips = cast(List[str], json.loads(result.stdout))
         self.apply_sgw_hostnames(sgw_ips)
+
+        if self.__wants_logslurp:
+            logslurp_command = ["terraform", "output", "logslurp_instance_public_ip"]
+            result = subprocess.run(logslurp_command, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(
+                    f"Command '{' '.join(logslurp_command)}' failed with exit status {result.returncode}: {result.stderr}"
+                )
+
+            self.__logslurp = cast(str, json.loads(result.stdout))
+
+
 
     def resolve_test_servers(self):
         for test_server_input in self.__test_server_inputs:
@@ -227,6 +248,12 @@ class TopologyConfig:
             i += 1
 
         print()
+
+        if self.__wants_logslurp:
+            print(f"Logslurp: {self.__logslurp}")
+
+        print()
+
         i = 1
         for test_server in self.__test_servers:
             print(f"Test Server {i}:")
@@ -247,6 +274,8 @@ class TopologyConfig:
         self.__cluster_inputs: List[ClusterInput] = []
         self.__test_server_inputs: List[TestServerInput] = []
         self.__test_servers: List[TestServerConfig] = []
+        self.__wants_logslurp: bool = False
+        self.__logslurp: Optional[str] = None
 
         with open(config_file, "r") as fin:
             config = cast(Dict, json.load(fin))
@@ -276,6 +305,10 @@ class TopologyConfig:
                             raw_server["platform"],
                         )
                     )
+
+            if self.__logslurp_key in config:
+                self.__wants_logslurp = cast(bool, config[self.__logslurp_key])
+                print(self.__wants_logslurp)
 
 
 def main(toplogy: TopologyConfig):

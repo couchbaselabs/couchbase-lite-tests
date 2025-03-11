@@ -5,7 +5,7 @@ import subprocess
 import sys
 from argparse import ArgumentParser
 from time import sleep
-from typing import IO, List, cast
+from typing import IO, Dict, List, cast
 
 from common.output import header
 from logslurp_setup.setup_logslurp import main as logslurp_main
@@ -23,8 +23,9 @@ def terraform_apply(public_key_name: str, topology: TopologyConfig):
             f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
         )
 
-    sgw_count = topology.total_sgw_count if topology is not None else 1
-    cbs_count = topology.total_cbs_count if topology is not None else 1
+    sgw_count = topology.total_sgw_count
+    cbs_count = topology.total_cbs_count
+    wants_logslurp = str(topology.wants_logslurp).lower()
 
     command = [
         "terraform",
@@ -32,6 +33,7 @@ def terraform_apply(public_key_name: str, topology: TopologyConfig):
         f"-var=key_name={public_key_name}",
         f"-var=server_count={cbs_count}",
         f"-var=sgw_count={sgw_count}",
+        f"-var=logslurp={wants_logslurp}", 
         "-auto-approve",
     ]
     result = subprocess.run(command, capture_output=False, text=True)
@@ -44,45 +46,42 @@ def terraform_apply(public_key_name: str, topology: TopologyConfig):
     header("Done, sleeping for 5s")
 
 
-def write_config(in_config_file: str, output: IO[str]):
+def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str]):
     header(f"Writing TDK configuration based on {in_config_file}...")
-    cbs_command = ["terraform", "output", "-json", "couchbase_instance_public_ips"]
-    result = subprocess.run(cbs_command, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise Exception(
-            f"Command '{' '.join(cbs_command)}' failed with exit status {result.returncode}: {result.stderr}"
-        )
-
-    cbs_ips = cast(List[str], json.loads(result.stdout))
-    sgw_command = ["terraform", "output", "-json", "sync_gateway_instance_public_ips"]
-    result = subprocess.run(sgw_command, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise Exception(
-            f"Command '{' '.join(sgw_command)}' failed with exit status {result.returncode}: {result.stderr}"
-        )
-
-    sgw_ips = cast(List[str], json.loads(result.stdout))
     with open(in_config_file, "r") as fin:
-        input = fin.read()
-        i = 1
-        for ip in cbs_ips:
-            next_arg = f"{{{{cbs-ip{i}}}}}"
-            print(f"{next_arg} -> {ip}")
-            input = input.replace(next_arg, ip)
-            i += 1
+        config_json = cast(Dict, json.load(fin))
+        config_json.pop("couchbase-servers", None)
+        config_json.pop("sync-gateways", None)
+        config_json.pop("test-servers", None)
+        config_json.pop("logslurp", None)
 
-        i = 1
-        for ip in sgw_ips:
-            next_arg = f"{{{{sgw-ip{i}}}}}"
-            print(f"{next_arg} -> {ip}")
-            input = input.replace(next_arg, ip)
-            i += 1
+        if len(topology.clusters) > 0:
+            cbs_instances = []
+            for cluster in topology.clusters:
+                for public_hostname in cluster.public_hostnames:
+                    cbs_instances.append({"hostname": public_hostname})
 
-        logslurp_ip = get_logslurp_ip()
-        print(f"ls-ip -> {logslurp_ip}")
-        input = input.replace("{{ls-ip}}", logslurp_ip)
+            config_json["couchbase-servers"] = cbs_instances
 
-        output.write(input)
+        if len(topology.sync_gateways) > 0:
+            sgw_instances = []
+            for sgw in topology.sync_gateways:
+                sgw_instances.append({"hostname": sgw.hostname, "tls": True})
+
+            config_json["sync-gateways"] = sgw_instances
+            
+        if topology.logslurp is not None:
+            config_json["logslurp"] = f"{topology.logslurp}:8180"
+        
+        if len(topology.test_servers) > 0:
+            test_servers = []
+            for ts in topology.test_servers:
+                port = 5555 if ts.platform.startswith("dotnet") else 8080
+                test_servers.append(f"http://{ts.ip_address}:{port}")
+            
+            config_json["test-servers"] = test_servers
+
+        json.dump(config_json, output, indent=2)
 
 
 def get_logslurp_ip():
@@ -148,10 +147,10 @@ if __name__ == "__main__":
     topology.dump()
     server_main(args.cbs_version, topology, args.private_key)
     sgw_main(args.sgw_url, topology, args.private_key)
-    logslurp_main(get_logslurp_ip(), args.private_key)
+    logslurp_main(topology, args.private_key)
     topology_main(topology)
     if args.tdk_config_out is not None:
         with open(args.tdk_config_out, "w") as fout:
-            write_config(args.tdk_config_in, fout)
+            write_config(args.tdk_config_in, topology, fout)
     else:
-        write_config(args.tdk_config_in, sys.stdout)
+        write_config(args.tdk_config_in, topology, sys.stdout)

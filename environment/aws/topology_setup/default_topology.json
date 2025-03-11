@@ -9,5 +9,6 @@
         {
             "cluster": 0
         }
-    ]
+    ],
+    "logslurp": true
 }

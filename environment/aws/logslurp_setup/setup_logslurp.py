@@ -10,6 +10,7 @@ import paramiko
 from common.output import header
 from termcolor import colored
 from tqdm import tqdm
+from topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 current_ssh = ""
@@ -92,10 +93,13 @@ def check_aws_key_checking() -> None:
         )
 
 
-def main(hostname: str, private_key: Optional[str] = None):
+def main(topology: TopologyConfig, private_key: Optional[str] = None):
+    if topology.logslurp is None:
+        return
+    
     header("Setting up logslurp")
     check_aws_key_checking()
-    ec2_hostname = get_ec2_hostname(hostname)
+    ec2_hostname = get_ec2_hostname(topology.logslurp)
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     pkey: Optional[paramiko.Ed25519Key] = (
@@ -104,7 +108,7 @@ def main(hostname: str, private_key: Optional[str] = None):
     ssh.connect(ec2_hostname, username="ec2-user", pkey=pkey)
 
     global current_ssh
-    current_ssh = hostname
+    current_ssh = topology.logslurp
     sftp = ssh.open_sftp()
     sftp_progress_bar(
         sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
@@ -144,7 +148,7 @@ def main(hostname: str, private_key: Optional[str] = None):
             ]
         )
 
-    header(f"Building and starting logslurp on {hostname}")
+    header(f"Building and starting logslurp on {topology.logslurp}")
     env = os.environ.copy()
     env["DOCKER_CONTEXT"] = "aws"
     subprocess.run(
@@ -153,15 +157,3 @@ def main(hostname: str, private_key: Optional[str] = None):
         env=env,
         cwd=SCRIPT_DIR / ".." / "..",
     )
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run a script over an SSH connection.")
-    parser.add_argument("hostname", help="The hostname or IP address of the server.")
-    parser.add_argument(
-        "--private-key",
-        help="The private key to use for the SSH connection (if not default)",
-    )
-    args = parser.parse_args()
-
-    main(args.hostname, args.private_key)

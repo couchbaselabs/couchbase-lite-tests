@@ -264,6 +264,7 @@ resource "aws_instance" "sync_gateway" {
 
 # And the machine that will run LogSlurp
 resource "aws_instance" "log_slurp" {
+    for_each = var.logslurp ? { "log_slurp": 1 } : {}
     ami = "ami-05576a079321f21f8"
     instance_type = "m5.large"
     key_name = var.key_name
@@ -297,6 +298,12 @@ variable "sgw_count" {
     default     = 1
 }
 
+variable "logslurp" {
+    description = "Whether or not to include a logslurp deployment"
+    type = bool
+    default = true
+}
+
 # These outputs are convenient for scripts to use for writing various IPs
 # to be used in config files, etc
 output "couchbase_instance_public_ips" {
@@ -312,5 +319,5 @@ output "couchbase_instance_private_ips" {
 }
 
 output "logslurp_instance_public_ip" {
-    value = aws_instance.log_slurp.public_ip
+    value = aws_instance.log_slurp["log_slurp"].public_ip
 }
