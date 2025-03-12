@@ -62,7 +62,8 @@ class TestEndtoEnd(CBLTestClass):
                     }
                 }
             },
-            "num_index_replicas": 0
+            "num_index_replicas": 0,
+            "use_views": true
         }
         payload = PutDatabasePayload(config)
         await sync_gateway.put_database(sg_db_name, payload)
