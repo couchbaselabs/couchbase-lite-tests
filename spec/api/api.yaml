@@ -14,7 +14,7 @@ info:
   description: |-
     This is a REST API specification for Couchbase Lite Test Server.
 
-    The APIs except GET '/' requires the following request headers:
+    The APIs except GET [/](#operation/getInfo) requires the following request headers:
     * CBLTest-API-Version (integer)
     * CBLTest-Client-ID (UUID)
 
@@ -26,10 +26,11 @@ info:
     * Any enum values in the spec are case insensitive.
 
     KeyPath:
-    * The /updateDatabase and /verifyDocuments API are using the JSON's keypath to
+    * The [/updateDatabase](#operation/updateDatabase) and [/verifyDocuments](#operation/verifyDocuments) API are using the JSON's keypath to
       refer to a specific path in the document's properties tree.
     * The keypath structure can be described as follows:
 
+      ```
       keypath  ::= ( [ DOLLAR DOT ] <property> | <index> ) <path>
       path     ::= (DOT <property> | <index>)* EOP
       index    ::= OBRACKET DIGIT+ CBRACKET
@@ -42,14 +43,15 @@ info:
       DIGIT    ::=  '0' |'1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
       ANY      ::= (! (DOT | OBRACKET | CBRACKET | EOP) ) | ESCAPE
       ESCAPE   ::= '\' (! EOP )
+      ```
 
     Changes
     1.1.0 (03/05/2025)
-    * Add /startListener and /stopListener endpoint
+    * Add [/startListener](#operation/startListener) and [/stopListener](#operation/stopListener) endpoint
 
     1.0.0 (09/27/2024)
     * Replace setupLogging endpoint with expanded newSession endpoint
-    * Add /log endpoint
+    * Add [/log](#operation/log) endpoint
 
     0.5.2 (09/25/2024)
     * Split getDocument into database and document key to more closely match other API
@@ -270,69 +272,69 @@ paths:
         how documents are updated, deleted or purged. For updating a document, the changes to the document are specified
         in 'updatedProperties' and 'removedProperties'.
 
-        updatedProperties:
+        - **updatedProperties**:
 
-        An array of objects. Each object contains one or more keys that are key paths into the document to be updated with the
-        values associated with the keys. The objects in the array are evaluated in their natural order.
+          An array of objects. Each object contains one or more keys that are key paths into the document to be updated with the
+          values associated with the keys. The objects in the array are evaluated in their natural order.
 
-        The keypath identifies a unique location in the document's property tree starting from the root that follows
-        dictionary properties and array elements. The keypath looks like "foo.bar[1].baz". The keypath structure can be found
-        in the description at the beginning of this specification.
+          The keypath identifies a unique location in the document's property tree starting from the root that follows
+          dictionary properties and array elements. The keypath looks like "foo.bar[1].baz". The keypath structure can be found
+          in the description at the beginning of this specification.
 
-        The value at the location specified by the keypath is replaced with the value associated with the keypath, in the object
-        regardless of its type. When a path in the keypath refers to a non-existent property, the key is added and
-        its value set as a dictionary or an array depending on the type of the path.
+          The value at the location specified by the keypath is replaced with the value associated with the keypath, in the object
+          regardless of its type. When a path in the keypath refers to a non-existent property, the key is added and
+          its value set as a dictionary or an array depending on the type of the path.
 
-        When a path in the keypath includes an array index that is out of bounds (the array is smaller than the specified index), the array
-        is padded with nulls until it is exactly large enough to make the specified index legal.
+           When a path in the keypath includes an array index that is out of bounds (the array is smaller than the specified index), the array
+           is padded with nulls until it is exactly large enough to make the specified index legal.
 
-        When a path (dictionary or array) in the keypath doesn't match the actual value type, the error will be returned.
+           When a path (dictionary or array) in the keypath doesn't match the actual value type, the error will be returned.
 
-        Examples,
+           Examples :
 
-        Document:
-        {
-          "name", {"first": "John", "last": "Doe"},
-          "addresses": [{"city": "San Francisco"}, {"city": "Palo Alto"}]
-        }
+          ```
+             Document:
+             {
+               "name", {"first": "John", "last": "Doe"},
+               "addresses": [{"city": "San Francisco"}, {"city": "Palo Alto"}]
+             }
 
-        Updates:
+             Updates:
 
-        name.last = "Tiger" -> {"name", {"first": "John", "last": "Tiger"}, ...}
-        name.middle = "Sky" -> {"name", {"first": "John", "middle": "sky", "last": "Tiger"}, ...}
-        name = "John Doe" -> {"name", "John Doe"}
+             name.last = "Tiger" -> {"name", {"first": "John", "last": "Tiger"}, ...}
+             name.middle = "Sky" -> {"name", {"first": "John", "middle": "sky", "last": "Tiger"}, ...}
+             name = "John Doe" -> {"name", "John Doe"}
 
-        name.first.value = "John" ->  Error as the value of "first" is not the dictionary
+             name.first.value = "John" ->  Error as the value of "first" is not the dictionary
+             addresses[0].city = "Santa Clara" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}], ...}
+             addresses[4].city = "San Mateo" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}, null, {"city": "San Mateo"}], ...}
+             phones[1] = "650-123-4567" -> {"phones": [null, "650-123-4567"]}
+          ```
+        - **removedProperties**:
 
-        addresses[0].city = "Santa Clara" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}], ...}
-        addresses[4].city = "San Mateo" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}, null, {"city": "San Mateo"}], ...}
-        phones[1] = "650-123-4567" -> {"phones": [null, "650-123-4567"]}
+          An array of the key paths which refer to ditionary keys or array elements to be removed. If a keypath refer to a non-existent
+          property or array element, the remove for the keypath will be no-ops. When removing multiple items in an array, the order of the array indexes
+          should be from high to low to avoid index mutation during the removal.
 
-        removedProperties:
+        - **updatedBlobs**:
 
-        An array of the key paths which refer to ditionary keys or array elements to be removed. If a keypath refer to a non-existent
-        property or array element, the remove for the keypath will be no-ops. When removing multiple items in an array, the order of the array indexes
-        should be from high to low to avoid index mutation during the removal.
+          A dictionary whose keys are the key paths into the document to be updated with the blob objects and values are
+          the blob file names listed in the blob dataset.
 
-        updatedBlobs:
+          The logic to update blobs is similar to the logic when updating properties. The value at the location specified
+          by the keypath is replaced with the blob object in the object regardless of its type. When a path in the keypath
+          refers to a non-existent property, the key is added and  its value set as a dictionary or an array depending on
+          the type of the path. When a path in the keypath includes an array index that is out of bounds, the array
+          is padded with nulls until it is exactly large enough to make the specified index legal.
 
-        A dictionary whose keys are the key paths into the document to be updated with the blob objects and values are
-        the blob file names listed in the blob dataset.
+          The blob object is created from the content of the blob file refered by the blob file name, the dictionary value
+          associated with each key path. If the blob file name refers to non-existing blob file, 400 request error will
+          be returned.
 
-        The logic to update blobs is similar to the logic when updating properties. The value at the location specified
-        by the keypath is replaced with the blob object in the object regardless of its type. When a path in the keypath
-        refers to a non-existent property, the key is added and  its value set as a dictionary or an array depending on
-        the type of the path. When a path in the keypath includes an array index that is out of bounds, the array
-        is padded with nulls until it is exactly large enough to make the specified index legal.
-
-        The blob object is created from the content of the blob file refered by the blob file name, the dictionary value
-        associated with each key path. If the blob file name refers to non-existing blob file, 400 request error will
-        be returned.
-
-        The content_type of the blob used when creating a blob object can be detected from the blob file name's extension
-        as the following rules:
-          * "image/jpeg" for the .jpg
-          * "application/octet-stream" for others
+          The content_type of the blob used when creating a blob object can be detected from the blob file name's extension
+          as the following rules:
+            * "image/jpeg" for the .jpg
+            * "application/octet-stream" for others
 
       operationId: updateDatabase
       requestBody:
@@ -637,7 +639,7 @@ paths:
                     description: |-
                       The actual document body of the document that has unexpected properties.
                     type: object
-                    additionalProperties: { }
+                    additionalProperties: {}
                     example: {'name': 'John Doe', 'address': {'city': 'Santa Clara', 'state': 'CA'}}
         '400':
           $ref: '#/components/responses/Error'
@@ -758,7 +760,7 @@ paths:
               type: object
               required: ['database', 'collections']
               properties:
-                database: 
+                database:
                   type: string
                   example: 'db1'
                 collections:
@@ -804,7 +806,7 @@ paths:
               type: object
               required: ['id']
               properties:
-                id: 
+                id:
                   type: string
                   format: uuid
                   example: '123e4567-e89b-12d3-a456-426614174000'
@@ -838,13 +840,15 @@ components:
       type: object
       additionalProperties:
         type: string
-      example: { 'catalog.cloths': [{'id': 'c1', 'rev': '800@Bob'}, {'id': 'c2', 'rev': '1-9ef'}],
-                 'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1010@Alice}]}
+      example: {
+        'catalog.cloths': [{'id': 'c1', 'rev': '800@Bob'}, {'id': 'c2', 'rev': '1-9ef'}],
+        'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1010@Alice'}]
+      }
     Document:
       description: |-
         Contains document's properties and the metadata.
       type: object
-      additionalProperties: { }
+      additionalProperties: {}
       example: {'_id': 'doc1', '_revs': '17f4ed7b51a50000@MlAW1NbbT8KcTRO8oPnpgw, 17f4ed7b42a70000@ScJAVJf3TdOUanAcByIcXg', 'foo': 'bar'}
     DocumentID:
       type: object
@@ -901,24 +905,24 @@ components:
           type: array
           items:
             type: object
-            additionalProperties: { }
+            additionalProperties: {}
             example:
               [
-                {'people[47].address': {'street': 'Oak St. ', 'city': 'Auburn'} },
-                {'people[3].address': {'street': 'Elm St. ', 'city': 'Sibley'} }
+                {'people[47].address': {'street': 'Oak St. ', 'city': 'Auburn'}},
+                {'people[3].address': {'street': 'Elm St. ', 'city': 'Sibley'}}
               ]
         removedProperties:
           description: An array of the key paths which refer to ditionary keys or array elements to be removed.
           type: array
           items:
             type: string
-            example: [ 'people[22].address', 'people[3]' ]
+            example: ['people[22].address', 'people[3]']
         updatedBlobs:
           description: A dictionary whose keys are the key paths into the document to be updated with the
             blob objects and values are the blob keys in the dataset.
           type: object
-          additionalProperties: { }
-          example: { 'photo.thumbnail': 's1.jpg' }
+          additionalProperties: {}
+          example: {'photo.thumbnail': 's1.jpg'}
     Error:
       type: object
       required: ['domain', 'code']
@@ -1094,8 +1098,8 @@ components:
           example: 'documentIDs'
         params:
           type: object
-          additionalProperties: { }
-          example: { 'documentIDs': ['doc1', 'doc2'] }
+          additionalProperties: {}
+          example: {'documentIDs': ['doc1', 'doc2']}
     ConflictResolver:
       description: |-
         The conflict resolver to set for this collection of the replication.  Each resolver is predefined
@@ -1110,8 +1114,8 @@ components:
           example: 'merge'
         params:
           type: object
-          additionalProperties: { }
-          example: { 'property': 'region'}
+          additionalProperties: {}
+          example: {'property': 'region'}
     ReplicatorStatus:
       type: object
       required: ['activity', 'progress']

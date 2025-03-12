@@ -1,0 +1,68 @@
+# Copyright 2024-Present Couchbase, Inc.
+#
+# Use of this software is governed by the Business Source License included in
+# the file licenses/BSL-Couchbase.txt.  As of the Change Date specified in that
+# file, in accordance with the Business Source License, use of this software
+# will be governed by the Apache License, Version 2.0, included in the file
+# licenses/APL2.txt.
+
+name: openapi
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  pull_request:
+    # Only run when we change an API spec
+    paths:
+      - 'spec/api/**'
+  push:
+    # Only run when we change an API spec
+    paths:
+      - 'spec/api/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !contains(github.ref, 'release/') && !contains(github.ref, 'main') }}
+
+jobs:
+  redocly_preview_links:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Find Comment
+        uses: peter-evans/find-comment@v3
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: Redocly preview
+      - name: Create or update comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            # Redocly preview
+
+            [API](https://redocly.github.io/redoc/?url=https://raw.githubusercontent.com/couchbaselabs/couchbase-lite-tests/${{ github.event.pull_request.head.sha }}/spec/api/api.yaml)
+          edit-mode: replace
+  api_validation:
+    runs-on: ubuntu-latest
+    name: OpenAPI Validation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r7kamura/redocly-problem-matchers@v1
+      - uses: mhiew/redoc-lint-github-action@v4
+        with:
+          args: '--format stylish spec/api/api.yaml'
+        env:
+          NO_COLOR: '1'
+  yamllint:
+    name: 'yamllint'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: karancode/yamllint-github-action@master
+        with:
+          yamllint_file_or_dir: 'spec'
