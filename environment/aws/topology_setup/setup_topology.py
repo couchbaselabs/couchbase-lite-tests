@@ -240,18 +240,20 @@ class TopologyConfig:
 
             i += 1
 
-        print()
+        if len(self.__clusters) > 0:
+            print()
+            
         i = 1
         for sgw in self.__sync_gateways:
             print(f"Sync Gateway {i}: {sgw.hostname} -> {sgw.cluster_hostname}")
             i += 1
 
-        print()
+        if len(self.__sync_gateways) > 0:
+            print()
 
         if self._wants_logslurp:
             print(f"Logslurp: {self.__logslurp}")
-
-        print()
+            print()
 
         i = 1
         for test_server in self.__test_servers:
@@ -261,7 +263,8 @@ class TopologyConfig:
             print(f"\tIP Address: {test_server.ip_address}")
             i += 1
 
-        print()
+        if len(self.__test_servers) > 0:
+            print()
 
     def __init__(self, config_file: Optional[str] = None):
         if config_file is None:
@@ -274,6 +277,7 @@ class TopologyConfig:
         self.__test_server_inputs: List[TestServerInput] = []
         self.__test_servers: List[TestServerConfig] = []
         self._wants_logslurp: Optional[bool] = None
+        self.__logslurp: Optional[str] = None
 
         with open(config_file, "r") as fin:
             config = cast(Dict, json.load(fin))

@@ -176,6 +176,51 @@ class DotnetTestServer(TestServer):
 
         subprocess.run(args, check=True, capture_output=False)
 
+class DotnetTestServerCli(TestServer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @property
+    @abstractmethod
+    def rid(self) -> str:
+        pass
+
+    def build(self, cbl_version: str):
+        version_parts = cbl_version.split("-")
+        build = version_parts[1]
+        cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
+        csproj_path = (
+            DOTNET_TEST_SERVER_DIR / "testserver.logic" / "testserver.logic.csproj"
+        )
+        header(f"Modifying Couchbase Lite version to {cbl_version}")
+        subprocess.run(
+            [
+                DOTNET_PATH,
+                "add",
+                csproj_path,
+                "package",
+                "Couchbase.Lite.Enterprise",
+                "--version",
+                cbl_version,
+            ],
+            check=True,
+            capture_output=False,
+        )
+
+        csproj_path = DOTNET_TEST_SERVER_DIR / "testserver.cli" / "testserver.cli.csproj"
+        header(f"Building .NET test server for {self.platform}")
+        args: List[str] = [
+            str(DOTNET_PATH),
+            "publish",
+            str(csproj_path),
+            "-r",
+            self.rid,
+            "-c",
+            "Release"
+        ]
+
+        subprocess.run(args, check=True, capture_output=False)
+
 
 @TestServer.register("dotnet_ios")
 class DotnetTestServer_iOS(DotnetTestServer):

@@ -93,7 +93,7 @@ def check_aws_key_checking() -> None:
 
 
 def main(topology: TopologyConfig, private_key: Optional[str] = None):
-    if topology.logslurp is None:
+    if not topology.wants_logslurp:
         return
 
     header("Setting up logslurp")

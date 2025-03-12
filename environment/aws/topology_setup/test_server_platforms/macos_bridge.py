@@ -1,4 +1,5 @@
 import subprocess
+from typing import Optional
 
 from common.output import header
 
@@ -32,4 +33,4 @@ class macOSBridge(PlatformBridge):
         print("No action needed for uninstalling macOS app")
 
     def get_ip(self, location):
-        return "localhost"
+        return location

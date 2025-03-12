@@ -51,14 +51,27 @@ static bool IsInterfaceValid(NetworkInterface ni)
 }
 
 var server = new CBLTestServer();
-if (args.Length == 1) {
-    server.Port = UInt16.Parse(args[0]);
+var silent = false;
+foreach(var arg in args) {
+    if(arg == "--silent") {
+        silent = true;
+    } else {
+        server.Port = UInt16.Parse(arg);
+    }
 }
 
 var _ = server.Start();
+void Log(string message)
+{
+    if(silent) {
+        return;
+    }
 
-Console.WriteLine($"Test Server Version: {CBLTestServer.Version}");
-Console.WriteLine("CBL Version: " + typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
+    Console.WriteLine(message);
+}
+
+Log($"Test Server Version: {CBLTestServer.Version}");
+Log("CBL Version: " + typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
 var validIPs = NetworkInterface.GetAllNetworkInterfaces().Where(IsInterfaceValid)
                     .SelectMany(x => x.GetIPProperties().UnicastAddresses)
                     .Where(x => x.Address.AddressFamily == AddressFamily.InterNetwork && x.Address.GetAddressBytes()[0] != 169);
@@ -67,9 +80,8 @@ var ipAddresses = "Server running at:" +
     Environment.NewLine +
     String.Join(Environment.NewLine, validIPs
     .Select(x => $"http://{x.Address}:{server.Port}"));
-Console.WriteLine(ipAddresses);
-Console.WriteLine("Press any key to exit at any time...");
+Log(ipAddresses);
 
-Console.Read();
+await Task.Delay(Timeout.Infinite);
 
 server.Stop();

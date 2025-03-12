@@ -17,15 +17,19 @@ from topology_setup.setup_topology import main as topology_main
 
 def terraform_apply(public_key_name: str, topology: TopologyConfig):
     header("Starting terraform apply")
+    sgw_count = topology.total_sgw_count
+    cbs_count = topology.total_cbs_count
+    wants_logslurp = str(topology.wants_logslurp).lower()
+
+    if sgw_count == 0 and cbs_count == 0 and not topology.wants_logslurp:
+        print("No AWS resources requested, skipping terraform")
+        return
+    
     result = subprocess.run(["terraform", "init"], capture_output=False, text=True)
     if result.returncode != 0:
         raise Exception(
             f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
         )
-
-    sgw_count = topology.total_sgw_count
-    cbs_count = topology.total_cbs_count
-    wants_logslurp = str(topology.wants_logslurp).lower()
 
     command = [
         "terraform",
@@ -42,8 +46,13 @@ def terraform_apply(public_key_name: str, topology: TopologyConfig):
         raise Exception(
             f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
         )
+    
+    topology.read_from_terraform()
 
     header("Done, sleeping for 5s")
+    # The machines won't be ready immediately, so we need to wait a bit
+    # before SSH access succeeds
+    sleep(5)
 
 
 def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str]):
@@ -70,7 +79,7 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
 
             config_json["sync-gateways"] = sgw_instances
 
-        if topology.logslurp is not None:
+        if topology.wants_logslurp:
             config_json["logslurp"] = f"{topology.logslurp}:8180"
 
         if len(topology.test_servers) > 0:
@@ -137,12 +146,6 @@ if __name__ == "__main__":
     )
 
     terraform_apply(args.public_key_name, topology)
-
-    # The machines won't be ready immediately, so we need to wait a bit
-    # before SSH access succeeds
-    sleep(5)
-
-    topology.read_from_terraform()
     topology.resolve_test_servers()
     topology.dump()
     server_main(args.cbs_version, topology, args.private_key)
