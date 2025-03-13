@@ -1,7 +1,7 @@
 import subprocess
 from typing import Optional
 
-from common.output import header
+from environment.aws.common.output import header
 
 from .platform_bridge import PlatformBridge
 

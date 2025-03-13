@@ -2,7 +2,7 @@ import subprocess
 from pathlib import Path
 from typing import List
 
-from common.output import header
+from environment.aws.common.output import header
 
 from .platform_bridge import PlatformBridge
 

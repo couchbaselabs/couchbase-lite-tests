@@ -5,6 +5,6 @@
     <ActiveDebugFramework>net8.0-windows10.0.19041.0</ActiveDebugFramework>
     <ActiveDebugProfile>Windows Machine</ActiveDebugProfile>
     <SelectedPlatformGroup>Emulator</SelectedPlatformGroup>
-    <DefaultDevice>pixel_5_-_api_26</DefaultDevice>
+    <DefaultDevice>dotnet_cbl_testing_22</DefaultDevice>
   </PropertyGroup>
 </Project>

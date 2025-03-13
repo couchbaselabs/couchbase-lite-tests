@@ -3,15 +3,14 @@ using Serilog.Events;
 
 namespace TestServer.Utilities
 {
-    public sealed class SerilogLogger : ILogger
+    public sealed class SerilogLogger : BaseLogSink
     {
-        public SerilogLogger()
+        public SerilogLogger(LogLevel level)
+            : base(level)
         {
         }
 
-        public LogLevel Level => LogLevel.Debug;
-
-        public void Log(LogLevel level, LogDomain domain, string message)
+        protected override void WriteLog(LogLevel level, LogDomain domain, string message)
         {
             var outLevel = LogEventLevel.Information;
             switch (level) {

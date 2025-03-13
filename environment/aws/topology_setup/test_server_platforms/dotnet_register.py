@@ -6,13 +6,14 @@ from os import environ
 from pathlib import Path
 from typing import List, Optional
 
-from common.output import header
+from environment.aws.common.output import header
 
-from topology_setup.test_server import TEST_SERVER_DIR, TestServer
+from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
 
 from .android_bridge import AndroidBridge
 from .ios_bridge import iOSBridge
 from .macos_bridge import macOSBridge
+from .exe_bridge import ExeBridge
 from .platform_bridge import PlatformBridge
 
 DOTNET_TEST_SERVER_DIR = TEST_SERVER_DIR / "dotnet"
@@ -216,7 +217,9 @@ class DotnetTestServerCli(TestServer):
             "-r",
             self.rid,
             "-c",
-            "Release"
+            "Release",
+            "--self-contained",
+            "true"
         ]
 
         subprocess.run(args, check=True, capture_output=False)
@@ -284,42 +287,25 @@ class DotnetTestServer_Android(DotnetTestServer):
 
 
 @TestServer.register("dotnet_windows")
-class DotnetTestServer_Windows(DotnetTestServer):
+class DotnetTestServer_Windows(DotnetTestServerCli):
     @property
     def platform(self) -> str:
         return ".NET Windows"
-
+    
     @property
-    def dotnet_framework(self) -> str:
-        return "net8.0-windows10.0.19041.0"
-
-    @property
-    def publish(self) -> bool:
-        return True
+    def rid(self) -> str:
+        return "win-x64"
 
     def create_bridge(self) -> PlatformBridge:
-        base_path = (
+        return ExeBridge(
             DOTNET_TEST_SERVER_DIR
-            / "testserver"
+            / "testserver.cli"
             / "bin"
             / "Release"
-            / "net8.0-windows10.0.19041.0"
-            / "win10-x64"
-            / "AppPackages"
-        )
-        install_scripts = glob.glob(
-            str(base_path / "**" / "Install.ps1"), recursive=True
-        )
-        if not install_scripts:
-            raise FileNotFoundError(
-                "Install.ps1 not found, was the test server properly built?"
-            )
-
-        install_path = install_scripts[0]
-        return WinUIBridge(
-            "testserver",
-            "bf1b9964-631c-4489-91fa-a04e7f3f3765_nw4t8ysxwwgx8",
-            install_path,
+            / "net8.0"
+            / "win-x64"
+            / "publish"
+            / "testserver.cli.exe", ["--silent", "5555"]
         )
 
 

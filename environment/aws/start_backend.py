@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 
 import json
+import os
 import subprocess
 import sys
 from argparse import ArgumentParser
 from time import sleep
-from typing import IO, Dict, cast
+from typing import IO, Dict, Optional, cast
 
-from common.output import header
-from logslurp_setup.setup_logslurp import main as logslurp_main
-from server_setup.setup_server import main as server_main
-from sgw_setup.setup_sgw import main as sgw_main
-from topology_setup.setup_topology import TopologyConfig
-from topology_setup.setup_topology import main as topology_main
+from environment.aws.common.output import header
+from environment.aws.logslurp_setup.setup_logslurp import main as logslurp_main
+from environment.aws.server_setup.setup_server import main as server_main
+from environment.aws.sgw_setup.setup_sgw import main as sgw_main
+from environment.aws.topology_setup.setup_topology import TopologyConfig, main as topology_main
 
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 def terraform_apply(public_key_name: str, topology: TopologyConfig):
+    os.chdir(SCRIPT_DIR)
     header("Starting terraform apply")
     sgw_count = topology.total_sgw_count
     cbs_count = topology.total_cbs_count
@@ -93,15 +95,20 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
         json.dump(config_json, output, indent=2)
 
 
-def get_logslurp_ip():
-    logslurp_command = ["terraform", "output", "-json", "logslurp_instance_public_ip"]
-    result = subprocess.run(logslurp_command, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise Exception(
-            f"Command '{' '.join(logslurp_command)}' failed with exit status {result.returncode}: {result.stderr}"
-        )
+def main(topology: TopologyConfig, public_key_name: str, sgw_url: str, tdk_config_in: str, cbs_version: str = "7.6.4", private_key: Optional[str] = None, tdk_config_out: Optional[str] = None):
+    terraform_apply(public_key_name, topology)
+    topology.resolve_test_servers()
+    topology.dump()
+    server_main(cbs_version, topology, private_key)
+    sgw_main(sgw_url, topology, private_key)
+    logslurp_main(topology, private_key)
+    topology_main(topology)
 
-    return cast(str, json.loads(result.stdout))
+    if tdk_config_out is not None:
+        with open(tdk_config_out, "w") as fout:
+            write_config(tdk_config_in, topology, fout)
+    else:
+        write_config(tdk_config_in, topology, sys.stdout)
 
 
 if __name__ == "__main__":
@@ -145,15 +152,4 @@ if __name__ == "__main__":
         TopologyConfig(args.topology) if args.topology is not None else TopologyConfig()
     )
 
-    terraform_apply(args.public_key_name, topology)
-    topology.resolve_test_servers()
-    topology.dump()
-    server_main(args.cbs_version, topology, args.private_key)
-    sgw_main(args.sgw_url, topology, args.private_key)
-    logslurp_main(topology, args.private_key)
-    topology_main(topology)
-    if args.tdk_config_out is not None:
-        with open(args.tdk_config_out, "w") as fout:
-            write_config(args.tdk_config_in, topology, fout)
-    else:
-        write_config(args.tdk_config_in, topology, sys.stdout)
+    main(topology, args.public_key_name, args.sgw_url, args.tdk_config_in, args.cbs_version, args.private_key, args.tdk_config_out)

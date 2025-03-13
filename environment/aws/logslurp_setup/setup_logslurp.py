@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Optional
 
 import paramiko
-from common.output import header
+from environment.aws.common.output import header
 from termcolor import colored
-from topology_setup.setup_topology import TopologyConfig
+from environment.aws.topology_setup.setup_topology import TopologyConfig
 from tqdm import tqdm
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -151,7 +151,19 @@ def main(topology: TopologyConfig, private_key: Optional[str] = None):
     env = os.environ.copy()
     env["DOCKER_CONTEXT"] = "aws"
     subprocess.run(
-        ["docker", "compose", "up", "-d", "--build", "cbl-test-logslurp"],
+        ["docker", "stop", "logslurp"],
+        check=False,
+        env=env,
+        cwd=SCRIPT_DIR / ".." / "..",
+    )
+    subprocess.run(
+        ["docker", "rm", "logslurp"],
+        check=False,
+        env=env,
+        cwd=SCRIPT_DIR / ".." / "..",
+    )
+    subprocess.run(
+        ["docker", "run", "-d", "-p", "8180:8180", "--name", "logslurp", "003946487953.dkr.ecr.us-east-1.amazonaws.com/couchbase/logslurp"],
         check=True,
         env=env,
         cwd=SCRIPT_DIR / ".." / "..",

@@ -9,7 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Couchbase.Lite.Enterprise" Version="4.0.0-b0006" />
+        <PackageReference Include="Couchbase.Lite.Enterprise" Version="3.2.2-b0018" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
         <PackageReference Include="Serilog.Expressions" Version="5.0.0" />
         <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />

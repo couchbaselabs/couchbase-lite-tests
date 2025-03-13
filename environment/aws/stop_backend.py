@@ -2,6 +2,7 @@
 
 import subprocess
 from argparse import ArgumentParser
+from topology_setup.setup_topology import TopologyConfig
 
 from common.output import header
 
@@ -9,26 +10,31 @@ if __name__ == "__main__":
     parser = ArgumentParser(
         description="Tear down a previously created E2E AWS EC2 testing backend"
     )
-    required = parser.add_argument_group("required arguments")
-    required.add_argument(
-        "--public-key-name",
-        help="The public key stored in AWS that pairs with the private key",
-        required=True,
+    parser.add_argument(
+        "--topology",
+        help="The topology file that was used to start the environemnt"
     )
     args = parser.parse_args()
+    topology = TopologyConfig(args.topology) if args.topology is not None else TopologyConfig()
 
     header("Starting terraform destroy")
     command = [
         "terraform",
         "destroy",
-        f"-var=key_name={args.public_key_name}",
+        f"-var=key_name=x",
         "-auto-approve",
     ]
+    
     result = subprocess.run(command, capture_output=False, text=True)
 
     if result.returncode != 0:
-        raise Exception(
-            f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
-        )
+        print(f"WARNING: Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}")
+        print()
 
     header("Done!")
+
+    header("Stopping test servers")
+    topology.stop_test_servers()
+    header("Done!")
+
+    exit(result.returncode)

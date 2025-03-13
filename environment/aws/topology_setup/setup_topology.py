@@ -3,9 +3,8 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Final, List, Optional, cast
 
-from common.output import header
-
-from .test_server import TestServer
+from environment.aws.common.output import header
+from environment.aws.topology_setup.test_server import TestServer
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -208,6 +207,13 @@ class TopologyConfig:
             bridge = test_server.create_bridge()
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
+
+    def stop_test_servers(self):
+        TestServer.initialize()
+        for test_server_input in self.__test_server_inputs:
+            test_server = TestServer.create(test_server_input.platform)
+            bridge = test_server.create_bridge()
+            bridge.stop(test_server_input.location)
 
     def apply_sgw_hostnames(self, hostnames: List[str]):
         for sgw_input in self.__sync_gateway_inputs:

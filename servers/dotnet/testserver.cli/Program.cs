@@ -10,6 +10,16 @@ using TestServer.Services;
 using TestServer.Utilities;
 using Couchbase.Lite.Logging;
 
+var silent = false;
+ushort port = 0;
+foreach (var arg in args) {
+    if (arg == "--silent") {
+        silent = true;
+    } else {
+        port = UInt16.Parse(arg);
+    }
+}
+
 ServiceCollection collection = new ServiceCollection();
 collection.AddSingleton<IDeviceInformation, DeviceInformation>();
 collection.AddSingleton<IFileSystem, CLIFileSystem>();
@@ -17,8 +27,11 @@ collection.AddSingleton<IFileSystem, CLIFileSystem>();
 var logFilePath = $"{Path.GetTempFileName()}.txt";
 var logConfig = new LoggerConfiguration()
     .MinimumLevel.Debug()
-    .WriteTo.File(logFilePath)
-    .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Warning);
+    .WriteTo.File(logFilePath);
+
+if(!silent) {
+    logConfig.WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Warning);
+}
 
 #if DEBUG
 logConfig.WriteTo.Debug(restrictedToMinimumLevel: LogEventLevel.Warning);
@@ -27,8 +40,8 @@ logConfig.WriteTo.Debug(restrictedToMinimumLevel: LogEventLevel.Warning);
 Serilog.Log.Logger = logConfig.CreateLogger();
 Serilog.Log.Logger.Write(LogEventLevel.Information, "Test server started at {time}", DateTimeOffset.UtcNow);
 
-Couchbase.Lite.Database.Log.Custom = new SerilogLogger();
-Couchbase.Lite.Database.Log.Console.Level = LogLevel.None;
+LogSinks.Custom = new SerilogLogger(LogLevel.Debug);
+LogSinks.Console = null;
 
 CBLTestServer.ServiceProvider = collection.BuildServiceProvider();
 
@@ -50,16 +63,10 @@ static bool IsInterfaceValid(NetworkInterface ni)
     return true;
 }
 
-var server = new CBLTestServer();
-var silent = false;
-foreach(var arg in args) {
-    if(arg == "--silent") {
-        silent = true;
-    } else {
-        server.Port = UInt16.Parse(arg);
-    }
-}
-
+var server = new CBLTestServer()
+{
+    Port = port
+};
 var _ = server.Start();
 void Log(string message)
 {

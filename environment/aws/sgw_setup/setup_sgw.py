@@ -7,9 +7,9 @@ from typing import Dict, Optional, cast
 
 import paramiko
 import requests
-from common.output import header
+from environment.aws.common.output import header
 from termcolor import colored
-from topology_setup.setup_topology import TopologyConfig
+from environment.aws.topology_setup.setup_topology import TopologyConfig
 from tqdm import tqdm
 
 SCRIPT_DIR = Path(__file__).resolve().parent

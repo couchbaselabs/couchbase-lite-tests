@@ -3,19 +3,22 @@ from __future__ import annotations
 import importlib
 from abc import ABC, abstractmethod
 from pathlib import Path
+import traceback
 from typing import Callable, Dict, Type
 
-from topology_setup.test_server_platforms.platform_bridge import PlatformBridge
+from environment.aws.topology_setup.test_server_platforms.platform_bridge import PlatformBridge
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEST_SERVER_DIR = (SCRIPT_DIR / ".." / ".." / ".." / "servers").resolve()
 
-
 class TestServer(ABC):
-    __registry: Dict[str, Type] = {}
+    __registry: Dict[str, Type[TestServer]] = {}
 
     @classmethod
     def initialize(cls) -> None:
+        if len(cls.__registry) > 0:
+            return
+        
         platforms_path = SCRIPT_DIR / "test_server_platforms"
         for platform in platforms_path.iterdir():
             if (
@@ -24,23 +27,24 @@ class TestServer(ABC):
                 and platform.suffix == ".py"
             ):
                 importlib.import_module(
-                    f"topology_setup.test_server_platforms.{platform.stem}"
+                    f"environment.aws.topology_setup.test_server_platforms.{platform.stem}"
                 )
 
     @classmethod
-    def register(cls, name: str) -> Callable[[Type], Type]:
-        def decorator(subclass: Type) -> Type:
+    def register(cls, name: str) -> Callable[[Type[TestServer]], Type[TestServer]]:
+        def decorator(subclass: Type[TestServer]) -> Type[TestServer]:
             cls.__registry[name] = subclass
             return subclass
 
         return decorator
 
     @classmethod
-    def create(cls, name: str, *args, **kwargs) -> TestServer:
+    def create(cls, name: str) -> TestServer:
+        TestServer.initialize()
         if name not in cls.__registry:
             raise ValueError(f"Unknown test server type: {name}")
 
-        return cls.__registry[name](*args, **kwargs)
+        return cls.__registry[name]()
 
     @property
     @abstractmethod
@@ -54,6 +58,5 @@ class TestServer(ABC):
     @abstractmethod
     def create_bridge(self) -> PlatformBridge:
         pass
-
 
 TestServer.initialize()
