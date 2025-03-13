@@ -163,7 +163,7 @@ def main(topology: TopologyConfig, private_key: Optional[str] = None):
         cwd=SCRIPT_DIR / ".." / "..",
     )
     subprocess.run(
-        ["docker", "run", "-d", "-p", "8180:8180", "--name", "logslurp", "003946487953.dkr.ecr.us-east-1.amazonaws.com/couchbase/logslurp"],
+        ["docker", "run", "-d", "-p", "8180:8180", "--name", "logslurp", "public.ecr.aws/q8y4w9v7/couchbase/logslurp"],
         check=True,
         env=env,
         cwd=SCRIPT_DIR / ".." / "..",

@@ -25,8 +25,9 @@ class macOSBridge(PlatformBridge):
 
     def stop(self, location: str) -> None:
         self.validate(location)
-        header("Stopping test server")
-        subprocess.run(["killall", "testserver"], check=True, capture_output=False)
+        header("Stopping macOS test server")
+        print("running 'killall testserver'")
+        subprocess.run(["killall", "testserver"], check=False, capture_output=False)
 
     def uninstall(self, location: str) -> None:
         self.validate(location)
