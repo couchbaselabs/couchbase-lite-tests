@@ -1,3 +1,45 @@
+"""
+This module provides the abstract base class TestServer for managing Couchbase Lite test servers on various platforms.
+It includes functions for initializing, registering, creating, building, downloading, compressing, and uncompressing test servers.
+
+Classes:
+    TestServer: An abstract base class for managing Couchbase Lite test servers on various platforms.
+
+Functions:
+    initialize(cls) -> None:
+        Initialize the test server registry by importing platform-specific modules.
+
+    register(cls, name: str) -> Callable[[Type[TestServer]], Type[TestServer]]:
+        Register a test server subclass with a given name.
+
+    create(cls, name: str, version: str) -> TestServer:
+        Create an instance of a registered test server subclass.
+
+    version(self) -> str:
+        Get the version of the test server.
+
+    platform(self) -> str:
+        Get the platform of the test server.
+
+    latestbuilds_path(self) -> str:
+        Get the path for the latest builds of the test server.
+
+    build(self) -> None:
+        Build the test server.
+
+    download(self) -> None:
+        Download the test server package from the latestbuilds server.
+
+    compress_package(self) -> str:
+        Compress the test server package.
+
+    uncompress_package(self, path: Path) -> None:
+        Uncompress the test server package.
+
+    create_bridge(self) -> PlatformBridge:
+        Create a platform bridge for the test server.
+"""
+
 from __future__ import annotations
 
 import importlib
@@ -18,6 +60,44 @@ TEST_SERVER_DIR = (SCRIPT_DIR / ".." / ".." / ".." / "servers").resolve()
 
 
 class TestServer(ABC):
+    """
+    An abstract base class for managing Couchbase Lite test servers on various platforms.
+
+    Methods:
+        initialize(cls) -> None:
+            Initialize the test server registry by importing platform-specific modules.
+
+        register(cls, name: str) -> Callable[[Type[TestServer]], Type[TestServer]]:
+            Register a test server subclass with a given name.
+
+        create(cls, name: str, version: str) -> TestServer:
+            Create an instance of a registered test server subclass.
+
+        version(self) -> str:
+            Get the version of the test server.
+
+        platform(self) -> str:
+            Get the platform of the test server.
+
+        latestbuilds_path(self) -> str:
+            Get the path for the latest builds of the test server.
+
+        build(self) -> None:
+            Build the test server.
+
+        download(self) -> None:
+            Download the test server package from the latestbuilds server.
+
+        compress_package(self) -> str:
+            Compress the test server package.
+
+        uncompress_package(self, path: Path) -> None:
+            Uncompress the test server package.
+
+        create_bridge(self) -> PlatformBridge:
+            Create a platform bridge for the test server.
+    """
+
     __registry: Dict[str, Type[TestServer]] = {}
 
     def __init__(self, version: str):
@@ -26,6 +106,9 @@ class TestServer(ABC):
 
     @classmethod
     def initialize(cls) -> None:
+        """
+        Initialize the test server registry by importing platform-specific modules.
+        """
         if len(cls.__registry) > 0:
             return
 
@@ -42,6 +125,16 @@ class TestServer(ABC):
 
     @classmethod
     def register(cls, name: str) -> Callable[[Type[TestServer]], Type[TestServer]]:
+        """
+        Register a test server subclass with a given name.
+
+        Args:
+            name (str): The name to register the test server subclass with.
+
+        Returns:
+            Callable[[Type[TestServer]], Type[TestServer]]: A decorator function to register the subclass.
+        """
+
         def decorator(subclass: Type[TestServer]) -> Type[TestServer]:
             cls.__registry[name] = subclass
             return subclass
@@ -50,6 +143,19 @@ class TestServer(ABC):
 
     @classmethod
     def create(cls, name: str, version: str) -> TestServer:
+        """
+        Create an instance of a registered test server subclass.
+
+        Args:
+            name (str): The name of the registered test server subclass.
+            version (str): The version of the test server.
+
+        Returns:
+            TestServer: An instance of the registered test server subclass.
+
+        Raises:
+            ValueError: If the test server type is unknown.
+        """
         cls.initialize()
 
         if name not in cls.__registry:
@@ -59,23 +165,50 @@ class TestServer(ABC):
 
     @property
     def version(self) -> str:
+        """
+        Get the version of the test server.
+
+        Returns:
+            str: The version of the test server.
+        """
         return self.__version
 
     @property
     @abstractmethod
     def platform(self) -> str:
+        """
+        Get the platform of the test server.
+
+        Returns:
+            str: The platform of the test server.
+        """
         pass
 
     @property
     @abstractmethod
     def latestbuilds_path(self) -> str:
+        """
+        Get the path for the latest builds of the test server.
+
+        Returns:
+            str: The path for the latest builds of the test server.
+        """
         pass
 
     @abstractmethod
     def build(self) -> None:
+        """
+        Build the test server.
+        """
         pass
 
     def download(self) -> None:
+        """
+        Download the test server package from the latestbuilds server.
+
+        Raises:
+            FileNotFoundError: If the test server package is not found on the latestbuilds server.
+        """
         download_dir = TEST_SERVER_DIR / "downloaded" / self.platform / self.version
         download_dir.mkdir(parents=True, exist_ok=True)
         if (download_dir / ".downloaded").exists():
@@ -100,14 +233,32 @@ class TestServer(ABC):
 
     @abstractmethod
     def compress_package(self) -> str:
+        """
+        Compress the test server package.
+
+        Returns:
+            str: The path to the compressed package.
+        """
         pass
 
     @abstractmethod
     def uncompress_package(self, path: Path) -> None:
+        """
+        Uncompress the test server package.
+
+        Args:
+            path (Path): The path to the compressed package.
+        """
         pass
 
     @abstractmethod
     def create_bridge(self) -> PlatformBridge:
+        """
+        Create a platform bridge for the test server.
+
+        Returns:
+            PlatformBridge: The platform bridge for the test server.
+        """
         pass
 
 

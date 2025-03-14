@@ -1,3 +1,30 @@
+"""
+This module provides the iOSBridge class for managing iOS applications on devices using ADB (Android Debug Bridge).
+It includes functions for validating devices, installing, running, stopping, and uninstalling applications, and retrieving the IP address of a device.
+
+Classes:
+    iOSBridge: A class to manage iOS applications on devices using ADB.
+
+Functions:
+    validate(self, location: str) -> None:
+        Validate that the device is connected and accessible via ADB.
+
+    install(self, location: str) -> None:
+        Install the application on the specified device.
+
+    run(self, location: str) -> None:
+        Run the application on the specified device.
+
+    stop(self, location: str) -> None:
+        Stop the application on the specified device.
+
+    uninstall(self, location: str) -> None:
+        Uninstall the application from the specified device.
+
+    get_ip(self, location: str) -> str:
+        Retrieve the IP address of the specified device.
+"""
+
 import platform
 import re
 import shutil
@@ -24,18 +51,44 @@ else:
 
 
 class iOSBridge(PlatformBridge):
+    """
+    A class to manage iOS applications on devices using either xharness or devicectl.
+    """
+
     def __init__(self, app_path: str, use_devicectl: bool = True):
+        """
+        Initialize the iOSBridge with the application path and whether to use devicectl.
+
+        Args:
+            app_path (str): The path to the application.
+            use_devicectl (bool): Whether to use devicectl for managing the application.
+        """
         self.__app_path = app_path
         self.__use_devicectl = use_devicectl
         self.__pid: str = ""
 
     def validate(self, location: str) -> None:
+        """
+        Validate that the device is connected and accessible
+
+        Args:
+            location (str): The device location (e.g., device UUID).
+
+        Raises:
+            RuntimeError: If the device is not found.
+        """
         if self.__use_devicectl:
             self.__validate_devicectl(location)
         else:
             self.__validate_libimobiledevice(location)
 
     def install(self, location: str) -> None:
+        """
+        Install the application on the specified device.
+
+        Args:
+            location (str): The device location (e.g., device UUID).
+        """
         header(f"Installing {self.__app_path} to {location}")
         if self.__use_devicectl:
             self.__install_devicectl(location)
@@ -43,6 +96,12 @@ class iOSBridge(PlatformBridge):
             self.__install_xharness(location)
 
     def run(self, location: str) -> None:
+        """
+        Run the application on the specified device.
+
+        Args:
+            location (str): The device location (e.g., device UUID).
+        """
         header(f"Running {self.__app_path} on {location}")
         if self.__use_devicectl:
             self.__run_devicectl(location)
@@ -50,6 +109,12 @@ class iOSBridge(PlatformBridge):
             self.__run_xharness(location)
 
     def stop(self, location: str) -> None:
+        """
+        Stop the application on the specified device.
+
+        Args:
+            location (str): The device location (e.g., device UUID).
+        """
         pid = self.__pid if self.__pid != "" else "<error>"
         header(f"Stopping testserver PID {pid} on {location}")
         if self.__use_devicectl:
@@ -58,6 +123,12 @@ class iOSBridge(PlatformBridge):
             self.__stop_xharness(location)
 
     def uninstall(self, location: str) -> None:
+        """
+        Uninstall the application from the specified device.
+
+        Args:
+            location (str): The device location (e.g., device UUID).
+        """
         print("iOS app uninstall deliberately not implemented")
 
     def __validate_libimobiledevice(self, location: str) -> None:
@@ -168,6 +239,18 @@ class iOSBridge(PlatformBridge):
                 )
 
     def get_ip(self, location: str) -> str:
+        """
+        Retrieve the IP address of the specified device.
+
+        Args:
+            location (str): The device location (e.g., device UUID).
+
+        Returns:
+            str: The IP address of the device.
+
+        Raises:
+            RuntimeError: If the IP address cannot be determined.
+        """
         # Apple provides no sane way to do this so the following dance is performed:
         #    1. Retrieve MAC address of device (this requires the default "Private Wifi Address" to be turned off on device)
         #    2. Broadcast a ping to the broadcast address of all network interfaces that have one, to ensure that the device

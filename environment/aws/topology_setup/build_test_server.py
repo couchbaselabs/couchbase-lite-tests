@@ -1,3 +1,15 @@
+"""
+This module builds and optionally uploads Couchbase Lite test servers to the latestbuilds server.
+It includes functions for checking if an upload already exists, compressing the server package, and uploading the package via SFTP.
+
+Functions:
+    upload_exists(server: TestServer) -> bool:
+        Check if the server package already exists on the latestbuilds server.
+
+    main() -> None:
+        Main function to build and optionally upload the Couchbase Lite test server.
+"""
+
 import os
 import sys
 from argparse import ArgumentParser
@@ -16,6 +28,18 @@ from environment.aws.topology_setup.test_server import TestServer
 
 
 def upload_exists(server: TestServer) -> bool:
+    """
+    Check if the server package already exists on the latestbuilds server.
+
+    Args:
+        server (TestServer): The test server instance.
+
+    Returns:
+        bool: True if the server package exists, False otherwise.
+
+    Raises:
+        RuntimeError: If an unexpected status code is returned from the latestbuilds server.
+    """
     url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{server.latestbuilds_path}"
     response = requests.head(url)
     if response.status_code == 200:
@@ -29,7 +53,16 @@ def upload_exists(server: TestServer) -> bool:
     )
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """
+    Main function to build and optionally upload the Couchbase Lite test server.
+
+    Parses command-line arguments to determine the platform, version, and whether to upload the built server.
+    Builds the test server and uploads it to the latestbuilds server if requested.
+
+    Raises:
+        SystemExit: If the LATESTBUILDS_PASSWORD environment variable is not set or if the upload is not requested.
+    """
     parser = ArgumentParser("Builds a given test server")
     parser.add_argument("platform", type=str, help="The platform to build")
     parser.add_argument("version", type=str, help="The version of CBL to use")
@@ -83,3 +116,7 @@ if __name__ == "__main__":
         f"/data/builds/latestbuilds/{server.latestbuilds_path}",
     )
     sftp.close()
+
+
+if __name__ == "__main__":
+    main()

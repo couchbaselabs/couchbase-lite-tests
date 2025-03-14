@@ -1,22 +1,30 @@
 #!/usr/bin/env python3
 
+"""
+This module tears down a previously created E2E AWS EC2 testing backend. It includes functions for destroying the Terraform-managed infrastructure
+and stopping the test servers.
+
+Functions:
+    main(topology_file: Optional[str]) -> None:
+        Main function to tear down the AWS environment and stop the test servers.
+"""
+
 import subprocess
 from argparse import ArgumentParser
+from typing import Optional
 
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
-if __name__ == "__main__":
-    parser = ArgumentParser(
-        description="Tear down a previously created E2E AWS EC2 testing backend"
-    )
-    parser.add_argument(
-        "--topology", help="The topology file that was used to start the environemnt"
-    )
-    args = parser.parse_args()
-    topology = (
-        TopologyConfig(args.topology) if args.topology is not None else TopologyConfig()
-    )
+
+def main(topology_file: Optional[str]) -> None:
+    """
+    Main function to tear down the AWS environment and stop the test servers.
+
+    Args:
+        topology_file (Optional[str]): The topology file that was used to start the environment.
+    """
+    topology = TopologyConfig(topology_file) if topology_file else TopologyConfig()
 
     header("Starting terraform destroy")
     command = [
@@ -41,3 +49,15 @@ if __name__ == "__main__":
     header("Done!")
 
     exit(result.returncode)
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser(
+        description="Tear down a previously created E2E AWS EC2 testing backend"
+    )
+    parser.add_argument(
+        "--topology", help="The topology file that was used to start the environment"
+    )
+    args = parser.parse_args()
+
+    main(args.topology)

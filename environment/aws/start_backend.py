@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
 
+"""
+This module prepares an AWS EC2 environment for running end-to-end (E2E) tests. It includes functions for applying Terraform configurations,
+writing TDK configurations, and managing the lifecycle of Couchbase Server, Sync Gateway, and Logslurp instances.
+
+Functions:
+    terraform_apply(public_key_name: str, topology: TopologyConfig) -> None:
+        Apply the Terraform configuration to set up the AWS environment.
+
+    write_config(in_config_file: str, topology: TopologyConfig, output: IO[str]) -> None:
+        Write the TDK configuration based on the provided topology.
+
+    main(topology: TopologyConfig, public_key_name: str, sgw_url: str, tdk_config_in: str, cbs_version: str = "7.6.4", private_key: Optional[str] = None, tdk_config_out: Optional[str] = None) -> None:
+        Main function to set up the AWS environment and run the test servers.
+"""
+
 import json
 import os
 import subprocess
@@ -21,7 +36,17 @@ from environment.aws.topology_setup.setup_topology import TopologyConfig
 from environment.aws.topology_setup.setup_topology import main as topology_main
 
 
-def terraform_apply(public_key_name: str, topology: TopologyConfig):
+def terraform_apply(public_key_name: str, topology: TopologyConfig) -> None:
+    """
+    Apply the Terraform configuration to set up the AWS environment.
+
+    Args:
+        public_key_name (str): The name of the public key stored in AWS.
+        topology (TopologyConfig): The topology configuration.
+
+    Raises:
+        Exception: If any Terraform command fails.
+    """
     os.chdir(SCRIPT_DIR)
     header("Starting terraform apply")
     sgw_count = topology.total_sgw_count
@@ -62,7 +87,17 @@ def terraform_apply(public_key_name: str, topology: TopologyConfig):
     sleep(5)
 
 
-def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str]):
+def write_config(
+    in_config_file: str, topology: TopologyConfig, output: IO[str]
+) -> None:
+    """
+    Write the TDK configuration based on the provided topology.
+
+    Args:
+        in_config_file (str): The path to the input TDK configuration file.
+        topology (TopologyConfig): The topology configuration.
+        output (IO[str]): The output stream to write the configuration to.
+    """
     header(f"Writing TDK configuration based on {in_config_file}...")
     with open(in_config_file, "r") as fin:
         config_json = cast(Dict, json.load(fin))
@@ -108,7 +143,19 @@ def main(
     cbs_version: str = "7.6.4",
     private_key: Optional[str] = None,
     tdk_config_out: Optional[str] = None,
-):
+) -> None:
+    """
+    Main function to set up the AWS environment and run the test servers.
+
+    Args:
+        topology (TopologyConfig): The topology configuration.
+        public_key_name (str): The name of the public key stored in AWS.
+        sgw_url (str): The URL of Sync Gateway to install.
+        tdk_config_in (str): The path to the input TDK configuration file.
+        cbs_version (str, optional): The version of Couchbase Server to install. Defaults to "7.6.4".
+        private_key (Optional[str], optional): The private key to use for the SSH connection. Defaults to None.
+        tdk_config_out (Optional[str], optional): The path to write the resulting TDK configuration file. Defaults to None.
+    """
     terraform_apply(public_key_name, topology)
     topology.resolve_test_servers()
     topology.dump()

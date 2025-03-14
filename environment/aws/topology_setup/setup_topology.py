@@ -1,3 +1,22 @@
+"""
+This module sets up the topology for Couchbase Lite tests on AWS. It includes classes and functions for managing clusters,
+Sync Gateway instances, and test servers. It also provides functionality to read configurations from Terraform and manage
+the lifecycle of test servers.
+
+Classes:
+    ClusterConfig: A class to store the configuration of a Couchbase Server cluster.
+    ClusterInput: A class to parse and store input configuration for a Couchbase Server cluster.
+    SyncGatewayInput: A class to parse and store input configuration for a Sync Gateway instance.
+    SyncGatewayConfig: A class to store the configuration of a Sync Gateway instance.
+    TestServerInput: A class to parse and store input configuration for a test server.
+    TestServerConfig: A class to store the configuration of a test server.
+    TopologyConfig: A class to manage the overall topology configuration, including clusters, Sync Gateway instances, and test servers.
+
+Functions:
+    main(topology: TopologyConfig) -> None:
+        Main function to run the test servers based on the provided topology configuration.
+"""
+
 import json
 import subprocess
 from pathlib import Path
@@ -10,6 +29,14 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 class ClusterConfig:
+    """
+    A class to store the configuration of a Couchbase Server cluster.
+
+    Attributes:
+        public_hostnames (List[str]): The public hostnames of the cluster nodes.
+        internal_hostnames (List[str]): The internal hostnames of the cluster nodes.
+    """
+
     @property
     def public_hostnames(self) -> List[str]:
         return self.__public_hostnames
@@ -24,6 +51,13 @@ class ClusterConfig:
 
 
 class ClusterInput:
+    """
+    A class to parse and store input configuration for a Couchbase Server cluster.
+
+    Attributes:
+        server_count (int): The number of servers in the cluster.
+    """
+
     __server_count_key: Final[str] = "server_count"
 
     @property
@@ -42,10 +76,27 @@ class ClusterInput:
     def create_config(
         self, public_hostnames: List[str], internal_hostnames: List[str]
     ) -> ClusterConfig:
+        """
+        Create a ClusterConfig instance from the provided hostnames.
+
+        Args:
+            public_hostnames (List[str]): The public hostnames of the cluster nodes.
+            internal_hostnames (List[str]): The internal hostnames of the cluster nodes.
+
+        Returns:
+            ClusterConfig: The created ClusterConfig instance.
+        """
         return ClusterConfig(public_hostnames, internal_hostnames)
 
 
 class SyncGatewayInput:
+    """
+    A class to parse and store input configuration for a Sync Gateway instance.
+
+    Attributes:
+        cluster_index (int): The index of the cluster to which the Sync Gateway belongs.
+    """
+
     @property
     def cluster_index(self) -> int:
         return self.__cluster_index
@@ -55,6 +106,14 @@ class SyncGatewayInput:
 
 
 class SyncGatewayConfig:
+    """
+    A class to store the configuration of a Sync Gateway instance.
+
+    Attributes:
+        hostname (str): The hostname of the Sync Gateway instance.
+        cluster_hostname (str): The hostname of the cluster to which the Sync Gateway belongs.
+    """
+
     @property
     def hostname(self) -> str:
         return self.__hostname
@@ -69,6 +128,16 @@ class SyncGatewayConfig:
 
 
 class TestServerInput:
+    """
+    A class to parse and store input configuration for a test server.
+
+    Attributes:
+        location (str): The location of the test server.
+        cbl_version (str): The version of Couchbase Lite to use.
+        platform (str): The platform of the test server.
+        download (bool): Whether to download the test server package.
+    """
+
     @property
     def location(self) -> str:
         return self.__location
@@ -93,6 +162,15 @@ class TestServerInput:
 
 
 class TestServerConfig:
+    """
+    A class to store the configuration of a test server.
+
+    Attributes:
+        ip_address (str): The IP address of the test server.
+        cbl_version (str): The version of Couchbase Lite used by the test server.
+        platform (str): The platform of the test server.
+    """
+
     @property
     def ip_address(self) -> str:
         return self.__ip_address
@@ -112,6 +190,19 @@ class TestServerConfig:
 
 
 class TopologyConfig:
+    """
+    A class to manage the overall topology configuration, including clusters, Sync Gateway instances, and test servers.
+
+    Attributes:
+        total_cbs_count (int): The total number of Couchbase Server nodes.
+        total_sgw_count (int): The total number of Sync Gateway instances.
+        clusters (List[ClusterConfig]): The list of cluster configurations.
+        sync_gateways (List[SyncGatewayConfig]): The list of Sync Gateway configurations.
+        test_servers (List[TestServerConfig]): The list of test server configurations.
+        wants_logslurp (bool): Whether Logslurp is desired.
+        logslurp (Optional[str]): The Logslurp configuration.
+    """
+
     __clusters_key: Final[str] = "clusters"
     __sync_gateways_key: Final[str] = "sync_gateways"
     __cluster_key: Final[str] = "cluster"
@@ -205,6 +296,12 @@ class TopologyConfig:
         return self.__logslurp
 
     def read_from_terraform(self):
+        """
+        Read the topology configuration from Terraform outputs.
+
+        Raises:
+            Exception: If any Terraform command fails.
+        """
         cbs_command = ["terraform", "output", "-json", "couchbase_instance_public_ips"]
         result = subprocess.run(cbs_command, capture_output=True, text=True)
         if result.returncode != 0:
@@ -250,6 +347,9 @@ class TopologyConfig:
             self.__logslurp = cast(str, json.loads(result.stdout))
 
     def resolve_test_servers(self):
+        """
+        Resolve the IP addresses of the test servers based on their locations.
+        """
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
                 test_server_input.platform, test_server_input.cbl_version
@@ -265,6 +365,9 @@ class TopologyConfig:
             )
 
     def run_test_servers(self):
+        """
+        Run the test servers based on their configurations.
+        """
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
                 test_server_input.platform, test_server_input.cbl_version
@@ -279,6 +382,9 @@ class TopologyConfig:
             bridge.run(test_server_input.location)
 
     def stop_test_servers(self):
+        """
+        Stop the running test servers.
+        """
         TestServer.initialize()
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
@@ -288,6 +394,12 @@ class TopologyConfig:
             bridge.stop(test_server_input.location)
 
     def apply_sgw_hostnames(self, hostnames: List[str]):
+        """
+        Apply the Sync Gateway hostnames to the configuration.
+
+        Args:
+            hostnames (List[str]): The list of Sync Gateway hostnames.
+        """
         for sgw_input in self.__sync_gateway_inputs:
             cluster = self.__clusters[sgw_input.cluster_index]
             sgw = SyncGatewayConfig(hostnames.pop(0), cluster.internal_hostnames[0])
@@ -296,6 +408,13 @@ class TopologyConfig:
     def apply_server_hostnames(
         self, server_hostnames: List[str], server_internal_hostnames: List[str]
     ):
+        """
+        Apply the server hostnames to the configuration.
+
+        Args:
+            server_hostnames (List[str]): The list of server public hostnames.
+            server_internal_hostnames (List[str]): The list of server internal hostnames.
+        """
         i = 0
         for cluster_input in self.__cluster_inputs:
             hostnames = server_hostnames[i : i + cluster_input.server_count]
@@ -307,6 +426,9 @@ class TopologyConfig:
             i += cluster_input.server_count
 
     def dump(self):
+        """
+        Print the resulting topology configuration.
+        """
         header("Resulting topology")
         i = 1
         for cluster in self.__clusters:
@@ -345,5 +467,11 @@ class TopologyConfig:
             print()
 
 
-def main(toplogy: TopologyConfig):
-    toplogy.run_test_servers()
+def main(topology: TopologyConfig) -> None:
+    """
+    Main function to run the test servers based on the provided topology configuration.
+
+    Args:
+        topology (TopologyConfig): The topology configuration.
+    """
+    topology.run_test_servers()

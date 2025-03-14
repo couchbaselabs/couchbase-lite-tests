@@ -1,5 +1,35 @@
 #!/usr/bin/env python3
 
+"""
+This module sets up Couchbase Sync Gateway (SGW) on AWS EC2 instances. It includes functions for downloading SGW packages,
+executing remote commands, setting up individual nodes, and configuring the SGW topology.
+
+Classes:
+    SgwDownloadInfo: A class to parse and store Sync Gateway download information.
+
+Functions:
+    lookup_sgw_build(version: str) -> int:
+        Look up the build number for a given Sync Gateway version.
+
+    download_sgw_package(download_info: SgwDownloadInfo) -> None:
+        Download the Sync Gateway package if it is not a release version.
+
+    setup_config(server_hostname: str) -> None:
+        Write the server hostname to the bootstrap configuration file.
+
+    remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
+        Execute a remote command via SSH with a description and optional error handling.
+
+    setup_server(hostname: str, pkey: Optional[paramiko.Ed25519Key], sgw_info: SgwDownloadInfo) -> None:
+        Set up a Sync Gateway server on an EC2 instance.
+
+    setup_topology(pkey: Optional[paramiko.Ed25519Key], sgw_info: SgwDownloadInfo, topology: TopologyConfig) -> None:
+        Set up the Sync Gateway topology on EC2 instances.
+
+    main(download_url: str, topology: TopologyConfig, private_key: Optional[str] = None) -> None:
+        Main function to set up the Sync Gateway topology.
+"""
+
 import json
 import os
 from pathlib import Path
@@ -19,6 +49,17 @@ current_ssh = ""
 
 
 class SgwDownloadInfo:
+    """
+    A class to parse and store Sync Gateway download information.
+
+    Attributes:
+        is_release (bool): Whether the download is a release version.
+        local_filename (str): The local filename of the downloaded package.
+        version (str): The version of Sync Gateway.
+        build_no (int): The build number of Sync Gateway.
+        url (str): The download URL of Sync Gateway.
+    """
+
     @property
     def is_release(self) -> bool:
         return self.__build_no == 0
@@ -59,6 +100,18 @@ class SgwDownloadInfo:
 
 
 def lookup_sgw_build(version: str) -> int:
+    """
+    Look up the build number for a given Sync Gateway version.
+
+    Args:
+        version (str): The version of Sync Gateway.
+
+    Returns:
+        int: The build number of the specified version.
+
+    Raises:
+        requests.RequestException: If the request to the build server fails.
+    """
     url = f"http://proget.build.couchbase.com:8080/api/get_version?product=sync_gateway&version={version}"
     r = requests.get(url)
     r.raise_for_status()
@@ -66,6 +119,15 @@ def lookup_sgw_build(version: str) -> int:
 
 
 def download_sgw_package(download_info: SgwDownloadInfo) -> None:
+    """
+    Download the Sync Gateway package if it is not a release version.
+
+    Args:
+        download_info (SgwDownloadInfo): The download information for Sync Gateway.
+
+    Raises:
+        requests.RequestException: If the request to download the package fails.
+    """
     if download_info.is_release:
         return
 
@@ -92,7 +154,13 @@ def download_sgw_package(download_info: SgwDownloadInfo) -> None:
         print(f"File {download_info.local_filename} already exists, skipping download.")
 
 
-def setup_config(server_hostname: str):
+def setup_config(server_hostname: str) -> None:
+    """
+    Write the server hostname to the bootstrap configuration file.
+
+    Args:
+        server_hostname (str): The hostname of the Couchbase Server.
+    """
     header(f"Writing {server_hostname} to bootstrap.json as CBS IP")
     with open(SCRIPT_DIR / "config" / "bootstrap.json", "r") as fin:
         with open(SCRIPT_DIR / "bootstrap.json", "w") as fout:
@@ -111,7 +179,19 @@ def setup_config(server_hostname: str):
 
 def remote_exec(
     ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True
-):
+) -> None:
+    """
+    Execute a remote command via SSH with a description and optional error handling.
+
+    Args:
+        ssh (paramiko.SSHClient): The SSH client.
+        command (str): The command to execute.
+        desc (str): A description of the command.
+        fail_on_error (bool): Whether to raise an exception if the command fails.
+
+    Raises:
+        Exception: If the command fails and fail_on_error is True.
+    """
     header(desc)
 
     _, stdout, stderr = ssh.exec_command(command, get_pty=True)
@@ -129,7 +209,15 @@ def remote_exec(
 
 def setup_server(
     hostname: str, pkey: Optional[paramiko.Ed25519Key], sgw_info: SgwDownloadInfo
-):
+) -> None:
+    """
+    Set up a Sync Gateway server on an EC2 instance.
+
+    Args:
+        hostname (str): The hostname or IP address of the EC2 instance.
+        pkey (Optional[paramiko.Ed25519Key]): The private key for SSH access.
+        sgw_info (SgwDownloadInfo): The download information for Sync Gateway.
+    """
     if sgw_info.is_release:
         print(f"Setting up server {hostname} with SGW {sgw_info.version}")
     else:
@@ -196,7 +284,15 @@ def setup_topology(
     pkey: Optional[paramiko.Ed25519Key],
     sgw_info: SgwDownloadInfo,
     topology: TopologyConfig,
-):
+) -> None:
+    """
+    Set up the Sync Gateway topology on EC2 instances.
+
+    Args:
+        pkey (Optional[paramiko.Ed25519Key]): The private key for SSH access.
+        sgw_info (SgwDownloadInfo): The download information for Sync Gateway.
+        topology (TopologyConfig): The topology configuration.
+    """
     if len(topology.sync_gateways) == 0:
         return
 
@@ -209,7 +305,15 @@ def setup_topology(
 
 def main(
     download_url: str, topology: TopologyConfig, private_key: Optional[str] = None
-):
+) -> None:
+    """
+    Main function to set up the Sync Gateway topology.
+
+    Args:
+        download_url (str): The download URL for Sync Gateway.
+        topology (TopologyConfig): The topology configuration.
+        private_key (Optional[str]): The path to the private key for SSH access.
+    """
     sgw_info = SgwDownloadInfo(download_url)
     download_sgw_package(sgw_info)
     pkey = (

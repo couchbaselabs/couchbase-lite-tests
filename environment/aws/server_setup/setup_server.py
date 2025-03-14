@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
 
+"""
+This module sets up Couchbase Server on AWS EC2 instances. It includes functions for executing remote commands,
+setting up individual nodes, and configuring the server topology.
+
+Functions:
+    remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
+        Execute a remote command via SSH with a description and optional error handling.
+
+    setup_node(hostname: str, pkey: Optional[paramiko.Ed25519Key], version: str, cluster: Optional[str] = None) -> None:
+        Set up a Couchbase Server node on an EC2 instance.
+
+    setup_topology(pkey: Optional[paramiko.Ed25519Key], version: str, topology: TopologyConfig) -> None:
+        Use the indicated topology to set up the desired number of Couchbase Server nodes
+
+    main(version: str, topology: TopologyConfig, private_key: Optional[str] = None) -> None:
+        Main function to set up the Couchbase Server topology.
+"""
+
 from pathlib import Path
 from typing import Optional
 
@@ -16,7 +34,19 @@ current_ssh = ""
 
 def remote_exec(
     ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True
-):
+) -> None:
+    """
+    Execute a remote command via SSH with a description and optional error handling.
+
+    Args:
+        ssh (paramiko.SSHClient): The SSH client.
+        command (str): The command to execute.
+        desc (str): A description of the command.
+        fail_on_error (bool): Whether to raise an exception if the command fails.
+
+    Raises:
+        Exception: If the command fails and fail_on_error is True.
+    """
     header(desc)
 
     _, stdout, stderr = ssh.exec_command(command)
@@ -37,7 +67,16 @@ def setup_node(
     pkey: Optional[paramiko.Ed25519Key],
     version: str,
     cluster: Optional[str] = None,
-):
+) -> None:
+    """
+    Set up a Couchbase Server node on an EC2 instance.
+
+    Args:
+        hostname (str): The hostname or IP address of the EC2 instance.
+        pkey (Optional[paramiko.Ed25519Key]): The private key for SSH access.
+        version (str): The version of Couchbase Server to install.
+        cluster (Optional[str]): The cluster to join, if any.
+    """
     couchbase_filename = f"couchbase-server-enterprise-{version}-linux.x86_64.rpm"
     couchbase_url = (
         f"http://packages.couchbase.com/releases/{version}/{couchbase_filename}"
@@ -84,6 +123,9 @@ def setup_node(
         ssh, "sudo systemctl start couchbase-server", "Starting Couchbase Server"
     )
 
+    # Some magic here that might be overlooked.  If we pass in a cluster
+    # address to the configure node script, it will join an existing cluster
+    # rather than using itself to create a new one
     config_command = "bash /tmp/configure-node.sh"
     if cluster is not None:
         config_command += f" {cluster}"
@@ -94,7 +136,15 @@ def setup_node(
 
 def setup_topology(
     pkey: Optional[paramiko.Ed25519Key], version: str, topology: TopologyConfig
-):
+) -> None:
+    """
+    Set up the Couchbase Server topology on EC2 instances.
+
+    Args:
+        pkey (Optional[paramiko.Ed25519Key]): The private key for SSH access.
+        version (str): The version of Couchbase Server to install.
+        topology (TopologyConfig): The topology configuration.
+    """
     if len(topology.clusters) == 0:
         return
 
@@ -104,7 +154,17 @@ def setup_topology(
             setup_node(server, pkey, version, cluster_config.public_hostnames[0])
 
 
-def main(version: str, topology: TopologyConfig, private_key: Optional[str] = None):
+def main(
+    version: str, topology: TopologyConfig, private_key: Optional[str] = None
+) -> None:
+    """
+    Main function to set up the Couchbase Server topology.
+
+    Args:
+        version (str): The version of Couchbase Server to install.
+        topology (TopologyConfig): The topology configuration.
+        private_key (Optional[str]): The path to the private key for SSH access.
+    """
     pkey = (
         paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
     )
