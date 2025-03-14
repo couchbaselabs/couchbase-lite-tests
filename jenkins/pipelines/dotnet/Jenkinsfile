@@ -29,11 +29,10 @@ pipeline {
                 stage("Windows") {
                     agent { label 'mob-e2e-win-01' }
                     options {
-                        lock('mob-e2e-win-01')
                         timeout(time: 60, unit: 'MINUTES') 
                     }
                     steps {
-                        pwsh "jenkins\\pipelines\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwUrl ${params.SGW_URL}"
+                        pwsh "jenkins\\pipelines\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwUrl ${params.SGW_URL} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
                     }
                     post { 
                         always { 
@@ -44,7 +43,6 @@ pipeline {
                 stage("Mac Catalyst") {
                     agent { label 'mob-e2e-mac-01' }
                     options {
-                        lock('mob-e2e-mac-01')
                         timeout(time: 60, unit: 'MINUTES') 
                     }
                     environment {
@@ -54,7 +52,7 @@ pipeline {
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        sh "jenkins/pipelines/dotnet/run_test.sh macos ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
+                        sh "jenkins/pipelines/dotnet/run_test.sh macos ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}' ~/.ssh/jborden.pem"
                     }
                     post { 
                         always { 
@@ -66,7 +64,7 @@ pipeline {
         }
         stage('iOS') {
             options {
-                lock("mob-e2e-mac-01")
+                lock("mob-e2e-iphone-01")
                 timeout(time: 60, unit: 'MINUTES') 
             }
             environment { 
@@ -78,7 +76,7 @@ pipeline {
             agent { label 'mob-e2e-mac-01' }
             steps {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                sh "jenkins/pipelines/dotnet/run_test.sh ios ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
+                sh "jenkins/pipelines/dotnet/run_test.sh ios ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}' ~/.ssh/jborden.pem"
             }
             post {
                 always {
@@ -88,12 +86,12 @@ pipeline {
         }
         stage('Android') {
             options {
-                lock("mob-e2e-mac-01")
+                lock("mob-e2e-android-01")
                 timeout(time: 60, unit: 'MINUTES') 
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
-                sh "jenkins/pipelines/dotnet/run_test.sh android ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
+                sh "jenkins/pipelines/dotnet/run_test.sh android ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}' ~/.ssh/jborden.pem"
             }
             post {
                 always {
