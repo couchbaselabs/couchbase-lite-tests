@@ -81,10 +81,15 @@ class TestServerInput:
     def platform(self) -> str:
         return self.__platform
 
-    def __init__(self, location: str, cbl_version: str, platform: str):
+    @property
+    def download(self) -> bool:
+        return self.__download
+
+    def __init__(self, location: str, cbl_version: str, platform: str, download: bool):
         self.__location = location
         self.__cbl_version = cbl_version
         self.__platform = platform
+        self.__download = download
 
 
 class TestServerConfig:
@@ -189,7 +194,9 @@ class TopologyConfig:
 
     def resolve_test_servers(self):
         for test_server_input in self.__test_server_inputs:
-            test_server = TestServer.create(test_server_input.platform)
+            test_server = TestServer.create(
+                test_server_input.platform, test_server_input.cbl_version
+            )
             bridge = test_server.create_bridge()
             bridge.validate(test_server_input.location)
             self.__test_servers.append(
@@ -202,8 +209,14 @@ class TopologyConfig:
 
     def run_test_servers(self):
         for test_server_input in self.__test_server_inputs:
-            test_server = TestServer.create(test_server_input.platform)
-            test_server.build(test_server_input.cbl_version)
+            test_server = TestServer.create(
+                test_server_input.platform, test_server_input.cbl_version
+            )
+            if test_server_input.download:
+                test_server.download()
+            else:
+                test_server.build()
+
             bridge = test_server.create_bridge()
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
@@ -211,7 +224,9 @@ class TopologyConfig:
     def stop_test_servers(self):
         TestServer.initialize()
         for test_server_input in self.__test_server_inputs:
-            test_server = TestServer.create(test_server_input.platform)
+            test_server = TestServer.create(
+                test_server_input.platform, test_server_input.cbl_version
+            )
             bridge = test_server.create_bridge()
             bridge.stop(test_server_input.location)
 
@@ -311,6 +326,7 @@ class TopologyConfig:
                             raw_server["location"],
                             raw_server["cbl_version"],
                             raw_server["platform"],
+                            cast(bool, raw_server.get("download", False)),
                         )
                     )
 
@@ -318,7 +334,9 @@ class TopologyConfig:
                 self._wants_logslurp = cast(bool, config[self.__logslurp_key])
 
             if self.__include_key in config:
-                include_file = str((SCRIPT_DIR / config[self.__include_key]).resolve())
+                include_file = str(
+                    (SCRIPT_DIR / cast(str, config[self.__include_key])).resolve()
+                )
                 sub_config = TopologyConfig(include_file)
                 self.__cluster_inputs.extend(sub_config.__cluster_inputs)
                 self.__sync_gateway_inputs.extend(sub_config.__sync_gateway_inputs)

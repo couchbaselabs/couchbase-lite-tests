@@ -6,7 +6,7 @@ from os import environ
 from pathlib import Path
 from typing import List, Optional
 
-from environment.aws.common.io import zip_directory
+from environment.aws.common.io import unzip_directory, zip_directory
 from environment.aws.common.output import header
 from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
 
@@ -26,6 +26,9 @@ else:
 
 
 class DotnetTestServer(TestServer):
+    def __init__(self, version: str):
+        super().__init__(version)
+
     @property
     @abstractmethod
     def dotnet_framework(self) -> str:
@@ -40,8 +43,8 @@ class DotnetTestServer(TestServer):
     def publish(self) -> bool:
         pass
 
-    def build(self, cbl_version: str):
-        version_parts = cbl_version.split("-")
+    def build(self):
+        version_parts = self.version.split("-")
         build = version_parts[1]
         cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
         csproj_path = (
@@ -85,16 +88,16 @@ class DotnetTestServer(TestServer):
 
 
 class DotnetTestServerCli(TestServer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     @abstractmethod
     def rid(self) -> str:
         pass
 
-    def build(self, cbl_version: str):
-        version_parts = cbl_version.split("-")
+    def build(self):
+        version_parts = self.version.split("-")
         build = version_parts[1]
         cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
         csproj_path = (
@@ -136,9 +139,12 @@ class DotnetTestServerCli(TestServer):
 
 @TestServer.register("dotnet_ios")
 class DotnetTestServer_iOS(DotnetTestServer):
+    def __init__(self, version: str):
+        super().__init__(version)
+
     @property
     def platform(self) -> str:
-        return ".NET iOS"
+        return "dotnet_ios"
 
     @property
     def dotnet_framework(self) -> str:
@@ -152,21 +158,23 @@ class DotnetTestServer_iOS(DotnetTestServer):
     def extra_args(self) -> Optional[str]:
         return "-p:RuntimeIdentifier=ios-arm64"
 
-    def latestbuilds_path(self, version: str) -> str:
-        version_parts = version.split("-")
+    def latestbuilds_path(self) -> str:
+        version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
 
     def create_bridge(self) -> PlatformBridge:
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else DOTNET_TEST_SERVER_DIR
+            / "testserver"
+            / "bin"
+            / "Release"
+            / "net8.0-ios"
+            / "ios-arm64"
+        )
         return iOSBridge(
-            str(
-                DOTNET_TEST_SERVER_DIR
-                / "testserver"
-                / "bin"
-                / "Release"
-                / "net8.0-ios"
-                / "ios-arm64"
-                / "testserver.app"
-            ),
+            str(prefix / "testserver.app"),
             False,
         )
 
@@ -185,12 +193,19 @@ class DotnetTestServer_iOS(DotnetTestServer):
         zip_directory(publish_dir, zip_path)
         return str(zip_path)
 
+    def uncompress_package(self, path):
+        unzip_directory(path, path.parent / "testserver.app")
+        path.unlink()
+
 
 @TestServer.register("dotnet_android")
 class DotnetTestServer_Android(DotnetTestServer):
+    def __init__(self, version: str):
+        super().__init__(version)
+
     @property
     def platform(self) -> str:
-        return ".NET Android"
+        return "dotnet_android"
 
     @property
     def dotnet_framework(self) -> str:
@@ -200,20 +215,27 @@ class DotnetTestServer_Android(DotnetTestServer):
     def publish(self) -> bool:
         return True
 
-    def latestbuilds_path(self, version: str) -> str:
-        version_parts = version.split("-")
+    def latestbuilds_path(self) -> str:
+        version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
     def create_bridge(self) -> PlatformBridge:
+        dir = (
+            TEST_SERVER_DIR
+            / "downloaded"
+            / self.platform
+            / self.version
+            / "testserver_android.apk"
+            if self._downloaded
+            else DOTNET_TEST_SERVER_DIR
+            / "testserver"
+            / "bin"
+            / "Release"
+            / "net8.0-android"
+            / "com.couchbase.dotnet.testserver-Signed.apk"
+        )
         return AndroidBridge(
-            str(
-                DOTNET_TEST_SERVER_DIR
-                / "testserver"
-                / "bin"
-                / "Release"
-                / "net8.0-android"
-                / "com.couchbase.dotnet.testserver-Signed.apk"
-            ),
+            str(dir),
             "com.couchbase.dotnet.testserver",
         )
 
@@ -231,31 +253,42 @@ class DotnetTestServer_Android(DotnetTestServer):
         shutil.copy(apk_path, zip_path)
         return str(zip_path)
 
+    def uncompress_package(self, path: Path) -> None:
+        # No action needed
+        pass
+
 
 @TestServer.register("dotnet_windows")
 class DotnetTestServer_Windows(DotnetTestServerCli):
+    def __init__(self, version: str):
+        super().__init__(version)
+
     @property
     def platform(self) -> str:
-        return ".NET Windows"
+        return "dotnet_windows"
 
     @property
     def rid(self) -> str:
         return "win-x64"
 
-    def latestbuilds_path(self, version: str) -> str:
-        version_parts = version.split("-")
+    def latestbuilds_path(self) -> str:
+        version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
 
     def create_bridge(self) -> PlatformBridge:
-        return ExeBridge(
-            DOTNET_TEST_SERVER_DIR
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else DOTNET_TEST_SERVER_DIR
             / "testserver.cli"
             / "bin"
             / "Release"
             / "net8.0"
             / "win-x64"
             / "publish"
-            / "testserver.cli.exe",
+        )
+        return ExeBridge(
+            prefix / "testserver.cli.exe",
             ["--silent", "5555"],
         )
 
@@ -274,12 +307,19 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
         zip_directory(publish_dir, zip_path)
         return str(zip_path)
 
+    def uncompress_package(self, path):
+        unzip_directory(path, path.parent)
+        path.unlink()
+
 
 @TestServer.register("dotnet_macos")
 class DotnetTestServer_macOS(DotnetTestServer):
+    def __init__(self, version: str):
+        super().__init__(version)
+
     @property
     def platform(self) -> str:
-        return ".NET macOS"
+        return "dotnet_macos"
 
     @property
     def dotnet_framework(self) -> str:
@@ -289,22 +329,22 @@ class DotnetTestServer_macOS(DotnetTestServer):
     def publish(self) -> bool:
         return False
 
-    def latestbuilds_path(self, version: str) -> str:
-        version_parts = version.split("-")
+    def latestbuilds_path(self) -> str:
+        version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
 
     def create_bridge(self) -> PlatformBridge:
-        return macOSBridge(
-            str(
-                DOTNET_TEST_SERVER_DIR
-                / "testserver"
-                / "bin"
-                / "Release"
-                / "net8.0-maccatalyst"
-                / "maccatalyst-x64"
-                / "testserver.app"
-            )
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else DOTNET_TEST_SERVER_DIR
+            / "testserver"
+            / "bin"
+            / "Release"
+            / "net8.0-maccatalyst"
+            / "maccatalyst-x64"
         )
+        return macOSBridge(str(prefix / "testserver.app"))
 
     def compress_package(self) -> str:
         header(f"Compressing .NET test server for {self.platform}")
@@ -320,3 +360,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
         zip_path = publish_dir.parents[5] / "testserver_macos.zip"
         zip_directory(publish_dir, zip_path)
         return str(zip_path)
+
+    def uncompress_package(self, path: Path) -> None:
+        unzip_directory(path, path.parent / "testserver.app")
+        path.unlink()

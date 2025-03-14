@@ -60,6 +60,10 @@
                     },
                     "platform": {
                         "type": "string"
+                    },
+                    "download": {
+                        "type": "boolean",
+                        "default": false
                     }
                 },
                 "required": ["location", "cbl_version", "platform"],
