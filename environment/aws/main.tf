@@ -220,6 +220,7 @@ resource "aws_security_group" "main" {
 
 # Finally we get to the machine that will run Couchbase Server
 resource "aws_instance" "couchbaseserver" {
+    count = var.server_count
     ami = "ami-05576a079321f21f8"
     instance_type = "m5.xlarge"
     key_name = var.key_name
@@ -241,7 +242,8 @@ resource "aws_instance" "couchbaseserver" {
 
 # And the machine that will run Sync Gateway
 resource "aws_instance" "sync_gateway" {
-  ami = "ami-05576a079321f21f8"
+    count = var.sgw_count
+    ami = "ami-05576a079321f21f8"
     instance_type = "m5.xlarge"
     key_name = var.key_name
 
@@ -260,11 +262,46 @@ resource "aws_instance" "sync_gateway" {
     }
 }
 
+# And the machine that will run LogSlurp
+resource "aws_instance" "log_slurp" {
+    for_each = var.logslurp ? { "log_slurp": 1 } : {}
+    ami = "ami-05576a079321f21f8"
+    instance_type = "m5.large"
+    key_name = var.key_name
+
+    subnet_id = aws_subnet.main.id
+    vpc_security_group_ids = [aws_security_group.main.id]
+    associate_public_ip_address = true
+
+    tags = {
+        Name = "ls"
+        Type = "logslurp"
+    }
+}
+
 # This is a variable that needs to be specified and it specifies
 # the name (in AWS) of the public key that will be allowed SSH access
 variable "key_name" {
     description = "The name of the EC2 key pair to use"
     type        = string
+}
+
+variable "server_count" {
+    description = "The number of Couchbase Server instances to create"
+    type        = number
+    default     = 1
+}
+
+variable "sgw_count" {
+    description = "The number of Sync Gateway instances to create"
+    type        = number
+    default     = 1
+}
+
+variable "logslurp" {
+    description = "Whether or not to include a logslurp deployment"
+    type = bool
+    default = true
 }
 
 # These outputs are convenient for scripts to use for writing various IPs
@@ -279,4 +316,8 @@ output "sync_gateway_instance_public_ips" {
 
 output "couchbase_instance_private_ips" {
     value = aws_instance.couchbaseserver[*].private_ip
+}
+
+output "logslurp_instance_public_ip" {
+    value = var.logslurp ? aws_instance.log_slurp["log_slurp"].public_ip : null
 }

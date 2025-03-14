@@ -33,11 +33,11 @@ pipeline {
                         timeout(time: 60, unit: 'MINUTES') 
                     }
                     steps {
-                        pwsh "jenkins\\pipelines\\dotnet\\test_winui.ps1 -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwUrl ${params.SGW_URL}"
+                        pwsh "jenkins\\pipelines\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwUrl ${params.SGW_URL}"
                     }
                     post { 
                         always { 
-                            pwsh 'jenkins\\pipelines\\dotnet\\teardown_winui.ps1'
+                            pwsh 'jenkins\\pipelines\\dotnet\\teardown.ps1'
                         }
                     }
                 }
@@ -54,11 +54,11 @@ pipeline {
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        sh "jenkins/pipelines/dotnet/test_mac.sh ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
+                        sh "jenkins/pipelines/dotnet/run_test.sh macos ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
                     }
                     post { 
                         always { 
-                            sh 'jenkins/pipelines/dotnet/teardown_mac.sh'
+                            sh 'jenkins/pipelines/dotnet/teardown.sh --topology environment/aws/topology.json'
                         }
                     }
                 }
@@ -78,11 +78,11 @@ pipeline {
             agent { label 'mob-e2e-mac-01' }
             steps {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                sh "jenkins/pipelines/dotnet/test_ios.sh ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
+                sh "jenkins/pipelines/dotnet/run_test.sh ios ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
             }
             post {
                 always {
-                    sh 'jenkins/pipelines/dotnet/teardown_ios.sh'
+                    sh 'jenkins/pipelines/dotnet/teardown.sh --topology environment/aws/topology.json'
                 }
             }
         }
@@ -93,11 +93,11 @@ pipeline {
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
-                sh "jenkins/pipelines/dotnet/test_android.sh ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
+                sh "jenkins/pipelines/dotnet/run_test.sh android ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
             }
             post {
                 always {
-                    sh 'jenkins/pipelines/dotnet/teardown_android.sh'
+                    sh 'jenkins/pipelines/dotnet/teardown.sh --topology environment/aws/topology.json'
                 }
             }
         }

@@ -1,20 +1,62 @@
 #!/usr/bin/env python3
 
+"""
+This module prepares an AWS EC2 environment for running end-to-end (E2E) tests. It includes functions for applying Terraform configurations,
+writing TDK configurations, and managing the lifecycle of Couchbase Server, Sync Gateway, and Logslurp instances.
+
+Functions:
+    terraform_apply(public_key_name: str, topology: TopologyConfig) -> None:
+        Apply the Terraform configuration to set up the AWS environment.
+
+    write_config(in_config_file: str, topology: TopologyConfig, output: IO[str]) -> None:
+        Write the TDK configuration based on the provided topology.
+
+    main(topology: TopologyConfig, public_key_name: str, sgw_url: str, tdk_config_in: str, cbs_version: str = "7.6.4", private_key: Optional[str] = None, tdk_config_out: Optional[str] = None) -> None:
+        Main function to set up the AWS environment and run the test servers.
+"""
+
 import json
+import os
 import subprocess
 import sys
 from argparse import ArgumentParser
+from pathlib import Path
 from time import sleep
-from typing import IO, List, cast
+from typing import IO, Dict, Optional, cast
 
-from common.output import header
-from logslurp_setup.setup_logslurp import main as logslurp_main
-from server_setup.setup_server import main as server_main
-from sgw_setup.setup_sgw import main as sgw_main
+if __name__ == "__main__":
+    SCRIPT_DIR = Path(__file__).parent
+    sys.path.append(str(SCRIPT_DIR.parents[1]))
+
+from environment.aws.common.output import header
+from environment.aws.logslurp_setup.setup_logslurp import main as logslurp_main
+from environment.aws.server_setup.setup_server import main as server_main
+from environment.aws.sgw_setup.setup_sgw import main as sgw_main
+from environment.aws.topology_setup.setup_topology import TopologyConfig
+from environment.aws.topology_setup.setup_topology import main as topology_main
 
 
-def terraform_apply(public_key_name: str):
+def terraform_apply(public_key_name: str, topology: TopologyConfig) -> None:
+    """
+    Apply the Terraform configuration to set up the AWS environment.
+
+    Args:
+        public_key_name (str): The name of the public key stored in AWS.
+        topology (TopologyConfig): The topology configuration.
+
+    Raises:
+        Exception: If any Terraform command fails.
+    """
+    os.chdir(SCRIPT_DIR)
     header("Starting terraform apply")
+    sgw_count = topology.total_sgw_count
+    cbs_count = topology.total_cbs_count
+    wants_logslurp = str(topology.wants_logslurp).lower()
+
+    if sgw_count == 0 and cbs_count == 0 and not topology.wants_logslurp:
+        print("No AWS resources requested, skipping terraform")
+        return
+
     result = subprocess.run(["terraform", "init"], capture_output=False, text=True)
     if result.returncode != 0:
         raise Exception(
@@ -25,6 +67,9 @@ def terraform_apply(public_key_name: str):
         "terraform",
         "apply",
         f"-var=key_name={public_key_name}",
+        f"-var=server_count={cbs_count}",
+        f"-var=sgw_count={sgw_count}",
+        f"-var=logslurp={wants_logslurp}",
         "-auto-approve",
     ]
     result = subprocess.run(command, capture_output=False, text=True)
@@ -34,42 +79,96 @@ def terraform_apply(public_key_name: str):
             f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
         )
 
-    header("Done!")
+    topology.read_from_terraform()
+
+    header("Done, sleeping for 5s")
+    # The machines won't be ready immediately, so we need to wait a bit
+    # before SSH access succeeds
+    sleep(5)
 
 
-def write_config(in_config_file: str, output: IO[str]):
+def write_config(
+    in_config_file: str, topology: TopologyConfig, output: IO[str]
+) -> None:
+    """
+    Write the TDK configuration based on the provided topology.
+
+    Args:
+        in_config_file (str): The path to the input TDK configuration file.
+        topology (TopologyConfig): The topology configuration.
+        output (IO[str]): The output stream to write the configuration to.
+    """
     header(f"Writing TDK configuration based on {in_config_file}...")
-    cbs_command = ["terraform", "output", "-json", "couchbase_instance_public_ips"]
-    result = subprocess.run(cbs_command, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise Exception(
-            f"Command '{' '.join(cbs_command)}' failed with exit status {result.returncode}: {result.stderr}"
-        )
-
-    cbs_ips = cast(List[str], json.loads(result.stdout))
-    sgw_command = ["terraform", "output", "-json", "sync_gateway_instance_public_ips"]
-    result = subprocess.run(sgw_command, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise Exception(
-            f"Command '{' '.join(sgw_command)}' failed with exit status {result.returncode}: {result.stderr}"
-        )
-
-    sgw_ips = cast(List[str], json.loads(result.stdout))
     with open(in_config_file, "r") as fin:
-        input = fin.read()
-        i = 1
-        for ip in cbs_ips:
-            next_arg = f"{{{{cbs-ip{i}}}}}"
-            print(f"{next_arg} -> {ip}")
-            input = input.replace(next_arg, ip)
+        config_json = cast(Dict, json.load(fin))
+        config_json.pop("couchbase-servers", None)
+        config_json.pop("sync-gateways", None)
+        config_json.pop("test-servers", None)
+        config_json.pop("logslurp", None)
 
-        i = 1
-        for ip in sgw_ips:
-            next_arg = f"{{{{sgw-ip{i}}}}}"
-            print(f"{next_arg} -> {ip}")
-            input = input.replace(next_arg, ip)
+        if len(topology.clusters) > 0:
+            cbs_instances = []
+            for cluster in topology.clusters:
+                for public_hostname in cluster.public_hostnames:
+                    cbs_instances.append({"hostname": public_hostname})
 
-        output.write(input)
+            config_json["couchbase-servers"] = cbs_instances
+
+        if len(topology.sync_gateways) > 0:
+            sgw_instances = []
+            for sgw in topology.sync_gateways:
+                sgw_instances.append({"hostname": sgw.hostname, "tls": True})
+
+            config_json["sync-gateways"] = sgw_instances
+
+        if topology.logslurp is not None:
+            config_json["logslurp"] = f"{topology.logslurp}:8180"
+
+        if len(topology.test_servers) > 0:
+            test_servers = []
+            for ts in topology.test_servers:
+                port = 5555 if ts.platform.startswith("dotnet") else 8080
+                test_servers.append(f"http://{ts.ip_address}:{port}")
+
+            config_json["test-servers"] = test_servers
+
+        json.dump(config_json, output, indent=2)
+
+
+def main(
+    topology: TopologyConfig,
+    public_key_name: str,
+    sgw_url: str,
+    tdk_config_in: str,
+    cbs_version: str = "7.6.4",
+    private_key: Optional[str] = None,
+    tdk_config_out: Optional[str] = None,
+) -> None:
+    """
+    Main function to set up the AWS environment and run the test servers.
+
+    Args:
+        topology (TopologyConfig): The topology configuration.
+        public_key_name (str): The name of the public key stored in AWS.
+        sgw_url (str): The URL of Sync Gateway to install.
+        tdk_config_in (str): The path to the input TDK configuration file.
+        cbs_version (str, optional): The version of Couchbase Server to install. Defaults to "7.6.4".
+        private_key (Optional[str], optional): The private key to use for the SSH connection. Defaults to None.
+        tdk_config_out (Optional[str], optional): The path to write the resulting TDK configuration file. Defaults to None.
+    """
+    terraform_apply(public_key_name, topology)
+    topology.resolve_test_servers()
+    topology.dump()
+    server_main(cbs_version, topology, private_key)
+    sgw_main(sgw_url, topology, private_key)
+    logslurp_main(topology, private_key)
+    topology_main(topology)
+
+    if tdk_config_out is not None:
+        with open(tdk_config_out, "w") as fout:
+            write_config(tdk_config_in, topology, fout)
+    else:
+        write_config(tdk_config_in, topology, sys.stdout)
 
 
 if __name__ == "__main__":
@@ -89,6 +188,10 @@ if __name__ == "__main__":
         "--tdk-config-out",
         help="The path to the write the resulting TDK configuration file (stdout if empty)",
     )
+    parser.add_argument(
+        "--topology",
+        help="The path to the topology configuration file",
+    )
     required = parser.add_argument_group("required arguments")
     required.add_argument(
         "--public-key-name",
@@ -105,34 +208,16 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    terraform_apply(args.public_key_name)
+    topology: TopologyConfig = (
+        TopologyConfig(args.topology) if args.topology is not None else TopologyConfig()
+    )
 
-    cbs_command = ["terraform", "output", "-json", "couchbase_instance_public_ips"]
-    result = subprocess.run(cbs_command, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise Exception(
-            f"Command '{' '.join(cbs_command)}' failed with exit status {result.returncode}: {result.stderr}"
-        )
-
-    cbs_ips = cast(List[str], json.loads(result.stdout))
-    sgw_command = ["terraform", "output", "-json", "sync_gateway_instance_public_ips"]
-    result = subprocess.run(sgw_command, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise Exception(
-            f"Command '{' '.join(sgw_command)}' failed with exit status {result.returncode}: {result.stderr}"
-        )
-
-    sgw_ips = cast(List[str], json.loads(result.stdout))
-
-    # The machines won't be ready immediately, so we need to wait a bit
-    # before SSH access succeeds
-    sleep(5)
-
-    server_main(cbs_ips, args.cbs_version, args.private_key)
-    sgw_main(sgw_ips, args.sgw_url, args.private_key)
-    logslurp_main(cbs_ips[0], args.private_key)
-    if args.tdk_config_out is not None:
-        with open(args.tdk_config_out, "w") as fout:
-            write_config(args.tdk_config_in, fout)
-    else:
-        write_config(args.tdk_config_in, sys.stdout)
+    main(
+        topology,
+        args.public_key_name,
+        args.sgw_url,
+        args.tdk_config_in,
+        args.cbs_version,
+        args.private_key,
+        args.tdk_config_out,
+    )

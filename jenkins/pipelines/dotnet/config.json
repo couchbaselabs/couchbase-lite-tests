@@ -1,9 +1,0 @@
-{
-    "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
-    "test-servers": ["http://{{test-server-ip}}:5555"],
-    "sync-gateways": [{"hostname": "{{test-client-ip}}", "tls": true}],
-    "couchbase-servers": [{"hostname": "{{test-client-ip}}"}],
-    "api-version": 1,
-    "logslurp": "{{test-client-ip}}:8180",
-    "greenboard": {"hostname": "jenkins.mobiledev.couchbase.com", "username": "writer", "password": "couchbase2" }
-}

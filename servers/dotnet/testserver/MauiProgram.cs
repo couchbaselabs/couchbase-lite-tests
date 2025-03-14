@@ -40,8 +40,8 @@ public static class MauiProgram
 		Serilog.Log.Logger = logConfig.CreateLogger();
         Serilog.Log.Logger.Write(LogEventLevel.Information, "Test server started at {time}", DateTimeOffset.UtcNow);
 
-		Couchbase.Lite.Database.Log.Custom = new SerilogLogger();
-		Couchbase.Lite.Database.Log.Console.Level = LogLevel.None;
+		LogSinks.Custom = new SerilogLogger(LogLevel.Debug);
+		LogSinks.Console = null;
 
 		Console.WriteLine($"Beginning combined server/cbl log to {LogFilePath}");
         Debug.WriteLine($"Beginning combined server/cbl log to {LogFilePath}");
