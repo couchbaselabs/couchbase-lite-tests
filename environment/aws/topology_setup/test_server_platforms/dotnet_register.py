@@ -1,19 +1,19 @@
-import glob
 import platform
+import shutil
 import subprocess
 from abc import abstractmethod
 from os import environ
 from pathlib import Path
 from typing import List, Optional
 
+from environment.aws.common.io import zip_directory
 from environment.aws.common.output import header
-
 from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
 
 from .android_bridge import AndroidBridge
+from .exe_bridge import ExeBridge
 from .ios_bridge import iOSBridge
 from .macos_bridge import macOSBridge
-from .exe_bridge import ExeBridge
 from .platform_bridge import PlatformBridge
 
 DOTNET_TEST_SERVER_DIR = TEST_SERVER_DIR / "dotnet"
@@ -25,101 +25,7 @@ else:
     DOTNET_PATH = Path.home() / ".dotnet" / "dotnet"
 
 
-class WinUIBridge(PlatformBridge):
-    def __init__(self, app_name: str, app_id: str, install_path: str):
-        self.__app_name = app_name
-        self.__app_id = app_id
-        self.__install_path = install_path
-
-    def validate(self, location):
-        if location != "localhost":
-            raise ValueError("WinUIBridge only supports local installation")
-
-    def install(self, location: str) -> None:
-        self.validate(location)
-        header(f"Installing from {self.__install_path}")
-
-        # https://github.com/PowerShell/PowerShell/issues/18530#issuecomment-1325691850
-        environ_copy = environ.copy()
-        environ_copy.pop("PSMODULEPATH")
-        subprocess.run(
-            [
-                "powershell",
-                "-NoProfile",
-                "-Command",
-                f"Import-Module Microsoft.PowerShell.Security; {self.__install_path} -Force",
-            ],
-            check=True,
-            capture_output=False,
-            env=environ_copy,
-        )
-
-    def run(self, location: str) -> None:
-        self.validate(location)
-        header(f"Running {self.__app_name} ({self.__app_id})")
-        subprocess.run(
-            [
-                "powershell",
-                "-NoProfile",
-                "-Command",
-                f'Invoke-Expression "start shell:AppsFolder\\{self.__app_id}!App"',
-            ],
-            check=True,
-            capture_output=False,
-        )
-        pass
-
-    def stop(self, location: str) -> None:
-        self.validate(location)
-        header(f"Stopping {self.__app_name} ({self.__app_id})")
-        result = subprocess.run(
-            [
-                "pwsh",
-                "-NoProfile",
-                "-Command",
-                f"Get-Process -ProcessName {self.__app_name} -ErrorAction Ignore | Select-Object -Expand Id",
-            ],
-            check=True,
-            capture_output=True,
-        )
-        if result is None:
-            print("No test server process found")
-            return
-
-        subprocess.run(
-            [
-                "pwsh",
-                "-NoProfile",
-                "-Command",
-                f"Stop-Process {result.stdout.decode()}",
-            ],
-            check=True,
-            capture_output=False,
-        )
-
-    def uninstall(self, location: str) -> None:
-        self.validate(location)
-        header(f"Uninstalling {self.__app_name} ({self.__app_id}")
-        app_id_prefix = self.__app_id.split("_")[0]
-        subprocess.run(
-            [
-                "powershell",
-                "-NoProfile",
-                "-Command",
-                f"Get-AppxPackage {app_id_prefix}* | Remove-AppxPackage",
-            ],
-            check=True,
-            capture_output=False,
-        )
-
-    def get_ip(self, location: str) -> str:
-        return "localhost"
-
-
 class DotnetTestServer(TestServer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     @property
     @abstractmethod
     def dotnet_framework(self) -> str:
@@ -177,6 +83,7 @@ class DotnetTestServer(TestServer):
 
         subprocess.run(args, check=True, capture_output=False)
 
+
 class DotnetTestServerCli(TestServer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -208,7 +115,9 @@ class DotnetTestServerCli(TestServer):
             capture_output=False,
         )
 
-        csproj_path = DOTNET_TEST_SERVER_DIR / "testserver.cli" / "testserver.cli.csproj"
+        csproj_path = (
+            DOTNET_TEST_SERVER_DIR / "testserver.cli" / "testserver.cli.csproj"
+        )
         header(f"Building .NET test server for {self.platform}")
         args: List[str] = [
             str(DOTNET_PATH),
@@ -219,7 +128,7 @@ class DotnetTestServerCli(TestServer):
             "-c",
             "Release",
             "--self-contained",
-            "true"
+            "true",
         ]
 
         subprocess.run(args, check=True, capture_output=False)
@@ -243,6 +152,10 @@ class DotnetTestServer_iOS(DotnetTestServer):
     def extra_args(self) -> Optional[str]:
         return "-p:RuntimeIdentifier=ios-arm64"
 
+    def latestbuilds_path(self, version: str) -> str:
+        version_parts = version.split("-")
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+
     def create_bridge(self) -> PlatformBridge:
         return iOSBridge(
             str(
@@ -256,6 +169,21 @@ class DotnetTestServer_iOS(DotnetTestServer):
             ),
             False,
         )
+
+    def compress_package(self):
+        header(f"Compressing .NET test server for {self.platform}")
+        publish_dir = (
+            DOTNET_TEST_SERVER_DIR
+            / "testserver"
+            / "bin"
+            / "Release"
+            / "net8.0-ios"
+            / "ios-arm64"
+            / "testserver.app"
+        )
+        zip_path = publish_dir.parents[5] / "testserver_ios.zip"
+        zip_directory(publish_dir, zip_path)
+        return str(zip_path)
 
 
 @TestServer.register("dotnet_android")
@@ -272,6 +200,10 @@ class DotnetTestServer_Android(DotnetTestServer):
     def publish(self) -> bool:
         return True
 
+    def latestbuilds_path(self, version: str) -> str:
+        version_parts = version.split("-")
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+
     def create_bridge(self) -> PlatformBridge:
         return AndroidBridge(
             str(
@@ -285,16 +217,34 @@ class DotnetTestServer_Android(DotnetTestServer):
             "com.couchbase.dotnet.testserver",
         )
 
+    def compress_package(self):
+        header(f"Compressing .NET test server for {self.platform}")
+        apk_path = (
+            DOTNET_TEST_SERVER_DIR
+            / "testserver"
+            / "bin"
+            / "Release"
+            / "net8.0-android"
+            / "com.couchbase.dotnet.testserver-Signed.apk"
+        )
+        zip_path = apk_path.parents[5] / "testserver_android.apk"
+        shutil.copy(apk_path, zip_path)
+        return str(zip_path)
+
 
 @TestServer.register("dotnet_windows")
 class DotnetTestServer_Windows(DotnetTestServerCli):
     @property
     def platform(self) -> str:
         return ".NET Windows"
-    
+
     @property
     def rid(self) -> str:
         return "win-x64"
+
+    def latestbuilds_path(self, version: str) -> str:
+        version_parts = version.split("-")
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
 
     def create_bridge(self) -> PlatformBridge:
         return ExeBridge(
@@ -305,8 +255,24 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
             / "net8.0"
             / "win-x64"
             / "publish"
-            / "testserver.cli.exe", ["--silent", "5555"]
+            / "testserver.cli.exe",
+            ["--silent", "5555"],
         )
+
+    def compress_package(self) -> str:
+        header(f"Compressing .NET test server for {self.platform}")
+        publish_dir = (
+            DOTNET_TEST_SERVER_DIR
+            / "testserver.cli"
+            / "bin"
+            / "Release"
+            / "net8.0"
+            / "win-x64"
+            / "publish"
+        )
+        zip_path = publish_dir.parents[5] / "testserver_windows.zip"
+        zip_directory(publish_dir, zip_path)
+        return str(zip_path)
 
 
 @TestServer.register("dotnet_macos")
@@ -323,6 +289,10 @@ class DotnetTestServer_macOS(DotnetTestServer):
     def publish(self) -> bool:
         return False
 
+    def latestbuilds_path(self, version: str) -> str:
+        version_parts = version.split("-")
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+
     def create_bridge(self) -> PlatformBridge:
         return macOSBridge(
             str(
@@ -335,3 +305,18 @@ class DotnetTestServer_macOS(DotnetTestServer):
                 / "testserver.app"
             )
         )
+
+    def compress_package(self) -> str:
+        header(f"Compressing .NET test server for {self.platform}")
+        publish_dir = (
+            DOTNET_TEST_SERVER_DIR
+            / "testserver"
+            / "bin"
+            / "Release"
+            / "net8.0-maccatalyst"
+            / "maccatalyst-x64"
+            / "testserver.app"
+        )
+        zip_path = publish_dir.parents[5] / "testserver_macos.zip"
+        zip_directory(publish_dir, zip_path)
+        return str(zip_path)

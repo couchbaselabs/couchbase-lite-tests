@@ -6,23 +6,14 @@ from pathlib import Path
 from typing import Optional
 
 import paramiko
-from environment.aws.common.output import header
 from termcolor import colored
+
+from environment.aws.common.io import sftp_progress_bar
+from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
-from tqdm import tqdm
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 current_ssh = ""
-
-
-def sftp_progress_bar(sftp: paramiko.SFTPClient, local_path: Path, remote_path: str):
-    file_size = os.path.getsize(local_path)
-    with tqdm(total=file_size, unit="B", unit_scale=True, desc=local_path.name) as bar:
-
-        def callback(transferred, total):
-            bar.update(transferred - bar.n)
-
-        sftp.put(local_path, remote_path, callback=callback)
 
 
 def remote_exec(
@@ -163,7 +154,16 @@ def main(topology: TopologyConfig, private_key: Optional[str] = None):
         cwd=SCRIPT_DIR / ".." / "..",
     )
     subprocess.run(
-        ["docker", "run", "-d", "-p", "8180:8180", "--name", "logslurp", "public.ecr.aws/q8y4w9v7/couchbase/logslurp"],
+        [
+            "docker",
+            "run",
+            "-d",
+            "-p",
+            "8180:8180",
+            "--name",
+            "logslurp",
+            "public.ecr.aws/q8y4w9v7/couchbase/logslurp",
+        ],
         check=True,
         env=env,
         cwd=SCRIPT_DIR / ".." / "..",

@@ -6,6 +6,7 @@ from os import environ
 from pathlib import Path
 
 import netifaces
+
 from environment.aws.common.output import header
 
 from .platform_bridge import PlatformBridge

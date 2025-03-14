@@ -1,5 +1,4 @@
 import subprocess
-from typing import Optional
 
 from environment.aws.common.output import header
 

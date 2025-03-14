@@ -12,9 +12,11 @@ from environment.aws.common.output import header
 from environment.aws.logslurp_setup.setup_logslurp import main as logslurp_main
 from environment.aws.server_setup.setup_server import main as server_main
 from environment.aws.sgw_setup.setup_sgw import main as sgw_main
-from environment.aws.topology_setup.setup_topology import TopologyConfig, main as topology_main
+from environment.aws.topology_setup.setup_topology import TopologyConfig
+from environment.aws.topology_setup.setup_topology import main as topology_main
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+
 
 def terraform_apply(public_key_name: str, topology: TopologyConfig):
     os.chdir(SCRIPT_DIR)
@@ -26,7 +28,7 @@ def terraform_apply(public_key_name: str, topology: TopologyConfig):
     if sgw_count == 0 and cbs_count == 0 and not topology.wants_logslurp:
         print("No AWS resources requested, skipping terraform")
         return
-    
+
     result = subprocess.run(["terraform", "init"], capture_output=False, text=True)
     if result.returncode != 0:
         raise Exception(
@@ -48,7 +50,7 @@ def terraform_apply(public_key_name: str, topology: TopologyConfig):
         raise Exception(
             f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
         )
-    
+
     topology.read_from_terraform()
 
     header("Done, sleeping for 5s")
@@ -95,7 +97,15 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
         json.dump(config_json, output, indent=2)
 
 
-def main(topology: TopologyConfig, public_key_name: str, sgw_url: str, tdk_config_in: str, cbs_version: str = "7.6.4", private_key: Optional[str] = None, tdk_config_out: Optional[str] = None):
+def main(
+    topology: TopologyConfig,
+    public_key_name: str,
+    sgw_url: str,
+    tdk_config_in: str,
+    cbs_version: str = "7.6.4",
+    private_key: Optional[str] = None,
+    tdk_config_out: Optional[str] = None,
+):
     terraform_apply(public_key_name, topology)
     topology.resolve_test_servers()
     topology.dump()
@@ -152,4 +162,12 @@ if __name__ == "__main__":
         TopologyConfig(args.topology) if args.topology is not None else TopologyConfig()
     )
 
-    main(topology, args.public_key_name, args.sgw_url, args.tdk_config_in, args.cbs_version, args.private_key, args.tdk_config_out)
+    main(
+        topology,
+        args.public_key_name,
+        args.sgw_url,
+        args.tdk_config_in,
+        args.cbs_version,
+        args.private_key,
+        args.tdk_config_out,
+    )

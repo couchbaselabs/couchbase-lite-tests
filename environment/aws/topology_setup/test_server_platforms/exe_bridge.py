@@ -1,24 +1,15 @@
 import json
-import os
-from pathlib import Path
 import subprocess
-import paramiko
-import psutil
+from pathlib import Path
 from typing import List, Optional
 
-from tqdm import tqdm
+import paramiko
+import psutil
 
 from environment.aws.common.output import header
+
 from .platform_bridge import PlatformBridge
 
-def sftp_progress_bar(sftp: paramiko.SFTPClient, local_path: Path, remote_path: str):
-    file_size = os.path.getsize(local_path)
-    with tqdm(total=file_size, unit="B", unit_scale=True, desc=local_path.name) as bar:
-
-        def callback(transferred, total):
-            bar.update(transferred - bar.n)
-
-        sftp.put(local_path, remote_path, callback=callback)
 
 def remote_exec(
     ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True
@@ -36,6 +27,7 @@ def remote_exec(
 
     header("Done!")
     print()
+
 
 class ExeBridge(PlatformBridge):
     def __init__(self, exe_path: str, extra_args: Optional[List[str]] = None):
@@ -69,9 +61,9 @@ class ExeBridge(PlatformBridge):
                 proc.terminate()
                 print(f"Stopped PID {proc.pid}")
                 return
-            
+
         print(f"Unable to find process to stop ({self.__exe_name})")
-        
+
     def uninstall(self, location: str) -> None:
         print("No action needed for uninstalling executable")
 

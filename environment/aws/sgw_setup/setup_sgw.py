@@ -7,10 +7,12 @@ from typing import Dict, Optional, cast
 
 import paramiko
 import requests
-from environment.aws.common.output import header
 from termcolor import colored
-from environment.aws.topology_setup.setup_topology import TopologyConfig
 from tqdm import tqdm
+
+from environment.aws.common.io import sftp_progress_bar
+from environment.aws.common.output import header
+from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 current_ssh = ""
@@ -105,16 +107,6 @@ def setup_config(server_hostname: str):
 
     with open(SCRIPT_DIR / "start-sgw.sh", "w", newline="\n") as file:
         file.write(start_sgw_content)
-
-
-def sftp_progress_bar(sftp: paramiko.SFTPClient, local_path: Path, remote_path: str):
-    file_size = os.path.getsize(local_path)
-    with tqdm(total=file_size, unit="B", unit_scale=True, desc=local_path.name) as bar:
-
-        def callback(transferred, total):
-            bar.update(transferred - bar.n)
-
-        sftp.put(local_path, remote_path, callback=callback)
 
 
 def remote_exec(

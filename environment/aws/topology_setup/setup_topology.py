@@ -248,7 +248,7 @@ class TopologyConfig:
 
         if len(self.__clusters) > 0:
             print()
-            
+
         i = 1
         for sgw in self.__sync_gateways:
             print(f"Sync Gateway {i}: {sgw.hostname} -> {sgw.cluster_hostname}")

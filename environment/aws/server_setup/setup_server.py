@@ -1,27 +1,17 @@
 #!/usr/bin/env python3
 
-import os
 from pathlib import Path
 from typing import Optional
 
 import paramiko
-from environment.aws.common.output import header
 from termcolor import colored
+
+from environment.aws.common.io import sftp_progress_bar
+from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
-from tqdm import tqdm
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 current_ssh = ""
-
-
-def sftp_progress_bar(sftp: paramiko.SFTPClient, local_path: Path, remote_path: str):
-    file_size = os.path.getsize(local_path)
-    with tqdm(total=file_size, unit="B", unit_scale=True, desc=local_path.name) as bar:
-
-        def callback(transferred, total):
-            bar.update(transferred - bar.n)
-
-        sftp.put(local_path, remote_path, callback=callback)
 
 
 def remote_exec(
