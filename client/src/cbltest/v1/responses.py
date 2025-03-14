@@ -392,3 +392,45 @@ class PostLogResponse(TestServerResponse):
 
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "log")
+
+
+class PostStartListenerResponse(TestServerResponse):
+    """
+    A POST /startListener response as specified in version 1 of the
+    [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
+
+    Example Body::
+
+        {
+            "id": "123e0000-e89b-12d3-a456-426614174000",
+            "port": 59840
+        }
+    """
+
+    __listener_id_key: Final[str] = "id"
+    __port_key: Final[str] = "port"
+
+    @property
+    def listener_id(self) -> str:
+        """Gets the ID of the listener that was started"""
+        return self.__listener_id
+
+    @property
+    def port(self) -> int:
+        """Gets the port of the listener that was started"""
+        return self.__port
+
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "startListener")
+        self.__listener_id = cast(str, body.get(self.__listener_id_key))
+        self.__port = cast(int, body.get(self.__port_key))
+
+
+class PostStopListenerResponse(TestServerResponse):
+    """
+    A POST /stopListener response as specified in version 1 of the
+    [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
+    """
+
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "stopListener")

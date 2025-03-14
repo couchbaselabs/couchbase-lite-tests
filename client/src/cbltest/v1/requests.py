@@ -676,6 +676,78 @@ class PostLogRequestBody(TestServerRequestBody):
         return {"message": self.__message}
 
 
+class PostStartListenerRequestBody(TestServerRequestBody):
+    """
+    The body of a POST /startListener request as specified in version 1 of the
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+
+    Example Body::
+
+        {
+            "database": "db",
+            "collections": ["foo.bar", "_default.baz"],
+            "port": 59840
+        }
+    """
+
+    @property
+    def database(self) -> str:
+        """The database to serve via the listener"""
+        return self.__database
+
+    @property
+    def collections(self) -> List[str]:
+        """The collections in the database to serve via the listener"""
+        return self.__collections
+
+    @property
+    def port(self) -> Optional[int]:
+        """The desired port to listen on (if None, the OS will choose)"""
+        return self.__port
+
+    def __init__(self, db: str, collections: List[str], port: Optional[int] = None):
+        super().__init__(1)
+        self.__database = db
+        self.__collections = collections
+        self.__port = port
+
+    def to_json(self) -> Any:
+        json: Dict[str, Any] = {
+            "database": self.__database,
+            "collections": self.__collections,
+        }
+
+        if self.__port is not None:
+            json["port"] = self.__port
+
+        return json
+
+
+class PostStopListenerRequestBody(TestServerRequestBody):
+    """
+    The body of a POST /stopListener request as specified in version 1 of the
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+
+    Example Body::
+
+        {
+            "id": ""123e4567-e89b-12d3-a456-426614174000""
+        }
+    """
+
+    @property
+    def id(self) -> str:
+        """The ID of the listener to stop (returned from /startListener)"""
+        return self.__id
+
+    def __init__(self, id: str):
+        super().__init__(1)
+        self.__id = id
+
+    def to_json(self) -> Any:
+        return {"id": self.__id}
+
+
 # Below this point are all of the concrete test server request types
 # Remember the note from the top of this file about the actual type of the payload
 class PostResetRequest(TestServerRequest):
@@ -826,3 +898,27 @@ class PostLogRequest(TestServerRequest):
 
     def __init__(self, uuid: UUID, payload: TestServerRequestBody):
         super().__init__(1, uuid, "log", PostLogRequestBody, payload=payload)
+
+
+class PostStartListenerRequest(TestServerRequest):
+    """
+    A POST /startListener request as specified in version 1 of the
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+    """
+
+    def __init__(self, uuid: UUID, payload: PostStartListenerRequestBody):
+        super().__init__(
+            1, uuid, "startListener", PostStartListenerRequestBody, payload=payload
+        )
+
+
+class PostStopListenerRequest(TestServerRequest):
+    """
+    A POST /stopListener request as specified in version 1 of the
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+    """
+
+    def __init__(self, uuid: UUID, payload: PostStopListenerRequestBody):
+        super().__init__(
+            1, uuid, "stopListener", PostStopListenerRequestBody, payload=payload
+        )
