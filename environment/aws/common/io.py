@@ -7,7 +7,7 @@ from requests import Response
 from tqdm import tqdm
 
 
-def download_progress_bar(response: Response, output_path: str):
+def download_progress_bar(response: Response, output_path: Path) -> None:
     total_size = int(response.headers.get("content-length", 0))
     block_size = 1024
 

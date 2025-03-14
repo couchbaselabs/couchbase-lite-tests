@@ -3,8 +3,8 @@
 import subprocess
 from argparse import ArgumentParser
 
-from common.output import header
-from topology_setup.setup_topology import TopologyConfig
+from environment.aws.common.output import header
+from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 if __name__ == "__main__":
     parser = ArgumentParser(

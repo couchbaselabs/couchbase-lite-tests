@@ -119,6 +119,63 @@ class TopologyConfig:
     __logslurp_key: Final[str] = "logslurp"
     __include_key: Final[str] = "include"
 
+    def __init__(self, config_file: Optional[str] = None):
+        if config_file is None:
+            config_file = str((SCRIPT_DIR / "default_topology.json").resolve())
+
+        self.__clusters: List[ClusterConfig] = []
+        self.__sync_gateways: List[SyncGatewayConfig] = []
+        self.__sync_gateway_inputs: List[SyncGatewayInput] = []
+        self.__cluster_inputs: List[ClusterInput] = []
+        self.__test_server_inputs: List[TestServerInput] = []
+        self.__test_servers: List[TestServerConfig] = []
+        self._wants_logslurp: Optional[bool] = None
+        self.__logslurp: Optional[str] = None
+
+        with open(config_file, "r") as fin:
+            config = cast(Dict, json.load(fin))
+            if self.__clusters_key in config:
+                raw_clusters = cast(List[Dict], config[self.__clusters_key])
+                for raw_cluster in raw_clusters:
+                    self.__cluster_inputs.append(ClusterInput(raw_cluster))
+
+            if self.__sync_gateways_key in config:
+                raw_entry = cast(List[Dict], config[self.__sync_gateways_key])
+                for raw_server in raw_entry:
+                    cluster_index = int(raw_server[self.__cluster_key])
+                    if cluster_index < 0 or cluster_index >= len(self.__cluster_inputs):
+                        raise ValueError(f"Invalid cluster index '{cluster_index}'")
+
+                    self.__sync_gateway_inputs.append(SyncGatewayInput(cluster_index))
+
+            if self.__test_servers_key in config:
+                raw_servers = cast(
+                    List[Dict[str, str]], config[self.__test_servers_key]
+                )
+                for raw_server in raw_servers:
+                    self.__test_server_inputs.append(
+                        TestServerInput(
+                            raw_server["location"],
+                            raw_server["cbl_version"],
+                            raw_server["platform"],
+                            cast(bool, raw_server.get("download", False)),
+                        )
+                    )
+
+            if self.__logslurp_key in config:
+                self._wants_logslurp = cast(bool, config[self.__logslurp_key])
+
+            if self.__include_key in config:
+                include_file = str(
+                    (SCRIPT_DIR / cast(str, config[self.__include_key])).resolve()
+                )
+                sub_config = TopologyConfig(include_file)
+                self.__cluster_inputs.extend(sub_config.__cluster_inputs)
+                self.__sync_gateway_inputs.extend(sub_config.__sync_gateway_inputs)
+                self.__test_server_inputs.extend(sub_config.__test_server_inputs)
+                if self._wants_logslurp is None:
+                    self._wants_logslurp = sub_config._wants_logslurp
+
     @property
     def total_cbs_count(self) -> int:
         return sum([cluster.server_count for cluster in self.__cluster_inputs])
@@ -286,63 +343,6 @@ class TopologyConfig:
 
         if len(self.__test_servers) > 0:
             print()
-
-    def __init__(self, config_file: Optional[str] = None):
-        if config_file is None:
-            config_file = str((SCRIPT_DIR / "default_topology.json").resolve())
-
-        self.__clusters: List[ClusterConfig] = []
-        self.__sync_gateways: List[SyncGatewayConfig] = []
-        self.__sync_gateway_inputs: List[SyncGatewayInput] = []
-        self.__cluster_inputs: List[ClusterInput] = []
-        self.__test_server_inputs: List[TestServerInput] = []
-        self.__test_servers: List[TestServerConfig] = []
-        self._wants_logslurp: Optional[bool] = None
-        self.__logslurp: Optional[str] = None
-
-        with open(config_file, "r") as fin:
-            config = cast(Dict, json.load(fin))
-            if self.__clusters_key in config:
-                raw_clusters = cast(List[Dict], config[self.__clusters_key])
-                for raw_cluster in raw_clusters:
-                    self.__cluster_inputs.append(ClusterInput(raw_cluster))
-
-            if self.__sync_gateways_key in config:
-                raw_entry = cast(List[Dict], config[self.__sync_gateways_key])
-                for raw_server in raw_entry:
-                    cluster_index = int(raw_server[self.__cluster_key])
-                    if cluster_index < 0 or cluster_index >= len(self.__cluster_inputs):
-                        raise ValueError(f"Invalid cluster index '{cluster_index}'")
-
-                    self.__sync_gateway_inputs.append(SyncGatewayInput(cluster_index))
-
-            if self.__test_servers_key in config:
-                raw_servers = cast(
-                    List[Dict[str, str]], config[self.__test_servers_key]
-                )
-                for raw_server in raw_servers:
-                    self.__test_server_inputs.append(
-                        TestServerInput(
-                            raw_server["location"],
-                            raw_server["cbl_version"],
-                            raw_server["platform"],
-                            cast(bool, raw_server.get("download", False)),
-                        )
-                    )
-
-            if self.__logslurp_key in config:
-                self._wants_logslurp = cast(bool, config[self.__logslurp_key])
-
-            if self.__include_key in config:
-                include_file = str(
-                    (SCRIPT_DIR / cast(str, config[self.__include_key])).resolve()
-                )
-                sub_config = TopologyConfig(include_file)
-                self.__cluster_inputs.extend(sub_config.__cluster_inputs)
-                self.__sync_gateway_inputs.extend(sub_config.__sync_gateway_inputs)
-                self.__test_server_inputs.extend(sub_config.__test_server_inputs)
-                if self._wants_logslurp is None:
-                    self._wants_logslurp = sub_config._wants_logslurp
 
 
 def main(toplogy: TopologyConfig):

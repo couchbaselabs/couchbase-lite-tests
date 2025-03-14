@@ -158,6 +158,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
     def extra_args(self) -> Optional[str]:
         return "-p:RuntimeIdentifier=ios-arm64"
 
+    @property
     def latestbuilds_path(self) -> str:
         version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
@@ -215,6 +216,7 @@ class DotnetTestServer_Android(DotnetTestServer):
     def publish(self) -> bool:
         return True
 
+    @property
     def latestbuilds_path(self) -> str:
         version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
@@ -271,6 +273,7 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
     def rid(self) -> str:
         return "win-x64"
 
+    @property
     def latestbuilds_path(self) -> str:
         version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
@@ -288,7 +291,7 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
             / "publish"
         )
         return ExeBridge(
-            prefix / "testserver.cli.exe",
+            str(prefix / "testserver.cli.exe"),
             ["--silent", "5555"],
         )
 
@@ -329,6 +332,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
     def publish(self) -> bool:
         return False
 
+    @property
     def latestbuilds_path(self) -> str:
         version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"

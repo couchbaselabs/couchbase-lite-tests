@@ -86,7 +86,7 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
 
             config_json["sync-gateways"] = sgw_instances
 
-        if topology.wants_logslurp:
+        if topology.logslurp is not None:
             config_json["logslurp"] = f"{topology.logslurp}:8180"
 
         if len(topology.test_servers) > 0:

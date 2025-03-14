@@ -15,8 +15,8 @@ from environment.aws.common.output import header
 from environment.aws.topology_setup.test_server import TestServer
 
 
-def upload_exists(server: TestServer, version: str) -> bool:
-    url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{server.latestbuilds_path(version)}"
+def upload_exists(server: TestServer) -> bool:
+    url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{server.latestbuilds_path}"
     response = requests.head(url)
     if response.status_code == 200:
         return True
@@ -45,19 +45,19 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    server = TestServer.create(args.platform)
+    server = TestServer.create(args.platform, args.version)
 
-    if args.ci and upload_exists(server, args.version):
+    if args.ci and upload_exists(server):
         print("Server already exists on latestbuilds, skipping build")
         exit(0)
 
-    server.build(args.version)
+    server.build()
 
     if not args.ci and not args.upload:
         print("Upload not requested, skipping")
         exit(0)
 
-    if upload_exists(server, args.version):
+    if upload_exists(server):
         print("Server already exists on latestbuilds, skipping upload")
         exit(0)
 
@@ -74,12 +74,12 @@ if __name__ == "__main__":
         password=os.environ["LATESTBUILDS_PASSWORD"],
     )
 
-    print(f"/data/builds/latestbuilds/{server.latestbuilds_path(args.version)}")
+    print(f"/data/builds/latestbuilds/{server.latestbuilds_path}")
     header("Uploading compressed server")
     sftp = ssh.open_sftp()
     sftp_progress_bar(
         sftp,
         package_path,
-        f"/data/builds/latestbuilds/{server.latestbuilds_path(args.version)}",
+        f"/data/builds/latestbuilds/{server.latestbuilds_path}",
     )
     sftp.close()

@@ -83,7 +83,7 @@ class TestServer(ABC):
             print()
             return
 
-        url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.latestbuilds_path()}"
+        url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.latestbuilds_path}"
         header(f"Downloading {url}")
         response = requests.head(url)
         if response.status_code == 404:
