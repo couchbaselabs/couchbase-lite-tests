@@ -7,7 +7,7 @@ function Copy-Datasets {
     )
     Banner -Text "Copying dataset resources v$Version"
 
-    Push-Location $PSScriptRoot/../../../servers/dotnet/testserver/Resources/Raw
+    Push-Location $PSScriptRoot/../../../servers/dotnet/testserver.cli
     Copy-Item -Force $PSScriptRoot/../../../dataset/server/dbs/$Version/*.zip . -Verbose
     Copy-Item -Recurse -Force $PSScriptRoot/../../../dataset/server/blobs . -Verbose
     Pop-Location

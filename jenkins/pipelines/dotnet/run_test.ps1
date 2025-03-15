@@ -9,7 +9,6 @@ Import-Module $PSScriptRoot/prepare_env.psm1 -Force
 $ErrorActionPreference = "Stop" 
 
 Install-DotNet
-Install-Maui
 Copy-Datasets -Version $Dataset
 
 python -m venv venv
