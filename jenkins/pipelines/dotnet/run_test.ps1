@@ -21,7 +21,7 @@ if ($null -ne $PrivateKeyPath) {
     $python_args += $PrivateKeyPath
 }
 
-python .\setup_test.py @python_args
+python $PSScriptRoot\setup_test.py @python_args
 
 Push-Location $PSScriptRoot\..\..\..\tests
 pip install -r requirements.txt

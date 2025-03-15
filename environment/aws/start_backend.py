@@ -24,8 +24,8 @@ from pathlib import Path
 from time import sleep
 from typing import IO, Dict, Optional, cast
 
+SCRIPT_DIR = Path(__file__).parent
 if __name__ == "__main__":
-    SCRIPT_DIR = Path(__file__).parent
     sys.path.append(str(SCRIPT_DIR.parents[1]))
 
 from environment.aws.common.output import header

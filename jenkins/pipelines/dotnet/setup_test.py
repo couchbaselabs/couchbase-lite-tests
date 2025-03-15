@@ -4,9 +4,10 @@ import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
-# Add the parent directory of the 'environment' package to the sys.path
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
-sys.path.append(str(SCRIPT_DIR.parents[2]))
+
+if __name__ == "__main__":
+    sys.path.append(str(SCRIPT_DIR.parents[2]))
 
 from environment.aws.start_backend import main as start_backend
 from environment.aws.topology_setup.setup_topology import TopologyConfig
