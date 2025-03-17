@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 This module builds and optionally uploads Couchbase Lite test servers to the latestbuilds server.
 It includes functions for checking if an upload already exists, compressing the server package, and uploading the package via SFTP.

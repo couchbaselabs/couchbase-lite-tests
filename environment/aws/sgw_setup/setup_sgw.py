@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 """
 This module sets up Couchbase Sync Gateway (SGW) on AWS EC2 instances. It includes functions for downloading SGW packages,
@@ -196,7 +197,14 @@ def remote_exec(
 
     _, stdout, stderr = ssh.exec_command(command, get_pty=True)
     for line in iter(stdout.readline, ""):
-        print(colored(f"[{current_ssh}] {line}", "light_grey"), end="")
+        try:
+            print(colored(f"[{current_ssh}] {line}", "light_grey"), end="")
+        except UnicodeEncodeError:
+            for c in line:
+                try:
+                    print(c, end="")
+                except UnicodeEncodeError:
+                    print("Character print failure")
 
     exit_status = stdout.channel.recv_exit_status()
     if fail_on_error and exit_status != 0:

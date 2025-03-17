@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 This module sets up the topology for Couchbase Lite tests on AWS. It includes classes and functions for managing clusters,
 Sync Gateway instances, and test servers. It also provides functionality to read configurations from Terraform and manage

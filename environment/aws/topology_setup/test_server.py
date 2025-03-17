@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 This module provides the abstract base class TestServer for managing Couchbase Lite test servers on various platforms.
 It includes functions for initializing, registering, creating, building, downloading, compressing, and uncompressing test servers.
