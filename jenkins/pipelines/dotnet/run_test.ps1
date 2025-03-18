@@ -29,6 +29,8 @@ $saved_exit = $LASTEXITCODE
 deactivate
 Pop-Location
 
+# FIXME: Find another way to do this so this is not hardcoded here
+taskkill /F /IM "testserver.cli.exe"
 if($saved_exit -ne 0) {
     throw "Testing failed!"
 }

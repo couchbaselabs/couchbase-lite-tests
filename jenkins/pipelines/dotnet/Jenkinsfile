@@ -109,6 +109,9 @@ pipeline {
         }
     }
     post {
+        always {
+            archiveArtifacts artifacts: 'tests/session.log', fingerprint: true
+        }
         failure {
             mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "jim.borden@couchbase.com";
         }
