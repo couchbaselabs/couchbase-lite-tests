@@ -197,14 +197,7 @@ def remote_exec(
 
     _, stdout, stderr = ssh.exec_command(command, get_pty=True)
     for line in iter(stdout.readline, ""):
-        try:
-            print(colored(f"[{current_ssh}] {line}", "light_grey"), end="")
-        except UnicodeEncodeError:
-            for c in line:
-                try:
-                    print(c, end="")
-                except UnicodeEncodeError:
-                    print("Character print failure")
+        print(colored(f"[{current_ssh}] {line}", "light_grey"), end="")
 
     exit_status = stdout.channel.recv_exit_status()
     if fail_on_error and exit_status != 0:

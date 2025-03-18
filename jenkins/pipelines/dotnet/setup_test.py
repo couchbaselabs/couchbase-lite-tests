@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import json
 import os
 import sys
@@ -8,6 +11,7 @@ SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parents[2]))
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from environment.aws.start_backend import main as start_backend
 from environment.aws.topology_setup.setup_topology import TopologyConfig
