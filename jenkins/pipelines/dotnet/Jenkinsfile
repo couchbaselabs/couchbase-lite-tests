@@ -31,9 +31,6 @@ pipeline {
                     options {
                         timeout(time: 60, unit: 'MINUTES') 
                     }
-                    environment {
-                        PYTHONUTF8=1
-                    }
                     steps {
                         pwsh "jenkins\\pipelines\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwUrl ${params.SGW_URL} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
                     }
@@ -53,7 +50,6 @@ pipeline {
                         KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
                         DEVELOPER_DIR="/Applications/Xcode.app"
                         MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
-                        PYTHONUTF8=1
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
@@ -78,7 +74,6 @@ pipeline {
                 IOS_TEST_SERVER_IP = "10.100.150.123"
                 DEVELOPER_DIR="/Applications/Xcode.app"
                 MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
-                PYTHONUTF8=1
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
@@ -96,9 +91,6 @@ pipeline {
             options {
                 lock("mob-e2e-android-01")
                 timeout(time: 60, unit: 'MINUTES') 
-            }
-            environment {
-                PYTHONUTF8=1
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
