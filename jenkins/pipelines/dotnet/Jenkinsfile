@@ -40,6 +40,7 @@ pipeline {
                     post { 
                         always { 
                             pwsh 'jenkins\\pipelines\\dotnet\\teardown.ps1'
+                            archiveArtifacts artifacts: 'tests\\session.log', fingerprint: true
                         }
                     }
                 }
@@ -56,11 +57,12 @@ pipeline {
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        sh "jenkins/pipelines/dotnet/run_test.sh macos ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}' ~/.ssh/jborden.pem"
+                        sh "jenkins/pipelines/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} macos '${params.SGW_URL}' ~/.ssh/jborden.pem"
                     }
                     post { 
                         always { 
                             sh 'jenkins/pipelines/dotnet/teardown.sh --topology environment/aws/topology.json'
+                            archiveArtifacts artifacts: 'tests/session.log', fingerprint: true
                         }
                     }
                 }
@@ -81,11 +83,12 @@ pipeline {
             agent { label 'mob-e2e-mac-01' }
             steps {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                sh "jenkins/pipelines/dotnet/run_test.sh ios ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}' ~/.ssh/jborden.pem"
+                sh "jenkins/pipelines/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ios '${params.SGW_URL}' ~/.ssh/jborden.pem"
             }
             post {
                 always {
                     sh 'jenkins/pipelines/dotnet/teardown.sh --topology environment/aws/topology.json'
+                    archiveArtifacts artifacts: 'tests/session.log', fingerprint: true
                 }
             }
         }
@@ -99,19 +102,17 @@ pipeline {
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
-                sh "jenkins/pipelines/dotnet/run_test.sh android ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}' ~/.ssh/jborden.pem"
+                sh "jenkins/pipelines/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} android '${params.SGW_URL}' ~/.ssh/jborden.pem"
             }
             post {
                 always {
                     sh 'jenkins/pipelines/dotnet/teardown.sh --topology environment/aws/topology.json'
+                    archiveArtifacts artifacts: 'tests/session.log', fingerprint: true
                 }
             }
         }
     }
     post {
-        always {
-            archiveArtifacts artifacts: 'tests/session.log', fingerprint: true
-        }
         failure {
             mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "jim.borden@couchbase.com";
         }
