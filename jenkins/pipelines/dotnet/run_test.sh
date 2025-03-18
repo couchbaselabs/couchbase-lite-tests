@@ -12,18 +12,13 @@ function usage() {
 }
 
 function prepare_dotnet() {
-    if [ $# -ne 1 ]; then
-        echo "No dataset version provided to prepare_dotnet!"
-        exit 1
-    fi
-
     source $SCRIPT_DIR/prepare_env.sh
     install_dotnet
     install_maui
     if [ "$platform" != "macos" ]; then
         install_xharness
     fi
-    copy_datasets $1
+    copy_datasets $dataset_version
 }
 
 if [ $# -lt 4 ]; then
@@ -40,7 +35,7 @@ dataset_version=$2
 platform=$3
 sgw_url=$4
 
-prepare_dotnet $dataset_version
+prepare_dotnet
 
 python3 -m venv venv
 source venv/bin/activate
