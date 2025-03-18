@@ -49,6 +49,9 @@ if platform.system() == "Windows":
 else:
     XHARNESS_PATH = Path.home() / ".dotnet" / "tools" / "xharness"
 
+SCRIPT_PATH = Path(__file__).resolve().parent
+PID_FILE = SCRIPT_PATH / "ios_pid.txt"
+
 
 class iOSBridge(PlatformBridge):
     """
@@ -65,7 +68,6 @@ class iOSBridge(PlatformBridge):
         """
         self.__app_path = app_path
         self.__use_devicectl = use_devicectl
-        self.__pid: str = ""
 
     def validate(self, location: str) -> None:
         """
@@ -115,8 +117,7 @@ class iOSBridge(PlatformBridge):
         Args:
             location (str): The device location (e.g., device UUID).
         """
-        pid = self.__pid if self.__pid != "" else "<error>"
-        header(f"Stopping testserver PID {pid} on {location}")
+        header(f"Stopping testserver on {location}")
         if self.__use_devicectl:
             self.__stop_devicectl(location)
         else:
@@ -166,6 +167,7 @@ class iOSBridge(PlatformBridge):
         pass
 
     def __run_xharness(self, location: str) -> None:
+        PID_FILE.unlink() if PID_FILE.exists() else None
         self.__verify_xharness()
         result = subprocess.run(
             [
@@ -186,18 +188,26 @@ class iOSBridge(PlatformBridge):
         # Extract PID from result.stdout
         match = re.search(r"pid ([0-9]+)", result.stdout.decode("utf-8"))
         if match:
-            self.__pid = match.group(1)
-            print(f"Extracted PID: {self.__pid}")
+            pid = match.group(1)
+            print(f"Extracted PID: {pid}")
         else:
             raise RuntimeError("Failed to extract PID from XHarness output")
+
+        with open(PID_FILE, "w") as file:
+            file.write(pid)
 
     def __stop_devicectl(self, location: str) -> None:
         pass
 
     def __stop_xharness(self, location: str) -> None:
+        if not PID_FILE.exists():
+            raise RuntimeError("PID file not found, cannot stop test server")
+
+        with open(PID_FILE) as file:
+            pid = file.read().strip()
+
+        print(f"\t...PID {pid}")
         self.__verify_xharness()
-        if self.__pid == "":
-            raise RuntimeError("PID not set, cannot stop test server")
 
         subprocess.run(
             [
@@ -208,7 +218,7 @@ class iOSBridge(PlatformBridge):
                 "--devname",
                 location,
                 "--killdev",
-                self.__pid,
+                pid,
             ],
             check=True,
             capture_output=False,
