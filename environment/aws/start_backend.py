@@ -21,6 +21,7 @@ import os
 import subprocess
 import sys
 from argparse import ArgumentParser
+from io import TextIOWrapper
 from pathlib import Path
 from time import sleep
 from typing import IO, Dict, Optional, cast
@@ -28,7 +29,8 @@ from typing import IO, Dict, Optional, cast
 SCRIPT_DIR = Path(__file__).parent
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parents[1]))
-    sys.stdout.reconfigure(encoding='utf-8')
+    if isinstance(sys.stdout, TextIOWrapper):
+        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
 from environment.aws.common.output import header
 from environment.aws.logslurp_setup.setup_logslurp import main as logslurp_main

@@ -16,7 +16,9 @@ Functions:
 import os
 import sys
 from argparse import ArgumentParser
+from io import TextIOWrapper
 from pathlib import Path
+from typing import cast
 
 import paramiko
 import requests
@@ -24,7 +26,8 @@ import requests
 if __name__ == "__main__":
     SCRIPT_DIR = Path(__file__).resolve().parent
     sys.path.append(str(SCRIPT_DIR.parents[2]))
-    sys.stdout.reconfigure(encoding="utf-8")
+    if isinstance(sys.stdout, TextIOWrapper):
+        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
 from environment.aws.common.io import sftp_progress_bar
 from environment.aws.common.output import header

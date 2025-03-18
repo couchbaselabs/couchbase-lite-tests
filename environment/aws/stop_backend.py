@@ -10,16 +10,18 @@ Functions:
         Main function to tear down the AWS environment and stop the test servers.
 """
 
-from pathlib import Path
 import subprocess
-from argparse import ArgumentParser
 import sys
-from typing import Optional
+from argparse import ArgumentParser
+from io import TextIOWrapper
+from pathlib import Path
+from typing import Optional, cast
 
 SCRIPT_DIR = Path(__file__).parent
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parents[1]))
-    sys.stdout.reconfigure(encoding='utf-8')
+    if isinstance(sys.stdout, TextIOWrapper):
+        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
