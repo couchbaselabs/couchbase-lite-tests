@@ -38,6 +38,7 @@ if __name__ == "__main__":
         topology = json.load(fin)
         topology["$schema"] = "topology_schema.json"
         topology["include"] = "default_topology.json"
+        topology["tag"] = args.platform
         topology["test_servers"][0]["cbl_version"] = args.version
         with open(topology_file, "w") as fout:
             json.dump(topology, fout, indent=4)
