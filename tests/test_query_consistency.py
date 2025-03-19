@@ -195,3 +195,20 @@ class TestQueryConsistency(CBLTestClass):
             "landmarks",
             id_sort,
         )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.parametrize("regex_val", [
+         r"\\bEng.*e\\b",
+         r"\\beng.*e\\b",
+    ])
+    async def test_query_pattern_regex(self, cblpytest: CBLPyTest, regex_val: str):
+        # This is annoying because the sort algorithm is different between server and lite
+        def id_sort(x: Dict):
+            return x["id"]
+
+        await self._test_query(
+            cblpytest,
+            f'SELECT meta().id, country, name  FROM {{}} WHERE REGEXP_CONTAINS(name, "{regex_val}")',
+            "landmarks",
+            id_sort,
+        )
