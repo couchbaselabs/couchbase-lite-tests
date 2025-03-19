@@ -261,9 +261,6 @@ class iOSBridge(PlatformBridge):
         Raises:
             RuntimeError: If the IP address cannot be determined.
         """
-        if "IOS_TEST_SERVER_IP" in environ:
-            return environ["IOS_TEST_SERVER_IP"]
-
         # Apple provides no sane way to do this so the following dance is performed:
         #    1. Retrieve MAC address of device (this requires the default "Private Wifi Address" to be turned off on device)
         #    2. Broadcast a ping to the broadcast address of all network interfaces that have one, to ensure that the device
