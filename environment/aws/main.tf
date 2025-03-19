@@ -13,23 +13,10 @@ provider "aws" {
     region = "us-east-1"
 }
 
-# This is all stuff that is already set up, we just need
-# to make terraform aware of it
-
-# The VPC is the equivalent to a docker network, essentially.
-# It has a giant block of private IP addresses, and turns
-# on AWS generation of DNS hostnames (i.e. compute-1.amazonaws.com)
-# It's sort of like the "ISP" of sorts
-data "aws_vpc" "main" {
-    filter {
-        name   = "tag:Name"
-        values = ["mobile-e2e"]
-    }
-}
-
-# The subnet is a network within the above block, which is basically
-# like inserting a router into the network that has governance
-# over (in our case) 10.0.1.1 - 10.0.1.255
+# Read the subnet in which to insert our EC2 instances.  
+# The mobile-e2e subnet exists in the mobile-e2e VPC and
+# has domain over the IP addresses 10.0.1.1 - 10.0.1.255
+# within the VPC
 data "aws_subnet" "main" {
     filter {
         name   = "tag:Name"
@@ -38,7 +25,8 @@ data "aws_subnet" "main" {
 }
 
 # The security group acts like a firewall to control which ports 
-# are accessible by what
+# are accessible by what.  This is already created in AWS and 
+# named mobile-e2e so that we can retrieve it
 data "aws_security_group" "main" {
     filter {
         name   = "tag:Name"
