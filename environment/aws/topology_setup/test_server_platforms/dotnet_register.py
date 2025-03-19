@@ -387,7 +387,7 @@ class DotnetTestServer_Android(DotnetTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        dir = (
+        path = (
             TEST_SERVER_DIR
             / "downloaded"
             / self.platform
@@ -402,7 +402,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             / "com.couchbase.dotnet.testserver-Signed.apk"
         )
         return AndroidBridge(
-            str(dir),
+            str(path),
             "com.couchbase.dotnet.testserver",
         )
 
