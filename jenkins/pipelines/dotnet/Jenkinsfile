@@ -29,22 +29,21 @@ pipeline {
                 stage("Windows") {
                     agent { label 'mob-e2e-win-01' }
                     options {
-                        lock('mob-e2e-win-01')
                         timeout(time: 60, unit: 'MINUTES') 
                     }
                     steps {
-                        pwsh "jenkins\\pipelines\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwUrl ${params.SGW_URL}"
+                        pwsh "jenkins\\pipelines\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwUrl ${params.SGW_URL} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
                     }
                     post { 
                         always { 
                             pwsh 'jenkins\\pipelines\\dotnet\\teardown.ps1'
+                            archiveArtifacts artifacts: 'tests\\session.log', fingerprint: true
                         }
                     }
                 }
                 stage("Mac Catalyst") {
                     agent { label 'mob-e2e-mac-01' }
                     options {
-                        lock('mob-e2e-mac-01')
                         timeout(time: 60, unit: 'MINUTES') 
                     }
                     environment {
@@ -54,11 +53,12 @@ pipeline {
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        sh "jenkins/pipelines/dotnet/run_test.sh macos ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
+                        sh "jenkins/pipelines/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} macos '${params.SGW_URL}' ~/.ssh/jborden.pem"
                     }
                     post { 
                         always { 
                             sh 'jenkins/pipelines/dotnet/teardown.sh --topology environment/aws/topology.json'
+                            archiveArtifacts artifacts: 'tests/session.log', fingerprint: true
                         }
                     }
                 }
@@ -66,38 +66,39 @@ pipeline {
         }
         stage('iOS') {
             options {
-                lock("mob-e2e-mac-01")
+                lock("mob-e2e-iphone-01")
                 timeout(time: 60, unit: 'MINUTES') 
             }
             environment { 
                 KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
-                IOS_TEST_SERVER_IP = "10.100.150.123"
                 DEVELOPER_DIR="/Applications/Xcode.app"
                 MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                sh "jenkins/pipelines/dotnet/run_test.sh ios ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
+                sh "jenkins/pipelines/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ios '${params.SGW_URL}' ~/.ssh/jborden.pem"
             }
             post {
                 always {
                     sh 'jenkins/pipelines/dotnet/teardown.sh --topology environment/aws/topology.json'
+                    archiveArtifacts artifacts: 'tests/session.log', fingerprint: true
                 }
             }
         }
         stage('Android') {
             options {
-                lock("mob-e2e-mac-01")
+                lock("mob-e2e-android-01")
                 timeout(time: 60, unit: 'MINUTES') 
             }
             agent { label 'mob-e2e-mac-01' }
             steps {
-                sh "jenkins/pipelines/dotnet/run_test.sh android ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} '${params.SGW_URL}'"
+                sh "jenkins/pipelines/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} android '${params.SGW_URL}' ~/.ssh/jborden.pem"
             }
             post {
                 always {
                     sh 'jenkins/pipelines/dotnet/teardown.sh --topology environment/aws/topology.json'
+                    archiveArtifacts artifacts: 'tests/session.log', fingerprint: true
                 }
             }
         }

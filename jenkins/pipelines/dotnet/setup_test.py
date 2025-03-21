@@ -1,12 +1,17 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import json
 import os
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
-# Add the parent directory of the 'environment' package to the sys.path
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
-sys.path.append(str(SCRIPT_DIR.parents[2]))
+
+if __name__ == "__main__":
+    sys.path.append(str(SCRIPT_DIR.parents[2]))
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from environment.aws.start_backend import main as start_backend
 from environment.aws.topology_setup.setup_topology import TopologyConfig
@@ -33,6 +38,7 @@ if __name__ == "__main__":
         topology = json.load(fin)
         topology["$schema"] = "topology_schema.json"
         topology["include"] = "default_topology.json"
+        topology["tag"] = args.platform
         topology["test_servers"][0]["cbl_version"] = args.version
         with open(topology_file, "w") as fout:
             json.dump(topology, fout, indent=4)

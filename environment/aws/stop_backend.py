@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 """
 This module tears down a previously created E2E AWS EC2 testing backend. It includes functions for destroying the Terraform-managed infrastructure
@@ -10,8 +11,17 @@ Functions:
 """
 
 import subprocess
+import sys
 from argparse import ArgumentParser
-from typing import Optional
+from io import TextIOWrapper
+from pathlib import Path
+from typing import Optional, cast
+
+SCRIPT_DIR = Path(__file__).parent
+if __name__ == "__main__":
+    sys.path.append(str(SCRIPT_DIR.parents[1]))
+    if isinstance(sys.stdout, TextIOWrapper):
+        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig

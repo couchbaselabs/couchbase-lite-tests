@@ -13,220 +13,38 @@ provider "aws" {
     region = "us-east-1"
 }
 
-# This is the equivalent to a docker network, essentially.
-# It creates a giant block of private IP addresses, and turns
-# on AWS generation of DNS hostnames (i.e. compute-1.amazonaws.com)
-# It's sort of like the "ISP" of sorts
-resource "aws_vpc" "main" {
-    cidr_block = "10.0.0.0/16"
-
-    enable_dns_support = true
-    enable_dns_hostnames = true
-    
-    tags = {
-        Name = "main-vpc"
+# Read the subnet in which to insert our EC2 instances.  
+# The mobile-e2e subnet exists in the mobile-e2e VPC and
+# has domain over the IP addresses 10.0.1.1 - 10.0.1.255
+# within the VPC
+data "aws_subnet" "main" {
+    filter {
+        name   = "tag:Name"
+        values = ["mobile-e2e"]
     }
 }
 
-# This creates a network within the above block, which is basically
-# like inserting a router into the network that has governance
-# over 10.0.1.1 - 10.0.1.255
-resource "aws_subnet" "main" {
-    vpc_id     = aws_vpc.main.id
-    cidr_block = "10.0.1.0/24"
-    availability_zone = "us-east-1a"
-
-    tags = {
-        Name = "main-subnet"
+# The security group acts like a firewall to control which ports 
+# are accessible by what.  This is already created in AWS and 
+# named mobile-e2e so that we can retrieve it
+data "aws_security_group" "main" {
+    filter {
+        name   = "tag:Name"
+        values = ["mobile-e2e"]
     }
 }
 
-# This is like your Internet modem, it allows a network
-# to be connected to the Internet.
-resource "aws_internet_gateway" "main" {
-    vpc_id = aws_vpc.main.id
+# Below are the resources that we will create
 
-    tags = {
-        Name = "main-igw"
-    }
-}
-
-# This is like a routing rule the says all outgoing traffic goes to the 
-# Internet gateway.
-resource "aws_route_table" "main" {
-    vpc_id = aws_vpc.main.id
-
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.main.id
-    }
-  
-    tags = {
-        Name = "main-route-table"
-    }
-}
-
-# This applies the above rule to the subnet so that all traffic 
-# can reach the Internet.  I'm not sure if there is an improvement
-# here or not regarding internal IP addresses.
-resource "aws_route_table_association" "main" {
-    subnet_id      = aws_subnet.main.id
-    route_table_id = aws_route_table.main.id
-}
-
-# This acts like a firewall to control which ports are accessible by what
-resource "aws_security_group" "main" {
-    vpc_id = aws_vpc.main.id
-
-    ingress {
-        from_port   = 22
-        to_port     = 22
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    ingress {
-        from_port   = 4984
-        to_port     = 4986
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-    
-    ingress {
-        from_port = 8180
-        to_port = 8180
-        protocol = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    ingress {
-        from_port   = 9876
-        to_port     = 9876
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    ingress {
-        from_port   = 8091
-        to_port     = 8096
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    ingress {
-        from_port   = 11207
-        to_port     = 11207
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    ingress {
-        from_port   = 11210
-        to_port     = 11211
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    ingress {
-        from_port   = 18091
-        to_port     = 18096
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    # Server node-to-node ports
-
-    ingress {
-        from_port   = 4396
-        to_port     = 4396
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"]
-    }
-
-    ingress {
-        from_port   = 9100
-        to_port     = 9105
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"]
-    }
-
-    ingress {
-        from_port   = 9110
-        to_port     = 9118
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"]
-    }
-
-    ingress {
-        from_port   = 9120
-        to_port     = 9122
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"]
-    }
-
-    ingress {
-        from_port   = 9130
-        to_port     = 9130
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"]
-    }
-
-    ingress {
-        from_port   = 9999
-        to_port     = 9999
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"]
-    }
-
-    ingress {
-        from_port   = 11209
-        to_port     = 11210
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"]
-    }
-
-    ingress {
-        from_port   = 19130
-        to_port     = 19130
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"]
-    }
-
-    ingress {
-        from_port   = 21100
-        to_port     = 21100
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"]
-    }
-
-    ingress {
-        from_port   = 21150
-        to_port     = 21150
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"]
-    }
-
-    egress {
-        from_port   = 0
-        to_port     = 0
-        protocol    = "-1"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    tags = {
-        Name = "main-sg"
-    }
-}
-
-# Finally we get to the machine that will run Couchbase Server
+# This is the machine(s) that will run Couchbase Server
 resource "aws_instance" "couchbaseserver" {
     count = var.server_count
     ami = "ami-05576a079321f21f8"
     instance_type = "m5.xlarge"
     key_name = var.key_name
 
-    subnet_id = aws_subnet.main.id
-    vpc_security_group_ids = [aws_security_group.main.id]
+    subnet_id = data.aws_subnet.main.id
+    vpc_security_group_ids = [data.aws_security_group.main.id]
     associate_public_ip_address = true
 
     root_block_device {
@@ -240,15 +58,15 @@ resource "aws_instance" "couchbaseserver" {
     }
 }
 
-# And the machine that will run Sync Gateway
+# And the machine(s) that will run Sync Gateway
 resource "aws_instance" "sync_gateway" {
     count = var.sgw_count
     ami = "ami-05576a079321f21f8"
     instance_type = "m5.xlarge"
     key_name = var.key_name
 
-    subnet_id = aws_subnet.main.id
-    vpc_security_group_ids = [aws_security_group.main.id]
+    subnet_id = data.aws_subnet.main.id
+    vpc_security_group_ids = [data.aws_security_group.main.id]
     associate_public_ip_address = true
 
     root_block_device {
@@ -269,8 +87,8 @@ resource "aws_instance" "log_slurp" {
     instance_type = "m5.large"
     key_name = var.key_name
 
-    subnet_id = aws_subnet.main.id
-    vpc_security_group_ids = [aws_security_group.main.id]
+    subnet_id = data.aws_subnet.main.id
+    vpc_security_group_ids = [data.aws_security_group.main.id]
     associate_public_ip_address = true
 
     tags = {
@@ -286,18 +104,21 @@ variable "key_name" {
     type        = string
 }
 
+# This controls how many Couchbase Server instances are created
 variable "server_count" {
     description = "The number of Couchbase Server instances to create"
     type        = number
     default     = 1
 }
 
+# This controls how many Sync Gateway instances are created
 variable "sgw_count" {
     description = "The number of Sync Gateway instances to create"
     type        = number
     default     = 1
 }
 
+# This controls whether or not to include a LogSlurp instance
 variable "logslurp" {
     description = "Whether or not to include a logslurp deployment"
     type = bool

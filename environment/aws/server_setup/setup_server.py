@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 """
 This module sets up Couchbase Server on AWS EC2 instances. It includes functions for executing remote commands,

@@ -9,7 +9,6 @@ Import-Module $PSScriptRoot/prepare_env.psm1 -Force
 $ErrorActionPreference = "Stop" 
 
 Install-DotNet
-Install-Maui
 Copy-Datasets -Version $Dataset
 
 python -m venv venv
@@ -21,7 +20,7 @@ if ($null -ne $PrivateKeyPath) {
     $python_args += $PrivateKeyPath
 }
 
-python .\setup_test.py @python_args
+python $PSScriptRoot\setup_test.py @python_args
 
 Push-Location $PSScriptRoot\..\..\..\tests
 pip install -r requirements.txt
@@ -30,6 +29,8 @@ $saved_exit = $LASTEXITCODE
 deactivate
 Pop-Location
 
+# FIXME: Find another way to do this so this is not hardcoded here
+taskkill /F /IM "testserver.cli.exe"
 if($saved_exit -ne 0) {
     throw "Testing failed!"
 }

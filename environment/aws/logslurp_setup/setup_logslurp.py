@@ -172,46 +172,55 @@ def main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
         capture_output=True,
         text=True,
     )
-    if "aws" in context_result.stdout:
-        header("Updating docker context")
+
+    context_name = "aws" if topology.tag == "" else f"aws-{topology.tag}"
+    if context_name in context_result.stdout:
+        header(f"Updating docker context '{context_name}'")
         subprocess.run(
             [
                 "docker",
                 "context",
                 "update",
-                "aws",
+                context_name,
                 "--docker",
                 f"host=ssh://ec2-user@{ec2_hostname}",
             ]
         )
     else:
-        header("Creating docker context")
+        header(f"Creating docker context '{context_name}'")
         subprocess.run(
             [
                 "docker",
                 "context",
                 "create",
-                "aws",
+                context_name,
                 "--docker",
                 f"host=ssh://ec2-user@{ec2_hostname}",
             ]
         )
 
-    header(f"Building and starting logslurp on {topology.logslurp}")
+    header(f"Starting logslurp on {topology.logslurp}")
     env = os.environ.copy()
-    env["DOCKER_CONTEXT"] = "aws"
-    subprocess.run(
-        ["docker", "stop", "logslurp"],
-        check=False,
+    env["DOCKER_CONTEXT"] = context_name
+
+    container_check = subprocess.run(
+        ["docker", "ps", "-a", "--filter", "name=logslurp", "--format", "{{.Status}}"],
+        check=True,
+        capture_output=True,
+        text=True,
         env=env,
-        cwd=SCRIPT_DIR / ".." / "..",
     )
-    subprocess.run(
-        ["docker", "rm", "logslurp"],
-        check=False,
-        env=env,
-        cwd=SCRIPT_DIR / ".." / "..",
-    )
+
+    if container_check.stdout.strip() != "":
+        if container_check.stdout.startswith("Up"):
+            print("logslurp already running, returning...")
+            return
+
+        print("Restarting existing logslurp container...")
+        subprocess.run(["docker", "start", "logslurp"], check=False, env=env)
+        return
+
+    print("Starting new logslurp container...")
     subprocess.run(
         [
             "docker",
@@ -225,7 +234,6 @@ def main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
         ],
         check=True,
         env=env,
-        cwd=SCRIPT_DIR / ".." / "..",
     )
 
 

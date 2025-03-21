@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 """
 This module prepares an AWS EC2 environment for running end-to-end (E2E) tests. It includes functions for applying Terraform configurations,
@@ -20,13 +21,16 @@ import os
 import subprocess
 import sys
 from argparse import ArgumentParser
+from io import TextIOWrapper
 from pathlib import Path
 from time import sleep
 from typing import IO, Dict, Optional, cast
 
+SCRIPT_DIR = Path(__file__).parent
 if __name__ == "__main__":
-    SCRIPT_DIR = Path(__file__).parent
     sys.path.append(str(SCRIPT_DIR.parents[1]))
+    if isinstance(sys.stdout, TextIOWrapper):
+        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
 from environment.aws.common.output import header
 from environment.aws.logslurp_setup.setup_logslurp import main as logslurp_main

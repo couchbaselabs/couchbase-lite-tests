@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 This module sets up the topology for Couchbase Lite tests on AWS. It includes classes and functions for managing clusters,
 Sync Gateway instances, and test servers. It also provides functionality to read configurations from Terraform and manage
@@ -209,6 +212,7 @@ class TopologyConfig:
     __test_servers_key: Final[str] = "test_servers"
     __logslurp_key: Final[str] = "logslurp"
     __include_key: Final[str] = "include"
+    __tag_key: Final[str] = "tag"
 
     def __init__(self, config_file: Optional[str] = None):
         if config_file is None:
@@ -222,6 +226,7 @@ class TopologyConfig:
         self.__test_servers: List[TestServerConfig] = []
         self._wants_logslurp: Optional[bool] = None
         self.__logslurp: Optional[str] = None
+        self.__tag: str = ""
 
         with open(config_file, "r") as fin:
             config = cast(Dict, json.load(fin))
@@ -267,6 +272,9 @@ class TopologyConfig:
                 if self._wants_logslurp is None:
                     self._wants_logslurp = sub_config._wants_logslurp
 
+            if self.__tag_key in config:
+                self.__tag = cast(str, config[self.__tag_key])
+
     @property
     def total_cbs_count(self) -> int:
         return sum([cluster.server_count for cluster in self.__cluster_inputs])
@@ -294,6 +302,10 @@ class TopologyConfig:
     @property
     def logslurp(self) -> Optional[str]:
         return self.__logslurp
+
+    @property
+    def tag(self) -> str:
+        return self.__tag
 
     def read_from_terraform(self):
         """

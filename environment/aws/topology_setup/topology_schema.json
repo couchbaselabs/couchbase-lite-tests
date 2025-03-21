@@ -75,6 +75,9 @@
         },
         "include": {
             "type": "string"
+        },
+        "tag": {
+            "type": "string"
         }
     }
 }
