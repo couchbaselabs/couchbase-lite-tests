@@ -28,6 +28,7 @@ Functions:
         Retrieve the IP address of the specified device.
 """
 
+import platform
 import subprocess
 from pathlib import Path
 from typing import List
@@ -63,6 +64,15 @@ class AndroidBridge(PlatformBridge):
         self.__app_id = app_id
         self.__activity = activity
         self.__adb_location = None
+
+        find_command = "where" if platform.system() == "Windows" else "which"
+        find_adb_result = subprocess.run(
+            [find_command, "adb"], check=False, capture_output=True, text=True
+        )
+        if find_adb_result.returncode == 0:
+            self.__adb_location = Path(find_adb_result.stdout.strip())
+            return
+
         for adb_location in self.__potential_adb_locations:
             print(adb_location)
             if (Path(adb_location) / "adb").exists():
