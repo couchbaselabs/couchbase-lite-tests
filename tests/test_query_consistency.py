@@ -94,6 +94,30 @@ class TestQueryConsistency(CBLTestClass):
 
         assert comparison(local_results, remote_results)
 
+    async def _test_join(
+        self, cblpytest: CBLPyTest, query: str, server_query: Optional[str] = None
+    ):
+        assert TestQueryConsistency.__database is not None, (
+            "Weird...setup not finished?"
+        )
+
+        if server_query is None:
+            server_query = query.replace("travel", "travel.travel")
+
+        self.mark_test_step(f"Run '{query}' on test server")
+        local_results = await TestQueryConsistency.__database.run_query(query)
+
+        # All of the join tests involve both airlines and routes.  Currently I can
+        # only choose one, but the others should be set up by now do to previous tests
+        # If running this test standalone, you may need to CREATE PRIMARY INDEX
+        # on both the airlines and routes collections.
+        self.mark_test_step(f"Run '{server_query}' on Couchbase Server")
+        remote_results = cblpytest.couchbase_servers[0].run_query(
+            server_query, "travel", "travel", "airlines"
+        )
+
+        assert json_equivalent(local_results, remote_results)
+
     @pytest.mark.asyncio(loop_scope="session")
     async def test_query_docids(self, cblpytest: CBLPyTest):
         # This is annoying because the sort algorithm is different between server and lite
@@ -194,4 +218,162 @@ class TestQueryConsistency(CBLTestClass):
             f'SELECT meta().id, country, name FROM {{}} WHERE name LIKE "{like_val}"',
             "landmarks",
             id_sort,
+        )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.parametrize(
+        "regex",
+        ["\\bEng.*e\\b", "\\beng.*e\\b"],
+    )
+    async def test_query_pattern_regex(self, cblpytest: CBLPyTest, regex: str):
+        # This is annoying because the sort algorithm is different between server and lite
+        def id_sort(x: Dict):
+            return x["id"]
+
+        await self._test_query(
+            cblpytest,
+            f'SELECT meta().id, country, name FROM {{}} t WHERE REGEXP_CONTAINS(t.name, "{regex}")',
+            "landmarks",
+            id_sort,
+        )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_query_is_not_valued(self, cblpytest: CBLPyTest):
+        await self._test_query(
+            cblpytest,
+            'SELECT meta().id, name FROM {} WHERE meta().id NOT LIKE "_sync%" and (name IS NULL OR name IS MISSING) ORDER BY name ASC LIMIT 100',
+            "hotels",
+        )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_query_ordering(self, cblpytest: CBLPyTest):
+        await self._test_query(
+            cblpytest,
+            'SELECT meta().id, title FROM {} WHERE type = "hotel" ORDER BY name ASC',
+            "hotels",
+        )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_query_substring(self, cblpytest: CBLPyTest):
+        await self._test_query(
+            cblpytest,
+            'SELECT meta().id, email, UPPER(name) from {} t where CONTAINS(t.email, "gmail.com")',
+            "landmarks",
+        )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_query_join(self, cblpytest: CBLPyTest):
+        query = """SELECT DISTINCT airlines.name, airlines.callsign, routes.destinationairport, routes.stops, routes.airline
+                   FROM travel.routes as routes
+                    JOIN travel.airlines AS airlines
+                    ON routes.airlineid = meta(airlines).id
+                   WHERE routes.sourceairport = "SFO"
+                   ORDER BY meta(routes).id
+                   LIMIT 2"""
+
+        server_query = """SELECT DISTINCT airlines.name, airlines.callsign, routes.destinationairport, routes.stops, routes.airline
+                   FROM travel.travel.routes as routes
+                    JOIN travel.travel.airlines AS airlines
+                    ON KEYS routes.airlineid
+                   WHERE routes.sourceairport = "SFO"
+                   ORDER BY meta(routes).id
+                   LIMIT 2"""
+
+        await self._test_join(cblpytest, query, server_query)
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_query_inner_join(self, cblpytest: CBLPyTest):
+        query = """
+            SELECT routes.airline, routes.sourceairport, airports.country
+            FROM travel.routes as routes
+             INNER JOIN travel.airports AS airports
+             ON airports.icao = routes.destinationairport
+            WHERE airports.country = "United States"
+             AND routes.stops = 0
+            ORDER BY routes.destinationairport
+        """
+
+        await self._test_join(cblpytest, query)
+
+    @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.parametrize(
+        "server_join_type",
+        ["LEFT JOIN", "LEFT OUTER JOIN"],
+    )
+    async def test_query_left_join(self, cblpytest: CBLPyTest, server_join_type: str):
+        query = """
+            SELECT airlines, routes
+            FROM travel.routes AS routes
+             LEFT JOIN travel.airlines AS airlines
+             ON meta(airlines).id = routes.airlineid
+            ORDER BY meta(routes).id
+            LIMIT 10
+        """
+
+        server_query = f"""
+            SELECT airlines, routes
+            FROM travel.travel.routes
+             {server_join_type} travel.travel.airlines
+             ON KEYS routes.airlineid
+            WHERE meta(routes).id NOT LIKE "_sync%"
+            ORDER BY meta(routes).id
+            LIMIT 10
+        """
+
+        await self._test_join(cblpytest, query, server_query)
+
+    @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.parametrize(
+        "operation",
+        ["=", "!="],
+    )
+    async def test_equality(self, cblpytest: CBLPyTest, operation: str):
+        await self._test_query(
+            cblpytest,
+            f'SELECT meta().id, name FROM {{}} WHERE country {operation} "France" ORDER BY meta().id ASC',
+            "airports",
+        )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.parametrize(
+        "operation",
+        [">", ">=", "<", "<="],
+    )
+    async def test_comparison(self, cblpytest: CBLPyTest, operation: str):
+        await self._test_query(
+            cblpytest,
+            f"SELECT meta().id FROM {{}} WHERE geo.alt {operation} 1000 ORDER BY meta().id ASC",
+            "airports",
+        )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_in(self, cblpytest: CBLPyTest):
+        await self._test_query(
+            cblpytest,
+            'SELECT meta().id FROM {} WHERE (country IN ["United States", "France"]) ORDER BY meta().id ASC',
+            "airports",
+        )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.parametrize(
+        "keyword",
+        ["BETWEEN", "NOT BETWEEN"],
+    )
+    async def test_between(self, cblpytest: CBLPyTest, keyword: str):
+        await self._test_query(
+            cblpytest,
+            f"SELECT meta().id FROM {{}} WHERE geo.alt {keyword} 100 and 200 ORDER BY meta().id ASC",
+            "airports",
+        )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.parametrize(
+        "keyword",
+        ["IS", "IS NOT"],
+    )
+    async def test_same(self, cblpytest: CBLPyTest, keyword: str):
+        await self._test_query(
+            cblpytest,
+            f"SELECT meta().id FROM {{}} WHERE iata {keyword} null ORDER BY meta().id ASC",
+            "airports",
         )

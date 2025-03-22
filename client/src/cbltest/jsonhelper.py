@@ -1,3 +1,4 @@
+import json
 import sys
 from typing import Any, List, Optional, Type, TypeVar, cast
 
@@ -6,9 +7,29 @@ if sys.version_info >= (3, 10):
 else:
     from typing_extensions import get_origin
 
-from .logging import cbl_warning
+from .logging import cbl_info, cbl_warning
 
 T = TypeVar("T")
+
+
+def dumps_with_ellipsis(obj: Any, limit: int = 100) -> str:
+    """
+    Truncate a string to a specified length and add an ellipsis in the middle for the truncated characters.
+
+    Args:
+        text (str): The input string to truncate.
+        limit (int): The maximum length of the resulting string, including the ellipsis. Default is 100.
+
+    Returns:
+        str: The truncated string with an ellipsis in the middle if it exceeds the limit.
+    """
+    text = json.dumps(obj)
+    if len(text) <= limit:
+        return text
+
+    # Calculate the length of each half, accounting for the ellipsis (3 characters)
+    half_length = (limit - 3) // 2
+    return f"{text[:half_length]}...{text[-half_length:]}"
 
 
 def _get_string_list(d: dict, key: str) -> Optional[List[str]]:
@@ -124,34 +145,62 @@ def _get_typed_required(d: dict, key: str, type: Type[T]) -> T:
     return cast(T, ret_val)
 
 
-def json_equivalent(left: Any, right: Any) -> bool:
+def json_equivalent(left: Any, right: Any, current_path: str = "") -> bool:
     if isinstance(left, dict):
         if not isinstance(right, dict):
+            left_obj = dumps_with_ellipsis(left)
+            right_obj = dumps_with_ellipsis(right)
+            cbl_info(
+                f"Lefthand '{left_obj}' was a dict and righthand '{right_obj}' was not"
+            )
             return False
 
         left_dict = cast(dict, left)
         right_dict = cast(dict, right)
         for key in left_dict:
             if key not in right_dict:
+                left_obj = dumps_with_ellipsis(left)
+                right_obj = dumps_with_ellipsis(right)
+                cbl_info(
+                    f"Lefthand '{left_obj}' contained key '{key}' and righthand '{right_obj}' did not"
+                )
                 return False
 
-            if not json_equivalent(left_dict[key], right_dict[key]):
+            next_path = f"{current_path}.{key}"
+            cbl_info(f"Entering key '{next_path}'")
+            if not json_equivalent(left_dict[key], right_dict[key], next_path):
                 return False
+
+            cbl_info(f"Returning to key '{current_path}'")
 
         return True
 
     if isinstance(left, list):
         if not isinstance(right, list):
+            left_obj = dumps_with_ellipsis(left)
+            right_obj = dumps_with_ellipsis(right)
+            cbl_info(
+                f"Lefthand '{left_obj}' was a list and righthand '{right_obj}' was not"
+            )
             return False
 
         left_list = cast(list, left)
         right_list = cast(list, right)
         if len(left_list) != len(right_list):
+            left_obj = dumps_with_ellipsis(left)
+            right_obj = dumps_with_ellipsis(right)
+            cbl_info(
+                f"Lefthand '{left_obj}' has different count ({len(left_list)}) than righthand '{right_obj}' {len(right_list)}"
+            )
             return False
 
         for i in range(0, len(left_list)):
+            next_path = f"{current_path}[{i}]"
+            cbl_info(f"Entering index '{next_path}'")
             if not json_equivalent(left_list[i], right_list[i]):
                 return False
+
+            cbl_info(f"Returning to '{current_path}'")
 
         return True
 
