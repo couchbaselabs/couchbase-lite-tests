@@ -232,7 +232,7 @@ class TestQueryConsistency(CBLTestClass):
 
         await self._test_query(
             cblpytest,
-            f'SELECT meta().id, country, name FROM {{}} t WHERE t.type="landmark" and REGEXP_CONTAINS(t.name, "{regex}")',
+            f'SELECT meta().id, country, name FROM {{}} t WHERE REGEXP_CONTAINS(t.name, "{regex}")',
             "landmarks",
             id_sort,
         )
