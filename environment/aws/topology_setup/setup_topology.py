@@ -23,7 +23,10 @@ Functions:
 import json
 import subprocess
 from pathlib import Path
+from time import sleep
 from typing import Dict, Final, List, Optional, cast
+
+import requests
 
 from environment.aws.common.output import header
 from environment.aws.topology_setup.test_server import TestServer
@@ -392,6 +395,22 @@ class TopologyConfig:
             bridge = test_server.create_bridge()
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
+            port = 5555 if test_server_input.platform.startswith("dotnet") else 8080
+            ip = bridge.get_ip(test_server_input.location)
+            for _ in range(0, 10):
+                try:
+                    requests.get(f"http://{ip}:{port}")
+                    return
+                except requests.exceptions.ConnectionError:
+                    print(
+                        f"Failed to connect to test server at {ip}:{port}, retrying in 1s..."
+                    )
+                    sleep(1)
+                    pass
+
+            raise RuntimeError(
+                f"Test server failed to start at {test_server_input.location}"
+            )
 
     def stop_test_servers(self):
         """
