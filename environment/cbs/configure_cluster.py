@@ -76,7 +76,7 @@ def deploy_and_configure_cluster():
         execute_remote_command(ip, f'bash {script_location}')
 
     print("Couchbase cluster configuration complete.")
-    
+
 
 if __name__ == '__main__':
     deploy_and_configure_cluster()

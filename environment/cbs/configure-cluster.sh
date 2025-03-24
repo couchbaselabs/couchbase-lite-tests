@@ -58,7 +58,6 @@ couchbase_cli_check() {
 if [ -e ${CONFIG_DONE_FILE} ]; then
   log "Couchbase cluster already configured. Exiting."
   config_done
-  exit 0
 fi
 
 log "Starting Couchbase Cluster Setup on VM..."
@@ -79,6 +78,10 @@ couchbase_cli_check cluster-init \
   --cluster-ramsize ${RAMSIZE} \
   --cluster-index-ramsize ${INDEX_RAMSIZE} \
   --index-storage-setting default
+
+echo "Verify credentials"
+curl_check http://localhost:8091/settings/web -d port=8091 -d username=Administrator -d password=password -u Administrator:password
+echo
 
 # # Add other nodes to the cluster
 # log "Adding nodes to the cluster..."
