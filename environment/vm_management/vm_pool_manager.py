@@ -71,7 +71,7 @@ def reserve_nodes(opts):
     for row in query:
         doc_id = row["id"]
 
-        res = cb_coll.lookup_in(doc_id, SD.get("poolId"))
+        res = cb_coll.lookup_in(doc_id, (SD.get("poolId"),))
 
         # Check if the poolId is "edge-server"
         if res != "edge-server":
