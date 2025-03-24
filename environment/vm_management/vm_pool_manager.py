@@ -72,9 +72,10 @@ def reserve_nodes(opts):
         doc_id = row["id"]
 
         res = cb_coll.lookup_in(doc_id, (SD.get("poolId"),))
+        value = res.content_as[str](0)
 
         # Check if the poolId is "edge-server"
-        if res != "edge-server":
+        if value != "edge-server":
             log_info(f"Skipping node {doc_id} as poolId is not 'edge-server'")
             continue
         
@@ -169,19 +170,23 @@ def reserve_node(doc_id, job_name, counter=0):
         return False
 
 
-def release_nodes(opts):
+def release_nodes(pool_list, opts):
     """Release nodes back to the pool."""
-    log_info(f"Releasing nodes: {opts.pool_list} back to the pool")
+    if pool_list:
+        log_info(f"Releasing nodes: {pool_list} back to the pool")
+        node_list = pool_list
+    elif opts.pool_list:
+        log_info(f"Releasing nodes: {opts.pool_list} back to the pool")
 
-    cleaned_pool_list = opts.pool_list.strip().rstrip(',')
+        cleaned_pool_list = opts.pool_list.strip().rstrip(',')
 
-    # If there are commas, split by commas; if there are spaces, split by spaces
-    if "," in cleaned_pool_list:
-        node_list = cleaned_pool_list.split(',')
-    elif " " in cleaned_pool_list:
-        node_list = cleaned_pool_list.split()
-    else:
-        node_list = [cleaned_pool_list]
+        # If there are commas, split by commas; if there are spaces, split by spaces
+        if "," in cleaned_pool_list:
+            node_list = cleaned_pool_list.split(',')
+        elif " " in cleaned_pool_list:
+            node_list = cleaned_pool_list.split()
+        else:
+            node_list = [cleaned_pool_list]
 
     for node in node_list:
         result = cb_coll.get(str(node))
@@ -279,7 +284,7 @@ def main():
                 fh.write(pool_json_str)
     elif opts.release_nodes:
         if opts.pool_list:
-            release_nodes(opts)
+            release_nodes([], opts)
         else:
             raise AttributeError("You must provide a list of IPs to release.")
     elif opts.get_available_nodes:
