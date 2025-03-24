@@ -4,6 +4,7 @@ import paramiko
 import subprocess
 import sys
 import time
+import couchbase.subdocument as SD
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterTimeoutOptions, ClusterOptions
@@ -70,10 +71,12 @@ def reserve_nodes(opts):
     for row in query:
         doc_id = row["id"]
 
+        res = cb_coll.lookup_in(doc_id, SD.get("poolId"))
+
         # Check if the poolId is "edge-server"
-        if row.get("poolId") != "edge-server":
+        if res != "edge-server":
             log_info(f"Skipping node {doc_id} as poolId is not 'edge-server'")
-            continue  # Skip this node if poolId is not "edge-server"
+            continue
         
         is_node_reserved = reserve_node(doc_id, opts.job_name)
         
