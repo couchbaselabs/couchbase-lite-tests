@@ -49,7 +49,7 @@ def uninstall_sync_gateway(ip):
     fix_hostname(ip)
 
     # Check if Sync Gateway service exists
-    output, error = run_remote_command(ip, "systemctl list-unit-files --type=service | grep sync_gateway")
+    output, error = run_remote_command(ip, "dpkg -l | grep sync-gateway")
     if not output:
         print(f"Sync Gateway is not installed on {ip}. Skipping uninstallation.")
         return
