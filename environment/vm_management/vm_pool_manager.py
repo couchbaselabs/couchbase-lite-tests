@@ -217,11 +217,11 @@ def main():
                       help="Specify the number of nodes you need from the server pool. Default value is 2")
 
     parser.add_option("--nodes-os-type",
-                      action="store", dest="nodes_os_type", default="debian",
+                      action="store", dest="nodes_os_type", default="ubuntu",
                       help="Specify the OS type of requested nodes")
 
     parser.add_option("--nodes-os-version",
-                      action="store", dest="nodes_os_version", default="12",
+                      action="store", dest="nodes_os_version", default="22",
                       help="Specify the OS version of requested nodes")
 
     parser.add_option("--slave-ip",
