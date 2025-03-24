@@ -108,7 +108,7 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build, crea
     
     print("Checking if Couchbase Edge Server is running on port 59840...")
     output = run_remote_command(edge_server_ip, "systemctl status couchbase-edge-server")
-    if "Started couchbase-edge-server.service" in output:
+    if "active (running)" in output:
         print(f"Couchbase Edge Server is running successfully on {edge_server_ip}.")
     else:
         print(f"Couchbase Edge Server failed to start on {edge_server_ip}. Exiting...")
