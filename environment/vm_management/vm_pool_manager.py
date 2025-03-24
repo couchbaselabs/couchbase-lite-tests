@@ -66,9 +66,17 @@ def reserve_nodes(opts):
 
     query = query_results(opts)
     pool_list = []
+
     for row in query:
         doc_id = row["id"]
+
+        # Check if the poolId is "edge-server"
+        if row.get("poolId") != "edge-server":
+            log_info(f"Skipping node {doc_id} as poolId is not 'edge-server'")
+            continue  # Skip this node if poolId is not "edge-server"
+        
         is_node_reserved = reserve_node(doc_id, opts.job_name)
+        
         if opts.nodes_os_type not in MOBILE_OS:
             vm_alive = check_vm_alive(doc_id)
             if not vm_alive:
@@ -85,6 +93,7 @@ def reserve_nodes(opts):
                 query = cluster.query(query_str)
             if is_node_reserved and device_alive:
                 pool_list.append(str(doc_id))
+        
         if len(pool_list) == int(opts.num_of_nodes):
             return pool_list
 

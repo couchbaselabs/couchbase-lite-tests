@@ -114,45 +114,6 @@ def fix_hostname(ip):
         add_host_cmd = f"echo '127.0.1.1 {hostname}' >> /etc/hosts"
         run_remote_command(ip, add_host_cmd)
 
-# async def ensure_sshpass(ip):
-#     """Ensure sshpass is installed on the remote machine using asyncssh."""
-#     print(f"Checking if sshpass is installed on {ip}...")
-
-#     async with asyncssh.connect(ip, username='root', password='couchbase', known_hosts=None) as client:
-#         result = await client.run(
-#             "if ! command -v sshpass; then "
-#             "sudo -n apt-get update && "
-#             "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -y sshpass; "
-#             "fi",
-#             check=True
-#         )
-
-#         if result.exit_status == 0:
-#             print(f"✅ sshpass is now installed on {ip}.")
-#             return True
-#         else:
-#             print(f"❌ Failed to install sshpass on {ip}: {result.stderr}")
-#             return False
-
-# def find_sshpass(ip, password="couchbase"):
-#     """Find sshpass dynamically on the remote machine."""
-#     ssh_command = f"/usr/bin/sshpass -p {password} ssh -o StrictHostKeyChecking=no root@{ip} 'export PATH=$PATH:/usr/local/bin:/usr/bin && which sshpass'"
-
-#     remote_check = subprocess.run(ssh_command, shell=True, capture_output=True, text=True)
-#     if remote_check.returncode == 0 and remote_check.stdout.strip():
-#         remote_sshpass = remote_check.stdout.strip()
-#         print(f"✅ Found sshpass on {ip} at: {remote_sshpass}")
-#         return remote_sshpass
-#     else:
-#         print(f"❌ sshpass not found on {ip}. STDERR:\n{remote_check.stderr}")
-#         sys.exit(1)
-
-# def find_sshpass(ip):
-#     """Finds the path of sshpass dynamically."""
-#     result = subprocess.run(f"sshpass -p couchbase ssh root@{ip} command -v sshpass", shell=True, capture_output=True, text=True)
-#     if result.returncode == 0:
-#         return result.stdout.strip()  # Return the sshpass path
-#     return None
 
 def run_remote_command(ip, command, password="couchbase"):
     """
@@ -184,18 +145,6 @@ def run_remote_command(ip, command, password="couchbase"):
     except Exception as e:
         print(f"Error executing command on {ip}: {e}")
         sys.exit(1)
-
-# # Function to run SSH commands on remote machine with password prompt handling
-# def run_remote_command(ip, command, password="couchbase"):
-#     # Use 'sshpass' to provide password for SSH commands
-#     sshpass_path = find_sshpass() or "/usr/bin/sshpass"
-#     ssh_command = f"{sshpass_path} -p {password} ssh root@{ip} '{command}'"
-#     print(f"Running command on {ip}: {command}")
-#     result = subprocess.run(ssh_command, shell=True, capture_output=True, text=True)
-#     if result.returncode != 0:
-#         print(f"Error executing command on {ip}: {result.stderr}")
-#         sys.exit(1)
-#     print(result.stdout)
 
 
 # Function to install Couchbase Server
@@ -235,20 +184,6 @@ def install_couchbase_server(version, build, ips):
             else:
                 print(f"Failed to access Couchbase UI on {ip}.")
             
-            # # Check if Couchbase is running
-            # result = subprocess.run(f"sshpass -p couchbase ssh root@{ip} '{check_process_command}'", shell=True, capture_output=True, text=True)
-            # if "couchbase" not in result.stdout:
-            #     print(f"Couchbase not found as a process on {ip}, starting the service...")
-            #     run_remote_command(ip, start_service_command)
-
-            # time.sleep(15)
-            
-            # # Check if Couchbase UI is accessible
-            # result = subprocess.run(f"sshpass -p couchbase ssh root@{ip} '{check_service_command}'", shell=True, capture_output=True, text=True)
-            # if result.returncode == 0:
-            #     print(f"Couchbase successfully installed and running on {ip}")
-            # else:
-            #     print(f"Failed to access Couchbase UI on {ip}.")
         except Exception as e:
             print(f"Error on {ip}: {e}")
 
