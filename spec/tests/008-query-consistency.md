@@ -122,3 +122,223 @@ Verify consistency using a query that makes use of the `LIKE` keyword
 2. Run `query` on Couchbase Server
 3. Sort results by `result.id`
 4. Check that the results are equal
+
+## #8 test_query_pattern_regex
+
+### Description
+
+Verify consistency using a query that makes use of the `regexp_contains` function
+
+### Steps
+
+`regex` = [\bEng.*e\b, \beng.*e\b]<br />
+`query` = SELECT meta().id, country, name FROM travel.landmarks t WHERE REGEXP_CONTAINS(t.name, "{regex}")
+
+1. Run `query` on test server
+2. Run `query` on Couchbase Server
+3. Sort results by `result.id`
+4. Check that the results are equal
+
+## #9 test_query_is_not_valued
+
+### Description
+
+Verify consistency using a query that makes use of `IS NULL OR IS MISSING`
+
+### Steps
+
+`query` = SELECT meta().id, name FROM travel.hotels WHERE meta().id NOT LIKE "_sync%" and (name IS NULL OR name IS MISSING) ORDER BY name ASC LIMIT 100
+
+1. Run `query` on test server
+2. Run `query` on Couchbase Server
+3. Check that the results are equal
+
+## #10 test_query_ordering
+
+### Description
+
+Verify consistent ordering as governed by the ORDER BY clause.  Note the WHERE clause
+is kept here to avoid picking up _sync docs.
+
+### Steps
+
+`query` = SELECT meta().id, title FROM travel.hotels WHERE type = "hotel" ORDER BY name ASC
+
+1. Run `query` on test server
+2. Run `query` on Couchbase Server
+3. Check that the results are equal
+
+## #11 test_query_substring
+
+### Description
+
+Verify consistency using a query that makes use of the `substring` function
+
+### Steps
+
+`query` = SELECT meta().id, email, UPPER(name) from travel.landmarks t where CONTAINS(t.email, "gmail.com")
+
+1. Run `query` on test server
+2. Run `query` on Couchbase Server
+3. Check that the results are equal
+
+## #12 test_query_join
+
+### Description
+
+Verify consistency using a query that makes use of the `JOIN` keyword.  The queries are
+slightly different because lite does not support the `ON KEYS` clause.
+
+### Steps
+
+`query` = SELECT DISTINCT airlines.name, airlines.callsign,<br />
+          routes.destinationairport, routes.stops, routes.airline<br />
+          FROM travel.routes as routes<br />
+           JOIN travel.airlines AS airlines<br />
+           ON routes.airlineid = meta(airlines).id<br />
+          WHERE routes.sourceairport = "SFO"<br />
+          ORDER BY meta(routes).id<br />
+          LIMIT 2<br />
+
+`server_query` = SELECT DISTINCT airlines.name, airlines.callsign, <br />
+                 routes.destinationairport, routes.stops, routes.airline<br />
+                 FROM travel.travel.routes as routes<br />
+                  JOIN travel.travel.airlines AS airlines<br />
+                  ON KEYS routes.airlineid<br />
+                 WHERE routes.sourceairport = "SFO"<br />
+                 ORDER BY meta(routes).id<br />
+                 LIMIT 2<br />
+
+1. Run `query` on test server
+2. Run `server_query` on Couchbase Server
+3. Check that the results are equal
+
+## #13 test_query_inner_join
+
+### Description
+
+Verify consistency using a query that makes use of the `INNER JOIN` keyword. 
+
+### Steps
+
+`query` =   SELECT routes.airline, routes.sourceairport, airports.country<br />
+            FROM travel.routes as routes<br />
+             INNER JOIN travel.airports AS airports<br />
+             ON airports.icao = routes.destinationairport<br />
+            WHERE airports.country = "United States"<br />
+             AND routes.stops = 0
+            
+
+1. Run `query` on test server
+2. Run `query` on Couchbase Server
+3. Check that the results are equal
+
+## #14 test_query_left_join
+
+### Description
+
+Verify consistency using a query that makes use of the `LEFT JOIN` and `LEFT OUTER JOIN` keywords.  
+The queries are slightly different because lite does not support the `ON KEYS` clause.  Furthermore,
+Lite doesn't support `LEFT OUTER JOIN` so it simply uses `LEFT JOIN` for both.
+
+### Steps
+
+`server_join_type` = [LEFT JOIN, LEFT OUTER JOIN]
+
+`query` =   SELECT airlines, routes<br />
+            FROM travel.routes AS routes<br />
+             LEFT JOIN travel.airlines AS airlines<br />
+             ON meta(airlines).id = routes.airlineid<br />
+            ORDER BY meta(routes).id<br />
+            LIMIT 10<br />
+
+`server_query` = SELECT airlines, routes<br />
+            FROM travel.travel.routes<br />
+             `{server_join_type}` travel.travel.airlines<br />
+             ON KEYS routes.airlineid<br />
+            WHERE meta(routes).id NOT LIKE "_sync%"<br />
+            ORDER BY meta(routes).id<br />
+            LIMIT 10<br />
+            
+
+1. Run `query` on test server
+2. Run `server_query` on Couchbase Server
+3. Check that the results are equal
+
+## #15 test_equality
+
+### Description
+
+Verify consistency using a query that makes use of the `=` and `!=` operators
+
+### Steps
+
+`operation` = [=, !=]
+
+`query` = SELECT meta().id, name FROM travel.airports WHERE country `{operation}` "France" ORDER BY meta().id ASC
+
+1. Run `query` on test server
+2. Run `query` on Couchbase Server
+3. Check that the results are equal
+
+## #16 test_comparison
+
+### Description
+
+Verify consistency using a query that makes use of the `>`, `>=`, `<` and `<=` operators
+
+### Steps
+
+`operation` = [>, >=, <, <=]
+
+`query` = SELECT meta().id FROM travel.airports WHERE geo.alt `{operation}` 1000 ORDER BY meta().id ASC
+
+1. Run `query` on test server
+2. Run `query` on Couchbase Server
+3. Check that the results are equal
+
+## #17 test_in
+
+### Description
+
+Verify consistency using a query that makes use of the `IN` keyword
+
+### Steps
+
+`query` = SELECT meta().id FROM travel.airports WHERE (country IN ["United States", "France"]) ORDER BY meta().id ASC
+
+1. Run `query` on test server
+2. Run `query` on Couchbase Server
+3. Check that the results are equal
+
+## #18 test_between
+
+### Description
+
+Verify consistency using a query that makes use of the `BETWEEN` and `NOT BETWEEN` keywords
+
+### Steps
+
+`keyword` = [BETWEEN, NOT BETWEEN]
+
+`query` = SELECT meta().id FROM travel.airports WHERE geo.alt `{keyword}` 100 and 200 ORDER BY meta().id ASC
+
+1. Run `query` on test server
+2. Run `query` on Couchbase Server
+3. Check that the results are equal
+
+## #19 test_same
+
+### Description
+
+Verify consistency using a query that makes use of the `IS` and `IS NOT` keywords
+
+### Steps
+
+`keyword` = [IS, IS NOT]
+
+`query` = SELECT meta().id FROM travel.airports WHERE iata `{keyword}` null ORDER BY meta().id ASC
+
+1. Run `query` on test server
+2. Run `query` on Couchbase Server
+3. Check that the results are equal
