@@ -14,7 +14,7 @@ Test that the replicator will stop with the `WebSocket 10404 NotFound` error whe
     * endpoint: `/names`
     * collections : `travel.airlines`
     * type: push
-    * continuos: false
+    * continuous: false
     * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that the replicator's error CBL/10404 error.
@@ -33,7 +33,7 @@ Test single shot push replication with multiple collections.
     * endpoint: `/travel`
     * collections : `travel.airlines`, `travel.airports`, `travel.hotels`
     * type: push
-    * continuos: false
+    * continuous: false
     * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
@@ -52,7 +52,7 @@ Test single shot pull replication with multiple collections.
    * endpoint: `/travel`
    * collections : `travel.routes`, `travel.landmarks`, `travel.hotels`
    * type: pull
-   * continuos: false
+   * continuous: false
    * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
@@ -71,7 +71,7 @@ Test single shot push-and-pull replication with multiple collections.
    * endpoint: `/travel`
    * collections : `travel.airlines`, `travel.airports`, `travel.hotels`, `travel.landmarks`, `travel.routes`
    * type: push-and-pull
-   * continuos: false
+   * continuous: false
    * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
@@ -90,7 +90,7 @@ Test continuous push replication with multiple collections.
    * endpoint: `/travel`
    * collections : `travel.airlines`, `travel.airports`, `travel.hotels`
    * type: push
-   * continuos: true
+   * continuous: true
    * enableDocumentListener: true
    * credentials: user1/pass
 4. Wait until the replicator is idle.
@@ -117,7 +117,7 @@ Test continuous pull replication with multiple collections.
    * endpoint: `/travel`
    * collections : `travel.routes`, `travel.landmarks`, `travel.hotels`
    * type: pull
-   * continuos: true
+   * continuous: true
    * enableDocumentListener: true
    * credentials: user1/pass
 4. Wait until the replicator is idle.
@@ -144,7 +144,7 @@ Test continuous push and pull replication with multiple collections.
    * endpoint: `/travel`
    * collections : `travel.airlines`, `travel.airports`, `travel.hotels`, `travel.landmarks`, `travel.routes`
    * type: push-and-pull
-   * continuos: true
+   * continuous: true
    * enableDocumentListener: true
    * credentials: user1/pass
 4. Wait until the replicator is idle.
@@ -179,7 +179,7 @@ Test push replication with the default collection.
    * endpoint: `/names`
    * collections : `_default._default`
    * type: push
-   * continuos: false
+   * continuous: false
    * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
@@ -198,7 +198,7 @@ Test pull replication with the default collection.
    * endpoint: `/names`
    * collections : `_default._default` 
    * type: pull
-   * continuos: false
+   * continuous: false
    * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
@@ -217,7 +217,7 @@ Test pull replication with the default collection.
    * endpoint: `/names`
    * collections : `_default._default`
    * type: push_and_pull
-   * continuos: false
+   * continuous: false
    * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
@@ -239,7 +239,7 @@ that the sequence starts from zero.
    * endpoint: `/travel`
    * collections : `travel.airlines`
    * type: push
-   * continuos: false
+   * continuous: false
    * credentials: user1/pass
 4. Wait until the replicator is stopped.
 5. Check that all docs are replicated correctly.
