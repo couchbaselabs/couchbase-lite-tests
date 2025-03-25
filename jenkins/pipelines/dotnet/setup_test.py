@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# For others looking to analyze what this file does, it basically performs two steps.
+# The first step is creating an appropriate topology JSON file.  You can see
+# the templates for .NET in the topologies directory.  It rewrites the $schema and
+# include property so that the relative paths are correct for the destination
+# directory, adds a tag for the platform, and sets the CBL version to use in the
+# test server.  Currently all of the tests that we are running use a single test
+# server, a single sync gateway, and a single Couchbase Server, and this will
+# be reflected in the topology file.
+#
+# The second step is to create a Topology instance from the resulting JSON file
+# and then pass that information, along with other basically hard coded info,
+# to the start_backend function which will handle the actual setup.
+
+
 import json
 import os
 import sys
