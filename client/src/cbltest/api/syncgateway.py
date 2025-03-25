@@ -576,17 +576,11 @@ class SyncGateway:
         with self.__tracer.start_as_current_span(
             "add_role", attributes={"cbl.role.name": role}
         ):
-            body = {"name": role, "collection_access": collection_access}
+            body = {"collection_access": collection_access}
 
-            try:
-                await self._send_request(
-                    "post", f"/{db_name}/_role/", JSONDictionary(body)
-                )
-            except CblSyncGatewayBadResponseError as e:
-                if e.code == 409:
-                    pass
-                else:
-                    raise
+            await self._send_request(
+                "put", f"/{db_name}/_role/{role}", JSONDictionary(body)
+            )
 
     def _analyze_dataset_response(self, response: list) -> None:
         assert isinstance(response, list), "Invalid bulk docs response (not a list)"
