@@ -32,3 +32,24 @@ to get deleted from the database after performing database compaction.
 14. Check that all docs are replicated correctly.
 15. Perform compact on the database.
 16. Verify updates to the snapshot from the step 11.
+
+## test_blob_replication
+
+### Description
+
+Basic blob replication check to ensure that blobs will be included in a replication.
+
+### Steps
+
+1.  Reset SG and load `names` dataset
+2.  Reset empty local database
+3. Create a document with a blob on the property `watermelon` with the contents of s10.jpg
+4. Start a replicator:
+   * endpoint: `/names`
+   * collections : `_default._default`
+   * type: push
+   * continuous: false
+   * credentials: user1/pass
+5. Wait until the replicator is stopped
+6. Check that the document with the ID from step 3 contains a valid `watermelon` property
+7. Check that the blob in the `watermelon` property has a corresponding attachment entry in SGW
