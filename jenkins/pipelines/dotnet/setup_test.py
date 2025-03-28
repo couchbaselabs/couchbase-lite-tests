@@ -64,5 +64,5 @@ if __name__ == "__main__":
         args.sgw_url,
         str(SCRIPT_DIR / "config_aws.json"),
         private_key=args.private_key,
-        tdk_config_out=str(SCRIPT_DIR.parents[2] / "tests" / "config.json"),
+        tdk_config_out=str(SCRIPT_DIR.parents[2] / "tests" / "dev_e2e" / "config.json"),
     )

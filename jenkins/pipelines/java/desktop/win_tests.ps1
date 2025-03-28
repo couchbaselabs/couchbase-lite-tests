@@ -77,9 +77,9 @@ try
     }
 
     Write-Host "Windows Desktop: Configure the tests"
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue tests\config_java_desktop.json
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue tests\dev_e2e\config_java_desktop.json
     Copy-Item .\jenkins\pipelines\java\desktop\config_java_desktop.json -Destination tests
-    Push-Location tests
+    Push-Location tests\dev_e2e
     Add-Content config_java_desktop.json "    `"test-servers`": [`"$serverUrl`"]"
     Add-Content config_java_desktop.json '}'
     Get-Content config_java_desktop.json

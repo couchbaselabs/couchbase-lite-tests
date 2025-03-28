@@ -8,7 +8,7 @@ param(
 
 $TestServerDir = "$PSScriptRoot\..\..\..\servers\c"
 $SharedDir="$PSScriptRoot\..\shared"
-$TestsDir = "$PSScriptRoot\..\..\..\tests"
+$TestsDir = "$PSScriptRoot\..\..\..\tests\dev_e2e"
 
 Write-Host "Build Test Server"
 Push-Location $TestServerDir
