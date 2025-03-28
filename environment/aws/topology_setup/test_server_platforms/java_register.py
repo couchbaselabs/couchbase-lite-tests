@@ -24,13 +24,17 @@ Functions:
         Uncompress the Java test server package.
 """
 
+import os
 import platform
 import subprocess
+import zipfile
 from abc import abstractmethod
 from pathlib import Path
 
 import psutil
+import requests
 
+from environment.aws.common.io import download_progress_bar, unzip_directory
 from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
 
 from .android_bridge import AndroidBridge
@@ -40,7 +44,54 @@ JAK_TEST_SERVER_DIR = TEST_SERVER_DIR / "jak"
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
-class JarBridge(PlatformBridge):
+class JavaBridge(PlatformBridge):
+    def _download_support_libs(self, cbl_version: str, variant: str) -> None:
+        if platform.system() != "Linux":
+            return
+
+        version_parts = cbl_version.split("-")
+        supportlib_dir = JAK_TEST_SERVER_DIR / variant / "supportlib"
+        supportlib_dir.mkdir(0o755, exist_ok=True)
+
+        if (supportlib_dir / "libstdc++.so.6").exists():
+            print(f"Support libraries already exist in {supportlib_dir}")
+            return
+
+        download_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/couchbase-lite-java-linux-supportlibs-{cbl_version}.zip"
+        try:
+            print(f"Downloading support libraries from {download_url}")
+            response = requests.get(download_url)
+            response.raise_for_status()
+
+            download_progress_bar(
+                response, JAK_TEST_SERVER_DIR / variant / "support.zip"
+            )
+            unzip_directory(
+                JAK_TEST_SERVER_DIR / variant / "support.zip", supportlib_dir
+            )
+            (JAK_TEST_SERVER_DIR / variant / "support.zip").unlink()
+
+            print(f"Support libraries downloaded and extracted to {supportlib_dir}")
+        except requests.RequestException as e:
+            print(f"Failed to download support libraries: {e}")
+            raise
+        except zipfile.BadZipFile as e:
+            print(f"Failed to extract support libraries: {e}")
+            raise
+
+    def _ensure_support_libs_in_path(self, variant: str) -> None:
+        if platform.system() != "Linux":
+            return
+
+        supportlib_dir = (JAK_TEST_SERVER_DIR / variant / "supportlib").resolve()
+        ld_lib_path = os.environ.get("LD_LIBRARY_PATH", "")
+        if ld_lib_path == "":
+            os.environ["LD_LIBRARY_PATH"] = str(supportlib_dir)
+        elif str(supportlib_dir) not in ld_lib_path:
+            os.environ["LD_LIBRARY_PATH"] = f"{supportlib_dir}:{ld_lib_path}"
+
+
+class JarBridge(JavaBridge):
     def __init__(self, cbl_version: str):
         self.__cbl_version = cbl_version
         if not (JAK_TEST_SERVER_DIR / "version.txt").exists():
@@ -59,7 +110,10 @@ class JarBridge(PlatformBridge):
         )
 
     def install(self, location: str) -> None:
-        pass
+        if location != "localhost":
+            raise ValueError("JarBridge only supports running on localhost")
+
+        self._download_support_libs(self.__cbl_version, "desktop")
 
     def uninstall(self, location: str) -> None:
         pass
@@ -78,6 +132,7 @@ class JarBridge(PlatformBridge):
         if location != "localhost":
             raise ValueError("JarBridge only supports running on localhost")
 
+        self._ensure_support_libs_in_path("desktop")
         args = ["java", "-jar", self.__jar_path, "server"]
         if platform.system() != "Windows":
             args.insert(0, "nohup")
@@ -105,7 +160,7 @@ class JarBridge(PlatformBridge):
             psutil.Process(pid).kill()
 
 
-class JettyBridge(PlatformBridge):
+class JettyBridge(JavaBridge):
     def __init__(self, cbl_version: str, dataset_version: str):
         super().__init__()
 
@@ -116,7 +171,10 @@ class JettyBridge(PlatformBridge):
             self.__gradle_path = self.__gradle_path.with_suffix(".bat")
 
     def install(self, location: str) -> None:
-        pass
+        if location != "localhost":
+            raise ValueError("JettyBridge only supports running on localhost")
+
+        self._download_support_libs(self.__cbl_version, "webservice")
 
     def uninstall(self, location: str) -> None:
         pass
@@ -135,6 +193,7 @@ class JettyBridge(PlatformBridge):
         if location != "localhost":
             raise ValueError("JettyBridge only supports running on localhost")
 
+        self._ensure_support_libs_in_path("webservice")
         self._stop(location, False)
         args = [
             self.__gradle_path,
@@ -486,8 +545,8 @@ class JAKTestServer_macOS(JAKTestServer):
         )
 
 
-@TestServer.register("jak_linux")
-class JAKTestServer_Linux(JAKTestServer):
+@TestServer.register("jak_linux_desktop")
+class JAKTestServer_LinuxDesktop(JAKTestServer_Desktop):
     """
     A class for managing Java test servers on Linux.
 
@@ -499,6 +558,16 @@ class JAKTestServer_Linux(JAKTestServer):
         super().__init__(version)
 
     @property
+    def platform(self) -> str:
+        """
+        Get the platform name.
+
+        Returns:
+            str: The platform name.
+        """
+        return "jak_linux_desktop"
+
+    @property
     def latestbuilds_path(self) -> str:
         """
         Get the path for the package on the latestbuilds server.
@@ -507,7 +576,63 @@ class JAKTestServer_Linux(JAKTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux.tar.gz"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_desktop.tar.gz"
+
+    def compress_package(self) -> str:
+        """
+        Compress the Java test server package.
+
+        Returns:
+            str: The path to the compressed package.
+        """
+        raise NotImplementedError(
+            "Please implement the compress logic for a built server"
+        )
+
+    def uncompress_package(self, path: Path) -> None:
+        """
+        Uncompress the Java test server package.
+
+        Args:
+            path (Path): The path to the compressed package.
+        """
+        raise NotImplementedError(
+            "Please implement the uncompress logic for a compressed server"
+        )
+
+
+@TestServer.register("jak_linux_webservice")
+class JAKTestServer_LinuxWebService(JAKTestServer_WebService):
+    """
+    A class for managing Java test servers on Windows.
+
+    Attributes:
+        version (str): The version of the test server.
+    """
+
+    def __init__(self, version: str):
+        super().__init__(version)
+
+    @property
+    def platform(self) -> str:
+        """
+        Get the platform name.
+
+        Returns:
+            str: The platform name.
+        """
+        return "jak_linux_webservice"
+
+    @property
+    def latestbuilds_path(self) -> str:
+        """
+        Get the path for the package on the latestbuilds server.
+
+        Returns:
+            str: The path for the latest builds.
+        """
+        version_parts = self.version.split("-")
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_webservice.tar.gz"
 
     def compress_package(self) -> str:
         """
