@@ -499,8 +499,8 @@ class JAKTestServer_WindowsWebService(JAKTestServer_WebService):
         )
 
 
-@TestServer.register("jak_macos")
-class JAKTestServer_macOS(JAKTestServer):
+@TestServer.register("jak_macos_webservice")
+class JAKTestServer_macOSDesktop(JAKTestServer_WebService):
     """
     A class for managing Java test servers on macOS.
 
@@ -512,6 +512,16 @@ class JAKTestServer_macOS(JAKTestServer):
         super().__init__(version)
 
     @property
+    def platform(self) -> str:
+        """
+        Get the platform name.
+
+        Returns:
+            str: The platform name.
+        """
+        return "jak_macos_webservice"
+
+    @property
     def latestbuilds_path(self) -> str:
         """
         Get the path for the package on the latestbuilds server.
@@ -520,7 +530,62 @@ class JAKTestServer_macOS(JAKTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_webservice.zip"
+
+    def compress_package(self) -> str:
+        """
+        Compress the Java test server package.
+
+        Returns:
+            str: The path to the compressed package.
+        """
+        raise NotImplementedError(
+            "Please implement the compress logic for a built server"
+        )
+
+    def uncompress_package(self, path: Path) -> None:
+        """
+        Uncompress the Java test server package.
+
+        Args:
+            path (Path): The path to the compressed package.
+        """
+        raise NotImplementedError(
+            "Please implement the uncompress logic for a compressed server"
+        )
+    
+@TestServer.register("jak_macos_desktop")
+class JAKTestServer_macOSDesktop(JAKTestServer_Desktop):
+    """
+    A class for managing Java test servers on macOS.
+
+    Attributes:
+        version (str): The version of the test server.
+    """
+
+    def __init__(self, version: str):
+        super().__init__(version)
+
+    @property
+    def platform(self) -> str:
+        """
+        Get the platform name.
+
+        Returns:
+            str: The platform name.
+        """
+        return "jak_macos_desktop"
+
+    @property
+    def latestbuilds_path(self) -> str:
+        """
+        Get the path for the package on the latestbuilds server.
+
+        Returns:
+            str: The path for the latest builds.
+        """
+        version_parts = self.version.split("-")
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_desktop.zip"
 
     def compress_package(self) -> str:
         """
