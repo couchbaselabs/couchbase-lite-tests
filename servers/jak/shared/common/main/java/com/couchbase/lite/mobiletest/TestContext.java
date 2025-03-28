@@ -14,6 +14,7 @@ import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.Replicator;
+import com.couchbase.lite.URLEndpointListener;
 import com.couchbase.lite.mobiletest.changes.Snapshot;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
