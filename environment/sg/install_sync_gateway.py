@@ -23,7 +23,7 @@ def get_ips_from_config(config_path, key):
     with open(config_path, 'r') as f:
         config_data = json.load(f)
     return [entry["hostname"] for entry in config_data.get(key, [])]
-    
+
 
 def run_remote_command(ip, command):
     """Runs a command on a remote server via SSH and returns output & error."""
@@ -69,8 +69,8 @@ def install_sync_gateway(sync_gateway_ip, sync_config, version, build):
     print(f"\nPreparing to install Sync Gateway on {sync_gateway_ip}...")
 
     # Check if Sync Gateway is already installed
-    output, _ = run_remote_command(sync_gateway_ip, "dpkg -l | grep sync-gateway")
-    if output:
+    output, _ = run_remote_command(sync_gateway_ip, "systemctl status sync_gateway")
+    if "could not be found" not in _.lower():
         print("Sync Gateway is already installed. Uninstall first if needed.")
         return
 
@@ -124,7 +124,7 @@ def install_sync_gateway(sync_gateway_ip, sync_config, version, build):
     print("Checking if Sync Gateway is running...")
     output, _ = run_remote_command(sync_gateway_ip, "systemctl status sync_gateway")
 
-    if "could not be found" in _.lower():
+    if "active (running)" not in output:
         print(f"Sync Gateway failed to start on {sync_gateway_ip}. Exiting...")
         sys.exit(1)
     else:

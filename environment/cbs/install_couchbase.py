@@ -159,7 +159,8 @@ def install_couchbase_server(version, build, ips):
             download_command = f"wget -q {download_url} -O /tmp/couchbase-server.deb  && echo 'Done'"
             fix_dependencies = "sudo apt-get install -f"
             install_command = "sudo dpkg -i /tmp/couchbase-server.deb"
-            check_process_command = "ps aux | grep couchbase"
+            # check_process_command = "ps aux | grep couchbase"
+            check_process_command = "systemctl status couchbase-server"
             start_service_command = "sudo systemctl start couchbase-server"
             check_service_command = "curl -s http://localhost:8091"
 
@@ -171,8 +172,11 @@ def install_couchbase_server(version, build, ips):
 
             # Check if Couchbase is running
             result = run_remote_command(ip, check_process_command)
-            if result is None or "couchbase" not in result:
-                print(f"Couchbase not found as a process on {ip}, starting the service...")
+            # if result is None or "couchbase" not in result:
+            #     print(f"Couchbase not found as a process on {ip}, starting the service...")
+            #     run_remote_command(ip, start_service_command)
+            if "active (running)" not in result:
+                print(f"Couchbase not running on {ip}")
                 run_remote_command(ip, start_service_command)
 
             time.sleep(15)
