@@ -50,6 +50,10 @@ def stop_couchbase_service(ip):
     print(f"Killing remaining Couchbase processes on {ip}...")
     run_remote_command(ip, "ps aux | grep '[c]ouchbase' | awk '{print $2}' | xargs -r sudo kill -9")
 
+    print(f"Disabling Couchbase service on {ip}...")
+    output, error = run_remote_command(ip, "sudo systemctl disable couchbase-server")
+    if "not found" in error.lower():
+        print("Couchbase service already removed.")
 
 def uninstall_couchbase_server(ips):
     """Uninstalls Couchbase Server from a list of remote machines."""
@@ -69,6 +73,12 @@ def uninstall_couchbase_server(ips):
             
             print(f"Removing Couchbase package on {ip}...")
             run_remote_command(ip, "sudo apt-get remove --purge couchbase-server -y")
+
+            print(f"Removing Couchbase directories on {ip}...")
+            run_remote_command(ip, "sudo rm -rf /opt/couchbase")
+
+            print(f"Removing systemd service on {ip}...")
+            run_remote_command(ip, "sudo rm -f /etc/systemd/system/couchbase-server.service /lib/systemd/system/couchbase-server.service")
             
             print(f"Cleaning up unused dependencies on {ip}...")
             run_remote_command(ip, "sudo apt-get autoremove -y")
@@ -78,6 +88,7 @@ def uninstall_couchbase_server(ips):
             
             # Verify uninstallation
             output, _ = run_remote_command(ip, "systemctl status couchbase-server")
+
             if "could not be found" in _.lower():
                 print(f"Couchbase successfully uninstalled on {ip}.")
             else:
