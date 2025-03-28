@@ -8,7 +8,7 @@ SGW_URL=${5}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 TEST_SERVER_DIR="${SCRIPT_DIR}/../../../servers/c"
-TESTS_DIR="${SCRIPT_DIR}/../../../tests"
+TESTS_DIR="${SCRIPT_DIR}/../../../tests/dev_e2e"
 
 echo "Build Test Server"
 pushd "${TEST_SERVER_DIR}" > /dev/null

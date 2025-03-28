@@ -50,9 +50,9 @@ echo "Start the environment"
 jenkins/pipelines/shared/setup_backend.sh "${SG_URL}"
 
 echo "Configure the tests"
-rm -rf tests/config_android.json
+rm -rf tests/dev_e2e/config_android.json
 cp -f "jenkins/pipelines/android/config_android.json" tests
-pushd tests
+pushd tests/dev_e2e
 echo '    "test-servers": ["http://'"$ANDROID_IP"':8080"]' >> config_android.json
 echo '}' >> config_android.json
 cat config_android.json

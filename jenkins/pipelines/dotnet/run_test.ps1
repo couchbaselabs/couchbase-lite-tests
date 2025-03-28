@@ -22,7 +22,7 @@ if ($null -ne $PrivateKeyPath) {
 
 python $PSScriptRoot\setup_test.py @python_args
 
-Push-Location $PSScriptRoot\..\..\..\tests
+Push-Location $PSScriptRoot\..\..\..\tests\dev_e2e
 pip install -r requirements.txt
 pytest -v --no-header --config config.json
 $saved_exit = $LASTEXITCODE
