@@ -35,10 +35,12 @@ def run_remote_command(ip, command):
         stdin, stdout, stderr = ssh.exec_command(command)
         output = stdout.read().decode()
         error = stderr.read().decode()
-        return output, error
+        return output.strip(), error.strip()
+
     except Exception as e:
         print(f"Error connecting to {ip}: {str(e)}")
         return None, str(e)
+        
     finally:
         ssh.close()
 
@@ -49,8 +51,8 @@ def uninstall_sync_gateway(ip):
     fix_hostname(ip)
 
     # Check if Sync Gateway service exists
-    output, error = run_remote_command(ip, "dpkg -l | grep sync-gateway")
-    if not output:
+    output, _ = run_remote_command(ip, "systemctl status sync_gateway")
+    if "could not be found" in _.lower():
         print(f"Sync Gateway is not installed on {ip}. Skipping uninstallation.")
         return
 
@@ -78,8 +80,8 @@ def uninstall_sync_gateway(ip):
     run_remote_command(ip, "sudo rm -rf /var/lib/dpkg/info/couchbase-sync-gateway.*")
 
     # Verify Sync Gateway removal
-    output, error = run_remote_command(ip, "systemctl status sync_gateway")
-    if "could not be found" in error.lower():
+    output, _ = run_remote_command(ip, "systemctl status sync_gateway")
+    if "could not be found" in _.lower():
         print(f"Sync Gateway successfully uninstalled from {ip}.")
     else:
         print(f"Sync Gateway service still exists on {ip}. Manual cleanup may be needed.")

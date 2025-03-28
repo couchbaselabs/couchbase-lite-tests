@@ -26,15 +26,18 @@ def run_remote_command(ip, command):
         stdin, stdout, stderr = ssh.exec_command(command)
         output = stdout.read().decode().strip()
         error = stderr.read().decode().strip()
+        return output.strip(), error.strip()
         
-        if error:
-            print(f"Error executing command on {ip}: {error}")
-            sys.exit(1)
+        # if error:
+        #     print(f"Error executing command on {ip}: {error}")
+        #     # sys.exit(1)
         
-        return output
+        # return output
+
     except Exception as e:
         print(f"Error connecting to {ip}: {str(e)}")
         sys.exit(1)
+
     finally:
         ssh.close()
 
@@ -54,15 +57,15 @@ def uninstall_couchbase_server(ips):
         try:
             fix_hostname(ip)
             print(f"Checking if Couchbase is running on {ip}...")
-            output = run_remote_command(ip, "ps aux | grep -v grep | grep couchbase")
+            output, _ = run_remote_command(ip, "systemctl status couchbase-server")
             
-            if not output:
+            if "could not be found" in _.lower():
                 print(f"Couchbase is not running on {ip}, skipping uninstallation.")
                 continue
             
             # Stop service and remove files
             stop_couchbase_service(ip)
-            # run_remote_command(ip, "sudo rm -r /tmp/couchbase-server.deb /var/couchbase-configured /var/log/couchbase-setup.log /opt/configure-cluster.sh /opt/configure-node.sh || true")
+            run_remote_command(ip, "sudo rm -r /tmp/couchbase-server.deb /var/couchbase-configured /var/log/couchbase-setup.log /opt/configure-cluster.sh /opt/configure-node.sh || true")
             
             print(f"Removing Couchbase package on {ip}...")
             run_remote_command(ip, "sudo apt-get remove --purge couchbase-server -y")
@@ -74,8 +77,8 @@ def uninstall_couchbase_server(ips):
             run_remote_command(ip, "sudo rm -rf /opt/couchbase")
             
             # Verify uninstallation
-            output = run_remote_command(ip, "ps aux | grep -v grep | grep couchbase")
-            if not output:
+            output, _ = run_remote_command(ip, "systemctl status couchbase-server")
+            if "could not be found" in _.lower():
                 print(f"Couchbase successfully uninstalled on {ip}.")
             else:
                 print(f"Failed to uninstall Couchbase on {ip}, service still running.")
