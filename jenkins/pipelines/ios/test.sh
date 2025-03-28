@@ -9,7 +9,7 @@ SGW_URL=${5}
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 SHARED_DIR="${SCRIPT_DIR}/../shared"
 TEST_SERVER_DIR="${SCRIPT_DIR}/../../../servers/ios"
-TESTS_DIR="${SCRIPT_DIR}/../../../tests"
+TESTS_DIR="${SCRIPT_DIR}/../../../tests/dev_e2e"
 
 # Find a connected iOS device:
 DEVICE_UDID="$("${SHARED_DIR}/ios_device.sh")"
