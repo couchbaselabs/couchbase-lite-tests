@@ -48,7 +48,7 @@ public class ListenerManager {
     }
 
     @NonNull
-    public Map<String, Object> stopRepl(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+    public Map<String, Object> stopListener(@NonNull TestContext ctxt, @NonNull TypedMap req) {
         // TODO: Implement
 
         return Collections.emptyMap();
