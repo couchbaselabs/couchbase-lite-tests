@@ -196,7 +196,7 @@ class JettyBridge(JavaBridge):
         self._ensure_support_libs_in_path("webservice")
         self._stop(location, False)
         args = [
-            self.__gradle_path,
+            str(self.__gradle_path),
             "jettyStart",
             f"-PcblVersion={self.__cbl_version}",
             f"-PdatasetVersion={self.__dataset_version}",
@@ -224,7 +224,7 @@ class JettyBridge(JavaBridge):
             raise ValueError("JettyBridge only supports running on localhost")
 
         args = [
-            self.__gradle_path,
+            str(self.__gradle_path),
             "appStop",
             f"-PcblVersion={self.__cbl_version}",
             f"-PdatasetVersion={self.__dataset_version}",
@@ -384,6 +384,9 @@ class JAKTestServer_WebService(JAKTestServer):
         return "webservice"
 
     def create_bridge(self):
+        if self.dataset_version is None:
+            raise RuntimeError("dataset_version must be set before creating bridge")
+
         return JettyBridge(self.version, self.dataset_version)
 
 
@@ -500,7 +503,7 @@ class JAKTestServer_WindowsWebService(JAKTestServer_WebService):
 
 
 @TestServer.register("jak_macos_webservice")
-class JAKTestServer_macOSDesktop(JAKTestServer_WebService):
+class JAKTestServer_macOSWebService(JAKTestServer_WebService):
     """
     A class for managing Java test servers on macOS.
 
@@ -553,7 +556,8 @@ class JAKTestServer_macOSDesktop(JAKTestServer_WebService):
         raise NotImplementedError(
             "Please implement the uncompress logic for a compressed server"
         )
-    
+
+
 @TestServer.register("jak_macos_desktop")
 class JAKTestServer_macOSDesktop(JAKTestServer_Desktop):
     """
