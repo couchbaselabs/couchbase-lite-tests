@@ -25,8 +25,17 @@ Functions:
         Uncompress the C test server package.
 """
 
+from abc import abstractmethod
+from io import BytesIO
+import os
 from pathlib import Path
+import shutil
+import subprocess
+from typing import cast
 
+from environment.aws.common.io import unzip_directory
+from environment.aws.common.output import header
+from environment.aws.topology_setup.cbl_library_downloader import CBLLibraryDownloader
 from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
 
 from .android_bridge import AndroidBridge
@@ -35,8 +44,13 @@ from .ios_bridge import iOSBridge
 from .platform_bridge import PlatformBridge
 
 C_TEST_SERVER_DIR = TEST_SERVER_DIR / "c"
+DOWNLOAD_DIR = C_TEST_SERVER_DIR / "download"
+BUILD_DIR = C_TEST_SERVER_DIR / "build"
+IOS_BUILD_DIR = C_TEST_SERVER_DIR / "build_device"
 SCRIPT_DIR = Path(__file__).resolve().parent
-
+LIB_DIR = C_TEST_SERVER_DIR / "lib"
+IOS_FRAMEWORKS_DIR = C_TEST_SERVER_DIR / "platforms" / "ios" / "Frameworks"
+IOS_VENDOR_DIR = C_TEST_SERVER_DIR / "platforms" / "ios" / "Vendor"
 
 class CTestServer(TestServer):
     """
@@ -49,12 +63,57 @@ class CTestServer(TestServer):
     def __init__(self, version: str):
         super().__init__(version)
 
-    def build(self) -> None:
+    @abstractmethod
+    def cbl_filename(self, version: str) -> str:
+        pass
+
+    def _copy_with_symlink_preservation(self, src: Path, dest: Path) -> None:
+        if src.is_symlink():
+            # Get the target of the symlink
+            target = os.readlink(src)
+            # Create the symlink at the destination
+            os.symlink(target, dest)
+        else:
+            # Copy the file normally
+            shutil.copy2(src, dest)
+
+class CTestServer_Desktop(CTestServer):
+     def _download_cbl(self) -> None:
+        """
+        Download the CBL library for the build
+        """
+        header(f"Downloading CBL library {self.version}")
+        build = 0
+        version_parts = self.version.split("-")
+        if len(version_parts) > 1:
+            build = int(version_parts[1])
+
+        DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+        download_file = DOWNLOAD_DIR / "framework.zip"
+        downloader = CBLLibraryDownloader(
+            "couchbase-lite-c",
+            self.cbl_filename(self.version),
+            version_parts[0],
+            build,
+        )
+        downloader.download(download_file)
+        unzip_directory(download_file, LIB_DIR)
+        (LIB_DIR / f"libcblite-{version_parts[0]}").rename(LIB_DIR / "libcblite")
+
+     def build(self) -> None:
         """
         Build the C test server.
         """
-        raise NotImplementedError("Please implement C build logic")
+        shutil.rmtree(LIB_DIR, ignore_errors=True)
+        self._download_cbl()
+        header("Building C test server")
+        shutil.rmtree(BUILD_DIR, ignore_errors=True)
+        BUILD_DIR.mkdir(0o755, exist_ok=True)
+        subprocess.run(["cmake", "-DCMAKE_BUILD_TYPE=Release", ".."], cwd=BUILD_DIR, check=True)
 
+        header("Installing C test server")
+        subprocess.run(["cmake", "--build", ".", "--target", "install", "-j"], cwd=BUILD_DIR, check=True)
+        
 
 @TestServer.register("c_ios")
 class CTestServer_iOS(CTestServer):
@@ -77,7 +136,70 @@ class CTestServer_iOS(CTestServer):
             str: The platform name.
         """
         return "c_ios"
+    
+    def cbl_filename(self, version: str) -> str:
+        return f"couchbase-lite-c-enterprise-{version}-ios.zip"
+    
+    def _download_cbl(self):
+        header(f"Downloading CBL library {self.version}")
+        build = 0
+        version_parts = self.version.split("-")
+        if len(version_parts) > 1:
+            build = int(version_parts[1])
 
+        DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+        download_file = DOWNLOAD_DIR / "framework.zip"
+        downloader = CBLLibraryDownloader(
+            "couchbase-lite-c",
+            self.cbl_filename(self.version),
+            version_parts[0],
+            build,
+        )
+        #downloader.download(download_file)
+        #shutil.rmtree(IOS_FRAMEWORKS_DIR / "CouchbaseLite.xcframework", ignore_errors=True)
+        #unzip_directory(download_file, IOS_FRAMEWORKS_DIR)
+
+        #shutil.rmtree(IOS_VENDOR_DIR / "cmake", ignore_errors=True)
+        #(IOS_VENDOR_DIR / "cmake").mkdir(0o755)
+        subprocess.run(["cmake", "-DCMAKE_BUILD_TYPE=Release", "../../../../vendor"], cwd=IOS_VENDOR_DIR / "cmake", check=True)
+
+    def build(self):
+        self._download_cbl()
+        header("Building")
+        env = os.environ.copy()
+        env["LANG"] = "en_US.UTF-8"
+        env["LC_ALL"] = "en_US.UTF-8"
+
+        xcodebuild_cmd = [
+            "xcodebuild",
+            "-scheme",
+            "TestServer",
+            "-sdk",
+            "iphoneos",
+            "-configuration",
+            "Release",
+            "-derivedDataPath",
+            str(IOS_BUILD_DIR),
+            "-allowProvisioningUpdates",
+        ]
+
+        with subprocess.Popen(
+            xcodebuild_cmd,
+            env=env,
+            cwd=C_TEST_SERVER_DIR / "platforms" / "ios",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        ) as xcodebuild_proc:
+            with subprocess.Popen(
+                ["xcpretty"], stdin=xcodebuild_proc.stdout, env=env
+            ) as xcpretty_proc:
+                # Close the stdout of the first process to allow it to receive a SIGPIPE if the second process exits
+                cast(BytesIO, xcodebuild_proc.stdout).close()
+
+                xcpretty_proc.wait()
+                if xcpretty_proc.returncode != 0:
+                    raise RuntimeError("Build failed")
+    
     @property
     def latestbuilds_path(self) -> str:
         """
@@ -98,15 +220,17 @@ class CTestServer_iOS(CTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        prefix = Path("")
-        if prefix == "":
-            raise NotImplementedError(
-                "Please choose a directory to either downloaded or built test server"
-            )
+        path = (
+            IOS_BUILD_DIR
+            / "Build"
+            / "Products"
+            / "Release-iphoneos"
+            / "TestServer.app"
+        )
 
         return iOSBridge(
-            str(prefix / "testserver.app"),
-            True,
+            str(path),
+            False,
         )
 
     def compress_package(self) -> str:
@@ -276,7 +400,7 @@ class CTestServer_Windows(CTestServer):
 
 
 @TestServer.register("c_macos")
-class CTestServer_macOS(CTestServer):
+class CTestServer_macOS(CTestServer_Desktop):
     """
     A class for managing C test servers on macOS.
 
@@ -287,6 +411,9 @@ class CTestServer_macOS(CTestServer):
     def __init__(self, version: str):
         super().__init__(version)
 
+    def cbl_filename(self, version: str) -> str:
+        return f"couchbase-lite-c-enterprise-{version}-macos.zip"
+
     @property
     def platform(self) -> str:
         """
@@ -296,6 +423,7 @@ class CTestServer_macOS(CTestServer):
             str: The platform name.
         """
         return "c_macos"
+        
 
     @property
     def latestbuilds_path(self) -> str:
@@ -308,6 +436,16 @@ class CTestServer_macOS(CTestServer):
         version_parts = self.version.split("-")
         return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
 
+    def build(self) -> None:
+        """
+        Build the C test server.
+        """
+        super().build()
+        libcblite_lib_dir = LIB_DIR / "libcblite" / "lib"
+        output_bin_dir = BUILD_DIR / "out" / "bin"
+        for dylib_file in libcblite_lib_dir.glob("libcblite*.dylib"):
+            self._copy_with_symlink_preservation(dylib_file, output_bin_dir / dylib_file.name)
+
     def create_bridge(self) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
@@ -315,18 +453,8 @@ class CTestServer_macOS(CTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        prefix = Path("")
-        if prefix == "":
-            raise NotImplementedError(
-                "Please choose a directory to either downloaded or built test server"
-            )
-
-        exe_name = ""
-        if exe_name == "":
-            raise NotImplementedError("Please set the exe name")
-
         return ExeBridge(
-            str(Path(prefix) / exe_name),
+            BUILD_DIR / "out" / "bin" / "testserver",
         )
 
     def compress_package(self) -> str:

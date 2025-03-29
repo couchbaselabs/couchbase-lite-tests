@@ -209,6 +209,8 @@
 		40D3FAC22CB784DF00696D75 /* PostNewSession.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40D3FAC12CB784DF00696D75 /* PostNewSession.cpp */; };
 		40F0BF3B2C9BE90E00027A7A /* PostRunQuery.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */; };
 		40F0BF402C9CF17400027A7A /* CBLReplicationConflictResolver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40F0BF3E2C9CF17400027A7A /* CBLReplicationConflictResolver.cpp */; };
+		4221A3E02D9795C800413F9F /* PostStopListener.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4221A3DF2D9795C800413F9F /* PostStopListener.cpp */; };
+		4221A3E12D9795C800413F9F /* PostStartListener.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4221A3DE2D9795C800413F9F /* PostStartListener.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -538,6 +540,8 @@
 		40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PostRunQuery.cpp; sourceTree = "<group>"; };
 		40F0BF3E2C9CF17400027A7A /* CBLReplicationConflictResolver.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CBLReplicationConflictResolver.cpp; sourceTree = "<group>"; };
 		40F0BF3F2C9CF17400027A7A /* CBLReplicationConflictResolver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLReplicationConflictResolver.h; sourceTree = "<group>"; };
+		4221A3DE2D9795C800413F9F /* PostStartListener.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PostStartListener.cpp; sourceTree = "<group>"; };
+		4221A3DF2D9795C800413F9F /* PostStopListener.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PostStopListener.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -833,7 +837,9 @@
 				4076E6EE2A9EAD04003DD799 /* PostReset.cpp */,
 				40F0BF3A2C9BE90D00027A7A /* PostRunQuery.cpp */,
 				4076E6E82A9EAD04003DD799 /* PostSnapshotDocuments.cpp */,
+				4221A3DE2D9795C800413F9F /* PostStartListener.cpp */,
 				4076E6EC2A9EAD04003DD799 /* PostStartReplicator.cpp */,
+				4221A3DF2D9795C800413F9F /* PostStopListener.cpp */,
 				40CAB01D2CE4128B001CA3F1 /* PostStopReplicator.cpp */,
 				4076E6E92A9EAD04003DD799 /* PostUpdateDatabase.cpp */,
 				4076E6EF2A9EAD04003DD799 /* PostVerifyDocuments.cpp */,
@@ -1160,6 +1166,8 @@
 				40348C582A8B0144002DA787 /* zip_fopen.c in Sources */,
 				40348C382A8B0144002DA787 /* zip_string.c in Sources */,
 				40348C502A8B0144002DA787 /* zip_source_call.c in Sources */,
+				4221A3E02D9795C800413F9F /* PostStopListener.cpp in Sources */,
+				4221A3E12D9795C800413F9F /* PostStartListener.cpp in Sources */,
 				40348C312A8B0144002DA787 /* zip_file_set_comment.c in Sources */,
 				406CE9E62A8C02C8003ACFBB /* IPAddress.swift in Sources */,
 				40348BE52A8B0143002DA787 /* zip_source_seek.c in Sources */,

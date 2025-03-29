@@ -45,7 +45,9 @@ set(SOURCE_FILES
         src/dispatcher/PostReset.cpp
         src/dispatcher/PostRunQuery.cpp
         src/dispatcher/PostSnapshotDocuments.cpp
+        src/dispatcher/PostStartListener.cpp
         src/dispatcher/PostStartReplicator.cpp
+        src/dispatcher/PostStopListener.cpp
         src/dispatcher/PostStopReplicator.cpp
         src/dispatcher/PostUpdateDatabase.cpp
         src/dispatcher/PostVerifyDocuments.cpp
