@@ -33,7 +33,7 @@ import shutil
 import subprocess
 from typing import cast
 
-from environment.aws.common.io import unzip_directory
+from environment.aws.common.io import unzip_directory, untar_directory
 from environment.aws.common.output import header
 from environment.aws.topology_setup.cbl_library_downloader import CBLLibraryDownloader
 from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
@@ -88,8 +88,10 @@ class CTestServer_Desktop(CTestServer):
         if len(version_parts) > 1:
             build = int(version_parts[1])
 
+        filename = self.cbl_filename(self.version)
+        ext = ".tar.gz" if filename.endswith(".tar.gz") else ".zip"
         DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
-        download_file = DOWNLOAD_DIR / "framework.zip"
+        download_file = DOWNLOAD_DIR / f"framework.{ext}"
         downloader = CBLLibraryDownloader(
             "couchbase-lite-c",
             self.cbl_filename(self.version),
@@ -97,7 +99,11 @@ class CTestServer_Desktop(CTestServer):
             build,
         )
         downloader.download(download_file)
-        unzip_directory(download_file, LIB_DIR)
+        if ext == ".zip":
+            unzip_directory(download_file, LIB_DIR)
+        else:
+            untar_directory(download_file, LIB_DIR)
+
         (LIB_DIR / f"libcblite-{version_parts[0]}").rename(LIB_DIR / "libcblite")
 
      def build(self) -> None:
@@ -107,8 +113,8 @@ class CTestServer_Desktop(CTestServer):
         shutil.rmtree(LIB_DIR, ignore_errors=True)
         self._download_cbl()
         header("Building C test server")
-        shutil.rmtree(BUILD_DIR, ignore_errors=True)
-        BUILD_DIR.mkdir(0o755, exist_ok=True)
+        #shutil.rmtree(BUILD_DIR, ignore_errors=True)
+        #BUILD_DIR.mkdir(0o755, exist_ok=True)
         subprocess.run(["cmake", "-DCMAKE_BUILD_TYPE=Release", ".."], cwd=BUILD_DIR, check=True)
 
         header("Installing C test server")
@@ -476,8 +482,7 @@ class CTestServer_macOS(CTestServer_Desktop):
         raise NotImplementedError("Please implement C uncompress_package logic")
 
 
-@TestServer.register("c_linux")
-class CTestServer_Linux(CTestServer):
+class CTestServer_Linux(CTestServer_Desktop):
     """
     A class for managing C test servers on Linux.
 
@@ -485,8 +490,9 @@ class CTestServer_Linux(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
+    def __init__(self, version: str, arch: str):
         super().__init__(version)
+        self.__arch = arch
 
     @property
     def platform(self) -> str:
@@ -496,7 +502,17 @@ class CTestServer_Linux(CTestServer):
         Returns:
             str: The platform name.
         """
-        return "c_linux"
+        return f"c_linux_{self.__arch}"
+    
+    def build(self) -> None:
+        super().build()
+        libcblite_lib_dir = LIB_DIR / "libcblite" / "lib"
+        output_bin_dir = BUILD_DIR / "out" / "bin"
+        for so_file in libcblite_lib_dir.glob("**/libcblite.so*"):
+            self._copy_with_symlink_preservation(so_file, output_bin_dir / so_file.name)
+    
+    def cbl_filename(self, version: str) -> str:
+        return f"couchbase-lite-c-enterprise-{version}-linux-{self.__arch}.tar.gz"
 
     @property
     def latestbuilds_path(self) -> str:
@@ -507,7 +523,7 @@ class CTestServer_Linux(CTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserverlinux.tar.gz"
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserverlinux-{self.__arch}.tar.gz"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -516,18 +532,8 @@ class CTestServer_Linux(CTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        prefix = ""
-        if prefix == "":
-            raise NotImplementedError(
-                "Please choose a directory to either downloaded or built test server"
-            )
-
-        exe_name = ""
-        if exe_name == "":
-            raise NotImplementedError("Please set the exe name")
-
         return ExeBridge(
-            str(Path(prefix) / exe_name),
+            BUILD_DIR / "out" / "bin" / "testserver",
         )
 
     def compress_package(self) -> str:
@@ -547,3 +553,15 @@ class CTestServer_Linux(CTestServer):
             path (Path): The path to the compressed package.
         """
         raise NotImplementedError("Please implement C uncompress_package logic")
+
+@TestServer.register("c_linux_x86_64")
+class CTestServer_Linux_x86_64(CTestServer_Linux):
+    """
+    A class for managing C test servers on Linux x86_64.
+
+    Attributes:
+        version (str): The version of the test server.
+    """
+
+    def __init__(self, version: str):
+        super().__init__(version, "x86_64")
