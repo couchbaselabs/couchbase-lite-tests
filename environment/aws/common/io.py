@@ -17,6 +17,7 @@ Functions:
 """
 
 import os
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -129,3 +130,52 @@ def unzip_directory(input: Path, output: Path) -> None:
 
     print("Done")
 
+def tar_directory(input: Path, output: Path) -> None:
+    """
+    Create a .tar.gz archive of the contents of a directory.
+
+    Args:
+        input (Path): The path to the directory to be archived.
+        output (Path): The path where the .tar.gz file will be saved.
+
+    Raises:
+        RuntimeError: If the input directory does not exist.
+    """
+    if not input.exists():
+        raise RuntimeError(f"{input} does not exist...")
+
+    print("Compressing")
+    with tarfile.open(output, "w:gz") as tar:
+        for root, _, files in os.walk(input):
+            for file in tqdm(files, desc="Archiving"):
+                file_path = Path(root) / file
+                tar.add(file_path, arcname=file_path.relative_to(input))
+
+    print("Done")
+
+
+def untar_directory(input: Path, output: Path) -> None:
+    """
+    Extract the contents of a .tar.gz archive to a directory.
+
+    Args:
+        input (Path): The path to the .tar.gz file to be extracted.
+        output (Path): The path where the contents will be extracted.
+
+    Raises:
+        RuntimeError: If the input .tar.gz file does not exist.
+    """
+    if not input.exists():
+        raise RuntimeError(f"{input} does not exist...")
+
+    print("Extracting")
+    with tarfile.open(input, "r:gz") as tar:
+        for member in tqdm(tar.getmembers(), desc="Extracting"):
+            tar.extract(member, path=output)
+
+            # Preserve file permissions
+            extracted_path = output / member.name
+            if member.mode and not member.islnk() and not member.issym():
+                extracted_path.chmod(member.mode)
+
+    print("Done")
