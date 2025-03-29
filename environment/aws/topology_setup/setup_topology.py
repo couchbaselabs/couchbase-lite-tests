@@ -415,7 +415,7 @@ class TopologyConfig:
             bridge.run(test_server_input.location)
             port = 5555 if test_server_input.platform.startswith("dotnet") else 8080
             ip = bridge.get_ip(test_server_input.location)
-            for _ in range(0, 10):
+            for _ in range(0, 30):
                 try:
                     requests.get(f"http://{ip}:{port}")
                     return

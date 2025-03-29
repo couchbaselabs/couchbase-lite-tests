@@ -60,7 +60,7 @@ class JavaBridge(PlatformBridge):
         download_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/couchbase-lite-java-linux-supportlibs-{cbl_version}.zip"
         try:
             print(f"Downloading support libraries from {download_url}")
-            response = requests.get(download_url)
+            response = requests.get(download_url, stream=True)
             response.raise_for_status()
 
             download_progress_bar(
