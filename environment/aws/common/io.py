@@ -108,12 +108,23 @@ def unzip_directory(input: Path, output: Path) -> None:
 
     with zipfile.ZipFile(input, "r") as zipf:
         for member in tqdm(zipf.infolist(), desc="Unzipping"):
-            zipf.extract(member, output)
             extracted_path = output / member.filename
+            # Check if the member is a symlink
+            is_symlink = (member.external_attr >> 16) & 0o120000 == 0o120000
+            if is_symlink:
+                # Read the symlink target from the ZIP file
+                with zipf.open(member) as link_file:
+                    target = link_file.read().decode("utf-8")
 
-            # Preserve file permissions
-            perm = member.external_attr >> 16
-            if perm:
-                extracted_path.chmod(perm)
+                # Create the symlink
+                extracted_path.parent.mkdir(parents=True, exist_ok=True)
+                extracted_path.symlink_to(target)
+            else:
+                # Extract regular files and directories
+                zipf.extract(member, output)
+                # Preserve file permissions
+                perm = member.external_attr >> 16
+                if perm:
+                    extracted_path.chmod(perm)
 
     print("Done")

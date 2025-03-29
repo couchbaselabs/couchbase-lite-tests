@@ -22,15 +22,26 @@ Functions:
         Uncompress the Swift test server package.
 """
 
+import os
+import shutil
+import subprocess
+from io import BytesIO
 from pathlib import Path
+from typing import cast
 
+from environment.aws.common.io import unzip_directory
+from environment.aws.common.output import header
+from environment.aws.topology_setup.cbl_library_downloader import CBLLibraryDownloader
 from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
 
 from .ios_bridge import iOSBridge
-from .macos_bridge import macOSBridge
 from .platform_bridge import PlatformBridge
 
 SWIFT_TEST_SERVER_DIR = TEST_SERVER_DIR / "ios"
+BUILD_DEVICE_DIR = SWIFT_TEST_SERVER_DIR / "build_device"
+DOWNLOAD_DIR = SWIFT_TEST_SERVER_DIR / "downloaded"
+FRAMEWORKS_DIR = SWIFT_TEST_SERVER_DIR / "Frameworks"
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
@@ -45,11 +56,30 @@ class SwiftTestServer(TestServer):
     def __init__(self, version: str):
         super().__init__(version)
 
-    def build(self) -> None:
+    def _download_cbl(self) -> None:
         """
-        Build the Swift test server.
+        Download the CBL library to the Frameworks directory
         """
-        raise NotImplementedError("Please implement JSwiftAK build logic")
+        header(f"Downloading CBL library {self.version}")
+        build = 0
+        version_parts = self.version.split("-")
+        if len(version_parts) > 1:
+            build = int(version_parts[1])
+
+        DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+        download_file = DOWNLOAD_DIR / "framework.zip"
+        downloader = CBLLibraryDownloader(
+            "couchbase-lite-ios",
+            "couchbase-lite-swift_xc_enterprise.zip",
+            self.version,
+            build,
+        )
+        downloader.download(download_file)
+        shutil.rmtree(
+            FRAMEWORKS_DIR / "CouchbaseLiteSwift.xcframework", ignore_errors=True
+        )
+        unzip_directory(download_file, FRAMEWORKS_DIR)
+        download_file.unlink()
 
 
 @TestServer.register("swift_ios")
@@ -87,6 +117,43 @@ class SwiftTestServer_iOS(SwiftTestServer):
         version_parts = self.version.split("-")
         return f"couchbase-lite-ios/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
 
+    def build(self) -> None:
+        self._download_cbl()
+        header("Building")
+        env = os.environ.copy()
+        env["LANG"] = "en_US.UTF-8"
+        env["LC_ALL"] = "en_US.UTF-8"
+
+        xcodebuild_cmd = [
+            "xcodebuild",
+            "-scheme",
+            "TestServer",
+            "-sdk",
+            "iphoneos",
+            "-configuration",
+            "Release",
+            "-derivedDataPath",
+            str(BUILD_DEVICE_DIR),
+            "-allowProvisioningUpdates",
+        ]
+
+        with subprocess.Popen(
+            xcodebuild_cmd,
+            env=env,
+            cwd=SWIFT_TEST_SERVER_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        ) as xcodebuild_proc:
+            with subprocess.Popen(
+                ["xcpretty"], stdin=xcodebuild_proc.stdout, env=env
+            ) as xcpretty_proc:
+                # Close the stdout of the first process to allow it to receive a SIGPIPE if the second process exits
+                cast(BytesIO, xcodebuild_proc.stdout).close()
+
+                xcpretty_proc.wait()
+                if xcpretty_proc.returncode != 0:
+                    raise RuntimeError("Build failed")
+
     def create_bridge(self) -> PlatformBridge:
         """
         Create a bridge for the Swift test server to be able to install, run, etc.
@@ -94,78 +161,16 @@ class SwiftTestServer_iOS(SwiftTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        path = ""
-        if path == "":
-            raise NotImplementedError(
-                "Please choose the path to find either downloaded or built test server"
-            )
-
+        path = (
+            BUILD_DEVICE_DIR
+            / "Build"
+            / "Products"
+            / "Release-iphoneos"
+            / "TestServer-iOS.app"
+        )
         return iOSBridge(
             str(path),
             True,
-        )
-
-    def compress_package(self) -> str:
-        """
-        Compress the Swift test server package.
-
-        Returns:
-            str: The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the compress logic for a built server"
-        )
-
-    def uncompress_package(self, path: Path) -> None:
-        """
-        Uncompress the Swift test server package.
-
-        Args:
-            path (Path): The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the uncompress logic for a compressed server"
-        )
-
-
-@TestServer.register("swift_macos")
-class SwiftTestServer_macOS(SwiftTestServer):
-    """
-    A class for managing Swift test servers on Linux.
-
-    Attributes:
-        version (str): The version of the test server.
-    """
-
-    def __init__(self, version: str):
-        super().__init__(version)
-
-    @property
-    def latestbuilds_path(self) -> str:
-        """
-        Get the path for the package on the latestbuilds server.
-
-        Returns:
-            str: The path for the latest builds.
-        """
-        version_parts = self.version.split("-")
-        return f"couchbase-lite-ios/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
-
-    def create_bridge(self) -> PlatformBridge:
-        """
-        Create a bridge for the Swift test server to be able to install, run, etc.
-
-        Returns:
-            PlatformBridge: The platform bridge.
-        """
-        path = ""
-        if path == "":
-            raise NotImplementedError(
-                "Please choose the path to find either downloaded or built test server"
-            )
-
-        return macOSBridge(
-            str(path),
         )
 
     def compress_package(self) -> str:
