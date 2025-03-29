@@ -134,7 +134,7 @@ class AndroidBridge(PlatformBridge):
                 "shell",
                 "am",
                 "start",
-                f"{self.__app_id}/{self.__app_id}.{self.__activity}",
+                f"{self.__app_id}/.{self.__activity}",
             ],
             check=True,
             capture_output=False,
