@@ -3,7 +3,7 @@ import json
 # Paths to the configuration files
 CLUSTER_CONFIG_PATH = 'tests/config/config.json'  # Cluster config file
 SG_CONFIG_TEMPLATE_PATH = 'environment/sg/config/bootstrap_sample.json'  # Sync Gateway config template
-UPDATED_SG_CONFIG_PATH = 'environment/sg/config/bootstrap.json'  # Updated Sync Gateway config
+UPDATED_SG_CONFIG_PATH = 'environment/sg/config/bootstrap-config.json'  # Updated Sync Gateway config
 
 # Load the cluster config to extract Couchbase IP
 with open(CLUSTER_CONFIG_PATH, 'r') as cluster_file:
