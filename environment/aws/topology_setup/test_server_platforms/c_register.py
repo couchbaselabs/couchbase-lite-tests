@@ -29,6 +29,7 @@ from abc import abstractmethod
 from io import BytesIO
 import os
 from pathlib import Path
+import platform
 import shutil
 import subprocess
 from typing import cast
@@ -104,8 +105,6 @@ class CTestServer_Desktop(CTestServer):
         else:
             untar_directory(download_file, LIB_DIR)
 
-        (LIB_DIR / f"libcblite-{version_parts[0]}").rename(LIB_DIR / "libcblite")
-
      def build(self) -> None:
         """
         Build the C test server.
@@ -115,7 +114,8 @@ class CTestServer_Desktop(CTestServer):
         header("Building C test server")
         #shutil.rmtree(BUILD_DIR, ignore_errors=True)
         #BUILD_DIR.mkdir(0o755, exist_ok=True)
-        subprocess.run(["cmake", "-DCMAKE_BUILD_TYPE=Release", ".."], cwd=BUILD_DIR, check=True)
+        cbl_version = self.version.split("-")[0]
+        subprocess.run(["cmake", "-DCMAKE_BUILD_TYPE=Release", f"-DCBL_VERSION={cbl_version}", ".."], cwd=BUILD_DIR, check=True)
 
         header("Installing C test server")
         subprocess.run(["cmake", "--build", ".", "--target", "install", "-j"], cwd=BUILD_DIR, check=True)
@@ -280,6 +280,50 @@ class CTestServer_Android(CTestServer):
         """
         return "c_android"
 
+    def cbl_filename(self, version: str) -> str:
+        return f"couchbase-lite-c-enterprise-{version}-android.zip"
+    
+    def _download_cbl(self):
+        android_lib_dir = C_TEST_SERVER_DIR / "platforms" / "android" / "app" / "src" / "main" / "cpp" / "lib"
+        header(f"Downloading CBL library {self.version}")
+        build = 0
+        version_parts = self.version.split("-")
+        if len(version_parts) > 1:
+            build = int(version_parts[1])
+
+        DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+        download_file = DOWNLOAD_DIR / "framework.zip"
+        downloader = CBLLibraryDownloader(
+            "couchbase-lite-c",
+            self.cbl_filename(self.version),
+            version_parts[0],
+            build,
+        )
+        downloader.download(download_file)
+        #shutil.rmtree(IOS_FRAMEWORKS_DIR / "CouchbaseLite.xcframework", ignore_errors=True)
+        unzip_directory(download_file, android_lib_dir)
+
+    def build(self) -> None:
+        """
+        Build the C test server.
+        """
+        #self._download_cbl()
+        gradle_path = C_TEST_SERVER_DIR / "platforms" / "android" / "gradlew"
+        if platform.system() == "Windows":
+            gradle_path = gradle_path.with_suffix(".bat")
+
+        args = [
+            str(gradle_path.resolve()),
+            "assembleRelease",
+            "-PabiFilters=arm64-v8a",
+            f"-PcblVersion={self.version.split('-')[0]}",
+            "--info"
+        ]
+        if platform.system() == "Windows":
+            args.append("--no-daemon")
+
+        subprocess.run(args, cwd=gradle_path.parent, check=True)
+
     @property
     def latestbuilds_path(self) -> str:
         """
@@ -298,15 +342,18 @@ class CTestServer_Android(CTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        path = ""
-        if path == "":
-            raise NotImplementedError(
-                "Please choose the path to find either downloaded or built test server"
-            )
-
-        app_id = ""
-        if app_id == "":
-            raise NotImplementedError("Please set the app id")
+        path = (
+            C_TEST_SERVER_DIR
+            / "platforms"
+            / "android"
+            / "app"
+            / "build"
+            / "outputs"
+            / "apk"
+            / "release"
+            / "app-release.apk"
+        )
+        app_id = "com.couchbase.lite.android.mobiletest"
 
         return AndroidBridge(
             str(path),
@@ -333,7 +380,7 @@ class CTestServer_Android(CTestServer):
 
 
 @TestServer.register("c_windows")
-class CTestServer_Windows(CTestServer):
+class CTestServer_Windows(CTestServer_Desktop):
     """
     A class for managing C test servers on Windows.
 
@@ -365,6 +412,18 @@ class CTestServer_Windows(CTestServer):
         version_parts = self.version.split("-")
         return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
 
+    def cbl_filename(self, version: str) -> str:
+        return f"couchbase-lite-c-enterprise-{version}-windows-x86_64.zip"
+
+    def build(self) -> None:
+        super().build()
+        libcblite_version = self.version.split("-")[0]
+        libcblite_lib_dir = LIB_DIR / f"libcblite-{libcblite_version}" / "bin"
+        output_bin_dir = BUILD_DIR / "out" / "bin"
+        for dll_file in libcblite_lib_dir.glob("cblite*"):
+            self._copy_with_symlink_preservation(dll_file, output_bin_dir / dll_file.name)
+
+
     def create_bridge(self) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
@@ -372,18 +431,8 @@ class CTestServer_Windows(CTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        prefix = ""
-        if prefix == "":
-            raise NotImplementedError(
-                "Please choose a directory to either downloaded or built test server"
-            )
-
-        exe_name = ""
-        if exe_name == "":
-            raise NotImplementedError("Please set the exe name")
-
         return ExeBridge(
-            str(Path(prefix) / exe_name),
+            BUILD_DIR / "out" / "bin" / "testserver.exe",
         )
 
     def compress_package(self) -> str:
@@ -447,7 +496,8 @@ class CTestServer_macOS(CTestServer_Desktop):
         Build the C test server.
         """
         super().build()
-        libcblite_lib_dir = LIB_DIR / "libcblite" / "lib"
+        libcblite_version = self.version.split("-")[0]
+        libcblite_lib_dir = LIB_DIR / f"libcblite-{libcblite_version}" / "lib"
         output_bin_dir = BUILD_DIR / "out" / "bin"
         for dylib_file in libcblite_lib_dir.glob("libcblite*.dylib"):
             self._copy_with_symlink_preservation(dylib_file, output_bin_dir / dylib_file.name)
@@ -506,7 +556,8 @@ class CTestServer_Linux(CTestServer_Desktop):
     
     def build(self) -> None:
         super().build()
-        libcblite_lib_dir = LIB_DIR / "libcblite" / "lib"
+        libcblite_version = self.version.split("-")[0]
+        libcblite_lib_dir = LIB_DIR / f"libcblite-{libcblite_version}" / "lib"
         output_bin_dir = BUILD_DIR / "out" / "bin"
         for so_file in libcblite_lib_dir.glob("**/libcblite.so*"):
             self._copy_with_symlink_preservation(so_file, output_bin_dir / so_file.name)

@@ -14,8 +14,11 @@ add_subdirectory(vendor)
 
 get_directory_property(civetweb_SOURCE_DIR DIRECTORY vendor DEFINITION civetweb_SOURCE_DIR)
 
-message(STATUS ${CMAKE_LIBRARY_ARCHITECTURE})
-find_package(CouchbaseLite REQUIRED VERSION 3.2.1 PATHS lib/libcblite)
+if(NOT DEFINED CBL_VERSION)
+    message(FATAL_ERROR "Please pass -DCBL_VERSION to indicate which version of Couchbase Lite you will use")
+endif()
+
+find_package(CouchbaseLite REQUIRED VERSION ${CBL_VERSION} PATHS lib/libcblite-${CBL_VERSION} NO_DEFAULT_PATH)
 
 if(APPLE)
     set(CMAKE_INSTALL_RPATH "@loader_path")
