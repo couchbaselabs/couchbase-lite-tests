@@ -29,10 +29,14 @@ from io import BytesIO
 from pathlib import Path
 from typing import cast
 
-from environment.aws.common.io import unzip_directory
+from environment.aws.common.io import unzip_directory, zip_directory
 from environment.aws.common.output import header
 from environment.aws.topology_setup.cbl_library_downloader import CBLLibraryDownloader
-from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
+from environment.aws.topology_setup.test_server import (
+    DOWNLOADED_TEST_SERVER_DIR,
+    TEST_SERVER_DIR,
+    TestServer,
+)
 
 from .ios_bridge import iOSBridge
 from .platform_bridge import PlatformBridge
@@ -160,13 +164,12 @@ class SwiftTestServer_iOS(SwiftTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        path = (
-            BUILD_DEVICE_DIR
-            / "Build"
-            / "Products"
-            / "Release-iphoneos"
-            / "TestServer-iOS.app"
+        location = (
+            DOWNLOADED_TEST_SERVER_DIR / self.platform / self.version
+            if self._downloaded
+            else BUILD_DEVICE_DIR / "Build" / "Products" / "Release-iphoneos"
         )
+        path = location / "TestServer-iOS.app"
         return iOSBridge(
             str(path),
             True,
@@ -179,9 +182,17 @@ class SwiftTestServer_iOS(SwiftTestServer):
         Returns:
             str: The path to the compressed package.
         """
-        raise NotImplementedError(
-            "Please implement the compress logic for a built server"
+        header("Compressing Swift test server for iOS")
+        publish_dir = (
+            BUILD_DEVICE_DIR
+            / "Build"
+            / "Products"
+            / "Release-iphoneos"
+            / "TestServer-iOS.app"
         )
+        zip_path = publish_dir.parents[5] / "testserver_ios.zip"
+        zip_directory(publish_dir, zip_path)
+        return str(zip_path)
 
     def uncompress_package(self, path: Path) -> None:
         """
@@ -190,6 +201,5 @@ class SwiftTestServer_iOS(SwiftTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        raise NotImplementedError(
-            "Please implement the uncompress logic for a compressed server"
-        )
+        unzip_directory(path, path.parent / "TestServer-iOS.app")
+        path.unlink()

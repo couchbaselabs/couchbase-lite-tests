@@ -60,6 +60,7 @@ from environment.aws.topology_setup.test_server_platforms.platform_bridge import
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEST_SERVER_DIR = (SCRIPT_DIR / ".." / ".." / ".." / "servers").resolve()
+DOWNLOADED_TEST_SERVER_DIR = TEST_SERVER_DIR / "downloaded"
 
 
 class TestServer(ABC):
@@ -212,7 +213,7 @@ class TestServer(ABC):
         Raises:
             FileNotFoundError: If the test server package is not found on the latestbuilds server.
         """
-        download_dir = TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+        download_dir = DOWNLOADED_TEST_SERVER_DIR / self.platform / self.version
         download_dir.mkdir(parents=True, exist_ok=True)
         if (download_dir / ".downloaded").exists():
             print("Already downloaded")
@@ -258,6 +259,12 @@ class TestServer(ABC):
     def create_bridge(self) -> PlatformBridge:
         """
         Create a platform bridge for the test server.
+
+        .. warning::
+            If self._downloaded is true your implementation must
+            use the path DOWNLOADED_TEST_SERVER_DIR / self.platform / self.version
+            to find the downloaded test server. Otherwise, it should
+            use whatever path is appropriate for the output of the build system.
 
         Returns:
             PlatformBridge: The platform bridge for the test server.
