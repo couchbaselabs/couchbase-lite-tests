@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
 
 import pytest
 from cbltest import CBLPyTest
@@ -206,3 +206,104 @@ class TestReplicationBlob(CBLTestClass):
         )
 
         await cblpytest.test_servers[0].cleanup()
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_blob_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
+        self.mark_test_step("Reset SG and load `names` dataset.")
+        cloud = CouchbaseCloud(
+            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
+        )
+        await cloud.configure_dataset(dataset_path, "names")
+
+        self.mark_test_step("Reset empty local database")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
+        db = dbs[0]
+
+        self.mark_test_step(
+            "Create a document with a blob on the property `watermelon` with the contents of s10.jpg"
+        )
+        async with db.batch_updater() as b:
+            b.upsert_document(
+                "_default._default", "fruits", new_blobs={"watermelon": "s10.jpg"}
+            )
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/names`
+                * collections : `_default._default`
+                * type: push
+                * continuous: false
+                * credentials: user1/pass
+        """)
+        replicator = Replicator(
+            db,
+            cblpytest.sync_gateways[0].replication_url("names"),
+            collections=[ReplicatorCollectionEntry(["_default._default"])],
+            replicator_type=ReplicatorType.PUSH,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator is stopped.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        self.mark_test_step(
+            "Check that the document with the ID from step 3 contains a valid `watermelon` property"
+        )
+        remote_doc = await cblpytest.sync_gateways[0].get_document("names", "fruits")
+        assert remote_doc is not None, "Document `fruits` not found in SGW"
+
+        def check_blob_prop(d: Dict, prop: str, expected_value: Any):
+            assert prop in d, f"Property `{prop}` not found in the blob"
+            assert d[prop] == expected_value, (
+                f"Property `{prop}` is incorrect (expected: {expected_value}, actual: {d[prop]})"
+            )
+
+        assert "watermelon" in remote_doc.body, (
+            "Property `watermelon` not found in the document"
+        )
+        check_blob_prop(remote_doc.body["watermelon"], "@type", "blob")
+        check_blob_prop(remote_doc.body["watermelon"], "content_type", "image/jpeg")
+        check_blob_prop(
+            remote_doc.body["watermelon"], "digest", "sha1-8ArxA/yauDMWJrQsvVSzo8RKhtk="
+        )
+        check_blob_prop(remote_doc.body["watermelon"], "length", 199095)
+
+        self.mark_test_step(
+            "Check that the blob in the `watermelon` property has a corresponding attachment entry in SGW"
+        )
+        assert "_attachments" in remote_doc.body, (
+            "Property `_attachments` not found in the document"
+        )
+        assert isinstance(remote_doc.body["_attachments"], dict), (
+            "Property `_attachments` is not a dictionary"
+        )
+        assert "blob_/watermelon" in remote_doc.body["_attachments"], (
+            "Attachment `blob_/watermelon` not found in the document"
+        )
+        assert isinstance(remote_doc.body["_attachments"]["blob_/watermelon"], dict), (
+            "Attachment `blob_/watermelon` is not a dictionary"
+        )
+        check_blob_prop(
+            remote_doc.body["_attachments"]["blob_/watermelon"],
+            "content_type",
+            "image/jpeg",
+        )
+        check_blob_prop(
+            remote_doc.body["_attachments"]["blob_/watermelon"],
+            "digest",
+            "sha1-8ArxA/yauDMWJrQsvVSzo8RKhtk=",
+        )
+        check_blob_prop(
+            remote_doc.body["_attachments"]["blob_/watermelon"], "length", 199095
+        )
+        check_blob_prop(
+            remote_doc.body["_attachments"]["blob_/watermelon"], "revpos", 1
+        )
+        check_blob_prop(
+            remote_doc.body["_attachments"]["blob_/watermelon"], "stub", True
+        )
