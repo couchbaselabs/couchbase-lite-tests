@@ -62,8 +62,8 @@ class CTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @abstractmethod
     def cbl_filename(self, version: str) -> str:
@@ -145,8 +145,8 @@ class CTestServer_iOS(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -284,8 +284,8 @@ class CTestServer_Android(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -414,8 +414,8 @@ class CTestServer_Windows(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -490,8 +490,8 @@ class CTestServer_macOS(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-macos.zip"
@@ -568,8 +568,8 @@ class CTestServer_Linux(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, arch: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
         self.__arch = arch
 
     @property

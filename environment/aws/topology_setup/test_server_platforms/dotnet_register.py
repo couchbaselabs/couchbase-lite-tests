@@ -64,8 +64,8 @@ class DotnetTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     @abstractmethod
@@ -152,8 +152,8 @@ class DotnetTestServerCli(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     @abstractmethod
@@ -219,8 +219,8 @@ class DotnetTestServer_iOS(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -336,8 +336,8 @@ class DotnetTestServer_Android(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -446,8 +446,8 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -544,8 +544,8 @@ class DotnetTestServer_macOS(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:

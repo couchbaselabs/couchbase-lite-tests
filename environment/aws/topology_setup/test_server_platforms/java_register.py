@@ -247,8 +247,8 @@ class JAKTestServer(TestServer):
     def test_server_path(self) -> str:
         pass
 
-    def __init__(self, version: str, gradle_target: str = "jar"):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str, gradle_target: str = "jar"):
+        super().__init__(version, dataset_version)
         self.__gradle_target = gradle_target
 
     def build(self) -> None:
@@ -283,8 +283,8 @@ class JAKTestServer_Android(JAKTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version, "assembleRelease")
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version, "assembleRelease")
 
     @property
     def test_server_path(self) -> str:
@@ -364,8 +364,8 @@ class JAKTestServer_Android(JAKTestServer):
 
 
 class JAKTestServer_Desktop(JAKTestServer):
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def test_server_path(self) -> str:
@@ -376,8 +376,8 @@ class JAKTestServer_Desktop(JAKTestServer):
 
 
 class JAKTestServer_WebService(JAKTestServer):
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def test_server_path(self) -> str:
@@ -399,8 +399,8 @@ class JAKTestServer_WindowsDesktop(JAKTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -455,8 +455,8 @@ class JAKTestServer_WindowsWebService(JAKTestServer_WebService):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -511,8 +511,8 @@ class JAKTestServer_macOSWebService(JAKTestServer_WebService):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -567,8 +567,8 @@ class JAKTestServer_macOSDesktop(JAKTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -623,8 +623,8 @@ class JAKTestServer_LinuxDesktop(JAKTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -679,8 +679,8 @@ class JAKTestServer_LinuxWebService(JAKTestServer_WebService):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:

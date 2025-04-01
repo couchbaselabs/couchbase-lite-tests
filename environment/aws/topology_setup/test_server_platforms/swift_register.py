@@ -57,8 +57,8 @@ class SwiftTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-swift_xc_enterprise_{version}.zip"
@@ -94,8 +94,8 @@ class SwiftTestServer_iOS(SwiftTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:

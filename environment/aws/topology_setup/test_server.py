@@ -48,7 +48,7 @@ from __future__ import annotations
 import importlib
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Dict, Optional, Type
+from typing import Callable, Dict, Type
 
 import requests
 
@@ -104,10 +104,10 @@ class TestServer(ABC):
 
     __registry: Dict[str, Type[TestServer]] = {}
 
-    def __init__(self, version: str):
+    def __init__(self, version: str, dataset_version: str) -> None:
         self.__version = version
+        self.__dataset_version = dataset_version
         self._downloaded = False
-        self.dataset_version: Optional[str] = None
         """If needed, the dataset version to use when building"""
 
     @classmethod
@@ -148,13 +148,14 @@ class TestServer(ABC):
         return decorator
 
     @classmethod
-    def create(cls, name: str, version: str) -> TestServer:
+    def create(cls, name: str, version: str, dataset_version: str) -> TestServer:
         """
         Create an instance of a registered test server subclass.
 
         Args:
             name (str): The name of the registered test server subclass.
             version (str): The version of the test server.
+            dataset_version (str): The dataset version to use when building.
 
         Returns:
             TestServer: An instance of the registered test server subclass.
@@ -167,7 +168,7 @@ class TestServer(ABC):
         if name not in cls.__registry:
             raise ValueError(f"Unknown test server type: {name}")
 
-        return cls.__registry[name](version)
+        return cls.__registry[name](version, dataset_version)
 
     @property
     def version(self) -> str:
@@ -178,6 +179,16 @@ class TestServer(ABC):
             str: The version of the test server.
         """
         return self.__version
+
+    @property
+    def dataset_version(self) -> str:
+        """
+        Get the dataset version of the test server.
+
+        Returns:
+            str: The dataset version of the test server.
+        """
+        return self.__dataset_version
 
     @property
     @abstractmethod
