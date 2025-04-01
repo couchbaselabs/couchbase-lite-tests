@@ -71,7 +71,7 @@ class SwiftTestServer(TestServer):
             "couchbase-lite-ios",
             f"{self.cbl_filename(self.version)}",
             version_parts[0],
-            version_parts[1] if len(version_parts) > 1 else 0,
+            int(version_parts[1]) if len(version_parts) > 1 else 0,
         )
         downloader.download(download_file)
         shutil.rmtree(
