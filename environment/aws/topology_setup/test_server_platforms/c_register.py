@@ -460,7 +460,7 @@ class CTestServer_Windows(CTestServer_Desktop):
             PlatformBridge: The platform bridge.
         """
         return ExeBridge(
-            BUILD_DIR / "out" / "bin" / "testserver.exe",
+            str(BUILD_DIR / "out" / "bin" / "testserver.exe"),
         )
 
     def compress_package(self) -> str:
@@ -539,7 +539,7 @@ class CTestServer_macOS(CTestServer_Desktop):
             PlatformBridge: The platform bridge.
         """
         return ExeBridge(
-            BUILD_DIR / "out" / "bin" / "testserver",
+            str(BUILD_DIR / "out" / "bin" / "testserver"),
         )
 
     def compress_package(self) -> str:
@@ -613,7 +613,7 @@ class CTestServer_Linux(CTestServer_Desktop):
             PlatformBridge: The platform bridge.
         """
         return ExeBridge(
-            BUILD_DIR / "out" / "bin" / "testserver",
+            str(BUILD_DIR / "out" / "bin" / "testserver"),
         )
 
     def compress_package(self) -> str:
