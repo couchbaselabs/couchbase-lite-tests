@@ -130,6 +130,7 @@ def unzip_directory(input: Path, output: Path) -> None:
 
     print("Done")
 
+
 def tar_directory(input: Path, output: Path) -> None:
     """
     Create a .tar.gz archive of the contents of a directory.

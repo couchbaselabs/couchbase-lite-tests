@@ -106,7 +106,9 @@ class ExeBridge(PlatformBridge):
         args.extend(self.__extra_args)
         log_file = Path(self.__exe_path).parent / "server.log"
         log_fd = open(log_file, "w")
-        process = subprocess.Popen(args, start_new_session=True, stdout=log_fd, stderr=log_fd)
+        process = subprocess.Popen(
+            args, start_new_session=True, stdout=log_fd, stderr=log_fd
+        )
         print(f"Started {self.__exe_name} with PID {process.pid}")
 
     def stop(self, location: str) -> None:

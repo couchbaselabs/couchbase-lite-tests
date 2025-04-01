@@ -25,16 +25,16 @@ Functions:
         Uncompress the C test server package.
 """
 
-from abc import abstractmethod
-from io import BytesIO
 import os
-from pathlib import Path
 import platform
 import shutil
 import subprocess
+from abc import abstractmethod
+from io import BytesIO
+from pathlib import Path
 from typing import cast
 
-from environment.aws.common.io import unzip_directory, untar_directory
+from environment.aws.common.io import untar_directory, unzip_directory
 from environment.aws.common.output import header
 from environment.aws.topology_setup.cbl_library_downloader import CBLLibraryDownloader
 from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
@@ -52,6 +52,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 LIB_DIR = C_TEST_SERVER_DIR / "lib"
 IOS_FRAMEWORKS_DIR = C_TEST_SERVER_DIR / "platforms" / "ios" / "Frameworks"
 IOS_VENDOR_DIR = C_TEST_SERVER_DIR / "platforms" / "ios" / "Vendor"
+
 
 class CTestServer(TestServer):
     """
@@ -78,8 +79,9 @@ class CTestServer(TestServer):
             # Copy the file normally
             shutil.copy2(src, dest)
 
+
 class CTestServer_Desktop(CTestServer):
-     def _download_cbl(self) -> None:
+    def _download_cbl(self) -> None:
         """
         Download the CBL library for the build
         """
@@ -105,21 +107,34 @@ class CTestServer_Desktop(CTestServer):
         else:
             untar_directory(download_file, LIB_DIR)
 
-     def build(self) -> None:
+    def build(self) -> None:
         """
         Build the C test server.
         """
         shutil.rmtree(LIB_DIR, ignore_errors=True)
         self._download_cbl()
         header("Building C test server")
-        #shutil.rmtree(BUILD_DIR, ignore_errors=True)
-        #BUILD_DIR.mkdir(0o755, exist_ok=True)
+        shutil.rmtree(BUILD_DIR, ignore_errors=True)
+        BUILD_DIR.mkdir(0o755, exist_ok=True)
         cbl_version = self.version.split("-")[0]
-        subprocess.run(["cmake", "-DCMAKE_BUILD_TYPE=Release", f"-DCBL_VERSION={cbl_version}", ".."], cwd=BUILD_DIR, check=True)
+        subprocess.run(
+            [
+                "cmake",
+                "-DCMAKE_BUILD_TYPE=Release",
+                f"-DCBL_VERSION={cbl_version}",
+                "..",
+            ],
+            cwd=BUILD_DIR,
+            check=True,
+        )
 
         header("Installing C test server")
-        subprocess.run(["cmake", "--build", ".", "--target", "install", "-j"], cwd=BUILD_DIR, check=True)
-        
+        subprocess.run(
+            ["cmake", "--build", ".", "--target", "install", "-j"],
+            cwd=BUILD_DIR,
+            check=True,
+        )
+
 
 @TestServer.register("c_ios")
 class CTestServer_iOS(CTestServer):
@@ -142,10 +157,10 @@ class CTestServer_iOS(CTestServer):
             str: The platform name.
         """
         return "c_ios"
-    
+
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-ios.zip"
-    
+
     def _download_cbl(self):
         header(f"Downloading CBL library {self.version}")
         build = 0
@@ -161,13 +176,19 @@ class CTestServer_iOS(CTestServer):
             version_parts[0],
             build,
         )
-        #downloader.download(download_file)
-        #shutil.rmtree(IOS_FRAMEWORKS_DIR / "CouchbaseLite.xcframework", ignore_errors=True)
-        #unzip_directory(download_file, IOS_FRAMEWORKS_DIR)
+        downloader.download(download_file)
+        shutil.rmtree(
+            IOS_FRAMEWORKS_DIR / "CouchbaseLite.xcframework", ignore_errors=True
+        )
+        unzip_directory(download_file, IOS_FRAMEWORKS_DIR)
 
-        #shutil.rmtree(IOS_VENDOR_DIR / "cmake", ignore_errors=True)
-        #(IOS_VENDOR_DIR / "cmake").mkdir(0o755)
-        subprocess.run(["cmake", "-DCMAKE_BUILD_TYPE=Release", "../../../../vendor"], cwd=IOS_VENDOR_DIR / "cmake", check=True)
+        shutil.rmtree(IOS_VENDOR_DIR / "cmake", ignore_errors=True)
+        (IOS_VENDOR_DIR / "cmake").mkdir(0o755)
+        subprocess.run(
+            ["cmake", "-DCMAKE_BUILD_TYPE=Release", "../../../../vendor"],
+            cwd=IOS_VENDOR_DIR / "cmake",
+            check=True,
+        )
 
     def build(self):
         self._download_cbl()
@@ -205,7 +226,7 @@ class CTestServer_iOS(CTestServer):
                 xcpretty_proc.wait()
                 if xcpretty_proc.returncode != 0:
                     raise RuntimeError("Build failed")
-    
+
     @property
     def latestbuilds_path(self) -> str:
         """
@@ -227,11 +248,7 @@ class CTestServer_iOS(CTestServer):
             PlatformBridge: The platform bridge.
         """
         path = (
-            IOS_BUILD_DIR
-            / "Build"
-            / "Products"
-            / "Release-iphoneos"
-            / "TestServer.app"
+            IOS_BUILD_DIR / "Build" / "Products" / "Release-iphoneos" / "TestServer.app"
         )
 
         return iOSBridge(
@@ -282,9 +299,18 @@ class CTestServer_Android(CTestServer):
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-android.zip"
-    
+
     def _download_cbl(self):
-        android_lib_dir = C_TEST_SERVER_DIR / "platforms" / "android" / "app" / "src" / "main" / "cpp" / "lib"
+        android_lib_dir = (
+            C_TEST_SERVER_DIR
+            / "platforms"
+            / "android"
+            / "app"
+            / "src"
+            / "main"
+            / "cpp"
+            / "lib"
+        )
         header(f"Downloading CBL library {self.version}")
         build = 0
         version_parts = self.version.split("-")
@@ -300,14 +326,16 @@ class CTestServer_Android(CTestServer):
             build,
         )
         downloader.download(download_file)
-        #shutil.rmtree(IOS_FRAMEWORKS_DIR / "CouchbaseLite.xcframework", ignore_errors=True)
+        shutil.rmtree(
+            IOS_FRAMEWORKS_DIR / "CouchbaseLite.xcframework", ignore_errors=True
+        )
         unzip_directory(download_file, android_lib_dir)
 
     def build(self) -> None:
         """
         Build the C test server.
         """
-        #self._download_cbl()
+        self._download_cbl()
         gradle_path = C_TEST_SERVER_DIR / "platforms" / "android" / "gradlew"
         if platform.system() == "Windows":
             gradle_path = gradle_path.with_suffix(".bat")
@@ -317,7 +345,6 @@ class CTestServer_Android(CTestServer):
             "assembleRelease",
             "-PabiFilters=arm64-v8a",
             f"-PcblVersion={self.version.split('-')[0]}",
-            "--info"
         ]
         if platform.system() == "Windows":
             args.append("--no-daemon")
@@ -353,7 +380,7 @@ class CTestServer_Android(CTestServer):
             / "release"
             / "app-release.apk"
         )
-        app_id = "com.couchbase.lite.android.mobiletest"
+        app_id = "com.couchbase.lite.testserver"
 
         return AndroidBridge(
             str(path),
@@ -421,8 +448,9 @@ class CTestServer_Windows(CTestServer_Desktop):
         libcblite_lib_dir = LIB_DIR / f"libcblite-{libcblite_version}" / "bin"
         output_bin_dir = BUILD_DIR / "out" / "bin"
         for dll_file in libcblite_lib_dir.glob("cblite*"):
-            self._copy_with_symlink_preservation(dll_file, output_bin_dir / dll_file.name)
-
+            self._copy_with_symlink_preservation(
+                dll_file, output_bin_dir / dll_file.name
+            )
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -478,7 +506,6 @@ class CTestServer_macOS(CTestServer_Desktop):
             str: The platform name.
         """
         return "c_macos"
-        
 
     @property
     def latestbuilds_path(self) -> str:
@@ -500,7 +527,9 @@ class CTestServer_macOS(CTestServer_Desktop):
         libcblite_lib_dir = LIB_DIR / f"libcblite-{libcblite_version}" / "lib"
         output_bin_dir = BUILD_DIR / "out" / "bin"
         for dylib_file in libcblite_lib_dir.glob("libcblite*.dylib"):
-            self._copy_with_symlink_preservation(dylib_file, output_bin_dir / dylib_file.name)
+            self._copy_with_symlink_preservation(
+                dylib_file, output_bin_dir / dylib_file.name
+            )
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -553,7 +582,7 @@ class CTestServer_Linux(CTestServer_Desktop):
             str: The platform name.
         """
         return f"c_linux_{self.__arch}"
-    
+
     def build(self) -> None:
         super().build()
         libcblite_version = self.version.split("-")[0]
@@ -561,7 +590,7 @@ class CTestServer_Linux(CTestServer_Desktop):
         output_bin_dir = BUILD_DIR / "out" / "bin"
         for so_file in libcblite_lib_dir.glob("**/libcblite.so*"):
             self._copy_with_symlink_preservation(so_file, output_bin_dir / so_file.name)
-    
+
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-linux-{self.__arch}.tar.gz"
 
@@ -604,6 +633,7 @@ class CTestServer_Linux(CTestServer_Desktop):
             path (Path): The path to the compressed package.
         """
         raise NotImplementedError("Please implement C uncompress_package logic")
+
 
 @TestServer.register("c_linux_x86_64")
 class CTestServer_Linux_x86_64(CTestServer_Linux):
