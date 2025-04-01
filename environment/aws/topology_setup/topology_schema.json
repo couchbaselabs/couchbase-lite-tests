@@ -58,6 +58,9 @@
                     "cbl_version": {
                         "type": "string"
                     },
+                    "dataset_version": {
+                        "type": "string"
+                    },
                     "platform": {
                         "type": "string"
                     },

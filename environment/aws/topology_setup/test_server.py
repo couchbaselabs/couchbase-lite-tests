@@ -48,7 +48,7 @@ from __future__ import annotations
 import importlib
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Dict, Type
+from typing import Callable, Dict, Optional, Type
 
 import requests
 
@@ -107,6 +107,8 @@ class TestServer(ABC):
     def __init__(self, version: str):
         self.__version = version
         self._downloaded = False
+        self.dataset_version: Optional[str] = None
+        """If needed, the dataset version to use when building"""
 
     @classmethod
     def initialize(cls) -> None:

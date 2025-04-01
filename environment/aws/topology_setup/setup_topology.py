@@ -140,6 +140,7 @@ class TestServerInput:
     Attributes:
         location (str): The location of the test server.
         cbl_version (str): The version of Couchbase Lite to use.
+        dataset_version (Optional[str]): The version of the dataset to use.
         platform (str): The platform of the test server.
         download (bool): Whether to download the test server package.
     """
@@ -153,6 +154,10 @@ class TestServerInput:
         return self.__cbl_version
 
     @property
+    def dataset_version(self) -> Optional[str]:
+        return self.__dataset_version
+
+    @property
     def platform(self) -> str:
         return self.__platform
 
@@ -160,9 +165,17 @@ class TestServerInput:
     def download(self) -> bool:
         return self.__download
 
-    def __init__(self, location: str, cbl_version: str, platform: str, download: bool):
+    def __init__(
+        self,
+        location: str,
+        cbl_version: str,
+        dataset_version: Optional[str],
+        platform: str,
+        download: bool,
+    ):
         self.__location = location
         self.__cbl_version = cbl_version
+        self.__dataset_version = dataset_version
         self.__platform = platform
         self.__download = download
 
@@ -256,6 +269,9 @@ class TopologyConfig:
                         TestServerInput(
                             raw_server["location"],
                             raw_server["cbl_version"],
+                            raw_server["dataset_version"]
+                            if "dataset_version" in raw_server
+                            else None,
                             raw_server["platform"],
                             cast(bool, raw_server.get("download", False)),
                         )
@@ -387,6 +403,8 @@ class TopologyConfig:
             test_server = TestServer.create(
                 test_server_input.platform, test_server_input.cbl_version
             )
+
+            test_server.dataset_version = test_server_input.dataset_version
             if test_server_input.download:
                 test_server.download()
             else:
@@ -397,7 +415,7 @@ class TopologyConfig:
             bridge.run(test_server_input.location)
             port = 5555 if test_server_input.platform.startswith("dotnet") else 8080
             ip = bridge.get_ip(test_server_input.location)
-            for _ in range(0, 10):
+            for _ in range(0, 30):
                 try:
                     requests.get(f"http://{ip}:{port}")
                     return
