@@ -68,9 +68,9 @@ while [[ -z "$SERVER_URL" ]]; do
 done
 
 echo "Linux Desktop: Configure the tests"
-rm -rf tests/config_java_desktop.json
+rm -rf tests/dev_e2e/config_java_desktop.json
 cp -f "jenkins/pipelines/java/desktop/config_java_desktop.json" tests
-pushd tests > /dev/null
+pushd tests/dev_e2e > /dev/null
 echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config_java_desktop.json
 echo '}' >> config_java_desktop.json
 cat config_java_desktop.json

@@ -46,7 +46,7 @@ else
     python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_url
 fi
 
-pushd $SCRIPT_DIR/../../../tests
+pushd $SCRIPT_DIR/../../../tests/dev_e2e
 pip install -r requirements.txt
 pytest -v --no-header --config config.json
 deactivate

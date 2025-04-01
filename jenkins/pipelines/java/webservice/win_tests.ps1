@@ -69,9 +69,9 @@ try
     }
 
     Write-Host "Windows Web Service: Configure the tests"
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue tests\config_java_webservice.json
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue tests\dev_e2e\config_java_webservice.json
     Copy-Item jenkins\pipelines\java\webservice\config_java_webservice.json -Destination tests
-    Push-Location tests
+    Push-Location tests\dev_e2e
     Add-Content config_java_webservice.json "    `"test-servers`": [`"$serverUrl`"]"
     Add-Content config_java_webservice.json '}'
     Get-Content config_java_webservice.json

@@ -62,9 +62,9 @@ while [[ -z "$SERVER_URL" ]]; do
 done
 
 echo "Linux Web Service: Configure the tests"
-rm -rf tests/config_java_webservice.json
+rm -rf tests/dev_e2e/config_java_webservice.json
 cp -f "jenkins/pipelines/java/webservice/config_java_webservice.json" tests
-pushd tests > /dev/null
+pushd tests/dev_e2e > /dev/null
 echo '    "test-servers": ["'"$SERVER_URL"'"]' >> config_java_webservice.json
 echo '}' >> config_java_webservice.json
 cat config_java_webservice.json
