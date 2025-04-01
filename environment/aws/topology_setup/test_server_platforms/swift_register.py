@@ -56,23 +56,22 @@ class SwiftTestServer(TestServer):
     def __init__(self, version: str):
         super().__init__(version)
 
+    def cbl_filename(self, version: str) -> str:
+        return f"couchbase-lite-swift_xc_enterprise_{version}.zip"
+
     def _download_cbl(self) -> None:
         """
         Download the CBL library to the Frameworks directory
         """
         header(f"Downloading CBL library {self.version}")
-        build = 0
         version_parts = self.version.split("-")
-        if len(version_parts) > 1:
-            build = int(version_parts[1])
-
         DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
         download_file = DOWNLOAD_DIR / "framework.zip"
         downloader = CBLLibraryDownloader(
             "couchbase-lite-ios",
-            "couchbase-lite-swift_xc_enterprise.zip",
-            self.version,
-            build,
+            f"{self.cbl_filename(self.version)}",
+            version_parts[0],
+            version_parts[1] if len(version_parts) > 1 else 0,
         )
         downloader.download(download_file)
         shutil.rmtree(
@@ -113,7 +112,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
             str: The path for the latest builds.
         """
 
-        # testserver_android.apk must match what is output in compress_package
+        # testserver_ios.zip must match what is output in compress_package
         version_parts = self.version.split("-")
         return f"couchbase-lite-ios/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
 

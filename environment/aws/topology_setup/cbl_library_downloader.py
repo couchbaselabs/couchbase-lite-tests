@@ -17,16 +17,11 @@ class CBLLibraryDownloader:
         Download the CBL library from the latest builds server.
         """
         if self.__build == 0:
-            split_filename = self.__file.split(".")
-            filename = f"{split_filename[0]}_{self.__version}.{split_filename[1]}"
-            download_url = f"https://releases.service.couchbase.com/builds/releases/mobile/{self.__project}/{self.__version}/{filename}"
-            print(f"Downloading CBL from {download_url}")
+            download_url = f"https://releases.service.couchbase.com/builds/releases/mobile/{self.__project}/{self.__version}/{self.__file}"
         else:
-            split_filename = self.__file.split(".")
-            filename = f"{split_filename[0]}_{self.__version}-{self.__build}.{split_filename[1]}"
-            download_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.__project}/{self.__version}/{self.__build}/{filename}"
-            print(f"Downloading CBL from {download_url}")
+            download_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.__project}/{self.__version}/{self.__build}/{self.__file}"
 
+        print(f"Downloading CBL from {download_url}")
         response = requests.get(download_url, stream=True)
         response.raise_for_status()
         download_progress_bar(response, location)
