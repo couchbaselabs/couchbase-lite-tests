@@ -55,6 +55,22 @@ if platform.system() == "Windows":
 else:
     DOTNET_PATH = Path.home() / ".dotnet" / "dotnet"
 
+def copy_dataset(dest_dir: Path, version: str):
+    header(f"Copying dataset resources v{version}")
+    db_dir = TEST_SERVER_DIR.parent / "dataset" / "server" / "dbs" / version
+    blob_dir = TEST_SERVER_DIR.parent / "dataset" / "server" / "blobs"
+
+    for db in db_dir.glob("*.zip"):
+        if not (dest_dir / db.name).exists():
+            print(f"Copying {db} -> {dest_dir / db.name}")
+            shutil.copy2(db, dest_dir)
+    
+    for blob in blob_dir.iterdir():
+        dest_blob_dir = dest_dir / "blobs"
+        dest_blob_dir.mkdir(0o755, exist_ok=True)
+        if not (dest_blob_dir / blob.name).exists():
+            print(f"Copying {blob} -> {dest_blob_dir / blob.name}")
+            shutil.copy2(blob, dest_blob_dir)
 
 class DotnetTestServer(TestServer):
     """
@@ -66,6 +82,12 @@ class DotnetTestServer(TestServer):
 
     def __init__(self, version: str, dataset_version: str):
         super().__init__(version, dataset_version)
+
+    def _copy_dataset(self) -> None:
+        copy_dataset(
+            DOTNET_TEST_SERVER_DIR / "testserver" / "Resources" / "Raw",
+            self.dataset_version,
+        )
 
     @property
     @abstractmethod
@@ -103,6 +125,7 @@ class DotnetTestServer(TestServer):
         """
         Build the .NET test server.
         """
+        self._copy_dataset()
         version_parts = self.version.split("-")
         build = version_parts[1]
         cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
@@ -166,10 +189,19 @@ class DotnetTestServerCli(TestServer):
         """
         pass
 
+    def _copy_dataset(self) -> None:
+        dest_dir = DOTNET_TEST_SERVER_DIR / "testserver.cli" / "Resources"
+        dest_dir.mkdir(0o755, exist_ok=True)
+        copy_dataset(
+            dest_dir,
+            self.dataset_version,
+        )
+
     def build(self) -> None:
         """
         Build the .NET CLI test server.
         """
+        self._copy_dataset()
         version_parts = self.version.split("-")
         build = version_parts[1]
         cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
