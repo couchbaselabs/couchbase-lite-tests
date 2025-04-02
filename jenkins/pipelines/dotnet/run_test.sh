@@ -18,7 +18,6 @@ function prepare_dotnet() {
     if [ "$platform" != "macos" ]; then
         install_xharness
     fi
-    copy_datasets $dataset_version
 }
 
 if [ $# -lt 4 ]; then

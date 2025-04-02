@@ -140,7 +140,7 @@ class TestServerInput:
     Attributes:
         location (str): The location of the test server.
         cbl_version (str): The version of Couchbase Lite to use.
-        dataset_version (Optional[str]): The version of the dataset to use.
+        dataset_version (str): The version of the dataset to use.
         platform (str): The platform of the test server.
         download (bool): Whether to download the test server package.
     """
@@ -154,7 +154,7 @@ class TestServerInput:
         return self.__cbl_version
 
     @property
-    def dataset_version(self) -> Optional[str]:
+    def dataset_version(self) -> str:
         return self.__dataset_version
 
     @property
@@ -169,7 +169,7 @@ class TestServerInput:
         self,
         location: str,
         cbl_version: str,
-        dataset_version: Optional[str],
+        dataset_version: str,
         platform: str,
         download: bool,
     ):
@@ -269,9 +269,7 @@ class TopologyConfig:
                         TestServerInput(
                             raw_server["location"],
                             raw_server["cbl_version"],
-                            raw_server["dataset_version"]
-                            if "dataset_version" in raw_server
-                            else None,
+                            raw_server["dataset_version"],
                             raw_server["platform"],
                             cast(bool, raw_server.get("download", False)),
                         )
@@ -383,7 +381,9 @@ class TopologyConfig:
         """
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
-                test_server_input.platform, test_server_input.cbl_version
+                test_server_input.platform,
+                test_server_input.cbl_version,
+                test_server_input.dataset_version,
             )
             bridge = test_server.create_bridge()
             bridge.validate(test_server_input.location)
@@ -401,10 +401,11 @@ class TopologyConfig:
         """
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
-                test_server_input.platform, test_server_input.cbl_version
+                test_server_input.platform,
+                test_server_input.cbl_version,
+                test_server_input.dataset_version,
             )
 
-            test_server.dataset_version = test_server_input.dataset_version
             if test_server_input.download:
                 test_server.download()
             else:
@@ -437,7 +438,9 @@ class TopologyConfig:
         TestServer.initialize()
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
-                test_server_input.platform, test_server_input.cbl_version
+                test_server_input.platform,
+                test_server_input.cbl_version,
+                test_server_input.dataset_version,
             )
             bridge = test_server.create_bridge()
             bridge.stop(test_server_input.location)

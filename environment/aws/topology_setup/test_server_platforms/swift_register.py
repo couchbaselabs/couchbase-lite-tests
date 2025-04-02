@@ -36,6 +36,7 @@ from environment.aws.topology_setup.test_server import (
     DOWNLOADED_TEST_SERVER_DIR,
     TEST_SERVER_DIR,
     TestServer,
+    copy_dataset,
 )
 
 from .ios_bridge import iOSBridge
@@ -57,8 +58,8 @@ class SwiftTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-swift_xc_enterprise_{version}.zip"
@@ -84,6 +85,13 @@ class SwiftTestServer(TestServer):
         unzip_directory(download_file, FRAMEWORKS_DIR)
         download_file.unlink()
 
+    def _copy_dataset(self) -> None:
+        dest_dir = SWIFT_TEST_SERVER_DIR / "Assets"
+        copy_dataset(
+            dest_dir,
+            self.dataset_version,
+        )
+
 
 @TestServer.register("swift_ios")
 class SwiftTestServer_iOS(SwiftTestServer):
@@ -94,8 +102,8 @@ class SwiftTestServer_iOS(SwiftTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -115,12 +123,11 @@ class SwiftTestServer_iOS(SwiftTestServer):
         Returns:
             str: The path for the latest builds.
         """
-
-        # testserver_ios.zip must match what is output in compress_package
         version_parts = self.version.split("-")
-        return f"couchbase-lite-ios/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        return f"couchbase-lite-ios/{version_parts[0]}/{version_parts[1]}/testserver_ios_{self.dataset_version}.zip"
 
     def build(self) -> None:
+        self._copy_dataset()
         self._download_cbl()
         header("Building")
         env = os.environ.copy()

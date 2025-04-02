@@ -26,6 +26,7 @@ Functions:
 
 import os
 import platform
+import shutil
 import subprocess
 import zipfile
 from abc import abstractmethod
@@ -35,7 +36,11 @@ import psutil
 import requests
 
 from environment.aws.common.io import download_progress_bar, unzip_directory
-from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
+from environment.aws.topology_setup.test_server import (
+    TEST_SERVER_DIR,
+    TestServer,
+    copy_dataset,
+)
 
 from .android_bridge import AndroidBridge
 from .platform_bridge import PlatformBridge
@@ -247,17 +252,40 @@ class JAKTestServer(TestServer):
     def test_server_path(self) -> str:
         pass
 
-    def __init__(self, version: str, gradle_target: str = "jar"):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str, gradle_target: str = "jar"):
+        super().__init__(version, dataset_version)
         self.__gradle_target = gradle_target
+
+    def _copy_dataset(self) -> None:
+        # The original script this was ported from copied all versions
+        # regardless of what was being built.  I opted to not do this
+        # and instead only copy the one that is going to be built
+        # so that way there is no need to keep a manual list of versions
+        # here.
+        dest_dir = (
+            JAK_TEST_SERVER_DIR
+            / self.test_server_path
+            / "assets"
+            / self.dataset_version
+        )
+        dest_dir.mkdir(0o755, exist_ok=True)
+        copy_dataset(dest_dir, self.dataset_version)
+
+        # This platform expects blobs to not be in a subfolder
+        blobs_dir = dest_dir / "blobs"
+        for blob in blobs_dir.iterdir():
+            (dest_dir / blob.name).unlink(missing_ok=True)
+            print(f"Moving {blob} -> {dest_dir / blob.name}")
+            blob.rename(dest_dir / blob.name)
+
+        shutil.rmtree(blobs_dir, ignore_errors=True)
+        blobs_dir.mkdir(0o755)
 
     def build(self) -> None:
         """
         Build the JAK test server.
         """
-        if self.dataset_version is None:
-            raise RuntimeError("dataset_version must be set before building")
-
+        self._copy_dataset()
         gradle_path = JAK_TEST_SERVER_DIR / self.test_server_path / "gradlew"
         if platform.system() == "Windows":
             gradle_path = gradle_path.with_suffix(".bat")
@@ -283,8 +311,8 @@ class JAKTestServer_Android(JAKTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version, "assembleRelease")
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version, "assembleRelease")
 
     @property
     def test_server_path(self) -> str:
@@ -308,10 +336,8 @@ class JAKTestServer_Android(JAKTestServer):
         Returns:
             str: The path for the latest builds.
         """
-
-        # testserver_android.apk must match what is output in compress_package
         version_parts = self.version.split("-")
-        return f"couchbase-lite-android/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return f"couchbase-lite-android/{version_parts[0]}/{version_parts[1]}/testserver_android_{self.dataset_version}.apk"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -364,8 +390,8 @@ class JAKTestServer_Android(JAKTestServer):
 
 
 class JAKTestServer_Desktop(JAKTestServer):
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def test_server_path(self) -> str:
@@ -376,17 +402,14 @@ class JAKTestServer_Desktop(JAKTestServer):
 
 
 class JAKTestServer_WebService(JAKTestServer):
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def test_server_path(self) -> str:
         return "webservice"
 
     def create_bridge(self):
-        if self.dataset_version is None:
-            raise RuntimeError("dataset_version must be set before creating bridge")
-
         return JettyBridge(self.version, self.dataset_version)
 
 
@@ -399,8 +422,8 @@ class JAKTestServer_WindowsDesktop(JAKTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -421,7 +444,7 @@ class JAKTestServer_WindowsDesktop(JAKTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_windows_desktop.zip"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_windows_desktop_{self.dataset_version}.zip"
 
     def compress_package(self) -> str:
         """
@@ -455,8 +478,8 @@ class JAKTestServer_WindowsWebService(JAKTestServer_WebService):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -477,7 +500,7 @@ class JAKTestServer_WindowsWebService(JAKTestServer_WebService):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_windows_webservice.zip"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_windows_webservice_{self.dataset_version}.zip"
 
     def compress_package(self) -> str:
         """
@@ -511,8 +534,8 @@ class JAKTestServer_macOSWebService(JAKTestServer_WebService):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -533,7 +556,7 @@ class JAKTestServer_macOSWebService(JAKTestServer_WebService):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_webservice.zip"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_webservice_{self.dataset_version}.zip"
 
     def compress_package(self) -> str:
         """
@@ -567,8 +590,8 @@ class JAKTestServer_macOSDesktop(JAKTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -589,7 +612,7 @@ class JAKTestServer_macOSDesktop(JAKTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_desktop.zip"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_desktop_{self.dataset_version}.zip"
 
     def compress_package(self) -> str:
         """
@@ -623,8 +646,8 @@ class JAKTestServer_LinuxDesktop(JAKTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -645,7 +668,7 @@ class JAKTestServer_LinuxDesktop(JAKTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_desktop.tar.gz"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_desktop_{self.dataset_version}.tar.gz"
 
     def compress_package(self) -> str:
         """
@@ -679,8 +702,8 @@ class JAKTestServer_LinuxWebService(JAKTestServer_WebService):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -701,7 +724,7 @@ class JAKTestServer_LinuxWebService(JAKTestServer_WebService):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_webservice.tar.gz"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_webservice_{self.dataset_version}.tar.gz"
 
     def compress_package(self) -> str:
         """

@@ -39,7 +39,11 @@ from typing import List, Optional
 
 from environment.aws.common.io import unzip_directory, zip_directory
 from environment.aws.common.output import header
-from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
+from environment.aws.topology_setup.test_server import (
+    TEST_SERVER_DIR,
+    TestServer,
+    copy_dataset,
+)
 
 from .android_bridge import AndroidBridge
 from .exe_bridge import ExeBridge
@@ -64,8 +68,14 @@ class DotnetTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
+
+    def _copy_dataset(self) -> None:
+        copy_dataset(
+            DOTNET_TEST_SERVER_DIR / "testserver" / "Resources" / "Raw",
+            self.dataset_version,
+        )
 
     @property
     @abstractmethod
@@ -103,6 +113,7 @@ class DotnetTestServer(TestServer):
         """
         Build the .NET test server.
         """
+        self._copy_dataset()
         version_parts = self.version.split("-")
         build = version_parts[1]
         cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
@@ -152,8 +163,8 @@ class DotnetTestServerCli(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     @abstractmethod
@@ -166,10 +177,19 @@ class DotnetTestServerCli(TestServer):
         """
         pass
 
+    def _copy_dataset(self) -> None:
+        dest_dir = DOTNET_TEST_SERVER_DIR / "testserver.cli" / "Resources"
+        dest_dir.mkdir(0o755, exist_ok=True)
+        copy_dataset(
+            dest_dir,
+            self.dataset_version,
+        )
+
     def build(self) -> None:
         """
         Build the .NET CLI test server.
         """
+        self._copy_dataset()
         version_parts = self.version.split("-")
         build = version_parts[1]
         cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
@@ -219,8 +239,8 @@ class DotnetTestServer_iOS(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -271,7 +291,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_ios_{self.dataset_version}.zip"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -336,8 +356,8 @@ class DotnetTestServer_Android(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -378,7 +398,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_android_{self.dataset_version}.apk"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -446,8 +466,8 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -478,7 +498,7 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_windows_{self.dataset_version}.zip"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -544,8 +564,8 @@ class DotnetTestServer_macOS(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -586,7 +606,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_macos_{self.dataset_version}.zip"
 
     def create_bridge(self) -> PlatformBridge:
         """
