@@ -26,6 +26,7 @@ Functions:
 
 import os
 import platform
+import shutil
 import subprocess
 import zipfile
 from abc import abstractmethod
@@ -35,7 +36,11 @@ import psutil
 import requests
 
 from environment.aws.common.io import download_progress_bar, unzip_directory
-from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
+from environment.aws.topology_setup.test_server import (
+    TEST_SERVER_DIR,
+    TestServer,
+    copy_dataset,
+)
 
 from .android_bridge import AndroidBridge
 from .platform_bridge import PlatformBridge
@@ -251,10 +256,36 @@ class JAKTestServer(TestServer):
         super().__init__(version, dataset_version)
         self.__gradle_target = gradle_target
 
+    def _copy_dataset(self) -> None:
+        # The original script this was ported from copied all versions
+        # regardless of what was being built.  I opted to not do this
+        # and instead only copy the one that is going to be built
+        # so that way there is no need to keep a manual list of versions
+        # here.
+        dest_dir = (
+            JAK_TEST_SERVER_DIR
+            / self.test_server_path
+            / "assets"
+            / self.dataset_version
+        )
+        dest_dir.mkdir(0o755, exist_ok=True)
+        copy_dataset(dest_dir, self.dataset_version)
+
+        # This platform expects blobs to not be in a subfolder
+        blobs_dir = dest_dir / "blobs"
+        for blob in blobs_dir.iterdir():
+            (dest_dir / blob.name).unlink(missing_ok=True)
+            print(f"Moving {blob} -> {dest_dir / blob.name}")
+            blob.rename(dest_dir / blob.name)
+
+        shutil.rmtree(blobs_dir, ignore_errors=True)
+        blobs_dir.mkdir(0o755)
+
     def build(self) -> None:
         """
         Build the JAK test server.
         """
+        self._copy_dataset()
         gradle_path = JAK_TEST_SERVER_DIR / self.test_server_path / "gradlew"
         if platform.system() == "Windows":
             gradle_path = gradle_path.with_suffix(".bat")
