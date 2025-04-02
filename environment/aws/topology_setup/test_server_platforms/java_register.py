@@ -305,10 +305,8 @@ class JAKTestServer_Android(JAKTestServer):
         Returns:
             str: The path for the latest builds.
         """
-
-        # testserver_android.apk must match what is output in compress_package
         version_parts = self.version.split("-")
-        return f"couchbase-lite-android/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return f"couchbase-lite-android/{version_parts[0]}/{version_parts[1]}/testserver_android_{self.dataset_version}.apk"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -415,7 +413,7 @@ class JAKTestServer_WindowsDesktop(JAKTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_windows_desktop.zip"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_windows_desktop_{self.dataset_version}.zip"
 
     def compress_package(self) -> str:
         """
@@ -471,7 +469,7 @@ class JAKTestServer_WindowsWebService(JAKTestServer_WebService):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_windows_webservice.zip"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_windows_webservice_{self.dataset_version}.zip"
 
     def compress_package(self) -> str:
         """
@@ -527,7 +525,7 @@ class JAKTestServer_macOSWebService(JAKTestServer_WebService):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_webservice.zip"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_webservice_{self.dataset_version}.zip"
 
     def compress_package(self) -> str:
         """
@@ -583,7 +581,7 @@ class JAKTestServer_macOSDesktop(JAKTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_desktop.zip"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_desktop_{self.dataset_version}.zip"
 
     def compress_package(self) -> str:
         """
@@ -639,7 +637,7 @@ class JAKTestServer_LinuxDesktop(JAKTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_desktop.tar.gz"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_desktop_{self.dataset_version}.tar.gz"
 
     def compress_package(self) -> str:
         """
@@ -695,7 +693,7 @@ class JAKTestServer_LinuxWebService(JAKTestServer_WebService):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_webservice.tar.gz"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_webservice_{self.dataset_version}.tar.gz"
 
     def compress_package(self) -> str:
         """

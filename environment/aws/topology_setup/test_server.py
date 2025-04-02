@@ -109,7 +109,6 @@ class TestServer(ABC):
         self.__version = version
         self.__dataset_version = dataset_version
         self._downloaded = False
-        """If needed, the dataset version to use when building"""
 
     @classmethod
     def initialize(cls) -> None:

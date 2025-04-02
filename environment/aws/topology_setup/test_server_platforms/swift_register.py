@@ -123,10 +123,8 @@ class SwiftTestServer_iOS(SwiftTestServer):
         Returns:
             str: The path for the latest builds.
         """
-
-        # testserver_ios.zip must match what is output in compress_package
         version_parts = self.version.split("-")
-        return f"couchbase-lite-ios/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        return f"couchbase-lite-ios/{version_parts[0]}/{version_parts[1]}/testserver_ios_{self.dataset_version}.zip"
 
     def build(self) -> None:
         self._copy_dataset()

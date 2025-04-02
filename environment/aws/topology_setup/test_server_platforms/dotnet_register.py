@@ -286,7 +286,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_ios_{self.dataset_version}.zip"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -393,7 +393,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_android_{self.dataset_version}.apk"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -493,7 +493,7 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_windows_{self.dataset_version}.zip"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -601,7 +601,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_macos_{self.dataset_version}.zip"
 
     def create_bridge(self) -> PlatformBridge:
         """
