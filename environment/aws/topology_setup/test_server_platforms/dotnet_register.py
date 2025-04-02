@@ -39,7 +39,11 @@ from typing import List, Optional
 
 from environment.aws.common.io import unzip_directory, zip_directory
 from environment.aws.common.output import header
-from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer, copy_dataset
+from environment.aws.topology_setup.test_server import (
+    TEST_SERVER_DIR,
+    TestServer,
+    copy_dataset,
+)
 
 from .android_bridge import AndroidBridge
 from .exe_bridge import ExeBridge
@@ -54,6 +58,7 @@ if platform.system() == "Windows":
     DOTNET_PATH = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "dotnet" / "dotnet.exe"
 else:
     DOTNET_PATH = Path.home() / ".dotnet" / "dotnet"
+
 
 class DotnetTestServer(TestServer):
     """

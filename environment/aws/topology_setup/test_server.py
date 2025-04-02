@@ -46,9 +46,9 @@ Functions:
 from __future__ import annotations
 
 import importlib
+import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
-import shutil
 from typing import Callable, Dict, Type
 
 import requests
@@ -284,24 +284,25 @@ class TestServer(ABC):
         """
         pass
 
+
 def copy_dataset(dest_dir: Path, version: str):
     header(f"Copying dataset resources v{version}")
     db_dir = TEST_SERVER_DIR.parent / "dataset" / "server" / "dbs" / version
     blob_dir = TEST_SERVER_DIR.parent / "dataset" / "server" / "blobs"
 
-    
     dest_db_dir = dest_dir / "dbs"
     shutil.rmtree(dest_db_dir, ignore_errors=True)
     dest_db_dir.mkdir(0o755)
     for db in db_dir.glob("*.zip"):
         print(f"Copying {db} -> {dest_db_dir / db.name}")
         shutil.copy2(db, dest_db_dir)
-    
+
     dest_blob_dir = dest_dir / "blobs"
     shutil.rmtree(dest_blob_dir, ignore_errors=True)
     dest_blob_dir.mkdir(0o755)
     for blob in blob_dir.iterdir():
         print(f"Copying {blob} -> {dest_blob_dir / blob.name}")
         shutil.copy2(blob, dest_blob_dir)
-            
+
+
 assert __name__ != "__main__", "This module is not meant to be run directly"
