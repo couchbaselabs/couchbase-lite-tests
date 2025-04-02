@@ -326,9 +326,8 @@ class CTestServer_Android(CTestServer):
             build,
         )
         downloader.download(download_file)
-        shutil.rmtree(
-            IOS_FRAMEWORKS_DIR / "CouchbaseLite.xcframework", ignore_errors=True
-        )
+        shutil.rmtree(android_lib_dir, ignore_errors=True)
+        android_lib_dir.mkdir(0o755)
         unzip_directory(download_file, android_lib_dir)
 
     def build(self) -> None:
