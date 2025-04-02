@@ -95,7 +95,7 @@ namespace TestServer
 
             Stream asset;
             try {
-                asset = await _fileSystem.OpenAppPackageFileAsync($"{datasetName}.cblite2.zip");
+                asset = await _fileSystem.OpenAppPackageFileAsync($"dbs/{datasetName}.cblite2.zip");
             } catch (Exception ex) {
                 throw new ApplicationException($"Unable to open dataset '{datasetName}'", ex);
             }

@@ -39,7 +39,7 @@ from typing import List, Optional
 
 from environment.aws.common.io import unzip_directory, zip_directory
 from environment.aws.common.output import header
-from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
+from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer, copy_dataset
 
 from .android_bridge import AndroidBridge
 from .exe_bridge import ExeBridge
@@ -54,23 +54,6 @@ if platform.system() == "Windows":
     DOTNET_PATH = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "dotnet" / "dotnet.exe"
 else:
     DOTNET_PATH = Path.home() / ".dotnet" / "dotnet"
-
-def copy_dataset(dest_dir: Path, version: str):
-    header(f"Copying dataset resources v{version}")
-    db_dir = TEST_SERVER_DIR.parent / "dataset" / "server" / "dbs" / version
-    blob_dir = TEST_SERVER_DIR.parent / "dataset" / "server" / "blobs"
-
-    for db in db_dir.glob("*.zip"):
-        if not (dest_dir / db.name).exists():
-            print(f"Copying {db} -> {dest_dir / db.name}")
-            shutil.copy2(db, dest_dir)
-    
-    for blob in blob_dir.iterdir():
-        dest_blob_dir = dest_dir / "blobs"
-        dest_blob_dir.mkdir(0o755, exist_ok=True)
-        if not (dest_blob_dir / blob.name).exists():
-            print(f"Copying {blob} -> {dest_blob_dir / blob.name}")
-            shutil.copy2(blob, dest_blob_dir)
 
 class DotnetTestServer(TestServer):
     """
