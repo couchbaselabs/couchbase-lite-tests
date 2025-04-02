@@ -255,9 +255,6 @@ class JAKTestServer(TestServer):
         """
         Build the JAK test server.
         """
-        if self.dataset_version is None:
-            raise RuntimeError("dataset_version must be set before building")
-
         gradle_path = JAK_TEST_SERVER_DIR / self.test_server_path / "gradlew"
         if platform.system() == "Windows":
             gradle_path = gradle_path.with_suffix(".bat")
@@ -384,9 +381,6 @@ class JAKTestServer_WebService(JAKTestServer):
         return "webservice"
 
     def create_bridge(self):
-        if self.dataset_version is None:
-            raise RuntimeError("dataset_version must be set before creating bridge")
-
         return JettyBridge(self.version, self.dataset_version)
 
 
