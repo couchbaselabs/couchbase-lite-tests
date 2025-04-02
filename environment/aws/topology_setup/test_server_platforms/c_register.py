@@ -51,7 +51,7 @@ IOS_BUILD_DIR = C_TEST_SERVER_DIR / "build_device"
 SCRIPT_DIR = Path(__file__).resolve().parent
 LIB_DIR = C_TEST_SERVER_DIR / "lib"
 IOS_FRAMEWORKS_DIR = C_TEST_SERVER_DIR / "platforms" / "ios" / "Frameworks"
-IOS_VENDOR_DIR = C_TEST_SERVER_DIR / "platforms" / "ios" / "Vendor"
+IOS_VENDOR_DIR = C_TEST_SERVER_DIR / "platforms" / "ios" / "vendor"
 
 
 class CTestServer(TestServer):
