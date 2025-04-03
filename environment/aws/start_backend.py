@@ -215,12 +215,13 @@ def main(
         print("Skipping Couchbase Server provisioning...")
 
     if steps & BackendSteps.SGW_PROVISION:
-        if len(topology.sync_gateways) > 0 and sgw_url is None:
-            raise Exception(
-                "--sgw-url was not provided, but it is required for provisioning SGW."
-            )
+        if len(topology.sync_gateways) > 0:
+            if sgw_url is None:
+                raise Exception(
+                    "--sgw-url was not provided, but it is required for provisioning SGW."
+                )
 
-        sgw_main(sgw_url, topology, private_key)
+            sgw_main(sgw_url, topology, private_key)
     else:
         print("Skipping Sync Gateway provisioning...")
 
