@@ -1,0 +1,127 @@
+pipeline {
+    agent { label 'mac-laptop9' }
+    parameters {
+        choice(name: 'CBL_PLATFORM', choices: ['all', 'c', 'android', 'java', 'ios', 'dotnet'], description: 'CBL Platform')
+        string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'CBL Version')
+        string(name: 'CBL_BUILD', defaultValue: '0', description: 'CBL Build Number, Use 0 for the latest successful build')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: "The dataset version to use (e.g. 3.2 or 4.0)")
+        string(name: 'SGW_VERSION', defaultValue: '4.0.0', description: 'The version of Sync Gateway to use')
+        booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force Triggering Test Job(s)') 
+    }
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+    }
+    triggers {
+        cron('@daily')
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                }
+            }
+        }
+        stage('Trigger E2E Tests') {
+            matrix {   
+                when { 
+                    anyOf {
+                        expression { params.CBL_PLATFORM == 'all' }
+                        expression { params.CBL_PLATFORM == env.CBL_PLATFORM}
+                    }
+                }
+                axes {
+                    axis {
+                        name 'CBL_PLATFORM'
+                        values 'c', 'android', 'java', 'ios', 'dotnet'
+                    }
+                }
+                stages {
+                    stage('Lookup Build and Trigger Test') {
+                        steps {
+                            script {
+                                def platform = env.CBL_PLATFORM
+                                def version = params.CBL_VERSION
+                                def buildNo = params.CBL_BUILD
+                                def datasetVersion = params.CBL_DATASET_VERSION
+                                def sgwVersion = params.SGW_VERSION
+                                def force = params.FORCE_TRIGGER
+                                def sgwUrl = ""
+
+                                // Lookup latest successful build when CBL_BUILD param is zero:
+                                if (buildNo == "0") {
+                                    try {
+                                        buildNo = sh script: "jenkins/pipelines/main/latest_successful_build.sh ${platform} ${version}", returnStdout: true
+                                    } catch (Exception e) {
+                                        error "Cannot get latest build number : ${e} for ${platform} v${version}"
+                                    }
+                                }
+
+                                try {
+                                    sgwUrl = sh script: "jenkins/pipelines/main/latest_sgw_url.sh ${sgwVersion}", returnStdout: true
+                                } catch(Exception e) {
+                                    error "Cannot get Sync Gateway download URL : ${e} for v${version}"
+                                }
+                                
+                                if (params.CBL_PLATFORM == "all") {
+                                    currentBuild.displayName = "${version}-${buildNo}-SGW${sgwVersion} (#${currentBuild.number})"
+                                } else {
+                                    currentBuild.displayName = "${platform}-${version}-${buildNo}-SGW${sgwVersion} (#${currentBuild.number})"
+                                }
+
+                                echo "PLATFORM: ${platform}"
+                                echo "VERSION: ${version}"
+                                echo "BUILD: ${buildNo}"
+                                echo "DATASET_VERSION: ${datasetVersion}"
+                                echo "SGW_URL: ${sgwUrl}"
+                                echo "FORCE: ${force}"
+
+                                // Check if the test has been trigger for the CBL build:
+                                def triggerTestJob = true
+                                def buildInfo = [:]
+                                def buildInfoFile = "/var/agent_home/${env.JOB_NAME}/${platform}.json"
+                                echo "Build Info File: ${buildInfoFile}"
+
+                                if (!force && fileExists(buildInfoFile)) {
+                                    try {
+                                        buildInfo = readJSON file: buildInfoFile, returnPojo: true
+                                    } catch (Exception e) {
+                                        echo "WARN : Error when reading  ${platform}.json : ${e}"
+                                    }
+                                    if (buildInfo[version] == buildNo) {
+                                        triggerTestJob = false
+                                    }
+                                }
+
+                                // Trigger Test Job:
+                                if (triggerTestJob) {
+                                    def jobName = "staging-e2e-test-${platform}"
+                                    echo "Triggering '${jobName}' job for ${platform} v${version}-${buildNo} with dataset ${datasetVersion}"
+
+                                    build job: jobName, parameters: [
+                                        string(name: "CBL_VERSION", value: version),
+                                        string(name: "CBL_BUILD", value: buildNo),
+                                        string(name: "CBL_DATASET_VERSION", value: datasetVersion),
+                                        string(name: "SGW_URL", value: sgwUrl)
+                                    ], wait: false
+
+                                    // Save CBL build info:
+                                    buildInfo[version] = buildNo
+                                    try {
+                                      writeJSON file: buildInfoFile, json: buildInfo
+                                    } catch (Exception e) {
+                                      error "Cannot save ${platform}.json with error: ${e}"
+                                    }
+                                } else {
+                                    echo "SKIP: ${platform} v${version}-${buildNo}"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
