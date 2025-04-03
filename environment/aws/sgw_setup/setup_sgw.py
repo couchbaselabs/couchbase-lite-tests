@@ -294,9 +294,6 @@ def setup_topology(
         sgw_info (SgwDownloadInfo): The download information for Sync Gateway.
         topology (TopologyConfig): The topology configuration.
     """
-    if len(topology.sync_gateways) == 0:
-        return
-
     i = 0
     for sgw in topology.sync_gateways:
         setup_config(sgw.cluster_hostname)
@@ -315,6 +312,9 @@ def main(
         topology (TopologyConfig): The topology configuration.
         private_key (Optional[str]): The path to the private key for SSH access.
     """
+    if len(topology.sync_gateways) == 0:
+        return
+
     sgw_info = SgwDownloadInfo(download_url)
     download_sgw_package(sgw_info)
     pkey = (
