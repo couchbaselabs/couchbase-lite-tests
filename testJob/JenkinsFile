@@ -1,5 +1,6 @@
 pipeline {
     agent { label 'mac-laptop9' }
+
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'CBL Version')
         string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: 'Dataset Version')
@@ -11,7 +12,6 @@ pipeline {
     environment {
         SCRIPT_DIR = 'environment'
         TESTS_DIR = 'tests'
-        DOCKER_ENV_FILE = '.env'
     }
     stages {
         stage('Checkout Repository') {
@@ -24,10 +24,8 @@ pipeline {
                 script {
                     sh """
                     cd ${SCRIPT_DIR}
-                    cp sample.env ${DOCKER_ENV_FILE}
                     docker compose down --rmi all
-                    docker compose up -d
-                    sleep 30
+                    python3 start-environment.py  # Using the script instead of manual docker commands
                     """
                 }
             }
