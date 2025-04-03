@@ -5,7 +5,7 @@ The contents of this folder all have to do with deploying and setting up LogSlur
 1. Transfer configure-system.sh to the remote node
 2. Run configure-system.sh (see later section for details)
 3. Sets up a local docker context that runs over SSH to the remote node
-4. Runs docker compose for just LogSlurp using the created context
+4. Starts a docker container of logslurp from Amazon ECR, or uses an existing one that it finds
 
 ## System Configuration
 
