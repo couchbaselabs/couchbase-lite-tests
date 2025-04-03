@@ -5,8 +5,6 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'CBL Version')
         string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: 'Dataset Version')
         string(name: 'CBL_PLATFORM', defaultValue: 'java', description: 'Platform')
-        string(name: 'SGW_URL', defaultValue: '', description: 'Sync Gateway URL')
-        string(name: 'PRIVATE_KEY_PATH', defaultValue: '', description: 'Path to SSH private key')
         string(name: 'TEST_TO_RUN', defaultValue: 'tests/test_api_scope_collection.py::TestLimitScopesCollections::test_limit_scopes_collections', description: 'Specific test to run')
     }
     environment {
@@ -17,17 +15,6 @@ pipeline {
         stage('Checkout Repository') {
             steps {
                 git branch: 'tests/apiScopeColl', url: 'https://github.com/couchbaselabs/couchbase-lite-tests.git'
-            }
-        }
-        stage('Start Docker Environment') {
-            steps {
-                script {
-                    sh """
-                    cd ${SCRIPT_DIR}
-                    docker compose down --rmi all
-                    python3 start-environment.py  # Using the script instead of manual docker commands
-                    """
-                }
             }
         }
         stage('Prepare Environment') {
@@ -42,14 +29,29 @@ pipeline {
                 }
             }
         }
+        stage('Start Simulator') {
+            steps {
+                script {
+                    if (params.CBL_PLATFORM == 'ios') {
+                        sh """
+                        echo "Starting iOS Simulator..."
+                        xcrun simctl boot "iPhone 14"
+                        """
+                    } else if (params.CBL_PLATFORM == 'android') {
+                        sh """
+                        echo "Starting Android Emulator..."
+                        emulator -avd Pixel_4_API_33 -no-window -no-audio -no-boot-anim &
+                        sleep 30  # Wait for emulator to boot
+                        adb wait-for-device
+                        """
+                    }
+                }
+            }
+        }
         stage('Run Setup Test') {
             steps {
                 script {
-                    if (params.PRIVATE_KEY_PATH?.trim()) {
-                        sh "python3 ${SCRIPT_DIR}/setup_test.py ${params.CBL_PLATFORM} ${params.CBL_VERSION} ${params.SGW_URL} --private_key ${params.PRIVATE_KEY_PATH}"
-                    } else {
-                        sh "python3 ${SCRIPT_DIR}/setup_test.py ${params.CBL_PLATFORM} ${params.CBL_VERSION} ${params.SGW_URL}"
-                    }
+                    sh "python3 ${SCRIPT_DIR}/setup_test.py ${params.CBL_PLATFORM} ${params.CBL_VERSION}"
                 }
             }
         }
@@ -68,9 +70,6 @@ pipeline {
     }
     post {
         always {
-            script {
-                sh "docker compose down"
-            }
             archiveArtifacts artifacts: 'test-results/*', allowEmptyArchive: true
         }
         failure {
