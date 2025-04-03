@@ -1,127 +1,82 @@
 pipeline {
     agent { label 'mac-laptop9' }
     parameters {
-        choice(name: 'CBL_PLATFORM', choices: ['all', 'c', 'android', 'java', 'ios', 'dotnet'], description: 'CBL Platform')
         string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'CBL Version')
-        string(name: 'CBL_BUILD', defaultValue: '0', description: 'CBL Build Number, Use 0 for the latest successful build')
-        string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: "The dataset version to use (e.g. 3.2 or 4.0)")
-        string(name: 'SGW_VERSION', defaultValue: '4.0.0', description: 'The version of Sync Gateway to use')
-        booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force Triggering Test Job(s)') 
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: 'Dataset Version')
+        string(name: 'CBL_PLATFORM', defaultValue: 'java', description: 'Platform')
+        string(name: 'SGW_URL', defaultValue: '', description: 'Sync Gateway URL')
+        string(name: 'PRIVATE_KEY_PATH', defaultValue: '', description: 'Path to SSH private key')
+        string(name: 'TEST_TO_RUN', defaultValue: 'tests/test_api_scope_collection.py::TestLimitScopesCollections::test_limit_scopes_collections', description: 'Specific test to run')
     }
-    options {
-        timeout(time: 30, unit: 'MINUTES')
-    }
-    triggers {
-        cron('@daily')
+    environment {
+        SCRIPT_DIR = 'environment'
+        TESTS_DIR = 'tests'
+        DOCKER_ENV_FILE = '.env'
     }
     stages {
-        stage('Init') {
+        stage('Checkout Repository') {
+            steps {
+                git branch: 'tests/apiScopeColl', url: 'https://github.com/couchbaselabs/couchbase-lite-tests.git'
+            }
+        }
+        stage('Start Docker Environment') {
             steps {
                 script {
-                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
-                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    sh """
+                    cd ${SCRIPT_DIR}
+                    cp sample.env ${DOCKER_ENV_FILE}
+                    docker compose down --rmi all
+                    docker compose up -d
+                    sleep 30
+                    """
                 }
             }
         }
-        stage('Trigger E2E Tests') {
-            matrix {   
-                when { 
-                    anyOf {
-                        expression { params.CBL_PLATFORM == 'all' }
-                        expression { params.CBL_PLATFORM == env.CBL_PLATFORM}
-                    }
+        stage('Prepare Environment') {
+            steps {
+                script {
+                    sh """
+                    source ${SCRIPT_DIR}/prepare_env.sh
+                    python3 -m venv venv
+                    source venv/bin/activate
+                    pip install -r ${SCRIPT_DIR}/aws/requirements.txt
+                    """
                 }
-                axes {
-                    axis {
-                        name 'CBL_PLATFORM'
-                        values 'c', 'android', 'java', 'ios', 'dotnet'
-                    }
-                }
-                stages {
-                    stage('Lookup Build and Trigger Test') {
-                        steps {
-                            script {
-                                def platform = env.CBL_PLATFORM
-                                def version = params.CBL_VERSION
-                                def buildNo = params.CBL_BUILD
-                                def datasetVersion = params.CBL_DATASET_VERSION
-                                def sgwVersion = params.SGW_VERSION
-                                def force = params.FORCE_TRIGGER
-                                def sgwUrl = ""
-
-                                // Lookup latest successful build when CBL_BUILD param is zero:
-                                if (buildNo == "0") {
-                                    try {
-                                        buildNo = sh script: "jenkins/pipelines/main/latest_successful_build.sh ${platform} ${version}", returnStdout: true
-                                    } catch (Exception e) {
-                                        error "Cannot get latest build number : ${e} for ${platform} v${version}"
-                                    }
-                                }
-
-                                try {
-                                    sgwUrl = sh script: "jenkins/pipelines/main/latest_sgw_url.sh ${sgwVersion}", returnStdout: true
-                                } catch(Exception e) {
-                                    error "Cannot get Sync Gateway download URL : ${e} for v${version}"
-                                }
-                                
-                                if (params.CBL_PLATFORM == "all") {
-                                    currentBuild.displayName = "${version}-${buildNo}-SGW${sgwVersion} (#${currentBuild.number})"
-                                } else {
-                                    currentBuild.displayName = "${platform}-${version}-${buildNo}-SGW${sgwVersion} (#${currentBuild.number})"
-                                }
-
-                                echo "PLATFORM: ${platform}"
-                                echo "VERSION: ${version}"
-                                echo "BUILD: ${buildNo}"
-                                echo "DATASET_VERSION: ${datasetVersion}"
-                                echo "SGW_URL: ${sgwUrl}"
-                                echo "FORCE: ${force}"
-
-                                // Check if the test has been trigger for the CBL build:
-                                def triggerTestJob = true
-                                def buildInfo = [:]
-                                def buildInfoFile = "/var/agent_home/${env.JOB_NAME}/${platform}.json"
-                                echo "Build Info File: ${buildInfoFile}"
-
-                                if (!force && fileExists(buildInfoFile)) {
-                                    try {
-                                        buildInfo = readJSON file: buildInfoFile, returnPojo: true
-                                    } catch (Exception e) {
-                                        echo "WARN : Error when reading  ${platform}.json : ${e}"
-                                    }
-                                    if (buildInfo[version] == buildNo) {
-                                        triggerTestJob = false
-                                    }
-                                }
-
-                                // Trigger Test Job:
-                                if (triggerTestJob) {
-                                    def jobName = "staging-e2e-test-${platform}"
-                                    echo "Triggering '${jobName}' job for ${platform} v${version}-${buildNo} with dataset ${datasetVersion}"
-
-                                    build job: jobName, parameters: [
-                                        string(name: "CBL_VERSION", value: version),
-                                        string(name: "CBL_BUILD", value: buildNo),
-                                        string(name: "CBL_DATASET_VERSION", value: datasetVersion),
-                                        string(name: "SGW_URL", value: sgwUrl)
-                                    ], wait: false
-
-                                    // Save CBL build info:
-                                    buildInfo[version] = buildNo
-                                    try {
-                                      writeJSON file: buildInfoFile, json: buildInfo
-                                    } catch (Exception e) {
-                                      error "Cannot save ${platform}.json with error: ${e}"
-                                    }
-                                } else {
-                                    echo "SKIP: ${platform} v${version}-${buildNo}"
-                                }
-                            }
-                        }
+            }
+        }
+        stage('Run Setup Test') {
+            steps {
+                script {
+                    if (params.PRIVATE_KEY_PATH?.trim()) {
+                        sh "python3 ${SCRIPT_DIR}/setup_test.py ${params.CBL_PLATFORM} ${params.CBL_VERSION} ${params.SGW_URL} --private_key ${params.PRIVATE_KEY_PATH}"
+                    } else {
+                        sh "python3 ${SCRIPT_DIR}/setup_test.py ${params.CBL_PLATFORM} ${params.CBL_VERSION} ${params.SGW_URL}"
                     }
                 }
             }
+        }
+        stage('Run Test') {
+            steps {
+                script {
+                    sh """
+                    source venv/bin/activate
+                    pip install -r ${TESTS_DIR}/requirements.txt
+                    pytest -v --no-header --config config.json ${params.TEST_TO_RUN}
+                    deactivate
+                    """
+                }
+            }
+        }
+    }
+    post {
+        always {
+            script {
+                sh "docker compose down"
+            }
+            archiveArtifacts artifacts: 'test-results/*', allowEmptyArchive: true
+        }
+        failure {
+            echo "Test failed. Check logs for details."
         }
     }
 }
