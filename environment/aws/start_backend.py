@@ -324,5 +324,5 @@ if __name__ == "__main__":
         args.cbs_version,
         args.private_key,
         args.tdk_config_out,
-        args.steps if args.steps is not None else BackendSteps.ALL,
+        args.steps if hasattr(args, "steps") else BackendSteps.ALL,
     )
