@@ -21,7 +21,6 @@ pipeline {
             steps {
                 script {
                     sh """
-                    source ${SCRIPT_DIR}/prepare_env.sh
                     python3 -m venv venv
                     source venv/bin/activate
                     pip install -r ${SCRIPT_DIR}/aws/requirements.txt
