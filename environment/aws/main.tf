@@ -80,6 +80,23 @@ resource "aws_instance" "sync_gateway" {
     }
 }
 
+# And the machine(s) that will run load balancers
+resource "aws_instance" "load_balancer" {
+    count = var.lb_count
+    ami = "ami-05576a079321f21f8"
+    instance_type = "m5.large"
+    key_name = var.key_name
+
+    subnet_id = data.aws_subnet.main.id
+    vpc_security_group_ids = [data.aws_security_group.main.id]
+    associate_public_ip_address = true
+
+    tags = {
+        Name = "lb"
+        Type = "loadbalancer"
+    }
+}
+
 # And the machine that will run LogSlurp
 resource "aws_instance" "log_slurp" {
     for_each = var.logslurp ? { "log_slurp": 1 } : {}
@@ -118,6 +135,13 @@ variable "sgw_count" {
     default     = 1
 }
 
+# This controls how many load balancer instances are created
+variable "lb_count" {
+    description = "The number of load balancer instances to create"
+    type        = number
+    default     = 0
+}
+
 # This controls whether or not to include a LogSlurp instance
 variable "logslurp" {
     description = "Whether or not to include a logslurp deployment"
@@ -135,8 +159,16 @@ output "sync_gateway_instance_public_ips" {
     value = aws_instance.sync_gateway[*].public_ip
 }
 
+output "load_balancer_instance_public_ips" {
+    value = aws_instance.load_balancer[*].public_ip
+}
+
 output "couchbase_instance_private_ips" {
     value = aws_instance.couchbaseserver[*].private_ip
+}
+
+output "sync_gateway_instance_private_ips" {
+    value = aws_instance.sync_gateway[*].private_ip
 }
 
 output "logslurp_instance_public_ip" {

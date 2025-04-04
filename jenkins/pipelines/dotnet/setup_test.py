@@ -36,7 +36,7 @@ if __name__ == "__main__":
     parser.add_argument("platform", type=str, help="The platform to setup")
     parser.add_argument("version", type=str, help="The version of CBL to use")
     parser.add_argument(
-        "sgw_url", type=str, help="The URL of the Sync Gateway to download"
+        "sgw_version", type=str, help="The version of the Sync Gateway to download"
     )
     parser.add_argument(
         "--private_key",
@@ -45,13 +45,27 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    topology_file = str(SCRIPT_DIR.parents[2] / "environment" / "aws" / "topology.json")
+    topology_file = str(
+        SCRIPT_DIR.parents[2]
+        / "environment"
+        / "aws"
+        / "topology_setup"
+        / "topology.json"
+    )
     with open(
         str(SCRIPT_DIR / "topologies" / f"topology_single_{args.platform}.json"), "r"
     ) as fin:
         topology = json.load(fin)
         topology["$schema"] = "topology_schema.json"
         topology["include"] = "default_topology.json"
+        topology["defaults"] = {
+            "cbs": {
+                "version": "7.6.4",
+            },
+            "sgw": {
+                "version": args.sgw_version,
+            },
+        }
         topology["tag"] = args.platform
         topology["test_servers"][0]["cbl_version"] = args.version
         with open(topology_file, "w") as fout:
@@ -60,9 +74,8 @@ if __name__ == "__main__":
     topology = TopologyConfig(topology_file)
     start_backend(
         topology,
-        "jborden",
-        args.sgw_url,
         str(SCRIPT_DIR / "config_aws.json"),
+        "jborden",
         private_key=args.private_key,
         tdk_config_out=str(SCRIPT_DIR.parents[2] / "tests" / "dev_e2e" / "config.json"),
     )

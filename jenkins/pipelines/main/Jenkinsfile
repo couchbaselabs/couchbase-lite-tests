@@ -105,6 +105,7 @@ pipeline {
                                         string(name: "CBL_BUILD", value: buildNo),
                                         string(name: "CBL_DATASET_VERSION", value: datasetVersion),
                                         string(name: "SGW_URL", value: sgwUrl)
+                                        string(name: "SGW_VERSION", value: sgwVersion)
                                     ], wait: false
 
                                     // Save CBL build info:
