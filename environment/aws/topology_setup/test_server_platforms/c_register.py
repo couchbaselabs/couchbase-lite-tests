@@ -37,7 +37,11 @@ from typing import cast
 from environment.aws.common.io import untar_directory, unzip_directory
 from environment.aws.common.output import header
 from environment.aws.topology_setup.cbl_library_downloader import CBLLibraryDownloader
-from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
+from environment.aws.topology_setup.test_server import (
+    TEST_SERVER_DIR,
+    TestServer,
+    copy_dataset,
+)
 
 from .android_bridge import AndroidBridge
 from .exe_bridge import ExeBridge
@@ -62,12 +66,15 @@ class CTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @abstractmethod
     def cbl_filename(self, version: str) -> str:
         pass
+
+    def _copy_dataset(self) -> None:
+        copy_dataset(C_TEST_SERVER_DIR / "assets", self.dataset_version)
 
     def _copy_with_symlink_preservation(self, src: Path, dest: Path) -> None:
         if src.is_symlink():
@@ -111,6 +118,7 @@ class CTestServer_Desktop(CTestServer):
         """
         Build the C test server.
         """
+        self._copy_dataset()
         shutil.rmtree(LIB_DIR, ignore_errors=True)
         self._download_cbl()
         header("Building C test server")
@@ -145,8 +153,8 @@ class CTestServer_iOS(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -284,8 +292,8 @@ class CTestServer_Android(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -414,8 +422,8 @@ class CTestServer_Windows(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     @property
     def platform(self) -> str:
@@ -490,8 +498,8 @@ class CTestServer_macOS(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version)
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-macos.zip"
@@ -568,8 +576,8 @@ class CTestServer_Linux(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, arch: str):
-        super().__init__(version)
+    def __init__(self, version: str, dataset_version: str, arch: str):
+        super().__init__(version, dataset_version)
         self.__arch = arch
 
     @property
@@ -643,5 +651,5 @@ class CTestServer_Linux_x86_64(CTestServer_Linux):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
-        super().__init__(version, "x86_64")
+    def __init__(self, version: str, dataset_version: str):
+        super().__init__(version, dataset_version, "x86_64")
