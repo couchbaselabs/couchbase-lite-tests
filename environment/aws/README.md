@@ -1,5 +1,7 @@
 # AWS Scripted Backend
 
+TL;DR This is mostly supplemental information.  If you are looking for what you need to understand to use this system, skip to [Putting it all together](#putting-it-all-together)
+
 The summary of what is created with this area is in this diagram:
 
 ![Architecture Diagram](diagrams/Architecture.png)
@@ -39,15 +41,17 @@ aws_session_token=<redacted>
 ```
 
 > [!NOTE]  
-> Using this method the credentials will only last for a few hours.  If you want a longer session than that you will need to use your long term credentials and getting them is beyond the scope of this document.
+> Using this method the credentials will only last for a few hours.  If you want a longer session than that you will need to use your long term credentials and getting them is beyond the scope of this document.  You will need to become familiar with the [IAM Section](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html) of AWS for that.
 
 ## Step 1: Infrastructure
 
-It's not enough to simply spin up virtual machines.  The creator is responsible for basically defining the entire virtual network that the machines are located in, including any LAN subnets and external Internet access.  The tool being used here is Terraform, and the [config file](./main.tf) defines what resources are created when the terraform command is run.  Here is a list of what is created or read in this config file:
+It's not enough to simply spin up virtual machines.  The creator (i.e. the person modifying the [config file](./main.tf)) is responsible for basically defining the entire virtual network that the machines are located in it, including any LAN subnets and external Internet access.  The tool being used here is [Terraform](https://developer.hashicorp.com/terraform/docs), and the [config file](./main.tf) defines what resources are created when the terraform command is run.  Here is a list of what is created or read in this config file:
 
 - Subnet covering 10.0.1.1 to 10.0.1.255 (read)
 - Routing rules inside VPC for ingress and egress (read)
 - x86_64 EC2 containers running AWS Linux 2 (created)
+
+"read" here means that there is a permanent resource created in the AWS account already.  "created" means that resources must be provisioned for a particular session.
 
 Creating and destroying these resources is as simple as running `terraform apply` and `terraform destroy` respectively.  You can add the following to avoid the console prompting you:  `-var=keyname=<keyname-from-step-0> -auto-approve`.  Other useful variables are `logslurp`, which is a bool indicating whether or not logslurp is needed, `sgw_count` which is the number of EC2 instances to create for SGW, and `server_count` which is the number of EC2 instances to create for Couchbase Server.  These default to `true`, `1`, and `1`.
 
@@ -137,4 +141,4 @@ optional arguments:
   --topology TOPOLOGY  The topology file that was used to start the environment
 ```
 
-The stop script only has one argument which is the topology file that was used to run start_backend above.  If no file was provided, then it should be omitted to use the default.
+The stop script only has one argument which is the topology file that was used to run start_backend above.  If no file was provided to start_backend, it means the default was used and you should also give no argument to stop_backend so that it also uses the default.
