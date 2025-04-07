@@ -40,7 +40,7 @@ def run_remote_command(ip, command):
     except Exception as e:
         print(f"Error connecting to {ip}: {str(e)}")
         return None, str(e)
-        
+
     finally:
         ssh.close()
 
@@ -66,7 +66,7 @@ def uninstall_sync_gateway(ip):
     
     print(f"Removing Sync Gateway package and directories from {ip}...")
     run_remote_command(ip, "sudo apt-get remove --purge -y couchbase-sync-gateway")
-    run_remote_command(ip, "sudo rm -rf /home/sync_gateway /opt/couchbase-sync-gateway /opt/sg /tmp/couchbase-sync-gateway-enterprise_x86_64.deb")
+    run_remote_command(ip, "sudo rm -rf /home/couchbase /home/sync_gateway /opt/couchbase-sync-gateway /opt/sg /tmp/couchbase-sync-gateway-enterprise_x86_64.deb")
 
     print(f"Cleaning up remaining Sync Gateway files on {ip}...")
     run_remote_command(ip, "sudo rm -rf /etc/sync_gateway /var/lib/sync_gateway /var/log/sync_gateway /tmp/sg_logs /var/tmp/sglogs")
