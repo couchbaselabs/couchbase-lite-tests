@@ -503,7 +503,7 @@ class TopologyConfig:
         if len(self.__sync_gateways) > 0:
             print()
 
-        if self._wants_logslurp:
+        if self.__logslurp is not None:
             print(f"Logslurp: {self.__logslurp}")
             print()
 

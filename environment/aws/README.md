@@ -1,5 +1,7 @@
 # AWS Scripted Backend
 
+**TL;DR This is mostly supplemental information.  If you are looking for what you need to understand to use this system, skip to [Putting it all together](#putting-it-all-together)**
+
 The summary of what is created with this area is in this diagram:
 
 ![Architecture Diagram](diagrams/Architecture.png)
@@ -20,8 +22,6 @@ One of the core principles of making this backend work is SSH key access.  This 
 1. The public key gets stored on Amazon servers for deployment to EC2 containers, and it has a user-selected name that you must remember (mine is jborden, for example)
 2. The private key gets stored by YOU.  Don't lose it or you will have to repeat this process.
 
-Next, you will need to run `terraform init` inside of this folder in order to set up the Terraform AWS Provider.  This only needs to be done once.
-
 Next, you need to make sure that the [python prerequisites](./requirements.txt) are installed in whatever environment you are using
 
 Next, you will need to add a section to your machine SSH config (`$HOME/.ssh/config`) to ensure that public keys from AWS are automatically added to the system known hosts.  This is because the hostname will be changing every time and docker remote deploy requires an unmolested SSH connection in order to function (without adding to known_hosts you will get an interactive prompt to add the remote host to the known hosts).  To accomplish this add the following section to your SSH config:
@@ -40,20 +40,24 @@ aws_secret_access_key=<redacted>
 aws_session_token=<redacted>
 ```
 
+> [!NOTE]  
+> Using this method the credentials will only last for a few hours.  If you want a longer session than that you will need to use your long term credentials and getting them is beyond the scope of this document.  You will need to become familiar with the [IAM Section](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html) of AWS for that.
+
 ## Step 1: Infrastructure
 
-It's not enough to simply spin up two virtual machines.  The creator is responsible for basically definiing the entire virtual network that the machines are located in, including any LAN subnets and external Internet access.  The tool being used here is Terraform, and the [config file](./main.tf) defines what resources are created when the terraform command is run.  Here is a list of what is created in this config file:
+It's not enough to simply spin up virtual machines.  The creator (i.e. the person modifying the [config file](./main.tf)) is responsible for basically defining the entire virtual network that the machines are located in it, including any LAN subnets and external Internet access.  The tool being used here is [Terraform](https://developer.hashicorp.com/terraform/docs), and the [config file](./main.tf) defines what resources are created when the terraform command is run.  Here is a list of what is created or read in this config file:
 
-- Virtual Private Cloud (VPC) covering IPs 10.0.0.1 to 10.0.255.255
-- Subnet covering 10.0.1.1 to 10.0.1.255
-- Internet Gateway (IGW)
-- Routing hop from VPC to IGW
-- Routing rules inside VPC for ingress and egress
-- Two EC2 containers running AWS Linux 2
+- Subnet covering 10.0.1.1 to 10.0.1.255 (read)
+- Routing rules inside VPC for ingress and egress (read)
+- x86_64 EC2 containers running AWS Linux 2 (created)
 
-Creating and destroying these resources is as simple as running `terraform apply` and `terraform destroy` respectively.  You can add the following to avoid the console prompting you:  `-var=keyname=<keyname-from-step-0> -auto-approve`.
+"read" here means that there is a permanent resource created in the AWS account already.  "created" means that resources must be provisioned for a particular session.
+
+Creating and destroying these resources is as simple as running `terraform apply` and `terraform destroy` respectively.  You can add the following to avoid the console prompting you:  `-var=keyname=<keyname-from-step-0> -auto-approve`.  Other useful variables are `logslurp`, which is a bool indicating whether or not logslurp is needed, `sgw_count` which is the number of EC2 instances to create for SGW, and `server_count` which is the number of EC2 instances to create for Couchbase Server.  These default to `true`, `1`, and `1`.
 
 ## Step 2: Deployment
+
+### AWS
 
 Once the resources are in place, they need to have the appropriate software installed on them.  The scripts for doing so are in the `sgw_setup` (for Sync Gateway) and `server_setup` (for Couchbase Server) folders.  
 
@@ -70,13 +74,25 @@ For Sync Gateway:
 - Create needed home directory subdirectories for config / logs
 - Install and start SGW
 
+### Test Server
+
+This scripted backend also builds / downloads test servers for deployment to various locations that are governed by the `location` field of the topology JSON.  The `topology_setup` folder is responsible for the following:
+
+- Build, or download, the test server with the appropriate CBL and dataset version
+- Install the test server to the desired location
+- Run the test server at the desired location
+
 ## Putting it all together
+
+Starting and stopping the system has dedicated python scripts.  These scripts are designed to be run either directly, or imported and called from another python script if desired.  If you skipped here from the beginning, be sure to review the [Prerequisites](#step-0-prerequisites).
 
 ### Starting
 
 ```
-usage: start_backend.py [-h] [--cbs-version CBS_VERSION] [--private-key PRIVATE_KEY] [--tdk-config-out TDK_CONFIG_OUT] --public-key-name PUBLIC_KEY_NAME --tdk-config-in TDK_CONFIG_IN
-                        --sgw-url SGW_URL
+usage: start_backend.py [-h] [--cbs-version CBS_VERSION] [--private-key PRIVATE_KEY] [--tdk-config-out TDK_CONFIG_OUT]
+                        [--topology TOPOLOGY] [--no-terraform-apply] [--no-cbs-provision] [--no-sgw-provision]
+                        [--no-ls-provision] [--no-ts-run] [--sgw-url SGW_URL] [--public-key-name PUBLIC_KEY_NAME]
+                        --tdk-config-in TDK_CONFIG_IN
 
 Prepare an AWS EC2 environment for running E2E tests
 
@@ -89,13 +105,21 @@ optional arguments:
   --tdk-config-out TDK_CONFIG_OUT
                         The path to the write the resulting TDK configuration file (stdout if empty)
   --topology TOPOLOGY   The path to the topology configuration file
+  --no-terraform-apply  Skip terraform apply step
+  --no-cbs-provision    Skip Couchbase Server provisioning step
+  --no-sgw-provision    Skip Sync Gateway provisioning step
+  --no-ls-provision     Skip Logslurp provisioning step
+  --no-ts-run           Skip test server install and run step
+
+conditionally required arguments:
+  --sgw-url SGW_URL     The URL of Sync Gateway to install (required if using SGW)
+  --public-key-name PUBLIC_KEY_NAME
+                        The public key stored in AWS that pairs with the private key (required if using any AWS
+                        elements)
 
 required arguments:
-  --public-key-name PUBLIC_KEY_NAME
-                        The public key stored in AWS that pairs with the private key
   --tdk-config-in TDK_CONFIG_IN
                         The path to the input TDK configuration file
-  --sgw-url SGW_URL     The URL of Sync Gateway to install.
 ```
 
 The Sync Gateway URL and Couchbase Server version properties should be self explanatory but the others are as follows:
@@ -106,30 +130,17 @@ The Sync Gateway URL and Couchbase Server version properties should be self expl
 - TDK config out: An optional file to write the resulting TDK config file to (otherwise it will go to stdout)
 - Topology is the toplogy JSON file that will describe how to set up AWS instances (see the [topology README](./topology_setup/README.md) for more information.)
 
-:exclamation: It is important to understand how the template system works for the TDK config in.  This system is capable of creating any number of couchbase server and sync gateway instances, and once it does it will begin to replace the following templates with actual IP addresses:  `\{\{cbs-ip\d+\}\}` / `\{\{sgw-ip\d+\}\}`.  So `{{cbs-ip1}}` will receive the IP address of the first created Couchbase Server, and correspondingly `{{sgw-ip1}}` will receive the IP address of the first created Sync Gateway, and so on.  A simple template case would look like this:
-
-```json5
-{
-    //...
-    "sync-gateways": [{"hostname": "{{sgw-ip1}}", "tls": true}],
-    "couchbase-servers": [{"hostname": "{{cbs-ip1}}"}],
-    //...
-}
-```
 
 ### Stopping
 
 ```
-usage: stop_backend.py [-h] --public-key-name PUBLIC_KEY_NAME
+usage: stop_backend.py [-h] [--topology TOPOLOGY]
 
 Tear down a previously created E2E AWS EC2 testing backend
 
 optional arguments:
-  -h, --help            show this help message and exit
-
-required arguments:
-  --public-key-name PUBLIC_KEY_NAME
-                        The public key stored in AWS that pairs with the private key
+  -h, --help           show this help message and exit
+  --topology TOPOLOGY  The topology file that was used to start the environment
 ```
 
-The stop script only has one argument that is required, and is only required as what seems to be a quirk of Terraform.  Since the Terraform config declares a variable to be used, it must be specified in all commands (which includes destroy), so the public key name from step 0 of this README should be used here as well.  
+The stop script only has one argument which is the topology file that was used to run start_backend above.  If no file was provided to start_backend, it means the default was used and you should also give no argument to stop_backend so that it also uses the default.
