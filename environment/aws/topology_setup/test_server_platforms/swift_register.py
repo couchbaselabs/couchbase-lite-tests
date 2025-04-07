@@ -172,7 +172,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
         path = location / "TestServer-iOS.app"
         return iOSBridge(
             str(path),
-            True,
+            "com.couchbase.ios.testserver",
         )
 
     def compress_package(self) -> str:
