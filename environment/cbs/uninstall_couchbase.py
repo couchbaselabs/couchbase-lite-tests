@@ -79,6 +79,7 @@ def uninstall_couchbase_server(ips):
 
             print(f"Removing systemd service on {ip}...")
             run_remote_command(ip, "sudo rm -f /etc/systemd/system/couchbase-server.service /lib/systemd/system/couchbase-server.service")
+            run_remote_command(ip, "sudo systemctl daemon-reload && sudo systemctl reset-failed")
             
             print(f"Cleaning up unused dependencies on {ip}...")
             run_remote_command(ip, "sudo apt-get autoremove -y")
