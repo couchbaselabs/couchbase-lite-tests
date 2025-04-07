@@ -21,7 +21,29 @@ TEST_COMPONENTS_MAPPING = {
         "couchbase-servers": 1,
         "edge-servers": 1,
         "http-clients": 0
+    },
+    "test_chaos_scenarios":{
+        "test-servers": 0,
+        "sync-gateways": 1,
+        "couchbase-servers": 1,
+        "edge-servers": 3,
+        "http-clients": 5
+    },
+    "test_functional":{
+        "test-servers": 0,
+        "sync-gateways": 1,
+        "couchbase-servers": 1,
+        "edge-servers": 2,
+        "http-clients": 3
+    },
+    "test_database_query":{
+        "test-servers": 0,
+        "sync-gateways": 0,
+        "couchbase-servers": 0,
+        "edge-servers": 1,
+        "http-clients": 1
     }
+
 }
 
 def load_pool_data():
