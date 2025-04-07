@@ -1,6 +1,6 @@
 # AWS Scripted Backend
 
-TL;DR This is mostly supplemental information.  If you are looking for what you need to understand to use this system, skip to [Putting it all together](#putting-it-all-together)
+**TL;DR This is mostly supplemental information.  If you are looking for what you need to understand to use this system, skip to [Putting it all together](#putting-it-all-together)**
 
 The summary of what is created with this area is in this diagram:
 
@@ -83,6 +83,8 @@ This scripted backend also builds / downloads test servers for deployment to var
 - Run the test server at the desired location
 
 ## Putting it all together
+
+Starting and stopping the system has dedicated python scripts.  These scripts are designed to be run either directly, or imported and called from another python script if desired.  If you skipped here from the beginning, be sure to review the [Prerequisites](#step-0-prerequisites).
 
 ### Starting
 
