@@ -31,6 +31,7 @@ class TestEdgeServerSync(CBLTestClass):
 
         # Get infrastructure components
         edge_server = cblpytest.edge_servers[0]
+        await edge_server.reset_db()
         sgw = cblpytest.sync_gateways[0]
         http_client = cblpytest.http_clients[0]
 
@@ -113,7 +114,8 @@ class TestEdgeServerSync(CBLTestClass):
         edge_server1 = cblpytest.edge_servers[0]
         edge_server2 = cblpytest.edge_servers[1]
         http_client = cblpytest.http_clients[0]
-
+        await edge_server1.reset_db()
+        await edge_server2.reset_db()
         # 1. Configure Edge Server with travel dataset
         file_path = os.path.abspath(os.path.dirname(__file__))
         file_path = str(Path(file_path, ".."))
