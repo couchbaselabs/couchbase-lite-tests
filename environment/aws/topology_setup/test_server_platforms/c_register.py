@@ -261,7 +261,7 @@ class CTestServer_iOS(CTestServer):
 
         return iOSBridge(
             str(path),
-            False,
+            "com.couchbase.CBLTestServer",
         )
 
     def compress_package(self) -> str:

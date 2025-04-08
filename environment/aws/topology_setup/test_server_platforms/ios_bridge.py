@@ -31,6 +31,7 @@ import shutil
 import subprocess
 from os import environ
 from pathlib import Path
+from typing import Set
 
 import netifaces
 
@@ -52,22 +53,25 @@ else:
 SCRIPT_PATH = Path(__file__).resolve().parent
 PID_FILE = SCRIPT_PATH / "ios_pid.txt"
 
+_xharness_devices: Set[str] = set()
+
 
 class iOSBridge(PlatformBridge):
     """
     A class to manage iOS applications on devices using either xharness or devicectl.
     """
 
-    def __init__(self, app_path: str, use_devicectl: bool = True):
+    def __init__(self, app_path: str, app_id: str):
         """
         Initialize the iOSBridge with the application path and whether to use devicectl.
 
         Args:
             app_path (str): The path to the application.
-            use_devicectl (bool): Whether to use devicectl for managing the application.
+            app_id (bool): The bundle ID of the application.
         """
         self.__app_path = app_path
-        self.__use_devicectl = use_devicectl
+        self.__has_xharness: bool = XHARNESS_PATH.is_file()
+        self.__app_id = app_id
 
     def validate(self, location: str) -> None:
         """
@@ -79,10 +83,25 @@ class iOSBridge(PlatformBridge):
         Raises:
             RuntimeError: If the device is not found.
         """
-        if self.__use_devicectl:
-            self.__validate_devicectl(location)
-        else:
-            self.__validate_libimobiledevice(location)
+        if location in _xharness_devices:
+            # Already previously validated
+            return
+
+        if self.__validate_devicectl(location):
+            return
+
+        if not self.__has_xharness:
+            raise RuntimeError(
+                f"devicectl cannot find device '{location}' and xharness not found, aborting..."
+            )
+
+        if not self.__validate_libimobiledevice(location):
+            raise RuntimeError(f"device '{location}' not found!")
+
+        print()
+        print("Device not found with devicectl, falling back to xharness...")
+        print()
+        _xharness_devices.add(location)
 
     def install(self, location: str) -> None:
         """
@@ -92,7 +111,7 @@ class iOSBridge(PlatformBridge):
             location (str): The device location (e.g., device UUID).
         """
         header(f"Installing {self.__app_path} to {location}")
-        if self.__use_devicectl:
+        if location not in _xharness_devices:
             self.__install_devicectl(location)
         else:
             self.__install_xharness(location)
@@ -105,7 +124,7 @@ class iOSBridge(PlatformBridge):
             location (str): The device location (e.g., device UUID).
         """
         header(f"Running {self.__app_path} on {location}")
-        if self.__use_devicectl:
+        if location not in _xharness_devices:
             self.__run_devicectl(location)
         else:
             self.__run_xharness(location)
@@ -118,7 +137,7 @@ class iOSBridge(PlatformBridge):
             location (str): The device location (e.g., device UUID).
         """
         header(f"Stopping testserver on {location}")
-        if self.__use_devicectl:
+        if location not in _xharness_devices:
             self.__stop_devicectl(location)
         else:
             self.__stop_xharness(location)
@@ -132,22 +151,48 @@ class iOSBridge(PlatformBridge):
         """
         print("iOS app uninstall deliberately not implemented")
 
-    def __validate_libimobiledevice(self, location: str) -> None:
+    def __validate_libimobiledevice(self, location: str) -> bool:
         self.__verify_libimobiledevice()
         result = subprocess.run(
             ["ideviceinfo", "-u", location], check=False, capture_output=True
         )
-        if result.returncode != 0:
-            raise RuntimeError(f"Device {location} not found!")
 
-    def __validate_devicectl(self, location: str) -> None:
-        pass
+        return result.returncode == 0
+
+    def __validate_devicectl(self, location: str) -> bool:
+        result = subprocess.run(
+            [
+                "xcrun",
+                "devicectl",
+                "device",
+                "info",
+                "details",
+                "--device",
+                location,
+            ],
+            check=False,
+            capture_output=True,
+        )
+
+        return result.returncode == 0
 
     def __install_devicectl(self, location: str) -> None:
-        pass
+        subprocess.run(
+            [
+                "xcrun",
+                "devicectl",
+                "device",
+                "install",
+                "app",
+                "--device",
+                location,
+                self.__app_path,
+            ],
+            check=True,
+            capture_output=False,
+        )
 
     def __install_xharness(self, location: str) -> None:
-        self.__verify_xharness()
         subprocess.run(
             [
                 str(XHARNESS_PATH),
@@ -164,11 +209,25 @@ class iOSBridge(PlatformBridge):
         )
 
     def __run_devicectl(self, location: str) -> None:
-        pass
+        result = subprocess.run(
+            [
+                "xcrun",
+                "devicectl",
+                "device",
+                "process",
+                "launch",
+                "--device",
+                location,
+                self.__app_id,
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        print(result.stdout)
 
     def __run_xharness(self, location: str) -> None:
         PID_FILE.unlink() if PID_FILE.exists() else None
-        self.__verify_xharness()
         result = subprocess.run(
             [
                 str(XHARNESS_PATH),
@@ -197,7 +256,68 @@ class iOSBridge(PlatformBridge):
             file.write(pid)
 
     def __stop_devicectl(self, location: str) -> None:
-        pass
+        print("Finding PID of test server...")
+        result = subprocess.run(
+            [
+                "xcrun",
+                "devicectl",
+                "device",
+                "info",
+                "apps",
+                "--device",
+                location,
+                "--bundle-id",
+                self.__app_id,
+                "--hide-headers",
+                "--hide-default-columns",
+                "--columns",
+                "path",
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        stdout = result.stdout.decode("utf-8").splitlines()
+        app_path = stdout[-1].strip()
+        print(f"\tApp Path: {app_path}")
+
+        result = subprocess.run(
+            [
+                "xcrun",
+                "devicectl",
+                "device",
+                "info",
+                "processes",
+                "--device",
+                location,
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        stdout = result.stdout.decode("utf-8").splitlines()
+        app_path_line = next((line for line in stdout if app_path in line), "error")
+
+        if app_path_line == "error":
+            raise RuntimeError(f"Failed to find PID in output: {stdout}")
+
+        pid = app_path_line.split(" ")[0]
+        print(f"\tPID {pid}")
+        subprocess.run(
+            [
+                "xcrun",
+                "devicectl",
+                "device",
+                "process",
+                "terminate",
+                "--device",
+                location,
+                "--pid",
+                pid,
+            ],
+            check=True,
+            capture_output=True,
+        )
 
     def __stop_xharness(self, location: str) -> None:
         if not PID_FILE.exists():
@@ -207,7 +327,6 @@ class iOSBridge(PlatformBridge):
             pid = file.read().strip()
 
         print(f"\t...PID {pid}")
-        self.__verify_xharness()
 
         subprocess.run(
             [
@@ -223,10 +342,6 @@ class iOSBridge(PlatformBridge):
             check=True,
             capture_output=False,
         )
-
-    def __verify_xharness(self) -> None:
-        if not XHARNESS_PATH.is_file():
-            raise RuntimeError(f"XHarness not found at {XHARNESS_PATH}, aborting...")
 
     def __verify_libimobiledevice(self) -> None:
         if shutil.which("ideviceinfo") is None:

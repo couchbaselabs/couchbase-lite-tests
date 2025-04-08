@@ -412,6 +412,7 @@ class TopologyConfig:
                 test_server.build()
 
             bridge = test_server.create_bridge()
+            bridge.validate(test_server_input.location)
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
             port = 5555 if test_server_input.platform.startswith("dotnet") else 8080
@@ -443,6 +444,7 @@ class TopologyConfig:
                 test_server_input.dataset_version,
             )
             bridge = test_server.create_bridge()
+            bridge.validate(test_server_input.location)
             bridge.stop(test_server_input.location)
 
     def apply_sgw_hostnames(self, hostnames: List[str]):

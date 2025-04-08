@@ -312,7 +312,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
         )
         return iOSBridge(
             str(prefix / "testserver.app"),
-            False,
+            "com.couchbase.dotnet.testserver",
         )
 
     def compress_package(self) -> str:
