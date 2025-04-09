@@ -1,6 +1,6 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
-    [Parameter(Mandatory=$true)][string]$Dataset,
+    [Parameter(Mandatory=$true)][string]$DatasetVersion,
     [Parameter(Mandatory=$true)][string]$SgwVersion,
     [Parameter()][string]$PrivateKeyPath
 )
@@ -13,7 +13,7 @@ Install-DotNet
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r $PSScriptRoot\..\..\..\environment\aws\requirements.txt
-$python_args = @("windows", $Version, $SgwVersion)
+$python_args = @("windows", $Version, $DatasetVersion, $SgwVersion)
 if ($null -ne $PrivateKeyPath) {
     $python_args += "--private_key"
     $python_args += $PrivateKeyPath

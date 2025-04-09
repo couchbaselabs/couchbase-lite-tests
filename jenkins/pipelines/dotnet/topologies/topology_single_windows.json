@@ -4,6 +4,7 @@
         {
             "platform": "dotnet_windows",
             "cbl_version": "{{version}}",
+            "dataset_version": "{{dataset_version}}",
             "location": "localhost"
         }
     ],

@@ -36,6 +36,9 @@ if __name__ == "__main__":
     parser.add_argument("platform", type=str, help="The platform to setup")
     parser.add_argument("version", type=str, help="The version of CBL to use")
     parser.add_argument(
+        "dataset_version", type=str, help="The version of the dataset to use"
+    )
+    parser.add_argument(
         "sgw_version", type=str, help="The version of the Sync Gateway to download"
     )
     parser.add_argument(
@@ -68,14 +71,15 @@ if __name__ == "__main__":
         }
         topology["tag"] = args.platform
         topology["test_servers"][0]["cbl_version"] = args.version
+        topology["test_servers"][0]["dataset_version"] = args.dataset_version
         with open(topology_file, "w") as fout:
             json.dump(topology, fout, indent=4)
 
     topology = TopologyConfig(topology_file)
     start_backend(
         topology,
-        str(SCRIPT_DIR / "config_aws.json"),
         "jborden",
+        str(SCRIPT_DIR / "config_aws.json"),
         private_key=args.private_key,
         tdk_config_out=str(SCRIPT_DIR.parents[2] / "tests" / "dev_e2e" / "config.json"),
     )
