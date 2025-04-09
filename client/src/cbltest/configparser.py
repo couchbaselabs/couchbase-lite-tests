@@ -1,13 +1,14 @@
 from json import dumps, load
 from pathlib import Path
-from typing import Final, List, Optional, cast
+from typing import Dict, Final, List, Optional
 
 from .jsonhelper import (
-    _assert_contains_string_list,
     _assert_string_entry,
     _get_bool_or_default,
     _get_int_or_default,
     _get_str_or_default,
+    _get_typed,
+    _get_typed_nonnull,
 )
 
 
@@ -100,6 +101,7 @@ class ParsedConfig:
     __test_server_key: Final[str] = "test-servers"
     __sgw_key: Final[str] = "sync-gateways"
     __cbs_key: Final[str] = "couchbase-servers"
+    __lb_key: Final[str] = "load-balancers"
     __greenboard_key: Final[str] = "greenboard"
     __api_version_key: Final[str] = "api-version"
     __logslurp_key: Final[str] = "logslurp"
@@ -118,6 +120,11 @@ class ParsedConfig:
     def couchbase_servers(self) -> List[dict]:
         """The list of couchbase servers that can be interacted with"""
         return self.__couchbase_servers
+
+    @property
+    def load_balancers(self) -> List[str]:
+        """The list of load balancers that can be interacted with"""
+        return self.__load_balancers
 
     @property
     def greenboard_url(self) -> Optional[str]:
@@ -154,14 +161,16 @@ class ParsedConfig:
         return self.__logslurp_url
 
     def __init__(self, json: dict):
-        self.__test_servers = _assert_contains_string_list(json, self.__test_server_key)
-        if self.__sgw_key not in json:
-            raise ValueError(f"Missing key in configuration '{self.__sgw_key}'")
-
-        self.__sync_gateways = json[self.__sgw_key]
-        self.__couchbase_servers = json[self.__cbs_key]
+        self.__test_servers = _get_typed_nonnull(
+            json, self.__test_server_key, List[str], []
+        )
+        self.__sync_gateways = _get_typed_nonnull(json, self.__sgw_key, List[Dict], [])
+        self.__couchbase_servers = _get_typed_nonnull(
+            json, self.__cbs_key, List[Dict], []
+        )
+        self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, List[str], [])
         self.__api_version = _get_int_or_default(json, self.__api_version_key, 1)
-        self.__greenboard = cast(dict, json.get(self.__greenboard_key))
+        self.__greenboard = _get_typed(json, self.__greenboard_key, Dict[str, str])
         if self.__greenboard is not None and (
             "hostname" not in self.__greenboard
             or "username" not in self.__greenboard
@@ -171,9 +180,7 @@ class ParsedConfig:
                 "Malformed greenboard entry, must have hostname username and password"
             )
 
-        self.__logslurp_url: Optional[str] = None
-        if self.__logslurp_key in json:
-            self.__logslurp_url = cast(str, json[self.__logslurp_key])
+        self.__logslurp_url = _get_typed(json, self.__logslurp_key, str)
 
     def __str__(self) -> str:
         ret_val = (
@@ -188,6 +195,12 @@ class ParsedConfig:
             + "\n"
             + "Couchbase Servers: "
             + dumps(self.__couchbase_servers)
+            + "\n"
+            + "Load Balancers: "
+            + dumps(self.__load_balancers)
+            + "\n"
+            + "Logslurp URL: "
+            + (self.__logslurp_url if self.__logslurp_url is not None else "")
             + "\n"
             + "Greenboard: "
             + (self.__greenboard["url"] if self.__greenboard is not None else "")

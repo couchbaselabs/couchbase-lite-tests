@@ -21,6 +21,9 @@ from cbltest.utils import assert_not_null
 from test_replication_filter_data import uk_and_france_doc_ids
 
 
+@pytest.mark.min_test_servers(1)
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_couchbase_servers(1)
 class TestReplicationFilter(CBLTestClass):
     def validate_replicated_doc_ids(
         self, expected: Set[str], actual: List[ReplicatorDocumentEntry]

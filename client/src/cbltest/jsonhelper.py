@@ -128,6 +128,11 @@ def _get_typed(d: dict, key: str, type: Type[T]) -> Optional[T]:
     return cast(T, ret_val)
 
 
+def _get_typed_nonnull(d: dict, key: str, type: Type[T], default: T) -> T:
+    found_val = _get_typed(d, key, type)
+    return found_val if found_val is not None else default
+
+
 def _get_typed_required(d: dict, key: str, type: Type[T]) -> T:
     if key not in d:
         raise ValueError(f"Missing required key {key} in dictionary!")
