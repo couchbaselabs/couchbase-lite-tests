@@ -2,9 +2,10 @@ pipeline {
     agent { label 'mac-laptop9' }
 
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'CBL Version')
-        string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: 'Dataset Version')
+        string(name: 'CBL_VERSION', defaultValue: '3.2.2', description: 'CBL Version')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '3.2', description: 'Dataset Version')
         string(name: 'CBL_PLATFORM', defaultValue: 'java', description: 'Platform')
+        string(name: 'SGW_URL', defaultValue: 'https://latestbuilds.service.couchbase.com/builds/latestbuilds/sync_gateway/3.2.3/16/couchbase-sync-gateway-enterprise_3.2.3-16_arm64.zip', description: "The url of Sync Gateway to download")
         string(name: 'TEST_TO_RUN', defaultValue: 'tests/test_api_scope_collection.py::TestLimitScopesCollections::test_limit_scopes_collections', description: 'Specific test to run')
     }
     environment {
@@ -50,7 +51,7 @@ pipeline {
         stage('Run Setup Test') {
             steps {
                 script {
-                    sh "python3 ${SCRIPT_DIR}/setup_test.py ${params.CBL_PLATFORM} ${params.CBL_VERSION}"
+                    sh "python3 ${SCRIPT_DIR}/../jenkins/pipelines/dotnet/setup_test.py ${params.CBL_PLATFORM} ${params.CBL_VERSION}"
                 }
             }
         }
