@@ -1,12 +1,17 @@
 name: Validate Python Files
-
 on:
   push:
     branches:
       - main
+    paths: &paths
+      - 'client/smoke-tests/**'
+      - 'client/src/**'
+      - 'environment/**'
+      - 'tests/**'
   pull_request:
     branches:
       - "**"
+    paths: *paths
 
 jobs:
   mypy:

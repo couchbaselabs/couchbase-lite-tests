@@ -46,6 +46,11 @@ info:
       ```
 
     Changes
+    1.2.0 (04/09/2025)
+    * Add [/startMultipeerReplicator](#operation/startMultipeerReplicator),
+    * Add [/stopMultipeerReplicator](#operation/stopMultipeerReplicator) endpoint
+    * Add [/getMultipeerReplicatorStatus](#operation/getMultipeerReplicatorStatus) endpoint
+
     1.1.0 (03/05/2025)
     * Add [/startListener](#operation/startListener) and [/stopListener](#operation/stopListener) endpoint
 
@@ -123,7 +128,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 1.1.0
+  version: 1.2.0
 tags:
   - name: API
     description: The API endpoints of the test server
@@ -819,6 +824,115 @@ paths:
           $ref: '#/components/responses/Error'
         '500':
           $ref: '#/components/responses/Error'
+  /startMultipeerReplicator:
+    post:
+      tags:
+        - API
+      summary: Starts a Multipeer replicator
+      description: |-
+        Starts a P2P listener so that the device can act as the passive side of a P2P replication.
+      operationId: startMultipeerReplicator
+      requestBody:
+        description: |-
+          The request object containing the collections to share and, optionally, the port to listen on.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['peerGroupID', 'database', 'collections']
+              properties:
+                peerGroupID:
+                  type: string
+                  example: 'com.couchbase.testing'
+                database:
+                  type: string
+                  example: 'db1'
+                collections:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ReplicationCollection"
+        required: true
+      responses:
+        '200':
+          description: |-
+            Success
+
+            The response body is an object containing the ID of the listener, and the port
+            it is listening on.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartListenerResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /stopMultipeerReplicator:
+    post:
+      tags:
+        - API
+      summary: Stops a Multipeer replicator
+      description: |-
+        Stops a previously started Multipeer Replicator.
+      operationId: stopMultipeerReplicator
+      requestBody:
+        description: |-
+          The request object containing the replicator to stop.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['id']
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  example: '123e4567-e89b-12d3-a456-426614174000'
+        required: true
+      responses:
+        '200':
+          description: |-
+            Success
+        '400':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /getMultipeerReplicatorStatus:
+    post:
+      tags:
+        - API
+      summary: Gets the status of a multipeer replicator
+      description: |-
+        Gets the status of a multipeer replicator
+      operationId: getMultipeerReplicatorStatus
+      requestBody:
+        description: |-
+          The request object containing the replicator to query.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['id']
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  example: '123e4567-e89b-12d3-a456-426614174000'
+        required: true
+      responses:
+        '200':
+          description: |-
+            Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultipeerReplicatorStatus'
+        '400':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
 components:
   schemas:
     Collections:
@@ -1140,6 +1254,21 @@ components:
             $ref: '#/components/schemas/DocumentReplication'
         error:
           $ref: '#/components/schemas/Error'
+    MultipeerReplicatorStatus:
+      type: object
+      required: ['replicators']
+      properties:
+        replicators:
+          type: array
+          items:
+            type: object
+            required: ['peerID', 'status']
+            properties:
+              peerID:
+                type: string
+                example: '1234567890abcdef'
+              status:
+                $ref: '#/components/schemas/ReplicatorStatus'
     ResetConfiguration:
       description: |-
         ResetConfiguration describes how the databases will be setup after the reset.

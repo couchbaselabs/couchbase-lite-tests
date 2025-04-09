@@ -18,6 +18,8 @@ on:
       - 'spec/api/**'
   push:
     # Only run when we change an API spec
+    branches: 
+      - 'main'
     paths:
       - 'spec/api/**'
 
