@@ -11,13 +11,38 @@
             {
                 "cluster": 1
             }
-        ]
+        ],
+        "logslurp": true
     },
     "additionalProperties": false,
     "properties": {
         "$schema": {
             "type": "string",
             "$comment": "Allows config files to declare they conform to this schema. Otherwise ignored."
+        },
+        "defaults": {
+            "type": "object",
+            "properties": {
+                "cbs": {
+                    "type": "object",
+                    "properties": {
+                        "version": {
+                            "type": "string",
+                            "default": "7.6.4"
+                        }
+                    }
+                },
+                "sgw": {
+                    "type": "object",
+                    "properties": {
+                        "version": {
+                            "type": "string",
+                            "default": "3.2.2"
+                        }
+                    }
+                }
+            },
+            "additionalProperties": false
         },
         "clusters": {
             "type": "array",
@@ -27,6 +52,10 @@
                     "server_count": {
                         "type": "integer",
                         "minimum": 1
+                    },
+                    "version": {
+                        "type": "string",
+                        "$comment": "The default here is 7.6.4 but can be changed with the schema defaults.cbs.version"
                     }
                 },
                 "required": ["server_count"],
@@ -41,6 +70,10 @@
                     "cluster": {
                         "type": "integer",
                         "minimum": 0
+                    },
+                    "version": {
+                        "type": "string",
+                        "$comment": "The default here is 3.2.2 but can be changed with the schema defaults.sgw.version"
                     }
                 },
                 "required": ["cluster"],
@@ -70,6 +103,24 @@
                     }
                 },
                 "required": ["location", "cbl_version", "platform", "dataset_version"],
+                "additionalProperties": false
+            }
+        },
+        "load_balancers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "sync_gateways": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "minItems": 1
+                    }
+                },
+                "required": ["sync_gateways"],
                 "additionalProperties": false
             }
         },

@@ -34,6 +34,7 @@ if __name__ == "__main__":
         cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
 from environment.aws.common.output import header
+from environment.aws.lb_setup.setup_load_balancers import main as lb_main
 from environment.aws.logslurp_setup.setup_logslurp import main as logslurp_main
 from environment.aws.server_setup.setup_server import main as server_main
 from environment.aws.sgw_setup.setup_sgw import main as sgw_main
@@ -56,9 +57,15 @@ def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) ->
     header("Starting terraform apply")
     sgw_count = topology.total_sgw_count
     cbs_count = topology.total_cbs_count
+    lb_count = topology.total_lb_count
     wants_logslurp = str(topology.wants_logslurp).lower()
 
-    if sgw_count == 0 and cbs_count == 0 and not topology.wants_logslurp:
+    if (
+        sgw_count == 0
+        and cbs_count == 0
+        and lb_count == 0
+        and not topology.wants_logslurp
+    ):
         print("No AWS resources requested, skipping terraform")
         return
 
@@ -79,6 +86,7 @@ def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) ->
         f"-var=key_name={public_key_name}",
         f"-var=server_count={cbs_count}",
         f"-var=sgw_count={sgw_count}",
+        f"-var=lb_count={lb_count}",
         f"-var=logslurp={wants_logslurp}",
         "-auto-approve",
     ]
@@ -114,6 +122,7 @@ def write_config(
         config_json.pop("couchbase-servers", None)
         config_json.pop("sync-gateways", None)
         config_json.pop("test-servers", None)
+        config_json.pop("load-balancers", None)
         config_json.pop("logslurp", None)
 
         if len(topology.clusters) > 0:
@@ -142,6 +151,13 @@ def write_config(
 
             config_json["test-servers"] = test_servers
 
+        if len(topology.load_balancers) > 0:
+            load_balancers = []
+            for lb in topology.load_balancers:
+                load_balancers.append(lb.hostname)
+
+            config_json["load-balancers"] = load_balancers
+
         json.dump(config_json, output, indent=2)
 
 
@@ -149,9 +165,17 @@ class BackendSteps(Flag):
     TERRAFORM_APPLY = auto()
     CBS_PROVISION = auto()
     SGW_PROVISION = auto()
+    LB_PROVISION = auto()
     LS_PROVISION = auto()
     TS_RUN = auto()
-    ALL = TERRAFORM_APPLY | CBS_PROVISION | SGW_PROVISION | LS_PROVISION | TS_RUN
+    ALL = (
+        TERRAFORM_APPLY
+        | CBS_PROVISION
+        | SGW_PROVISION
+        | LB_PROVISION
+        | LS_PROVISION
+        | TS_RUN
+    )
 
 
 class RemoveFlagAction(Action):
@@ -172,10 +196,8 @@ class RemoveFlagAction(Action):
 
 def main(
     topology: TopologyConfig,
+    public_key_name: str,
     tdk_config_in: str,
-    public_key_name: Optional[str] = None,
-    sgw_url: Optional[str] = None,
-    cbs_version: str = "7.6.4",
     private_key: Optional[str] = None,
     tdk_config_out: Optional[str] = None,
     steps: BackendSteps = BackendSteps.ALL,
@@ -186,9 +208,7 @@ def main(
     Args:
         topology (TopologyConfig): The topology configuration.
         public_key_name (str): The name of the public key stored in AWS.
-        sgw_url (str): The URL of Sync Gateway to install.
         tdk_config_in (str): The path to the input TDK configuration file.
-        cbs_version (str, optional): The version of Couchbase Server to install. Defaults to "7.6.4".
         private_key (Optional[str], optional): The private key to use for the SSH connection. Defaults to None.
         tdk_config_out (Optional[str], optional): The path to write the resulting TDK configuration file. Defaults to None.
         steps (BackendSteps, optional): The steps to execute. Defaults to BackendSteps.ALL.
@@ -210,20 +230,19 @@ def main(
     topology.dump()
 
     if steps & BackendSteps.CBS_PROVISION:
-        server_main(cbs_version, topology, private_key)
+        server_main(topology, private_key)
     else:
         print("Skipping Couchbase Server provisioning...")
 
     if steps & BackendSteps.SGW_PROVISION:
-        if len(topology.sync_gateways) > 0:
-            if sgw_url is None:
-                raise Exception(
-                    "--sgw-url was not provided, but it is required for provisioning SGW."
-                )
-
-            sgw_main(sgw_url, topology, private_key)
+        sgw_main(topology, private_key)
     else:
         print("Skipping Sync Gateway provisioning...")
+
+    if steps & BackendSteps.LB_PROVISION:
+        lb_main(topology, private_key)
+    else:
+        print("Skipping load balancer provisioning...")
 
     if steps & BackendSteps.LS_PROVISION:
         logslurp_main(topology, private_key)
@@ -245,11 +264,6 @@ def main(
 if __name__ == "__main__":
     parser = ArgumentParser(
         description="Prepare an AWS EC2 environment for running E2E tests"
-    )
-    parser.add_argument(
-        "--cbs-version",
-        default="7.6.4",
-        help="The version of Couchbase Server to install.",
     )
     parser.add_argument(
         "--private-key",
@@ -283,6 +297,12 @@ if __name__ == "__main__":
         help="Skip Sync Gateway provisioning step",
     )
     parser.add_argument(
+        "--no-lb-provision",
+        action=RemoveFlagAction,
+        flag_to_remove=BackendSteps.LS_PROVISION,
+        help="Skip load balancer provisioning step",
+    )
+    parser.add_argument(
         "--no-ls-provision",
         action=RemoveFlagAction,
         flag_to_remove=BackendSteps.LS_PROVISION,
@@ -296,9 +316,6 @@ if __name__ == "__main__":
     )
 
     conditional_required = parser.add_argument_group("conditionally required arguments")
-    conditional_required.add_argument(
-        "--sgw-url", help="The URL of Sync Gateway to install (required if using SGW)"
-    )
     conditional_required.add_argument(
         "--public-key-name",
         help="The public key stored in AWS that pairs with the private key (required if using any AWS elements)",
@@ -318,10 +335,8 @@ if __name__ == "__main__":
 
     main(
         topology,
-        args.tdk_config_in,
         args.public_key_name,
-        args.sgw_url,
-        args.cbs_version,
+        args.tdk_config_in,
         args.private_key,
         args.tdk_config_out,
         args.steps if hasattr(args, "steps") else BackendSteps.ALL,

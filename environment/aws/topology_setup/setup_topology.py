@@ -34,6 +34,109 @@ from environment.aws.topology_setup.test_server import TestServer
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
+class DefaultProperty:
+    """
+    Like an optional, but with a default value
+    """
+
+    @property
+    def value(self) -> str:
+        return self.__value if self.__value is not None else self.__default_value
+
+    @property
+    def is_set(self) -> bool:
+        return self.__value is not None
+
+    def __init__(self, default_value: str):
+        self.__default_value = default_value
+        self.__value: Optional[str] = None
+
+    def set_value(self, value: str):
+        self.__value = value
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class CouchbaseServerDefaults:
+    __cbs_key: Final[str] = "cbs"
+    __version_key: Final[str] = "version"
+    __default_version: Final[str] = "7.6.4"
+
+    @property
+    def version(self) -> DefaultProperty:
+        return self.__version
+
+    def __init__(self, parent: Dict):
+        self.__version = DefaultProperty(self.__default_version)
+        if self.__cbs_key not in parent:
+            return
+
+        cbs_defaults = cast(Dict, parent[self.__cbs_key])
+        if self.__version_key not in cbs_defaults:
+            return
+
+        self.__version.set_value(cast(str, cbs_defaults[self.__version_key]))
+
+
+class SyncGatewayDefaults:
+    __sgw_key: Final[str] = "sgw"
+    __version_key: Final[str] = "version"
+    __default_version: Final[str] = "3.2.2"
+
+    @property
+    def version(self) -> DefaultProperty:
+        return self.__version
+
+    def __init__(self, parent: Dict):
+        self.__version = DefaultProperty(self.__default_version)
+        if self.__sgw_key not in parent:
+            return
+
+        sgw_defaults = cast(Dict, parent[self.__sgw_key])
+        if self.__version_key not in sgw_defaults:
+            return
+
+        self.__version.set_value(cast(str, sgw_defaults[self.__version_key]))
+
+
+class ConfigDefaults:
+    __defaults_key: Final[str] = "defaults"
+
+    @property
+    def CouchbaseServer(self) -> CouchbaseServerDefaults:
+        return self.__cbs_defaults
+
+    @property
+    def SyncGateway(self) -> SyncGatewayDefaults:
+        return self.__sgw_defaults
+
+    def __init__(self, parent: Dict):
+        defaults = {}
+        if self.__defaults_key in parent:
+            defaults = cast(Dict, parent[self.__defaults_key])
+
+        self.__cbs_defaults = CouchbaseServerDefaults(defaults)
+        self.__sgw_defaults = SyncGatewayDefaults(defaults)
+
+    def extend(self, other: "ConfigDefaults"):
+        if other.CouchbaseServer.version.is_set:
+            if self.CouchbaseServer.version.is_set:
+                raise Exception(
+                    "Both main and included file are setting default CBS version"
+                )
+
+            self.CouchbaseServer.version.set_value(other.CouchbaseServer.version.value)
+
+        if other.SyncGateway.version.is_set:
+            if self.SyncGateway.version.is_set:
+                raise Exception(
+                    "Both main and included file are setting default SGW version"
+                )
+
+            self.SyncGateway.version.set_value(other.SyncGateway.version.value)
+
+
 class ClusterConfig:
     """
     A class to store the configuration of a Couchbase Server cluster.
@@ -51,7 +154,14 @@ class ClusterConfig:
     def internal_hostnames(self) -> List[str]:
         return self.__internal_hostnames
 
-    def __init__(self, public_hostnames: List[str], internal_hostnames: List[str]):
+    @property
+    def version(self) -> str:
+        return self.__version
+
+    def __init__(
+        self, version: str, public_hostnames: List[str], internal_hostnames: List[str]
+    ):
+        self.__version = version
         self.__public_hostnames = public_hostnames
         self.__internal_hostnames = internal_hostnames
 
@@ -70,7 +180,11 @@ class ClusterInput:
     def server_count(self) -> int:
         return self.__server_count
 
-    def __init__(self, config: Optional[Dict] = None):
+    @property
+    def version(self) -> str:
+        return self.__version
+
+    def __init__(self, version: str, config: Optional[Dict] = None):
         if config is not None:
             if self.__server_count_key not in config:
                 raise ValueError(
@@ -78,6 +192,8 @@ class ClusterInput:
                 )
 
             self.__server_count: int = int(config[self.__server_count_key])
+
+        self.__version = version
 
     def create_config(
         self, public_hostnames: List[str], internal_hostnames: List[str]
@@ -92,7 +208,7 @@ class ClusterInput:
         Returns:
             ClusterConfig: The created ClusterConfig instance.
         """
-        return ClusterConfig(public_hostnames, internal_hostnames)
+        return ClusterConfig(self.version, public_hostnames, internal_hostnames)
 
 
 class SyncGatewayInput:
@@ -107,8 +223,13 @@ class SyncGatewayInput:
     def cluster_index(self) -> int:
         return self.__cluster_index
 
-    def __init__(self, cluster_index: int):
+    @property
+    def version(self) -> str:
+        return self.__version
+
+    def __init__(self, cluster_index: int, version: str):
         self.__cluster_index = cluster_index
+        self.__version = version
 
 
 class SyncGatewayConfig:
@@ -116,8 +237,60 @@ class SyncGatewayConfig:
     A class to store the configuration of a Sync Gateway instance.
 
     Attributes:
+        version (str): The version of the Sync Gateway instance to install.
         hostname (str): The hostname of the Sync Gateway instance.
+        internal_hostname (str): The EC2 internal hostname of the Sync Gateway instance.
         cluster_hostname (str): The hostname of the cluster to which the Sync Gateway belongs.
+    """
+
+    @property
+    def version(self) -> str:
+        return self.__version
+
+    @property
+    def hostname(self) -> str:
+        return self.__hostname
+
+    @property
+    def internal_hostname(self) -> str:
+        return self.__internal_hostname
+
+    @property
+    def cluster_hostname(self) -> str:
+        return self.__cluster_hostname
+
+    def __init__(
+        self, version: str, hostname: str, internal_hostname: str, cluster_hostname: str
+    ):
+        self.__version = version
+        self.__hostname = hostname
+        self.__internal_hostname = internal_hostname
+        self.__cluster_hostname = cluster_hostname
+
+
+class LoadBalancerInput:
+    """
+    A class to parse and store input configuration for a load balancer.
+
+    Attributes:
+        sync_gateways (List[int]): The list of Sync Gateway indices associated with the load balancer.
+    """
+
+    @property
+    def sync_gateways(self) -> List[int]:
+        return self.__sync_gateways
+
+    def __init__(self, sync_gateways: List[int]):
+        self.__sync_gateways = sync_gateways
+
+
+class LoadBalancerConfig:
+    """
+    A class to store the configuration of a load balancer.
+
+    Attributes:
+        hostname (str): The hostname of the load balancer.
+        sync_gateways (List[int]): The list of Sync Gateway indices associated with the load balancer.
     """
 
     @property
@@ -125,12 +298,12 @@ class SyncGatewayConfig:
         return self.__hostname
 
     @property
-    def cluster_hostname(self) -> str:
-        return self.__cluster_hostname
+    def upstreams(self) -> List[str]:
+        return self.__upstreams
 
-    def __init__(self, hostname: str, cluster_hostname: str):
+    def __init__(self, hostname: str, upstreams: List[str]):
         self.__hostname = hostname
-        self.__cluster_hostname = cluster_hostname
+        self.__upstreams = upstreams
 
 
 class TestServerInput:
@@ -226,30 +399,49 @@ class TopologyConfig:
     __sync_gateways_key: Final[str] = "sync_gateways"
     __cluster_key: Final[str] = "cluster"
     __test_servers_key: Final[str] = "test_servers"
+    __load_balancers_key: Final[str] = "load_balancers"
     __logslurp_key: Final[str] = "logslurp"
     __include_key: Final[str] = "include"
     __tag_key: Final[str] = "tag"
+    __version_key: Final[str] = "version"
 
-    def __init__(self, config_file: Optional[str] = None):
+    def __init__(
+        self,
+        config_file: Optional[str] = None,
+        parent_defaults: Optional[ConfigDefaults] = None,
+    ):
         if config_file is None:
             config_file = str((SCRIPT_DIR / "default_topology.json").resolve())
 
+        self.__defaults = ConfigDefaults({})
         self.__clusters: List[ClusterConfig] = []
         self.__sync_gateways: List[SyncGatewayConfig] = []
         self.__sync_gateway_inputs: List[SyncGatewayInput] = []
         self.__cluster_inputs: List[ClusterInput] = []
         self.__test_server_inputs: List[TestServerInput] = []
         self.__test_servers: List[TestServerConfig] = []
+        self.__load_balancers: List[LoadBalancerConfig] = []
+        self.__load_balancer_inputs: List[LoadBalancerInput] = []
         self._wants_logslurp: Optional[bool] = None
         self.__logslurp: Optional[str] = None
         self.__tag: str = ""
 
         with open(config_file, "r") as fin:
             config = cast(Dict, json.load(fin))
+
+            self.__defaults = ConfigDefaults(config)
+            if parent_defaults is not None:
+                self.__defaults.extend(parent_defaults)
+
             if self.__clusters_key in config:
                 raw_clusters = cast(List[Dict], config[self.__clusters_key])
                 for raw_cluster in raw_clusters:
-                    self.__cluster_inputs.append(ClusterInput(raw_cluster))
+                    version = (
+                        cast(str, raw_cluster[self.__version_key])
+                        if self.__version_key in raw_cluster
+                        else str(self.__defaults.CouchbaseServer.version)
+                    )
+                    self.__cluster_inputs.append(ClusterInput(version, raw_cluster))
 
             if self.__sync_gateways_key in config:
                 raw_entry = cast(List[Dict], config[self.__sync_gateways_key])
@@ -258,7 +450,14 @@ class TopologyConfig:
                     if cluster_index < 0 or cluster_index >= len(self.__cluster_inputs):
                         raise ValueError(f"Invalid cluster index '{cluster_index}'")
 
-                    self.__sync_gateway_inputs.append(SyncGatewayInput(cluster_index))
+                    version = (
+                        cast(str, raw_server[self.__version_key])
+                        if self.__version_key in raw_server
+                        else str(self.__defaults.SyncGateway.version)
+                    )
+                    self.__sync_gateway_inputs.append(
+                        SyncGatewayInput(cluster_index, version)
+                    )
 
             if self.__test_servers_key in config:
                 raw_servers = cast(
@@ -275,16 +474,36 @@ class TopologyConfig:
                         )
                     )
 
+            if self.__load_balancers_key in config:
+                raw_balancers = cast(
+                    List[Dict[str, List[int]]], config[self.__load_balancers_key]
+                )
+                for raw_balancer in raw_balancers:
+                    sgw_indices = raw_balancer["sync_gateways"]
+                    for sgw_index in sgw_indices:
+                        if sgw_index < 0 or sgw_index >= len(
+                            self.__sync_gateway_inputs
+                        ):
+                            raise ValueError(
+                                f"Invalid Sync Gateway index '{sgw_index}'"
+                            )
+
+                    self.__load_balancer_inputs.append(LoadBalancerInput(sgw_indices))
+
             if self.__logslurp_key in config:
                 self._wants_logslurp = cast(bool, config[self.__logslurp_key])
 
             if self.__include_key in config:
                 include_file = str(
-                    (SCRIPT_DIR / cast(str, config[self.__include_key])).resolve()
+                    (
+                        Path(str(config_file)).parent
+                        / cast(str, config[self.__include_key])
+                    ).resolve()
                 )
-                sub_config = TopologyConfig(include_file)
+                sub_config = TopologyConfig(include_file, self.__defaults)
                 self.__cluster_inputs.extend(sub_config.__cluster_inputs)
                 self.__sync_gateway_inputs.extend(sub_config.__sync_gateway_inputs)
+                self.__load_balancer_inputs.extend(sub_config.__load_balancer_inputs)
                 self.__test_server_inputs.extend(sub_config.__test_server_inputs)
                 if self._wants_logslurp is None:
                     self._wants_logslurp = sub_config._wants_logslurp
@@ -301,6 +520,10 @@ class TopologyConfig:
         return len(self.__sync_gateway_inputs)
 
     @property
+    def total_lb_count(self) -> int:
+        return len(self.__load_balancer_inputs)
+
+    @property
     def clusters(self) -> List[ClusterConfig]:
         return self.__clusters
 
@@ -311,6 +534,10 @@ class TopologyConfig:
     @property
     def test_servers(self) -> List[TestServerConfig]:
         return self.__test_servers
+
+    @property
+    def load_balancers(self) -> List[LoadBalancerConfig]:
+        return self.__load_balancers
 
     @property
     def wants_logslurp(self) -> bool:
@@ -363,7 +590,36 @@ class TopologyConfig:
             )
 
         sgw_ips = cast(List[str], json.loads(result.stdout))
-        self.apply_sgw_hostnames(sgw_ips)
+
+        sgw_command = [
+            "terraform",
+            "output",
+            "-json",
+            "sync_gateway_instance_private_ips",
+        ]
+        result = subprocess.run(sgw_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(
+                f"Command '{' '.join(sgw_command)}' failed with exit status {result.returncode}: {result.stderr}"
+            )
+
+        sgw_internal_ips = cast(List[str], json.loads(result.stdout))
+        self.apply_sgw_hostnames(sgw_ips, sgw_internal_ips)
+
+        lb_command = [
+            "terraform",
+            "output",
+            "-json",
+            "load_balancer_instance_public_ips",
+        ]
+        result = subprocess.run(lb_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(
+                f"Command '{' '.join(lb_command)}' failed with exit status {result.returncode}: {result.stderr}"
+            )
+
+        lb_ips = cast(List[str], json.loads(result.stdout))
+        self.apply_lb_hostnames(lb_ips)
 
         if self._wants_logslurp:
             logslurp_command = ["terraform", "output", "logslurp_instance_public_ip"]
@@ -447,7 +703,7 @@ class TopologyConfig:
             bridge.validate(test_server_input.location)
             bridge.stop(test_server_input.location)
 
-    def apply_sgw_hostnames(self, hostnames: List[str]):
+    def apply_sgw_hostnames(self, hostnames: List[str], internal_hostnames: List[str]):
         """
         Apply the Sync Gateway hostnames to the configuration.
 
@@ -456,7 +712,12 @@ class TopologyConfig:
         """
         for sgw_input in self.__sync_gateway_inputs:
             cluster = self.__clusters[sgw_input.cluster_index]
-            sgw = SyncGatewayConfig(hostnames.pop(0), cluster.internal_hostnames[0])
+            sgw = SyncGatewayConfig(
+                sgw_input.version,
+                hostnames.pop(0),
+                internal_hostnames.pop(0),
+                cluster.internal_hostnames[0],
+            )
             self.__sync_gateways.append(sgw)
 
     def apply_server_hostnames(
@@ -475,9 +736,31 @@ class TopologyConfig:
             internal_hostnames = server_internal_hostnames[
                 i : i + cluster_input.server_count
             ]
-            cluster = ClusterConfig(hostnames, internal_hostnames)
+            cluster = ClusterConfig(
+                cluster_input.version, hostnames, internal_hostnames
+            )
             self.__clusters.append(cluster)
             i += cluster_input.server_count
+
+    def apply_lb_hostnames(self, hostnames: List[str]):
+        """
+        Apply the load balancer hostnames to the configuration.
+
+        Args:
+            hostnames (List[str]): The list of load balancer hostnames.
+        """
+        if len(self.__sync_gateways) == 0:
+            raise Exception(
+                "apply_sgw_hostnames must be called prior to apply_lb_hostnames"
+            )
+
+        for lb_input in self.__load_balancer_inputs:
+            sgw_hostnames = []
+            for sgw_index in lb_input.sync_gateways:
+                sgw_hostnames.append(self.__sync_gateways[sgw_index].internal_hostname)
+
+            lb = LoadBalancerConfig(hostnames.pop(0), sgw_hostnames)
+            self.__load_balancers.append(lb)
 
     def dump(self):
         """
@@ -486,7 +769,7 @@ class TopologyConfig:
         header("Resulting topology")
         i = 1
         for cluster in self.__clusters:
-            print(f"Cluster {i}:")
+            print(f"Cluster {i} ({cluster.version}):")
             for i in range(0, len(cluster.public_hostnames)):
                 print(
                     f"\t{cluster.public_hostnames[i]} / {cluster.internal_hostnames[i]}"
@@ -499,11 +782,19 @@ class TopologyConfig:
 
         i = 1
         for sgw in self.__sync_gateways:
-            print(f"Sync Gateway {i}: {sgw.hostname} -> {sgw.cluster_hostname}")
+            print(
+                f"Sync Gateway {i} ({sgw.version}): {sgw.hostname} -> {sgw.cluster_hostname}"
+            )
             i += 1
 
         if len(self.__sync_gateways) > 0:
             print()
+
+        i = 1
+        for lb in self.__load_balancers:
+            print(f"Load Balancer {i}: {lb.hostname}")
+            for up in lb.upstreams:
+                print(f"\t{up}")
 
         if self.__logslurp is not None:
             print(f"Logslurp: {self.__logslurp}")

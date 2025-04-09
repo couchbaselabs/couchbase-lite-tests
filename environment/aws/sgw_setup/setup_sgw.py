@@ -33,8 +33,9 @@ Functions:
 
 import json
 import os
+import sys
 from pathlib import Path
-from typing import Dict, Optional, cast
+from typing import Dict, Final, Optional, cast
 
 import paramiko
 import requests
@@ -61,6 +62,9 @@ class SgwDownloadInfo:
         url (str): The download URL of Sync Gateway.
     """
 
+    __is_release_key: Final[str] = "IsRelease"
+    __build_no_key: Final[str] = "BuildNumber"
+
     @property
     def is_release(self) -> bool:
         return self.__build_no == 0
@@ -81,23 +85,41 @@ class SgwDownloadInfo:
     def url(self) -> str:
         return self.__url
 
-    def _parse_release_url(self, download_url: str):
-        self.__local_filename = download_url.split("/")[-1]
-        self.__version = download_url.split("/")[-2]
+    def _init_release(self, version: str):
+        self.__version = version
         self.__build_no = 0
-        self.__url = download_url
+        self.__local_filename = (
+            f"couchbase-sync-gateway-enterprise_{self.__version}_x86_64.rpm"
+        )
+        self.__url = f"https://packages.couchbase.com/releases/couchbase-sync-gateway/{self.__version}/{self.__local_filename}"
 
-    def _parse_internal_url(self, download_url: str):
-        self.__local_filename = download_url.split("/")[-1]
-        self.__version = download_url.split("/")[-3]
-        self.__build_no = int(download_url.split("/")[-2])
-        self.__url = download_url
+    def _init_internal(self, version: str, build_no: int):
+        self.__version = version
+        self.__build_no = build_no
+        self.__local_filename = f"couchbase-sync-gateway-enterprise_{self.__version}-{self.__build_no}_x86_64.rpm"
+        self.__url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/sync_gateway/{self.__version}/{self.__build_no}/{self.__local_filename}"
 
-    def __init__(self, download_url: str):
-        if "latestbuilds" in download_url:
-            self._parse_internal_url(download_url)
+    def __init__(self, version: str):
+        if "-" in version:
+            version_parts = version.split("-")
+            self._init_internal(version_parts[0], int(version_parts[1]))
+            return
+
+        url = f"http://proget.build.couchbase.com:8080/api/get_version?product=sync_gateway&version={version}"
+        r = requests.get(url)
+        r.raise_for_status()
+        version_info = cast(Dict, r.json())
+        if self.__is_release_key not in version_info:
+            json.dump(version_info, sys.stdout)
+            raise ValueError("Invalid version information received from server.")
+
+        if cast(bool, version_info[self.__is_release_key]):
+            self._init_release(version)
         else:
-            self._parse_release_url(download_url)
+            if self.__build_no_key not in version_info:
+                json.dump(version_info, sys.stdout)
+                raise ValueError("Invalid version information received from server.")
+            self._init_internal(version, cast(int, version_info[self.__build_no_key]))
 
 
 def lookup_sgw_build(version: str) -> int:
@@ -283,7 +305,6 @@ def setup_server(
 
 def setup_topology(
     pkey: Optional[paramiko.Ed25519Key],
-    sgw_info: SgwDownloadInfo,
     topology: TopologyConfig,
 ) -> None:
     """
@@ -296,29 +317,26 @@ def setup_topology(
     """
     i = 0
     for sgw in topology.sync_gateways:
+        sgw_info = SgwDownloadInfo(sgw.version)
+        download_sgw_package(sgw_info)
         setup_config(sgw.cluster_hostname)
         setup_server(sgw.hostname, pkey, sgw_info)
         i += 1
 
 
-def main(
-    download_url: str, topology: TopologyConfig, private_key: Optional[str] = None
-) -> None:
+def main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
     """
     Main function to set up the Sync Gateway topology.
 
     Args:
-        download_url (str): The download URL for Sync Gateway.
         topology (TopologyConfig): The topology configuration.
         private_key (Optional[str]): The path to the private key for SSH access.
     """
     if len(topology.sync_gateways) == 0:
         return
 
-    sgw_info = SgwDownloadInfo(download_url)
-    download_sgw_package(sgw_info)
     pkey = (
         paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
     )
 
-    setup_topology(pkey, sgw_info, topology)
+    setup_topology(pkey, topology)

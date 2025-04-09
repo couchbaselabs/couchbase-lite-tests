@@ -136,7 +136,7 @@ def setup_node(
 
 
 def setup_topology(
-    pkey: Optional[paramiko.Ed25519Key], version: str, topology: TopologyConfig
+    pkey: Optional[paramiko.Ed25519Key], topology: TopologyConfig
 ) -> None:
     """
     Set up the Couchbase Server topology on EC2 instances.
@@ -150,14 +150,14 @@ def setup_topology(
         return
 
     for cluster_config in topology.clusters:
-        setup_node(cluster_config.public_hostnames[0], pkey, version)
+        setup_node(cluster_config.public_hostnames[0], pkey, cluster_config.version)
         for server in cluster_config.public_hostnames[1:]:
-            setup_node(server, pkey, version, cluster_config.public_hostnames[0])
+            setup_node(
+                server, pkey, cluster_config.version, cluster_config.public_hostnames[0]
+            )
 
 
-def main(
-    version: str, topology: TopologyConfig, private_key: Optional[str] = None
-) -> None:
+def main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
     """
     Main function to set up the Couchbase Server topology.
 
@@ -170,4 +170,4 @@ def main(
         paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
     )
 
-    setup_topology(pkey, version, topology)
+    setup_topology(pkey, topology)
