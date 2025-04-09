@@ -35,6 +35,13 @@ dependencies = [
 "Homepage" = "https://github.com/couchbaselabs/couchbase-lite-tests"
 "Bug Tracker" = "https://github.com/couchbaselabs/couchbase-lite-tests/issues"
 
+[project.entry-points.pytest11]
+required_topology = "cbltest.plugins.required_topology"
+cbse_filter = "cbltest.plugins.cbse_filter"
+cblpytest_fixture = "cbltest.plugins.cblpytest_fixture"
+greenboard_fixture = "cbltest.plugins.greenboard_fixture"
+span_generation_fixture = "cbltest.plugins.span_generation_fixture"
+
 [tool.hatch.version]
 path = "src/cbltest/version.py"
 

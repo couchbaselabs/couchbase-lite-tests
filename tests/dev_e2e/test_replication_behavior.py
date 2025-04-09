@@ -14,6 +14,9 @@ from cbltest.api.replicator_types import (
 from cbltest.utils import assert_not_null
 
 
+@pytest.mark.min_test_servers(1)
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_couchbase_servers(1)
 class TestReplicationBehavior(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_empty_database_active_only(

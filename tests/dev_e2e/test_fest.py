@@ -15,6 +15,9 @@ from cbltest.api.replicator_types import (
 )
 
 
+@pytest.mark.min_test_servers(1)
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_couchbase_servers(1)
 class TestFest(CBLTestClass):
     async def setup_test_fest_cloud(
         self, cblpytest: CBLPyTest, dataset_path: Path, roles: Dict[str, List[str]]

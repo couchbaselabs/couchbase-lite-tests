@@ -20,6 +20,9 @@ from cbltest.api.replicator_types import (
 from cbltest.api.syncgateway import DocumentUpdateEntry
 
 
+@pytest.mark.min_test_servers(1)
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_couchbase_servers(1)
 class TestReplicationAutoPurge(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_remove_docs_from_channel_with_auto_purge_enabled(

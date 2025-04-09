@@ -49,15 +49,23 @@ class CBLPyTest:
 
     @property
     def test_servers(self) -> List[TestServer]:
+        """Gets the list of Test Servers available"""
         return self.__test_servers
 
     @property
     def sync_gateways(self) -> List[SyncGateway]:
+        """Gets the list of Sync Gateways available"""
         return self.__sync_gateways
 
     @property
     def couchbase_servers(self) -> List[CouchbaseServer]:
+        """Gets the list of Couchbase Servers available"""
         return self.__couchbase_servers
+
+    @property
+    def load_balancers(self) -> List[str]:
+        """Gets the list of Load Balancers available"""
+        return self.__config.load_balancers
 
     @staticmethod
     async def create(
