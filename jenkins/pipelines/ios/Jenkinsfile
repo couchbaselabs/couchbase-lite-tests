@@ -5,7 +5,7 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: "The dataset version to use (e.g. 3.2 or 4.0)")
-        string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
+        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
     }
     options {
         timeout(time: 30, unit: 'MINUTES')
@@ -16,6 +16,7 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
                     currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD}-${CBL_EDITION} (#${currentBuild.number})"
                     currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION}"
                 }
@@ -33,7 +34,7 @@ pipeline {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run iOS Test"
-                sh "jenkins/pipelines/ios/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.CBL_DATASET_VERSION}' '${params.SGW_URL}'"
+                sh "jenkins/pipelines/ios/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.CBL_DATASET_VERSION}' '${params.SGW_VERSION}'"
             }
             post { 
                 always { 
