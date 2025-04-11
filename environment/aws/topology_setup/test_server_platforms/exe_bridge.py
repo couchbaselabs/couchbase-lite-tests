@@ -15,6 +15,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
+import click
 import paramiko
 import psutil
 
@@ -42,15 +43,15 @@ def remote_exec(
 
     _, stdout, stderr = ssh.exec_command(command)
     for line in iter(stdout.readline, ""):
-        print(line, end="")
+        click.echo(line, nl=False)
 
     exit_status = stdout.channel.recv_exit_status()
     if fail_on_error and exit_status != 0:
-        print(stderr.read().decode())
+        click.secho(stderr.read().decode(), fg="red")
         raise Exception(f"Command '{command}' failed with exit status {exit_status}")
 
     header("Done!")
-    print()
+    click.echo()
 
 
 class ExeBridge(PlatformBridge):
@@ -77,7 +78,7 @@ class ExeBridge(PlatformBridge):
         Args:
             location (str): The location of the executable (e.g., "localhost").
         """
-        print("No validation needed for executables")
+        click.echo("No validation needed for executables")
 
     def install(self, location: str) -> None:
         """
@@ -87,7 +88,7 @@ class ExeBridge(PlatformBridge):
             location (str): The location of the executable (e.g., "localhost").
         """
         if location == "localhost":
-            print("No action needed for installing executables locally")
+            click.echo("No action needed for installing executables locally")
             return
 
     def run(self, location: str) -> None:
@@ -99,8 +100,8 @@ class ExeBridge(PlatformBridge):
         """
         header(f"Running {self.__exe_path}")
         if len(self.__extra_args) > 0:
-            print(f"Extra args: {json.dumps(self.__extra_args)}")
-            print()
+            click.echo(f"Extra args: {json.dumps(self.__extra_args)}")
+            click.echo()
 
         args = [self.__exe_path]
         args.extend(self.__extra_args)
@@ -109,7 +110,7 @@ class ExeBridge(PlatformBridge):
         process = subprocess.Popen(
             args, start_new_session=True, stdout=log_fd, stderr=log_fd
         )
-        print(f"Started {self.__exe_name} with PID {process.pid}")
+        click.echo(f"Started {self.__exe_name} with PID {process.pid}")
 
     def stop(self, location: str) -> None:
         """
@@ -122,10 +123,10 @@ class ExeBridge(PlatformBridge):
         for proc in psutil.process_iter():
             if proc.name() == self.__exe_name:
                 proc.terminate()
-                print(f"Stopped PID {proc.pid}")
+                click.secho(f"Stopped PID {proc.pid}", fg="green")
                 return
 
-        print(f"Unable to find process to stop ({self.__exe_name})")
+        click.secho(f"Unable to find process to stop ({self.__exe_name})", fg="yellow")
 
     def uninstall(self, location: str) -> None:
         """
@@ -134,7 +135,7 @@ class ExeBridge(PlatformBridge):
         Args:
             location (str): The location of the executable (e.g., "localhost").
         """
-        print("No action needed for uninstalling executable")
+        click.echo("No action needed for uninstalling executable")
 
     def get_ip(self, location: str) -> str:
         """

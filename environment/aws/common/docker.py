@@ -3,6 +3,8 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
+import click
+
 from environment.aws.common.output import header
 
 
@@ -130,14 +132,14 @@ def start_container(
 
     if container_check.stdout.strip() != "":
         if container_check.stdout.startswith("Up"):
-            print(f"{name} already running, returning...")
+            click.echo(f"{name} already running, returning...")
             return
 
-        print(f"Restarting existing {name} container...")
+        click.echo(f"Restarting existing {name} container...")
         subprocess.run(["docker", "start", name], check=False, env=env)
         return
 
-    print(f"Starting new {name} container...")
+    click.echo(f"Starting new {name} container...")
     args = [
         "docker",
         "run",
