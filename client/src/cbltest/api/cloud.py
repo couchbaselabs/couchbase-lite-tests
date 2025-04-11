@@ -9,7 +9,7 @@ from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.syncgateway import PutDatabasePayload, SyncGateway
 from cbltest.assertions import _assert_not_null
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.utils import _try_n_times, nameof
+from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
 
 
@@ -60,8 +60,8 @@ class CouchbaseCloud:
         with self.__tracer.start_as_current_span(
             "configure_dataset", attributes={"cbl.dataset.name": dataset_name}
         ) as current_span:
-            _assert_not_null(dataset_path, nameof(dataset_path))
-            _assert_not_null(dataset_name, nameof(dataset_name))
+            _assert_not_null(dataset_path, "dataset_path")
+            _assert_not_null(dataset_name, "dataset_name")
 
             config_filepath = dataset_path / f"{dataset_name}-sg-config.json"
             data_filepath = dataset_path / f"{dataset_name}-sg.json"

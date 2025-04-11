@@ -16,6 +16,7 @@ Functions:
         Unzip the contents of a zip file to a directory.
 """
 
+from contextlib import contextmanager
 import os
 import tarfile
 import zipfile
@@ -183,3 +184,12 @@ def untar_directory(input: Path, output: Path) -> None:
                 extracted_path.chmod(member.mode)
 
     click.echo("Done")
+
+@contextmanager
+def pushd(new_dir: Path):
+    prev_dir = Path.cwd()
+    try:
+        os.chdir(new_dir)
+        yield
+    finally:
+        os.chdir(prev_dir)

@@ -1,8 +1,6 @@
 import time
 from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union, cast
 
-from varname import argname
-
 from .api.error import CblTimeoutError
 
 T = TypeVar("T")
@@ -39,6 +37,3 @@ def assert_not_null(input: Optional[T], msg: str) -> T:
     assert input is not None, msg
     return cast(T, input)
 
-
-def nameof(*args):
-    return argname("*args")
