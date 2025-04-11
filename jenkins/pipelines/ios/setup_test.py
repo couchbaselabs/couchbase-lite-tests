@@ -54,9 +54,7 @@ if __name__ == "__main__":
         / "topology_setup"
         / "topology.json"
     )
-    with open(
-        str(SCRIPT_DIR / "topology_single_device.json"), "r"
-    ) as fin:
+    with open(str(SCRIPT_DIR / "topology_single_device.json"), "r") as fin:
         topology = json.load(fin)
         topology["$schema"] = "topology_schema.json"
         topology["include"] = "default_topology.json"

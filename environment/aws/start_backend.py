@@ -17,7 +17,6 @@ Functions:
 """
 
 import json
-import os
 import subprocess
 import sys
 from argparse import Action, ArgumentParser
@@ -33,8 +32,8 @@ if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
         cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
-from environment.aws.common.output import header
 from environment.aws.common.io import pushd
+from environment.aws.common.output import header
 from environment.aws.lb_setup.setup_load_balancers import main as lb_main
 from environment.aws.logslurp_setup.setup_logslurp import main as logslurp_main
 from environment.aws.server_setup.setup_server import main as server_main
@@ -54,7 +53,7 @@ def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) ->
     Raises:
         Exception: If any Terraform command fails.
     """
-    
+
     with pushd(SCRIPT_DIR):
         header("Starting terraform apply")
         sgw_count = topology.total_sgw_count
@@ -219,7 +218,9 @@ def main(
         terraform_apply(public_key_name, topology)
     else:
         with pushd(SCRIPT_DIR):
-            result = subprocess.run(["terraform", "init"], capture_output=False, text=True)
+            result = subprocess.run(
+                ["terraform", "init"], capture_output=False, text=True
+            )
             if result.returncode != 0:
                 raise Exception(
                     f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"

@@ -153,14 +153,10 @@ class DatabaseUpdateEntry(JSONSerializable):
         )
         """The type of update to be performed"""
 
-        self.collection: str = cast(
-            str, _assert_not_null(collection, "collection")
-        )
+        self.collection: str = cast(str, _assert_not_null(collection, "collection"))
         """The collection to that the document to be modified belongs to"""
 
-        self.document_id: str = cast(
-            str, _assert_not_null(document_id, "document_id")
-        )
+        self.document_id: str = cast(str, _assert_not_null(document_id, "document_id"))
         """The ID of the document to be modified"""
 
         self.updated_properties: Optional[List[Dict[str, Any]]] = updated_properties
