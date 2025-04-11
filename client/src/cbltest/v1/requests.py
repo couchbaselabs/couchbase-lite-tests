@@ -12,7 +12,6 @@ from cbltest.api.replicator_types import (
 from cbltest.assertions import _assert_not_null
 from cbltest.logging import cbl_warning
 from cbltest.requests import TestServerRequest, TestServerRequestBody
-from cbltest.utils import nameof
 
 # Some conventions that are followed in this file are that all request classes that
 # will be sent to the test server are classes that end in 'Request'.  Their bodies
@@ -106,7 +105,7 @@ class PostGetAllDocumentsRequestBody(TestServerRequestBody):
 
     def __init__(self, database: str, *collections: str):
         super().__init__(1)
-        _assert_not_null(database, nameof(database))
+        _assert_not_null(database, "database")
         self.database = database
         """The database to get document IDs from"""
 
@@ -150,18 +149,14 @@ class DatabaseUpdateEntry(JSONSerializable):
         new_blobs: Optional[Dict[str, str]] = None,
     ) -> None:
         self.type: DatabaseUpdateEntry = cast(
-            DatabaseUpdateEntry, _assert_not_null(type, nameof(type))
+            DatabaseUpdateEntry, _assert_not_null(type, "type")
         )
         """The type of update to be performed"""
 
-        self.collection: str = cast(
-            str, _assert_not_null(collection, nameof(collection))
-        )
+        self.collection: str = cast(str, _assert_not_null(collection, "collection"))
         """The collection to that the document to be modified belongs to"""
 
-        self.document_id: str = cast(
-            str, _assert_not_null(document_id, nameof(document_id))
-        )
+        self.document_id: str = cast(str, _assert_not_null(document_id, "document_id"))
         """The ID of the document to be modified"""
 
         self.updated_properties: Optional[List[Dict[str, Any]]] = updated_properties

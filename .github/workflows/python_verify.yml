@@ -3,15 +3,19 @@ on:
   push:
     branches:
       - main
-    paths: &paths
-      - 'client/smoke-tests/**'
+    paths:
+      - 'client/smoke_tests/**'
       - 'client/src/**'
       - 'environment/**'
       - 'tests/**'
   pull_request:
     branches:
       - "**"
-    paths: *paths
+    paths:
+      - 'client/smoke_tests/**'
+      - 'client/src/**'
+      - 'environment/**'
+      - 'tests/**'
 
 jobs:
   mypy:

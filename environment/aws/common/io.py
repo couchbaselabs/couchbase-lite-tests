@@ -19,6 +19,7 @@ Functions:
 import os
 import tarfile
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
 
 import paramiko
@@ -180,3 +181,13 @@ def untar_directory(input: Path, output: Path) -> None:
                 extracted_path.chmod(member.mode)
 
     print("Done")
+
+
+@contextmanager
+def pushd(new_dir: Path):
+    prev_dir = Path.cwd()
+    try:
+        os.chdir(new_dir)
+        yield
+    finally:
+        os.chdir(prev_dir)
