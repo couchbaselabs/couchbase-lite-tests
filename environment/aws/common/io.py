@@ -21,9 +21,12 @@ import tarfile
 import zipfile
 from pathlib import Path
 
+import click
 import paramiko
 from requests import Response
 from tqdm import tqdm
+
+LIGHT_GRAY = (128, 128, 128)
 
 
 def download_progress_bar(response: Response, output_path: Path) -> None:
@@ -83,14 +86,14 @@ def zip_directory(input: Path, output: Path) -> None:
     if not input.exists():
         raise RuntimeError(f"{input} does not exist...")
 
-    print("Zipping...")
+    click.echo("Zipping...")
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk(input):
             for file in tqdm(files, desc="Zipping"):
                 file_path = Path(root) / file
                 zipf.write(file_path, file_path.relative_to(input))
 
-    print("Done")
+    click.echo("Done")
 
 
 def unzip_directory(input: Path, output: Path) -> None:
@@ -128,7 +131,7 @@ def unzip_directory(input: Path, output: Path) -> None:
                 if perm:
                     extracted_path.chmod(perm)
 
-    print("Done")
+    click.echo("Done")
 
 
 def tar_directory(input: Path, output: Path) -> None:
@@ -145,14 +148,14 @@ def tar_directory(input: Path, output: Path) -> None:
     if not input.exists():
         raise RuntimeError(f"{input} does not exist...")
 
-    print("Compressing")
+    click.echo("Compressing")
     with tarfile.open(output, "w:gz") as tar:
         for root, _, files in os.walk(input):
             for file in tqdm(files, desc="Archiving"):
                 file_path = Path(root) / file
                 tar.add(file_path, arcname=file_path.relative_to(input))
 
-    print("Done")
+    click.echo("Done")
 
 
 def untar_directory(input: Path, output: Path) -> None:
@@ -169,7 +172,7 @@ def untar_directory(input: Path, output: Path) -> None:
     if not input.exists():
         raise RuntimeError(f"{input} does not exist...")
 
-    print("Extracting")
+    click.echo("Extracting")
     with tarfile.open(input, "r:gz") as tar:
         for member in tqdm(tar.getmembers(), desc="Extracting"):
             tar.extract(member, path=output)
@@ -179,4 +182,4 @@ def untar_directory(input: Path, output: Path) -> None:
             if member.mode and not member.islnk() and not member.issym():
                 extracted_path.chmod(member.mode)
 
-    print("Done")
+    click.echo("Done")

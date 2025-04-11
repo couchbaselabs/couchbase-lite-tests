@@ -32,6 +32,7 @@ import zipfile
 from abc import abstractmethod
 from pathlib import Path
 
+import click
 import psutil
 import requests
 
@@ -59,12 +60,14 @@ class JavaBridge(PlatformBridge):
         supportlib_dir.mkdir(0o755, exist_ok=True)
 
         if (supportlib_dir / "libstdc++.so.6").exists():
-            print(f"Support libraries already exist in {supportlib_dir}")
+            click.secho(
+                f"Support libraries already exist in {supportlib_dir}", fg="yellow"
+            )
             return
 
         download_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/couchbase-lite-java-linux-supportlibs-{cbl_version}.zip"
         try:
-            print(f"Downloading support libraries from {download_url}")
+            click.echo(f"Downloading support libraries from {download_url}")
             response = requests.get(download_url, stream=True)
             response.raise_for_status()
 
@@ -76,12 +79,14 @@ class JavaBridge(PlatformBridge):
             )
             (JAK_TEST_SERVER_DIR / variant / "support.zip").unlink()
 
-            print(f"Support libraries downloaded and extracted to {supportlib_dir}")
+            click.echo(
+                f"Support libraries downloaded and extracted to {supportlib_dir}"
+            )
         except requests.RequestException as e:
-            print(f"Failed to download support libraries: {e}")
+            click.secho(f"Failed to download support libraries: {e}", fg="red")
             raise
         except zipfile.BadZipFile as e:
-            print(f"Failed to extract support libraries: {e}")
+            click.secho(f"Failed to extract support libraries: {e}", fg="red")
             raise
 
     def _ensure_support_libs_in_path(self, variant: str) -> None:
@@ -152,7 +157,7 @@ class JarBridge(JavaBridge):
             start_new_session=True,
         )
 
-        print(f"Started {self.__jar_path} with PID {process.pid}")
+        click.echo(f"Started {self.__jar_path} with PID {process.pid}")
         with open(info_dir / "server.pid", "w") as pid_file:
             pid_file.write(str(process.pid))
 
@@ -219,7 +224,7 @@ class JettyBridge(JavaBridge):
             start_new_session=True,
             cwd=self.__gradle_path.parent,
         )
-        print(f"Started web service with PID {process.pid}")
+        click.echo(f"Started web service with PID {process.pid}")
 
     def stop(self, location: str) -> None:
         self._stop(location, True)
@@ -275,7 +280,7 @@ class JAKTestServer(TestServer):
         blobs_dir = dest_dir / "blobs"
         for blob in blobs_dir.iterdir():
             (dest_dir / blob.name).unlink(missing_ok=True)
-            print(f"Moving {blob} -> {dest_dir / blob.name}")
+            click.echo(f"Moving {blob} -> {dest_dir / blob.name}")
             blob.rename(dest_dir / blob.name)
 
         shutil.rmtree(blobs_dir, ignore_errors=True)

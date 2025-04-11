@@ -12,10 +12,11 @@ Functions:
 
 import subprocess
 import sys
-from argparse import ArgumentParser
 from io import TextIOWrapper
 from pathlib import Path
 from typing import Optional, cast
+
+import click
 
 SCRIPT_DIR = Path(__file__).parent
 if __name__ == "__main__":
@@ -27,14 +28,20 @@ from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 
-def main(topology_file: Optional[str]) -> None:
+@click.command()
+@click.option(
+    "--topology",
+    help="The topology file that was used to start the environment",
+    type=click.Path(exists=True),
+)
+def main(topology: Optional[str]) -> None:
     """
     Main function to tear down the AWS environment and stop the test servers.
 
     Args:
         topology_file (Optional[str]): The topology file that was used to start the environment.
     """
-    topology = TopologyConfig(topology_file) if topology_file else TopologyConfig()
+    topology_obj = TopologyConfig(topology) if topology else TopologyConfig()
 
     header("Starting terraform destroy")
     command = [
@@ -47,27 +54,20 @@ def main(topology_file: Optional[str]) -> None:
     result = subprocess.run(command, capture_output=False, text=True)
 
     if result.returncode != 0:
-        print(
-            f"WARNING: Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
+        click.secho(
+            f"WARNING: Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}",
+            fg="yellow",
         )
-        print()
+        click.echo()
 
     header("Done!")
 
     header("Stopping test servers")
-    topology.stop_test_servers()
+    topology_obj.stop_test_servers()
     header("Done!")
 
     exit(result.returncode)
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(
-        description="Tear down a previously created E2E AWS EC2 testing backend"
-    )
-    parser.add_argument(
-        "--topology", help="The topology file that was used to start the environment"
-    )
-    args = parser.parse_args()
-
-    main(args.topology)
+    main()

@@ -27,6 +27,8 @@ Functions:
 
 import subprocess
 
+import click
+
 from environment.aws.common.output import header
 
 from .platform_bridge import PlatformBridge
@@ -70,7 +72,7 @@ class macOSBridge(PlatformBridge):
             location (str): The location of the application (e.g., "localhost").
         """
         self.validate(location)
-        print("No action needed for installing macOS app")
+        click.echo("No action needed for installing macOS app")
 
     def run(self, location: str) -> None:
         """
@@ -92,7 +94,7 @@ class macOSBridge(PlatformBridge):
         """
         self.validate(location)
         header("Stopping macOS test server")
-        print("running 'killall testserver'")
+        click.echo("running 'killall testserver'")
         subprocess.run(["killall", "testserver"], check=False, capture_output=False)
 
     def uninstall(self, location: str) -> None:
@@ -103,7 +105,7 @@ class macOSBridge(PlatformBridge):
             location (str): The location of the application (e.g., "localhost").
         """
         self.validate(location)
-        print("No action needed for uninstalling macOS app")
+        click.echo("No action needed for uninstalling macOS app")
 
     def get_ip(self, location: str) -> str:
         """

@@ -26,6 +26,7 @@ from pathlib import Path
 from time import sleep
 from typing import Dict, Final, List, Optional, cast
 
+import click
 import requests
 
 from environment.aws.common.output import header
@@ -678,8 +679,9 @@ class TopologyConfig:
                     requests.get(f"http://{ip}:{port}")
                     return
                 except requests.exceptions.ConnectionError:
-                    print(
-                        f"Failed to connect to test server at {ip}:{port}, retrying in 1s..."
+                    click.secho(
+                        f"Failed to connect to test server at {ip}:{port}, retrying in 1s...",
+                        fg="yellow",
                     )
                     sleep(1)
                     pass
@@ -769,47 +771,47 @@ class TopologyConfig:
         header("Resulting topology")
         i = 1
         for cluster in self.__clusters:
-            print(f"Cluster {i} ({cluster.version}):")
+            click.echo(f"Cluster {i} ({cluster.version}):")
             for i in range(0, len(cluster.public_hostnames)):
-                print(
+                click.echo(
                     f"\t{cluster.public_hostnames[i]} / {cluster.internal_hostnames[i]}"
                 )
 
             i += 1
 
         if len(self.__clusters) > 0:
-            print()
+            click.echo()
 
         i = 1
         for sgw in self.__sync_gateways:
-            print(
+            click.echo(
                 f"Sync Gateway {i} ({sgw.version}): {sgw.hostname} -> {sgw.cluster_hostname}"
             )
             i += 1
 
         if len(self.__sync_gateways) > 0:
-            print()
+            click.echo()
 
         i = 1
         for lb in self.__load_balancers:
-            print(f"Load Balancer {i}: {lb.hostname}")
+            click.echo(f"Load Balancer {i}: {lb.hostname}")
             for up in lb.upstreams:
-                print(f"\t{up}")
+                click.echo(f"\t{up}")
 
         if self.__logslurp is not None:
-            print(f"Logslurp: {self.__logslurp}")
-            print()
+            click.echo(f"Logslurp: {self.__logslurp}")
+            click.echo()
 
         i = 1
         for test_server in self.__test_servers:
-            print(f"Test Server {i}:")
-            print(f"\tPlatform: {test_server.platform}")
-            print(f"\tCBL Version: {test_server.cbl_version}")
-            print(f"\tIP Address: {test_server.ip_address}")
+            click.echo(f"Test Server {i}:")
+            click.echo(f"\tPlatform: {test_server.platform}")
+            click.echo(f"\tCBL Version: {test_server.cbl_version}")
+            click.echo(f"\tIP Address: {test_server.ip_address}")
             i += 1
 
         if len(self.__test_servers) > 0:
-            print()
+            click.echo()
 
 
 def main(topology: TopologyConfig) -> None:

@@ -37,12 +37,12 @@ import sys
 from pathlib import Path
 from typing import Dict, Final, Optional, cast
 
+import click
 import paramiko
 import requests
-from termcolor import colored
 from tqdm import tqdm
 
-from environment.aws.common.io import sftp_progress_bar
+from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
@@ -174,7 +174,10 @@ def download_sgw_package(download_info: SgwDownloadInfo) -> None:
                     size = f.write(chunk)
                     bar.update(size)
     else:
-        print(f"File {download_info.local_filename} already exists, skipping download.")
+        click.secho(
+            f"File {download_info.local_filename} already exists, skipping download.",
+            fg="yellow",
+        )
 
 
 def setup_config(server_hostname: str) -> None:
@@ -219,15 +222,15 @@ def remote_exec(
 
     _, stdout, stderr = ssh.exec_command(command, get_pty=True)
     for line in iter(stdout.readline, ""):
-        print(colored(f"[{current_ssh}] {line}", "light_grey"), end="")
+        click.secho(f"[{current_ssh}] {line}", fg=LIGHT_GRAY, nl=False)  # type: ignore
 
     exit_status = stdout.channel.recv_exit_status()
     if fail_on_error and exit_status != 0:
-        print(stderr.read().decode())
+        click.secho(stderr.read().decode(), fg="red")
         raise Exception(f"Command '{command}' failed with exit status {exit_status}")
 
     header("Done!")
-    print()
+    click.echo()
 
 
 def setup_server(
@@ -242,9 +245,9 @@ def setup_server(
         sgw_info (SgwDownloadInfo): The download information for Sync Gateway.
     """
     if sgw_info.is_release:
-        print(f"Setting up server {hostname} with SGW {sgw_info.version}")
+        click.echo(f"Setting up server {hostname} with SGW {sgw_info.version}")
     else:
-        print(
+        click.echo(
             f"Setting up server {hostname} with SGW {sgw_info.version}-{sgw_info.build_no}"
         )
 

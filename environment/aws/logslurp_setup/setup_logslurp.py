@@ -21,15 +21,15 @@ Functions:
 from pathlib import Path
 from typing import Optional
 
+import click
 import paramiko
-from termcolor import colored
 
 from environment.aws.common.docker import (
     check_aws_key_checking,
     get_ec2_hostname,
     start_container,
 )
-from environment.aws.common.io import sftp_progress_bar
+from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
@@ -56,15 +56,15 @@ def remote_exec(
 
     _, stdout, stderr = ssh.exec_command(command, get_pty=True)
     for line in iter(stdout.readline, ""):
-        print(colored(f"[{current_ssh}] {line}", "light_grey"), end="")
+        click.secho(f"[{current_ssh}] {line}", fg=LIGHT_GRAY, nl=False)  # type: ignore
 
     exit_status = stdout.channel.recv_exit_status()
     if fail_on_error and exit_status != 0:
-        print(stderr.read().decode())
+        click.secho(stderr.read().decode(), fg="red")
         raise Exception(f"Command '{command}' failed with exit status {exit_status}")
 
     header("Done!")
-    print()
+    click.echo()
 
 
 def main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:

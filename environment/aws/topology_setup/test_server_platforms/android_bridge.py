@@ -33,6 +33,8 @@ import subprocess
 from pathlib import Path
 from typing import List
 
+import click
+
 from environment.aws.common.output import header
 
 from .platform_bridge import PlatformBridge
@@ -74,7 +76,6 @@ class AndroidBridge(PlatformBridge):
             return
 
         for adb_location in self.__potential_adb_locations:
-            print(adb_location)
             if (Path(adb_location) / "adb").exists():
                 self.__adb_location = Path(adb_location) / "adb"
                 break
@@ -207,7 +208,7 @@ class AndroidBridge(PlatformBridge):
             text=True,
         )
         for line in result.stdout.split("\n"):
-            print(line)
+            click.echo(line)
             if "inet" in line:
                 return line.lstrip().split(" ")[1].split("/")[0]
 
