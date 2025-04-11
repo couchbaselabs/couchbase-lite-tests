@@ -36,4 +36,3 @@ def _try_n_times(
 def assert_not_null(input: Optional[T], msg: str) -> T:
     assert input is not None, msg
     return cast(T, input)
-

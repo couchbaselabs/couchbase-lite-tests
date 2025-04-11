@@ -16,10 +16,10 @@ Functions:
         Unzip the contents of a zip file to a directory.
 """
 
-from contextlib import contextmanager
 import os
 import tarfile
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
 
 import click
@@ -184,6 +184,7 @@ def untar_directory(input: Path, output: Path) -> None:
                 extracted_path.chmod(member.mode)
 
     click.echo("Done")
+
 
 @contextmanager
 def pushd(new_dir: Path):
