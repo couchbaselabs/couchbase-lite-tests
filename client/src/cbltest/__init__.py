@@ -15,7 +15,6 @@ from .configparser import (
 from .extrapropsparser import _parse_extra_props
 from .logging import LogLevel, cbl_log_init, cbl_setLogLevel
 from .requests import RequestFactory
-from .utils import nameof
 
 if version_info < (3, 9):
     raise RuntimeError("Python must be at least v3.9!")
@@ -95,7 +94,7 @@ class CBLPyTest:
         extra_props_path: Optional[str] = None,
         test_server_only: bool = False,
     ):
-        _assert_not_null(config_path, nameof(config_path))
+        _assert_not_null(config_path, "config_path")
         self.__config = _parse_config(config_path)
         self.__log_level = LogLevel(log_level)
         cbl_setLogLevel(self.__log_level)
