@@ -20,12 +20,13 @@ import json
 import os
 import subprocess
 import sys
-from argparse import Action, ArgumentParser
 from enum import Flag, auto
 from io import TextIOWrapper
 from pathlib import Path
 from time import sleep
-from typing import IO, Dict, Optional, cast
+from typing import IO, Any, Dict, Optional, cast
+
+import click
 
 SCRIPT_DIR = Path(__file__).parent
 if __name__ == "__main__":
@@ -40,6 +41,24 @@ from environment.aws.server_setup.setup_server import main as server_main
 from environment.aws.sgw_setup.setup_sgw import main as sgw_main
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 from environment.aws.topology_setup.setup_topology import main as topology_main
+
+
+class TopologyParamType(click.ParamType):
+    name = "path"
+
+    def convert(
+        self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]
+    ) -> TopologyConfig:
+        if isinstance(value, TopologyConfig):
+            return value
+
+        if value is None:
+            return TopologyConfig()
+
+        if isinstance(value, str):
+            return TopologyConfig(cast(str, value))
+
+        self.fail("Unable to convert non string value to TopologyConfig", param, ctx)
 
 
 def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) -> None:
@@ -66,7 +85,7 @@ def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) ->
         and lb_count == 0
         and not topology.wants_logslurp
     ):
-        print("No AWS resources requested, skipping terraform")
+        click.secho("No AWS resources requested, skipping terraform", fg="yellow")
         return
 
     if public_key_name is None:
@@ -162,6 +181,7 @@ def write_config(
 
 
 class BackendSteps(Flag):
+    NONE = 0
     TERRAFORM_APPLY = auto()
     CBS_PROVISION = auto()
     SGW_PROVISION = auto()
@@ -178,25 +198,9 @@ class BackendSteps(Flag):
     )
 
 
-class RemoveFlagAction(Action):
-    """
-    Custom argparse action to remove a specific flag from steps.
-    """
-
-    def __init__(self, option_strings, dest, nargs=0, **kwargs):
-        self.flag_to_remove = kwargs.pop("flag_to_remove", None)
-        super().__init__(option_strings, dest, nargs=nargs, **kwargs)
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        if not hasattr(namespace, "steps"):
-            namespace.steps = BackendSteps.ALL
-        if self.flag_to_remove:
-            namespace.steps &= ~self.flag_to_remove
-
-
 def main(
     topology: TopologyConfig,
-    public_key_name: str,
+    public_key_name: Optional[str],
     tdk_config_in: str,
     private_key: Optional[str] = None,
     tdk_config_out: Optional[str] = None,
@@ -221,9 +225,9 @@ def main(
             raise Exception(
                 f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
             )
-        print()
-        print("Skipping terraform apply...")
-        print()
+        click.echo()
+        click.secho("Skipping terraform apply...", fg="yellow")
+        click.echo()
         topology.read_from_terraform()
 
     topology.resolve_test_servers()
@@ -232,27 +236,27 @@ def main(
     if steps & BackendSteps.CBS_PROVISION:
         server_main(topology, private_key)
     else:
-        print("Skipping Couchbase Server provisioning...")
+        click.secho("Skipping Couchbase Server provisioning...", fg="yellow")
 
     if steps & BackendSteps.SGW_PROVISION:
         sgw_main(topology, private_key)
     else:
-        print("Skipping Sync Gateway provisioning...")
+        click.secho("Skipping Sync Gateway provisioning...", fg="yellow")
 
     if steps & BackendSteps.LB_PROVISION:
         lb_main(topology, private_key)
     else:
-        print("Skipping load balancer provisioning...")
+        click.secho("Skipping load balancer provisioning...", fg="yellow")
 
     if steps & BackendSteps.LS_PROVISION:
         logslurp_main(topology, private_key)
     else:
-        print("Skipping Logslurp provisioning...")
+        click.secho("Skipping Logslurp provisioning...", fg="yellow")
 
     if steps & BackendSteps.TS_RUN:
         topology_main(topology)
     else:
-        print("Skipping test server install and run...")
+        click.secho("Skipping test server install and run...", fg="yellow")
 
     if tdk_config_out is not None:
         with open(tdk_config_out, "w") as fout:
@@ -261,83 +265,111 @@ def main(
         write_config(tdk_config_in, topology, sys.stdout)
 
 
-if __name__ == "__main__":
-    parser = ArgumentParser(
-        description="Prepare an AWS EC2 environment for running E2E tests"
-    )
-    parser.add_argument(
-        "--private-key",
-        help="The private key to use for the SSH connection (if not default)",
-    )
-    parser.add_argument(
-        "--tdk-config-out",
-        help="The path to the write the resulting TDK configuration file (stdout if empty)",
-    )
-    parser.add_argument(
-        "--topology",
-        help="The path to the topology configuration file",
-    )
-
-    parser.add_argument(
-        "--no-terraform-apply",
-        action=RemoveFlagAction,
-        flag_to_remove=BackendSteps.TERRAFORM_APPLY,
-        help="Skip terraform apply step",
-    )
-    parser.add_argument(
-        "--no-cbs-provision",
-        action=RemoveFlagAction,
-        flag_to_remove=BackendSteps.CBS_PROVISION,
-        help="Skip Couchbase Server provisioning step",
-    )
-    parser.add_argument(
-        "--no-sgw-provision",
-        action=RemoveFlagAction,
-        flag_to_remove=BackendSteps.SGW_PROVISION,
-        help="Skip Sync Gateway provisioning step",
-    )
-    parser.add_argument(
-        "--no-lb-provision",
-        action=RemoveFlagAction,
-        flag_to_remove=BackendSteps.LS_PROVISION,
-        help="Skip load balancer provisioning step",
-    )
-    parser.add_argument(
-        "--no-ls-provision",
-        action=RemoveFlagAction,
-        flag_to_remove=BackendSteps.LS_PROVISION,
-        help="Skip Logslurp provisioning step",
-    )
-    parser.add_argument(
-        "--no-ts-run",
-        action=RemoveFlagAction,
-        flag_to_remove=BackendSteps.TS_RUN,
-        help="Skip test server install and run step",
-    )
-
-    conditional_required = parser.add_argument_group("conditionally required arguments")
-    conditional_required.add_argument(
-        "--public-key-name",
-        help="The public key stored in AWS that pairs with the private key (required if using any AWS elements)",
-    )
-
-    required = parser.add_argument_group("required arguments")
-    required.add_argument(
-        "--tdk-config-in",
-        help="The path to the input TDK configuration file",
-        required=True,
-    )
-    args = parser.parse_args()
-
-    topology: TopologyConfig = (
-        TopologyConfig(args.topology) if args.topology is not None else TopologyConfig()
-    )
+@click.command()
+@click.option(
+    "--topology",
+    help="The path to the topology configuration file",
+    default=TopologyConfig(),
+    type=TopologyParamType(),
+)
+@click.option(
+    "--public-key-name",
+    help="The public key stored in AWS that pairs with the private key (required if using any AWS elements)",
+)
+@click.option(
+    "--private-key",
+    help="The private key to use for the SSH connection (if not default)",
+    type=click.Path(exists=True),
+)
+@click.option(
+    "--tdk-config-out",
+    help="The path to the write the resulting TDK configuration file (stdout if empty)",
+    type=click.Path(writable=True),
+)
+@click.option(
+    "--no-terraform-apply",
+    type=bool,
+    is_flag=True,
+    help="Skip terraform apply step",
+    envvar="TDK_NO_TERRAFORM_APPLY",
+)
+@click.option(
+    "--no-cbs-provision",
+    type=bool,
+    is_flag=True,
+    help="Skip Couchbase Server provisioning step",
+    envvar="TDK_NO_CBS_PROVISION",
+)
+@click.option(
+    "--no-sgw-provision",
+    type=bool,
+    is_flag=True,
+    help="Skip Sync Gateway provisioning step",
+    envvar="TDK_NO_SGW_PROVISION",
+)
+@click.option(
+    "--no-lb-provision",
+    type=bool,
+    is_flag=True,
+    help="Skip load balancer provisioning step",
+    envvar="TDK_NO_LB_PROVISION",
+)
+@click.option(
+    "--no-ls-provision",
+    type=bool,
+    is_flag=True,
+    help="Skip Logslurp provisioning step",
+    envvar="TDK_NO_LS_PROVISION",
+)
+@click.option(
+    "--no-ts-run",
+    type=bool,
+    is_flag=True,
+    help="Skip test server install and run step",
+    envvar="TDK_NO_TS_RUN",
+)
+@click.option(
+    "--tdk-config-in",
+    required=True,
+    help="The path to the input TDK configuration file",
+    type=click.Path(exists=True),
+)
+def cli_entry(
+    topology: TopologyConfig,
+    public_key_name: Optional[str],
+    tdk_config_in: str,
+    private_key: Optional[str],
+    tdk_config_out: Optional[str],
+    no_terraform_apply: bool,
+    no_cbs_provision: bool,
+    no_sgw_provision: bool,
+    no_lb_provision: bool,
+    no_ls_provision: bool,
+    no_ts_run: bool,
+) -> None:
+    steps = BackendSteps.ALL
+    if no_terraform_apply:
+        steps &= ~BackendSteps.TERRAFORM_APPLY
+    if no_cbs_provision:
+        steps &= ~BackendSteps.CBS_PROVISION
+    if no_sgw_provision:
+        steps &= ~BackendSteps.SGW_PROVISION
+    if no_lb_provision:
+        steps &= ~BackendSteps.LB_PROVISION
+    if no_ls_provision:
+        steps &= ~BackendSteps.LS_PROVISION
+    if no_ts_run:
+        steps &= ~BackendSteps.TS_RUN
 
     main(
         topology,
-        args.public_key_name,
-        args.tdk_config_in,
-        args.private_key,
-        args.tdk_config_out,
-        args.steps if hasattr(args, "steps") else BackendSteps.ALL,
+        public_key_name,
+        tdk_config_in,
+        private_key,
+        tdk_config_out,
+        steps,
     )
+
+
+if __name__ == "__main__":
+    cli_entry()

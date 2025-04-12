@@ -33,6 +33,7 @@ from os import environ
 from pathlib import Path
 from typing import Set
 
+import click
 import netifaces
 
 from environment.aws.common.output import header
@@ -98,9 +99,11 @@ class iOSBridge(PlatformBridge):
         if not self.__validate_libimobiledevice(location):
             raise RuntimeError(f"device '{location}' not found!")
 
-        print()
-        print("Device not found with devicectl, falling back to xharness...")
-        print()
+        click.echo()
+        click.secho(
+            "Device not found with devicectl, falling back to xharness...", fg="yellow"
+        )
+        click.echo()
         _xharness_devices.add(location)
 
     def install(self, location: str) -> None:
@@ -149,7 +152,7 @@ class iOSBridge(PlatformBridge):
         Args:
             location (str): The device location (e.g., device UUID).
         """
-        print("iOS app uninstall deliberately not implemented")
+        click.echo("iOS app uninstall deliberately not implemented")
 
     def __validate_libimobiledevice(self, location: str) -> bool:
         self.__verify_libimobiledevice()
@@ -224,7 +227,7 @@ class iOSBridge(PlatformBridge):
             capture_output=True,
         )
 
-        print(result.stdout)
+        click.echo(result.stdout)
 
     def __run_xharness(self, location: str) -> None:
         PID_FILE.unlink() if PID_FILE.exists() else None
@@ -242,13 +245,13 @@ class iOSBridge(PlatformBridge):
             check=True,
             capture_output=True,
         )
-        print(result.stdout)
+        click.echo(result.stdout)
 
         # Extract PID from result.stdout
         match = re.search(r"pid ([0-9]+)", result.stdout.decode("utf-8"))
         if match:
             pid = match.group(1)
-            print(f"Extracted PID: {pid}")
+            click.secho(f"Extracted PID: {pid}", fg="green")
         else:
             raise RuntimeError("Failed to extract PID from XHarness output")
 
@@ -256,7 +259,7 @@ class iOSBridge(PlatformBridge):
             file.write(pid)
 
     def __stop_devicectl(self, location: str) -> None:
-        print("Finding PID of test server...")
+        click.echo("Finding PID of test server...")
         result = subprocess.run(
             [
                 "xcrun",
@@ -279,7 +282,7 @@ class iOSBridge(PlatformBridge):
 
         stdout = result.stdout.decode("utf-8").splitlines()
         app_path = stdout[-1].strip()
-        print(f"\tApp Path: {app_path}")
+        click.echo(f"\tApp Path: {app_path}")
 
         result = subprocess.run(
             [
@@ -302,7 +305,7 @@ class iOSBridge(PlatformBridge):
             raise RuntimeError(f"Failed to find PID in output: {stdout}")
 
         pid = app_path_line.split(" ")[0]
-        print(f"\tPID {pid}")
+        click.echo(f"\tPID {pid}")
         subprocess.run(
             [
                 "xcrun",
@@ -326,7 +329,7 @@ class iOSBridge(PlatformBridge):
         with open(PID_FILE) as file:
             pid = file.read().strip()
 
-        print(f"\t...PID {pid}")
+        click.echo(f"\t...PID {pid}")
 
         subprocess.run(
             [
@@ -358,7 +361,7 @@ class iOSBridge(PlatformBridge):
                     continue
 
                 ip = addr[netifaces.AF_INET][0]["broadcast"]
-                print(f"Broadcasting ping request on {interface} ({ip})")
+                click.echo(f"Broadcasting ping request on {interface} ({ip})")
                 subprocess.run(
                     ["ping", ip, "-c", "3"], check=True, capture_output=True, text=True
                 )

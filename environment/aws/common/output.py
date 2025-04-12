@@ -6,7 +6,7 @@ Functions:
         Print a green text header that makes the message very obvious
 """
 
-from termcolor import colored
+import click
 
 
 def header(text: str) -> None:
@@ -18,6 +18,7 @@ def header(text: str) -> None:
     Args:
         text (str): The text to print
     """
-    print()
-    print(colored(f"=== {text} ===", "green"))
-    print()
+
+    click.echo()
+    click.secho(f"=== {text} ===", fg="green")
+    click.echo()

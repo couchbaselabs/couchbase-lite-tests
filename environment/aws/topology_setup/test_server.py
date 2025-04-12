@@ -51,6 +51,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Callable, Dict, Type
 
+import click
 import requests
 
 from environment.aws.common.io import download_progress_bar
@@ -229,8 +230,8 @@ class TestServer(ABC):
         download_dir = DOWNLOADED_TEST_SERVER_DIR / self.platform / self.version
         download_dir.mkdir(parents=True, exist_ok=True)
         if (download_dir / ".downloaded").exists():
-            print("Already downloaded")
-            print()
+            click.secho("Already downloaded", fg="green")
+            click.echo()
             return
 
         url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.latestbuilds_path}"
@@ -243,7 +244,6 @@ class TestServer(ABC):
         response = requests.get(url, stream=True)
         file_path = download_dir / Path(url).name
         download_progress_bar(response, file_path)
-        print(file_path)
         self.uncompress_package(file_path)
         Path(download_dir / ".downloaded").touch()
         self._downloaded = True
@@ -294,14 +294,14 @@ def copy_dataset(dest_dir: Path, version: str):
     shutil.rmtree(dest_db_dir, ignore_errors=True)
     dest_db_dir.mkdir(0o755)
     for db in db_dir.glob("*.zip"):
-        print(f"Copying {db} -> {dest_db_dir / db.name}")
+        click.echo(f"Copying {db} -> {dest_db_dir / db.name}")
         shutil.copy2(db, dest_db_dir)
 
     dest_blob_dir = dest_dir / "blobs"
     shutil.rmtree(dest_blob_dir, ignore_errors=True)
     dest_blob_dir.mkdir(0o755)
     for blob in blob_dir.iterdir():
-        print(f"Copying {blob} -> {dest_blob_dir / blob.name}")
+        click.echo(f"Copying {blob} -> {dest_blob_dir / blob.name}")
         shutil.copy2(blob, dest_blob_dir)
 
 

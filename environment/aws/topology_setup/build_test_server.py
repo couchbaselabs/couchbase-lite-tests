@@ -20,6 +20,7 @@ from io import TextIOWrapper
 from pathlib import Path
 from typing import cast
 
+import click
 import paramiko
 import requests
 
@@ -93,21 +94,23 @@ def main() -> None:
         )
 
     if args.ci and upload_exists(server):
-        print("Server already exists on latestbuilds, skipping build")
+        click.secho("Server already exists on latestbuilds, skipping build", fg="green")
         exit(0)
 
     server.build()
 
     if not args.ci and not args.upload:
-        print("Upload not requested, skipping")
+        click.secho("Upload not requested, skipping", fg="yellow")
         exit(0)
 
     if upload_exists(server):
-        print("Server already exists on latestbuilds, skipping upload")
+        click.secho(
+            "Server already exists on latestbuilds, skipping upload", fg="yellow"
+        )
         exit(0)
 
     if "LATESTBUILDS_PASSWORD" not in os.environ:
-        print("LATESTBUILDS_PASSWORD env var is not set")
+        click.secho("LATESTBUILDS_PASSWORD env var is not set", fg="red")
         exit(1)
 
     package_path = Path(server.compress_package())
@@ -119,7 +122,6 @@ def main() -> None:
         password=os.environ["LATESTBUILDS_PASSWORD"],
     )
 
-    print(f"/data/builds/latestbuilds/{server.latestbuilds_path}")
     header("Uploading compressed server")
     sftp = ssh.open_sftp()
     sftp_progress_bar(

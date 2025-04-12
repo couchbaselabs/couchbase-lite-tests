@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import click
 import requests
 
 from environment.aws.common.io import download_progress_bar
@@ -21,8 +22,8 @@ class CBLLibraryDownloader:
         else:
             download_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.__project}/{self.__version}/{self.__build}/{self.__file}"
 
-        print(f"Downloading CBL from {download_url}")
+        click.echo(f"Downloading CBL from {download_url}")
         response = requests.get(download_url, stream=True)
         response.raise_for_status()
         download_progress_bar(response, location)
-        print("Done")
+        click.echo("Done")
