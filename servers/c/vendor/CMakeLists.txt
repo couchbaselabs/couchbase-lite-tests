@@ -25,7 +25,7 @@ include(FetchContent)
 FetchContent_Declare(
         civetweb
         GIT_REPOSITORY https://github.com/couchbasedeps/civetweb
-        GIT_TAG cbl_c_testserver
+        GIT_TAG v1.16-couchbase
         GIT_SHALLOW TRUE
 )
 
@@ -46,12 +46,8 @@ set(BUILD_SHARED_LIBS OFF) # Ugh how many times do I have to tell you?!
 message(STATUS "Fetching civetweb...")
 FetchContent_MakeAvailable(civetweb)
 
-FetchContent_Declare(
-        json
-        GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent
-        GIT_TAG v3.9.1
-        GIT_SHALLOW TRUE
-)
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_MakeAvailable(json)
 message(STATUS "Fetching json...")
 FetchContent_MakeAvailable(json)
 
@@ -59,7 +55,7 @@ if(MSVC)
     FetchContent_Declare(
             zlib
             GIT_REPOSITORY https://github.com/couchbasedeps/zlib
-            GIT_TAG master
+            GIT_TAG v1.3.1
             GIT_SHALLOW TRUE
     )
 
@@ -88,7 +84,7 @@ FetchContent_MakeAvailable(ixwebsocket)
 FetchContent_Declare(
         libzip
         GIT_REPOSITORY https://github.com/nih-at/libzip
-        GIT_TAG v1.7.3
+        GIT_TAG v1.11.3
         GIT_SHALLOW TRUE
 )
 

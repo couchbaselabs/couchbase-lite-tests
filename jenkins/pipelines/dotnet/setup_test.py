@@ -71,7 +71,7 @@ def cli_entry(
                 "version": sgw_version,
             },
         }
-        topology["tag"] = platform
+        topology["tag"] = f"dotnet_{platform}"
         topology["test_servers"][0]["cbl_version"] = cbl_version
         topology["test_servers"][0]["dataset_version"] = dataset_version
         with open(topology_file, "w") as fout:

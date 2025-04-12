@@ -16,6 +16,7 @@ Functions:
         Unzip the contents of a zip file to a directory.
 """
 
+from contextlib import contextmanager
 import os
 import tarfile
 import zipfile

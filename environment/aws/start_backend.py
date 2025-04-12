@@ -375,6 +375,33 @@ def cli_entry(
         steps,
     )
 
+def script_entry(
+    topology: TopologyConfig,
+    public_key_name: Optional[str],
+    tdk_config_in: str,
+    private_key: Optional[str] = None,
+    tdk_config_out: Optional[str] = None,
+    steps: Optional[BackendSteps] = None,
+) -> None:
+    if steps is not None:
+        main(
+            topology,
+            public_key_name,
+            tdk_config_in,
+            private_key,
+            tdk_config_out,
+            steps,
+        )
+    else:
+        args = [
+            "--topology", topology,
+            "--public-key-name", public_key_name,
+            "--tdk-config-in", tdk_config_in,
+            "--private-key", private_key,
+            "--tdk-config-out", tdk_config_out
+        ]
+        cli_entry(args)
+
 
 if __name__ == "__main__":
     cli_entry()

@@ -5,7 +5,7 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'CBL_DATASET_VERSION', defaultValue: '', description: "The dataset version to use (e.g. 3.2 or 4.0)")
-        string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
+        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
     }
     options {
         timeout(time: 60, unit: 'MINUTES')
@@ -17,6 +17,7 @@ pipeline {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
                     if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
                     currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD}-${CBL_EDITION} (#${currentBuild.number})"
                     currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION}"
                 }
@@ -32,22 +33,19 @@ pipeline {
                     }
                     steps {
                         echo "Run macOS Test"
-                        sh "jenkins/pipelines/c/macos_test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.CBL_DATASET_VERSION}' '${params.SGW_URL}'"
+                        sh "jenkins/pipelines/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} macos '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                     }
                     post { 
                         always { 
                             echo "Teardown macOS Test"
-                            sh 'jenkins/pipelines/c/macos_teardown.sh'
+                            sh 'jenkins/pipelines/c/teardown.sh'
                         }
                     }
                 }
                 stage('iOS') {
-                    when {
-                        expression { return false } // Skip for now
-                    }
                     agent { label 'mob-e2e-mac-01' }
                     options {
-                        lock('mob-e2e-mac-01')
+                        lock('mob-e2e-iphone-01')
                         timeout(time: 60, unit: 'MINUTES') 
                     }
                     environment { 
@@ -57,12 +55,12 @@ pipeline {
                         // Unlock keychain:
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "Run iOS Test"
-                        sh "jenkins/pipelines/c/ios_test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.CBL_DATASET_VERSION}' '${params.SGW_URL}'"
+                        sh "jenkins/pipelines/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                     }
                     post { 
                         always { 
                             echo "Teardown iOS Test"
-                            sh 'jenkins/pipelines/c/ios_teardown.sh'
+                            sh 'jenkins/pipelines/c/teardown.sh'
                         }
                     }
                 }
@@ -74,12 +72,12 @@ pipeline {
                     }
                     steps {
                         echo "Run linux Test"
-                        sh "jenkins/pipelines/c/linux_test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.CBL_DATASET_VERSION}' '${params.SGW_URL}'"
+                        sh "jenkins/pipelines/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} linux_x86_64 '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                     }
                     post { 
                         always { 
                             echo "Teardown linux Test"
-                            sh 'jenkins/pipelines/c/linux_teardown.sh'
+                            sh 'jenkins/pipelines/c/teardown.sh'
                         }
                     }
                 }
@@ -90,12 +88,12 @@ pipeline {
                         timeout(time: 60, unit: 'MINUTES') 
                     }
                     steps {
-                        pwsh "jenkins\\pipelines\\c\\wins_test.ps1 -Edition ${params.CBL_EDITION} -Version ${params.CBL_VERSION} -Build ${params.CBL_BUILD} -DatasetVersion ${params.CBL_DATASET_VERSION} -SgwUrl ${params.SGW_URL}"
+                        pwsh "jenkins\\pipelines\\c\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
                     }
                     post { 
                         always { 
                             echo "Teardown Windows Test"
-                            pwsh 'jenkins\\pipelines\\c\\wins_teardown.ps1'
+                            pwsh 'jenkins\\pipelines\\c\\teardown.ps1'
                         }
                     }
                 }
