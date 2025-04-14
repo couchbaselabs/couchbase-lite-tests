@@ -22,6 +22,34 @@ TEST_COMPONENTS_MAPPING = {
         "edge-servers": 1,
         "http-clients": 0
     },
+    "test_changes_feed": {
+        "test-servers": 0,
+        "sync-gateways": 1,
+        "couchbase-servers": 1,
+        "edge-servers": 1,
+        "http-clients": 0
+    },
+    "test_db_uuid": {
+        "test-servers": 0,
+        "sync-gateways": 0,
+        "couchbase-servers": 0,
+        "edge-servers": 1,
+        "http-clients": 0
+    },
+    "test_audit_logging": {
+        "test-servers": 0,
+        "sync-gateways": 1,
+        "couchbase-servers": 1,
+        "edge-servers": 1,
+        "http-clients": 0
+    },
+    "test_system": {
+        "test-servers": 0,
+        "sync-gateways": 1,
+        "couchbase-servers": 1,
+        "edge-servers": 1,
+        "http-clients": 1
+    },
     "test_chaos_scenarios":{
         "test-servers": 0,
         "sync-gateways": 1,
