@@ -65,7 +65,7 @@ class TestLogging(CBLTestClass):
             "num_index_replicas": 0
         }
         payload = PutDatabasePayload(config)
-        # await sync_gateway.put_database(sg_db_name, payload)
+        await sync_gateway.put_database(sg_db_name, payload)
         logger.info(f"Database created in Sync Gateway and linked to {bucket_name}.")
 
         input_data = {
@@ -93,14 +93,14 @@ class TestLogging(CBLTestClass):
         response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
 
         self.mark_test_step("Check that Sync Gateway has 5 documents")
-        # assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Sync Gateway initially.")
 
         logger.info("Checking initial document sync from Sync Gateway to Edge Server...")
         response = await edge_server.get_all_documents(es_db_name)
 
         self.mark_test_step("Check that Edge Server has 5 documents")
-        # assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Edge Server initially.")
 
         self.mark_test_step("Checking audit logs for start and stop")
@@ -180,7 +180,7 @@ class TestLogging(CBLTestClass):
             "num_index_replicas": 0
         }
         payload = PutDatabasePayload(config)
-        # await sync_gateway.put_database(sg_db_name, payload)
+        await sync_gateway.put_database(sg_db_name, payload)
         logger.info(f"Database created in Sync Gateway and linked to {bucket_name}.")
 
         input_data = {
@@ -280,7 +280,7 @@ class TestLogging(CBLTestClass):
             "num_index_replicas": 0
         }
         payload = PutDatabasePayload(config)
-        # await sync_gateway.put_database(sg_db_name, payload)
+        await sync_gateway.put_database(sg_db_name, payload)
         logger.info(f"Database created in Sync Gateway and linked to {bucket_name}.")
 
         input_data = {
@@ -308,14 +308,14 @@ class TestLogging(CBLTestClass):
         response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
 
         self.mark_test_step("Check that Sync Gateway has 5 documents")
-        # assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Sync Gateway initially.")
 
         logger.info("Checking initial document sync from Sync Gateway to Edge Server...")
         response = await edge_server.get_all_documents(es_db_name)
 
         self.mark_test_step("Check that Edge Server has 5 documents")
-        # assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Edge Server initially.")
 
         self.mark_test_step("Checking audit logs for start and stop")
