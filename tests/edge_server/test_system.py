@@ -34,7 +34,7 @@ class TestSystem(CBLTestClass):
         self.mark_test_step("Starting system test with Server, Sync Gateway, Edge Server and 1 client")
 
         # Calculate end time for 30 minutes from now
-        end_time = datetime.now() + timedelta(minutes=180)
+        end_time = datetime.now() + timedelta(minutes=360)
 
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
@@ -49,7 +49,7 @@ class TestSystem(CBLTestClass):
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat()
             }
-        #     server.add_document(bucket_name, doc["id"], doc)
+            server.add_document(bucket_name, doc["id"], doc)
         logger.info("10 documents created in Couchbase Server.")
 
         self.mark_test_step("Creating a database in Sync Gateway and adding a user and role.")
@@ -68,15 +68,15 @@ class TestSystem(CBLTestClass):
             "num_index_replicas": 0
         }
         payload = PutDatabasePayload(config)
-        # await sync_gateway.put_database(sg_db_name, payload)
+        await sync_gateway.put_database(sg_db_name, payload)
         logger.info(f"Database created in Sync Gateway and linked to {bucket_name}.")
 
         input_data = {
             "_default._default": ["public"]
         }
         access_dict = sync_gateway.create_collection_access_dict(input_data)
-        # await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
-        # await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
+        await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
+        await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
         logger.info("User and role added to Sync Gateway.")
 
@@ -96,17 +96,17 @@ class TestSystem(CBLTestClass):
         response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
 
         self.mark_test_step("Check that Sync Gateway has 10 documents")
-        # assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Sync Gateway initially.")
 
         logger.info("Checking initial document sync from Sync Gateway to Edge Server...")
         response = await edge_server.get_all_documents(es_db_name)
 
         self.mark_test_step("Check that Edge Server has 10 documents")
-        # assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Edge Server initially.")
 
-        doc_counter = 46 # Initialize the document counter
+        doc_counter = 11 # Initialize the document counter
 
         # Run until 30 minutes have passed
         while datetime.now() < end_time:
@@ -292,7 +292,7 @@ class TestSystem(CBLTestClass):
         self.mark_test_step("Starting system test with Server, Sync Gateway, Edge Server and 1 client with intermittent connectivity with Edge Server")
 
         # Calculate end time for 30 minutes from now
-        end_time = datetime.now() + timedelta(minutes=180)
+        end_time = datetime.now() + timedelta(minutes=360)
 
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
@@ -326,15 +326,15 @@ class TestSystem(CBLTestClass):
             "num_index_replicas": 0
         }
         payload = PutDatabasePayload(config)
-        # await sync_gateway.put_database(sg_db_name, payload)
+        await sync_gateway.put_database(sg_db_name, payload)
         logger.info(f"Database created in Sync Gateway and linked to {bucket_name}.")
 
         input_data = {
             "_default._default": ["public"]
         }
         access_dict = sync_gateway.create_collection_access_dict(input_data)
-        # await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
-        # await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
+        await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
+        await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
         logger.info("User and role added to Sync Gateway.")
 
@@ -357,17 +357,17 @@ class TestSystem(CBLTestClass):
         response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
 
         self.mark_test_step("Check that Sync Gateway has 10 documents")
-        # assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Sync Gateway initially.")
 
         logger.info("Checking initial document sync from Sync Gateway to Edge Server...")
         response = await edge_server.get_all_documents(es_db_name)
 
         self.mark_test_step("Check that Edge Server has 10 documents")
-        # assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Edge Server initially.")
 
-        doc_counter = 2000 # Initialize the document counter
+        doc_counter = 11 # Initialize the document counter
 
         # Run until 30 minutes have passed
         while datetime.now() < end_time:
@@ -582,7 +582,7 @@ class TestSystem(CBLTestClass):
         self.mark_test_step("Starting system test with Server, Sync Gateway, Edge Server and HTTP clients")
 
         # Calculate end time for 30 minutes from now
-        end_time = datetime.now() + timedelta(minutes=120)
+        end_time = datetime.now() + timedelta(minutes=360)
 
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
@@ -616,15 +616,15 @@ class TestSystem(CBLTestClass):
             "num_index_replicas": 0
         }
         payload = PutDatabasePayload(config)
-        # await sync_gateway.put_database(sg_db_name, payload)
+        await sync_gateway.put_database(sg_db_name, payload)
         logger.info(f"Database created in Sync Gateway and linked to {bucket_name}.")
 
         input_data = {
             "_default._default": ["public"]
         }
         access_dict = sync_gateway.create_collection_access_dict(input_data)
-        # await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
-        # await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
+        await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
+        await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
         logger.info("User and role added to Sync Gateway.")
 
@@ -644,14 +644,14 @@ class TestSystem(CBLTestClass):
         response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
 
         self.mark_test_step("Check that Sync Gateway has 10 documents")
-        # assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Sync Gateway initially.")
 
         logger.info("Checking initial document sync from Sync Gateway to Edge Server...")
         response = await edge_server.get_all_documents(es_db_name)
 
         self.mark_test_step("Check that Edge Server has 10 documents")
-        # assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Edge Server initially.")
 
         self.mark_test_step("Check that Edge Server and Sync Gateway have the same number of documents")
@@ -673,7 +673,7 @@ class TestSystem(CBLTestClass):
         last_three_docs = [doc.id for doc in sg_response.rows[-3:]]
         print(last_three_docs)
 
-        doc_counter = 25000 # Initialize the document counter
+        doc_counter = 11 # Initialize the document counter
 
         # Run until 30 minutes have passed
         while datetime.now() < end_time:
@@ -908,7 +908,7 @@ class TestSystem(CBLTestClass):
         self.mark_test_step("Starting system test with Server, Sync Gateway, Edge Server and HTTP clients with intermittent connectivity with Edge Server")
 
         # Calculate end time for 30 minutes from now
-        end_time = datetime.now() + timedelta(minutes=180)
+        end_time = datetime.now() + timedelta(minutes=360)
 
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
@@ -942,15 +942,15 @@ class TestSystem(CBLTestClass):
             "num_index_replicas": 0
         }
         payload = PutDatabasePayload(config)
-        # await sync_gateway.put_database(sg_db_name, payload)
+        await sync_gateway.put_database(sg_db_name, payload)
         logger.info(f"Database created in Sync Gateway and linked to {bucket_name}.")
 
         input_data = {
             "_default._default": ["public"]
         }
         access_dict = sync_gateway.create_collection_access_dict(input_data)
-        # await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
-        # await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
+        await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
+        await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
         logger.info("User and role added to Sync Gateway.")
 
@@ -973,14 +973,14 @@ class TestSystem(CBLTestClass):
         response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
 
         self.mark_test_step("Check that Sync Gateway has 10 documents")
-        # assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Sync Gateway initially.")
 
         logger.info("Checking initial document sync from Sync Gateway to Edge Server...")
         response = await edge_server.get_all_documents(es_db_name)
 
         self.mark_test_step("Check that Edge Server has 10 documents")
-        # assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
         logger.info(f"Found {len(response.rows)} documents synced to Edge Server initially.")
 
         self.mark_test_step("Check that Edge Server and Sync Gateway have the same number of documents")
@@ -1001,7 +1001,7 @@ class TestSystem(CBLTestClass):
 
         last_three_docs = [doc.id for doc in sg_response.rows[-3:]]
 
-        doc_counter = 17000 # Initialize the document counter
+        doc_counter = 11 # Initialize the document counter
 
         # Run until 30 minutes have passed
         while datetime.now() < end_time:
@@ -1050,7 +1050,7 @@ class TestSystem(CBLTestClass):
                 time.sleep(10)
                 edge_server_down = True
 
-            # self.mark_test_step("Randomizing the client to perform the operation")
+            self.mark_test_step("Randomizing the client to perform the operation")
             client = random.choice(range(1, num_of_clients+1))
             self.mark_test_step(f"Client {client} selected, continuing with the test...")
             logger.info(f"Client {client} selected to perform the operation")
