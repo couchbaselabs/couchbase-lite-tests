@@ -1,19 +1,10 @@
-#!/bin/bash
-# Clean up after running Android tests
+#!/bin/bash -e
 
-# try to kill the test server
-adb uninstall com.couchbase.lite.android.mobiletest 2 >& 1 > /dev/null || true
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-echo "Shutdown Environment"
-pushd environment > /dev/null
-docker compose down
-
-# kill logcat
-logcat_pid=$(cat logcat.pid)
-if [ -n "$logcat_pid" ]; then
-   kill $logcat_pid
-fi
-
-# just in case the last attempt failed
-adb uninstall com.couchbase.lite.android.mobiletest 2 >& 1 > /dev/null || true
-
+export PYTHONPATH=$SCRIPT_DIR/../../../
+pushd $SCRIPT_DIR/../../../environment/aws
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python3 ./stop_backend.py --topology topology_setup/topology.json

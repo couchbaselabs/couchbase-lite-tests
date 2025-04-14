@@ -15,7 +15,7 @@ from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_info, cbl_warning
-from cbltest.utils import assert_not_null, nameof
+from cbltest.utils import assert_not_null
 from cbltest.version import VERSION
 
 
@@ -29,7 +29,7 @@ class _CollectionMap(JSONSerializable):
         return list(self.__collections.keys())
 
     def __init__(self, scope_name: str) -> None:
-        _assert_not_null(scope_name, nameof(scope_name))
+        _assert_not_null(scope_name, "scope_name")
         self.__scope_name = scope_name
         self.__collections: Dict[str, dict] = {}
 
@@ -53,7 +53,7 @@ class PutDatabasePayload(JSONSerializable):
         return self.__bucket
 
     def __init__(self, dataset_or_config: dict):
-        _assert_not_null(dataset_or_config, nameof(dataset_or_config))
+        _assert_not_null(dataset_or_config, "dataset_or_config")
         assert isinstance(dataset_or_config, dict), (
             "Invalid dataset_or_config passed to PutDatabasePayload"
         )
@@ -100,7 +100,7 @@ class PutDatabasePayload(JSONSerializable):
         :param scope_name: The name of the scope in which the collection resides
         :param collection_name: The name of the collection to retrieve data from
         """
-        _assert_not_null(scope_name, nameof(scope_name))
+        _assert_not_null(scope_name, "scope_name")
         col_map = self.__scopes.get(scope_name, _CollectionMap(collection_name))
         self.__scopes[scope_name] = col_map
         col_map.add_collection(collection_name, payload)
@@ -426,7 +426,7 @@ class SyncGateway:
 
         :param db_name: The DB to replicate with
         """
-        _assert_not_null(db_name, nameof(db_name))
+        _assert_not_null(db_name, "db_name")
         return urljoin(self.__replication_url, db_name)
 
     async def _put_database(

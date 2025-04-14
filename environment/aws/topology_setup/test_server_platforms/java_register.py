@@ -272,7 +272,7 @@ class JAKTestServer(TestServer):
             / "assets"
             / self.dataset_version
         )
-        dest_dir.mkdir(0o755, exist_ok=True)
+        dest_dir.mkdir(0o755, parents=True, exist_ok=True)
         copy_dataset(dest_dir, self.dataset_version)
 
     def build(self) -> None:

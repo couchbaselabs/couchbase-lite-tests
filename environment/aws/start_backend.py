@@ -17,7 +17,6 @@ Functions:
 """
 
 import json
-import os
 import subprocess
 import sys
 from enum import Flag, auto
@@ -34,6 +33,7 @@ if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
         cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
+from environment.aws.common.io import pushd
 from environment.aws.common.output import header
 from environment.aws.lb_setup.setup_load_balancers import main as lb_main
 from environment.aws.logslurp_setup.setup_logslurp import main as logslurp_main
@@ -72,56 +72,57 @@ def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) ->
     Raises:
         Exception: If any Terraform command fails.
     """
-    os.chdir(SCRIPT_DIR)
-    header("Starting terraform apply")
-    sgw_count = topology.total_sgw_count
-    cbs_count = topology.total_cbs_count
-    lb_count = topology.total_lb_count
-    wants_logslurp = str(topology.wants_logslurp).lower()
 
-    if (
-        sgw_count == 0
-        and cbs_count == 0
-        and lb_count == 0
-        and not topology.wants_logslurp
-    ):
-        click.secho("No AWS resources requested, skipping terraform", fg="yellow")
-        return
+    with pushd(SCRIPT_DIR):
+        header("Starting terraform apply")
+        sgw_count = topology.total_sgw_count
+        cbs_count = topology.total_cbs_count
+        lb_count = topology.total_lb_count
+        wants_logslurp = str(topology.wants_logslurp).lower()
 
-    if public_key_name is None:
-        raise Exception(
-            "--public-key-name was not provided, but it is required for AWS resources."
-        )
+        if (
+            sgw_count == 0
+            and cbs_count == 0
+            and lb_count == 0
+            and not topology.wants_logslurp
+        ):
+            click.secho("No AWS resources requested, skipping terraform", fg="yellow")
+            return
 
-    result = subprocess.run(["terraform", "init"], capture_output=False, text=True)
-    if result.returncode != 0:
-        raise Exception(
-            f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
-        )
+        if public_key_name is None:
+            raise Exception(
+                "--public-key-name was not provided, but it is required for AWS resources."
+            )
 
-    command = [
-        "terraform",
-        "apply",
-        f"-var=key_name={public_key_name}",
-        f"-var=server_count={cbs_count}",
-        f"-var=sgw_count={sgw_count}",
-        f"-var=lb_count={lb_count}",
-        f"-var=logslurp={wants_logslurp}",
-        "-auto-approve",
-    ]
-    result = subprocess.run(command, capture_output=False, text=True)
+        result = subprocess.run(["terraform", "init"], capture_output=False, text=True)
+        if result.returncode != 0:
+            raise Exception(
+                f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
+            )
 
-    if result.returncode != 0:
-        raise Exception(
-            f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
-        )
+        command = [
+            "terraform",
+            "apply",
+            f"-var=key_name={public_key_name}",
+            f"-var=server_count={cbs_count}",
+            f"-var=sgw_count={sgw_count}",
+            f"-var=lb_count={lb_count}",
+            f"-var=logslurp={wants_logslurp}",
+            "-auto-approve",
+        ]
+        result = subprocess.run(command, capture_output=False, text=True)
 
-    topology.read_from_terraform()
+        if result.returncode != 0:
+            raise Exception(
+                f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
+            )
 
-    header("Done, sleeping for 5s")
-    # The machines won't be ready immediately, so we need to wait a bit
-    # before SSH access succeeds
-    sleep(5)
+        topology.read_from_terraform()
+
+        header("Done, sleeping for 5s")
+        # The machines won't be ready immediately, so we need to wait a bit
+        # before SSH access succeeds
+        sleep(5)
 
 
 def write_config(
@@ -220,15 +221,19 @@ def main(
     if steps & BackendSteps.TERRAFORM_APPLY:
         terraform_apply(public_key_name, topology)
     else:
-        result = subprocess.run(["terraform", "init"], capture_output=False, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
+        with pushd(SCRIPT_DIR):
+            result = subprocess.run(
+                ["terraform", "init"], capture_output=False, text=True
             )
-        click.echo()
-        click.secho("Skipping terraform apply...", fg="yellow")
-        click.echo()
-        topology.read_from_terraform()
+            if result.returncode != 0:
+                raise Exception(
+                    f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
+                )
+
+            click.echo()
+            click.secho("Skipping terraform apply...", fg="yellow")
+            click.echo()
+            topology.read_from_terraform()
 
     topology.resolve_test_servers()
     topology.dump()
