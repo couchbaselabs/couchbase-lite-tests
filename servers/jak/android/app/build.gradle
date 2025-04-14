@@ -22,7 +22,7 @@ plugins {
 
 ext {
     SERVER_VERSION = file("${ROOT_DIR}/version.txt").text.trim()
-    SERVER_BUILD  = "${getBuildId()}"
+    SERVER_BUILD = "${getBuildId()}"
 
     SPOTBUGS_VERSION = '4.7.3'
 
@@ -36,13 +36,17 @@ ext {
 }
 
 def COUCHBASE_LITE_VERSION = project.hasProperty("cblVersion") ? cblVersion : ""
-if (!(COUCHBASE_LITE_VERSION =~ /^\d{1,2}\.\d{1,2}\.\d{1,2}([ab.]\d)?-/)) { throw new InvalidUserDataException ("!!! Bad Couchbase version: ${COUCHBASE_LITE_VERSION}") }
+if (!(COUCHBASE_LITE_VERSION =~ /^\d{1,2}\.\d{1,2}\.\d{1,2}([ab.]\d)?-/)) {
+    throw new InvalidUserDataException("!!! Bad Couchbase version: ${COUCHBASE_LITE_VERSION}")
+}
 
 // If it is a snapshot, it is in maven local
 def USE_LOCAL_MAVEN = COUCHBASE_LITE_VERSION.endsWith("SNAPSHOT")
 
 def DATASET_VERSION = project.hasProperty("datasetVersion") ? datasetVersion : ""
-if (!(DATASET_VERSION =~ /^\d{1,2}\.\d{1,2}/)) { throw new InvalidUserDataException ("!!! Bad dataset version: ${DATASET_VERSION}") }
+if (!(DATASET_VERSION =~ /^\d{1,2}\.\d{1,2}/)) {
+    throw new InvalidUserDataException("!!! Bad dataset version: ${DATASET_VERSION}")
+}
 def ASSETS_DIR = "${ASSETS_ROOT}/${DATASET_VERSION}"
 
 println "Building test server ${SERVER_VERSION}@${SERVER_BUILD} for CBL Android ${COUCHBASE_LITE_VERSION} with ${DATASET_VERSION} data"
@@ -126,7 +130,10 @@ android {
 repositories {
     if (USE_LOCAL_MAVEN) { mavenLocal() }
     else {
-        maven { url 'https://proget.sc.couchbase.com/maven2/internalmaven' }
+        maven {
+            url 'https://proget.sc.couchbase.com/maven2/internalmaven'
+            content { includeGroupByRegex "com\\.couchbase\\.lite.*" }
+        }
     }
 
     // Home of NanoHTTP
@@ -136,7 +143,6 @@ repositories {
     mavenCentral()
 }
 
-configurations.all { resolutionStrategy.cacheChangingModulesFor 1, 'seconds' }
 dependencies {
     compileOnly "com.github.spotbugs:spotbugs-annotations:${SPOTBUGS_VERSION}"
 
@@ -154,7 +160,7 @@ dependencies {
 
     implementation 'org.nanohttpd:nanohttpd:2.3.2-SNAPSHOT'
 
-    implementation ("com.couchbase.lite:couchbase-lite-android-ee-ktx:${COUCHBASE_LITE_VERSION}") { changing = true }
+    implementation "com.couchbase.lite:couchbase-lite-android-ee-ktx:${COUCHBASE_LITE_VERSION}"
 
     testImplementation 'junit:junit:4.13.2'
 
@@ -287,7 +293,7 @@ def getVersionCode(version) {
 def getBuildId() {
     def hostname = "rogue"
     try { hostname = "hostname".execute().text.trim() }
-    catch (Exception ignore) { }
+    catch (Exception ignore) {}
 
     return "${getCommit().substring(0, 10)} on ${hostname}"
 }
@@ -295,7 +301,7 @@ def getBuildId() {
 def getCommit() {
     def commit = "unofficial"
     try { commit = "git rev-parse HEAD".execute().text.trim() }
-    catch (Exception ignore) { }
+    catch (Exception ignore) {}
     return commit
 }
 

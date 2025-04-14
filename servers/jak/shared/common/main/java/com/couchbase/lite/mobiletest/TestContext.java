@@ -41,21 +41,25 @@ public final class TestContext implements AutoCloseable {
     @Nullable
     private Map<String, Replicator> openRepls;
     @Nullable
-    private Map<String, DocReplListener> openListeners;
+    private Map<String, DocReplListener> openDocListeners;
     @Nullable
     private Map<String, Snapshot> openSnapshots;
+    @Nullable
+    private Map<String, URLEndpointListener> openEndptListeners;
 
     TestContext(@NonNull String client) { this.client = client; }
 
     @Override
     public void close() {
         // belt
-        openListeners = null;
+        openDocListeners = null;
 
         // ... and suspenders...
         openSnapshots = null;
 
         stopRepls();
+
+        stopEndptListeners();
 
         closeCollections();
 
@@ -82,107 +86,148 @@ public final class TestContext implements AutoCloseable {
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
     public void addDb(@NonNull String name, @NonNull Database db) {
         Log.p(TAG, "Adding database to context: " + name);
-        if (openDbs == null) { openDbs = new HashMap<>(); }
-        if (openDbs.containsKey(name)) { throw new ClientError("Attempt to replace an open database"); }
-        openDbs.put(name, db);
+        Map<String, Database> dbs = openDbs;
+        if (dbs == null) {
+            dbs = new HashMap<>();
+            openDbs = dbs;
+        }
+        if (dbs.containsKey(name)) { throw new ClientError("Attempt to replace an open database"); }
+        dbs.put(name, db);
     }
 
     @Nullable
-    public Database getDb(@NonNull String name) { return (openDbs == null) ? null : openDbs.get(name); }
-
-    @Nullable
-    public Database removeDb(@NonNull String name) { return (openDbs == null) ? null : openDbs.remove(name); }
-
-    public void addListener(@NonNull String id, @NonNull URLEndpointListener listener) {
-        // TODO: implement
-        throw new UnsupportedOperationException("Not implemented");
-    }
-
-    public void removeListener(@NonNull String id) {
-        // TODO: implement
-        throw new UnsupportedOperationException("Not implemented");
+    public Database getDb(@NonNull String name) {
+        final Map<String, Database> dbs = openDbs;
+        return (dbs == null) ? null : dbs.get(name);
     }
 
     @Nullable
-    public URLEndpointListener getListener(@NonNull String id) {
-        // TODO: implement
-        throw new UnsupportedOperationException("Not implemented");
+    public Database removeDb(@NonNull String name) {
+        final Map<String, Database> dbs = openDbs;
+        return (dbs == null) ? null : dbs.remove(name);
     }
 
     @Nullable
     public Collection getOpenCollection(@NonNull String collFqn) {
-        return (openCollections == null) ? null : openCollections.get(collFqn);
+        final Map<String, Collection> collections = openCollections;
+        return (collections == null) ? null : collections.get(collFqn);
     }
 
     public void addOpenCollection(@NonNull Collection collection) {
-        if (openCollections == null) { openCollections = new HashMap<>(); }
-        openCollections.put(DatabaseService.getCollectionFQN(collection), collection);
+        Map<String, Collection> collections = openCollections;
+        if (collections == null) {
+            collections = new HashMap<>();
+            openCollections = collections;
+        }
+        collections.put(DatabaseService.getCollectionFQN(collection), collection);
     }
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
     public void addRepl(@NonNull String id, @NonNull Replicator repl) {
-        if (openRepls == null) { openRepls = new HashMap<>(); }
-        if (openRepls.containsKey(id)) { throw new ClientError("Attempt to replace an existing replicator"); }
-        openRepls.put(id, repl);
+        Map<String, Replicator> repls = openRepls;
+        if (repls == null) {
+            repls = new HashMap<>();
+            openRepls = repls;
+        }
+        if (repls.containsKey(id)) { throw new ClientError("Attempt to replace an existing replicator"); }
+        repls.put(id, repl);
     }
 
     @Nullable
-    public Replicator getRepl(@NonNull String name) { return (openRepls == null) ? null : openRepls.get(name); }
+    public Replicator getRepl(@NonNull String name) {
+        final Map<String, Replicator> repls = openRepls;
+        return (repls == null) ? null : repls.get(name);
+    }
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
     public void addDocReplListener(@NonNull String replId, @NonNull DocReplListener listener) {
-        if (openListeners == null) { openListeners = new HashMap<>(); }
-        if (openListeners.containsKey(replId)) { throw new ClientError("Attempt to replace an existing doc listener"); }
-        openListeners.put(replId, listener);
+        Map<String, DocReplListener> docListeners = openDocListeners;
+        if (openDocListeners == null) {
+            docListeners = new HashMap<>();
+            openDocListeners = docListeners;
+        }
+        if (docListeners.containsKey(replId)) { throw new ClientError("Attempt to replace an existing doc listener"); }
+        docListeners.put(replId, listener);
     }
 
     @Nullable
     public DocReplListener getDocReplListener(@NonNull String id) {
-        return (openListeners == null) ? null : openListeners.get(id);
+        final Map<String, DocReplListener> docListeners = openDocListeners;
+        return (docListeners == null) ? null : docListeners.get(id);
     }
 
     @NonNull
     public String addSnapshot(@NonNull Snapshot snapshot) {
         final String snapshotId = UUID.randomUUID().toString();
-        if (openSnapshots == null) { openSnapshots = new HashMap<>(); }
-        openSnapshots.put(snapshotId, snapshot);
+        Map<String, Snapshot> snapshots = openSnapshots;
+        if (openSnapshots == null) {
+            snapshots = new HashMap<>();
+            openSnapshots = snapshots;
+        }
+        snapshots.put(snapshotId, snapshot);
         return snapshotId;
     }
 
     @NonNull
     public Snapshot getSnapshot(@NonNull String id) {
-        if (openSnapshots != null) {
-            final Snapshot snapshot = openSnapshots.get(id);
+        final Map<String, Snapshot> shapshots = openSnapshots;
+        if (shapshots != null) {
+            final Snapshot snapshot = shapshots.get(id);
             if (snapshot != null) { return snapshot; }
         }
         throw new ClientError("No such snapshot: " + id);
     }
 
+    public void addEndptListener(@NonNull String id, @NonNull URLEndpointListener listener) {
+        Map<String, URLEndpointListener> endptListeners = openEndptListeners;
+        if (endptListeners == null) {
+            endptListeners = new HashMap<>();
+            openEndptListeners = endptListeners;
+        }
+        if (endptListeners.containsKey(id)) { throw new ClientError("Attempt to replace an existing listener"); }
+        endptListeners.put(id, listener);
+    }
+
+    @Nullable
+    public URLEndpointListener getEndptListener(@NonNull String id) {
+        final Map<String, URLEndpointListener> endptListeners = openEndptListeners;
+        return (endptListeners == null) ? null : endptListeners.get(id);
+    }
+
     private void stopRepls() {
-        final Map<String, Replicator> liveRepls = this.openRepls;
-        this.openRepls = null;
+        final Map<String, Replicator> liveRepls = openRepls;
+        openRepls = null;
         if (liveRepls == null) { return; }
         for (Replicator repl: liveRepls.values()) {
             if (repl != null) { repl.stop(); }
         }
     }
 
+    private void stopEndptListeners() {
+        final Map<String, URLEndpointListener> liveEndptListeners = openEndptListeners;
+        openEndptListeners = null;
+        if (liveEndptListeners == null) { return; }
+        for (URLEndpointListener listener: liveEndptListeners.values()) {
+            if (listener != null) { listener.stop(); }
+        }
+    }
+
     private void closeCollections() {
-        final Map<String, Collection> openColls = openCollections;
-        this.openCollections = null;
-        if (openColls == null) { return; }
-        for (Collection collection: openColls.values()) { collection.close(); }
+        final Map<String, Collection> liveCollections = openCollections;
+        openCollections = null;
+        if (liveCollections == null) { return; }
+        for (Collection collection: liveCollections.values()) { collection.close(); }
     }
 
     private void deleteDbs() {
-        final File dbDir = this.dbDir;
-        this.dbDir = null;
+        final File liveDbDir = dbDir;
+        dbDir = null;
 
-        final Map<String, Database> openDbs = this.openDbs;
-        this.openDbs = null;
+        final Map<String, Database> liveDbs = openDbs;
+        openDbs = null;
 
-        if (openDbs != null) {
-            for (Map.Entry<String, Database> entry: openDbs.entrySet()) {
+        if (liveDbs != null) {
+            for (Map.Entry<String, Database> entry: liveDbs.entrySet()) {
                 final Database db = entry.getValue();
                 if (db == null) {
                     Log.err(TAG, "Attempt to close non-existent database: " + entry.getKey());
@@ -192,13 +237,13 @@ public final class TestContext implements AutoCloseable {
                 final String dbName = db.getName();
                 try { db.close(); }
                 catch (CouchbaseLiteException e) {
-                    throw new CblApiFailure("Failed closing database: " + dbName + " in " + dbDir, e);
+                    throw new CblApiFailure("Failed closing database: " + dbName + " in " + liveDbDir, e);
                 }
             }
         }
 
-        if ((dbDir != null) && !new FileUtils().deleteRecursive(dbDir)) {
-            Log.err(TAG, "Failed deleting db dir on reset: " + dbDir);
+        if ((liveDbDir != null) && !new FileUtils().deleteRecursive(liveDbDir)) {
+            Log.err(TAG, "Failed deleting db dir on reset: " + liveDbDir);
         }
     }
 }

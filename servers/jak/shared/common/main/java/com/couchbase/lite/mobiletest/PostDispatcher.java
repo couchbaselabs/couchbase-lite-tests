@@ -22,9 +22,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 
+import com.couchbase.lite.mobiletest.endpoints.v1.EndptListenerManager;
 import com.couchbase.lite.mobiletest.endpoints.v1.GetAllDocs;
 import com.couchbase.lite.mobiletest.endpoints.v1.GetDocument;
-import com.couchbase.lite.mobiletest.endpoints.v1.ListenerManager;
 import com.couchbase.lite.mobiletest.endpoints.v1.Logger;
 import com.couchbase.lite.mobiletest.endpoints.v1.PerformMaintenance;
 import com.couchbase.lite.mobiletest.endpoints.v1.ReplicatorManager;
@@ -73,11 +73,13 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
         addEndpoint(
             1,
             "/startListener",
-            (c, r) -> new ListenerManager(app.getDbSvc(), app.getListenerService()).createListener(app.getSession(c), r));
+            (c, r) -> new EndptListenerManager(app.getDbSvc(), app.getListenerService())
+                .startListener(app.getSession(c), r));
         addEndpoint(
             1,
             "/stopListener",
-            (c, r) -> new ListenerManager(app.getDbSvc(), app.getListenerService()).stopListener(app.getSession(c), r));
+            (c, r) -> new EndptListenerManager(app.getDbSvc(), app.getListenerService())
+                .stopListener(app.getSession(c), r));
         addEndpoint(1, "/snapshotDocuments", (c, r) -> new SnapshotDocs(app.getDbSvc()).snapshot(app.getSession(c), r));
         addEndpoint(1, "/verifyDocuments", (c, r) -> new VerifyDocs(app.getDbSvc()).verify(app.getSession(c), r));
         addEndpoint(
