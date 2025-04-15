@@ -1,24 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# For others looking to analyze what this file does, it basically performs two steps.
-# The first step is creating an appropriate topology JSON file.  You can see
-# the template for Android neighboring this script.  It rewrites the $schema and
-# include property so that the relative paths are correct for the destination
-# directory, adds a tag for the platform, and sets the CBL version to use in the
-# test server.  Currently all of the tests that we are running use a single test
-# server, a single sync gateway, and a single Couchbase Server, and this will
-# be reflected in the topology file.
-#
-# The second step is to create a Topology instance from the resulting JSON file
-# and then pass that information, along with other basically hard coded info,
-# to the start_backend function which will handle the actual setup.
-
-
-import json
+from typing import Optional
+import click
 import os
 import sys
-from argparse import ArgumentParser
 from pathlib import Path
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
@@ -27,56 +13,31 @@ if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parents[2]))
     sys.stdout.reconfigure(encoding="utf-8")
 
-from environment.aws.start_backend import main as start_backend
-from environment.aws.topology_setup.setup_topology import TopologyConfig
+from jenkins.pipelines.shared.setup_test import setup_test
+
+@click.command()
+@click.argument("cbl_version")
+@click.argument("dataset_version")
+@click.argument("sgw_version")
+@click.option(
+    "--private_key",
+    help="The private key to use for the SSH connection (if not default)",
+)
+def cli_entry(
+    cbl_version: str,
+    dataset_version: str,
+    sgw_version: str,
+    private_key: Optional[str],
+) -> None:
+    setup_test(
+        cbl_version,
+        dataset_version,
+        sgw_version,
+        SCRIPT_DIR / "topology_single_device.json",
+        SCRIPT_DIR / "config.json",
+        f"swift_ios",
+        private_key,
+    )
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="Setup an Android testing environment")
-
-    parser.add_argument("version", type=str, help="The version of CBL to use")
-    parser.add_argument(
-        "dataset_version", type=str, help="The version of the dataset to use"
-    )
-    parser.add_argument(
-        "sgw_version", type=str, help="The version of the Sync Gateway to download"
-    )
-    parser.add_argument(
-        "--private_key",
-        type=str,
-        help="The private key to use for the SSH connection (if not default)",
-    )
-    args = parser.parse_args()
-
-    topology_file = str(
-        SCRIPT_DIR.parents[2]
-        / "environment"
-        / "aws"
-        / "topology_setup"
-        / "topology.json"
-    )
-    with open(str(SCRIPT_DIR / "topology_single_device.json"), "r") as fin:
-        topology = json.load(fin)
-        topology["$schema"] = "topology_schema.json"
-        topology["include"] = "default_topology.json"
-        topology["defaults"] = {
-            "cbs": {
-                "version": "7.6.4",
-            },
-            "sgw": {
-                "version": args.sgw_version,
-            },
-        }
-        topology["tag"] = "swift_ios"
-        topology["test_servers"][0]["cbl_version"] = args.version
-        topology["test_servers"][0]["dataset_version"] = args.dataset_version
-        with open(topology_file, "w") as fout:
-            json.dump(topology, fout, indent=4)
-
-    topology = TopologyConfig(topology_file)
-    start_backend(
-        topology,
-        "jborden",
-        str(SCRIPT_DIR / "config.json"),
-        private_key=args.private_key,
-        tdk_config_out=str(SCRIPT_DIR.parents[2] / "tests" / "dev_e2e" / "config.json"),
-    )
+    cli_entry()
