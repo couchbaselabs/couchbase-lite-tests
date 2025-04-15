@@ -6,7 +6,7 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'CBL_DATASET_VERSION', defaultValue: '', description: "The dataset version to use")
-        string(name: 'SGW_URL', defaultValue: '', description: "The url of Sync Gateway to download")
+        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
     }
     stages {
         stage('Init') {
@@ -15,6 +15,7 @@ pipeline {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
                     if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
                     currentBuild.displayName = "java-${CBL_EDITION} ${params.CBL_VERSION}-${params.CBL_BUILD}/${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
                 }
             }
@@ -29,13 +30,12 @@ pipeline {
                 stage('OSX Desktop Test') {
                     agent { label 'mob-e2e-mac-01' }
                     options {
-                        // timeout(time: 60, unit: 'MINUTES')
                         lock("mob-e2e-mac-01")
                     }
                     steps {
                         echo "=== Run OSX Desktop Tests"
                         sh """
-                            jenkins/pipelines/java/desktop/osx_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_URL}"
+                            jenkins/pipelines/java/desktop/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" macos "${params.SGW_VERSION}" ~/.ssh/jborden.pem
                         """
                         echo "=== OSX Desktop Tests Complete"
                     }
@@ -43,7 +43,7 @@ pipeline {
                         always {
                             echo "=== Teardown OSX Desktop Tests"
                             sh '''
-                                jenkins/pipelines/java/desktop/osx_teardown.sh
+                                jenkins/pipelines/java/desktop/teardown.sh
                             '''
                             echo "=== OSX Desktop Test Teardown Complete"
                         }
@@ -59,14 +59,14 @@ pipeline {
                     steps {
                         echo "=== Run Windows Desktop Tests"
                         pwsh """
-                            jenkins\\pipelines\\java\\desktop\\win_tests.ps1 "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_URL}"
+                            jenkins\\pipelines\\java\\desktop\\run_test.ps1 -Version "${params.CBL_VERSION}"-"${params.CBL_BUILD}" -DatasetVersion "${params.CBL_DATASET_VERSION}" -SgwVersion "${params.SGW_VERSION}" -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
                         """
                         echo "=== Windows Desktop Tests Complete"
                     }
                     post {
                         always {
                             echo "=== Teardown Windows Desktop Tests"
-                            pwsh 'jenkins\\pipelines\\java\\desktop\\win_teardown.ps1'
+                            pwsh 'jenkins\\pipelines\\java\\desktop\\teardown.ps1'
                             echo "=== Windows Desktop Test Teardown Complete"
                         }
                     }
@@ -81,7 +81,7 @@ pipeline {
                     steps {
                         echo "=== Run Linux Desktop Tests"
                         sh """
-                            jenkins/pipelines/java/desktop/linux_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_URL}"
+                            jenkins/pipelines/java/desktop/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
                         """
                         echo "=== Linux Desktop Tests Complete"
                     }
@@ -89,7 +89,7 @@ pipeline {
                         always {
                             echo "=== Teardown Linux Desktop Tests"
                             sh '''
-                                jenkins/pipelines/java/desktop/linux_teardown.sh
+                                jenkins/pipelines/java/desktop/teardown.sh
                             '''
                             echo "=== Linux Desktop Test Teardown Complete"
                         }
@@ -105,7 +105,7 @@ pipeline {
                     steps {
                         echo "=== Run OSX Web Service Tests"
                         sh """
-                            jenkins/pipelines/java/webservice/osx_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_URL}"
+                            jenkins/pipelines/java/webservice/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" macos "${params.SGW_VERSION}" ~/.ssh/jborden.pem
                         """
                         echo "=== OSX Web Service Tests Complete"
                     }
@@ -113,7 +113,7 @@ pipeline {
                         always {
                             echo "=== Teardown OSX Web Service Tests"
                             sh """
-                                jenkins/pipelines/java/webservice/osx_teardown.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}"
+                                jenkins/pipelines/java/webservice/teardown.sh
                             """
                             echo "=== OSX Web Service Test Teardown Complete"
                         }
@@ -129,7 +129,7 @@ pipeline {
                     steps {
                         echo "=== Run Windows Web Service Tests"
                         pwsh """
-                            jenkins\\pipelines\\java\\webservice\\win_tests.ps1 "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_URL}"
+                            jenkins\\pipelines\\java\\webservice\\run_test.ps1 -Version "${params.CBL_VERSION}"-"${params.CBL_BUILD}" -DatasetVersion "${params.CBL_DATASET_VERSION}" -SgwVersion "${params.SGW_VERSION}" -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
                         """
                         echo "=== Windows Web Service Tests Complete"
                     }
@@ -137,7 +137,7 @@ pipeline {
                         always {
                             echo "=== Teardown Windows Web Service Tests"
                             pwsh """
-                                jenkins\\pipelines\\java\\webservice\\win_teardown.ps1 "${params.CBL_VERSION}" "${params.CBL_BUILD}"
+                                jenkins\\pipelines\\java\\webservice\\teardown.ps1
                             """
                             echo "=== Windows Web Service Test Teardown Complete"
                         }
@@ -153,7 +153,7 @@ pipeline {
                     steps {
                         echo "=== Run Linux Web Service Tests"
                         sh """
-                            jenkins/pipelines/java/webservice/linux_tests.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_URL}"
+                            jenkins/pipelines/java/webservice/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
                         """
                         echo "=== Linux Web Service Tests Complete"
                     }
@@ -161,7 +161,7 @@ pipeline {
                         always {
                             echo "=== Teardown Linux Web Service Tests"
                             sh """
-                                jenkins/pipelines/java/webservice/linux_teardown.sh "${params.CBL_VERSION}" "${params.CBL_BUILD}"
+                                jenkins/pipelines/java/webservice/teardown.sh
                             """
                             echo "=== Linux Web Service Test Teardown Complete"
                         }
