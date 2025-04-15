@@ -60,6 +60,7 @@ class TopologyParamType(click.ParamType):
 
         self.fail("Unable to convert non string value to TopologyConfig", param, ctx)
 
+
 def topology_has_aws_resources(topology: TopologyConfig) -> bool:
     """
     Check if the topology has any AWS resources.
@@ -78,6 +79,7 @@ def topology_has_aws_resources(topology: TopologyConfig) -> bool:
         or topology.wants_logslurp
     )
 
+
 def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) -> None:
     """
     Apply the Terraform configuration to set up the AWS environment.
@@ -95,7 +97,7 @@ def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) ->
         if not topology_has_aws_resources(topology):
             click.secho("No AWS resources requested, skipping terraform", fg="yellow")
             return
-        
+
         if public_key_name is None:
             raise Exception(
                 "--public-key-name was not provided, but it is required for AWS resources."
@@ -106,7 +108,7 @@ def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) ->
             raise Exception(
                 f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
             )
-        
+
         sgw_count = topology.total_sgw_count
         cbs_count = topology.total_cbs_count
         lb_count = topology.total_lb_count
@@ -388,6 +390,7 @@ def cli_entry(
         steps,
     )
 
+
 def script_entry(
     topology: TopologyConfig,
     public_key_name: Optional[str],
@@ -407,11 +410,16 @@ def script_entry(
         )
     else:
         args = [
-            "--topology", topology,
-            "--public-key-name", public_key_name,
-            "--tdk-config-in", tdk_config_in,
-            "--private-key", private_key,
-            "--tdk-config-out", tdk_config_out
+            "--topology",
+            topology,
+            "--public-key-name",
+            public_key_name,
+            "--tdk-config-in",
+            tdk_config_in,
+            "--private-key",
+            private_key,
+            "--tdk-config-out",
+            tdk_config_out,
         ]
         cli_entry(args)
 

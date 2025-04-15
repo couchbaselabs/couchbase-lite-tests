@@ -4,18 +4,20 @@ on:
     branches:
       - main
     paths:
-      - 'client/smoke_tests/**'
-      - 'client/src/**'
-      - 'environment/**'
-      - 'tests/**'
+      - 'client/smoke_tests/**/*.py'
+      - 'client/src/**/*.py'
+      - 'environment/**/*.py'
+      - 'tests/**/*.py'
+      - 'jenkins/pipelines/**/*.py'
   pull_request:
     branches:
       - "**"
     paths:
-      - 'client/smoke_tests/**'
-      - 'client/src/**'
-      - 'environment/**'
-      - 'tests/**'
+      - 'client/smoke_tests/**/*.py'
+      - 'client/src/**/*.py'
+      - 'environment/**/*.py'
+      - 'tests/**/*.py'
+      - 'jenkins/pipelines/**/*.py'
 
 jobs:
   mypy:

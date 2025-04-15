@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # For others looking to analyze what this file does, it basically performs two steps.
-# The first step is creating an appropriate topology JSON file.  It rewrites the $schema 
+# The first step is creating an appropriate topology JSON file.  It rewrites the $schema
 # and include property so that the relative paths are correct for the destination
 # directory, adds a tag for the platform, and sets the CBL version to use in the
 # test server.  Currently all of the tests that we are running use a single test
@@ -13,11 +13,12 @@
 # and then pass that information, along with other basically hard coded info,
 # to the start_backend function which will handle the actual setup.
 
-import click
 import json
 import os
 from pathlib import Path
 from typing import Optional
+
+import click
 
 from environment.aws.start_backend import script_entry as start_backend
 from environment.aws.topology_setup.setup_topology import TopologyConfig
@@ -75,14 +76,22 @@ def setup_test(
     with open(topology_file_in, "r") as fin:
         topology = json.load(fin)
         topology["$schema"] = "topology_schema.json"
-        if "include" in topology and str(topology["include"]).endswith("default_topology.json"):
+        if "include" in topology and str(topology["include"]).endswith(
+            "default_topology.json"
+        ):
             old_include = Path(str(topology["include"]))
             if not old_include.is_absolute():
                 absolute_include = (topology_file_in.parent / old_include).resolve()
                 if not absolute_include.is_relative_to(topology_file_out.parent):
                     click.secho(f"When requesting include '{old_include}'", fg="yellow")
-                    click.secho(f"Resolved path {absolute_include} is not relative to {topology_file_out.parent}", fg="yellow")
-                    click.secho(f"Setting include to absolute path instead of adjusted relative", fg="yellow")
+                    click.secho(
+                        f"Resolved path {absolute_include} is not relative to {topology_file_out.parent}",
+                        fg="yellow",
+                    )
+                    click.secho(
+                        "Setting include to absolute path instead of adjusted relative",
+                        fg="yellow",
+                    )
                     topology["include"] = str(absolute_include)
                 else:
                     new_include = absolute_include.relative_to(topology_file_out.parent)
@@ -102,7 +111,7 @@ def setup_test(
         with open(topology_file_out, "w") as fout:
             json.dump(topology, fout, indent=4)
 
-    topology = TopologyConfig(topology_file_out)
+    topology = TopologyConfig(str(topology_file_out))
     start_backend(
         topology,
         "jborden",

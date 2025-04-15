@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import click
 import os
 import sys
+from io import TextIOWrapper
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
+
+import click
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parents[3]))
-    sys.stdout.reconfigure(encoding="utf-8")
+    if isinstance(sys.stdout, TextIOWrapper):
+        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
 from jenkins.pipelines.shared.setup_test import setup_test
+
 
 @click.command()
 @click.argument("platform")
@@ -39,6 +43,7 @@ def cli_entry(
         f"jak_{platform}_desktop",
         private_key,
     )
+
 
 if __name__ == "__main__":
     cli_entry()

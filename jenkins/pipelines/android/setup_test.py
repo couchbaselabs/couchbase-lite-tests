@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import Optional
-import click
 import os
 import sys
+from io import TextIOWrapper
 from pathlib import Path
+from typing import Optional, cast
+
+import click
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parents[2]))
-    sys.stdout.reconfigure(encoding="utf-8")
+    if isinstance(sys.stdout, TextIOWrapper):
+        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
 from jenkins.pipelines.shared.setup_test import setup_test
+
 
 @click.command()
 @click.argument("cbl_version")
@@ -36,8 +40,9 @@ def cli_entry(
         SCRIPT_DIR / "topology_single_device.json",
         SCRIPT_DIR / "config_android.json",
         "jak_android",
-        private_key
+        private_key,
     )
+
 
 if __name__ == "__main__":
     cli_entry()
