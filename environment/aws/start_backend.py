@@ -61,6 +61,25 @@ class TopologyParamType(click.ParamType):
         self.fail("Unable to convert non string value to TopologyConfig", param, ctx)
 
 
+def topology_has_aws_resources(topology: TopologyConfig) -> bool:
+    """
+    Check if the topology has any AWS resources.
+
+    Args:
+        topology (TopologyConfig): The topology configuration.
+
+    Returns:
+        bool: True if there are AWS resources, False otherwise.
+    """
+    print(topology.total_sgw_count)
+    return (
+        topology.total_sgw_count > 0
+        or topology.total_cbs_count > 0
+        or topology.total_lb_count > 0
+        or topology.wants_logslurp
+    )
+
+
 def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) -> None:
     """
     Apply the Terraform configuration to set up the AWS environment.
@@ -75,17 +94,7 @@ def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) ->
 
     with pushd(SCRIPT_DIR):
         header("Starting terraform apply")
-        sgw_count = topology.total_sgw_count
-        cbs_count = topology.total_cbs_count
-        lb_count = topology.total_lb_count
-        wants_logslurp = str(topology.wants_logslurp).lower()
-
-        if (
-            sgw_count == 0
-            and cbs_count == 0
-            and lb_count == 0
-            and not topology.wants_logslurp
-        ):
+        if not topology_has_aws_resources(topology):
             click.secho("No AWS resources requested, skipping terraform", fg="yellow")
             return
 
@@ -99,6 +108,11 @@ def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) ->
             raise Exception(
                 f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
             )
+
+        sgw_count = topology.total_sgw_count
+        cbs_count = topology.total_cbs_count
+        lb_count = topology.total_lb_count
+        wants_logslurp = str(topology.wants_logslurp).lower()
 
         command = [
             "terraform",
@@ -233,7 +247,8 @@ def main(
             click.echo()
             click.secho("Skipping terraform apply...", fg="yellow")
             click.echo()
-            topology.read_from_terraform()
+            if topology_has_aws_resources(topology):
+                topology.read_from_terraform()
 
     topology.resolve_test_servers()
     topology.dump()
@@ -374,6 +389,39 @@ def cli_entry(
         tdk_config_out,
         steps,
     )
+
+
+def script_entry(
+    topology: TopologyConfig,
+    public_key_name: Optional[str],
+    tdk_config_in: str,
+    private_key: Optional[str] = None,
+    tdk_config_out: Optional[str] = None,
+    steps: Optional[BackendSteps] = None,
+) -> None:
+    if steps is not None:
+        main(
+            topology,
+            public_key_name,
+            tdk_config_in,
+            private_key,
+            tdk_config_out,
+            steps,
+        )
+    else:
+        args = [
+            "--topology",
+            topology,
+            "--public-key-name",
+            public_key_name,
+            "--tdk-config-in",
+            tdk_config_in,
+            "--private-key",
+            private_key,
+            "--tdk-config-out",
+            tdk_config_out,
+        ]
+        cli_entry(args)
 
 
 if __name__ == "__main__":

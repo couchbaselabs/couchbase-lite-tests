@@ -137,8 +137,12 @@ class CTestServer_Desktop(CTestServer):
         )
 
         header("Installing C test server")
+        args = ["cmake", "--build", ".", "--target", "install"]
+        if platform.system() == "Windows":
+            args.extend(["--config", "Release"])
+
         subprocess.run(
-            ["cmake", "--build", ".", "--target", "install", "-j"],
+            args,
             cwd=BUILD_DIR,
             check=True,
         )

@@ -19,11 +19,10 @@ def adb_logcat(adb_path, device_serial):
 
     with subprocess.Popen(cmd, stdout=subprocess.PIPE) as log:
         while True:
-            line = log.stdout.readline()
-            if not line:
+            if not log.stdout:
                 break
 
-            line = line.decode("utf-8")
+            line = log.stdout.readline().decode()
 
             if out_file is not None:
                 out_file.write(line)

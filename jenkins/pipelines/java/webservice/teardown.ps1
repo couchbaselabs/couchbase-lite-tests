@@ -1,5 +1,5 @@
 $env:PYTHONPATH = "$PSScriptRoot\..\..\..\"
-Push-Location $PSScriptRoot\..\..\..\environment\aws
+Push-Location $PSScriptRoot\..\..\..\..\environment\aws
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
