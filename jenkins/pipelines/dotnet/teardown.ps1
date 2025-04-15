@@ -1,5 +1,3 @@
-Import-Module $PSScriptRoot/prepare_env.psm1 -Force
-
 $env:PYTHONPATH = "$PSScriptRoot\..\..\..\"
 Push-Location $PSScriptRoot\..\..\..\environment\aws
 python -m venv venv
