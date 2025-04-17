@@ -29,16 +29,19 @@ pipeline {
                     agent { label 'mob-e2e-mac-01' }
                     options {
                         lock('mob-e2e-mac-01')
-                        timeout(time: 60, unit: 'MINUTES') 
                     }
                     steps {
                         echo "Run macOS Test"
-                        sh "jenkins/pipelines/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} macos '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} macos '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
                     }
                     post { 
                         always { 
                             echo "Teardown macOS Test"
-                            sh 'jenkins/pipelines/c/teardown.sh'
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/c/teardown.sh'
+                            }
                         }
                     }
                 }
@@ -46,7 +49,6 @@ pipeline {
                     agent { label 'mob-e2e-mac-01' }
                     options {
                         lock('mob-e2e-iphone-01')
-                        timeout(time: 60, unit: 'MINUTES') 
                     }
                     environment { 
                         KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
@@ -55,12 +57,36 @@ pipeline {
                         // Unlock keychain:
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "Run iOS Test"
-                        sh "jenkins/pipelines/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
                     }
                     post { 
                         always { 
                             echo "Teardown iOS Test"
-                            sh 'jenkins/pipelines/c/teardown.sh'
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/c/teardown.sh'
+                            }
+                        }
+                    }
+                }
+                stage('Android') {
+                    agent { label 'mob-e2e-mac-01' }
+                    options {
+                        lock('mob-e2e-android-01')
+                    }
+                    steps {
+                        echo "Run Android Test"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} android '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown Android Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/c/teardown.sh'
+                            }
                         }
                     }
                 }
@@ -68,16 +94,19 @@ pipeline {
                     agent { label 'mob-e2e-deb-02' }
                     options {
                         lock('mob-e2e-deb-02')
-                        timeout(time: 60, unit: 'MINUTES') 
                     }
                     steps {
                         echo "Run linux Test"
-                        sh "jenkins/pipelines/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} linux_x86_64 '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} linux_x86_64 '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
                     }
                     post { 
                         always { 
                             echo "Teardown linux Test"
-                            sh 'jenkins/pipelines/c/teardown.sh'
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/c/teardown.sh'
+                            }
                         }
                     }
                 }
@@ -85,15 +114,18 @@ pipeline {
                     agent { label 'mob-e2e-win-01' }
                     options {
                         lock('mob-e2e-win-01')
-                        timeout(time: 60, unit: 'MINUTES') 
                     }
                     steps {
-                        pwsh "jenkins\\pipelines\\c\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            pwsh "jenkins\\pipelines\\c\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
+                        }
                     }
                     post { 
                         always { 
                             echo "Teardown Windows Test"
-                            pwsh 'jenkins\\pipelines\\c\\teardown.ps1'
+                            timeout(time: 5, unit: 'MINUTES') {
+                                pwsh 'jenkins\\pipelines\\c\\teardown.ps1'
+                            }
                         }
                     }
                 }

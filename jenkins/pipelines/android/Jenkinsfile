@@ -26,16 +26,20 @@ pipeline {
             }
             steps {
                 echo "Run Android Tests"
-                sh """
-                    jenkins/pipelines/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
-                """
+                timeout(time: 60, unit: 'MINUTES') {
+                    sh """
+                        jenkins/pipelines/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
+                    """
+                }
             }
             post {
                 always {
                     echo "Teardown Android Tests"
-                    sh '''
-                        jenkins/pipelines/android/android_teardown.sh
-                    '''
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh '''
+                            jenkins/pipelines/android/android_teardown.sh
+                        '''
+                    }
                 }
             }
         }
