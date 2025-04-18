@@ -261,7 +261,7 @@ class CTestServer_iOS(CTestServer):
         """
         version_parts = self.version.split("-")
         return (
-            f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+            f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_ios_{self.dataset_version}.zip"
         )
 
     def create_bridge(self) -> PlatformBridge:
@@ -390,7 +390,7 @@ class CTestServer_Android(CTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_android_{self.latestbuilds_path}.apk"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -481,7 +481,7 @@ class CTestServer_Windows(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_windows_{self.latestbuilds_path}.zip"
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-windows-x86_64.zip"
@@ -514,7 +514,7 @@ class CTestServer_Windows(CTestServer_Desktop):
         Returns:
             str: The path to the compressed package.
         """
-        header(f"Compressing C test server for {self.platform}")
+        header(f"Compressing C test server for Windows")
         publish_dir = (
             C_TEST_SERVER_DIR
             / "build"
@@ -560,7 +560,7 @@ class CTestServer_macOS(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_macos_{self.dataset_version}.zip"
 
     def build(self) -> None:
         """
@@ -593,16 +593,14 @@ class CTestServer_macOS(CTestServer_Desktop):
         Returns:
             str: The path to the compressed package.
         """
-        header(f"Compressing C test server for {self.platform}")
+        header(f"Compressing C test server for macOS")
         publish_dir = (
             C_TEST_SERVER_DIR
             / "build"
             / "out"
+            / "bin"
         )
-
-        shutil.rmtree(publish_dir / "include", ignore_errors=True)
-        shutil.rmtree(publish_dir / "shared", ignore_errors=True)
-        zip_path = publish_dir.parents[5] / f"testserver_macos.zip"
+        zip_path = publish_dir.parents[5] / "testserver_macos.zip"
         zip_directory(publish_dir, zip_path)
         return str(zip_path)
 
@@ -674,11 +672,10 @@ class CTestServer_Linux(CTestServer_Desktop):
             C_TEST_SERVER_DIR
             / "build"
             / "out"
+            / "bin"
         )
 
-        shutil.rmtree(publish_dir / "include", ignore_errors=True)
-        shutil.rmtree(publish_dir / "shared", ignore_errors=True)
-        tar_path = publish_dir.parents[5] / f"testserver_{self.platform}.zip"
+        tar_path = publish_dir.parents[5] / f"testserver_{self.platform}.tar.gz"
         tar_directory(publish_dir, tar_path)
         return str(tar_path)
 
