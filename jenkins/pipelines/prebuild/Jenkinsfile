@@ -49,9 +49,9 @@ pipeline {
                             deactivate
                         """
                     } else {
-                        sh """
+                        sh """#!/bin/bash
                             python3 -m venv venv
-                            source "venv/bin/activate"
+                            source venv/bin/activate
                             pip install -r "environment/aws/requirements.txt"
                             python "environment/aws/topology_setup/build_test_server.py" $PLATFORM $VERSION-$BLD_NUM $DATASET_VERSION --ci
                             deactivate
