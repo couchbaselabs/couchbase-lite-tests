@@ -36,7 +36,12 @@ from typing import cast
 
 import click
 
-from environment.aws.common.io import tar_directory, untar_directory, unzip_directory, zip_directory
+from environment.aws.common.io import (
+    tar_directory,
+    untar_directory,
+    unzip_directory,
+    zip_directory,
+)
 from environment.aws.common.output import header
 from environment.aws.topology_setup.cbl_library_downloader import CBLLibraryDownloader
 from environment.aws.topology_setup.test_server import (
@@ -139,7 +144,15 @@ class CTestServer_Desktop(CTestServer):
         )
 
         header("Installing C test server")
-        args = ["cmake", "--build", ".", "--target", "install", "--parallel", os.cpu_count()]
+        args = [
+            "cmake",
+            "--build",
+            ".",
+            "--target",
+            "install",
+            "--parallel",
+            str(os.cpu_count()),
+        ]
         if platform.system() == "Windows":
             args.extend(["--config", "Release"])
 
@@ -260,9 +273,7 @@ class CTestServer_iOS(CTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return (
-            f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_ios_{self.dataset_version}.zip"
-        )
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_ios_{self.dataset_version}.zip"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -436,7 +447,9 @@ class CTestServer_Android(CTestServer):
             / "release"
             / "app-release.apk"
         )
-        zip_path = apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
+        zip_path = (
+            apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
+        )
         shutil.copy(apk_path, zip_path)
         return str(zip_path)
 
@@ -447,7 +460,9 @@ class CTestServer_Android(CTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        click.secho("No uncompressing needed for Android test server package", fg="yellow")
+        click.secho(
+            "No uncompressing needed for Android test server package", fg="yellow"
+        )
 
 
 @TestServer.register("c_windows")
@@ -514,13 +529,8 @@ class CTestServer_Windows(CTestServer_Desktop):
         Returns:
             str: The path to the compressed package.
         """
-        header(f"Compressing C test server for Windows")
-        publish_dir = (
-            C_TEST_SERVER_DIR
-            / "build"
-            / "out"
-            / "bin"
-        )
+        header("Compressing C test server for Windows")
+        publish_dir = C_TEST_SERVER_DIR / "build" / "out" / "bin"
         zip_path = publish_dir.parents[5] / "testserver_windows.zip"
         zip_directory(publish_dir, zip_path)
         return str(zip_path)
@@ -593,13 +603,8 @@ class CTestServer_macOS(CTestServer_Desktop):
         Returns:
             str: The path to the compressed package.
         """
-        header(f"Compressing C test server for macOS")
-        publish_dir = (
-            C_TEST_SERVER_DIR
-            / "build"
-            / "out"
-            / "bin"
-        )
+        header("Compressing C test server for macOS")
+        publish_dir = C_TEST_SERVER_DIR / "build" / "out" / "bin"
         zip_path = publish_dir.parents[5] / "testserver_macos.zip"
         zip_directory(publish_dir, zip_path)
         return str(zip_path)
@@ -668,12 +673,7 @@ class CTestServer_Linux(CTestServer_Desktop):
             str: The path to the compressed package.
         """
         header(f"Compressing C test server for {self.platform}")
-        publish_dir = (
-            C_TEST_SERVER_DIR
-            / "build"
-            / "out"
-            / "bin"
-        )
+        publish_dir = C_TEST_SERVER_DIR / "build" / "out" / "bin"
 
         tar_path = publish_dir.parents[5] / f"testserver_{self.platform}.tar.gz"
         tar_directory(publish_dir, tar_path)

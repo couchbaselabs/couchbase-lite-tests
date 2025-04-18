@@ -367,7 +367,9 @@ class JAKTestServer_Android(JAKTestServer):
             / "release"
             / "app-release.apk"
         )
-        zip_path = apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
+        zip_path = (
+            apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
+        )
         shutil.copy(apk_path, zip_path)
         return str(zip_path)
 
@@ -378,7 +380,10 @@ class JAKTestServer_Android(JAKTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        click.secho("No uncompressing needed for Android test server package", fg="yellow")
+        click.secho(
+            "No uncompressing needed for Android test server package", fg="yellow"
+        )
+
 
 @TestServer.register("jak_desktop")
 class JAKTestServer_Desktop(JAKTestServer):
@@ -390,7 +395,7 @@ class JAKTestServer_Desktop(JAKTestServer):
     @property
     def test_server_path(self) -> str:
         return "desktop"
-    
+
     @property
     def platform(self) -> str:
         """
@@ -400,7 +405,7 @@ class JAKTestServer_Desktop(JAKTestServer):
             str: The platform name.
         """
         return "jak_desktop"
-    
+
     @property
     def latestbuilds_path(self) -> str:
         """
@@ -413,22 +418,26 @@ class JAKTestServer_Desktop(JAKTestServer):
         return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
 
     def create_bridge(self):
-        jar_path = str(
-            TEST_SERVER_DIR
-            / "downloaded"
-            / self.platform
-            / self.version
-            / f"CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
-        ) if self._downloaded else str(
-            JAK_TEST_SERVER_DIR
-            / "desktop"
-            / "app"
-            / "build"
-            / "libs"
-            / f"CBLTestServer-Java-Desktop-{self.__server_version}_{self.version}.jar"
+        jar_path = (
+            str(
+                TEST_SERVER_DIR
+                / "downloaded"
+                / self.platform
+                / self.version
+                / f"CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
+            )
+            if self._downloaded
+            else str(
+                JAK_TEST_SERVER_DIR
+                / "desktop"
+                / "app"
+                / "build"
+                / "libs"
+                / f"CBLTestServer-Java-Desktop-{self.__server_version}_{self.version}.jar"
+            )
         )
         return JarBridge(jar_path, self.version)
-    
+
     def compress_package(self):
         """
         Compress the C test server package.
@@ -449,7 +458,10 @@ class JAKTestServer_Desktop(JAKTestServer):
 
         # The server version is not going to be known when downloading from latestbuilds,
         # and the CBL version will be built into the path on latestbuilds, so remove both
-        copy_path = jar_path.parents[5] / f"CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
+        copy_path = (
+            jar_path.parents[5]
+            / f"CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
+        )
         shutil.copy(jar_path, copy_path)
         return str(copy_path)
 
@@ -460,7 +472,10 @@ class JAKTestServer_Desktop(JAKTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        click.secho("No uncompressing needed for JAK desktop server package", fg="yellow")
+        click.secho(
+            "No uncompressing needed for JAK desktop server package", fg="yellow"
+        )
+
 
 @TestServer.register("jak_webservice")
 class JAKTestServer_WebService(JAKTestServer):
@@ -470,7 +485,7 @@ class JAKTestServer_WebService(JAKTestServer):
     @property
     def test_server_path(self) -> str:
         return "webservice"
-    
+
     @property
     def platform(self) -> str:
         """
@@ -483,12 +498,12 @@ class JAKTestServer_WebService(JAKTestServer):
 
     def create_bridge(self):
         return JettyBridge(self.version, self.dataset_version)
-    
+
     def compress_package(self):
         raise NotImplementedError(
             "Please implement the compress logic for a built server"
         )
-    
+
     def uncompress_package(self, path: Path) -> None:
         """
         Uncompress the C test server package.

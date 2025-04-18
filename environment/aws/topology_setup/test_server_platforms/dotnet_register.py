@@ -444,7 +444,9 @@ class DotnetTestServer_Android(DotnetTestServer):
             / "net8.0-android"
             / "com.couchbase.dotnet.testserver-Signed.apk"
         )
-        zip_path = apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
+        zip_path = (
+            apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
+        )
         shutil.copy(apk_path, zip_path)
         return str(zip_path)
 
@@ -455,7 +457,9 @@ class DotnetTestServer_Android(DotnetTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        click.secho("No uncompressing needed for Android test server package", fg="yellow")
+        click.secho(
+            "No uncompressing needed for Android test server package", fg="yellow"
+        )
 
 
 @TestServer.register("dotnet_windows")
