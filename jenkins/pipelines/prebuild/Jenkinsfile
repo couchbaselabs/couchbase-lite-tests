@@ -40,6 +40,7 @@ pipeline {
             }
             steps {
                 script {
+                    currentBuild.displayName = "${params.PLATFORM} ${params.VERSION}-${params.BLD_NUM}/${params.DATASET_VERSION}"
                     if (params.PLATFORM.contains("windows")) {
                         pwsh """
                             python -m venv venv
