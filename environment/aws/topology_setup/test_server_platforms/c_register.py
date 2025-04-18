@@ -34,7 +34,9 @@ from io import BytesIO
 from pathlib import Path
 from typing import cast
 
-from environment.aws.common.io import untar_directory, unzip_directory
+import click
+
+from environment.aws.common.io import tar_directory, untar_directory, unzip_directory, zip_directory
 from environment.aws.common.output import header
 from environment.aws.topology_setup.cbl_library_downloader import CBLLibraryDownloader
 from environment.aws.topology_setup.test_server import (
@@ -146,6 +148,16 @@ class CTestServer_Desktop(CTestServer):
             cwd=BUILD_DIR,
             check=True,
         )
+
+    def uncompress_package(self, path: Path) -> None:
+        """
+        Uncompress the C test server package.
+
+        Args:
+            path (Path): The path to the compressed package.
+        """
+        unzip_directory(path, path.parent)
+        path.unlink()
 
 
 @TestServer.register("c_ios")
@@ -275,7 +287,13 @@ class CTestServer_iOS(CTestServer):
         Returns:
             str: The path to the compressed package.
         """
-        raise NotImplementedError("Please implement C compress_package logic")
+        header(f"Compressing C test server for {self.platform}")
+        publish_dir = (
+            IOS_BUILD_DIR / "Build" / "Products" / "Release-iphoneos" / "TestServer.app"
+        )
+        zip_path = publish_dir.parents[5] / "testserver_ios.zip"
+        zip_directory(publish_dir, zip_path)
+        return str(zip_path)
 
     def uncompress_package(self, path: Path) -> None:
         """
@@ -284,7 +302,8 @@ class CTestServer_iOS(CTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        raise NotImplementedError("Please implement C uncompress_package logic")
+        unzip_directory(path, path.parent / "testserver.app")
+        path.unlink()
 
 
 @TestServer.register("c_android")
@@ -405,7 +424,21 @@ class CTestServer_Android(CTestServer):
         Returns:
             str: The path to the compressed package.
         """
-        raise NotImplementedError("Please implement C compress_package logic")
+        header(f"Compressing C test server for {self.platform}")
+        apk_path = (
+            C_TEST_SERVER_DIR
+            / "platforms"
+            / "android"
+            / "app"
+            / "build"
+            / "outputs"
+            / "apk"
+            / "release"
+            / "app-release.apk"
+        )
+        zip_path = apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
+        shutil.copy(apk_path, zip_path)
+        return str(zip_path)
 
     def uncompress_package(self, path: Path) -> None:
         """
@@ -414,7 +447,7 @@ class CTestServer_Android(CTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        raise NotImplementedError("Please implement C uncompress_package logic")
+        click.secho("No uncompressing needed for Android test server package", fg="yellow")
 
 
 @TestServer.register("c_windows")
@@ -481,16 +514,16 @@ class CTestServer_Windows(CTestServer_Desktop):
         Returns:
             str: The path to the compressed package.
         """
-        raise NotImplementedError("Please implement C compress_package logic")
-
-    def uncompress_package(self, path: Path) -> None:
-        """
-        Uncompress the C test server package.
-
-        Args:
-            path (Path): The path to the compressed package.
-        """
-        raise NotImplementedError("Please implement C uncompress_package logic")
+        header(f"Compressing C test server for {self.platform}")
+        publish_dir = (
+            C_TEST_SERVER_DIR
+            / "build"
+            / "out"
+            / "bin"
+        )
+        zip_path = publish_dir.parents[5] / "testserver_windows.zip"
+        zip_directory(publish_dir, zip_path)
+        return str(zip_path)
 
 
 @TestServer.register("c_macos")
@@ -560,16 +593,18 @@ class CTestServer_macOS(CTestServer_Desktop):
         Returns:
             str: The path to the compressed package.
         """
-        raise NotImplementedError("Please implement C compress_package logic")
+        header(f"Compressing C test server for {self.platform}")
+        publish_dir = (
+            C_TEST_SERVER_DIR
+            / "build"
+            / "out"
+        )
 
-    def uncompress_package(self, path: Path) -> None:
-        """
-        Uncompress the C test server package.
-
-        Args:
-            path (Path): The path to the compressed package.
-        """
-        raise NotImplementedError("Please implement C uncompress_package logic")
+        shutil.rmtree(publish_dir / "include", ignore_errors=True)
+        shutil.rmtree(publish_dir / "shared", ignore_errors=True)
+        zip_path = publish_dir.parents[5] / f"testserver_macos.zip"
+        zip_directory(publish_dir, zip_path)
+        return str(zip_path)
 
 
 class CTestServer_Linux(CTestServer_Desktop):
@@ -634,7 +669,18 @@ class CTestServer_Linux(CTestServer_Desktop):
         Returns:
             str: The path to the compressed package.
         """
-        raise NotImplementedError("Please implement C compress_package logic")
+        header(f"Compressing C test server for {self.platform}")
+        publish_dir = (
+            C_TEST_SERVER_DIR
+            / "build"
+            / "out"
+        )
+
+        shutil.rmtree(publish_dir / "include", ignore_errors=True)
+        shutil.rmtree(publish_dir / "shared", ignore_errors=True)
+        tar_path = publish_dir.parents[5] / f"testserver_{self.platform}.zip"
+        tar_directory(publish_dir, tar_path)
+        return str(tar_path)
 
     def uncompress_package(self, path: Path) -> None:
         """
@@ -643,7 +689,8 @@ class CTestServer_Linux(CTestServer_Desktop):
         Args:
             path (Path): The path to the compressed package.
         """
-        raise NotImplementedError("Please implement C uncompress_package logic")
+        untar_directory(path, path.parent)
+        path.unlink()
 
 
 @TestServer.register("c_linux_x86_64")

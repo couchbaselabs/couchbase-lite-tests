@@ -26,6 +26,7 @@ Functions:
 
 import os
 import platform
+import shutil
 import subprocess
 import zipfile
 from abc import abstractmethod
@@ -36,6 +37,7 @@ import psutil
 import requests
 
 from environment.aws.common.io import download_progress_bar, unzip_directory
+from environment.aws.common.output import header
 from environment.aws.topology_setup.test_server import (
     TEST_SERVER_DIR,
     TestServer,
@@ -101,22 +103,12 @@ class JavaBridge(PlatformBridge):
 
 
 class JarBridge(JavaBridge):
-    def __init__(self, cbl_version: str):
+    def __init__(self, path: str, cbl_version: str):
         self.__cbl_version = cbl_version
         if not (JAK_TEST_SERVER_DIR / "version.txt").exists():
             raise ValueError("Server version.txt not found")
 
-        with open(JAK_TEST_SERVER_DIR / "version.txt") as f:
-            self.__server_version = f.read().strip()
-
-        self.__jar_path = str(
-            JAK_TEST_SERVER_DIR
-            / "desktop"
-            / "app"
-            / "build"
-            / "libs"
-            / f"CBLTestServer-Java-Desktop-{self.__server_version}_{self.__cbl_version}.jar"
-        )
+        self.__jar_path = path
 
     def install(self, location: str) -> None:
         if location != "localhost":
@@ -364,12 +356,20 @@ class JAKTestServer_Android(JAKTestServer):
         Returns:
             str: The path to the compressed package.
         """
-
-        # NOTE: It is ok to just rename to make sure that you have testserver_android.apk,
-        # as .NET does
-        raise NotImplementedError(
-            "Please implement the compress logic for a built server"
+        header(f"Compressing C test server for {self.platform}")
+        apk_path = (
+            JAK_TEST_SERVER_DIR
+            / self.test_server_path
+            / "app"
+            / "build"
+            / "outputs"
+            / "apk"
+            / "release"
+            / "app-release.apk"
         )
+        zip_path = apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
+        shutil.copy(apk_path, zip_path)
+        return str(zip_path)
 
     def uncompress_package(self, path: Path) -> None:
         """
@@ -378,23 +378,91 @@ class JAKTestServer_Android(JAKTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        raise NotImplementedError(
-            "Please implement the uncompress logic for a compressed server"
-        )
+        click.secho("No uncompressing needed for Android test server package", fg="yellow")
 
-
+@TestServer.register("jak_desktop")
 class JAKTestServer_Desktop(JAKTestServer):
     def __init__(self, version: str, dataset_version: str):
         super().__init__(version, dataset_version)
+        with open(JAK_TEST_SERVER_DIR / "version.txt") as f:
+            self.__server_version = f.read().strip()
 
     @property
     def test_server_path(self) -> str:
         return "desktop"
+    
+    @property
+    def platform(self) -> str:
+        """
+        Get the platform name.
+
+        Returns:
+            str: The platform name.
+        """
+        return "jak_desktop"
+    
+    @property
+    def latestbuilds_path(self) -> str:
+        """
+        Get the path for the package on the latestbuilds server.
+
+        Returns:
+            str: The path for the latest builds.
+        """
+        version_parts = self.version.split("-")
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
 
     def create_bridge(self):
-        return JarBridge(self.version)
+        jar_path = str(
+            TEST_SERVER_DIR
+            / "downloaded"
+            / self.platform
+            / self.version
+            / f"CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
+        ) if self._downloaded else str(
+            JAK_TEST_SERVER_DIR
+            / "desktop"
+            / "app"
+            / "build"
+            / "libs"
+            / f"CBLTestServer-Java-Desktop-{self.__server_version}_{self.version}.jar"
+        )
+        return JarBridge(jar_path, self.version)
+    
+    def compress_package(self):
+        """
+        Compress the C test server package.
 
+        Returns:
+            str: The path to the compressed package.
+        """
+        header(f"Compressing C test server for {self.platform}")
 
+        jar_path = (
+            JAK_TEST_SERVER_DIR
+            / "desktop"
+            / "app"
+            / "build"
+            / "libs"
+            / f"CBLTestServer-Java-Desktop-{self.__server_version}_{self.version}.jar"
+        )
+
+        # The server version is not going to be known when downloading from latestbuilds,
+        # and the CBL version will be built into the path on latestbuilds, so remove both
+        copy_path = jar_path.parents[5] / f"CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
+        shutil.copy(jar_path, copy_path)
+        return str(copy_path)
+
+    def uncompress_package(self, path: Path) -> None:
+        """
+        Uncompress the C test server package.
+
+        Args:
+            path (Path): The path to the compressed package.
+        """
+        click.secho("No uncompressing needed for JAK desktop server package", fg="yellow")
+
+@TestServer.register("jak_webservice")
 class JAKTestServer_WebService(JAKTestServer):
     def __init__(self, version: str, dataset_version: str):
         super().__init__(version, dataset_version)
@@ -402,342 +470,31 @@ class JAKTestServer_WebService(JAKTestServer):
     @property
     def test_server_path(self) -> str:
         return "webservice"
+    
+    @property
+    def platform(self) -> str:
+        """
+        Get the platform name.
+
+        Returns:
+            str: The platform name.
+        """
+        return "jak_webservice"
 
     def create_bridge(self):
         return JettyBridge(self.version, self.dataset_version)
-
-
-@TestServer.register("jak_windows_desktop")
-class JAKTestServer_WindowsDesktop(JAKTestServer_Desktop):
-    """
-    A class for managing Java test servers on Windows.
-
-    Attributes:
-        version (str): The version of the test server.
-    """
-
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "jak_windows_desktop"
-
-    @property
-    def latestbuilds_path(self) -> str:
-        """
-        Get the path for the package on the latestbuilds server.
-
-        Returns:
-            str: The path for the latest builds.
-        """
-        version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_windows_desktop_{self.dataset_version}.zip"
-
-    def compress_package(self) -> str:
-        """
-        Compress the Java test server package.
-
-        Returns:
-            str: The path to the compressed package.
-        """
+    
+    def compress_package(self):
         raise NotImplementedError(
             "Please implement the compress logic for a built server"
         )
-
+    
     def uncompress_package(self, path: Path) -> None:
         """
-        Uncompress the Java test server package.
+        Uncompress the C test server package.
 
         Args:
             path (Path): The path to the compressed package.
         """
-        raise NotImplementedError(
-            "Please implement the uncompress logic for a compressed server"
-        )
-
-
-@TestServer.register("jak_windows_webservice")
-class JAKTestServer_WindowsWebService(JAKTestServer_WebService):
-    """
-    A class for managing Java test servers on Windows.
-
-    Attributes:
-        version (str): The version of the test server.
-    """
-
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "jak_windows_webservice"
-
-    @property
-    def latestbuilds_path(self) -> str:
-        """
-        Get the path for the package on the latestbuilds server.
-
-        Returns:
-            str: The path for the latest builds.
-        """
-        version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_windows_webservice_{self.dataset_version}.zip"
-
-    def compress_package(self) -> str:
-        """
-        Compress the Java test server package.
-
-        Returns:
-            str: The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the compress logic for a built server"
-        )
-
-    def uncompress_package(self, path: Path) -> None:
-        """
-        Uncompress the Java test server package.
-
-        Args:
-            path (Path): The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the uncompress logic for a compressed server"
-        )
-
-
-@TestServer.register("jak_macos_webservice")
-class JAKTestServer_macOSWebService(JAKTestServer_WebService):
-    """
-    A class for managing Java test servers on macOS.
-
-    Attributes:
-        version (str): The version of the test server.
-    """
-
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "jak_macos_webservice"
-
-    @property
-    def latestbuilds_path(self) -> str:
-        """
-        Get the path for the package on the latestbuilds server.
-
-        Returns:
-            str: The path for the latest builds.
-        """
-        version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_webservice_{self.dataset_version}.zip"
-
-    def compress_package(self) -> str:
-        """
-        Compress the Java test server package.
-
-        Returns:
-            str: The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the compress logic for a built server"
-        )
-
-    def uncompress_package(self, path: Path) -> None:
-        """
-        Uncompress the Java test server package.
-
-        Args:
-            path (Path): The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the uncompress logic for a compressed server"
-        )
-
-
-@TestServer.register("jak_macos_desktop")
-class JAKTestServer_macOSDesktop(JAKTestServer_Desktop):
-    """
-    A class for managing Java test servers on macOS.
-
-    Attributes:
-        version (str): The version of the test server.
-    """
-
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "jak_macos_desktop"
-
-    @property
-    def latestbuilds_path(self) -> str:
-        """
-        Get the path for the package on the latestbuilds server.
-
-        Returns:
-            str: The path for the latest builds.
-        """
-        version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_macos_desktop_{self.dataset_version}.zip"
-
-    def compress_package(self) -> str:
-        """
-        Compress the Java test server package.
-
-        Returns:
-            str: The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the compress logic for a built server"
-        )
-
-    def uncompress_package(self, path: Path) -> None:
-        """
-        Uncompress the Java test server package.
-
-        Args:
-            path (Path): The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the uncompress logic for a compressed server"
-        )
-
-
-@TestServer.register("jak_linux_desktop")
-class JAKTestServer_LinuxDesktop(JAKTestServer_Desktop):
-    """
-    A class for managing Java test servers on Linux.
-
-    Attributes:
-        version (str): The version of the test server.
-    """
-
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "jak_linux_desktop"
-
-    @property
-    def latestbuilds_path(self) -> str:
-        """
-        Get the path for the package on the latestbuilds server.
-
-        Returns:
-            str: The path for the latest builds.
-        """
-        version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_desktop_{self.dataset_version}.tar.gz"
-
-    def compress_package(self) -> str:
-        """
-        Compress the Java test server package.
-
-        Returns:
-            str: The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the compress logic for a built server"
-        )
-
-    def uncompress_package(self, path: Path) -> None:
-        """
-        Uncompress the Java test server package.
-
-        Args:
-            path (Path): The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the uncompress logic for a compressed server"
-        )
-
-
-@TestServer.register("jak_linux_webservice")
-class JAKTestServer_LinuxWebService(JAKTestServer_WebService):
-    """
-    A class for managing Java test servers on Windows.
-
-    Attributes:
-        version (str): The version of the test server.
-    """
-
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "jak_linux_webservice"
-
-    @property
-    def latestbuilds_path(self) -> str:
-        """
-        Get the path for the package on the latestbuilds server.
-
-        Returns:
-            str: The path for the latest builds.
-        """
-        version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/testserver_linux_webservice_{self.dataset_version}.tar.gz"
-
-    def compress_package(self) -> str:
-        """
-        Compress the Java test server package.
-
-        Returns:
-            str: The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the compress logic for a built server"
-        )
-
-    def uncompress_package(self, path: Path) -> None:
-        """
-        Uncompress the Java test server package.
-
-        Args:
-            path (Path): The path to the compressed package.
-        """
-        raise NotImplementedError(
-            "Please implement the uncompress logic for a compressed server"
-        )
+        unzip_directory(path, path.parent)
+        path.unlink()
