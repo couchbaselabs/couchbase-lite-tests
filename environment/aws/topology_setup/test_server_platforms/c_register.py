@@ -647,7 +647,7 @@ class CTestServer_Linux(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserverlinux-{self.__arch}.tar.gz"
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_linux-{self.__arch}_{self.dataset_version}.tar.gz"
 
     def create_bridge(self) -> PlatformBridge:
         """
