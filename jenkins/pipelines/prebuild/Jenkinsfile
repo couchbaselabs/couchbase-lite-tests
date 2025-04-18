@@ -49,7 +49,7 @@ pipeline {
                             deactivate
                         """
                     } else {
-                        sh """#!/bin/bash
+                        sh """#!/bin/bash -e
                             python3 -m venv venv
                             source venv/bin/activate
                             pip install -r "environment/aws/requirements.txt"
