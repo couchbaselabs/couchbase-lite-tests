@@ -139,7 +139,7 @@ class CTestServer_Desktop(CTestServer):
         )
 
         header("Installing C test server")
-        args = ["cmake", "--build", ".", "--target", "install"]
+        args = ["cmake", "--build", ".", "--target", "install", "--parallel", os.cpu_count()]
         if platform.system() == "Windows":
             args.extend(["--config", "Release"])
 
