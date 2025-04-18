@@ -401,7 +401,7 @@ class CTestServer_Android(CTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_android_{self.latestbuilds_path}.apk"
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_android_{self.dataset_version}.apk"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -496,7 +496,7 @@ class CTestServer_Windows(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_windows_{self.latestbuilds_path}.zip"
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_windows_{self.dataset_version}.zip"
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-windows-x86_64.zip"
