@@ -21,7 +21,6 @@
 		40348A8E2A8AFC16002DA787 /* civetweb.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348A8D2A8AFC16002DA787 /* civetweb.c */; };
 		40348A982A8AFD14002DA787 /* TSLogger.mm in Sources */ = {isa = PBXBuildFile; fileRef = 40348A942A8AFD14002DA787 /* TSLogger.mm */; };
 		40348A992A8AFD14002DA787 /* TSTestServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 40348A952A8AFD14002DA787 /* TSTestServer.mm */; };
-		40348B562A8B0127002DA787 /* zip_err_str.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348B552A8B0127002DA787 /* zip_err_str.c */; };
 		40348BE32A8B0143002DA787 /* zip_source_tell.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348B572A8B013F002DA787 /* zip_source_tell.c */; };
 		40348BE42A8B0143002DA787 /* zip_fopen_encrypted.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348B582A8B013F002DA787 /* zip_fopen_encrypted.c */; };
 		40348BE52A8B0143002DA787 /* zip_source_seek.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348B592A8B013F002DA787 /* zip_source_seek.c */; };
@@ -74,7 +73,6 @@
 		40348C192A8B0144002DA787 /* zip_unchange.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348B912A8B0141002DA787 /* zip_unchange.c */; };
 		40348C1A2A8B0144002DA787 /* zip_close.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348B922A8B0141002DA787 /* zip_close.c */; };
 		40348C1C2A8B0144002DA787 /* zip_hash.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348B942A8B0141002DA787 /* zip_hash.c */; };
-		40348C1D2A8B0144002DA787 /* zip_mkstempm.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348B952A8B0141002DA787 /* zip_mkstempm.c */; };
 		40348C1E2A8B0144002DA787 /* zip_progress.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348B962A8B0141002DA787 /* zip_progress.c */; };
 		40348C1F2A8B0144002DA787 /* zip_buffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348B972A8B0141002DA787 /* zip_buffer.c */; };
 		40348C202A8B0144002DA787 /* zip_ftell.c in Sources */ = {isa = PBXBuildFile; fileRef = 40348B992A8B0141002DA787 /* zip_ftell.c */; };
@@ -211,6 +209,9 @@
 		40F0BF402C9CF17400027A7A /* CBLReplicationConflictResolver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 40F0BF3E2C9CF17400027A7A /* CBLReplicationConflictResolver.cpp */; };
 		4221A3E02D9795C800413F9F /* PostStopListener.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4221A3DF2D9795C800413F9F /* PostStopListener.cpp */; };
 		4221A3E12D9795C800413F9F /* PostStartListener.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4221A3DE2D9795C800413F9F /* PostStartListener.cpp */; };
+		423A0B872DB1F57B00BA66B5 /* zip_err_str.c in Sources */ = {isa = PBXBuildFile; fileRef = 423A0B862DB1F57B00BA66B5 /* zip_err_str.c */; };
+		423A0B892DB1F5D600BA66B5 /* zip_source_get_dostime.c in Sources */ = {isa = PBXBuildFile; fileRef = 423A0B882DB1F5D600BA66B5 /* zip_source_get_dostime.c */; };
+		423A0B8B2DB1F60C00BA66B5 /* zip_source_pass_to_lower_layer.c in Sources */ = {isa = PBXBuildFile; fileRef = 423A0B8A2DB1F60C00BA66B5 /* zip_source_pass_to_lower_layer.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -246,7 +247,6 @@
 		40348A952A8AFD14002DA787 /* TSTestServer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TSTestServer.mm; sourceTree = "<group>"; };
 		40348A962A8AFD14002DA787 /* TSTestServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TSTestServer.h; sourceTree = "<group>"; };
 		40348A972A8AFD14002DA787 /* TSLogger.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TSLogger.h; sourceTree = "<group>"; };
-		40348B552A8B0127002DA787 /* zip_err_str.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_err_str.c; path = vendor/cmake/zip_err_str.c; sourceTree = SOURCE_ROOT; };
 		40348B572A8B013F002DA787 /* zip_source_tell.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_source_tell.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_source_tell.c"; sourceTree = SOURCE_ROOT; };
 		40348B582A8B013F002DA787 /* zip_fopen_encrypted.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_fopen_encrypted.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_fopen_encrypted.c"; sourceTree = SOURCE_ROOT; };
 		40348B592A8B013F002DA787 /* zip_source_seek.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_source_seek.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_source_seek.c"; sourceTree = SOURCE_ROOT; };
@@ -309,7 +309,6 @@
 		40348B922A8B0141002DA787 /* zip_close.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_close.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_close.c"; sourceTree = SOURCE_ROOT; };
 		40348B932A8B0141002DA787 /* zip_random_win32.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_random_win32.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_random_win32.c"; sourceTree = SOURCE_ROOT; };
 		40348B942A8B0141002DA787 /* zip_hash.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_hash.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_hash.c"; sourceTree = SOURCE_ROOT; };
-		40348B952A8B0141002DA787 /* zip_mkstempm.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_mkstempm.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_mkstempm.c"; sourceTree = SOURCE_ROOT; };
 		40348B962A8B0141002DA787 /* zip_progress.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_progress.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_progress.c"; sourceTree = SOURCE_ROOT; };
 		40348B972A8B0141002DA787 /* zip_buffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = zip_buffer.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_buffer.c"; sourceTree = SOURCE_ROOT; };
 		40348B982A8B0141002DA787 /* zip_crypto_mbedtls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = zip_crypto_mbedtls.h; path = "vendor/cmake/_deps/libzip-src/lib/zip_crypto_mbedtls.h"; sourceTree = SOURCE_ROOT; };
@@ -542,6 +541,9 @@
 		40F0BF3F2C9CF17400027A7A /* CBLReplicationConflictResolver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CBLReplicationConflictResolver.h; sourceTree = "<group>"; };
 		4221A3DE2D9795C800413F9F /* PostStartListener.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PostStartListener.cpp; sourceTree = "<group>"; };
 		4221A3DF2D9795C800413F9F /* PostStopListener.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PostStopListener.cpp; sourceTree = "<group>"; };
+		423A0B862DB1F57B00BA66B5 /* zip_err_str.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = zip_err_str.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_err_str.c"; sourceTree = SOURCE_ROOT; };
+		423A0B882DB1F5D600BA66B5 /* zip_source_get_dostime.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = zip_source_get_dostime.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_source_get_dostime.c"; sourceTree = SOURCE_ROOT; };
+		423A0B8A2DB1F60C00BA66B5 /* zip_source_pass_to_lower_layer.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = zip_source_pass_to_lower_layer.c; path = "vendor/cmake/_deps/libzip-src/lib/zip_source_pass_to_lower_layer.c"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -642,7 +644,6 @@
 		40348B542A8B00A5002DA787 /* libzip */ = {
 			isa = PBXGroup;
 			children = (
-				40348B552A8B0127002DA787 /* zip_err_str.c */,
 				40348BE22A8B0143002DA787 /* compat.h */,
 				40348BD02A8B0143002DA787 /* zip_add_dir.c */,
 				40348BD62A8B0143002DA787 /* zip_add_entry.c */,
@@ -668,6 +669,7 @@
 				40348BC22A8B0143002DA787 /* zip_dirent.c */,
 				40348BA72A8B0142002DA787 /* zip_discard.c */,
 				40348B8E2A8B0141002DA787 /* zip_entry.c */,
+				423A0B862DB1F57B00BA66B5 /* zip_err_str.c */,
 				40348B732A8B0140002DA787 /* zip_error_clear.c */,
 				40348BB92A8B0142002DA787 /* zip_error_get_sys_type.c */,
 				40348BAB2A8B0142002DA787 /* zip_error_get.c */,
@@ -709,7 +711,6 @@
 				40348B6B2A8B0140002DA787 /* zip_io_util.c */,
 				40348BCA2A8B0143002DA787 /* zip_libzip_version.c */,
 				40348BBF2A8B0142002DA787 /* zip_memdup.c */,
-				40348B952A8B0141002DA787 /* zip_mkstempm.c */,
 				40348BC12A8B0142002DA787 /* zip_name_locate.c */,
 				40348BA62A8B0142002DA787 /* zip_new.c */,
 				40348B9D2A8B0141002DA787 /* zip_open.c */,
@@ -749,10 +750,12 @@
 				40348B892A8B0141002DA787 /* zip_source_file.h */,
 				40348B672A8B0140002DA787 /* zip_source_free.c */,
 				40348B5B2A8B013F002DA787 /* zip_source_function.c */,
+				423A0B882DB1F5D600BA66B5 /* zip_source_get_dostime.c */,
 				40348B5C2A8B0140002DA787 /* zip_source_get_file_attributes.c */,
 				40348BA12A8B0142002DA787 /* zip_source_is_deleted.c */,
 				40348B9E2A8B0142002DA787 /* zip_source_layered.c */,
 				40348B772A8B0140002DA787 /* zip_source_open.c */,
+				423A0B8A2DB1F60C00BA66B5 /* zip_source_pass_to_lower_layer.c */,
 				40348BD52A8B0143002DA787 /* zip_source_pkware_decode.c */,
 				40348BC02A8B0142002DA787 /* zip_source_pkware_encode.c */,
 				40348B882A8B0141002DA787 /* zip_source_read.c */,
@@ -1021,6 +1024,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 40348A7F2A8AF843002DA787 /* Build configuration list for PBXNativeTarget "TestServer" */;
 			buildPhases = (
+				423A0B832DB1ECEE00BA66B5 /* Run Script */,
 				40348A672A8AF842002DA787 /* Sources */,
 				40348A682A8AF842002DA787 /* Frameworks */,
 				40348A692A8AF842002DA787 /* Resources */,
@@ -1085,6 +1089,28 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		423A0B832DB1ECEE00BA66B5 /* Run Script */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/zsh;
+			shellScript = "echo \"Generating zip_err_str.c\"\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\nLIBZIP_DIR=$PROJECT_DIR/vendor/cmake/_deps/libzip-src\npushd $LIBZIP_DIR/lib\ncmake -DPROJECT_SOURCE_DIR=$LIBZIP_DIR -P $LIBZIP_DIR/cmake/GenerateZipErrorStrings.cmake\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		40348A672A8AF842002DA787 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -1145,7 +1171,6 @@
 				40348C1C2A8B0144002DA787 /* zip_hash.c in Sources */,
 				4076E73E2A9EAD04003DD799 /* StringUtil.cpp in Sources */,
 				40348C192A8B0144002DA787 /* zip_unchange.c in Sources */,
-				40348C1D2A8B0144002DA787 /* zip_mkstempm.c in Sources */,
 				40348C2F2A8B0144002DA787 /* zip_fopen_index_encrypted.c in Sources */,
 				40348C5F2A8B0144002DA787 /* zip_get_file_comment.c in Sources */,
 				40348A732A8AF842002DA787 /* ViewController.swift in Sources */,
@@ -1161,7 +1186,6 @@
 				40348C202A8B0144002DA787 /* zip_ftell.c in Sources */,
 				40348C3E2A8B0144002DA787 /* zip_error_to_str.c in Sources */,
 				40348C042A8B0143002DA787 /* zip_source_tell_write.c in Sources */,
-				40348B562A8B0127002DA787 /* zip_err_str.c in Sources */,
 				40348C462A8B0144002DA787 /* zip_file_rename.c in Sources */,
 				40348C582A8B0144002DA787 /* zip_fopen.c in Sources */,
 				40348C382A8B0144002DA787 /* zip_string.c in Sources */,
@@ -1176,6 +1200,7 @@
 				40348C2D2A8B0144002DA787 /* zip_extra_field_api.c in Sources */,
 				40348C352A8B0144002DA787 /* zip_winzip_aes.c in Sources */,
 				40348BF42A8B0143002DA787 /* zip_fread.c in Sources */,
+				423A0B872DB1F57B00BA66B5 /* zip_err_str.c in Sources */,
 				4076E7332A9EAD04003DD799 /* Fleece.cpp in Sources */,
 				40348C0E2A8B0143002DA787 /* zip_file_strerror.c in Sources */,
 				40348C002A8B0143002DA787 /* zip_source_open.c in Sources */,
@@ -1226,6 +1251,7 @@
 				40CAB0962CE41485001CA3F1 /* IXSelectInterruptPipe.cpp in Sources */,
 				40CAB0972CE41485001CA3F1 /* IXSocketOpenSSL.cpp in Sources */,
 				40CAB0982CE41485001CA3F1 /* IXSocketServer.cpp in Sources */,
+				423A0B892DB1F5D600BA66B5 /* zip_source_get_dostime.c in Sources */,
 				40CAB0992CE41485001CA3F1 /* IXWebSocketHandshake.cpp in Sources */,
 				40CAB09A2CE41485001CA3F1 /* IXWebSocketPerMessageDeflateCodec.cpp in Sources */,
 				40CAB09B2CE41485001CA3F1 /* IXSocketFactory.cpp in Sources */,
@@ -1275,6 +1301,7 @@
 				40348A712A8AF842002DA787 /* SceneDelegate.swift in Sources */,
 				40348C0F2A8B0143002DA787 /* zip_error_strerror.c in Sources */,
 				4076E7292A9EAD04003DD799 /* PostGetAllDocuments.cpp in Sources */,
+				423A0B8B2DB1F60C00BA66B5 /* zip_source_pass_to_lower_layer.c in Sources */,
 				40348C182A8B0144002DA787 /* zip_source_zip.c in Sources */,
 				40348BF02A8B0143002DA787 /* zip_set_name.c in Sources */,
 				4076E73F2A9EAD04003DD799 /* Files+Apple.mm in Sources */,

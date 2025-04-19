@@ -37,6 +37,8 @@ from os import environ
 from pathlib import Path
 from typing import List, Optional
 
+import click
+
 from environment.aws.common.io import unzip_directory, zip_directory
 from environment.aws.common.output import header
 from environment.aws.topology_setup.test_server import (
@@ -412,7 +414,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             / "downloaded"
             / self.platform
             / self.version
-            / "testserver_android.apk"
+            / f"testserver_android_{self.dataset_version}.apk"
             if self._downloaded
             else DOTNET_TEST_SERVER_DIR
             / "testserver"
@@ -442,7 +444,9 @@ class DotnetTestServer_Android(DotnetTestServer):
             / "net8.0-android"
             / "com.couchbase.dotnet.testserver-Signed.apk"
         )
-        zip_path = apk_path.parents[5] / "testserver_android.apk"
+        zip_path = (
+            apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
+        )
         shutil.copy(apk_path, zip_path)
         return str(zip_path)
 
@@ -453,8 +457,9 @@ class DotnetTestServer_Android(DotnetTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        # No action needed
-        pass
+        click.secho(
+            "No uncompressing needed for Android test server package", fg="yellow"
+        )
 
 
 @TestServer.register("dotnet_windows")

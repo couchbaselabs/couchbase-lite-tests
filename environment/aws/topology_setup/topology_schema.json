@@ -95,7 +95,22 @@
                         "type": "string"
                     },
                     "platform": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                            "dotnet_windows",
+                            "dotnet_macos",
+                            "dotnet_ios",
+                            "dotnet_android",
+                            "jak_webservice",
+                            "jak_desktop",
+                            "jak_android",
+                            "c_windows",
+                            "c_macos",
+                            "c_linux_x86_64",
+                            "c_ios",
+                            "c_android",
+                            "swift_ios"
+                        ]
                     },
                     "download": {
                         "type": "boolean",
