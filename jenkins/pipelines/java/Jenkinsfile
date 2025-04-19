@@ -34,17 +34,21 @@ pipeline {
                     }
                     steps {
                         echo "=== Run OSX Desktop Tests"
-                        sh """
-                            jenkins/pipelines/java/desktop/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" macos "${params.SGW_VERSION}" ~/.ssh/jborden.pem
-                        """
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh """
+                                jenkins/pipelines/java/desktop/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" macos "${params.SGW_VERSION}" ~/.ssh/jborden.pem
+                            """
+                        }
                         echo "=== OSX Desktop Tests Complete"
                     }
                     post {
                         always {
                             echo "=== Teardown OSX Desktop Tests"
-                            sh '''
-                                jenkins/pipelines/java/desktop/teardown.sh
-                            '''
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh '''
+                                    jenkins/pipelines/java/desktop/teardown.sh
+                                '''
+                            }
                             echo "=== OSX Desktop Test Teardown Complete"
                         }
                     }
@@ -53,20 +57,23 @@ pipeline {
                 stage('Windows Desktop Test') {
                     agent { label 'mob-e2e-win-01' }
                     options {
-                        // timeout(time: 60, unit: 'MINUTES')
                         lock("mob-e2e-win-01")
                     }
                     steps {
                         echo "=== Run Windows Desktop Tests"
-                        pwsh """
-                            jenkins\\pipelines\\java\\desktop\\run_test.ps1 -Version "${params.CBL_VERSION}"-"${params.CBL_BUILD}" -DatasetVersion "${params.CBL_DATASET_VERSION}" -SgwVersion "${params.SGW_VERSION}" -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
-                        """
+                        timeout(time: 120, unit: 'MINUTES') {
+                            pwsh """
+                                jenkins\\pipelines\\java\\desktop\\run_test.ps1 -Version "${params.CBL_VERSION}"-"${params.CBL_BUILD}" -DatasetVersion "${params.CBL_DATASET_VERSION}" -SgwVersion "${params.SGW_VERSION}" -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
+                            """
+                        }
                         echo "=== Windows Desktop Tests Complete"
                     }
                     post {
                         always {
                             echo "=== Teardown Windows Desktop Tests"
-                            pwsh 'jenkins\\pipelines\\java\\desktop\\teardown.ps1'
+                            timeout(time: 5, unit: 'MINUTES') {
+                                pwsh 'jenkins\\pipelines\\java\\desktop\\teardown.ps1'
+                            }
                             echo "=== Windows Desktop Test Teardown Complete"
                         }
                     }
@@ -75,22 +82,25 @@ pipeline {
                 stage('Linux Desktop Test') {
                     agent { label 'mob-e2e-deb-02' }
                     options {
-                        // timeout(time: 60, unit: 'MINUTES')
                         lock("mob-e2e-deb-02")
                     }
                     steps {
                         echo "=== Run Linux Desktop Tests"
-                        sh """
-                            jenkins/pipelines/java/desktop/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
-                        """
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh """
+                                jenkins/pipelines/java/desktop/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
+                            """
+                        }
                         echo "=== Linux Desktop Tests Complete"
                     }
                     post {
                         always {
                             echo "=== Teardown Linux Desktop Tests"
-                            sh '''
-                                jenkins/pipelines/java/desktop/teardown.sh
-                            '''
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh '''
+                                    jenkins/pipelines/java/desktop/teardown.sh
+                                '''
+                            }
                             echo "=== Linux Desktop Test Teardown Complete"
                         }
                     }
@@ -99,22 +109,25 @@ pipeline {
                 stage('OSX Web Service Test') {
                     agent { label 'mob-e2e-mac-01' }
                     options {
-                        // timeout(time: 120, unit: 'MINUTES')
                         lock("mob-e2e-mac-01")
                     }
                     steps {
                         echo "=== Run OSX Web Service Tests"
-                        sh """
-                            jenkins/pipelines/java/webservice/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" macos "${params.SGW_VERSION}" ~/.ssh/jborden.pem
-                        """
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh """
+                                jenkins/pipelines/java/webservice/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" macos "${params.SGW_VERSION}" ~/.ssh/jborden.pem
+                            """
+                        }
                         echo "=== OSX Web Service Tests Complete"
                     }
                     post {
                         always {
                             echo "=== Teardown OSX Web Service Tests"
-                            sh """
-                                jenkins/pipelines/java/webservice/teardown.sh
-                            """
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh """
+                                    jenkins/pipelines/java/webservice/teardown.sh
+                                """
+                            }
                             echo "=== OSX Web Service Test Teardown Complete"
                         }
                     }
@@ -123,22 +136,25 @@ pipeline {
                 stage('Windows Web Service Test') {
                     agent { label 'mob-e2e-win-01' }
                     options {
-                        // timeout(time: 120, unit: 'MINUTES')
                         lock("mob-e2e-win-01")
                     }
                     steps {
                         echo "=== Run Windows Web Service Tests"
-                        pwsh """
-                            jenkins\\pipelines\\java\\webservice\\run_test.ps1 -Version "${params.CBL_VERSION}"-"${params.CBL_BUILD}" -DatasetVersion "${params.CBL_DATASET_VERSION}" -SgwVersion "${params.SGW_VERSION}" -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
-                        """
+                        timeout(time: 120, unit: 'MINUTES') {
+                            pwsh """
+                                jenkins\\pipelines\\java\\webservice\\run_test.ps1 -Version "${params.CBL_VERSION}"-"${params.CBL_BUILD}" -DatasetVersion "${params.CBL_DATASET_VERSION}" -SgwVersion "${params.SGW_VERSION}" -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
+                            """
+                        }
                         echo "=== Windows Web Service Tests Complete"
                     }
                     post {
                         always {
                             echo "=== Teardown Windows Web Service Tests"
-                            pwsh """
-                                jenkins\\pipelines\\java\\webservice\\teardown.ps1
-                            """
+                            timeout(time: 5, unit: 'MINUTES') {
+                                pwsh """
+                                    jenkins\\pipelines\\java\\webservice\\teardown.ps1
+                                """
+                            }
                             echo "=== Windows Web Service Test Teardown Complete"
                         }
                     }
@@ -147,22 +163,25 @@ pipeline {
                 stage('Linux Web Service Test') {
                     agent { label 'mob-e2e-deb-02' }
                     options {
-                        // timeout(time: 120, unit: 'MINUTES')
                         lock("mob-e2e-deb-02")
                     }
                     steps {
                         echo "=== Run Linux Web Service Tests"
-                        sh """
-                            jenkins/pipelines/java/webservice/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
-                        """
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh """
+                                jenkins/pipelines/java/webservice/run_test.sh "${params.CBL_VERSION}"-"${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
+                            """
+                        }
                         echo "=== Linux Web Service Tests Complete"
                     }
                     post {
                         always {
                             echo "=== Teardown Linux Web Service Tests"
-                            sh """
-                                jenkins/pipelines/java/webservice/teardown.sh
-                            """
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh """
+                                    jenkins/pipelines/java/webservice/teardown.sh
+                                """
+                            }
                             echo "=== Linux Web Service Test Teardown Complete"
                         }
                     }
