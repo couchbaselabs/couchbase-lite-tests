@@ -17,12 +17,10 @@ Functions:
 """
 
 import json
-import subprocess
 import sys
 from enum import Flag, auto
 from io import TextIOWrapper
 from pathlib import Path
-from time import sleep
 from typing import IO, Any, Dict, Optional, cast
 
 import click
@@ -33,10 +31,10 @@ if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
         cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
-from environment.aws.common.io import pushd
 from environment.aws.common.output import header
 from environment.aws.lb_setup.setup_load_balancers import main as lb_main
 from environment.aws.logslurp_setup.setup_logslurp import main as logslurp_main
+from environment.aws.pulumi.setup import pulumi_up
 from environment.aws.server_setup.setup_server import main as server_main
 from environment.aws.sgw_setup.setup_sgw import main as sgw_main
 from environment.aws.topology_setup.setup_topology import TopologyConfig
@@ -59,84 +57,6 @@ class TopologyParamType(click.ParamType):
             return TopologyConfig(cast(str, value))
 
         self.fail("Unable to convert non string value to TopologyConfig", param, ctx)
-
-
-def topology_has_aws_resources(topology: TopologyConfig) -> bool:
-    """
-    Check if the topology has any AWS resources.
-
-    Args:
-        topology (TopologyConfig): The topology configuration.
-
-    Returns:
-        bool: True if there are AWS resources, False otherwise.
-    """
-    print(topology.total_sgw_count)
-    return (
-        topology.total_sgw_count > 0
-        or topology.total_cbs_count > 0
-        or topology.total_lb_count > 0
-        or topology.wants_logslurp
-    )
-
-
-def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) -> None:
-    """
-    Apply the Terraform configuration to set up the AWS environment.
-
-    Args:
-        public_key_name (str): The name of the public key stored in AWS.
-        topology (TopologyConfig): The topology configuration.
-
-    Raises:
-        Exception: If any Terraform command fails.
-    """
-
-    with pushd(SCRIPT_DIR):
-        header("Starting terraform apply")
-        if not topology_has_aws_resources(topology):
-            click.secho("No AWS resources requested, skipping terraform", fg="yellow")
-            return
-
-        if public_key_name is None:
-            raise Exception(
-                "--public-key-name was not provided, but it is required for AWS resources."
-            )
-
-        result = subprocess.run(["terraform", "init"], capture_output=False, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
-            )
-
-        sgw_count = topology.total_sgw_count
-        cbs_count = topology.total_cbs_count
-        lb_count = topology.total_lb_count
-        wants_logslurp = str(topology.wants_logslurp).lower()
-
-        command = [
-            "terraform",
-            "apply",
-            f"-var=key_name={public_key_name}",
-            f"-var=server_count={cbs_count}",
-            f"-var=sgw_count={sgw_count}",
-            f"-var=lb_count={lb_count}",
-            f"-var=logslurp={wants_logslurp}",
-            "-auto-approve",
-        ]
-        result = subprocess.run(command, capture_output=False, text=True)
-
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
-
-        topology.read_from_terraform()
-
-        header("Done, sleeping for 5s")
-        # The machines won't be ready immediately, so we need to wait a bit
-        # before SSH access succeeds
-        sleep(5)
 
 
 def write_config(
@@ -197,14 +117,14 @@ def write_config(
 
 class BackendSteps(Flag):
     NONE = 0
-    TERRAFORM_APPLY = auto()
+    PULUMI_UPDATE = auto()
     CBS_PROVISION = auto()
     SGW_PROVISION = auto()
     LB_PROVISION = auto()
     LS_PROVISION = auto()
     TS_RUN = auto()
     ALL = (
-        TERRAFORM_APPLY
+        PULUMI_UPDATE
         | CBS_PROVISION
         | SGW_PROVISION
         | LB_PROVISION
@@ -232,23 +152,13 @@ def main(
         tdk_config_out (Optional[str], optional): The path to write the resulting TDK configuration file. Defaults to None.
         steps (BackendSteps, optional): The steps to execute. Defaults to BackendSteps.ALL.
     """
-    if steps & BackendSteps.TERRAFORM_APPLY:
-        terraform_apply(public_key_name, topology)
+    if steps & BackendSteps.PULUMI_UPDATE:
+        pulumi_up(public_key_name, topology)
     else:
-        with pushd(SCRIPT_DIR):
-            result = subprocess.run(
-                ["terraform", "init"], capture_output=False, text=True
-            )
-            if result.returncode != 0:
-                raise Exception(
-                    f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
-                )
-
-            click.echo()
-            click.secho("Skipping terraform apply...", fg="yellow")
-            click.echo()
-            if topology_has_aws_resources(topology):
-                topology.read_from_terraform()
+        click.echo()
+        click.secho("Skipping pulumi update...", fg="yellow")
+        click.echo()
+        topology.read_from_pulumi()
 
     topology.resolve_test_servers()
     topology.dump()
@@ -307,11 +217,11 @@ def main(
     type=click.Path(writable=True),
 )
 @click.option(
-    "--no-terraform-apply",
+    "--no-pulumi-update",
     type=bool,
     is_flag=True,
-    help="Skip terraform apply step",
-    envvar="TDK_NO_TERRAFORM_APPLY",
+    help="Skip pulumi update step",
+    envvar="TDK_NO_PULUMI_UPDATE",
 )
 @click.option(
     "--no-cbs-provision",
@@ -360,7 +270,7 @@ def cli_entry(
     tdk_config_in: str,
     private_key: Optional[str],
     tdk_config_out: Optional[str],
-    no_terraform_apply: bool,
+    no_pulumi_update: bool,
     no_cbs_provision: bool,
     no_sgw_provision: bool,
     no_lb_provision: bool,
@@ -368,8 +278,8 @@ def cli_entry(
     no_ts_run: bool,
 ) -> None:
     steps = BackendSteps.ALL
-    if no_terraform_apply:
-        steps &= ~BackendSteps.TERRAFORM_APPLY
+    if no_pulumi_update:
+        steps &= ~BackendSteps.PULUMI_UPDATE
     if no_cbs_provision:
         steps &= ~BackendSteps.CBS_PROVISION
     if no_sgw_provision:

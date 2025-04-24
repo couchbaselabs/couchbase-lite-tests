@@ -15,3 +15,6 @@ requests==2.32.3
 tdqm==0.0.1
 tqdm==4.67.1
 urllib3==2.3.0
+pulumi-aws==6.77.1
+pulumi>=3.0.0,<4.0.0
+pulumi-automation==0.10.0

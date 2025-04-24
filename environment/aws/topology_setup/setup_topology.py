@@ -21,15 +21,16 @@ Functions:
 """
 
 import json
-import subprocess
 from pathlib import Path
 from time import sleep
-from typing import Dict, Final, List, Optional, cast
+from typing import Dict, Final, List, Optional, Type, TypeVar, cast
 
 import click
 import requests
+from pulumi.automation import OutputMap, select_stack
 
 from environment.aws.common.output import header
+from environment.aws.pulumi import constants, output_keys
 from environment.aws.topology_setup.test_server import TestServer
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -382,6 +383,9 @@ class TestServerConfig:
         self.__platform = platform
 
 
+T = TypeVar("T")
+
+
 class TopologyConfig:
     """
     A class to manage the overall topology configuration, including clusters, Sync Gateway instances, and test servers.
@@ -552,85 +556,56 @@ class TopologyConfig:
     def tag(self) -> str:
         return self.__tag
 
-    def read_from_terraform(self):
+    def has_aws_resources(self) -> bool:
         """
-        Read the topology configuration from Terraform outputs.
+        Check if the topology has any AWS resources.
 
-        Raises:
-            Exception: If any Terraform command fails.
+        Args:
+            topology (TopologyConfig): The topology configuration.
+
+        Returns:
+            bool: True if there are AWS resources, False otherwise.
         """
-        cbs_command = ["terraform", "output", "-json", "couchbase_instance_public_ips"]
-        result = subprocess.run(cbs_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(cbs_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
+        return (
+            self.total_sgw_count > 0
+            or self.total_cbs_count > 0
+            or self.total_lb_count > 0
+            or self.wants_logslurp
+        )
 
-        cbs_ips = cast(List[str], json.loads(result.stdout))
+    def read_from_pulumi(self):
+        """
+        Read the topology configuration from pulumi outputs.
+        """
+        if not self.has_aws_resources():
+            return
 
-        cbs_command = ["terraform", "output", "-json", "couchbase_instance_private_ips"]
-        result = subprocess.run(cbs_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(cbs_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
+        def get_required(outputs: OutputMap, key: str, type: Type[T]) -> T:
+            if key not in outputs:
+                raise Exception(f"Missing required output '{key}'")
 
-        cbs_internal_ips = cast(List[str], json.loads(result.stdout))
-        self.apply_server_hostnames(cbs_ips, cbs_internal_ips)
+            return cast(T, outputs[key].value)
 
-        sgw_command = [
-            "terraform",
-            "output",
-            "-json",
-            "sync_gateway_instance_public_ips",
-        ]
-        result = subprocess.run(sgw_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(sgw_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
+        pulumi_stack = select_stack(
+            constants.STACK_NAME, work_dir=str(constants.WORK_DIR)
+        )
+        pulumi_outputs = pulumi_stack.outputs()
 
-        sgw_ips = cast(List[str], json.loads(result.stdout))
-
-        sgw_command = [
-            "terraform",
-            "output",
-            "-json",
-            "sync_gateway_instance_private_ips",
-        ]
-        result = subprocess.run(sgw_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(sgw_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
-
-        sgw_internal_ips = cast(List[str], json.loads(result.stdout))
-        self.apply_sgw_hostnames(sgw_ips, sgw_internal_ips)
-
-        lb_command = [
-            "terraform",
-            "output",
-            "-json",
-            "load_balancer_instance_public_ips",
-        ]
-        result = subprocess.run(lb_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(lb_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
-
-        lb_ips = cast(List[str], json.loads(result.stdout))
-        self.apply_lb_hostnames(lb_ips)
-
+        self.apply_server_hostnames(
+            get_required(pulumi_outputs, output_keys.CBS_PUBLIC_IPS, List[str]),
+            get_required(pulumi_outputs, output_keys.CBS_PRIVATE_IPS, List[str]),
+        )
+        self.apply_sgw_hostnames(
+            get_required(pulumi_outputs, output_keys.SGW_PUBLIC_IPS, List[str]),
+            get_required(pulumi_outputs, output_keys.SGW_PRIVATE_IPS, List[str]),
+        )
+        self.apply_lb_hostnames(
+            get_required(pulumi_outputs, output_keys.LB_PUBLIC_IPS, List[str])
+        )
         if self._wants_logslurp:
-            logslurp_command = ["terraform", "output", "logslurp_instance_public_ip"]
-            result = subprocess.run(logslurp_command, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise Exception(
-                    f"Command '{' '.join(logslurp_command)}' failed with exit status {result.returncode}: {result.stderr}"
-                )
-
-            self.__logslurp = cast(str, json.loads(result.stdout))
+            self.__logslurp = get_required(
+                pulumi_outputs, output_keys.LOG_SLURP_PUBLIC_IP, str
+            )
 
     def resolve_test_servers(self):
         """

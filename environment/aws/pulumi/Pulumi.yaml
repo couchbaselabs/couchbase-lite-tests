@@ -1,0 +1,4 @@
+backend:
+  url: file://.
+name: mobile-e2e
+runtime: python
