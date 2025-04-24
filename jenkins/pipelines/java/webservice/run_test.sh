@@ -27,7 +27,7 @@ sgw_version=$4
 
 python3 -m venv venv
 source venv/bin/activate
-pip install -r $SCRIPT_DIR/../../../environment/aws/requirements.txt
+pip install -r $SCRIPT_DIR/../../../../environment/aws/requirements.txt
 if [ -n "$private_key_path" ]; then
     python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $dataset_version $sgw_version --private_key $private_key_path
 else
