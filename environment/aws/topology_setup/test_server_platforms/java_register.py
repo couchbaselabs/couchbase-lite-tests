@@ -496,6 +496,12 @@ class JAKTestServer_WebService(JAKTestServer):
         """
         return "jak_webservice"
 
+    @property
+    def latestbuilds_path(self) -> str:
+        raise NotImplementedError(
+            "Please implement the latestbuilds path for webservice"
+        )
+
     def create_bridge(self):
         return JettyBridge(self.version, self.dataset_version)
 

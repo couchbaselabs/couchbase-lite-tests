@@ -36,9 +36,9 @@ def cli_entry(
         cbl_version,
         dataset_version,
         sgw_version,
-        SCRIPT_DIR / f"topology_single_host.json",
+        SCRIPT_DIR / "topology_single_host.json",
         SCRIPT_DIR / "config_java_webservice.json",
-        f"jak_webservice",
+        "jak_webservice",
         private_key,
     )
 
