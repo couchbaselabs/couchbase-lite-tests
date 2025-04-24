@@ -36,7 +36,7 @@ def cli_entry(
         cbl_version,
         dataset_version,
         sgw_version,
-        SCRIPT_DIR / "topologies" / f"topology_single_host.json",
+        SCRIPT_DIR / f"topology_single_host.json",
         SCRIPT_DIR / "config_java_desktop.json",
         f"jak_desktop",
         private_key,
