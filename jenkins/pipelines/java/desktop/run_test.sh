@@ -32,7 +32,7 @@ else
     python3 $SCRIPT_DIR/setup_test.py $cbl_version $dataset_version $sgw_version
 fi
 
-pushd $SCRIPT_DIR/../../../tests/dev_e2e
+pushd $SCRIPT_DIR/../../../../tests/dev_e2e
 pip install -r requirements.txt
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
 deactivate
