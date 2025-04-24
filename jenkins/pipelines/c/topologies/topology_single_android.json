@@ -2,7 +2,7 @@
     "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
     "test_servers": [
         {
-            "platform": "dotnet_android",
+            "platform": "c_android",
             "cbl_version": "{{version}}",
             "dataset_version": "{{dataset_version}}",
             "location": "1BCACS00001MX3"
