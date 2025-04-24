@@ -63,7 +63,7 @@ pipeline {
                         echo "=== Run Windows Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             pwsh """
-                                jenkins\\pipelines\\java\\desktop\\run_test.ps1 -Version "${params.CBL_VERSION}"-"${params.CBL_BUILD}" -DatasetVersion "${params.CBL_DATASET_VERSION}" -SgwVersion "${params.SGW_VERSION}" -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
+                                jenkins\\pipelines\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -DatasetVersion ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
                             """
                         }
                         echo "=== Windows Desktop Tests Complete"
