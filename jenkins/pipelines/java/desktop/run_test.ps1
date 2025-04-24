@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r $PSScriptRoot\..\..\..\environment\aws\requirements.txt
-$python_args = @("windows", $Version, $DatasetVersion, $SgwVersion)
+$python_args = @($Version, $DatasetVersion, $SgwVersion)
 if ($null -ne $PrivateKeyPath) {
     $python_args += "--private_key"
     $python_args += $PrivateKeyPath
