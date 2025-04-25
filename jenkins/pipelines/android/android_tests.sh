@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 # Build the Android test server, deploy it, and run the tests
 
 BUILD_TOOLS_VERSION='34.0.0'
