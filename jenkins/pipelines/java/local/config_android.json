@@ -1,8 +1,0 @@
-{
-    "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
-    "sync-gateways": [{"hostname": "192.168.89.180", "tls": true}],
-    "couchbase-servers": [{"hostname": "192.168.89.180"}],
-    "api-version": 1,
-    "test-servers": ["http://192.168.89.162:8080"]
-}
-

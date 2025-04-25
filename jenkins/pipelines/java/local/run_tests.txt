@@ -1,3 +1,0 @@
-
-rm -rf http_log testserver.log; pytest --maxfail=3 -W ignore::DeprecationWarning --config config_java.json
-
