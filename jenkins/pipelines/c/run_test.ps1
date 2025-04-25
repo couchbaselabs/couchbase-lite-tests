@@ -17,6 +17,9 @@ if ($null -ne $PrivateKeyPath) {
 }
 
 python $PSScriptRoot\setup_test.py @python_args
+if($LASTEXITCODE -ne 0) {
+    throw "Setup failed!"
+}
 
 Push-Location $PSScriptRoot\..\..\..\tests\dev_e2e
 pip install -r requirements.txt
