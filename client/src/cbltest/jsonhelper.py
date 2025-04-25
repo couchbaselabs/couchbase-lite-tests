@@ -1,11 +1,5 @@
 import json
-import sys
-from typing import Any, List, Optional, Type, TypeVar, cast
-
-if sys.version_info >= (3, 10):
-    from typing import get_origin
-else:
-    from typing_extensions import get_origin
+from typing import Any, List, Optional, Type, TypeVar, cast, get_origin
 
 from .logging import cbl_info, cbl_warning
 

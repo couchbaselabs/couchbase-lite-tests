@@ -16,14 +16,30 @@
 import json
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 import click
+import requests
 
 from environment.aws.start_backend import script_entry as start_backend
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
+
+
+def resolved_version(product: str, version: str) -> str:
+    if len(version.split(".")) >= 3:
+        return version
+
+    r = requests.get(
+        f"http://proget.build.couchbase.com:8080/api/latest_release?product={product}&version={version}"
+    )
+    if r.status_code != 200:
+        raise RuntimeError(
+            f"Failed to get latest version for {product} {version}: {r.text}"
+        )
+
+    return cast(str, r.json()["version"])
 
 
 def setup_test(
@@ -34,6 +50,7 @@ def setup_test(
     config_file_in: Path,
     topology_tag: str,
     private_key: Optional[str] = None,
+    couchbase_version: str = "7.6",
 ) -> None:
     """
     Sets up a testing environment with the specified CBL version, dataset version, and Sync Gateway version.
@@ -99,10 +116,10 @@ def setup_test(
 
         topology["defaults"] = {
             "cbs": {
-                "version": "7.6.4",
+                "version": resolved_version("couchbase-server", couchbase_version),
             },
             "sgw": {
-                "version": sgw_version,
+                "version": resolved_version("sync-gateway", sgw_version),
             },
         }
         topology["tag"] = topology_tag
