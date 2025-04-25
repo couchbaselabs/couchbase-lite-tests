@@ -71,7 +71,6 @@ def topology_has_aws_resources(topology: TopologyConfig) -> bool:
     Returns:
         bool: True if there are AWS resources, False otherwise.
     """
-    print(topology.total_sgw_count)
     return (
         topology.total_sgw_count > 0
         or topology.total_cbs_count > 0

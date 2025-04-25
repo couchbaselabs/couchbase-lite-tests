@@ -19,7 +19,6 @@ from jenkins.pipelines.shared.setup_test import setup_test
 
 
 @click.command()
-@click.argument("platform")
 @click.argument("cbl_version")
 @click.argument("dataset_version")
 @click.argument("sgw_version")
@@ -28,7 +27,6 @@ from jenkins.pipelines.shared.setup_test import setup_test
     help="The private key to use for the SSH connection (if not default)",
 )
 def cli_entry(
-    platform: str,
     cbl_version: str,
     dataset_version: str,
     sgw_version: str,
@@ -38,9 +36,9 @@ def cli_entry(
         cbl_version,
         dataset_version,
         sgw_version,
-        SCRIPT_DIR / "topologies" / f"topology_single_{platform}.json",
+        SCRIPT_DIR / "topology_single_host.json",
         SCRIPT_DIR / "config_java_webservice.json",
-        f"jak_{platform}_webservice",
+        "jak_webservice",
         private_key,
     )
 

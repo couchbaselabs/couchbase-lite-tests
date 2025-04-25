@@ -229,6 +229,7 @@ class CTestServer_iOS(CTestServer):
 
     def build(self):
         self._download_cbl()
+        self._copy_dataset()
         header("Building")
         env = os.environ.copy()
         env["LANG"] = "en_US.UTF-8"
@@ -377,6 +378,7 @@ class CTestServer_Android(CTestServer):
         Build the C test server.
         """
         self._download_cbl()
+        self._copy_dataset()
         gradle_path = C_TEST_SERVER_DIR / "platforms" / "android" / "gradlew"
         if platform.system() == "Windows":
             gradle_path = gradle_path.with_suffix(".bat")
