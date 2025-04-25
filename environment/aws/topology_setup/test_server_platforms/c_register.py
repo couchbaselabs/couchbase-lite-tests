@@ -83,16 +83,6 @@ class CTestServer(TestServer):
     def _copy_dataset(self) -> None:
         copy_dataset(C_TEST_SERVER_DIR / "assets", self.dataset_version)
 
-    def _copy_with_symlink_preservation(self, src: Path, dest: Path) -> None:
-        if src.is_symlink():
-            # Get the target of the symlink
-            target = os.readlink(src)
-            # Create the symlink at the destination
-            os.symlink(target, dest)
-        else:
-            # Copy the file normally
-            shutil.copy2(src, dest)
-
 
 class CTestServer_Desktop(CTestServer):
     def _download_cbl(self) -> None:
@@ -503,16 +493,6 @@ class CTestServer_Windows(CTestServer_Desktop):
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-windows-x86_64.zip"
 
-    def build(self) -> None:
-        super().build()
-        libcblite_version = self.version.split("-")[0]
-        libcblite_lib_dir = LIB_DIR / f"libcblite-{libcblite_version}" / "bin"
-        output_bin_dir = BUILD_DIR / "out" / "bin"
-        for dll_file in libcblite_lib_dir.glob("cblite*"):
-            self._copy_with_symlink_preservation(
-                dll_file, output_bin_dir / dll_file.name
-            )
-
     def create_bridge(self) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
@@ -574,19 +554,6 @@ class CTestServer_macOS(CTestServer_Desktop):
         version_parts = self.version.split("-")
         return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_macos_{self.dataset_version}.zip"
 
-    def build(self) -> None:
-        """
-        Build the C test server.
-        """
-        super().build()
-        libcblite_version = self.version.split("-")[0]
-        libcblite_lib_dir = LIB_DIR / f"libcblite-{libcblite_version}" / "lib"
-        output_bin_dir = BUILD_DIR / "out" / "bin"
-        for dylib_file in libcblite_lib_dir.glob("libcblite*.dylib"):
-            self._copy_with_symlink_preservation(
-                dylib_file, output_bin_dir / dylib_file.name
-            )
-
     def create_bridge(self) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
@@ -633,14 +600,6 @@ class CTestServer_Linux(CTestServer_Desktop):
             str: The platform name.
         """
         return f"c_linux_{self.__arch}"
-
-    def build(self) -> None:
-        super().build()
-        libcblite_version = self.version.split("-")[0]
-        libcblite_lib_dir = LIB_DIR / f"libcblite-{libcblite_version}" / "lib"
-        output_bin_dir = BUILD_DIR / "out" / "bin"
-        for so_file in libcblite_lib_dir.glob("**/libcblite.so*"):
-            self._copy_with_symlink_preservation(so_file, output_bin_dir / so_file.name)
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-linux-{self.__arch}.tar.gz"
