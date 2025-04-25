@@ -7,8 +7,6 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#elif __APPLE__
-#include <mach-o/dyld.h>
 #elif __linux__
 #include <unistd.h>
 #endif
@@ -37,14 +35,6 @@ namespace ts::support {
         }
         
         return std::string(path);
-#elif __APPLE__
-        char path[1024];
-        uint32_t size = sizeof(path);
-        if (_NSGetExecutablePath(path, &size) == 0) {
-            return std::string(path);
-        } else {
-            throw std::runtime_error("Buffer too small for executable path");
-        }
 #elif __linux__
         char path[1024];
         ssize_t count = readlink("/proc/self/exe", path, sizeof(path));
