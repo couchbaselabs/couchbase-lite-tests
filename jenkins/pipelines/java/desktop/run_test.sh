@@ -1,6 +1,8 @@
 #!/bin/bash -e
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+ROOT_DIR=$SCRIPT_DIR/../../../..
+SHARED_DIR="${SCRIPT_DIR}/../../shared"
 
 function usage() {
     echo "Usage: $0 <version> <dataset_version> <platform> <sgw_version> [private_key_path]"
@@ -23,18 +25,18 @@ cbl_version=$1
 dataset_version=$2
 sgw_version=$3
 
-source $SCRIPT_DIR/../shared/check_python_version.sh
+source $SHARED_DIR/check_python_version.sh
 
 create_venv venv
 source venv/bin/activate
-pip install -r $SCRIPT_DIR/../../../../environment/aws/requirements.txt
+pip install -r $ROOT_DIR/environment/aws/requirements.txt
 if [ -n "$private_key_path" ]; then
     python3 $SCRIPT_DIR/setup_test.py $cbl_version $dataset_version $sgw_version --private_key $private_key_path
 else
     python3 $SCRIPT_DIR/setup_test.py $cbl_version $dataset_version $sgw_version
 fi
 
-pushd $SCRIPT_DIR/../../../../tests/dev_e2e
+pushd $ROOT_DIR/tests/dev_e2e
 pip install -r requirements.txt
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
 deactivate
