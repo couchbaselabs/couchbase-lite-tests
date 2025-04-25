@@ -41,11 +41,10 @@ else
 fi
 deactivate
 
-# The following appears to be incomplete as it hangs the script here...
-# echo "Start logcat"
-# pushd $SCRIPT_DIR
-# python3 logcat.py 
-# echo $! > logcat.pid
+echo "Start logcat"
+pushd $SCRIPT_DIR
+python3 logcat.py &
+echo $! > logcat.pid
 
 pushd $SCRIPT_DIR/../../../tests/dev_e2e > /dev/null
 rm -rf venv http_log testserver.log
