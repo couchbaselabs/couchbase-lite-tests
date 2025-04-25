@@ -29,26 +29,28 @@ yes | ${SDK_MGR} --licenses > /dev/null 2>&1
 ${SDK_MGR} --install "build-tools;${BUILD_TOOLS_VERSION}"
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
-python3.10 -m venv venv
+source $SCRIPT_DIR/../shared/check_python_version.sh
+
+create_venv venv
 source venv/bin/activate
 pip install -r $SCRIPT_DIR/../../../environment/aws/requirements.txt
 if [ -n "$private_key_path" ]; then
-    python3.10 $SCRIPT_DIR/setup_test.py $CBL_VERSION $DATASET_VERSION $SG_VERSION --private_key $private_key_path
+    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $DATASET_VERSION $SG_VERSION --private_key $private_key_path
 else
-    python3.10 $SCRIPT_DIR/setup_test.py $CBL_VERSION $DATASET_VERSION $SG_VERSION
+    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $DATASET_VERSION $SG_VERSION
 fi
 deactivate
 
 # The following appears to be incomplete as it hangs the script here...
 # echo "Start logcat"
 # pushd $SCRIPT_DIR
-# python3.10 logcat.py 
+# python3 logcat.py 
 # echo $! > logcat.pid
 
 pushd $SCRIPT_DIR/../../../tests/dev_e2e > /dev/null
 rm -rf venv http_log testserver.log
-python3.10 -m venv venv
-. venv/bin/activate
+create_venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 
 echo "Run the tests"

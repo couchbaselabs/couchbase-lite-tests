@@ -25,7 +25,9 @@ dataset_version=$2
 platform=$3
 sgw_version=$4
 
-python3 -m venv venv
+source $SCRIPT_DIR/../shared/check_python_version.sh
+
+create_venv venv
 source venv/bin/activate
 pip install -r $SCRIPT_DIR/../../../environment/aws/requirements.txt
 if [ -n "$private_key_path" ]; then

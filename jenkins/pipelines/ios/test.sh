@@ -14,13 +14,15 @@ TESTS_DIR="${SCRIPT_DIR}/../../../tests/dev_e2e"
 
 echo "Setup backend..."
 
-python3.10 -m venv venv
+source $SHARED_DIR/check_python_version.sh
+
+create_venv venv
 source venv/bin/activate
 pip install -r $SCRIPT_DIR/../../../environment/aws/requirements.txt
 if [ -n "$private_key_path" ]; then
-    python3.10 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $CBL_DATASET_VERSION $SGW_VERSION --private_key $private_key_path
+    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $CBL_DATASET_VERSION $SGW_VERSION --private_key $private_key_path
 else
-    python3.10 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $CBL_DATASET_VERSION $SGW_VERSION
+    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $CBL_DATASET_VERSION $SGW_VERSION
 fi
 deactivate
 
@@ -28,7 +30,7 @@ deactivate
 echo "Run tests..."
 
 pushd "${TESTS_DIR}" > /dev/null
-python3.10 -m venv venv
+create_venv venv
 . venv/bin/activate
 pip install -r requirements.txt
 pytest -v --no-header -W ignore::DeprecationWarning --config config.json
