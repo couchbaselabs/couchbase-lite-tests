@@ -31,7 +31,7 @@ PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
 source $SCRIPT_DIR/../shared/check_python_version.sh
 
-python3 -m venv venv
+create_venv venv
 source venv/bin/activate
 pip install -r $SCRIPT_DIR/../../../environment/aws/requirements.txt
 if [ -n "$private_key_path" ]; then
@@ -49,8 +49,8 @@ deactivate
 
 pushd $SCRIPT_DIR/../../../tests/dev_e2e > /dev/null
 rm -rf venv http_log testserver.log
-python3 -m venv venv
-. venv/bin/activate
+create_venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 
 echo "Run the tests"

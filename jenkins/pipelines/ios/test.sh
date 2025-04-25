@@ -16,7 +16,7 @@ echo "Setup backend..."
 
 source $SHARED_DIR/check_python_version.sh
 
-python3 -m venv venv
+create_venv venv
 source venv/bin/activate
 pip install -r $SCRIPT_DIR/../../../environment/aws/requirements.txt
 if [ -n "$private_key_path" ]; then
@@ -30,7 +30,7 @@ deactivate
 echo "Run tests..."
 
 pushd "${TESTS_DIR}" > /dev/null
-python3 -m venv venv
+create_venv venv
 . venv/bin/activate
 pip install -r requirements.txt
 pytest -v --no-header -W ignore::DeprecationWarning --config config.json
