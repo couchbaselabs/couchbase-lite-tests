@@ -24,6 +24,11 @@ from jenkins.pipelines.shared.setup_test import setup_test
 @click.argument("dataset_version")
 @click.argument("sgw_version")
 @click.option(
+    "--cbs_version",
+    default="7.6",
+    help="The Couchbase Server version to use for the test (default: 7.6.x)",
+)
+@click.option(
     "--private_key",
     help="The private key to use for the SSH connection (if not default)",
 )
@@ -33,6 +38,7 @@ def cli_entry(
     dataset_version: str,
     sgw_version: str,
     private_key: Optional[str],
+    cbs_version: str,
 ) -> None:
     setup_test(
         cbl_version,
@@ -42,6 +48,7 @@ def cli_entry(
         SCRIPT_DIR / "config_aws.json",
         f"dotnet_{platform}",
         private_key,
+        cbs_version,
     )
 
 
