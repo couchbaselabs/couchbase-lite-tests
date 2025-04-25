@@ -127,3 +127,19 @@ install(
         TARGETS testserver
         RUNTIME DESTINATION bin
 )
+
+get_target_property(CBLITE_DLL_LOCATION cblite IMPORTED_LOCATION_MINSIZEREL)
+install(
+        FILES ${CBLITE_DLL_LOCATION}
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+)
+
+install(
+        DIRECTORY assets
+        DESTINATION ${CMAKE_INSTALL_PREFIX}
+        FILES_MATCHING
+        PATTERN "*"
+        PATTERN ".gitkeep" EXCLUDE
+)
+
+
