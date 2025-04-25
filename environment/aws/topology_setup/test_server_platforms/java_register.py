@@ -260,7 +260,6 @@ class JAKTestServer(TestServer):
         # here.
         dest_dir = (
             JAK_TEST_SERVER_DIR
-            / self.test_server_path
             / "assets"
             / self.dataset_version
         )
