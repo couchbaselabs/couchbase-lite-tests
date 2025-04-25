@@ -14,10 +14,10 @@ function create_venv() {
         if command -v python$REQUIRED_VERSION &> /dev/null; then
             echo "python3 is not high enough version ($PYTHON_VERSION < $REQUIRED_VERSION)."
             echo "Using python$REQUIRED_VERSION instead."
-            python3.10 -m venv $1
+            python${REQUIRED_VERSION} -m venv $1
         else
             echo "Error: Python $REQUIRED_VERSION or higher is required, but not found."
-            echo "Checked python3 and python3.10."
+            echo "Checked python3 and python$REQUIRED_VERSION."
             exit 1
         fi
     else 
