@@ -18,7 +18,7 @@ if(NOT DEFINED CBL_VERSION)
     message(FATAL_ERROR "Please pass -DCBL_VERSION to indicate which version of Couchbase Lite you will use")
 endif()
 
-find_package(CouchbaseLite REQUIRED VERSION ${CBL_VERSION} PATHS lib/libcblite-${CBL_VERSION} NO_DEFAULT_PATH)
+find_package(CouchbaseLite REQUIRED EXACT VERSION ${CBL_VERSION} PATHS lib/libcblite-${CBL_VERSION} lib/libcblite NO_DEFAULT_PATH)
 
 if(APPLE)
     set(CMAKE_INSTALL_RPATH "@loader_path")
@@ -129,8 +129,10 @@ install(
 )
 
 get_target_property(CBLITE_DLL_LOCATION cblite IMPORTED_LOCATION_MINSIZEREL)
+get_filename_component(CBLITE_PARENT_DIR "${CBLITE_DLL_LOCATION}" DIRECTORY)
+file(GLOB CBLITE_FILES "${CBLITE_PARENT_DIR}/*")
 install(
-        FILES ${CBLITE_DLL_LOCATION}
+        FILES ${CBLITE_FILES}
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
 )
 
