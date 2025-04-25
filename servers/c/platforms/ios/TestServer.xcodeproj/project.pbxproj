@@ -1103,6 +1103,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"${SRCROOT}/vendor/cmake/_deps/libzip-src/lib/zip_err_str.c",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/zsh;
