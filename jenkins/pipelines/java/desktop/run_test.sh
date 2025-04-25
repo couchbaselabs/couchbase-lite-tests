@@ -23,6 +23,8 @@ cbl_version=$1
 dataset_version=$2
 sgw_version=$3
 
+source $SCRIPT_DIR/../shared/check_python_version.sh
+
 python3 -m venv venv
 source venv/bin/activate
 pip install -r $SCRIPT_DIR/../../../../environment/aws/requirements.txt

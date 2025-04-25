@@ -25,6 +25,8 @@ dataset_version=$2
 platform=$3
 sgw_version=$4
 
+source $SCRIPT_DIR/../shared/check_python_version.sh
+
 python3 -m venv venv
 source venv/bin/activate
 pip install -r $SCRIPT_DIR/../../../environment/aws/requirements.txt

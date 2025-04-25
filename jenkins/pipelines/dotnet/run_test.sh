@@ -36,6 +36,8 @@ sgw_version=$4
 
 prepare_dotnet
 
+source $SCRIPT_DIR/../shared/check_python_version.sh
+
 python3 -m venv venv
 source venv/bin/activate
 pip install -r $SCRIPT_DIR/../../../environment/aws/requirements.txt
