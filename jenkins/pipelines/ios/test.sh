@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
+
 EDITION=${1}
 CBL_VERSION=${2}
 CBL_BLD_NUM=${3}

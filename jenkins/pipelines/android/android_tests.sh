@@ -1,6 +1,8 @@
 #!/bin/bash -e
 # Build the Android test server, deploy it, and run the tests
 
+trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
+
 BUILD_TOOLS_VERSION='34.0.0'
 SDK_MGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --channel=1"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -55,7 +57,3 @@ pip install -r requirements.txt
 echo "Run the tests"
 adb shell input keyevent KEYCODE_WAKEUP
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
-
-echo "Tests complete: $STATUS"
-exit $STATUS
-
