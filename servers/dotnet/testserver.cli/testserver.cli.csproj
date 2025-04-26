@@ -26,11 +26,4 @@
     <ProjectReference Include="..\testserver.logic\testserver.logic.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-      <None Include="Resources\**\*">
-          <Link>Resources\%(RecursiveDir)/%(FileName)%(Extension)</Link>
-          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-  </ItemGroup>
-
 </Project>

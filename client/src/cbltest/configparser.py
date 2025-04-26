@@ -12,6 +12,29 @@ from .jsonhelper import (
 )
 
 
+class TestServerInfo:
+    """The parsed Test Server information from the config file"""
+
+    ___url_key: Final[str] = "url"
+    __dataset_version_key: Final[str] = "dataset_version"
+
+    @property
+    def url(self) -> str:
+        """Gets the URL of the test server instance"""
+        return self.__url
+
+    @property
+    def dataset_version(self) -> str:
+        """Gets the dataset version of the test server instance"""
+        return self.__dataset_version
+
+    def __init__(self, data: dict):
+        self.__url: str = _assert_string_entry(data, self.___url_key)
+        self.__dataset_version: str = _assert_string_entry(
+            data, self.__dataset_version_key
+        )
+
+
 class SyncGatewayInfo:
     """The parsed Sync Gateway information from the config file"""
 
@@ -105,9 +128,10 @@ class ParsedConfig:
     __greenboard_key: Final[str] = "greenboard"
     __api_version_key: Final[str] = "api-version"
     __logslurp_key: Final[str] = "logslurp"
+    __dataset_version_key: Final[str] = "dataset_version"
 
     @property
-    def test_servers(self) -> List[str]:
+    def test_servers(self) -> List[dict]:
         """The list of test servers that can be interacted with"""
         return self.__test_servers
 
@@ -160,9 +184,13 @@ class ParsedConfig:
         """The URL of the optional logslurp server to send and collect logs"""
         return self.__logslurp_url
 
+    def dataset_version_at(self, i: int) -> str:
+        """The dataset version of the test server instance"""
+        return self.__test_servers[i][self.__dataset_version_key]
+
     def __init__(self, json: dict):
         self.__test_servers = _get_typed_nonnull(
-            json, self.__test_server_key, List[str], []
+            json, self.__test_server_key, List[Dict], []
         )
         self.__sync_gateways = _get_typed_nonnull(json, self.__sgw_key, List[Dict], [])
         self.__couchbase_servers = _get_typed_nonnull(

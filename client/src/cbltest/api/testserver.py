@@ -79,7 +79,9 @@ class TestServer:
 
             return ret_val
 
-    async def new_session(self, id: str, url: Optional[str], tag: Optional[str]):
+    async def new_session(
+        self, id: str, dataset_version: str, url: Optional[str], tag: Optional[str]
+    ):
         """
         Instructs this test server to log to the given LogSlurp instance
 
@@ -88,7 +90,7 @@ class TestServer:
         :param tag: The tag to use for this test server
         """
         with self.__tracer.start_as_current_span("new_session"):
-            payload = PostNewSessionRequestBody(id, url, tag)
+            payload = PostNewSessionRequestBody(id, dataset_version, url, tag)
             request = self.__request_factory.create_request(
                 TestServerRequestType.NEW_SESSION, payload
             )

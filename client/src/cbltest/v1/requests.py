@@ -568,14 +568,20 @@ class PostNewSessionRequestBody(TestServerRequestBody):
         """Returns the tag to use to print in log statements from this particular remote"""
         return self.__tag
 
-    def __init__(self, id: str, url: Optional[str], tag: Optional[str]):
+    def __init__(
+        self, id: str, dataset_version: str, url: Optional[str], tag: Optional[str]
+    ):
         super().__init__(1)
         self.__url = url
+        self.__dataset_version = dataset_version
         self.__id = id
         self.__tag = tag
 
     def to_json(self) -> Any:
-        json: Dict[str, Any] = {"id": self.__id}
+        json: Dict[str, Any] = {
+            "id": self.__id,
+            "dataset_version": self.__dataset_version,
+        }
         if self.__url is not None and self.__tag is not None:
             json["logging"] = {"url": self.__url, "tag": self.__tag}
 

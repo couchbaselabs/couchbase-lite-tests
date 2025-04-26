@@ -51,6 +51,9 @@ info:
     * Add [/stopMultipeerReplicator](#operation/stopMultipeerReplicator) endpoint
     * Add [/getMultipeerReplicatorStatus](#operation/getMultipeerReplicatorStatus) endpoint
 
+    1.1.1 (04/26/2025)
+    * Modify newSession to accept dataset_version to set the version of the dataset to be downloaded
+
     1.1.0 (03/05/2025)
     * Add [/startListener](#operation/startListener) and [/stopListener](#operation/stopListener) endpoint
 
@@ -1073,6 +1076,10 @@ components:
           description: The Session ID to appear in the header of all subsequent requests
           type: string
           example: 'c64aae38-87c1c-4524-823a-e267fc39c3c4'
+        dataset_version:
+          description: The version of the dataset to use for this session (default 3.2)
+          type: string
+          example: 4.0
         logging:
           type: object
           required: ['url', 'tag']

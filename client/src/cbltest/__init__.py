@@ -10,6 +10,7 @@ from .configparser import (
     CouchbaseServerInfo,
     ParsedConfig,
     SyncGatewayInfo,
+    TestServerInfo,
     _parse_config,
 )
 from .extrapropsparser import _parse_extra_props
@@ -80,6 +81,7 @@ class CBLPyTest:
         for ts in ret_val.test_servers:
             await ts.new_session(
                 str(ret_val.request_factory.uuid),
+                ret_val.config.dataset_version_at(ts_index),
                 ret_val.config.logslurp_url,
                 f"test-server[{ts_index}]",
             )
@@ -105,8 +107,11 @@ class CBLPyTest:
         self.__request_factory = RequestFactory(self.__config)
         self.__test_servers: List[TestServer] = []
         index = 0
-        for url in self.__config.test_servers:
-            self.__test_servers.append(TestServer(self.__request_factory, index, url))
+        for ts in self.__config.test_servers:
+            ts_info = TestServerInfo(ts)
+            self.__test_servers.append(
+                TestServer(self.__request_factory, index, ts_info.url)
+            )
             index += 1
 
         self.__sync_gateways: List[SyncGateway] = []
