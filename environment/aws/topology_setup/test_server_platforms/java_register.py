@@ -258,12 +258,7 @@ class JAKTestServer(TestServer):
         # and instead only copy the one that is going to be built
         # so that way there is no need to keep a manual list of versions
         # here.
-        dest_dir = (
-            JAK_TEST_SERVER_DIR
-            / self.test_server_path
-            / "assets"
-            / self.dataset_version
-        )
+        dest_dir = JAK_TEST_SERVER_DIR / "assets" / self.dataset_version
         dest_dir.mkdir(0o755, parents=True, exist_ok=True)
         copy_dataset(dest_dir, self.dataset_version)
 

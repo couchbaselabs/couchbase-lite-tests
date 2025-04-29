@@ -1,5 +1,7 @@
-#!/bin/bash
+#!/bin/bash -e
 # Build the Android test server, deploy it, and run the tests
+
+trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 
 BUILD_TOOLS_VERSION='34.0.0'
 SDK_MGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --channel=1"
@@ -41,11 +43,10 @@ else
 fi
 deactivate
 
-# The following appears to be incomplete as it hangs the script here...
-# echo "Start logcat"
-# pushd $SCRIPT_DIR
-# python3 logcat.py 
-# echo $! > logcat.pid
+echo "Start logcat"
+pushd $SCRIPT_DIR
+python3 logcat.py &
+echo $! > logcat.pid
 
 pushd $SCRIPT_DIR/../../../tests/dev_e2e > /dev/null
 rm -rf venv http_log testserver.log
@@ -56,7 +57,3 @@ pip install -r requirements.txt
 echo "Run the tests"
 adb shell input keyevent KEYCODE_WAKEUP
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
-
-echo "Tests complete: $STATUS"
-exit $STATUS
-
