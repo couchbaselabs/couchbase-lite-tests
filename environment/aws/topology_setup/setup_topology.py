@@ -373,12 +373,19 @@ class TestServerConfig:
         return self.__cbl_version
 
     @property
+    def dataset_version(self) -> str:
+        return self.__dataset_version
+
+    @property
     def platform(self) -> str:
         return self.__platform
 
-    def __init__(self, ip_address: str, cbl_version: str, platform: str):
+    def __init__(
+        self, ip_address: str, cbl_version: str, dataset_version: str, platform: str
+    ):
         self.__ip_address = ip_address
         self.__cbl_version = cbl_version
+        self.__dataset_version = dataset_version
         self.__platform = platform
 
 
@@ -648,6 +655,7 @@ class TopologyConfig:
                 TestServerConfig(
                     bridge.get_ip(test_server_input.location),
                     test_server_input.cbl_version,
+                    test_server_input.dataset_version,
                     test_server_input.platform,
                 )
             )
@@ -807,6 +815,7 @@ class TopologyConfig:
             click.echo(f"Test Server {i}:")
             click.echo(f"\tPlatform: {test_server.platform}")
             click.echo(f"\tCBL Version: {test_server.cbl_version}")
+            click.echo(f"\tDataset Version: {test_server.dataset_version}")
             click.echo(f"\tIP Address: {test_server.ip_address}")
             i += 1
 

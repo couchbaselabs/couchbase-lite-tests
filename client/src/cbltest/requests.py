@@ -5,7 +5,7 @@ from enum import Enum
 from importlib import import_module
 from pathlib import Path
 from shutil import rmtree
-from typing import Any, Optional, Type, cast
+from typing import Any, List, Optional, Type, cast
 from urllib.parse import urljoin
 from uuid import UUID, uuid4
 
@@ -238,7 +238,9 @@ class RequestFactory:
         self.__uuid = uuid4()
         self.__session = ClientSession()
         self.__version = available_api_version(config.api_version)
-        self.__server_urls = config.test_servers
+        self.__server_urls = cast(
+            List[str], list(str(ts["url"]) for ts in config.test_servers)
+        )
         cbl_info(
             f"RequestFactory created with API version {self.__version} ({self.__uuid})"
         )
