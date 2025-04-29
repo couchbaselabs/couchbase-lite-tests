@@ -6,7 +6,7 @@ Functions:
         Print a green text header that makes the message very obvious
 """
 
-# from termcolor import colored
+from termcolor import colored
 
 
 def header(text: str) -> None:
