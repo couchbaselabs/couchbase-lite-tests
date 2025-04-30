@@ -1,0 +1,140 @@
+pipeline {
+    agent none
+    parameters {
+        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
+        string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
+        string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '', description: "The dataset version to use (e.g. 3.2 or 4.0)")
+        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+    }
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD}-${CBL_EDITION} (#${currentBuild.number})"
+                    currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION}"
+                }
+            }
+        }
+        stage('Run Tests') {
+            parallel {
+                stage('macOS') {
+                    agent { label 'mob-e2e-mac-01' }
+                    options {
+                        lock('mob-e2e-mac-01')
+                    }
+                    steps {
+                        echo "Run macOS Test"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} macos '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown macOS Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
+                            }
+                        }
+                    }
+                }
+                stage('iOS') {
+                    agent { label 'mob-e2e-mac-01' }
+                    options {
+                        lock('mob-e2e-iphone-01')
+                    }
+                    environment { 
+                        KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
+                    }
+                    steps {
+                        // Unlock keychain:
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        echo "Run iOS Test"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown iOS Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
+                            }
+                        }
+                    }
+                }
+                stage('Android') {
+                    agent { label 'mob-e2e-mac-01' }
+                    options {
+                        lock('mob-e2e-android-01')
+                    }
+                    steps {
+                        echo "Run Android Test"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} android '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown Android Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
+                            }
+                        }
+                    }
+                }
+                stage('linux') {
+                    agent { label 'mob-e2e-deb-02' }
+                    options {
+                        lock('mob-e2e-deb-02')
+                    }
+                    steps {
+                        echo "Run linux Test"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} linux_x86_64 '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown linux Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
+                            }
+                        }
+                    }
+                }
+                stage('windows') {
+                    agent { label 'mob-e2e-win-01' }
+                    options {
+                        lock('mob-e2e-win-01')
+                    }
+                    steps {
+                        timeout(time: 60, unit: 'MINUTES') {
+                            pwsh "jenkins\\pipelines\\dev_e2e\\c\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
+                        }
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown Windows Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                pwsh 'jenkins\\pipelines\\dev_e2e\\c\\teardown.ps1'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "pasin@couchbase.com";
+        }
+    }
+}
