@@ -1,0 +1,52 @@
+pipeline {
+    agent none
+    parameters {
+        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
+        string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '', description: "The dataset version to use")
+        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    currentBuild.displayName = "android-${CBL_EDITION} ${params.CBL_VERSION}-${params.CBL_BUILD}/${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
+                }
+            }
+        }
+        stage('Android') {
+            agent { label 'mob-e2e-mac-01' }
+            options {
+                lock("mob-e2e-android-01")
+            }
+            steps {
+                echo "Run Android Tests"
+                timeout(time: 60, unit: 'MINUTES') {
+                    sh """
+                        jenkins/pipelines/dev_e2e/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
+                    """
+                }
+            }
+            post {
+                always {
+                    echo "Teardown Android Tests"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh '''
+                            jenkins/pipelines/dev_e2e/android/android_teardown.sh
+                        '''
+                    }
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "blake.meike@couchbase.com";
+        }
+    }
+}
