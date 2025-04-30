@@ -48,7 +48,7 @@ resource "aws_instance" "couchbaseserver" {
     associate_public_ip_address = true
 
     root_block_device {
-        volume_size = 200  # 200 GiB
+        volume_size = 50  # 50 GiB
         volume_type = "gp2"
     }
 
@@ -70,7 +70,7 @@ resource "aws_instance" "sync_gateway" {
     associate_public_ip_address = true
 
     root_block_device {
-        volume_size = 20  # 20 GiB
+        volume_size = 10  # 10 GiB
         volume_type = "gp2"
     }
 
