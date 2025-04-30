@@ -1,4 +1,5 @@
 from typing import List, Optional, cast
+from urllib.parse import urljoin
 
 from opentelemetry.trace import get_tracer
 
@@ -12,6 +13,7 @@ from cbltest.v1.requests import (
     PostResetRequestBody,
 )
 from cbltest.version import VERSION
+from cbltest.assertions import _assert_not_null
 
 
 class TestServer:
@@ -117,3 +119,14 @@ class TestServer:
             TestServerRequestType.LOG, payload
         )
         await self.__request_factory.send_request(self.__index, request)
+
+    def replication_url(self, db_name: str, port: int):
+        """
+        Returns the URL of the replication endpoint for this test server
+        """
+        ws_scheme = "ws://"  # For now not using secure
+
+        _assert_not_null(db_name, "db_name")
+        replication_url = f"{ws_scheme}{self.url}:{port}"
+        return urljoin(replication_url, db_name)
+
