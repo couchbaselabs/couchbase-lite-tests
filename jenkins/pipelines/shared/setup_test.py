@@ -51,6 +51,7 @@ def setup_test(
     topology_tag: str,
     private_key: Optional[str] = None,
     couchbase_version: str = "7.6",
+    public_key_name: str = "jborden",
 ) -> None:
     """
     Sets up a testing environment with the specified CBL version, dataset version, and Sync Gateway version.
@@ -131,7 +132,7 @@ def setup_test(
     topology = TopologyConfig(str(topology_file_out))
     start_backend(
         topology,
-        "jborden",
+        public_key_name,
         str(config_file_in),
         private_key=private_key,
         tdk_config_out=str(config_file_out),
