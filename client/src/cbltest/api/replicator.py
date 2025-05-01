@@ -2,7 +2,7 @@ import asyncio
 from datetime import timedelta
 from itertools import islice
 from time import time
-from typing import List, Optional, Set, cast
+from typing import cast
 
 from opentelemetry.trace import get_tracer
 
@@ -51,7 +51,7 @@ class Replicator:
         return self.__id != ""
 
     @property
-    def document_updates(self) -> List[ReplicatorDocumentEntry]:
+    def document_updates(self) -> list[ReplicatorDocumentEntry]:
         """
         Gets the list of document updates received from the server and caches them.
 
@@ -69,12 +69,12 @@ class Replicator:
         endpoint: str,
         replicator_type: ReplicatorType = ReplicatorType.PUSH_AND_PULL,
         continuous: bool = False,
-        authenticator: Optional[ReplicatorAuthenticator] = None,
+        authenticator: ReplicatorAuthenticator | None = None,
         reset: bool = False,
-        collections: Optional[List[ReplicatorCollectionEntry]] = None,
+        collections: list[ReplicatorCollectionEntry] | None = None,
         enable_document_listener: bool = False,
         enable_auto_purge: bool = True,
-        pinned_server_cert: Optional[str] = None,
+        pinned_server_cert: str | None = None,
     ):
         assert database._request_factory.version == 1, (
             "This version of the cbl test API requires request API v1"
@@ -84,7 +84,7 @@ class Replicator:
         self.__request_factory = database._request_factory
         self.__endpoint = endpoint
         self.__id: str = ""
-        self.__document_updates: List[ReplicatorDocumentEntry] = []
+        self.__document_updates: list[ReplicatorDocumentEntry] = []
         self.__tracer = get_tracer(__name__, VERSION)
         self.replicator_type: ReplicatorType = replicator_type
         """The direction of the replicator"""
@@ -92,13 +92,13 @@ class Replicator:
         self.continuous: bool = continuous
         """Whether or not this replicator is continuous"""
 
-        self.authenticator: Optional[ReplicatorAuthenticator] = authenticator
+        self.authenticator: ReplicatorAuthenticator | None = authenticator
         """The authenticator to use, if any"""
 
         self.reset: bool = reset
         """Whether or not to restart the replicator from the beginning"""
 
-        self.collections: List[ReplicatorCollectionEntry] = (
+        self.collections: list[ReplicatorCollectionEntry] = (
             collections if collections is not None else []
         )
         """The collections to use in this replication"""
@@ -110,7 +110,7 @@ class Replicator:
         """If True (default) auto purge is enabled for the replicator so documents will be automatically
         removed when access is lost"""
 
-        self.pinned_server_cert: Optional[str] = pinned_server_cert
+        self.pinned_server_cert: str | None = pinned_server_cert
         """The PEM representation of the certificate that the remote is using"""
 
     def add_default_collection(self) -> None:
@@ -203,7 +203,7 @@ class Replicator:
 
     async def wait_for_doc_events(
         self,
-        events: Set[WaitForDocumentEventEntry],
+        events: set[WaitForDocumentEventEntry],
         interval: timedelta = timedelta(seconds=0.5),
     ) -> bool:
         """
@@ -260,7 +260,7 @@ class Replicator:
 
     async def wait_for_all_doc_events(
         self,
-        events: Set[WaitForDocumentEventEntry],
+        events: set[WaitForDocumentEventEntry],
         max_retries: int = 5,
         ping_interval: timedelta = timedelta(seconds=1),
         idle_timeout: timedelta = timedelta(seconds=30),
@@ -328,11 +328,11 @@ class Replicator:
 
     async def wait_for_any_doc_event(
         self,
-        events: Set[WaitForDocumentEventEntry],
+        events: set[WaitForDocumentEventEntry],
         max_retries: int = 10,
         ping_interval: timedelta = timedelta(seconds=1),
         idle_timeout: timedelta = timedelta(seconds=10),
-    ) -> Optional[WaitForDocumentEventEntry]:
+    ) -> WaitForDocumentEventEntry | None:
         """
         This function will poll a continuous replicator every 'ping_interval seconds, waiting for it to become idle,
         until it sees one of the events in 'events'.  It will return the first event it sees, or None

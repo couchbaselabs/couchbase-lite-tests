@@ -1,9 +1,7 @@
 from datetime import timedelta
 from time import sleep
-from typing import Dict, List
 
 from couchbase.auth import PasswordAuthenticator
-from couchbase.bucket import Bucket
 from couchbase.cluster import Cluster
 from couchbase.exceptions import (
     BucketAlreadyExistsException,
@@ -41,7 +39,7 @@ class CouchbaseServer:
             self.__cluster = Cluster(url, opts)
             self.__cluster.wait_until_ready(timedelta(seconds=10))
 
-    def create_collections(self, bucket: str, scope: str, names: List[str]) -> None:
+    def create_collections(self, bucket: str, scope: str, names: list[str]) -> None:
         """
         A function that will create a specified set of collections in the specified scope
         which resides in the specified bucket
@@ -55,9 +53,7 @@ class CouchbaseServer:
             "Create Scope",
             attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket},
         ):
-            bucket_obj = _try_n_times(
-                10, 1, False, self.__cluster.bucket, Bucket, bucket
-            )
+            bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
             c = bucket_obj.collections()
             try:
                 if scope != "_default":
@@ -150,7 +146,7 @@ class CouchbaseServer:
         bucket: str,
         scope: str = "_default",
         collection: str = "_default",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Runs the specified query on the server.  The query may be formatted in a special way.
 

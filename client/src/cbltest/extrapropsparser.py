@@ -1,9 +1,9 @@
 from json import load
 from pathlib import Path
-from typing import Dict, cast
+from typing import cast
 
 
-def _parse_extra_props(file_path: str) -> Dict[str, str]:
+def _parse_extra_props(file_path: str) -> dict[str, str]:
     p = Path(file_path)
     if not p.exists():
         raise FileNotFoundError(f"Extra props file not found at {file_path}!")
@@ -14,4 +14,4 @@ def _parse_extra_props(file_path: str) -> Dict[str, str]:
     if not isinstance(json, dict):
         raise ValueError("Extra props is not a JSON dictionary object")
 
-    return cast(Dict[str, str], json)
+    return cast(dict[str, str], json)

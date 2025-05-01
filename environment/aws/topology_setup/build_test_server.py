@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 This module builds and optionally uploads Couchbase Lite test servers to the latestbuilds server.

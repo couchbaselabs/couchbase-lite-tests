@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 This module prepares an AWS EC2 environment for running end-to-end (E2E) tests. It includes functions for applying Terraform configurations,
@@ -23,7 +22,7 @@ from enum import Flag, auto
 from io import TextIOWrapper
 from pathlib import Path
 from time import sleep
-from typing import IO, Any, Dict, Optional, cast
+from typing import IO, Any, cast
 
 import click
 
@@ -47,7 +46,7 @@ class TopologyParamType(click.ParamType):
     name = "path"
 
     def convert(
-        self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]
+        self, value: Any, param: click.Parameter | None, ctx: click.Context | None
     ) -> TopologyConfig:
         if isinstance(value, TopologyConfig):
             return value
@@ -79,7 +78,7 @@ def topology_has_aws_resources(topology: TopologyConfig) -> bool:
     )
 
 
-def terraform_apply(public_key_name: Optional[str], topology: TopologyConfig) -> None:
+def terraform_apply(public_key_name: str | None, topology: TopologyConfig) -> None:
     """
     Apply the Terraform configuration to set up the AWS environment.
 
@@ -150,8 +149,8 @@ def write_config(
         output (IO[str]): The output stream to write the configuration to.
     """
     header(f"Writing TDK configuration based on {in_config_file}...")
-    with open(in_config_file, "r") as fin:
-        config_json = cast(Dict, json.load(fin))
+    with open(in_config_file) as fin:
+        config_json = cast(dict, json.load(fin))
         config_json.pop("couchbase-servers", None)
         config_json.pop("sync-gateways", None)
         config_json.pop("test-servers", None)
@@ -219,10 +218,10 @@ class BackendSteps(Flag):
 
 def main(
     topology: TopologyConfig,
-    public_key_name: Optional[str],
+    public_key_name: str | None,
     tdk_config_in: str,
-    private_key: Optional[str] = None,
-    tdk_config_out: Optional[str] = None,
+    private_key: str | None = None,
+    tdk_config_out: str | None = None,
     steps: BackendSteps = BackendSteps.ALL,
 ) -> None:
     """
@@ -360,10 +359,10 @@ def main(
 )
 def cli_entry(
     topology: TopologyConfig,
-    public_key_name: Optional[str],
+    public_key_name: str | None,
     tdk_config_in: str,
-    private_key: Optional[str],
-    tdk_config_out: Optional[str],
+    private_key: str | None,
+    tdk_config_out: str | None,
     no_terraform_apply: bool,
     no_cbs_provision: bool,
     no_sgw_provision: bool,
@@ -397,11 +396,11 @@ def cli_entry(
 
 def script_entry(
     topology: TopologyConfig,
-    public_key_name: Optional[str],
+    public_key_name: str | None,
     tdk_config_in: str,
-    private_key: Optional[str] = None,
-    tdk_config_out: Optional[str] = None,
-    steps: Optional[BackendSteps] = None,
+    private_key: str | None = None,
+    tdk_config_out: str | None = None,
+    steps: BackendSteps | None = None,
 ) -> None:
     if steps is not None:
         main(

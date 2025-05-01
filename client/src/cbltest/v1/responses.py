@@ -1,4 +1,4 @@
-from typing import Any, Dict, Final, List, Optional, cast
+from typing import Any, Final, cast
 
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -80,23 +80,23 @@ class PostGetAllDocumentsResponse(TestServerResponse):
     """
 
     @property
-    def collection_keys(self) -> List[str]:
+    def collection_keys(self) -> list[str]:
         """Gets all the collections that are specified in the response"""
         return list(self.__payload.keys())
 
     def documents_for_collection(
         self, collection: str
-    ) -> List[PostGetAllDocumentsEntry]:
+    ) -> list[PostGetAllDocumentsEntry]:
         """
         Gets the documents contained in the specified collection
 
         :param collection: The collection to return documents from
         """
-        return cast(List[PostGetAllDocumentsEntry], self.__payload.get(collection))
+        return cast(list[PostGetAllDocumentsEntry], self.__payload.get(collection))
 
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "getAllDocuments")
-        self.__payload: Dict[str, List[PostGetAllDocumentsEntry]] = {}
+        self.__payload: dict[str, list[PostGetAllDocumentsEntry]] = {}
         for k in body:
             v = body[k]
             self.__payload[k] = []
@@ -139,7 +139,7 @@ class PostSnapshotDocumentsResponse(TestServerResponse):
 
 
 class ValueOrMissing:
-    def __init__(self, value: Optional[Any] = None, exists: bool = False):
+    def __init__(self, value: Any | None = None, exists: bool = False):
         self.value = value
         self.exists = exists if value is None else True
 
@@ -169,7 +169,7 @@ class PostVerifyDocumentsResponse(TestServerResponse):
         return self.__result
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         """Gets the description of what went wrong if result is false"""
         return self.__description
 
@@ -184,7 +184,7 @@ class PostVerifyDocumentsResponse(TestServerResponse):
         return self.__actual
 
     @property
-    def document(self) -> Optional[Dict[str, Any]]:
+    def document(self) -> dict[str, Any] | None:
         """Gets the document body of the document with the faulty keypath, if applicable"""
         return self.__document
 
@@ -205,7 +205,7 @@ class PostVerifyDocumentsResponse(TestServerResponse):
         else:
             self.__actual = ValueOrMissing(body.get(self.__actual_key), True)
 
-        self.__document = _get_typed(body, self.__document_key, Dict[str, Any])
+        self.__document = _get_typed(body, self.__document_key, dict[str, Any])
 
 
 class PostStartReplicatorResponse(TestServerResponse):
@@ -282,12 +282,12 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
         return self.__progress
 
     @property
-    def replicator_error(self) -> Optional[ErrorResponseBody]:
+    def replicator_error(self) -> ErrorResponseBody | None:
         """Gets the error that occurred during replication, if any"""
         return self.__replicator_error
 
     @property
-    def documents(self) -> List[ReplicatorDocumentEntry]:
+    def documents(self) -> list[ReplicatorDocumentEntry]:
         """Gets the unseen list of documents replicated previously.  Note
         that once viewed it will be cleared"""
         return self.__documents
@@ -348,10 +348,10 @@ class PostRunQueryResponse(TestServerResponse):
     __results_key: Final[str] = "results"
 
     @property
-    def results(self) -> List[Dict]:
+    def results(self) -> list[dict]:
         return self.__results
 
-    def __init__(self, status_code: int, uuid: str, body: Dict):
+    def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "runQuery")
         if self.__results_key not in body:
             return
@@ -375,11 +375,11 @@ class PostGetDocumentResponse(TestServerResponse):
     """
 
     @property
-    def raw_body(self) -> Dict:
+    def raw_body(self) -> dict:
         """The raw return value from the server (containing id, revs, and body)"""
         return self.__body
 
-    def __init__(self, status_code: int, uuid: str, body: Dict):
+    def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "getDocument")
         self.__body = body
 

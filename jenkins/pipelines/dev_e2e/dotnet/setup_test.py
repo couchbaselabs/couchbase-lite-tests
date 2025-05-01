@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import os
 import sys
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Optional, cast
+from typing import cast
 
 import click
 
@@ -37,7 +36,7 @@ def cli_entry(
     cbl_version: str,
     dataset_version: str,
     sgw_version: str,
-    private_key: Optional[str],
+    private_key: str | None,
     cbs_version: str,
 ) -> None:
     setup_test(

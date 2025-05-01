@@ -1,5 +1,5 @@
 import json
-from typing import Any, List, Optional, Type, TypeVar, cast, get_origin
+from typing import Any, TypeVar, cast, get_origin
 
 from .logging import cbl_info, cbl_warning
 
@@ -26,7 +26,7 @@ def dumps_with_ellipsis(obj: Any, limit: int = 100) -> str:
     return f"{text[:half_length]}...{text[-half_length:]}"
 
 
-def _get_string_list(d: dict, key: str) -> Optional[List[str]]:
+def _get_string_list(d: dict, key: str) -> list[str] | None:
     if key not in d:
         return None
 
@@ -40,10 +40,10 @@ def _get_string_list(d: dict, key: str) -> Optional[List[str]]:
                 f"Expecting an array of strings for {key} but found {x} inside!"
             )
 
-    return cast(List[str], ret_val)
+    return cast(list[str], ret_val)
 
 
-def _assert_contains_string_list(d: dict, key: str) -> List[str]:
+def _assert_contains_string_list(d: dict, key: str) -> list[str]:
     ret_val = _get_string_list(d, key)
     if ret_val is None:
         raise ValueError(f"Missing required key {key} in dictionary!")
@@ -102,19 +102,19 @@ def _get_bool_or_default(d: dict, key: str, default: bool) -> bool:
     return cast(bool, ret_val)
 
 
-def _get_typed(d: dict, key: str, type: Type[T]) -> Optional[T]:
+def _get_typed(d: dict, key: str, expected_type: type[T]) -> T | None:
     if key not in d:
         return None
 
-    origin = get_origin(type)
+    origin = get_origin(expected_type)
     if origin is None:
-        origin = type
+        origin = expected_type
 
     ret_val = d[key]
     if ret_val is None:
         return ret_val
 
-    if not isinstance(ret_val, cast(Type, origin)):
+    if not isinstance(ret_val, origin):
         raise ValueError(
             f"Expecting {str(type)} for key {key} but found {ret_val} instead"
         )
@@ -122,21 +122,21 @@ def _get_typed(d: dict, key: str, type: Type[T]) -> Optional[T]:
     return cast(T, ret_val)
 
 
-def _get_typed_nonnull(d: dict, key: str, type: Type[T], default: T) -> T:
-    found_val = _get_typed(d, key, type)
+def _get_typed_nonnull(d: dict, key: str, expected_type: type[T], default: T) -> T:
+    found_val = _get_typed(d, key, expected_type)
     return found_val if found_val is not None else default
 
 
-def _get_typed_required(d: dict, key: str, type: Type[T]) -> T:
+def _get_typed_required(d: dict, key: str, expected_type: type[T]) -> T:
     if key not in d:
         raise ValueError(f"Missing required key {key} in dictionary!")
 
-    origin = get_origin(type)
+    origin = get_origin(expected_type)
     if origin is None:
-        origin = type
+        origin = expected_type
 
     ret_val = d[key]
-    if not isinstance(ret_val, cast(Type, origin)):
+    if not isinstance(ret_val, origin):
         raise ValueError(
             f"Expecting {str(type)} for key {key} but found {ret_val} instead"
         )

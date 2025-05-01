@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from enum import Enum, Flag, auto
-from typing import Any, Dict, Final, List, Optional, cast
+from typing import Any, Final, cast
 
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.assertions import _assert_not_empty
@@ -21,13 +21,13 @@ class ReplicatorFilter(JSONSerializable):
         """Gets the name of the filter"""
         return self.__name
 
-    def __init__(self, name: str, parameters: Optional[dict] = None):
+    def __init__(self, name: str, parameters: dict | None = None):
         self.__name = name
         self.parameters = parameters
         """The parameters to be applied to the filter"""
 
     def to_json(self) -> Any:
-        ret_val: Dict[str, Any] = {"name": self.name}
+        ret_val: dict[str, Any] = {"name": self.name}
         if self.parameters is not None:
             ret_val["params"] = self.parameters
 
@@ -44,13 +44,13 @@ class ReplicatorConflictResolver(JSONSerializable):
         """Gets the name of the resolver"""
         return self.__name
 
-    def __init__(self, name: str, parameters: Optional[dict] = None):
+    def __init__(self, name: str, parameters: dict | None = None):
         self.__name = name
         self.parameters = parameters
         """The parameters to be applied to the resolver"""
 
     def to_json(self) -> Any:
-        ret_val: Dict[str, Any] = {"name": self.name}
+        ret_val: dict[str, Any] = {"name": self.name}
         if self.parameters is not None:
             ret_val["params"] = self.parameters
 
@@ -59,18 +59,18 @@ class ReplicatorConflictResolver(JSONSerializable):
 
 class ReplicatorCollectionEntry(JSONSerializable):
     @property
-    def names(self) -> List[str]:
+    def names(self) -> list[str]:
         """Gets the name of the collection that the options will be applied to"""
         return self.__names
 
     def __init__(
         self,
-        names: Optional[List[str]] = None,
-        channels: Optional[List[str]] = None,
-        document_ids: Optional[List[str]] = None,
-        push_filter: Optional[ReplicatorFilter] = None,
-        pull_filter: Optional[ReplicatorFilter] = None,
-        conflict_resolver: Optional[ReplicatorConflictResolver] = None,
+        names: list[str] | None = None,
+        channels: list[str] | None = None,
+        document_ids: list[str] | None = None,
+        push_filter: ReplicatorFilter | None = None,
+        pull_filter: ReplicatorFilter | None = None,
+        conflict_resolver: ReplicatorConflictResolver | None = None,
     ):
         if names is None:
             self.__names = ["_default"]
@@ -278,7 +278,7 @@ class ReplicatorDocumentFlags(Flag):
         raise ValueError(f"Unrecognized input ReplicatorDocumentFlags {input}")
 
     @classmethod
-    def parse_all(cls, input: List[str]) -> ReplicatorDocumentFlags:
+    def parse_all(cls, input: list[str]) -> ReplicatorDocumentFlags:
         """
         Parses and ORs a list of string words representing flags
 
@@ -342,7 +342,7 @@ class ReplicatorDocumentEntry:
         return self.__flags
 
     @property
-    def error(self) -> Optional[ErrorResponseBody]:
+    def error(self) -> ErrorResponseBody | None:
         """Gets the error that prevented the document from being replicated, if any"""
         return self.__error
 
@@ -358,9 +358,9 @@ class ReplicatorDocumentEntry:
         assert self.__document_id is not None, "Null ID on replicator document received"
         self.__is_push = _get_typed_required(body, self.__is_push_key, bool)
         self.__flags = ReplicatorDocumentFlags.parse_all(
-            _get_typed_required(body, self.__flags_key, List[str])
+            _get_typed_required(body, self.__flags_key, list[str])
         )
-        self.__error: Optional[ErrorResponseBody] = ErrorResponseBody.create(
+        self.__error: ErrorResponseBody | None = ErrorResponseBody.create(
             cast(dict, body.get(self.__error_key))
         )
 
@@ -388,7 +388,7 @@ class WaitForDocumentEventEntry:
         return self.__direction
 
     @property
-    def flags(self) -> Optional[ReplicatorDocumentFlags]:
+    def flags(self) -> ReplicatorDocumentFlags | None:
         """Gets the flags of the event to wait for.  Events that otherwise match
         (e.g. have the same document ID) will be ignored"""
         return self.__flags
@@ -398,9 +398,9 @@ class WaitForDocumentEventEntry:
         collection: str,
         id: str,
         direction: ReplicatorType,
-        flags: Optional[ReplicatorDocumentFlags],
-        err_domain: Optional[str] = None,
-        err_code: Optional[int] = None,
+        flags: ReplicatorDocumentFlags | None,
+        err_domain: str | None = None,
+        err_code: int | None = None,
     ):
         assert isinstance(collection, str), (
             "WaitForDocumentEventEntry: collection not a string"
@@ -457,7 +457,7 @@ class ReplicatorStatus:
         return self.__activity
 
     @property
-    def error(self) -> Optional[ErrorResponseBody]:
+    def error(self) -> ErrorResponseBody | None:
         """Gets the error for the Replicator, if any"""
         return self.__error
 
@@ -465,7 +465,7 @@ class ReplicatorStatus:
         self,
         progress: ReplicatorProgress,
         activity: ReplicatorActivityLevel,
-        error: Optional[ErrorResponseBody],
+        error: ErrorResponseBody | None,
     ):
         self.__progress = progress
         self.__activity = activity

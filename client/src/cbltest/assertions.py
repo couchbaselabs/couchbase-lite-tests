@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any
 
 
 def _assert_not_null(arg: Any, name: str) -> Any:
@@ -8,7 +8,7 @@ def _assert_not_null(arg: Any, name: str) -> Any:
     return arg
 
 
-def _assert_not_empty(arg: List[Any], name: str) -> Any:
+def _assert_not_empty(arg: list[Any], name: str) -> Any:
     if len(arg) <= 0:
         raise TypeError(f"{name} must not be empty!")
 

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 This module sets up the LogSlurp service on an AWS EC2 instance. It includes functions for executing remote commands,
 checking SSH key settings, and configuring Docker contexts.
@@ -19,7 +17,6 @@ Functions:
 """
 
 from pathlib import Path
-from typing import Optional
 
 import click
 import paramiko
@@ -67,7 +64,7 @@ def remote_exec(
     click.echo()
 
 
-def main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
+def main(topology: TopologyConfig, private_key: str | None = None) -> None:
     """
     Set up the LogSlurp service on an AWS EC2 instance.
 
@@ -84,7 +81,7 @@ def main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
     ec2_hostname = get_ec2_hostname(topology.logslurp)
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    pkey: Optional[paramiko.Ed25519Key] = (
+    pkey: paramiko.Ed25519Key | None = (
         paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
     )
     ssh.connect(ec2_hostname, username="ec2-user", pkey=pkey)

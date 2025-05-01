@@ -1,4 +1,4 @@
-from typing import List, Optional, cast
+from typing import cast
 
 from opentelemetry.trace import get_tracer
 
@@ -44,10 +44,10 @@ class TestServer:
 
     async def create_and_reset_db(
         self,
-        db_names: List[str],
-        dataset: Optional[str] = None,
-        collections: Optional[List[str]] = None,
-    ) -> List[Database]:
+        db_names: list[str],
+        dataset: str | None = None,
+        collections: list[str] | None = None,
+    ) -> list[Database]:
         """
         Creates and returns a set of Databases based on the given dataset
 
@@ -73,14 +73,14 @@ class TestServer:
                 TestServerRequestType.RESET, payload
             )
             await self.__request_factory.send_request(self.__index, request)
-            ret_val: List[Database] = []
+            ret_val: list[Database] = []
             for db_name in db_names:
                 ret_val.append(Database(self.__request_factory, self.__index, db_name))
 
             return ret_val
 
     async def new_session(
-        self, id: str, dataset_version: str, url: Optional[str], tag: Optional[str]
+        self, id: str, dataset_version: str, url: str | None, tag: str | None
     ):
         """
         Instructs this test server to log to the given LogSlurp instance

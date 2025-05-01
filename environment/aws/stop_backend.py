@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 This module tears down a previously created E2E AWS EC2 testing backend. It includes functions for destroying the Terraform-managed infrastructure
@@ -14,7 +13,7 @@ import subprocess
 import sys
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Optional, cast
+from typing import cast
 
 import click
 
@@ -34,7 +33,7 @@ from environment.aws.topology_setup.setup_topology import TopologyConfig
     help="The topology file that was used to start the environment",
     type=click.Path(exists=True),
 )
-def main(topology: Optional[str]) -> None:
+def main(topology: str | None) -> None:
     """
     Main function to tear down the AWS environment and stop the test servers.
 

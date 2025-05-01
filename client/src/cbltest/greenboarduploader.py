@@ -10,7 +10,7 @@ from couchbase.options import ClusterOptions
 from cbltest.logging import cbl_warning
 
 
-class GreenboardUploader(object):
+class GreenboardUploader:
     """
     A class for uploading results to a specified greenboard server bucket
     """

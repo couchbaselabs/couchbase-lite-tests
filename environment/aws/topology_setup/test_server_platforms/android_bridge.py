@@ -31,7 +31,6 @@ Functions:
 import platform
 import subprocess
 from pathlib import Path
-from typing import List
 
 import click
 
@@ -45,7 +44,7 @@ class AndroidBridge(PlatformBridge):
     A class to manage Android applications on devices using ADB.
     """
 
-    __potential_adb_locations: List[str] = [
+    __potential_adb_locations: list[str] = [
         "/opt/homebrew/share/android-commandlinetools/platform-tools/",
         "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools",
     ]
