@@ -17,7 +17,7 @@ The system consists of 4 components:
 * README.md - this file
 * client - A python framework that configures the environment, runs tests and reports their results
 * dataset - A collection datasets used in tests.  Each dataset appears in two formats, as a cblite2 db, and as raw JSON
-* environment - The docker compose script that creates and runs the environment
+* environment - Scripts and such for setting up and tearing down a backend environment
 * jenkins - The jenkins pipelines and the docker compose for running the Jenkins server.
 * servers - A test server for each CBL platform.  Servers run on their platform and accept instructions from the client to run tests
 * spec - Documentation:  The specification for this system.
@@ -28,7 +28,7 @@ The system consists of 4 components:
 ### Requirements
 
 1. [Docker](https://www.docker.com/get-started)
-2. [Python 3.9+](https://www.python.org/downloads)
+2. [Python 3.10+](https://www.python.org/downloads)
 3. [OpenSSL 1.1 for CBS Python SDK](https://docs.couchbase.com/python-sdk/current/hello-world/start-using-sdk.html)
 4. [Git LFS](https://git-lfs.com)
 
@@ -40,43 +40,15 @@ The system consists of 4 components:
    ```
    This repository uses Git LFS to store binary dataset files. Ensure that you have [Git LFS](https://git-lfs.com) installed, and run `git lfs install` once to setup the extension hook before cloning the repository.
 
-2. Open a terminal window and start the environment by running the `./start_environment.py` script in the environment folder.
-   The script will start CBS and SG in the docker container in the background and wait until SG is successfully started before exiting.
-   ```
-   cd environment
-   ./start_environment.py
-   ```
-   * To shutdown the environment, run `docker compose down`.
-   
-3. Build and run the test server of the platform that you want to test.
-   * [C](https://github.com/couchbaselabs/couchbase-lite-tests/tree/main/servers/c)
-   * Android
-   * .Net
-   * iOS
-     
-4. From the tests directory, set up a python virtual environment:
-   ```
-   cd tests
-   python3 -m venv venv
-   . venv/bin/activate
-   pip install -r requirements.txt
-   ```
-   * You may need to use `python<version>` command e.g. `python3.10` if you already have `python3` for the other version.
-   * You only need to create the python venv once. To reactivate run `. venv/bin/activate`, and to deactivate run `deactivate`.
-   * When you update the repo or the Python TDK code, run `pip install ../client` to update the TDK.
+2. From the jenkins/pipelines directory of your choice, run the relevant script (such as run_test.ps1, test.sh, etc) with the various arguments regarding versions of things to use.
 
-5. Edit the file `config.example.json` with the URL of your Test server started in the Step 2.
-   ```
-   "test-servers": ["http://192.168.100.104:8080"]
-   ```
-6. Run the pytest tests as examples below.
-   ```
-   # Run one test file:
-   pytest --config config.example.json test_basic_replication.py
+### Contributing
 
-   # Run all tests:
-   pytest --config config.example.json
+Notice that this repo has a .pre-commit-config.yaml file, which means it is ready to use with the [pre-commit](https://pre-commit.com/#intro) python tool.  Essentially, after you clone this repo you should run 
 
-   # Run all with detail and without deprecation warning:
-   pytest -v --no-header -W ignore::DeprecationWarning --config config.example.json
-   ```
+```
+pip install pre-commit
+pre-commit install
+```
+
+After that git pre-commit validation will check various things for you to ensure adherence to best practices and standards.

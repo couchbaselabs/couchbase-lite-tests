@@ -1,5 +1,3 @@
-from typing import Optional
-
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.database import Database
@@ -53,7 +51,7 @@ class TestStartReplicator:
         ],
     )
     async def test_known_conflict_resolvers(
-        self, cblpytest: CBLPyTest, name: str, parameters: Optional[dict]
+        self, cblpytest: CBLPyTest, name: str, parameters: dict | None
     ):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]

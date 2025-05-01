@@ -1,6 +1,6 @@
 from json import dumps, load
 from pathlib import Path
-from typing import List, Optional, cast
+from typing import cast
 
 from opentelemetry.trace import get_tracer
 
@@ -35,13 +35,13 @@ class CouchbaseCloud:
             raise ValueError(f"{count} indexes remain in '{bucket}' bucket")
 
     def _wait_for_all_indexed_removed(self, bucket: str) -> None:
-        _try_n_times(10, 2, True, self._check_all_indexes_removed, type(None), bucket)
+        _try_n_times(10, 2, True, self._check_all_indexes_removed, bucket)
 
     async def configure_dataset(
         self,
         dataset_path: Path,
         dataset_name: str,
-        sg_config_options: Optional[List[str]] = None,
+        sg_config_options: list[str] | None = None,
     ) -> None:
         """
         Creates a database, ensuring that it is in an empty state when finished

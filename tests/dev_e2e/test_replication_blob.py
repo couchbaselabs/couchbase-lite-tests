@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
@@ -84,7 +84,7 @@ class TestReplicationBlob(CBLTestClass):
             ),
             "hotel_1 vanished from SGW",
         )
-        hotels_updates: List[DocumentUpdateEntry] = []
+        hotels_updates: list[DocumentUpdateEntry] = []
         hotels_updates.append(
             DocumentUpdateEntry(
                 "hotel_1",
@@ -260,7 +260,7 @@ class TestReplicationBlob(CBLTestClass):
         remote_doc = await cblpytest.sync_gateways[0].get_document("names", "fruits")
         assert remote_doc is not None, "Document `fruits` not found in SGW"
 
-        def check_blob_prop(d: Dict, prop: str, expected_value: Any):
+        def check_blob_prop(d: dict, prop: str, expected_value: Any):
             assert prop in d, f"Property `{prop}` not found in the blob"
             assert d[prop] == expected_value, (
                 f"Property `{prop}` is incorrect (expected: {expected_value}, actual: {d[prop]})"

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List, Set
 
 import pytest
 from cbltest import CBLPyTest
@@ -26,7 +25,7 @@ from test_replication_filter_data import uk_and_france_doc_ids
 @pytest.mark.min_couchbase_servers(1)
 class TestReplicationFilter(CBLTestClass):
     def validate_replicated_doc_ids(
-        self, expected: Set[str], actual: List[ReplicatorDocumentEntry]
+        self, expected: set[str], actual: list[ReplicatorDocumentEntry]
     ) -> None:
         for update in actual:
             assert update.document_id in expected, (

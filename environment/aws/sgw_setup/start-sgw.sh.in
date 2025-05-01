@@ -1,5 +1,3 @@
-#!/bin/sh
-
 SSL=${SSL:-true}
 
 SCRIPT=$(readlink -f "$0")

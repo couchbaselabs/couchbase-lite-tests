@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 This module sets up Couchbase Server on AWS EC2 instances. It includes functions for executing remote commands,
 setting up individual nodes, and configuring the server topology.
@@ -20,7 +17,6 @@ Functions:
 """
 
 from pathlib import Path
-from typing import Optional
 
 import click
 import paramiko
@@ -65,9 +61,9 @@ def remote_exec(
 
 def setup_node(
     hostname: str,
-    pkey: Optional[paramiko.Ed25519Key],
+    pkey: paramiko.Ed25519Key | None,
     version: str,
-    cluster: Optional[str] = None,
+    cluster: str | None = None,
 ) -> None:
     """
     Set up a Couchbase Server node on an EC2 instance.
@@ -135,9 +131,7 @@ def setup_node(
     ssh.close()
 
 
-def setup_topology(
-    pkey: Optional[paramiko.Ed25519Key], topology: TopologyConfig
-) -> None:
+def setup_topology(pkey: paramiko.Ed25519Key | None, topology: TopologyConfig) -> None:
     """
     Set up the Couchbase Server topology on EC2 instances.
 
@@ -157,7 +151,7 @@ def setup_topology(
             )
 
 
-def main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
+def main(topology: TopologyConfig, private_key: str | None = None) -> None:
     """
     Main function to set up the Couchbase Server topology.
 

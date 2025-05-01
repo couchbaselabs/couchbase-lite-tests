@@ -1,8 +1,7 @@
 # This contains some of the hardcoded answers to the tests in test_replication_filter.py
-from typing import Set
 
 # Solution for steps 5 and 8 in test_pull_channels_filter
-uk_and_france_doc_ids: Set[str] = {
+uk_and_france_doc_ids: set[str] = {
     "airport_1",
     "airport_2",
     "airport_3",

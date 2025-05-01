@@ -1,4 +1,4 @@
-from typing import List, Optional, cast
+from typing import cast
 
 from opentelemetry.trace import get_tracer
 
@@ -17,7 +17,7 @@ class Listener:
     """A class representing the passive side of a replication inside of a test server"""
 
     def __init__(
-        self, database: Database, collections: List[str], port: Optional[int] = None
+        self, database: Database, collections: list[str], port: int | None = None
     ):
         self.database = database
         """The database that the listener will be serving"""

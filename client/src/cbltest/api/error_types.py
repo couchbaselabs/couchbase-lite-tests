@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Final, Optional
+from typing import Final
 
 
 class ErrorDomain:
@@ -49,7 +49,7 @@ class ErrorResponseBody:
         return self.__message
 
     @classmethod
-    def create(c, body: Optional[dict]) -> Optional[ErrorResponseBody]:
+    def create(c, body: dict | None) -> ErrorResponseBody | None:
         """
         Creates an :class:`ErrorResponseBody` if the provided body contains the appropriate
         content, or returns `None` otherwise

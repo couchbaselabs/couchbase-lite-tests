@@ -1,6 +1,6 @@
 from json import dumps, load
 from pathlib import Path
-from typing import Dict, Final, List, Optional
+from typing import Final
 
 from .jsonhelper import (
     _assert_string_entry,
@@ -131,27 +131,27 @@ class ParsedConfig:
     __dataset_version_key: Final[str] = "dataset_version"
 
     @property
-    def test_servers(self) -> List[dict]:
+    def test_servers(self) -> list[dict]:
         """The list of test servers that can be interacted with"""
         return self.__test_servers
 
     @property
-    def sync_gateways(self) -> List[dict]:
+    def sync_gateways(self) -> list[dict]:
         """The list of sync gateways that can be interacted with"""
         return self.__sync_gateways
 
     @property
-    def couchbase_servers(self) -> List[dict]:
+    def couchbase_servers(self) -> list[dict]:
         """The list of couchbase servers that can be interacted with"""
         return self.__couchbase_servers
 
     @property
-    def load_balancers(self) -> List[str]:
+    def load_balancers(self) -> list[str]:
         """The list of load balancers that can be interacted with"""
         return self.__load_balancers
 
     @property
-    def greenboard_url(self) -> Optional[str]:
+    def greenboard_url(self) -> str | None:
         """The optional URL to greenboard for uploading results"""
         if self.__greenboard is None:
             return None
@@ -159,7 +159,7 @@ class ParsedConfig:
         return self.__greenboard["hostname"]
 
     @property
-    def greenboard_username(self) -> Optional[str]:
+    def greenboard_username(self) -> str | None:
         """The optional URL to greenboard for uploading results"""
         if self.__greenboard is None:
             return None
@@ -167,7 +167,7 @@ class ParsedConfig:
         return self.__greenboard["username"]
 
     @property
-    def greenboard_password(self) -> Optional[str]:
+    def greenboard_password(self) -> str | None:
         """The optional URL to greenboard for uploading results"""
         if self.__greenboard is None:
             return None
@@ -180,7 +180,7 @@ class ParsedConfig:
         return self.__api_version
 
     @property
-    def logslurp_url(self) -> Optional[str]:
+    def logslurp_url(self) -> str | None:
         """The URL of the optional logslurp server to send and collect logs"""
         return self.__logslurp_url
 
@@ -190,15 +190,15 @@ class ParsedConfig:
 
     def __init__(self, json: dict):
         self.__test_servers = _get_typed_nonnull(
-            json, self.__test_server_key, List[Dict], []
+            json, self.__test_server_key, list[dict], []
         )
-        self.__sync_gateways = _get_typed_nonnull(json, self.__sgw_key, List[Dict], [])
+        self.__sync_gateways = _get_typed_nonnull(json, self.__sgw_key, list[dict], [])
         self.__couchbase_servers = _get_typed_nonnull(
-            json, self.__cbs_key, List[Dict], []
+            json, self.__cbs_key, list[dict], []
         )
-        self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, List[str], [])
+        self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, list[str], [])
         self.__api_version = _get_int_or_default(json, self.__api_version_key, 1)
-        self.__greenboard = _get_typed(json, self.__greenboard_key, Dict[str, str])
+        self.__greenboard = _get_typed(json, self.__greenboard_key, dict[str, str])
         if self.__greenboard is not None and (
             "hostname" not in self.__greenboard
             or "username" not in self.__greenboard

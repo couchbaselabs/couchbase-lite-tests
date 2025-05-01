@@ -1,4 +1,4 @@
-from typing import Final, List, Optional, cast
+from typing import Final, cast
 
 import pytest
 from cbltest.configparser import _parse_config
@@ -55,7 +55,7 @@ def pytest_runtest_setup(item: pytest.Item):
         cbl_warning("Unable to get config option in required_topology plugin")
         return  # Don't fail the test, just don't do validation
 
-    def check(mark: Optional[pytest.Mark], value: List, desc: str) -> None:
+    def check(mark: pytest.Mark | None, value: list, desc: str) -> None:
         if mark is None:
             return
 

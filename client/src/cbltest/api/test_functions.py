@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from opentelemetry.trace import get_tracer
 
@@ -8,7 +8,7 @@ from cbltest.api.syncgateway import AllDocumentsResponseRow, SyncGateway
 from cbltest.version import VERSION
 
 
-def _compare_revisions(cbl_rev: str, sg_rev: List[Optional[str]]):
+def _compare_revisions(cbl_rev: str, sg_rev: list[str | None]):
     """
     A CBL revision and a SG revision are the same iff the cbl_rev
     (an array of rev tree rev id and hlv cv) matches one of the sg_revs exactly
@@ -38,7 +38,7 @@ class DocsCompareResult:
     """
 
     @property
-    def message(self) -> Optional[str]:
+    def message(self) -> str | None:
         """
         If success is false, then this message will contain the description
         of the first difference found in the two lists
@@ -50,7 +50,7 @@ class DocsCompareResult:
         """Gets whether or not the two lists match"""
         return self.__success
 
-    def __init__(self, success: bool, message: Optional[str] = None):
+    def __init__(self, success: bool, message: str | None = None):
         self.__success = success
         self.__message = message
 
@@ -59,8 +59,8 @@ _test_function_tracer = get_tracer("test_functions", VERSION)
 
 
 def compare_doc_results(
-    local: List[AllDocumentsEntry],
-    remote: List[AllDocumentsResponseRow],
+    local: list[AllDocumentsEntry],
+    remote: list[AllDocumentsResponseRow],
     mode: ReplicatorType,
 ) -> DocsCompareResult:
     """
@@ -81,8 +81,8 @@ def compare_doc_results(
                 f"Local count {len(local)} did not match remote count {len(remote)}",
             )
 
-        local_dict: Dict[str, str] = {}
-        remote_dict: Dict[str, List[Optional[str]]] = {}
+        local_dict: dict[str, str] = {}
+        remote_dict: dict[str, list[str | None]] = {}
 
         for local_entry in local:
             local_dict[local_entry.id] = local_entry.rev
@@ -90,8 +90,8 @@ def compare_doc_results(
         for remote_entry in remote:
             remote_dict[remote_entry.id] = [remote_entry.revid, remote_entry.cv]
 
-        source: Dict[str, Any]
-        dest: Dict[str, Any]
+        source: dict[str, Any]
+        dest: dict[str, Any]
         if mode == ReplicatorType.PUSH:
             source = local_dict
             dest = remote_dict
@@ -123,7 +123,7 @@ async def compare_local_and_remote(
     remote: SyncGateway,
     mode: ReplicatorType,
     bucket: str,
-    collections: List[str],
+    collections: list[str],
 ) -> None:
     """
     Checks the specified collections for consistency between local and remote, using the

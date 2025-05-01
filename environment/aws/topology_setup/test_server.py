@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 This module provides the abstract base class TestServer for managing Couchbase Lite test servers on various platforms.
 It includes functions for initializing, registering, creating, building, downloading, compressing, and uncompressing test servers.
@@ -48,8 +45,8 @@ from __future__ import annotations
 import importlib
 import shutil
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Dict, Type
 
 import click
 import requests
@@ -104,7 +101,7 @@ class TestServer(ABC):
             Create a platform bridge for the test server.
     """
 
-    __registry: Dict[str, Type[TestServer]] = {}
+    __registry: dict[str, type[TestServer]] = {}
 
     def __init__(self, version: str, dataset_version: str) -> None:
         self.__version = version
@@ -131,7 +128,7 @@ class TestServer(ABC):
                 )
 
     @classmethod
-    def register(cls, name: str) -> Callable[[Type[TestServer]], Type[TestServer]]:
+    def register(cls, name: str) -> Callable[[type[TestServer]], type[TestServer]]:
         """
         Register a test server subclass with a given name.
 
@@ -142,7 +139,7 @@ class TestServer(ABC):
             Callable[[Type[TestServer]], Type[TestServer]]: A decorator function to register the subclass.
         """
 
-        def decorator(subclass: Type[TestServer]) -> Type[TestServer]:
+        def decorator(subclass: type[TestServer]) -> type[TestServer]:
             cls.__registry[name] = subclass
             return subclass
 

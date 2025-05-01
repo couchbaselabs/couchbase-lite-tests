@@ -1,6 +1,5 @@
 from datetime import timedelta
 from pathlib import Path
-from typing import List
 
 import pytest
 from cbltest import CBLPyTest
@@ -448,7 +447,7 @@ class TestBasicReplication(CBLTestClass):
                 * Remove 2 hotels in `travel.hotels`.
         """)
         # Add 2 routes in `travel.routes`
-        routes_updates: List[DocumentUpdateEntry] = [
+        routes_updates: list[DocumentUpdateEntry] = [
             DocumentUpdateEntry(
                 "test_route_1",
                 None,
@@ -477,7 +476,7 @@ class TestBasicReplication(CBLTestClass):
         )
 
         # Update 2 landmarks in `travel.landmarks`
-        landmarks_updates: List[DocumentUpdateEntry] = []
+        landmarks_updates: list[DocumentUpdateEntry] = []
         landmarks_all_docs = await cblpytest.sync_gateways[0].get_all_documents(
             "travel", "travel", "landmarks"
         )
@@ -694,7 +693,7 @@ class TestBasicReplication(CBLTestClass):
                 * Remove 2 CBL hotels in `travel.hotels`.
         """)
         # Add 2 routes in `travel.routes`
-        routes_updates: List[DocumentUpdateEntry] = [
+        routes_updates: list[DocumentUpdateEntry] = [
             DocumentUpdateEntry(
                 "test_route_1",
                 None,
@@ -723,7 +722,7 @@ class TestBasicReplication(CBLTestClass):
         )
 
         # Update 2 SG landmarks in `travel.landmarks`
-        landmarks_updates: List[DocumentUpdateEntry] = []
+        landmarks_updates: list[DocumentUpdateEntry] = []
         landmarks_all_docs = await cblpytest.sync_gateways[0].get_all_documents(
             "travel", "travel", "landmarks"
         )
@@ -763,7 +762,7 @@ class TestBasicReplication(CBLTestClass):
         )
 
         # Update 2 CBL hotels in `travel.landmarks`
-        hotels_updates: List[DocumentUpdateEntry] = []
+        hotels_updates: list[DocumentUpdateEntry] = []
         hotels_all_docs = await cblpytest.sync_gateways[0].get_all_documents(
             "travel", "travel", "hotels"
         )

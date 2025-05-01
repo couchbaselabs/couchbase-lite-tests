@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List
 
 import pytest
 from cbltest import CBLPyTest
@@ -89,7 +88,7 @@ class TestReplicationAutoPurge(CBLTestClass):
                 * Update `post_3` with channels = ["group2"]
                 * Delete `post_4`
         """)
-        updates: List[DocumentUpdateEntry] = []
+        updates: list[DocumentUpdateEntry] = []
         for doc in lite_all_docs["_default.posts"]:
             if doc.id == "post_1":
                 updates.append(DocumentUpdateEntry(doc.id, doc.rev, {"channels": []}))
@@ -396,7 +395,7 @@ class TestReplicationAutoPurge(CBLTestClass):
                 * Update `post_2` with channels = ["group1"]
                 * Update `post_3` with channels = ["group2"]
         """)
-        updates: List[DocumentUpdateEntry] = []
+        updates: list[DocumentUpdateEntry] = []
         for doc in lite_all_docs["_default.posts"]:
             if doc.id == "post_1":
                 updates.append(DocumentUpdateEntry(doc.id, doc.rev, {"channels": []}))
@@ -691,7 +690,7 @@ class TestReplicationAutoPurge(CBLTestClass):
                 * Update post_1 with channels = [] (ACCESS-REMOVED)
                 * Update post_2 with channels = [] (ACCESS-REMOVED)
         """)
-        channel_access_dict: List[DocumentUpdateEntry] = [
+        channel_access_dict: list[DocumentUpdateEntry] = [
             DocumentUpdateEntry("post_1", rev_ids["post_1"], body={"channels": []}),
             DocumentUpdateEntry("post_2", rev_ids["post_2"], body={"channels": []}),
         ]
