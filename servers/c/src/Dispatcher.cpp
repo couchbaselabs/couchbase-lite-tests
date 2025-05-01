@@ -26,7 +26,7 @@ namespace ts {
         addRule({"POST", "/newSession", HANDLER(handlePOSTNewSession)});
         addRule({"POST", "/reset", HANDLER(handlePOSTReset)});
         addRule({"POST", "/getAllDocuments", HANDLER(handlePOSTGetAllDocuments)});
-        addRule({"POST", "/test/getDocument", HANDLER(handlePOSTGetDocument)});
+        addRule({"POST", "/getDocument", HANDLER(handlePOSTGetDocument)});
         addRule({"POST", "/updateDatabase", HANDLER(handlePOSTUpdateDatabase)});
         addRule({"POST", "/startReplicator", HANDLER(handlePOSTStartReplicator)});
         addRule({"POST", "/startListener", HANDLER(handlePOSTStartListener)});
