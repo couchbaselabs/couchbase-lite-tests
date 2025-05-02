@@ -4,6 +4,7 @@ from urllib.parse import urljoin
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.database import Database
+from cbltest.assertions import _assert_not_null
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.responses import GetRootResponse
@@ -13,7 +14,6 @@ from cbltest.v1.requests import (
     PostResetRequestBody,
 )
 from cbltest.version import VERSION
-from cbltest.assertions import _assert_not_null
 
 
 class TestServer:
@@ -129,4 +129,3 @@ class TestServer:
         _assert_not_null(db_name, "db_name")
         replication_url = f"{ws_scheme}{self.url}:{port}"
         return urljoin(replication_url, db_name)
-
