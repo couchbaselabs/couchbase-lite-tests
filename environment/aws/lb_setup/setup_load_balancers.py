@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 This module sets up load balancers on an AWS EC2 instance. It includes functions for executing remote commands,
 checking SSH key settings, and configuring Docker contexts.
@@ -19,7 +17,6 @@ Functions:
 """
 
 from pathlib import Path
-from typing import List, Optional
 
 import click
 import paramiko
@@ -67,7 +64,7 @@ def remote_exec(
     click.echo()
 
 
-def create_nginx_config(upstreams: List[str]) -> None:
+def create_nginx_config(upstreams: list[str]) -> None:
     with open(SCRIPT_DIR / "nginx.conf", "w") as f:
         f.write("events { }\n")
         f.write("\n")
@@ -105,7 +102,7 @@ def create_nginx_config(upstreams: List[str]) -> None:
         f.write("}\n")
 
 
-def main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
+def main(topology: TopologyConfig, private_key: str | None = None) -> None:
     """
     Set up the load balancers on an AWS EC2 instance.
 
@@ -124,7 +121,7 @@ def main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
         ec2_hostname = get_ec2_hostname(lb.hostname)
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        pkey: Optional[paramiko.Ed25519Key] = (
+        pkey: paramiko.Ed25519Key | None = (
             paramiko.Ed25519Key.from_private_key_file(private_key)
             if private_key
             else None

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, cast
 from uuid import UUID
 
 from cbltest.api.database_types import DocumentEntry
@@ -44,12 +44,12 @@ class PostResetRequestBody(TestServerRequestBody):
         }
     """
 
-    def __init__(self, name: Optional[str] = None):
+    def __init__(self, name: str | None = None):
         super().__init__(1)
         self.__test_name = name
-        self.__databases: Dict[str, Dict[str, Any]] = {}
+        self.__databases: dict[str, dict[str, Any]] = {}
 
-    def add_dataset(self, name: str, result_db_names: List[str]) -> None:
+    def add_dataset(self, name: str, result_db_names: list[str]) -> None:
         """
         Add a dataset entry to the :class:`PostResetRequestBody`
 
@@ -60,7 +60,7 @@ class PostResetRequestBody(TestServerRequestBody):
             self.__databases[db_name] = {"dataset": name}
 
     def add_empty(
-        self, result_db_names: List[str], collections: Optional[List[str]] = None
+        self, result_db_names: list[str], collections: list[str] | None = None
     ):
         """
         Add an empty database entry to the :class`PostResetRequestBody`
@@ -72,8 +72,8 @@ class PostResetRequestBody(TestServerRequestBody):
             entry = {} if collections is None else {"collections": collections}
             self.__databases[db_name] = entry
 
-    def to_json(self) -> Dict[str, Any]:
-        json: Dict[str, Any] = {"databases": self.__databases}
+    def to_json(self) -> dict[str, Any]:
+        json: dict[str, Any] = {"databases": self.__databases}
         if self.__test_name:
             json["test"] = self.__test_name
 
@@ -97,7 +97,7 @@ class PostGetAllDocumentsRequestBody(TestServerRequestBody):
     """
 
     @property
-    def collections(self) -> List[str]:
+    def collections(self) -> list[str]:
         """
         Gets the collections specified in the :class:`PostGetAllDocumentsRequestBody`
         """
@@ -144,9 +144,9 @@ class DatabaseUpdateEntry(JSONSerializable):
         type: DatabaseUpdateType,
         collection: str,
         document_id: str,
-        updated_properties: Optional[List[Dict[str, Any]]] = None,
-        removed_properties: Optional[List[str]] = None,
-        new_blobs: Optional[Dict[str, str]] = None,
+        updated_properties: list[dict[str, Any]] | None = None,
+        removed_properties: list[str] | None = None,
+        new_blobs: dict[str, str] | None = None,
     ) -> None:
         self.type: DatabaseUpdateEntry = cast(
             DatabaseUpdateEntry, _assert_not_null(type, "type")
@@ -159,7 +159,7 @@ class DatabaseUpdateEntry(JSONSerializable):
         self.document_id: str = cast(str, _assert_not_null(document_id, "document_id"))
         """The ID of the document to be modified"""
 
-        self.updated_properties: Optional[List[Dict[str, Any]]] = updated_properties
+        self.updated_properties: list[dict[str, Any]] | None = updated_properties
         """
         The properties to be updated on a given document. 
         Note that to remove a property, `removed_properties` must be used.
@@ -167,13 +167,13 @@ class DatabaseUpdateEntry(JSONSerializable):
         to be edited.
         """
 
-        self.removed_properties: Optional[List[str]] = removed_properties
+        self.removed_properties: list[str] | None = removed_properties
         """
         The keypaths to be removed on a given document. 
         It has no meaning if `type` is not `UPDATE`
         """
 
-        self.new_blobs: Optional[Dict[str, str]] = new_blobs
+        self.new_blobs: dict[str, str] | None = new_blobs
         """
         The keypaths to add blobs to, with the values being the name of the blob to add
         according to the blob dataset
@@ -233,8 +233,8 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
 
     def __init__(
         self,
-        database: Optional[str] = None,
-        updates: Optional[List[DatabaseUpdateEntry]] = None,
+        database: str | None = None,
+        updates: list[DatabaseUpdateEntry] | None = None,
     ):
         super().__init__(1)
         self.database = database
@@ -247,12 +247,12 @@ class PostUpdateDatabaseRequestBody(TestServerRequestBody):
         """
 
     def to_json(self) -> Any:
-        raw: Dict[str, Any] = {"database": self.database}
+        raw: dict[str, Any] = {"database": self.database}
 
         raw_entries = []
 
         if self.updates is not None:
-            for e in cast(List[DatabaseUpdateEntry], self.updates):
+            for e in cast(list[DatabaseUpdateEntry], self.updates):
                 raw_entry = e.to_json()
                 if raw_entry is None:
                     cbl_warning(
@@ -287,14 +287,14 @@ class PostSnapshotDocumentsRequestBody(TestServerRequestBody):
         """Gets the database that this snapshot will be taken from"""
         return self.__database
 
-    def entries(self) -> List[DocumentEntry]:
+    def entries(self) -> list[DocumentEntry]:
         """
         Gets the (mutable) list of documents to be snapshotted.  This list can be
         directly added to or removed from
         """
         return self.__entries
 
-    def __init__(self, database: str, entries: Optional[List[DocumentEntry]] = None):
+    def __init__(self, database: str, entries: list[DocumentEntry] | None = None):
         super().__init__(1)
         self.__database = database
         self.__entries = entries if entries is not None else []
@@ -348,7 +348,7 @@ class PostVerifyDocumentsRequestBody(TestServerRequestBody):
         self,
         database: str,
         snapshot: str,
-        changes: Optional[List[DatabaseUpdateEntry]] = None,
+        changes: list[DatabaseUpdateEntry] | None = None,
     ):
         super().__init__(1)
         self.__snapshot = snapshot
@@ -438,13 +438,13 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
         """Whether or not this is a continuous replication (i.e. doesn't stop when finished
         with its initial changes)"""
 
-        self.authenticator: Optional[ReplicatorAuthenticator] = None
+        self.authenticator: ReplicatorAuthenticator | None = None
         """The authenticator to use to perform authentication with the remote"""
 
         self.reset: bool = False
         """Whether or not to start the replication over from the beginning"""
 
-        self.collections: List[ReplicatorCollectionEntry] = []
+        self.collections: list[ReplicatorCollectionEntry] = []
         """The per-collection configuration to use inside the replication"""
 
         self.enableDocumentListener: bool = False
@@ -453,7 +453,7 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
         self.enableAutoPurge: bool = True
         """If set to True (default), the replicator will automatically purge documents on access loss"""
 
-        self.pinnedServerCert: Optional[str] = None
+        self.pinnedServerCert: str | None = None
         """The PEM representation of the TLS certificate that the remote is using"""
 
     def to_json(self) -> Any:
@@ -554,7 +554,7 @@ class PostNewSessionRequestBody(TestServerRequestBody):
     """
 
     @property
-    def url(self) -> Optional[str]:
+    def url(self) -> str | None:
         """Returns the URL of the LogSlurp server"""
         return self.__url
 
@@ -564,13 +564,11 @@ class PostNewSessionRequestBody(TestServerRequestBody):
         return self.__id
 
     @property
-    def tag(self) -> Optional[str]:
+    def tag(self) -> str | None:
         """Returns the tag to use to print in log statements from this particular remote"""
         return self.__tag
 
-    def __init__(
-        self, id: str, dataset_version: str, url: Optional[str], tag: Optional[str]
-    ):
+    def __init__(self, id: str, dataset_version: str, url: str | None, tag: str | None):
         super().__init__(1)
         self.__url = url
         self.__dataset_version = dataset_version
@@ -578,7 +576,7 @@ class PostNewSessionRequestBody(TestServerRequestBody):
         self.__tag = tag
 
     def to_json(self) -> Any:
-        json: Dict[str, Any] = {
+        json: dict[str, Any] = {
             "id": self.__id,
             "dataset_version": self.__dataset_version,
         }
@@ -697,23 +695,23 @@ class PostStartListenerRequestBody(TestServerRequestBody):
         return self.__database
 
     @property
-    def collections(self) -> List[str]:
+    def collections(self) -> list[str]:
         """The collections in the database to serve via the listener"""
         return self.__collections
 
     @property
-    def port(self) -> Optional[int]:
+    def port(self) -> int | None:
         """The desired port to listen on (if None, the OS will choose)"""
         return self.__port
 
-    def __init__(self, db: str, collections: List[str], port: Optional[int] = None):
+    def __init__(self, db: str, collections: list[str], port: int | None = None):
         super().__init__(1)
         self.__database = db
         self.__collections = collections
         self.__port = port
 
     def to_json(self) -> Any:
-        json: Dict[str, Any] = {
+        json: dict[str, Any] = {
             "database": self.__database,
             "collections": self.__collections,
         }

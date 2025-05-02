@@ -1,5 +1,5 @@
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, List
 
 import pytest
 from cbltest import CBLPyTest
@@ -207,7 +207,7 @@ class TestCustomConflict(CBLTestClass):
         self.mark_test_step(
             "Modify each of name_101, name_102, and name_103 remotely to have `name.last` = 'Jones'"
         )
-        sgw_updates: List[DocumentUpdateEntry] = []
+        sgw_updates: list[DocumentUpdateEntry] = []
         for suffix in range(101, 104):
             existing_id = f"name_{suffix}"
             existing = await cblpytest.sync_gateways[0].get_document(

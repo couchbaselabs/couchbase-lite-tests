@@ -2,7 +2,7 @@ import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, cast
 from urllib.parse import urljoin
 
 from aiohttp import BasicAuth, ClientSession, TCPConnector
@@ -25,13 +25,13 @@ class _CollectionMap(JSONSerializable):
         return self.__scope_name
 
     @property
-    def collections(self) -> List[str]:
+    def collections(self) -> list[str]:
         return list(self.__collections.keys())
 
     def __init__(self, scope_name: str) -> None:
         _assert_not_null(scope_name, "scope_name")
         self.__scope_name = scope_name
-        self.__collections: Dict[str, dict] = {}
+        self.__collections: dict[str, dict] = {}
 
     def add_collection(self, collection_name: str, payload: dict) -> None:
         if collection_name in self.__collections:
@@ -64,7 +64,7 @@ class PutDatabasePayload(JSONSerializable):
         self.__bucket = _get_typed_required(self.__config, "bucket", str)
         """The bucket name in the backing Couchbase Server"""
 
-        self.__scopes: Dict[str, _CollectionMap] = {}
+        self.__scopes: dict[str, _CollectionMap] = {}
         scopes = _get_typed_required(self.__config, "scopes", dict)
         for scope in scopes:
             scope_dict = _get_typed_required(scopes, scope, dict)
@@ -73,11 +73,11 @@ class PutDatabasePayload(JSONSerializable):
                 collection_dict = _get_typed_required(collections, collection, dict)
                 self._add_collection(collection_dict, scope, collection)
 
-    def scopes(self) -> List[str]:
+    def scopes(self) -> list[str]:
         """Gets all the scopes contained in the payload"""
         return list(self.__scopes.keys())
 
-    def collections(self, scope: str) -> List[str]:
+    def collections(self, scope: str) -> list[str]:
         """
         Gets a list of collections specified for the given scope
 
@@ -125,12 +125,12 @@ class AllDocumentsResponseRow:
         return self.__id
 
     @property
-    def revid(self) -> Optional[str]:
+    def revid(self) -> str | None:
         """Gets the revision ID of the row"""
         return self.__revid
 
     @property
-    def cv(self) -> Optional[str]:
+    def cv(self) -> str | None:
         """Gets the current version for the row"""
         return self.__cv
 
@@ -139,9 +139,7 @@ class AllDocumentsResponseRow:
         """Gets the either revid or cv, whichever is populated (at least one must be)"""
         return cast(str, self.__revid if self.__revid is not None else self.__cv)
 
-    def __init__(
-        self, key: str, id: str, revid: Optional[str], cv: Optional[str]
-    ) -> None:
+    def __init__(self, key: str, id: str, revid: str | None, cv: str | None) -> None:
         self.__key = key
         self.__id = id
         self.__revid = revid
@@ -154,7 +152,7 @@ class AllDocumentsResponse:
     """
 
     @property
-    def rows(self) -> List[AllDocumentsResponseRow]:
+    def rows(self) -> list[AllDocumentsResponseRow]:
         """Gets the entries of the response"""
         return self.__rows
 
@@ -163,9 +161,9 @@ class AllDocumentsResponse:
 
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
-        self.__rows: List[AllDocumentsResponseRow] = []
-        for row in cast(List[Dict], input["rows"]):
-            rev = cast(Dict, row["value"])
+        self.__rows: list[AllDocumentsResponseRow] = []
+        for row in cast(list[dict], input["rows"]):
+            rev = cast(dict, row["value"])
             self.__rows.append(
                 AllDocumentsResponseRow(
                     row["key"],
@@ -192,7 +190,7 @@ class DocumentUpdateEntry(JSONSerializable):
 
     @property
     @deprecated("Only should be used until 4.0 SGW gets close to GA")
-    def rev(self) -> Optional[str]:
+    def rev(self) -> str | None:
         """
         Gets the rev ID of the entry (NOTE: Will go away after 4.0 SGW gets close to GA)
         """
@@ -201,7 +199,7 @@ class DocumentUpdateEntry(JSONSerializable):
 
         return cast(str, self.__body["_rev"])
 
-    def __init__(self, id: str, revid: Optional[str], body: dict):
+    def __init__(self, id: str, revid: str | None, body: dict):
         self.__body = body.copy()
         self.__body["_id"] = id
         if revid:
@@ -229,12 +227,12 @@ class RemoteDocument(JSONSerializable):
         return self.__id
 
     @property
-    def revid(self) -> Optional[str]:
+    def revid(self) -> str | None:
         """Gets the revision ID of the document"""
         return self.__rev
 
     @property
-    def cv(self) -> Optional[str]:
+    def cv(self) -> str | None:
         """Gets the CV of the document"""
         return self.__cv
 
@@ -291,7 +289,7 @@ class CouchbaseVersion(ABC):
         return self.__build_number
 
     @abstractmethod
-    def parse(self, input: str) -> Tuple[str, int]:
+    def parse(self, input: str) -> tuple[str, int]:
         pass
 
     def __init__(self, input: str):
@@ -306,7 +304,7 @@ class SyncGatewayVersion(CouchbaseVersion):
     A class for parsing Sync Gateway Version
     """
 
-    def parse(self, input: str) -> Tuple[str, int]:
+    def parse(self, input: str) -> tuple[str, int]:
         first_lparen = input.find("(")
         first_semicol = input.find(";")
         if first_lparen == -1 or first_semicol == -1:
@@ -342,7 +340,7 @@ class SyncGateway:
         )
 
     def _create_session(
-        self, secure: bool, scheme: str, url: str, port: int, auth: Optional[BasicAuth]
+        self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None
     ) -> ClientSession:
         if secure:
             ssl_context = ssl.create_default_context(cadata=self.tls_cert())
@@ -360,9 +358,9 @@ class SyncGateway:
         self,
         method: str,
         path: str,
-        payload: Optional[JSONSerializable] = None,
-        params: Optional[Dict[str, str]] = None,
-        session: Optional[ClientSession] = None,
+        payload: JSONSerializable | None = None,
+        params: dict[str, str] | None = None,
+        session: ClientSession | None = None,
     ) -> Any:
         if session is None:
             session = self.__admin_session
@@ -411,7 +409,7 @@ class SyncGateway:
             assert "/" in raw_version
             return SyncGatewayVersion(raw_version.split("/")[1])
 
-    def tls_cert(self) -> Optional[str]:
+    def tls_cert(self) -> str | None:
         if not self.__secure:
             cbl_warning(
                 "Sync Gateway instance not using TLS, returning empty tls_cert..."
@@ -471,7 +469,7 @@ class SyncGateway:
         ):
             await self._send_request("delete", f"/{db_name}/")
 
-    def create_collection_access_dict(self, input: Dict[str, List[str]]) -> dict:
+    def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
         Creates a collection access dictionary in the format that Sync Gateway expects,
         given an input dictionary keyed by collection with a list of channels
@@ -504,7 +502,7 @@ class SyncGateway:
                 )
 
             if spec[0] not in ret_val:
-                scope_dict: Dict[str, dict] = {}
+                scope_dict: dict[str, dict] = {}
                 ret_val[spec[0]] = scope_dict
             else:
                 scope_dict = ret_val[spec[0]]
@@ -517,9 +515,9 @@ class SyncGateway:
         self,
         db_name: str,
         name: str,
-        password: Optional[str] = None,
-        collection_access: Optional[dict] = None,
-        admin_roles: Optional[List[str]] = None,
+        password: str | None = None,
+        collection_access: dict | None = None,
+        admin_roles: list[str] | None = None,
     ) -> None:
         """
         Adds or updates the specified user to a Sync Gateway database with the specified channel access
@@ -535,7 +533,7 @@ class SyncGateway:
         with self.__tracer.start_as_current_span(
             "add_user", attributes={"cbl.user.name": name}
         ):
-            body: Dict[str, Any] = {
+            body: dict[str, Any] = {
                 "name": name,
             }
 
@@ -612,8 +610,8 @@ class SyncGateway:
         ):
             last_scope: str = ""
             last_coll: str = ""
-            collected: List[dict] = []
-            with open(path, "r", encoding="utf8") as fin:
+            collected: list[dict] = []
+            with open(path, encoding="utf8") as fin:
                 json_line = fin.readline()
                 while json_line:
                     json = cast(dict, loads(json_line))
@@ -675,7 +673,7 @@ class SyncGateway:
     async def _rewrite_rev_ids(
         self,
         db_name: str,
-        updates: List[DocumentUpdateEntry],
+        updates: list[DocumentUpdateEntry],
         scope: str,
         collection: str,
     ) -> None:
@@ -712,7 +710,7 @@ class SyncGateway:
     async def update_documents(
         self,
         db_name: str,
-        updates: List[DocumentUpdateEntry],
+        updates: list[DocumentUpdateEntry],
         scope: str = "_default",
         collection: str = "_default",
     ) -> None:
@@ -829,7 +827,7 @@ class SyncGateway:
         doc_id: str,
         scope: str = "_default",
         collection: str = "_default",
-    ) -> Optional[RemoteDocument]:
+    ) -> RemoteDocument | None:
         """
         Gets a document from Sync Gateway
 

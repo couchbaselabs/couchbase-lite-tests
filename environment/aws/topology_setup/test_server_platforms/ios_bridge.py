@@ -31,7 +31,6 @@ import shutil
 import subprocess
 from os import environ
 from pathlib import Path
-from typing import Set
 
 import click
 import netifaces
@@ -54,7 +53,7 @@ else:
 SCRIPT_PATH = Path(__file__).resolve().parent
 PID_FILE = SCRIPT_PATH / "ios_pid.txt"
 
-_xharness_devices: Set[str] = set()
+_xharness_devices: set[str] = set()
 
 
 class iOSBridge(PlatformBridge):

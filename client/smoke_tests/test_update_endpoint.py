@@ -1,5 +1,3 @@
-from typing import Optional
-
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.database import Database
@@ -13,7 +11,7 @@ class TestUpdateDatabase:
         # will not be informed about the currently running test
         CBLPyTestGlobal.running_test_name = method.__name__
 
-        self.db: Optional[Database] = None
+        self.db: Database | None = None
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(

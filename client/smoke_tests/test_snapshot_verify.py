@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
@@ -16,12 +16,12 @@ class TestSnapshotVerify:
 
     def upsert_multiple(
         self,
-        instances: List[Union[SnapshotUpdater, DatabaseUpdater]],
+        instances: list[SnapshotUpdater | DatabaseUpdater],
         collection: str,
         document: str,
-        new_properties: Optional[List[Dict[str, Any]]] = None,
-        removed_properties: Optional[List[str]] = None,
-        new_blobs: Optional[Dict[str, str]] = None,
+        new_properties: list[dict[str, Any]] | None = None,
+        removed_properties: list[str] | None = None,
+        new_blobs: dict[str, str] | None = None,
     ) -> None:
         for instance in instances:
             instance.upsert_document(
@@ -30,7 +30,7 @@ class TestSnapshotVerify:
 
     def delete_multiple(
         self,
-        instances: List[Union[SnapshotUpdater, DatabaseUpdater]],
+        instances: list[SnapshotUpdater | DatabaseUpdater],
         collection: str,
         document: str,
     ) -> None:
@@ -39,7 +39,7 @@ class TestSnapshotVerify:
 
     def purge_multiple(
         self,
-        instances: List[Union[SnapshotUpdater, DatabaseUpdater]],
+        instances: list[SnapshotUpdater | DatabaseUpdater],
         collection: str,
         document: str,
     ) -> None:

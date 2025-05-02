@@ -13,7 +13,6 @@ Functions:
 import json
 import subprocess
 from pathlib import Path
-from typing import List, Optional
 
 import click
 import paramiko
@@ -59,7 +58,7 @@ class ExeBridge(PlatformBridge):
     A class to manage executable applications on local or remote machines.
     """
 
-    def __init__(self, exe_path: str, extra_args: Optional[List[str]] = None):
+    def __init__(self, exe_path: str, extra_args: list[str] | None = None):
         """
         Initialize the ExeBridge with the executable path and optional extra arguments.
 

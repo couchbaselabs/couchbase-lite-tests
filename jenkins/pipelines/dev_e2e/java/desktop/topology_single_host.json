@@ -1,0 +1,12 @@
+{
+    "$schema": "../../../../../environment/aws/topology_setup/topology_schema.json",
+    "test_servers": [
+        {
+            "platform": "jak_desktop",
+            "cbl_version": "{{version}}",
+            "dataset_version": "{{dataset_version}}",
+            "location": "localhost"
+        }
+    ],
+    "include": "../../../../../environment/aws/topology_setup/default_topology.json"
+}

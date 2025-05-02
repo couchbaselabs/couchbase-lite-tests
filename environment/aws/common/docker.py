@@ -1,7 +1,6 @@
 import os
 import subprocess
 from pathlib import Path
-from typing import List, Optional
 
 import click
 
@@ -83,8 +82,8 @@ def start_container(
     context_name: str,
     image_name: str,
     host: str,
-    docker_args: Optional[List[str]] = None,
-    container_args: Optional[List[str]] = None,
+    docker_args: list[str] | None = None,
+    container_args: list[str] | None = None,
 ) -> None:
     context_result = subprocess.run(
         ["docker", "context", "ls", "--format", "{{.Name}}"],
