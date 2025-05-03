@@ -31,7 +31,8 @@ async def cblpytest(request: pytest.FixtureRequest):
         trace.set_tracer_provider(provider)
 
     cblpytest = await CBLPyTest.create(config, log_level, test_props)
-    return cblpytest
+    yield cblpytest
+    await cblpytest.close()
 
 
 # Some command line options are added as part of this plugin,

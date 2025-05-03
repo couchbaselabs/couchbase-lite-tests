@@ -305,3 +305,7 @@ class RequestFactory:
 
         writer.write_end(str(ret_val), ret_val.serialize())
         return ret_val
+
+    async def close(self) -> None:
+        if not self.__session.closed:
+            await self.__session.close()

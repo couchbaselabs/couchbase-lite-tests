@@ -136,6 +136,14 @@ class CBLPyTest:
                     )
                 )
 
+    async def close(self) -> None:
+        """
+        Closes all the test servers and sync gateways
+        """
+        await self.request_factory.close()
+        for sg in self.__sync_gateways:
+            await sg.close()
+
     def __str__(self) -> str:
         ret_val = (
             "Configuration:"
