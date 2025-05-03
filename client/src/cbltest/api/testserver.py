@@ -23,7 +23,13 @@ class ServerVariant(Flag):
     JAVA = auto()
 
     def __str__(self) -> str:
-        return "|".join([member.name for member in ServerVariant if member in self])
+        return "|".join(
+            [
+                member.name
+                for member in ServerVariant
+                if member in self and member.name is not None
+            ]
+        )
 
 
 class TestServer:
@@ -44,7 +50,7 @@ class TestServer:
         self.__url = url
         self.__request_factory = request_factory
         self.__tracer = get_tracer(__name__, VERSION)
-        self.__variant = None
+        self.__variant: ServerVariant | None = None
 
     async def get_variant(self) -> ServerVariant:
         if self.__variant is None:
