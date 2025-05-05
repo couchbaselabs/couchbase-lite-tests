@@ -20,34 +20,28 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'mob-e2e-mac-01' }
-            options {
-                lock("mob-e2e-iphone-01")
-            }
-            environment { 
-                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
-            }
+            agent { label 'mac-mini-new' }
             steps {
                 // Unlock keychain:
-                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+//                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run iOS Test"
                 timeout(time: 60, unit: 'MINUTES') {
                     sh "jenkins/pipelines/dev_e2e/ios/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.CBL_DATASET_VERSION}' '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                 }
             }
-            post { 
-                always { 
-                    echo "Teardown iOS Test"
-                    timeout(time: 5, unit: 'MINUTES') {
-                        sh 'jenkins/pipelines/dev_e2e/ios/teardown.sh'
-                    }
-                }
-            }
+//             post {
+//                 always {
+//                     echo "Teardown iOS Test"
+//                     timeout(time: 5, unit: 'MINUTES') {
+//                         sh 'jenkins/pipelines/dev_e2e/ios/teardown.sh'
+//                     }
+//                 }
+//             }
         }
     }
     post {
         failure {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "pasin@couchbase.com";
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
         }
     }
 }
