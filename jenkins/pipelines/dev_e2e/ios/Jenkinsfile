@@ -31,7 +31,7 @@ pipeline {
                         terraform version
                         python3 --version
                         export AWS_PROFILE=mobile-for-now
-                        echo "AWS_PROFILE: ${AWS_PROFILE}"
+                        echo "AWS_PROFILE is set to \$AWS_PROFILE"
                         jenkins/pipelines/dev_e2e/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                     """
 
