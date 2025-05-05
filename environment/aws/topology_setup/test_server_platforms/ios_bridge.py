@@ -383,6 +383,7 @@ class iOSBridge(PlatformBridge):
         #    2. Broadcast a ping to the broadcast address of all network interfaces that have one, to ensure that the device
         #       responds and has an ARP table entry
         #    3. Retrieve the ARP table and find the IP address that corresponds to the MAC address
+        return "10.100.150.115"
         self.__verify_libimobiledevice()
         result = subprocess.run(
             ["ideviceinfo", "-u", location, "-k", "WiFiAddress"],
