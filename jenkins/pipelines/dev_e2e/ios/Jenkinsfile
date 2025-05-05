@@ -30,6 +30,8 @@ pipeline {
                         export PATH="/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:\$PATH"
                         terraform version
                         python3 --version
+                        export AWS_PROFILE=mobile-for-now
+                        echo "AWS_PROFILE: ${AWS_PROFILE}"
                         jenkins/pipelines/dev_e2e/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                     """
 
