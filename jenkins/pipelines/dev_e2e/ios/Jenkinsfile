@@ -27,7 +27,8 @@ pipeline {
                 echo "Run iOS Test"
                 timeout(time: 60, unit: 'MINUTES') {
                     sh """
-                        export PATH="/opt/homebrew/opt/python@3.10/bin:\$PATH"
+                        export PATH="/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:\$PATH"
+                        terraform version
                         python3 --version
                         jenkins/pipelines/dev_e2e/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                     """
