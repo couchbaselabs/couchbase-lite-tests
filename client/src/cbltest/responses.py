@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Final, Optional
+from typing import Any, Final
 
 from cbltest.api.error_types import ErrorResponseBody
 from cbltest.api.jsonserializable import JSONSerializable
@@ -20,7 +20,7 @@ class TestServerResponse(JSONSerializable):
         return self.__uuid
 
     @property
-    def error(self) -> Optional[ErrorResponseBody]:
+    def error(self) -> ErrorResponseBody | None:
         """Gets the error sent by the remote server, if any"""
         return self.__error
 
@@ -82,7 +82,7 @@ class GetRootResponse(TestServerResponse):
         return self.__device
 
     @property
-    def additional_info(self) -> Optional[str]:
+    def additional_info(self) -> str | None:
         """ "Gets any additional info that the server happens to send"""
         return self.__additional_info
 

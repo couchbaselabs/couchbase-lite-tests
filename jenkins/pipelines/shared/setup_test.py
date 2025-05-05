@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 # For others looking to analyze what this file does, it basically performs two steps.
 # The first step is creating an appropriate topology JSON file.  It rewrites the $schema
 # and include property so that the relative paths are correct for the destination
@@ -16,7 +13,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Optional, cast
+from typing import cast
 
 import click
 import requests
@@ -49,8 +46,9 @@ def setup_test(
     topology_file_in: Path,
     config_file_in: Path,
     topology_tag: str,
-    private_key: Optional[str] = None,
+    private_key: str | None = None,
     couchbase_version: str = "7.6",
+    public_key_name: str = "jborden",
 ) -> None:
     """
     Sets up a testing environment with the specified CBL version, dataset version, and Sync Gateway version.
@@ -90,7 +88,7 @@ def setup_test(
         f"Output file {config_file_out} already exists and is not writeable."
     )
 
-    with open(topology_file_in, "r") as fin:
+    with open(topology_file_in) as fin:
         topology = json.load(fin)
         topology["$schema"] = "topology_schema.json"
         if "include" in topology and str(topology["include"]).endswith(
@@ -131,7 +129,7 @@ def setup_test(
     topology = TopologyConfig(str(topology_file_out))
     start_backend(
         topology,
-        "jborden",
+        public_key_name,
         str(config_file_in),
         private_key=private_key,
         tdk_config_out=str(config_file_out),

@@ -1,6 +1,4 @@
 from json import dumps
-from sys import version_info
-from typing import Dict, List, Optional
 
 from .api.couchbaseserver import CouchbaseServer
 from .api.syncgateway import SyncGateway
@@ -16,9 +14,6 @@ from .configparser import (
 from .extrapropsparser import _parse_extra_props
 from .logging import LogLevel, cbl_log_init, cbl_setLogLevel
 from .requests import RequestFactory
-
-if version_info < (3, 9):
-    raise RuntimeError("Python must be at least v3.9!")
 
 
 class CBLPyTest:
@@ -38,7 +33,7 @@ class CBLPyTest:
         return self.__log_level
 
     @property
-    def extra_props(self) -> Optional[Dict[str, str]]:
+    def extra_props(self) -> dict[str, str] | None:
         """Gets the extra properties provided as parsed from the provided JSON file path"""
         return self.__extra_props
 
@@ -48,22 +43,22 @@ class CBLPyTest:
         return self.__request_factory
 
     @property
-    def test_servers(self) -> List[TestServer]:
+    def test_servers(self) -> list[TestServer]:
         """Gets the list of Test Servers available"""
         return self.__test_servers
 
     @property
-    def sync_gateways(self) -> List[SyncGateway]:
+    def sync_gateways(self) -> list[SyncGateway]:
         """Gets the list of Sync Gateways available"""
         return self.__sync_gateways
 
     @property
-    def couchbase_servers(self) -> List[CouchbaseServer]:
+    def couchbase_servers(self) -> list[CouchbaseServer]:
         """Gets the list of Couchbase Servers available"""
         return self.__couchbase_servers
 
     @property
-    def load_balancers(self) -> List[str]:
+    def load_balancers(self) -> list[str]:
         """Gets the list of Load Balancers available"""
         return self.__config.load_balancers
 
@@ -71,7 +66,7 @@ class CBLPyTest:
     async def create(
         config_path: str,
         log_level: LogLevel = LogLevel.VERBOSE,
-        extra_props_path: Optional[str] = None,
+        extra_props_path: str | None = None,
         test_server_only: bool = False,
     ):
         ret_val = CBLPyTest(config_path, log_level, extra_props_path, test_server_only)
@@ -93,7 +88,7 @@ class CBLPyTest:
         self,
         config_path: str,
         log_level: LogLevel = LogLevel.VERBOSE,
-        extra_props_path: Optional[str] = None,
+        extra_props_path: str | None = None,
         test_server_only: bool = False,
     ):
         _assert_not_null(config_path, "config_path")
@@ -105,7 +100,7 @@ class CBLPyTest:
             self.__extra_props = _parse_extra_props(extra_props_path)
 
         self.__request_factory = RequestFactory(self.__config)
-        self.__test_servers: List[TestServer] = []
+        self.__test_servers: list[TestServer] = []
         index = 0
         for ts in self.__config.test_servers:
             ts_info = TestServerInfo(ts)
@@ -114,7 +109,7 @@ class CBLPyTest:
             )
             index += 1
 
-        self.__sync_gateways: List[SyncGateway] = []
+        self.__sync_gateways: list[SyncGateway] = []
         index = 0
         if not test_server_only:
             for sg in self.__config.sync_gateways:
@@ -131,7 +126,7 @@ class CBLPyTest:
                 )
                 index += 1
 
-        self.__couchbase_servers: List[CouchbaseServer] = []
+        self.__couchbase_servers: list[CouchbaseServer] = []
         if not test_server_only:
             for cbs in self.__config.couchbase_servers:
                 cbs_info = CouchbaseServerInfo(cbs)

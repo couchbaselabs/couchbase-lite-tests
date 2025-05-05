@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 This module sets up Couchbase Sync Gateway (SGW) on AWS EC2 instances. It includes functions for downloading SGW packages,
 executing remote commands, setting up individual nodes, and configuring the SGW topology.
@@ -35,7 +32,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Final, Optional, cast
+from typing import Final, cast
 
 import click
 import paramiko
@@ -108,7 +105,7 @@ class SgwDownloadInfo:
         url = f"http://proget.build.couchbase.com:8080/api/get_version?product=sync_gateway&version={version}"
         r = requests.get(url)
         r.raise_for_status()
-        version_info = cast(Dict, r.json())
+        version_info = cast(dict, r.json())
         if self.__is_release_key not in version_info:
             json.dump(version_info, sys.stdout)
             raise ValueError("Invalid version information received from server.")
@@ -188,16 +185,18 @@ def setup_config(server_hostname: str) -> None:
         server_hostname (str): The hostname of the Couchbase Server.
     """
     header(f"Writing {server_hostname} to bootstrap.json as CBS IP")
-    with open(SCRIPT_DIR / "config" / "bootstrap.json", "r") as fin:
+    with open(SCRIPT_DIR / "config" / "bootstrap.json") as fin:
         with open(SCRIPT_DIR / "bootstrap.json", "w") as fout:
-            config_content = cast(Dict, json.load(fin))
+            config_content = cast(dict, json.load(fin))
             config_content["bootstrap"]["server"] = f"couchbases://{server_hostname}"
             json.dump(config_content, fout, indent=4)
 
-    with open(SCRIPT_DIR / "start-sgw.sh.in", "r") as file:
+    with open(SCRIPT_DIR / "start-sgw.sh.in") as file:
         start_sgw_content = file.read()
 
-    start_sgw_content = start_sgw_content.replace("{{server-ip}}", server_hostname)
+    start_sgw_content = "#!/bin/sh\n\n" + start_sgw_content.replace(
+        "{{server-ip}}", server_hostname
+    )
 
     with open(SCRIPT_DIR / "start-sgw.sh", "w", newline="\n") as file:
         file.write(start_sgw_content)
@@ -234,7 +233,7 @@ def remote_exec(
 
 
 def setup_server(
-    hostname: str, pkey: Optional[paramiko.Ed25519Key], sgw_info: SgwDownloadInfo
+    hostname: str, pkey: paramiko.Ed25519Key | None, sgw_info: SgwDownloadInfo
 ) -> None:
     """
     Set up a Sync Gateway server on an EC2 instance.
@@ -307,7 +306,7 @@ def setup_server(
 
 
 def setup_topology(
-    pkey: Optional[paramiko.Ed25519Key],
+    pkey: paramiko.Ed25519Key | None,
     topology: TopologyConfig,
 ) -> None:
     """
@@ -327,7 +326,7 @@ def setup_topology(
         i += 1
 
 
-def main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
+def main(topology: TopologyConfig, private_key: str | None = None) -> None:
     """
     Main function to set up the Sync Gateway topology.
 

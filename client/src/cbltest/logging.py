@@ -11,7 +11,6 @@ from logging import (
     getLogger,
 )
 from sys import stdout
-from typing import Optional
 
 import requests
 from websocket import create_connection
@@ -25,7 +24,7 @@ class LogSlurpHandler(Handler):
         return self.__id
 
     def __init__(self, url: str, id: str):
-        super(LogSlurpHandler, self).__init__()
+        super().__init__()
         self.__url = url
         self.__id = id
         self.__ws = create_connection(
@@ -37,7 +36,7 @@ class LogSlurpHandler(Handler):
         self.__ws.send_text(self.format(record))
 
     def close(self):
-        super(LogSlurpHandler, self).close()
+        super().close()
         self.__ws.close()
         s = requests.Session()
         resp = s.post(
@@ -75,7 +74,7 @@ console.setLevel(DEBUG)
 console.setFormatter(Formatter("%(asctime)s [%(levelname)s]: %(message)s"))
 
 
-def cbl_log_init(log_id: str, logslurp_url: Optional[str]) -> None:
+def cbl_log_init(log_id: str, logslurp_url: str | None) -> None:
     _cbl_log.addHandler(file)
     _cbl_log.addHandler(console)
 

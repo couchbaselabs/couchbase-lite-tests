@@ -1,6 +1,7 @@
+from collections.abc import Callable
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -22,7 +23,7 @@ from cbltest.jsonhelper import json_equivalent
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestQueryConsistency(CBLTestClass):
-    __database: Optional[Database] = None
+    __database: Database | None = None
 
     @pytest_asyncio.fixture(autouse=True)
     async def setup_method_fixture(self, cblpytest: CBLPyTest, dataset_path: Path):
@@ -72,7 +73,7 @@ class TestQueryConsistency(CBLTestClass):
         cblpytest: CBLPyTest,
         query: str,
         collection: str,
-        sort: Optional[Callable[[Dict], str]] = None,
+        sort: Callable[[dict], str] | None = None,
         comparison: Callable[[Any, Any], bool] = json_equivalent,
     ):
         assert TestQueryConsistency.__database is not None, (
@@ -98,7 +99,7 @@ class TestQueryConsistency(CBLTestClass):
         assert comparison(local_results, remote_results)
 
     async def _test_join(
-        self, cblpytest: CBLPyTest, query: str, server_query: Optional[str] = None
+        self, cblpytest: CBLPyTest, query: str, server_query: str | None = None
     ):
         assert TestQueryConsistency.__database is not None, (
             "Weird...setup not finished?"
@@ -124,7 +125,7 @@ class TestQueryConsistency(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_query_docids(self, cblpytest: CBLPyTest):
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: Dict):
+        def id_sort(x: dict):
             return x["id"]
 
         await self._test_query(
@@ -137,7 +138,7 @@ class TestQueryConsistency(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_any_operator(self, cblpytest: CBLPyTest):
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: Dict):
+        def id_sort(x: dict):
             return x["id"]
 
         await self._test_query(
@@ -176,7 +177,7 @@ class TestQueryConsistency(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_query_where_and_or(self, cblpytest: CBLPyTest):
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: Dict):
+        def id_sort(x: dict):
             return x["id"]
 
         await self._test_query(
@@ -189,7 +190,7 @@ class TestQueryConsistency(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_selects(self, cblpytest: CBLPyTest):
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: Dict):
+        def id_sort(x: dict):
             return x["id"]
 
         await self._test_query(
@@ -213,7 +214,7 @@ class TestQueryConsistency(CBLTestClass):
     )
     async def test_query_pattern_like(self, cblpytest: CBLPyTest, like_val: str):
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: Dict):
+        def id_sort(x: dict):
             return x["id"]
 
         await self._test_query(
@@ -230,7 +231,7 @@ class TestQueryConsistency(CBLTestClass):
     )
     async def test_query_pattern_regex(self, cblpytest: CBLPyTest, regex: str):
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: Dict):
+        def id_sort(x: dict):
             return x["id"]
 
         await self._test_query(

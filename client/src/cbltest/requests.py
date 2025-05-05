@@ -5,7 +5,7 @@ from enum import Enum
 from importlib import import_module
 from pathlib import Path
 from shutil import rmtree
-from typing import Any, List, Optional, Type, cast
+from typing import Any, cast
 from urllib.parse import urljoin
 from uuid import UUID, uuid4
 
@@ -62,7 +62,7 @@ class TestServerRequest:
     """The base class from which all requests derive, and in which all work is done"""
 
     @property
-    def payload(self) -> Optional[TestServerRequestBody]:
+    def payload(self) -> TestServerRequestBody | None:
         """Gets the body of the request.  The actual type is simply the request typename with 'Body' appended.
 
         E.g. PostResetRequest -> PostResetRequestBody"""
@@ -73,9 +73,9 @@ class TestServerRequest:
         version: int,
         uuid: UUID,
         http_name: str,
-        payload_type: Optional[Type] = None,
+        payload_type: type | None = None,
         method: str = "post",
-        payload: Optional[TestServerRequestBody] = None,
+        payload: TestServerRequestBody | None = None,
     ):
         # For those subclassing this, usually all you need to do is call this constructor
         # filling out the appropriate information via args
@@ -113,7 +113,7 @@ class TestServerRequest:
         return cast(TestServerResponse, response_class(r.status, uuid, content))
 
     async def send(
-        self, url: str, session: Optional[ClientSession] = None
+        self, url: str, session: ClientSession | None = None
     ) -> TestServerResponse:
         """
         Send the request to the specified URL, though `RequestFactory.send_request` is preferred.
@@ -239,14 +239,14 @@ class RequestFactory:
         self.__session = ClientSession()
         self.__version = available_api_version(config.api_version)
         self.__server_urls = cast(
-            List[str], list(str(ts["url"]) for ts in config.test_servers)
+            list[str], list(str(ts["url"]) for ts in config.test_servers)
         )
         cbl_info(
             f"RequestFactory created with API version {self.__version} ({self.__uuid})"
         )
 
     def _create_request(
-        self, name: str, payload: Optional[TestServerRequestBody] = None
+        self, name: str, payload: TestServerRequestBody | None = None
     ) -> TestServerRequest:
         if payload is not None and self.__version != payload.version:
             raise ValueError(
@@ -263,7 +263,7 @@ class RequestFactory:
     def create_request(
         self,
         type: TestServerRequestType,
-        payload: Optional[TestServerRequestBody] = None,
+        payload: TestServerRequestBody | None = None,
     ) -> TestServerRequest:
         """
         Creates a request to send.

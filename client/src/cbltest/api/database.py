@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from json import dumps
-from typing import Any, Dict, Final, List, Optional, cast
+from typing import Any, Final, cast
 
 from opentelemetry.trace import get_tracer
 
@@ -36,7 +36,7 @@ from cbltest.version import VERSION
 class SnapshotUpdater:
     def __init__(self, id: str):
         self._id = id
-        self._updates: List[DatabaseUpdateEntry] = []
+        self._updates: list[DatabaseUpdateEntry] = []
 
     def delete_document(self, collection: str, id: str):
         """
@@ -64,9 +64,9 @@ class SnapshotUpdater:
         self,
         collection: str,
         id: str,
-        new_properties: Optional[List[Dict[str, Any]]] = None,
-        removed_properties: Optional[List[str]] = None,
-        new_blobs: Optional[Dict[str, str]] = None,
+        new_properties: list[dict[str, Any]] | None = None,
+        removed_properties: list[str] | None = None,
+        new_blobs: dict[str, str] | None = None,
     ):
         """
         Updates or inserts a document using the given new and/or removed properties
@@ -108,10 +108,10 @@ class DatabaseUpdater:
             "This version of the CBLTest API requires request API v1"
         )
         self._db_name = db_name
-        self._updates: List[DatabaseUpdateEntry] = []
+        self._updates: list[DatabaseUpdateEntry] = []
         self.__request_factory = request_factory
         self.__index = index
-        self.__error: Optional[str] = None
+        self.__error: str | None = None
         self.__tracer = get_tracer(__name__, VERSION)
 
     async def __aenter__(self):
@@ -160,9 +160,9 @@ class DatabaseUpdater:
         self,
         collection: str,
         id: str,
-        new_properties: Optional[List[Dict[str, Any]]] = None,
-        removed_properties: Optional[List[str]] = None,
-        new_blobs: Optional[Dict[str, str]] = None,
+        new_properties: list[dict[str, Any]] | None = None,
+        removed_properties: list[str] | None = None,
+        new_blobs: dict[str, str] | None = None,
     ):
         """
         Updates or inserts a document using the given new and/or removed properties
@@ -222,13 +222,13 @@ class AllDocumentsCollection:
     """
 
     @property
-    def documents(self) -> List[AllDocumentsEntry]:
+    def documents(self) -> list[AllDocumentsEntry]:
         """
         Gets the list of document IDs contained in the collection
         """
         return self.__documents
 
-    def __init__(self, docs: List[PostGetAllDocumentsEntry]):
+    def __init__(self, docs: list[PostGetAllDocumentsEntry]):
         self.__documents = list(AllDocumentsEntry(x) for x in docs)
 
 
@@ -249,7 +249,7 @@ class VerifyResult:
         return self.__response.result
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         """Gets the description of what went wrong if result is false"""
         return self.__response.description
 
@@ -264,7 +264,7 @@ class VerifyResult:
         return self.__response.actual
 
     @property
-    def document(self) -> Optional[Dict[str, Any]]:
+    def document(self) -> dict[str, Any] | None:
         """Gets the document body of the document with the faulty keypath, if applicable"""
         return self.__response.document
 
@@ -291,11 +291,11 @@ class GetDocumentResult:
         return self.__revs
 
     @property
-    def body(self) -> Dict[str, Any]:
+    def body(self) -> dict[str, Any]:
         """Gets the body of the document"""
         return self.__body
 
-    def __init__(self, raw: Dict[str, Any]) -> None:
+    def __init__(self, raw: dict[str, Any]) -> None:
         assert self.__id_key in raw and self.__revs_key in raw, (
             "Malformed raw dict in GetDocumentResult"
         )
@@ -340,7 +340,7 @@ class Database:
 
     async def get_all_documents(
         self, *collections: str
-    ) -> Dict[str, List[AllDocumentsEntry]]:
+    ) -> dict[str, list[AllDocumentsEntry]]:
         """
         Performs a getAllDocumentIDs request for the given collections
 
@@ -359,7 +359,7 @@ class Database:
             )
             resp = await self.__request_factory.send_request(self.__index, req)
             cast_resp = cast(PostGetAllDocumentsResponse, resp)
-            ret_val: Dict[str, List[AllDocumentsEntry]] = {}
+            ret_val: dict[str, list[AllDocumentsEntry]] = {}
             for c in cast_resp.collection_keys:
                 ret_val[c] = list(
                     AllDocumentsEntry(d) for d in cast_resp.documents_for_collection(c)
@@ -389,7 +389,7 @@ class Database:
             cast_resp = cast(PostGetDocumentResponse, resp)
             return GetDocumentResult(cast_resp.raw_body)
 
-    async def create_snapshot(self, documents: List[DocumentEntry]) -> str:
+    async def create_snapshot(self, documents: list[DocumentEntry]) -> str:
         """
         Creates a snapshot on the database to use for later verification
 
@@ -433,7 +433,7 @@ class Database:
             )
             await self.__request_factory.send_request(self.__index, req)
 
-    async def run_query(self, query: str) -> List[Dict]:
+    async def run_query(self, query: str) -> list[dict]:
         """
         Runs a SQL++ query on the database and returns the results
 

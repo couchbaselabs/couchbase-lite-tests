@@ -1,0 +1,198 @@
+
+pipeline {
+    agent none
+    parameters {
+        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
+        string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '', description: "The dataset version to use")
+        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    currentBuild.displayName = "java-${CBL_EDITION} ${params.CBL_VERSION}-${params.CBL_BUILD}/${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
+                }
+            }
+        }
+
+        // If Jenkins will actually run things in parallel, we will, at least for now
+        // need to use locks to protect platform tests from corrupting each other's back ends.
+        // Might as well use them here, for exactly the same purpose.
+
+        stage('Tests') {
+            parallel {
+                stage('OSX Desktop Test') {
+                    agent { label 'mob-e2e-mac-01' }
+                    options {
+                        lock("mob-e2e-mac-01")
+                    }
+                    steps {
+                        echo "=== Run OSX Desktop Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh """
+                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                            """
+                        }
+                        echo "=== OSX Desktop Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown OSX Desktop Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh '''
+                                    jenkins/pipelines/dev_e2e/java/desktop/teardown.sh
+                                '''
+                            }
+                            echo "=== OSX Desktop Test Teardown Complete"
+                        }
+                    }
+                }
+
+                stage('Windows Desktop Test') {
+                    agent { label 'mob-e2e-win-01' }
+                    options {
+                        lock("mob-e2e-win-01")
+                    }
+                    steps {
+                        echo "=== Run Windows Desktop Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            pwsh """
+                                jenkins\\pipelines\\dev_e2e\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -DatasetVersion ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
+                            """
+                        }
+                        echo "=== Windows Desktop Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Windows Desktop Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                pwsh 'jenkins\\pipelines\\dev_e2e\\java\\desktop\\teardown.ps1'
+                            }
+                            echo "=== Windows Desktop Test Teardown Complete"
+                        }
+                    }
+                }
+
+                stage('Linux Desktop Test') {
+                    agent { label 'mob-e2e-deb-02' }
+                    options {
+                        lock("mob-e2e-deb-02")
+                    }
+                    steps {
+                        echo "=== Run Linux Desktop Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh """
+                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                            """
+                        }
+                        echo "=== Linux Desktop Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Linux Desktop Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh '''
+                                    jenkins/pipelines/dev_e2e/java/desktop/teardown.sh
+                                '''
+                            }
+                            echo "=== Linux Desktop Test Teardown Complete"
+                        }
+                    }
+                }
+
+                stage('OSX Web Service Test') {
+                    agent { label 'mob-e2e-mac-01' }
+                    options {
+                        lock("mob-e2e-mac-01")
+                    }
+                    steps {
+                        echo "=== Run OSX Web Service Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh """
+                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                            """
+                        }
+                        echo "=== OSX Web Service Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown OSX Web Service Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh """
+                                    jenkins/pipelines/dev_e2e/java/webservice/teardown.sh
+                                """
+                            }
+                            echo "=== OSX Web Service Test Teardown Complete"
+                        }
+                    }
+                }
+
+                stage('Windows Web Service Test') {
+                    agent { label 'mob-e2e-win-01' }
+                    options {
+                        lock("mob-e2e-win-01")
+                    }
+                    steps {
+                        echo "=== Run Windows Web Service Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            pwsh """
+                                jenkins\\pipelines\\dev_e2e\\java\\webservice\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -DatasetVersion ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
+                            """
+                        }
+                        echo "=== Windows Web Service Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Windows Web Service Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                pwsh """
+                                    jenkins\\pipelines\\dev_e2e\\java\\webservice\\teardown.ps1
+                                """
+                            }
+                            echo "=== Windows Web Service Test Teardown Complete"
+                        }
+                    }
+                }
+
+                stage('Linux Web Service Test') {
+                    agent { label 'mob-e2e-deb-02' }
+                    options {
+                        lock("mob-e2e-deb-02")
+                    }
+                    steps {
+                        echo "=== Run Linux Web Service Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh """
+                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                            """
+                        }
+                        echo "=== Linux Web Service Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Linux Web Service Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh """
+                                    jenkins/pipelines/dev_e2e/java/webservice/teardown.sh
+                                """
+                            }
+                            echo "=== Linux Web Service Test Teardown Complete"
+                        }
+                    }
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "blake.meike@couchbase.com";
+        }
+    }
+}
+

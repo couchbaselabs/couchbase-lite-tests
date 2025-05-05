@@ -35,7 +35,6 @@ import subprocess
 from abc import abstractmethod
 from os import environ
 from pathlib import Path
-from typing import List, Optional
 
 import click
 
@@ -81,7 +80,7 @@ class DotnetTestServer(TestServer):
         pass
 
     @property
-    def extra_args(self) -> Optional[str]:
+    def extra_args(self) -> str | None:
         """
         Get the extra arguments for the build command.
 
@@ -129,7 +128,7 @@ class DotnetTestServer(TestServer):
         verb = "publish" if self.publish else "build"
         csproj_path = DOTNET_TEST_SERVER_DIR / "testserver" / "testserver.csproj"
         header(f"Building .NET test server for {self.platform}")
-        args: List[str] = [
+        args: list[str] = [
             str(DOTNET_PATH),
             verb,
             str(csproj_path),
@@ -197,7 +196,7 @@ class DotnetTestServerCli(TestServer):
             DOTNET_TEST_SERVER_DIR / "testserver.cli" / "testserver.cli.csproj"
         )
         header(f"Building .NET test server for {self.platform}")
-        args: List[str] = [
+        args: list[str] = [
             str(DOTNET_PATH),
             "publish",
             str(csproj_path),
@@ -255,7 +254,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
         return False
 
     @property
-    def extra_args(self) -> Optional[str]:
+    def extra_args(self) -> str | None:
         """
         Get the extra arguments for the build command.
 

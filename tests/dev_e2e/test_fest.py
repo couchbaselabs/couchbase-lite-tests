@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import pytest
 from cbltest import CBLPyTest
@@ -20,7 +19,7 @@ from cbltest.api.replicator_types import (
 @pytest.mark.min_couchbase_servers(1)
 class TestFest(CBLTestClass):
     async def setup_test_fest_cloud(
-        self, cblpytest: CBLPyTest, dataset_path: Path, roles: Dict[str, List[str]]
+        self, cblpytest: CBLPyTest, dataset_path: Path, roles: dict[str, list[str]]
     ) -> CouchbaseCloud:
         self.mark_test_step("Reset SG and load todo dataset")
         cloud = CouchbaseCloud(
@@ -50,7 +49,7 @@ class TestFest(CBLTestClass):
 
         return cloud
 
-    async def setup_test_fest_dbs(self, cblpytest: CBLPyTest) -> List[Database]:
+    async def setup_test_fest_dbs(self, cblpytest: CBLPyTest) -> list[Database]:
         self.mark_test_step("Reset local databases load them with the todo dataset")
         return await cblpytest.test_servers[0].create_and_reset_db(
             ["db1", "db2"], dataset="todo"
@@ -59,9 +58,9 @@ class TestFest(CBLTestClass):
     async def setup_test_fest_repls(
         self,
         cblpytest: CBLPyTest,
-        dbs: Tuple[Database, Database],
-        users: Tuple[str, str] = ("user1", "user1"),
-    ) -> Tuple[Replicator, Replicator]:
+        dbs: tuple[Database, Database],
+        users: tuple[str, str] = ("user1", "user1"),
+    ) -> tuple[Replicator, Replicator]:
         self.mark_test_step(f"""
                 Create a replicator
                     * endpoint: /todo
