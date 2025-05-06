@@ -20,33 +20,40 @@ pipeline {
             }
         }
         stage('Android') {
-            agent { label 'mob-e2e-mac-01' }
-            options {
-                lock("mob-e2e-android-01")
-            }
+            agent { label 'mac-laptop1-new' }
+//             options {
+//                 lock("mob-e2e-android-01")
+//             }
             steps {
                 echo "Run Android Tests"
                 timeout(time: 60, unit: 'MINUTES') {
                     sh """
-                        jenkins/pipelines/dev_e2e/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
+                        ln -sf /usr/local/bin/python3.10 /tmp/python3
+                        export PATH="/usr/local/bin:\$PATH"
+                        terraform version
+                        python3 --version
+                        export AWS_PROFILE=mobile-for-now
+                        echo "AWS_PROFILE is set to \$AWS_PROFILE"
+                        which xcpretty && xcpretty --version
+                        jenkins/pipelines/dev_e2e/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                     """
                 }
             }
-            post {
-                always {
-                    echo "Teardown Android Tests"
-                    timeout(time: 5, unit: 'MINUTES') {
-                        sh '''
-                            jenkins/pipelines/dev_e2e/android/android_teardown.sh
-                        '''
-                    }
-                }
-            }
+//             post {
+//                 always {
+//                     echo "Teardown Android Tests"
+//                     timeout(time: 5, unit: 'MINUTES') {
+//                         sh '''
+//                             jenkins/pipelines/dev_e2e/android/android_teardown.sh
+//                         '''
+//                     }
+//                 }
+//             }
         }
     }
     post {
         failure {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "blake.meike@couchbase.com";
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
         }
     }
 }
