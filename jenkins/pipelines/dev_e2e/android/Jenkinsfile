@@ -29,13 +29,13 @@ pipeline {
                 timeout(time: 60, unit: 'MINUTES') {
                     sh """
                         ln -sf /usr/local/bin/python3.10 /tmp/python3
-                        export PATH="/usr/local/bin:\$PATH"
+                        export PATH="/usr/local/bin:/tmp:\$PATH"
                         terraform version
                         python3 --version
                         export AWS_PROFILE=mobile-for-now
                         echo "AWS_PROFILE is set to \$AWS_PROFILE"
                         which xcpretty && xcpretty --version
-                        jenkins/pipelines/dev_e2e/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                        jenkins/pipelines/dev_e2e/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.CBL_DATASET_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
                     """
                 }
             }
