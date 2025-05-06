@@ -30,6 +30,8 @@ pipeline {
                     sh """
                         ln -sf /usr/local/bin/python3.10 /tmp/python3
                         export PATH="/usr/local/bin:/tmp:\$PATH"
+                        export ANDROID_HOME=/Users/couchbase/Library/Android/sdk
+                        export PATH=\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:\$PATH
                         terraform version
                         python3 --version
                         export AWS_PROFILE=mobile-for-now
