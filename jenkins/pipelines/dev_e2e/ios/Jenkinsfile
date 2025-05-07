@@ -20,7 +20,7 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'mac-mini-new' }
+            agent { label 'ios_m4' }
             steps {
                 // Unlock keychain:
 //                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
