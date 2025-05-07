@@ -43,7 +43,7 @@ print_box() {
     local content="$1"
     local title="$2"
 
-    local max_length=$(echo "$content" | awk '{ if (length > max) max = length } END { print max }')
+    local max_length=$(echo "$content" | wc -L)
     local border=$(printf '%*s' $((max_length + 4)) | tr ' ' '-')
 
     local title_padding=$(( (max_length - ${#title}) / 2 ))
