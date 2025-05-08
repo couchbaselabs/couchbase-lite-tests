@@ -1,0 +1,45 @@
+@startuml architecture-2
+
+!define AWSPuml https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v19.0/dist
+!include AWSPuml/AWSCommon.puml
+!include AWSPuml/AWSSimplified.puml
+!include AWSPuml/Containers/ElasticContainerServiceContainer3.puml
+!include AWSPuml/NetworkingContentDelivery/VPCInternetGateway.puml
+!include AWSPuml/Groups/VPC.puml
+
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam node {
+    BackgroundColor #E0E0E0
+    BorderColor Black
+    FontName "Courier New"
+}
+skinparam component {
+    BackgroundColor #FFFFFF
+    BorderColor Black
+    FontName "Courier New"
+}
+skinparam defaultTextAlignment center
+
+node "Control Machine" as Control {
+    component "Orchestrator"
+    component "TDK"
+}
+
+' Bottom layer: Mobile Device
+node "Mobile Device\n(USB-connected)" as Mobile {
+    
+}
+
+VPCInternetGateway(igw, "IGW\nInternet\nGateway", "")
+VPCGroup(vpc, "Subnet\n10.0.1.0/24") {
+    ElasticContainerServiceContainer3(cbs, "Node 1", "")
+    ElasticContainerServiceContainer3(sgw, "Node 2", "")
+    ElasticContainerServiceContainer3(ls, "Node 3", "")
+}
+
+Control -down-> Mobile
+Orchestrator -up-> vpc
+igw <--> vpc
+
+@enduml
