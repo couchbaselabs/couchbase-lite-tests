@@ -20,10 +20,13 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'ios_m4' }
+            agent { label 'mac-mini-new' }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+            }
             steps {
                 // Unlock keychain:
-//                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run iOS Test"
                 timeout(time: 60, unit: 'MINUTES') {
                     sh """
@@ -38,14 +41,14 @@ pipeline {
 
                 }
             }
-//             post {
-//                 always {
-//                     echo "Teardown iOS Test"
-//                     timeout(time: 5, unit: 'MINUTES') {
-//                         sh 'jenkins/pipelines/dev_e2e/ios/teardown.sh'
-//                     }
-//                 }
-//             }
+            post {
+                always {
+                    echo "Teardown iOS Test"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh 'jenkins/pipelines/dev_e2e/ios/teardown.sh'
+                    }
+                }
+            }
         }
     }
     post {
