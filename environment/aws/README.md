@@ -2,9 +2,21 @@
 
 **TL;DR This is mostly supplemental information.  If you are looking for what you need to understand to use this system, skip to [Putting it all together](#putting-it-all-together)**
 
-The summary of what is created with this area is in this diagram:
+The way it works from a high level is as follows.  The starting point is an environment set up as in the following:
 
-![Architecture Diagram](diagrams/Architecture.png)
+![Architecture Start](diagrams/architecture-1.png)
+
+Inside of the control machine there are two components.  The TDK is responsible for executing tests and the orchestrator is responsible for setting them up.  When setting up, the orchestrator first creates the proper number of instance in Amazon EC2 inside of a pre-created virtual subnet:
+
+![Architecture Phase 2](diagrams/architecture-2.png)
+
+The next thing it does is install the appropriate software onto each of the EC2 nodes, and install the desired variant of the test server onto the mobile device:
+
+![Architecture Phase 3](diagrams/architecture-3.png)
+
+And at the end the TDK will be able to communicate with all of the pieces that were set up:
+
+![Architecture Final](diagrams/architecture-4.png)
 
 The details of how this works in terms of infrastructure are in comments in the [Terraform Config File](./main.tf).  There is a lot to cover in this README so let's go section by section.  These sections are all handled automatically by the start and stop backend scripts, but this will provide some context as to what they are doing.
 
