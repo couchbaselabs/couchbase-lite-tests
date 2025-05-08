@@ -34,15 +34,23 @@ class TestServer:
         self.__url = url
         self.__request_factory = request_factory
         self.__tracer = get_tracer(__name__, VERSION)
+        self.__info: GetRootResponse | None = None
 
     async def get_info(self) -> GetRootResponse:
         """
-        Retrieves the information about the running test server
+        Retrieves the information about the running test server.
+        This is cached after the first call.
         """
-        with self.__tracer.start_as_current_span("get_info"):
-            request = self.__request_factory.create_request(TestServerRequestType.ROOT)
-            resp = await self.__request_factory.send_request(self.__index, request)
-            return cast(GetRootResponse, resp)
+        if self.__info is None:
+            with self.__tracer.start_as_current_span("get_info"):
+                request = self.__request_factory.create_request(
+                    TestServerRequestType.ROOT
+                )
+                resp = await self.__request_factory.send_request(self.__index, request)
+                ret_val = cast(GetRootResponse, resp)
+                self.__info = ret_val
+
+        return self.__info
 
     async def create_and_reset_db(
         self,

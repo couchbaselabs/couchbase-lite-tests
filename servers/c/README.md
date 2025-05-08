@@ -20,7 +20,7 @@
 2. Find you the latest successful build number. Skip this if you have already known a specific build to test.
 
    ```
-   ./jenkins/pipelines/main/latest_successful_build.sh c 4.0.0
+   ./jenkins/pipelines/dev_e2e/main/latest_successful_build.sh c 4.0.0
    ```
 
 3. Build and Run

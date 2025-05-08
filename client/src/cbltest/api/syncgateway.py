@@ -863,3 +863,10 @@ class SyncGateway:
                 )
 
             return RemoteDocument(cast_resp)
+
+    async def close(self) -> None:
+        """
+        Closes the Sync Gateway session
+        """
+        if not self.__admin_session.closed:
+            await self.__admin_session.close()

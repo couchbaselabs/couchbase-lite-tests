@@ -53,14 +53,14 @@ pipeline {
                                 // Lookup latest successful build when CBL_BUILD param is zero:
                                 if (buildNo == "0") {
                                     try {
-                                        buildNo = sh script: "jenkins/pipelines/main/latest_successful_build.sh ${platform} ${version}", returnStdout: true
+                                        buildNo = sh script: "jenkins/pipelines/dev_e2e/main/latest_successful_build.sh ${platform} ${version}", returnStdout: true
                                     } catch (Exception e) {
                                         error "Cannot get latest build number : ${e} for ${platform} v${version}"
                                     }
                                 }
 
                                 try {
-                                    sgwUrl = sh script: "jenkins/pipelines/main/latest_sgw_url.sh ${sgwVersion}", returnStdout: true
+                                    sgwUrl = sh script: "jenkins/pipelines/main/dev_e2e/latest_sgw_url.sh ${sgwVersion}", returnStdout: true
                                 } catch(Exception e) {
                                     error "Cannot get Sync Gateway download URL : ${e} for v${version}"
                                 }
