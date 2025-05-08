@@ -1,4 +1,3 @@
-from enum import Flag, auto
 from typing import cast
 
 from opentelemetry.trace import get_tracer
@@ -13,23 +12,6 @@ from cbltest.v1.requests import (
     PostResetRequestBody,
 )
 from cbltest.version import VERSION
-
-
-class ServerVariant(Flag):
-    ANDROID = auto()
-    C = auto()
-    DOTNET = auto()
-    IOS = auto()
-    JAVA = auto()
-
-    def __str__(self) -> str:
-        return "|".join(
-            [
-                member.name
-                for member in ServerVariant
-                if member in self and member.name is not None
-            ]
-        )
 
 
 class TestServer:
@@ -50,24 +32,23 @@ class TestServer:
         self.__url = url
         self.__request_factory = request_factory
         self.__tracer = get_tracer(__name__, VERSION)
-        self.__variant: ServerVariant | None = None
-
-    async def get_variant(self) -> ServerVariant:
-        if self.__variant is None:
-            self.__variant = self.__extract_variant(await self.get_info())
-
-        return self.__variant
+        self.__info: GetRootResponse | None = None
 
     async def get_info(self) -> GetRootResponse:
         """
-        Retrieves the information about the running test server
+        Retrieves the information about the running test server.
+        This is cached after the first call.
         """
-        with self.__tracer.start_as_current_span("get_info"):
-            request = self.__request_factory.create_request(TestServerRequestType.ROOT)
-            resp = await self.__request_factory.send_request(self.__index, request)
-            ret_val = cast(GetRootResponse, resp)
-            self.__variant = self.__extract_variant(ret_val)
-            return ret_val
+        if self.__info is None:
+            with self.__tracer.start_as_current_span("get_info"):
+                request = self.__request_factory.create_request(
+                    TestServerRequestType.ROOT
+                )
+                resp = await self.__request_factory.send_request(self.__index, request)
+                ret_val = cast(GetRootResponse, resp)
+                self.__info = ret_val
+
+        return self.__info
 
     async def create_and_reset_db(
         self,
@@ -144,26 +125,3 @@ class TestServer:
             TestServerRequestType.LOG, payload
         )
         await self.__request_factory.send_request(self.__index, request)
-
-    def __extract_variant(self, info: GetRootResponse) -> ServerVariant:
-        """
-        Extracts the test server variant from the given info object.
-
-        Args:
-            info (GetRootResponse): The information object containing test server details.
-
-        Returns:
-            TestServerVariant: The extracted test server variant.
-        """
-        if info.cbl == "couchbase-lite-android":
-            return ServerVariant.ANDROID
-        elif info.cbl == "couchbase-lite-c":
-            return ServerVariant.C
-        elif info.cbl == "couchbase-lite-net":
-            return ServerVariant.DOTNET
-        elif info.cbl == "couchbase-lite-ios":
-            return ServerVariant.IOS
-        elif info.cbl == "couchbase-lite-java":
-            return ServerVariant.JAVA
-        else:
-            raise ValueError(f"Unknown test server variant: {info.cbl}")

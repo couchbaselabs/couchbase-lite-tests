@@ -1,11 +1,29 @@
 from __future__ import annotations
 
+from enum import Flag, auto
 from typing import Any, Final
 
 from cbltest.api.error_types import ErrorResponseBody
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.jsonhelper import _get_typed, _get_typed_required
 from cbltest.version import available_api_version
+
+
+class ServerVariant(Flag):
+    ANDROID = auto()
+    C = auto()
+    DOTNET = auto()
+    IOS = auto()
+    JVM = auto()
+
+    def __str__(self) -> str:
+        return "|".join(
+            [
+                member.name
+                for member in ServerVariant
+                if member in self and member.name is not None
+            ]
+        )
 
 
 class TestServerResponse(JSONSerializable):
@@ -60,6 +78,7 @@ class GetRootResponse(TestServerResponse):
     __cbl_key: Final[str] = "cbl"
     __device_key: Final[str] = "device"
     __additional_info_key: Final[str] = "additionalInfo"
+    __variant: ServerVariant | None = None
 
     @property
     def version(self) -> int:
@@ -75,6 +94,25 @@ class GetRootResponse(TestServerResponse):
     def cbl(self) -> str:
         """Gets the variant of Couchbase Lite (e.g. C) that the remote server is using"""
         return self.__cbl
+
+    @property
+    def variant(self) -> ServerVariant:
+        """Gets the variant of Couchbase Lite (e.g. C) that the remote server is using"""
+        if self.__variant is None:
+            if self.__cbl == "couchbase-lite-android":
+                return ServerVariant.ANDROID
+            elif self.__cbl == "couchbase-lite-c":
+                return ServerVariant.C
+            elif self.__cbl == "couchbase-lite-net":
+                return ServerVariant.DOTNET
+            elif self.__cbl == "couchbase-lite-ios":
+                return ServerVariant.IOS
+            elif self.__cbl == "couchbase-lite-java":
+                return ServerVariant.JVM
+            else:
+                raise ValueError(f"Unknown test server variant: {self.__cbl}")
+
+        return self.__variant
 
     @property
     def device(self) -> dict:

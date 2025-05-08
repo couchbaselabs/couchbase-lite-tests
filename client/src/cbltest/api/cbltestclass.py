@@ -2,9 +2,10 @@ from abc import ABC
 
 import pytest
 
-from cbltest.api.testserver import ServerVariant, TestServer
+from cbltest.api.testserver import TestServer
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.logging import cbl_info, cbl_warning
+from cbltest.responses import ServerVariant
 
 
 class CBLTestClass(ABC):
@@ -42,7 +43,7 @@ class CBLTestClass(ABC):
 
         :param platform: The platform to check against.
         """
-        variant = await server.get_variant()
+        variant = (await server.get_info()).variant
         if variant not in allow_platforms:
             self.__skipped = True
             pytest.skip(f"{variant} is not in the platforms {allow_platforms}")
