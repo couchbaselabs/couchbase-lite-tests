@@ -37,3 +37,23 @@ class MaintenanceType(Enum):
 
     def __str__(self) -> str:
         return self.value
+
+
+class EncryptedValue(JSONSerializable):
+    """A class for holding the encrypted property of a database.
+    Note this it is only supported on the C test server.
+    """
+
+    @property
+    def value(self) -> str:
+        """The value of the property"""
+        return self.__value
+
+    def __init__(self, value: str):
+        self.__value: str = value
+
+    def to_json(self) -> Any:
+        return {
+            "@type": "encryptable",
+            "value": self.__value,
+        }
