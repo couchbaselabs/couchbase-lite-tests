@@ -8,7 +8,14 @@ class JSONSerializable(ABC):
 
     def serialize(self) -> str:
         """Serializes the object into a pretty formatted JSON string"""
-        return dumps(self.to_json(), indent=2)
+
+        def fallback_serializer(obj: Any) -> Any:
+            if isinstance(obj, JSONSerializable):
+                return obj.to_json()
+
+            return obj
+
+        return dumps(self.to_json(), indent=2, default=fallback_serializer)
 
     @abstractmethod
     def to_json(self) -> Any:

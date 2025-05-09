@@ -28,6 +28,28 @@ using namespace ts::support::error;
 #define ASSET_BLOBS_DIR "blobs"
 
 namespace ts::cbl {
+    static FLSliceResult xor_cipher(FLSlice input) {
+        FLSliceResult result = FLSliceResult_New(input.size);
+        for (int i = 0; i < input.size; ++i) {
+            ((uint8_t*)(result.buf))[i] = ((uint8_t*)input.buf)[i] ^ 'K';
+        }
+        return result;
+    }
+
+    static FLSliceResult xor_encryptor(void* context, FLString scope, FLString collection, 
+        FLString docID, FLDict props, FLString path, FLSlice input, FLStringResult* algorithm, 
+        FLStringResult* keyID, CBLError* error) {
+        *algorithm = FLSlice_Copy(FLSTR("XOR-K"));
+        return xor_cipher(input);
+    }
+
+
+    static FLSliceResult xor_decryptor(void* context, FLString scope, FLString collection, 
+        FLString documentID, FLDict properties, FLString keyPath, FLSlice input, FLString algorithm, 
+        FLString keyID, CBLError* error) {
+        return xor_cipher(input);
+    }
+
     /// Constructor
 
     CBLManager::CBLManager(const string &databaseDir, const string &assetDir) {
@@ -372,6 +394,10 @@ namespace ts::cbl {
             config.pinnedServerCertificate = {params.pinnedServerCert->data(),
                                               params.pinnedServerCert->size()};
         }
+
+        // Some stubs for encrypting and decrypting
+        config.documentPropertyEncryptor = xor_encryptor;
+        config.documentPropertyDecryptor = xor_decryptor;
 
         CBLReplicator *repl = CBLReplicator_Create(&config, &error);
         checkCBLError(error);
