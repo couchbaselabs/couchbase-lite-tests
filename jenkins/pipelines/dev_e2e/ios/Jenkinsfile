@@ -41,6 +41,8 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh 'jenkins/pipelines/dev_e2e/ios/teardown.sh'
                     }
+                    archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
                 }
             }
         }

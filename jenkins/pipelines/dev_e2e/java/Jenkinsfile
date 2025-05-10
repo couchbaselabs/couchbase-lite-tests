@@ -49,6 +49,8 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/desktop/teardown.sh
                                 '''
                             }
+                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== OSX Desktop Test Teardown Complete"
                         }
                     }
@@ -74,6 +76,8 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 pwsh 'jenkins\\pipelines\\dev_e2e\\java\\desktop\\teardown.ps1'
                             }
+                            archiveArtifacts artifacts: 'tests\\dev_e2e\\session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests\\dev_e2e\\http_log\\*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Windows Desktop Test Teardown Complete"
                         }
                     }
@@ -101,6 +105,8 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/desktop/teardown.sh
                                 '''
                             }
+                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Linux Desktop Test Teardown Complete"
                         }
                     }
@@ -128,6 +134,8 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/webservice/teardown.sh
                                 """
                             }
+                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== OSX Web Service Test Teardown Complete"
                         }
                     }
@@ -155,6 +163,8 @@ pipeline {
                                     jenkins\\pipelines\\dev_e2e\\java\\webservice\\teardown.ps1
                                 """
                             }
+                            archiveArtifacts artifacts: 'tests\\dev_e2e\\session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests\\dev_e2e\\http_log\\*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Windows Web Service Test Teardown Complete"
                         }
                     }
@@ -182,6 +192,8 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/webservice/teardown.sh
                                 """
                             }
+                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Linux Web Service Test Teardown Complete"
                         }
                     }
