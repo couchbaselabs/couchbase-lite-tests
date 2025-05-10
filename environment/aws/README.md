@@ -1,6 +1,6 @@
 # AWS Scripted Backend
 
-**TL;DR This is mostly supplemental information.  If you are looking for what you need to understand to use this system, skip to [Putting it all together](#putting-it-all-together)**
+**TL;DR This is mostly supplemental information.  If you are looking for what you need to understand to use this system, skip to [Prerequisites](#step-0-prerequisites) and [Putting it all together](#putting-it-all-together)**
 
 The way it works from a high level is as follows.  The starting point is an environment set up as in the following:
 
@@ -29,21 +29,29 @@ For more information on the specifics see the following sub README:
 
 ## Step 0: Prerequisites
 
+### Public / Private Key Pair
+
 One of the core principles of making this backend work is SSH key access.  This requires that as part of deploying containers into EC2, a public key must be set up for SSH access to the various machines.  The process for doing this is [documented by Amazon](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/create-key-pairs.html) but the summary is that as part of this two very important things happen.
 
 1. The public key gets stored on Amazon servers for deployment to EC2 containers, and it has a user-selected name that you must remember (mine is jborden, for example)
 2. The private key gets stored by YOU.  Don't lose it or you will have to repeat this process.
 
-Next, you need to make sure that the [python prerequisites](./requirements.txt) are installed in whatever environment you are using
+### Python dependencies
 
-Next, you will need to add a section to your machine SSH config (`$HOME/.ssh/config`) to ensure that public keys from AWS are automatically added to the system known hosts.  This is because the hostname will be changing every time and docker remote deploy requires an unmolested SSH connection in order to function (without adding to known_hosts you will get an interactive prompt to add the remote host to the known hosts).  To accomplish this add the following section to your SSH config:
+You need to make sure that the [python dependencies](./requirements.txt) are installed in whatever environment you are using
+
+### SSH configuration
+
+You will need to add a section to your machine SSH config (`$HOME/.ssh/config`) to ensure that public keys from AWS are automatically added to the system known hosts.  This is because the hostname will be changing every time and docker remote deploy requires an unmolested SSH connection in order to function (without adding to known_hosts you will get an interactive prompt to add the remote host to the known hosts).  To accomplish this add the following section to your SSH config:
 
 ```
 Host *.amazonaws.com
     StrictHostKeyChecking accept-new
 ```
 
-Finally, you will need to set up your Amazon AWS credentials so that terraform can use them.  As a Couchbase Employee the easiest way to do this is to set them up as described on the AWS SSO page that can be accessed via the Okta landing page.  The easiest result (option 2 on the resulting page) looks something like the following added to `$HOME/.aws/credentials`
+### AWS Credentials
+
+You will need to set up your Amazon AWS credentials so that terraform can use them.  As a Couchbase Employee the easiest way to do this is to set them up as described on the AWS SSO page that can be accessed via the Okta landing page.  The easiest result (option 2 on the resulting page) looks something like the following added to `$HOME/.aws/credentials`
 
 ```
 [<redacted>_Admin]
@@ -54,6 +62,26 @@ aws_session_token=<redacted>
 
 > [!NOTE]  
 > Using this method the credentials will only last for a few hours.  If you want a longer session than that you will need to use your long term credentials and getting them is beyond the scope of this document.  You will need to become familiar with the [IAM Section](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html) of AWS for that.
+
+### Git LFS
+
+As stated in the top level README of this repo, Git LFS must be installed so that the datasets and blobs are properly pulled for building test servers.  
+
+### Xcode 16.0 or higher (iOS only)
+
+This is required because of a command usage that was introduced in this version of Xcode
+
+### iPhone Private WiFi (iOS only)
+
+The "Private Wi-Fi Address" setting of the network that the nodes and devices are connected to *must* be set to `Off` for auto detection of iOS device IP addresses to work.
+
+### libimobiledevice (iOS only)
+
+You need to install this package from homebrew as it is a dependency for the iOS IP discovery process
+
+### XHarness (optional, iOS only)
+
+If you are working with devices that are iOS 16.x or lower you will need to install [XHarness](https://github.com/dotnet/xharness)
 
 ## Step 1: Infrastructure
 
