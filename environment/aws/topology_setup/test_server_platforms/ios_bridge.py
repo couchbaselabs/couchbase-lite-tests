@@ -323,7 +323,7 @@ class iOSBridge(PlatformBridge):
         pid = match.group(1)
         click.echo(f"\tPID {pid}")
 
-        subprocess.run(
+        result = subprocess.run(
             [
                 "xcrun",
                 "devicectl",
@@ -338,6 +338,8 @@ class iOSBridge(PlatformBridge):
             check=True,
             capture_output=True,
         )
+        click.echo(result.stdout.decode("utf-8").splitlines())
+        click.echo(result.stderr.decode("utf-8").splitlines())
 
     def __stop_xharness(self, location: str) -> None:
         if not PID_FILE.exists():
