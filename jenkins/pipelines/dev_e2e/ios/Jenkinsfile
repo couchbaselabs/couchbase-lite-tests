@@ -24,7 +24,7 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'ios_m4' }
+            agent { label 'mac-mini-new' }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
             }
