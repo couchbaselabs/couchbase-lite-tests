@@ -7,6 +7,10 @@ pipeline {
         string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: "The dataset version to use (e.g. 3.2 or 4.0)")
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
     }
+    environment {
+        PATH = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/sbin"
+        GIT_EXEC_PATH = "/opt/homebrew/opt/git/libexec/git-core"
+    }
     stages {
         stage('Init') {
             steps {
@@ -45,7 +49,10 @@ pipeline {
                 always {
                     echo "Teardown iOS Test"
                     timeout(time: 5, unit: 'MINUTES') {
-                        sh 'jenkins/pipelines/dev_e2e/ios/teardown.sh'
+                        sh """
+                            export PATH="/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+                            jenkins/pipelines/dev_e2e/ios/teardown.sh
+                        """
                     }
                 }
             }
