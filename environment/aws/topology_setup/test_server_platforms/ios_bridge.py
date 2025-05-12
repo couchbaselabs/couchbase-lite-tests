@@ -280,18 +280,9 @@ class iOSBridge(PlatformBridge):
         )
 
         stdout = result.stdout.decode("utf-8").splitlines()
-
-        # Extract path ending in ".app" from the output
-        app_path = None
-        for line in stdout:
-            match = re.search(r"(/.*?\.app)", line)
-            if match:
-                app_path = match.group(1)
-                break
-
-        if not app_path:
-            raise RuntimeError(f"Failed to extract app path from output: {stdout}")
-
+        if len(stdout) < 2:
+            raise RuntimeError(f"Unexpected output when finding app path: {stdout}")
+        app_path = stdout[-1].strip()
         click.echo(f"\tApp Path: {app_path}")
 
         result = subprocess.run(
@@ -309,21 +300,17 @@ class iOSBridge(PlatformBridge):
         )
 
         stdout = result.stdout.decode("utf-8").splitlines()
-
-        # Find the process line that contains the app path
         app_path_line = next((line for line in stdout if app_path in line), None)
         if not app_path_line:
             raise RuntimeError(f"Failed to find PID in output: {stdout}")
 
-        # Extract PID as the first number in the matching line
         match = re.match(r"^\s*(\d+)", app_path_line)
         if not match:
             raise RuntimeError(f"Failed to parse PID from line: {app_path_line}")
-
         pid = match.group(1)
         click.echo(f"\tPID {pid}")
 
-        result = subprocess.run(
+        subprocess.run(
             [
                 "xcrun",
                 "devicectl",
@@ -338,8 +325,6 @@ class iOSBridge(PlatformBridge):
             check=True,
             capture_output=True,
         )
-        click.echo(result.stdout.decode("utf-8").splitlines())
-        click.echo(result.stderr.decode("utf-8").splitlines())
 
     def __stop_xharness(self, location: str) -> None:
         if not PID_FILE.exists():
