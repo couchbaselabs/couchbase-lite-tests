@@ -35,11 +35,7 @@ pipeline {
                 timeout(time: 60, unit: 'MINUTES') {
                     sh """
                         export PATH="/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:\$PATH"
-                        terraform version
-                        python3 --version
                         export AWS_PROFILE=mobile-for-now
-                        echo "AWS_PROFILE is set to \$AWS_PROFILE"
-                        which xcpretty && xcpretty --version
                         jenkins/pipelines/dev_e2e/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                     """
 
@@ -50,7 +46,8 @@ pipeline {
                     echo "Teardown iOS Test"
                     timeout(time: 5, unit: 'MINUTES') {
                         sh """
-                            export PATH="/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+                            export PATH="/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:\$PATH"
+                            export AWS_PROFILE=mobile-for-now
                             jenkins/pipelines/dev_e2e/ios/teardown.sh
                         """
                     }
