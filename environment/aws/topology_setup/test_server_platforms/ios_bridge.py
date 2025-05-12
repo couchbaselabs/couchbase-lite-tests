@@ -300,7 +300,8 @@ class iOSBridge(PlatformBridge):
         )
 
         stdout = result.stdout.decode("utf-8").splitlines()
-        app_path_line = next((line for line in stdout if app_path in line), None)
+        app_path_prefix = app_path.rstrip('/') + '/'
+        app_path_line = next((line for line in stdout if app_path_prefix in line), None)
         if not app_path_line:
             raise RuntimeError(f"Failed to find PID in output: {stdout}")
 
