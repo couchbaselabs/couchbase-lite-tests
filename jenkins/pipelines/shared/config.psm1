@@ -39,6 +39,8 @@ Set-Variable -Name ENVIRONMENT_DIR -Value (Find-Dir -TargetDir "environment") -O
 
 Set-Variable -Name SHARED_PIPELINES_DIR -Value (Join-Path -Path $PIPELINES_DIR -ChildPath "shared") -Option ReadOnly
 Set-Variable -Name DEV_E2E_PIPELINES_DIR -Value (Join-Path -Path $PIPELINES_DIR -ChildPath "dev_e2e") -Option ReadOnly
+Set-Variable -Name QE_TESTS_DIR -Value (Join-Path -Path $TESTS_DIR -ChildPath "QE") -Option ReadOnly
+Set-Variable -Name QE_PIPELINES_DIR -Value (Join-Path -Path $PIPELINES_DIR -ChildPath "QE") -Option ReadOnly
 Set-Variable -Name DEV_E2E_TESTS_DIR -Value (Join-Path -Path $TESTS_DIR -ChildPath "dev_e2e") -Option ReadOnly
 Set-Variable -Name AWS_ENVIRONMENT_DIR -Value (Join-Path -Path $ENVIRONMENT_DIR -ChildPath "aws") -Option ReadOnly
 
@@ -49,6 +51,8 @@ ENVIRONMENT_DIR: $ENVIRONMENT_DIR
 SHARED_PIPELINES_DIR: $SHARED_PIPELINES_DIR
 DEV_E2E_PIPELINES_DIR: $DEV_E2E_PIPELINES_DIR
 DEV_E2E_TESTS_DIR: $DEV_E2E_TESTS_DIR
+QE_TESTS_DIR: $QE_TESTS_DIR
+QE_PIPELINES_DIR: $QE_PIPELINES_DIR
 AWS_ENVIRONMENT_DIR: $AWS_ENVIRONMENT_DIR
 "@
 
@@ -56,4 +60,4 @@ Write-Box -Content $content -Title "Defining the following values:"
 
 Export-ModuleMember -Variable PIPELINES_DIR, TESTS_DIR, `
 ENVIRONMENT_DIR, SHARED_PIPELINES_DIR, DEV_E2E_PIPELINES_DIR, `
-DEV_E2E_TESTS_DIR, AWS_ENVIRONMENT_DIR
+DEV_E2E_TESTS_DIR, QE_PIPELINES_DIR, QE_TESTS_DIR, AWS_ENVIRONMENT_DIR
