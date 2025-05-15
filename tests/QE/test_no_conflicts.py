@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.listener import Listener
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database_types import DocumentEntry
+from cbltest.api.listener import Listener
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -14,7 +14,6 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
-
 from cbltest.api.syncgateway import DocumentUpdateEntry
 
 
@@ -27,7 +26,6 @@ async def update_cbl(cbl_db, doc_id, data):
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestNoConflicts(CBLTestClass):
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sg_cbl_updates_concurrently_with_push_pull(
         self, cblpytest: CBLPyTest, dataset_path: Path
@@ -50,9 +48,11 @@ class TestNoConflicts(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
-        db = (await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="posts"
-        ))[0]
+        db = (
+            await cblpytest.test_servers[0].create_and_reset_db(
+                ["db1"], dataset="posts"
+            )
+        )[0]
 
         self.mark_test_step("Pull replication to CBL")
         replicator = Replicator(
@@ -93,17 +93,25 @@ class TestNoConflicts(CBLTestClass):
 
         self.mark_test_step("Verify updated doc count in CBL")
         lite_all_docs = await db.get_all_documents("_default.posts")
-        doc_count = len(lite_all_docs["_default.posts"])         
+        doc_count = len(lite_all_docs["_default.posts"])
         assert doc_count == 6, (
             f"Incorrect number of documents replicated (expected 6; got {doc_count})"
         )
 
         self.mark_test_step("Update docs in SGW and CBL")
         await asyncio.gather(
-            cblpytest.sync_gateways[0].update_documents("posts", [DocumentUpdateEntry(
-                "post_2000", None, {"channels": "group1", "title": "SGW Update"}
-            )], collection="posts"),
-            update_cbl(db, "post_2000", [{"channels": "group1", "title": "CBL Update"}]),
+            cblpytest.sync_gateways[0].update_documents(
+                "posts",
+                [
+                    DocumentUpdateEntry(
+                        "post_2000", None, {"channels": "group1", "title": "SGW Update"}
+                    )
+                ],
+                collection="posts",
+            ),
+            update_cbl(
+                db, "post_2000", [{"channels": "group1", "title": "CBL Update"}]
+            ),
         )
 
         self.mark_test_step("Start Push Pull replication between SGW and CBL")
@@ -146,7 +154,9 @@ class TestNoConflicts(CBLTestClass):
         )
 
         self.mark_test_step("Update docs through CBL")
-        await update_cbl(db, "post_2000", [{"channels": "group1", "title": "CBL Update 2"}])
+        await update_cbl(
+            db, "post_2000", [{"channels": "group1", "title": "CBL Update 2"}]
+        )
 
         self.mark_test_step("Wait until the replicator is idle")
         stat2 = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
@@ -183,15 +193,33 @@ class TestNoConflicts(CBLTestClass):
             10. Verify all docs replicated to sync-gateway.
         """
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
+        cloud = CouchbaseCloud(
+            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
+        )
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step("Reset local database and load `posts` dataset on all 3 CBLs")
-        db1 = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts"))[0]
-        db2 = (await cblpytest.test_servers[1].create_and_reset_db(["db2"], dataset="posts"))[0]
-        db3 = (await cblpytest.test_servers[2].create_and_reset_db(["db3"], dataset="posts"))[0]
+        self.mark_test_step(
+            "Reset local database and load `posts` dataset on all 3 CBLs"
+        )
+        db1 = (
+            await cblpytest.test_servers[0].create_and_reset_db(
+                ["db1"], dataset="posts"
+            )
+        )[0]
+        db2 = (
+            await cblpytest.test_servers[1].create_and_reset_db(
+                ["db2"], dataset="posts"
+            )
+        )[0]
+        db3 = (
+            await cblpytest.test_servers[2].create_and_reset_db(
+                ["db3"], dataset="posts"
+            )
+        )[0]
 
-        self.mark_test_step("Create docs in CBL DB1, DB2, DB3 associated with its own channel")
+        self.mark_test_step(
+            "Create docs in CBL DB1, DB2, DB3 associated with its own channel"
+        )
         await asyncio.gather(
             update_cbl(db1, "post_1000", [{"channels": "group1"}]),
             update_cbl(db2, "post_1000", [{"channels": "group1"}]),
@@ -202,7 +230,9 @@ class TestNoConflicts(CBLTestClass):
         await listener2.start()
         listener3 = Listener(db3, ["_default.posts"], 59841)
         await listener3.start()
-        self.mark_test_step("Replicate docs from CBL DB1 to DB2 with push pull and continous")
+        self.mark_test_step(
+            "Replicate docs from CBL DB1 to DB2 with push pull and continous"
+        )
         repl1 = Replicator(
             db1,
             cblpytest.test_servers[1].replication_url("db2", 59840),
@@ -240,9 +270,15 @@ class TestNoConflicts(CBLTestClass):
 
         self.mark_test_step("Update docs on CBL DB1, DB2, DB3")
         await asyncio.gather(
-            update_cbl(db1, "post_1000", [{"channels": "group1", "title": "CBL1 Update 1"}]),
-            update_cbl(db2, "post_1000", [{"channels": "group1", "title": "CBL2 Update 1"}]),
-            update_cbl(db3, "post_1000", [{"channels": "group2", "title": "CBL3 Update 1"}]),
+            update_cbl(
+                db1, "post_1000", [{"channels": "group1", "title": "CBL1 Update 1"}]
+            ),
+            update_cbl(
+                db2, "post_1000", [{"channels": "group1", "title": "CBL2 Update 1"}]
+            ),
+            update_cbl(
+                db3, "post_1000", [{"channels": "group2", "title": "CBL3 Update 1"}]
+            ),
         )
 
         self.mark_test_step("Wait until the replicators are idle")
@@ -255,7 +291,9 @@ class TestNoConflicts(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Replicate docs from CBL DB3 to SGW with push pull and continous")
+        self.mark_test_step(
+            "Replicate docs from CBL DB3 to SGW with push pull and continous"
+        )
         replicator = Replicator(
             db3,
             cblpytest.sync_gateways[0].replication_url("posts"),
@@ -280,9 +318,13 @@ class TestNoConflicts(CBLTestClass):
         cbl1_doc = await db1.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
-        assert sg_doc.body.get("title") == cbl1_doc.body.get("title") == \
-            cbl2_doc.body.get("title") == cbl3_doc.body.get("title"), (
-                f"Title mismatch in replicated docs (SGW: {sg_doc.body.get('title')}; \
+        assert (
+            sg_doc.body.get("title")
+            == cbl1_doc.body.get("title")
+            == cbl2_doc.body.get("title")
+            == cbl3_doc.body.get("title")
+        ), (
+            f"Title mismatch in replicated docs (SGW: {sg_doc.body.get('title')}; \
                     CBL1: {cbl1_doc.body.get('title')}, CBL2: {cbl2_doc.body.get('title')}, \
                     CBL3: {cbl3_doc.body.get('title')}"
         )
@@ -313,10 +355,24 @@ class TestNoConflicts(CBLTestClass):
         )
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step("Reset local database and load `posts` dataset on all 3 CBLs")
-        db1 = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts"))[0]
-        db2 = (await cblpytest.test_servers[1].create_and_reset_db(["db2"], dataset="posts"))[0]
-        db3 = (await cblpytest.test_servers[2].create_and_reset_db(["db3"], dataset="posts"))[0]
+        self.mark_test_step(
+            "Reset local database and load `posts` dataset on all 3 CBLs"
+        )
+        db1 = (
+            await cblpytest.test_servers[0].create_and_reset_db(
+                ["db1"], dataset="posts"
+            )
+        )[0]
+        db2 = (
+            await cblpytest.test_servers[1].create_and_reset_db(
+                ["db2"], dataset="posts"
+            )
+        )[0]
+        db3 = (
+            await cblpytest.test_servers[2].create_and_reset_db(
+                ["db3"], dataset="posts"
+            )
+        )[0]
 
         self.mark_test_step("Create docs in SG")
         await cblpytest.sync_gateways[0].update_documents(
@@ -373,20 +429,32 @@ class TestNoConflicts(CBLTestClass):
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
         assert cbl1_doc.id == cbl2_doc.id == cbl3_doc.id, (
-            f"Wrong document ID in CBL docs (expected 'post_1000'; 
-            got CBL1: {cbl1_doc.id}, CBL2: {cbl2_doc.id}, CBL3: {cbl3_doc.id}"
+            f"Wrong document ID in CBL docs (expected 'post_1000'; \
+                got CBL1: {cbl1_doc.id}, CBL2: {cbl2_doc.id}, CBL3: {cbl3_doc.id}"
         )
 
         self.mark_test_step("Update docs in SGW and all 3 CBLs")
         await asyncio.gather(
             cblpytest.sync_gateways[0].update_documents(
                 "posts",
-                [DocumentUpdateEntry("post_1000", None, {"channels": "group1", "title": "SGW Update 1"})],
+                [
+                    DocumentUpdateEntry(
+                        "post_1000",
+                        None,
+                        {"channels": "group1", "title": "SGW Update 1"},
+                    )
+                ],
                 collection="posts",
             ),
-            update_cbl(db1, "post_1000", [{"channels": "group1", "title": "CBL1 Update 1"}]),
-            update_cbl(db2, "post_1000", [{"channels": "group1", "title": "CBL2 Update 1"}]),
-            update_cbl(db3, "post_1000", [{"channels": "group1", "title": "CBL3 Update 1"}]),
+            update_cbl(
+                db1, "post_1000", [{"channels": "group1", "title": "CBL1 Update 1"}]
+            ),
+            update_cbl(
+                db2, "post_1000", [{"channels": "group1", "title": "CBL2 Update 1"}]
+            ),
+            update_cbl(
+                db3, "post_1000", [{"channels": "group1", "title": "CBL3 Update 1"}]
+            ),
         )
 
         self.mark_test_step("Do PUSH and PULL replication to 3 CBLs")
@@ -436,21 +504,33 @@ class TestNoConflicts(CBLTestClass):
         cbl1_doc = await db1.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
-        sg_doc = await cblpytest.sync_gateways[0].get_document("posts", "post_1000", collection="posts")
-        assert cbl1_doc.body.get("title") == cbl2_doc.body.get("title") \
-             == cbl3_doc.body.get("title") == sg_doc.body.get("title"), (
-                f"Document title mismatch (SGW: {sg_doc.body.get('title')}; \
+        sg_doc = await cblpytest.sync_gateways[0].get_document(
+            "posts", "post_1000", collection="posts"
+        )
+        assert (
+            cbl1_doc.body.get("title")
+            == cbl2_doc.body.get("title")
+            == cbl3_doc.body.get("title")
+            == sg_doc.body.get("title")
+        ), (
+            f"Document title mismatch (SGW: {sg_doc.body.get('title')}; \
                     CBL1: {cbl1_doc.body.get('title')}, CBL2: {cbl2_doc.body.get('title')}, \
                     CBL3: {cbl3_doc.body.get('title')}"
         )
 
         self.mark_test_step("Update docs through all 3 CBLs")
         await asyncio.gather(
-            update_cbl(db1, "post_1000", [{"channels": "group1", "title": "CBL1 Update 2"}]),
-            update_cbl(db2, "post_1000", [{"channels": "group1", "title": "CBL2 Update 2"}]),
-            update_cbl(db3, "post_1000", [{"channels": "group1", "title": "CBL3 Update 2"}]),
+            update_cbl(
+                db1, "post_1000", [{"channels": "group1", "title": "CBL1 Update 2"}]
+            ),
+            update_cbl(
+                db2, "post_1000", [{"channels": "group1", "title": "CBL2 Update 2"}]
+            ),
+            update_cbl(
+                db3, "post_1000", [{"channels": "group1", "title": "CBL3 Update 2"}]
+            ),
         )
-        
+
         self.mark_test_step("Wait until the replicators are idle")
         status = await repl1.wait_for(ReplicatorActivityLevel.IDLE)
         assert status.error is None, (
@@ -469,10 +549,16 @@ class TestNoConflicts(CBLTestClass):
         cbl1_doc = await db1.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
-        sg_doc = await cblpytest.sync_gateways[0].get_document("posts", "post_1000", collection="posts")
-        assert cbl1_doc.body.get("title") == cbl2_doc.body.get("title") \
-             == cbl3_doc.body.get("title") == sg_doc.body.get("title"), (
-                f"Document title mismatch (SGW: {sg_doc.body.get('title')}; \
+        sg_doc = await cblpytest.sync_gateways[0].get_document(
+            "posts", "post_1000", collection="posts"
+        )
+        assert (
+            cbl1_doc.body.get("title")
+            == cbl2_doc.body.get("title")
+            == cbl3_doc.body.get("title")
+            == sg_doc.body.get("title")
+        ), (
+            f"Document title mismatch (SGW: {sg_doc.body.get('title')}; \
                     CBL1: {cbl1_doc.body.get('title')}, CBL2: {cbl2_doc.body.get('title')}, \
                     CBL3: {cbl3_doc.body.get('title')}"
         )
