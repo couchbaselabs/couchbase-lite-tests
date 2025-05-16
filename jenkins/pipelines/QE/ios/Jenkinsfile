@@ -2,10 +2,10 @@ pipeline {
     agent none
     parameters {
         choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
-        string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'Couchbase Lite Version')
-        string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
-        string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: "The dataset version to use (e.g. 3.2 or 4.0)")
-        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+        string(name: 'CBL_VERSION', defaultValue: '3.2.3', description: 'Couchbase Lite Version')
+        string(name: 'CBL_BUILD', defaultValue: '6', description: 'Couchbase Lite Build Number')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '3.2', description: "The dataset version to use (e.g. 3.2 or 4.0)")
+        string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
     }
     stages {
         stage('Init') {
