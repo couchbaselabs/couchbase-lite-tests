@@ -63,7 +63,6 @@ class TestNoConflicts(CBLTestClass):
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
         )
-        print("Starting PULL replicator...")
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
@@ -104,13 +103,15 @@ class TestNoConflicts(CBLTestClass):
                 "posts",
                 [
                     DocumentUpdateEntry(
-                        "post_2000", None, {"channels": "group1", "title": "SGW Update"}
+                        "post_2000",
+                        None,
+                        {"channels": ["group1"], "title": "SGW Update"},
                     )
                 ],
                 collection="posts",
             ),
             update_cbl(
-                db, "post_2000", [{"channels": "group1", "title": "CBL Update"}]
+                db, "post_2000", [{"channels": ["group1"], "title": "CBL Update"}]
             ),
         )
 
@@ -155,7 +156,7 @@ class TestNoConflicts(CBLTestClass):
 
         self.mark_test_step("Update docs through CBL")
         await update_cbl(
-            db, "post_2000", [{"channels": "group1", "title": "CBL Update 2"}]
+            db, "post_2000", [{"channels": ["group1"], "title": "CBL Update 2"}]
         )
 
         self.mark_test_step("Wait until the replicator is idle")

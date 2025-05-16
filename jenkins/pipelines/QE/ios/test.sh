@@ -13,17 +13,17 @@ private_key_path=${6}
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
 
-echo "Setup backend..."
+# echo "Setup backend..."
 
-create_venv venv
-source venv/bin/activate
-pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-if [ -n "$private_key_path" ]; then
-   python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $CBL_DATASET_VERSION $SGW_VERSION --private_key $private_key_path
-else
-   python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $CBL_DATASET_VERSION $SGW_VERSION
-fi
-deactivate
+# create_venv venv
+# source venv/bin/activate
+# pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
+# if [ -n "$private_key_path" ]; then
+#    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $CBL_DATASET_VERSION $SGW_VERSION --private_key $private_key_path
+# else
+#    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $CBL_DATASET_VERSION $SGW_VERSION
+# fi
+# deactivate
 
 # Run Tests :
 echo "Run tests..."
@@ -32,6 +32,6 @@ pushd "${QE_TESTS_DIR}" > /dev/null
 create_venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json test_no_conflicts.py::TestNoConflicts::test_sg_cbl_updates_concurrently_with_push_pull
+pytest -v --no-header -W ignore::DeprecationWarning --config config.json
 deactivate
 popd > /dev/null

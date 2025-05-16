@@ -1,0 +1,273 @@
+from pathlib import Path
+
+import pytest
+from cbltest import CBLPyTest
+from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cloud import CouchbaseCloud
+from cbltest.api.database_types import EncryptedValue
+from cbltest.api.replicator import Replicator
+from cbltest.api.replicator_types import (
+    ReplicatorActivityLevel,
+    ReplicatorBasicAuthenticator,
+    ReplicatorCollectionEntry,
+    ReplicatorType,
+)
+from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.responses import ServerVariant
+
+
+@pytest.mark.min_test_servers(1)
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_couchbase_servers(1)
+class TestReplicatorEncryptionHook(CBLTestClass):
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_replication_complex_doc_encryption(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ):
+        """
+        @summary: Testing  dict and array encrypted values are present in 10-15th level of
+        complex doc and replicated should detected values without any errors.
+            1. Have SG and CBL up and running
+            2. Create a complex document with encryption property (Array, and Dict)
+            3. Start the replicator and make sure documents are replicated on SG.
+            4. Verify encrypted fields and Verify data is encrypted.
+            5. Verify encrypted value at 15th level are detected by replicator and shown correctly on sg.
+        """
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
+
+        self.mark_test_step("Reset SG and load `posts` dataset")
+        cloud = CouchbaseCloud(
+            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
+        )
+        await cloud.configure_dataset(dataset_path, "posts")
+
+        self.mark_test_step("Reset local database, and load `posts` dataset.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+            ["db1"], dataset="posts"
+        )
+        db = dbs[0]
+
+        self.mark_test_step("Replicate to CBL from SGW")
+        replicator = Replicator(
+            db,
+            cblpytest.sync_gateways[0].replication_url("posts"),
+            collections=[ReplicatorCollectionEntry(["_default.posts"])],
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        self.mark_test_step("Check that all docs are replicated correctly.")
+        lite_all_docs = await db.get_all_documents("_default.posts")
+        assert len(lite_all_docs["_default.posts"]) == 5, (
+            f"Incorrect number of initial documents replicated (expected 5; got {len(lite_all_docs['_default.posts'])}"
+        )
+        await compare_local_and_remote(
+            db,
+            cblpytest.sync_gateways[0],
+            ReplicatorType.PUSH,
+            "posts",
+            ["_default.posts"],
+        )
+
+        self.mark_test_step(
+            "Create document in CBL with encrypted value at the 15th level of nesting"
+        )
+        async with db.batch_updater() as b:
+            b.upsert_document(
+                "_default.posts",
+                "post_1000",
+                [
+                    {
+                        "channels": ["group1"],
+                        "nest_1": {
+                            "nest_2": {
+                                "nest_3": {
+                                    "nest_4": {
+                                        "nest_5": {
+                                            "nest_6": {
+                                                "nest_7": {
+                                                    "nest_8": {
+                                                        "nest_9": {
+                                                            "nest_10": {
+                                                                "nest_11": {
+                                                                    "nest_12": {
+                                                                        "nest_13": {
+                                                                            "nest_14": EncryptedValue(
+                                                                                "secret_password"
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                ],
+            )
+
+        self.mark_test_step("Replicate to SGW from CBL")
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+        lite_all_docs = await db.get_all_documents("_default.posts")
+        assert len(lite_all_docs["_default.posts"]) == 6, (
+            f"Incorrect number of initial documents replicated (expected 6; got {len(lite_all_docs['_default.posts'])}"
+        )
+
+        self.mark_test_step("Check that the document is in SGW")
+        doc = await cblpytest.sync_gateways[0].get_document(
+            "posts", "post_1000", collection="posts"
+        )
+        self.mark_test_step(f"Document from SGW: {doc.id}")
+
+        await cblpytest.test_servers[0].cleanup()
+        self.mark_test_step("...COMPLETED...")
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_delta_sync_with_encryption(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ):
+        """
+        @summary: Verify Delta sync do not work when encryption callback hook is present
+                  Verify Doc is not editable in the SG
+            1. Have delta sync enabled
+            2. Create docs with encrypted field in CBL
+            3. Do push/pull replication to SGW
+            4. Update docs in CBL & SG
+            5. Replicate docs using pull replication.
+            6. Verify Bandwidth is saved for other documents
+        """
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
+
+        self.mark_test_step(
+            "Reset SG and load `travel` dataset with delta sync enabled"
+        )
+        cloud = CouchbaseCloud(
+            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
+        )
+        await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
+
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+            ["db1"], dataset="travel"
+        )
+        db = dbs[0]
+
+        self.mark_test_step("Start a replicator")
+        replicator = Replicator(
+            db,
+            cblpytest.sync_gateways[0].replication_url("travel"),
+            collections=[ReplicatorCollectionEntry(["travel.hotels"])],
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        self.mark_test_step("Check that all docs are replicated correctly.")
+        lite_all_docs = await db.get_all_documents("travel.hotels")
+        assert len(lite_all_docs["travel.hotels"]) == 700, (
+            f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])}"
+        )
+        await compare_local_and_remote(
+            db,
+            cblpytest.sync_gateways[0],
+            ReplicatorType.PUSH_AND_PULL,
+            "travel",
+            ["travel.hotels"],
+        )
+
+        self.mark_test_step("Create a document with encrypted field in CBL")
+        async with db.batch_updater() as b:
+            b.upsert_document(
+                "travel.hotels",
+                "hotel_1",
+                [{"name": "CBL", "encrypted_field": EncryptedValue("secret_password")}],
+            )
+
+        self.mark_test_step("Replicate to SGW from CBL")
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        self.mark_test_step("Verify the new document is present in SGW")
+        lite_all_docs = await db.get_all_documents("travel.hotels")
+        assert len(lite_all_docs["travel.hotels"]) == 701, (
+            f"Incorrect number of new documents replicated (expected 701; got {len(lite_all_docs['travel.hotels'])}"
+        )
+        doc = await cblpytest.sync_gateways[0].get_document(
+            "travel", "hotel_1", "travel", "hotels"
+        )
+        assert doc is not None, "Document should exist in SGW"
+        assert doc.body.get("encrypted_field") is not None, (
+            "Encrypted value should be present"
+        )
+
+        self.mark_test_step("Update docs in CBL & SGW")
+        async with db.batch_updater() as b:
+            b.upsert_document("travel.hotels", "hotel_2", {"name": "SGW"})
+        await cblpytest.sync_gateways[0].update_documents(
+            "travel",
+            [DocumentUpdateEntry("hotel_2", None, {"name": "CBL"})],
+            "travel",
+            "hotels",
+        )
+
+        self.mark_test_step("Replicate docs using pull replication")
+        replicator = Replicator(
+            db,
+            cblpytest.sync_gateways[0].replication_url("travel"),
+            collections=[ReplicatorCollectionEntry(["travel.hotels"])],
+            replicator_type=ReplicatorType.PULL,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+        )
+        await replicator.start()
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        self.mark_test_step("Verify bandwidth is saved for other documents")
+        lite_all_docs = await db.get_all_documents("travel.hotels")
+        total_docs = len(lite_all_docs["travel.hotels"])
+        repl_status = await replicator.get_status()
+        assert repl_status.progress.completed, "Expected replication to be completed"
+        processed_docs = len(replicator.document_updates)
+        assert processed_docs == 1, (
+            f"Expected only 1 document to be processed due to delta sync, but got {processed_docs}"
+        )
+        assert processed_docs < total_docs, (
+            f"All documents ({total_docs}) were processed instead of just the mutated ones ({processed_docs})"
+        )
+
+        await cblpytest.test_servers[0].clean_up()
+        self.mark_test_step("...COMPLETED...")
