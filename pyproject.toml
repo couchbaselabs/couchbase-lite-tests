@@ -2,6 +2,10 @@
 lint.extend-select = ["I"]
 lint.ignore = ["E402"]
 
+[tool.mypy]
+check_untyped_defs = true
+exclude = "conftest.py" # Exclude conftest.py, since these are duplicated across several test files
+
 [[tool.mypy.overrides]]
-module = ["couchbase.*", "opentelemetry.exporter.*", "opentelemetry.sdk.*"]
+module = "couchbase.*"
 ignore_missing_imports = true
