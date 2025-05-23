@@ -776,7 +776,9 @@ class SyncGateway:
             merged_updates = []
             for update in updates:
                 try:
-                    current_doc = await self.get_document(db_name, update.id, scope, collection)
+                    current_doc = await self.get_document(
+                        db_name, update.id, scope, collection
+                    )
                     current_body = dict(current_doc.body)
                     current_body.update(update.to_json())
                     current_body["_id"] = update.id
@@ -784,7 +786,9 @@ class SyncGateway:
                         current_body["_rev"] = update.rev
                 except Exception:
                     current_body = update.to_json()
-                merged_updates.append(DocumentUpdateEntry(update.id, update.rev, current_body))
+                merged_updates.append(
+                    DocumentUpdateEntry(update.id, update.rev, current_body)
+                )
 
             await self._rewrite_rev_ids(db_name, merged_updates, scope, collection)
             body = {"docs": list(u.to_json() for u in merged_updates)}
