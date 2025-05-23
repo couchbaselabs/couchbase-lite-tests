@@ -431,7 +431,7 @@ class TestNoConflicts(CBLTestClass):
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
         assert cbl1_doc.id == cbl2_doc.id == cbl3_doc.id, (
             f"Wrong document ID in CBL docs (expected 'post_1000'; \
-                got CBL1: {cbl1_doc.id}, CBL2: {cbl2_doc.id}, CBL3: {cbl3_doc.id}"
+                got CBL1: {cbl1_doc.id}, CBL2: {cbl2_doc.id}, CBL3: {cbl3_doc.id})"
         )
 
         self.mark_test_step("Update docs in SGW and all 3 CBLs")

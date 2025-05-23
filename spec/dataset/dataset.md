@@ -548,3 +548,62 @@ curl --location --request POST 'http://<sg-address>:4985/todo/_role/' \
   }
 }
 ```
+
+## 5. short_expiry
+
+### CBL Dataset
+
+| Collections         | #Docs       |
+| :------------------ | ----------- |
+| _default._default   | 1           | doc1         |
+
+### SG Dataset
+
+| Collections         | #Docs       | Doc ID           |
+| :------------------ | ----------- | -----------------|
+| _default._default   | 1           | doc1             |
+
+### SG Config
+
+ | Config      | Value             |
+ | ----------- | ------------------|
+ | Database    | short_expiry      |
+ | Port        | 4984 / 4985       |
+ | Collections | _default._default |
+
+#### Sync Function
+
+```js
+function (doc, oldDoc, meta) {
+  if (doc._deleted) {
+    channel(oldDoc.channels)
+  } else {
+    channel(doc.channels)
+  }
+}
+```
+
+#### Options
+
+ | Name              | Description           |
+ | ----------------- | --------------------- |
+ | delta_sync        | Enabled, 3 min expiry |
+
+#### Users
+
+| Username | Password  | admin_channels |
+| :------- | --------- |----------------|
+| user1    | pass      | ["*"]          |
+
+### Sample Docs
+
+```JSON
+{
+  "_id": "doc1",
+  "scope": "_default",
+  "collection": "_default",
+  "channels": ["*"],
+  "type": "test",
+  "value": "This is a test document for short_expiry dataset."
+}
+```

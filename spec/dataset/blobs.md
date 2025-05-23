@@ -15,6 +15,12 @@
 | l9.jpg   | image/jpeg   | sha1-sKmH8rJtV3JardoWTE7nJ1yk0gE= | 2838244 |
 | l10.jpg  | image/jpeg   | sha1-TSC2gaaEZbi0kC3zBwdzc7wIOcc= | 1986238 |
 
+## Extra Large Size
+
+| name     | content_type | digest                                      | length    |
+| :------- | ------------ | ------------------------------------------- | --------- |
+| xl1.jpg  | image/jpeg   | sha1-35626dfbdafb966833ee60121cb7edcf9884bd3f | 21200000  |
+
 ## Small Size
 
 | name     | content_type | digest                            | length  | 

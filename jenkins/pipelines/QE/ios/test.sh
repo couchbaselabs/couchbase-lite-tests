@@ -32,6 +32,6 @@ pushd "${QE_TESTS_DIR}" > /dev/null
 create_venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json test_delta_sync.py::TestDeltaSync::test_delta_sync_utf8_strings
+pytest -v --no-header -W ignore::DeprecationWarning --config config.json test_replication_eventing.py
 deactivate
 popd > /dev/null

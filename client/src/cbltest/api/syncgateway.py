@@ -427,6 +427,12 @@ class SyncGateway:
         _assert_not_null(db_name, "db_name")
         return urljoin(self.__replication_url, db_name)
 
+    def get_expvars(self):
+        """
+        Gets the expvars for the Sync Gateway
+        """
+        return urljoin(self.__admin_url, "_expvar")
+
     async def _put_database(
         self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0
     ) -> None:
@@ -734,6 +740,54 @@ class SyncGateway:
 
             body = {"docs": list(u.to_json() for u in updates)}
 
+            await self._send_request(
+                "post",
+                f"/{db_name}.{scope}.{collection}/_bulk_docs",
+                JSONDictionary(body),
+            )
+
+    async def upsert_documents(
+        self,
+        db_name: str,
+        updates: list[DocumentUpdateEntry],
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> None:
+        """
+        Upserts a list of documents on Sync Gateway.
+        Its different from update_documents in that it will not overwrite the doc body in case the
+            doc already exists.
+        It will preserve the existing body fields and only add / update whatever is being passed,
+            like the behaviour shown by the function batch_upsert used in CBL updates.
+
+        :param db_name: The name of the DB endpoint to upsert
+        :param updates: A list of upserts to perform
+        :param scope: The scope that the upserts will be applied to (default '_default')
+        :param collection: The collection that the upserts will be applied to (default '_default')
+        """
+        with self.__tracer.start_as_current_span(
+            "update_documents",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+            },
+        ):
+            merged_updates = []
+            for update in updates:
+                try:
+                    current_doc = await self.get_document(db_name, update.id, scope, collection)
+                    current_body = dict(current_doc.body)
+                    current_body.update(update.to_json())
+                    current_body["_id"] = update.id
+                    if update.rev:
+                        current_body["_rev"] = update.rev
+                except Exception:
+                    current_body = update.to_json()
+                merged_updates.append(DocumentUpdateEntry(update.id, update.rev, current_body))
+
+            await self._rewrite_rev_ids(db_name, merged_updates, scope, collection)
+            body = {"docs": list(u.to_json() for u in merged_updates)}
             await self._send_request(
                 "post",
                 f"/{db_name}.{scope}.{collection}/_bulk_docs",

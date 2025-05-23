@@ -1,0 +1,42 @@
+{
+  "config": {
+    "bucket": "posts",
+    "old_rev_expiry_seconds": 60,
+    "scopes": {
+      "_default": {
+        "collections": {
+          "_default": {
+            "sync": "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
+          }
+        }
+      }
+    },
+    "num_index_replicas": 0
+  },
+  "config_options": {
+    "delta_sync": {
+      "delta_sync": {
+        "enabled": true,
+        "rev_max_age_seconds": 60
+      }
+    },
+    "delta_sync_with_expiry": {
+      "delta_sync": {
+        "enabled": true,
+        "rev_max_age_seconds": 60
+      }
+    }
+  },
+  "users": {
+    "user1": {
+      "password": "pass",
+      "collection_access": {
+        "_default": {
+          "_default": {
+            "admin_channels": ["*"]
+          }
+        }
+      }
+    }
+  }
+} 
