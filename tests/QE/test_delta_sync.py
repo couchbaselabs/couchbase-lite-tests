@@ -431,7 +431,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Create docs in CBL")
-        utf8_body = "東京🚀🌏Привет世界مرحبا" * 100
+        utf8_body = "東京🚀🌏Привет世界مرحبا"
         async with db.batch_updater() as b:
             b.upsert_document(
                 "travel.hotels", "hotel_1", [{"name": "CBL", "utf8": utf8_body}]
