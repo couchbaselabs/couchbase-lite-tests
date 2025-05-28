@@ -270,6 +270,8 @@ class iOSBridge(PlatformBridge):
                 location,
                 "--bundle-id",
                 self.__app_id,
+                "--hide-headers",
+                "--hide-default-columns",
                 "--columns",
                 "path",
             ],
