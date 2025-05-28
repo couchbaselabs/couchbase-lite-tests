@@ -360,10 +360,19 @@ class iOSBridge(PlatformBridge):
                     continue
 
                 ip = addr[netifaces.AF_INET][0]["broadcast"]
+                if ip.startswith("169.254"):
+                    continue
+
                 click.echo(f"Broadcasting ping request on {interface} ({ip})")
-                subprocess.run(
-                    ["ping", ip, "-c", "3"], check=True, capture_output=True, text=True
+                result = subprocess.run(
+                    ["ping", ip, "-c", "3"], check=False, capture_output=True, text=True
                 )
+
+                if result.returncode != 0:
+                    click.secho(
+                        f"Failed to ping {ip} on {interface}: {result.stderr}",
+                        fg="yellow",
+                    )
 
     def get_ip(self, location: str) -> str:
         """
