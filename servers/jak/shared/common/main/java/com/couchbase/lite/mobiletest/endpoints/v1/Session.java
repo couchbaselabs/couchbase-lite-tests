@@ -43,14 +43,18 @@ public class Session {
     private static final String KEY_COLLECTIONS = "collections";
     private static final String KEY_DATASET = "dataset";
     private static final String KEY_ID = "id";
+    private static final String KEY_DATASET_VERSION = "dataset_version";
     private static final String KEY_LOGGING = "logging";
+
     private static final String KEY_URL = "url";
     private static final String KEY_TAG = "tag";
+
 
     private static final Set<String> LEGAL_SESSION_KEYS;
     static {
         final Set<String> l = new HashSet<>();
         l.add(KEY_ID);
+        l.add(KEY_DATASET_VERSION);
         l.add(KEY_LOGGING);
         LEGAL_SESSION_KEYS = Collections.unmodifiableSet(l);
     }
@@ -103,7 +107,7 @@ public class Session {
 
         endSession(app);
 
-        final TestContext newCtxt = app.newSession(sessionId);
+        final TestContext newCtxt = app.newSession(sessionId, req.getString(KEY_DATASET_VERSION));
         startSession(app, newCtxt);
 
         final TypedMap logConfig = req.getMap(KEY_LOGGING);
@@ -121,11 +125,15 @@ public class Session {
 
         final TestContext oldCtxt = app.getSession(client);
         String testName = oldCtxt.getTestName();
+
         if (testName != null) { Log.p(TAG, "<<<<< END TEST: " + testName); }
+
+        // preserve the dataset version across resets
+        final String datasetVersion = oldCtxt.getDatasetVersion();
 
         endSession(app);
 
-        final TestContext newCtxt = app.newSession(client);
+        final TestContext newCtxt = app.newSession(client, datasetVersion);
         final DatabaseService dbSvc = startSession(app, newCtxt);
         testName = req.getString(KEY_TEST_NAME);
         newCtxt.setTestName(testName);

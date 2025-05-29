@@ -155,9 +155,9 @@ public abstract class TestApp {
     }
 
     @NonNull
-    public final TestContext newSession(@NonNull String client) {
+    public final TestContext newSession(@NonNull String client, @Nullable String datasetVersion) {
         final TestContext ctxt = session;
-        session = new TestContext(client);
+        session = new TestContext(client, datasetVersion);
         if (ctxt != null) { ctxt.close(); }
         return session;
     }
