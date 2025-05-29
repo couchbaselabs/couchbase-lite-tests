@@ -33,13 +33,13 @@ class TestNoConflicts(CBLTestClass):
         """
         @summary:
             1. Create docs in SG.
-            2. Pull replication to CBL
-            3. update docs in SG and CBL.
-            4. Push_pull replication to CBL.
-            5. Verify docs can resolve conflicts and should be able to replicate docs to CBL
-            6. Update docs through in CBL
-            7. Verify docs got replicated to sg with CBL updates
-            8. Add verification of sync-gateway
+            2. Pull replication (continuous) to CBL.
+            3. Update docs in SG and CBL.
+            4. Push/pull replication (continuous) to CBL.
+            5. Verify docs can resolve conflicts and should be able to replicate docs to CBL.
+            6. Update docs through CBL.
+            7. Verify docs got replicated to SGW with CBL updates.
+            8. Add verification of SGW.
         """
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(
@@ -54,19 +54,20 @@ class TestNoConflicts(CBLTestClass):
             )
         )[0]
 
-        self.mark_test_step("Pull replication to CBL")
+        self.mark_test_step("Pull replication (continuous) to CBL")
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
+            continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
         )
         await replicator.start()
 
-        self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        self.mark_test_step("Wait until the replicator is idle")
+        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
@@ -76,25 +77,11 @@ class TestNoConflicts(CBLTestClass):
             f"Incorrect number of initial documents replicated (expected 5; got {len(lite_all_docs['_default.posts'])}"
         )
 
-        self.mark_test_step("Create docs in SG and replicate to CBL")
+        self.mark_test_step("Create docs in SG")
         await cblpytest.sync_gateways[0].update_documents(
             "posts",
             [DocumentUpdateEntry("post_1000", None, {"channels": ["group1"]})],
             collection="posts",
-        )
-        await replicator.start()
-
-        self.mark_test_step("Wait until replication is complete")
-        status2 = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status2.error is None, (
-            f"Error waiting for replicator: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
-        )
-
-        self.mark_test_step("Verify updated doc count in CBL")
-        lite_all_docs = await db.get_all_documents("_default.posts")
-        doc_count = len(lite_all_docs["_default.posts"])
-        assert doc_count == 6, (
-            f"Incorrect number of documents replicated (expected 6; got {doc_count})"
         )
 
         self.mark_test_step("Update docs in SGW and CBL")
@@ -103,7 +90,7 @@ class TestNoConflicts(CBLTestClass):
                 "posts",
                 [
                     DocumentUpdateEntry(
-                        "post_2000",
+                        "post_1000",
                         None,
                         {"channels": ["group1"], "title": "SGW Update"},
                     )
@@ -111,44 +98,45 @@ class TestNoConflicts(CBLTestClass):
                 collection="posts",
             ),
             update_cbl(
-                db, "post_2000", [{"channels": ["group1"], "title": "CBL Update"}]
+                db, "post_1000", [{"channels": ["group1"], "title": "CBL Update"}]
             ),
         )
 
-        self.mark_test_step("Start Push Pull replication between SGW and CBL")
-        replicator = Replicator(
+        self.mark_test_step(
+            "Start Push Pull replication between SGW and CBL (continuous)"
+        )
+        replicator2 = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
-            replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
         )
-        await replicator.start()
+        await replicator2.start()
 
         self.mark_test_step("Wait until the replicator is idle")
-        stat = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
+        stat = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
         assert stat.error is None, (
             f"Error waiting for replicator: ({stat.error.domain} / {stat.error.code}) {stat.error.message}"
         )
 
         self.mark_test_step("Verify updated doc count in CBL")
         lite_all_docs = await db.get_all_documents("_default.posts")
-        assert len(lite_all_docs["_default.posts"]) == 7, (
-            f"Incorrect number of documents replicated (expected 7; got {len(lite_all_docs['_default.posts'])}"
+        assert len(lite_all_docs["_default.posts"]) == 6, (
+            f"Incorrect number of documents replicated (expected 6; got {len(lite_all_docs['_default.posts'])}"
         )
 
         self.mark_test_step("Verify updated doc body in SGW and CBL")
-        cbl_doc = await db.get_document(DocumentEntry("_default.posts", "post_2000"))
-        assert cbl_doc.id == "post_2000", (
-            f"Incorrect document ID (expected post_2000; got {cbl_doc.id}"
+        cbl_doc = await db.get_document(DocumentEntry("_default.posts", "post_1000"))
+        assert cbl_doc.id == "post_1000", (
+            f"Incorrect document ID (expected post_1000; got {cbl_doc.id})"
         )
         sg_doc = await cblpytest.sync_gateways[0].get_document(
-            "posts", "post_2000", collection="posts"
+            "posts", "post_1000", collection="posts"
         )
-        assert sg_doc.id == "post_2000", (
-            f"Incorrect document ID (expected post_2000; got {sg_doc.id}"
+        assert sg_doc.id == "post_1000", (
+            f"Incorrect document ID (expected post_1000; got {sg_doc.id})"
         )
         assert sg_doc.body.get("title") == cbl_doc.body.get("title"), (
             f"Mismatch in document title, SG: {sg_doc.body.get('title')}, CBL: {cbl_doc.body.get('title')}"
@@ -156,18 +144,18 @@ class TestNoConflicts(CBLTestClass):
 
         self.mark_test_step("Update docs through CBL")
         await update_cbl(
-            db, "post_2000", [{"channels": ["group1"], "title": "CBL Update 2"}]
+            db, "post_1000", [{"channels": ["group1"], "title": "CBL Update 2"}]
         )
 
         self.mark_test_step("Wait until the replicator is idle")
-        stat2 = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
+        stat2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
         assert stat2.error is None, (
             f"Error waiting for replicator: ({stat2.error.domain} / {stat2.error.code}) {stat2.error.message}"
         )
 
-        self.mark_test_step("Verify docs got replicated to sg with CBL updates")
+        self.mark_test_step("Verify docs got replicated to SGW with CBL updates")
         sg_doc = await cblpytest.sync_gateways[0].get_document(
-            "posts", "post_2000", collection="posts"
+            "posts", "post_1000", collection="posts"
         )
         assert sg_doc.body.get("title") == "CBL Update 2", (
             f"Wrong title in SG doc (expected 'CBL Update 2'; got {sg_doc.body.get('title')}"

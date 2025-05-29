@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -137,7 +138,10 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         doc = await cblpytest.sync_gateways[0].get_document(
             "posts", "post_1000", collection="posts"
         )
-        self.mark_test_step(f"Document from SGW: {doc.id}")
+        assert doc is not None, "Document should exist in SGW"
+        assert doc.body.get("encrypted_field") is not None, (
+            "Encrypted value should be present"
+        )
 
         await cblpytest.test_servers[0].cleanup()
         self.mark_test_step("...COMPLETED...")
@@ -147,14 +151,13 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         """
-        @summary: Verify Delta sync do not work when encryption callback hook is present
-                  Verify Doc is not editable in the SG
-            1. Have delta sync enabled
-            2. Create docs with encrypted field in CBL
-            3. Do push/pull replication to SGW
-            4. Update docs in CBL & SG
+        @summary: Verify Delta sync do not work when encryption callback hook is present.
+            1. Have delta sync enabled.
+            2. Create docs with encrypted field in CBL.
+            3. Do push-pull replication to SGW.
+            4. Update docs in CBL & SGW.
             5. Replicate docs using pull replication.
-            6. Verify Bandwidth is saved for other documents
+            6. Verify entire document is replicated, as they have encrypted fields.
         """
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
 
@@ -172,11 +175,12 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("Start a replicator")
+        self.mark_test_step("Start a push-pull replicator (continuous)")
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
+            continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
         )
@@ -206,22 +210,32 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             b.upsert_document(
                 "travel.hotels",
                 "hotel_1",
-                [{"name": "CBL", "encrypted_field": EncryptedValue("secret_password")}],
+                [
+                    {
+                        "name": "CBL update 1",
+                        "encrypted_field": EncryptedValue("secret_password"),
+                    }
+                ],
             )
 
         self.mark_test_step("Replicate to SGW from CBL")
         await replicator.start()
 
-        self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        self.mark_test_step("Wait until the replicator is idle.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        self.mark_test_step("Record the bytes transferred.")
+        _, bytes_written_before = await cblpytest.sync_gateways[0].bytes_transferred(
+            "travel"
         )
 
         self.mark_test_step("Verify the new document is present in SGW")
         lite_all_docs = await db.get_all_documents("travel.hotels")
         assert len(lite_all_docs["travel.hotels"]) == 701, (
-            f"Incorrect number of new documents replicated (expected 701; got {len(lite_all_docs['travel.hotels'])}"
+            f"Incorrect number of new documents replicated (expected 701; got {len(lite_all_docs['travel.hotels'])})"
         )
         doc = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_1", "travel", "hotels"
@@ -231,17 +245,33 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             "Encrypted value should be present"
         )
 
-        self.mark_test_step("Update docs in CBL & SGW")
+        self.mark_test_step("Update that document in CBL & SGW")
         async with db.batch_updater() as b:
-            b.upsert_document("travel.hotels", "hotel_2", {"name": "SGW"})
+            b.upsert_document(
+                "travel.hotels",
+                "hotel_1",
+                {
+                    "name": "SGW update 2",
+                    "encrypted_field": EncryptedValue("secret_password"),
+                },
+            )
         await cblpytest.sync_gateways[0].update_documents(
             "travel",
-            [DocumentUpdateEntry("hotel_2", None, {"name": "CBL"})],
+            [
+                DocumentUpdateEntry(
+                    "hotel_1",
+                    None,
+                    {
+                        "name": "CBL update 2",
+                        "encrypted_field": EncryptedValue("secret_password"),
+                    },
+                )
+            ],
             "travel",
             "hotels",
         )
 
-        self.mark_test_step("Replicate docs using pull replication")
+        self.mark_test_step("Replicate that document using pull replication")
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -256,6 +286,11 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
+        self.mark_test_step("Record the bytes transferred.")
+        _, bytes_written_after = await cblpytest.sync_gateways[0].bytes_transferred(
+            "travel"
+        )
+
         self.mark_test_step("Verify bandwidth is saved for other documents")
         lite_all_docs = await db.get_all_documents("travel.hotels")
         total_docs = len(lite_all_docs["travel.hotels"])
@@ -268,6 +303,14 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         assert processed_docs < total_docs, (
             f"All documents ({total_docs}) were processed instead of just the mutated ones ({processed_docs})"
         )
+        sgw_doc = await cblpytest.sync_gateways[0].get_document(
+            "travel", "hotel_2", "travel", "hotels"
+        )
+        updated_doc_bytes = len(json.dumps(sgw_doc.body).encode("utf-8"))
+        delta_bytes = bytes_written_after - bytes_written_before
+        assert delta_bytes < updated_doc_bytes, (
+            f"Expected delta to be less than the full doc size, but got {delta_bytes} bytes (doc size: {updated_doc_bytes})"
+        )
 
-        await cblpytest.test_servers[0].clean_up()
+        await cblpytest.test_servers[0].cleanup()
         self.mark_test_step("...COMPLETED...")

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
+import requests
 from aiohttp import BasicAuth, ClientSession, TCPConnector
 from deprecated import deprecated
 from opentelemetry.trace import get_tracer
@@ -427,11 +428,24 @@ class SyncGateway:
         _assert_not_null(db_name, "db_name")
         return urljoin(self.__replication_url, db_name)
 
-    def get_expvars(self):
+    async def bytes_transferred(self, dataset_name: str) -> tuple[int, int]:
         """
-        Gets the expvars for the Sync Gateway
+        Gets the bytes transferred for a given dataset
+
+        :param dataset_name: The name of the dataset to get the bytes transferred for
         """
-        return urljoin(self.__admin_url, "_expvar")
+        resp = requests.get(
+            urljoin(self.__admin_url, "_expvar"),
+            verify=False,
+            auth=("admin", "password"),
+        )
+        resp.raise_for_status()
+        expvars = resp.json()
+
+        db_stats = expvars["syncgateway"]["per_db"][dataset_name]["database"]
+        doc_reads_bytes = db_stats["doc_reads_bytes_blip"]
+        doc_writes_bytes = db_stats["doc_writes_bytes_blip"]
+        return doc_reads_bytes, doc_writes_bytes
 
     async def _put_database(
         self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0

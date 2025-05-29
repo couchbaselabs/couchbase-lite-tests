@@ -32,6 +32,6 @@ pushd "${QE_TESTS_DIR}" > /dev/null
 create_venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json test_replication_eventing.py
+pytest -v --no-header -W ignore::DeprecationWarning --config config.json
 deactivate
 popd > /dev/null

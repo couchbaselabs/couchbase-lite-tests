@@ -19,12 +19,6 @@
         "enabled": true,
         "rev_max_age_seconds": 60
       }
-    },
-    "delta_sync_with_expiry": {
-      "delta_sync": {
-        "enabled": true,
-        "rev_max_age_seconds": 60
-      }
     }
   },
   "users": {

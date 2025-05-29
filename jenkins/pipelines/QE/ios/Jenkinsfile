@@ -23,29 +23,22 @@ pipeline {
             agent { label 'mac-mini-new' }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                AWS_PROFILE = "mobile-for-now"
             }
             steps {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run iOS Test"
                 timeout(time: 60, unit: 'MINUTES') {
-                    sh """
-                        export PATH="/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:\$PATH"
-                        export AWS_PROFILE=mobile-for-now
-                        jenkins/pipelines/QE/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
-                    """
-
+                    sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
                 }
             }
             post {
                 always {
                     echo "Teardown iOS Test"
                     timeout(time: 5, unit: 'MINUTES') {
-                        sh """
-                            export PATH="/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:\$PATH"
-                            export AWS_PROFILE=mobile-for-now
-                            jenkins/pipelines/QE/ios/teardown.sh
-                        """
+                        sh "jenkins/pipelines/QE/ios/teardown.sh"
                     }
                     archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
                     archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true

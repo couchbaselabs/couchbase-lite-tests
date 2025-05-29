@@ -31,19 +31,19 @@ class TestReplicationEventing(CBLTestClass):
             4. Check the error is thrown in replication event changes
                 as CBS can't have doc greater than 20mb.
         """
-        self.mark_test_step("Reset SG and load `posts` dataset")
+        self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = CouchbaseCloud(
             cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
         )
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step("Reset local database, and load `posts` dataset")
+        self.mark_test_step("Reset local database, and load `posts` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(
             ["db1"], dataset="posts"
         )
         db = dbs[0]
 
-        self.mark_test_step("Start replication")
+        self.mark_test_step("Start push-pull replication.")
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("posts"),
@@ -53,13 +53,13 @@ class TestReplicationEventing(CBLTestClass):
         )
         await replicator.start()
 
-        self.mark_test_step("Wait for replication to complete")
+        self.mark_test_step("Wait for replication to complete.")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Create document with a large attachment")
+        self.mark_test_step("Create document with a large attachment (20MB).")
         async with db.batch_updater() as b:
             b.upsert_document(
                 "_default.posts",
@@ -67,16 +67,16 @@ class TestReplicationEventing(CBLTestClass):
                 new_blobs={"image": "xl1.jpg"},
             )
 
-        self.mark_test_step("Verify document was created successfully")
+        self.mark_test_step("Verify document was created successfully.")
         doc = await db.get_document(DocumentEntry("_default.posts", "large_doc"))
         assert doc is not None, "Document not found after update"
 
-        self.mark_test_step("Verify document content")
+        self.mark_test_step("Verify document content.")
         assert "image" in doc.body, "Large blob not found in document"
         blob_dict = doc.body.get("image")
         assert isinstance(blob_dict, dict), "image is not a dict"
 
-        self.mark_test_step("Start push one-shot replication to SGW")
+        self.mark_test_step("Start push one-shot replication to SGW.")
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("posts"),
@@ -87,7 +87,7 @@ class TestReplicationEventing(CBLTestClass):
         )
         await replicator.start()
 
-        self.mark_test_step("Wait until the replicator is stopped")
+        self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(
             ReplicatorActivityLevel.STOPPED,
             timedelta(seconds=5),
@@ -97,7 +97,7 @@ class TestReplicationEventing(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Verify document was not replicated")
+        self.mark_test_step("Verify document was not replicated.")
         docs_after = await db.get_all_documents("_default.posts")
         sgw_docs_after = await cblpytest.sync_gateways[0].get_all_documents(
             "posts", collection="posts"

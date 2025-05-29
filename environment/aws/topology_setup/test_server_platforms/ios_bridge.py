@@ -279,17 +279,18 @@ class iOSBridge(PlatformBridge):
                 check=True,
                 capture_output=True,
             )
-            click.echo("STDOUT:\n" + result.stdout.decode())
-            click.echo("STDERR:\n" + result.stderr.decode())
         except subprocess.CalledProcessError as e:
-            click.echo(
-                f"App not found or devicectl failed. Skipping termination. Error:\n{e.stderr.decode('utf-8')}"
+            click.secho(
+                f"App not found or devicectl failed. Skipping termination. Error:\n{e.stderr.decode('utf-8')}",
+                fg="yellow",
             )
             return
 
         stdout = result.stdout.decode("utf-8").splitlines()
         if not stdout:
-            click.echo("App not found in device list. Skipping termination.")
+            click.secho(
+                "App not found in device list. Skipping termination.", fg="yellow"
+            )
             return
 
         app_path = stdout[-1].strip()
