@@ -305,15 +305,12 @@ class TestNoConflicts(CBLTestClass):
         sg_doc = await cblpytest.sync_gateways[0].get_document(
             "posts", "post_1000", collection="posts"
         )
+        assert sg_doc is not None, "Document should exist in SGW"
         cbl1_doc = await db1.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
         assert (
-            sg_doc is not None
-            and cbl1_doc is not None
-            and cbl2_doc is not None
-            and cbl3_doc is not None
-            and sg_doc.body.get("title")
+            sg_doc.body.get("title")
             == cbl1_doc.body.get("title")
             == cbl2_doc.body.get("title")
             == cbl3_doc.body.get("title")
@@ -501,12 +498,9 @@ class TestNoConflicts(CBLTestClass):
         sg_doc = await cblpytest.sync_gateways[0].get_document(
             "posts", "post_1000", collection="posts"
         )
+        assert sg_doc is not None, "Document should exist in SGW"
         assert (
-            sg_doc is not None
-            and cbl1_doc is not None
-            and cbl2_doc is not None
-            and cbl3_doc is not None
-            and cbl1_doc.body.get("title")
+            cbl1_doc.body.get("title")
             == cbl2_doc.body.get("title")
             == cbl3_doc.body.get("title")
             == sg_doc.body.get("title")
@@ -550,12 +544,9 @@ class TestNoConflicts(CBLTestClass):
         sg_doc = await cblpytest.sync_gateways[0].get_document(
             "posts", "post_1000", collection="posts"
         )
+        assert sg_doc is not None, "Document should exist in SGW"
         assert (
-            sg_doc is not None
-            and cbl1_doc is not None
-            and cbl2_doc is not None
-            and cbl3_doc is not None
-            and cbl1_doc.body.get("title")
+            cbl1_doc.body.get("title")
             == cbl2_doc.body.get("title")
             == cbl3_doc.body.get("title")
             == sg_doc.body.get("title")

@@ -306,6 +306,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         sgw_doc = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_2", "travel", "hotels"
         )
+        assert sgw_doc is not None, "Document should exist in SGW"
         updated_doc_bytes = len(json.dumps(sgw_doc.body).encode("utf-8"))
         delta_bytes = bytes_written_after - bytes_written_before
         assert delta_bytes < updated_doc_bytes, (

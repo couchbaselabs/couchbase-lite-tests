@@ -448,6 +448,7 @@ class TestDeltaSync(CBLTestClass):
         sgw_doc = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_1", "travel", "hotels"
         )
+        assert sgw_doc is not None, "Document should exist in SGW"
         self.mark_test_step("Update docs in SGW/CBL with utf8 strings")
         updates = [
             DocumentUpdateEntry(
@@ -605,6 +606,7 @@ class TestDeltaSync(CBLTestClass):
         sgw_doc = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_1", "travel", "hotels"
         )
+        assert sgw_doc is not None, "Document should exist in SGW"
         await cblpytest.sync_gateways[0].upsert_documents(
             "travel",
             [
@@ -734,6 +736,7 @@ class TestDeltaSync(CBLTestClass):
         sgw_doc = await cblpytest.sync_gateways[0].get_document(
             "posts", "post_1", collection="posts"
         )
+        assert sgw_doc is not None, "Document should exist in SGW"
         await cblpytest.sync_gateways[0].upsert_documents(
             "posts",
             [
@@ -1114,6 +1117,7 @@ class TestDeltaSync(CBLTestClass):
         doc = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_1", "travel", "hotels"
         )
+        assert doc is not None, "Document should exist in SGW"
         current_rev = doc.revid
         large_doc_body = "X" * 2_000_000
         await cblpytest.sync_gateways[0].update_documents(
