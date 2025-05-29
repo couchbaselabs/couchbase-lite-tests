@@ -206,6 +206,9 @@ class TestDeltaSync(CBLTestClass):
         sgw_doc_2 = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_2", "travel", "hotels"
         )
+        assert sgw_doc_1 is not None and sgw_doc_2 is not None, (
+            "Documents should exist in SGW"
+        )
         updated_doc_size = len(json.dumps(sgw_doc_1.body).encode("utf-8")) + len(
             json.dumps(sgw_doc_2.body).encode("utf-8")
         )
@@ -356,6 +359,7 @@ class TestDeltaSync(CBLTestClass):
         sgw_doc = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_1", "travel", "hotels"
         )
+        assert sgw_doc is not None, "Document should exist in SGW"
         updated_doc_size = len(json.dumps(sgw_doc.body).encode("utf-8"))
         delta_bytes_read = read_pull_bytes_after - read_pull_bytes_before
         assert delta_bytes_read < updated_doc_size, (
@@ -486,6 +490,7 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Verify only delta is updated.")
         cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_1"))
+        assert cbl_doc is not None, "Document should exist in CBL"
         updated_doc_size = len(json.dumps(cbl_doc.body).encode("utf-8"))
         delta_bytes_transferred = bytes_pull_after - bytes_pull_before
         assert delta_bytes_transferred < updated_doc_size, (
@@ -638,6 +643,7 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Verify delta transferred is less than doc size.")
         cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_1"))
+        assert cbl_doc is not None, "Document should exist in CBL"
         updated_doc_size = len(json.dumps(cbl_doc.body).encode("utf-8"))
         delta_bytes_transferred = bytes_read_after - bytes_read_before
         assert delta_bytes_transferred < updated_doc_size, (
@@ -765,6 +771,7 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Verify delta transferred equivalent to doc size.")
         cbl_doc = await db.get_document(DocumentEntry("_default.posts", "post_1"))
+        assert cbl_doc is not None, "Document should exist in CBL"
         updated_doc_size = len(json.dumps(cbl_doc.body).encode("utf-8"))
         delta_bytes_transferred = bytes_read_after - bytes_read_before
         assert delta_bytes_transferred >= 0.8 * updated_doc_size, (
@@ -846,6 +853,7 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Verify doc body in SGW matches the updates from CBL.")
         sgw_doc = await cblpytest.sync_gateways[0].get_document("short_expiry", "doc_1")
+        assert sgw_doc is not None, "Document should exist in SGW"
         assert sgw_doc.body.get("name") == "CBL", "Expected doc to have `name` as `CBL`"
 
         self.mark_test_step("Update docs in SGW.")
@@ -886,6 +894,9 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Verify the doc in SGW and CBL have same content.")
         sgw_doc = await cblpytest.sync_gateways[0].get_document("short_expiry", "doc_1")
         cbl_doc = await db.get_document(DocumentEntry("_default._default", "doc_1"))
+        assert sgw_doc is not None and cbl_doc is not None, (
+            "Documents should exist in SGW and CBL"
+        )
         assert sgw_doc.body.get("name") == cbl_doc.body.get("name") == "SGW", (
             "Expected doc to have same content"
         )
@@ -1012,6 +1023,9 @@ class TestDeltaSync(CBLTestClass):
             "travel", "hotel_1", "travel", "hotels"
         )
         cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_1"))
+        assert sgw_doc is not None and cbl_doc is not None, (
+            "Documents should exist in SGW and CBL"
+        )
         assert sgw_doc.body.get("name") == cbl_doc.body.get("name"), (
             "Expected doc to have same content"
         )
@@ -1133,6 +1147,7 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Verify full doc is replicated.")
         cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_1"))
+        assert cbl_doc is not None, "Document should exist in CBL"
         assert cbl_doc.body.get("name") == large_doc_body, (
             "Expected doc to have same content"
         )

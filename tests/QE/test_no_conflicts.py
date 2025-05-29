@@ -129,12 +129,14 @@ class TestNoConflicts(CBLTestClass):
 
         self.mark_test_step("Verify updated doc body in SGW and CBL")
         cbl_doc = await db.get_document(DocumentEntry("_default.posts", "post_1000"))
+        assert cbl_doc is not None, "Document not found"
         assert cbl_doc.id == "post_1000", (
             f"Incorrect document ID (expected post_1000; got {cbl_doc.id})"
         )
         sg_doc = await cblpytest.sync_gateways[0].get_document(
             "posts", "post_1000", collection="posts"
         )
+        assert sg_doc is not None, "Document not found"
         assert sg_doc.id == "post_1000", (
             f"Incorrect document ID (expected post_1000; got {sg_doc.id})"
         )
@@ -157,6 +159,7 @@ class TestNoConflicts(CBLTestClass):
         sg_doc = await cblpytest.sync_gateways[0].get_document(
             "posts", "post_1000", collection="posts"
         )
+        assert sg_doc is not None, "Document not found"
         assert sg_doc.body.get("title") == "CBL Update 2", (
             f"Wrong title in SG doc (expected 'CBL Update 2'; got {sg_doc.body.get('title')}"
         )
@@ -229,7 +232,6 @@ class TestNoConflicts(CBLTestClass):
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.test_servers[1].tls_cert(),
         )
         await repl1.start()
 
@@ -247,7 +249,6 @@ class TestNoConflicts(CBLTestClass):
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.test_servers[2].tls_cert(),
         )
         await repl2.start()
 
@@ -308,7 +309,11 @@ class TestNoConflicts(CBLTestClass):
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
         assert (
-            sg_doc.body.get("title")
+            sg_doc is not None
+            and cbl1_doc is not None
+            and cbl2_doc is not None
+            and cbl3_doc is not None
+            and sg_doc.body.get("title")
             == cbl1_doc.body.get("title")
             == cbl2_doc.body.get("title")
             == cbl3_doc.body.get("title")
@@ -497,7 +502,11 @@ class TestNoConflicts(CBLTestClass):
             "posts", "post_1000", collection="posts"
         )
         assert (
-            cbl1_doc.body.get("title")
+            sg_doc is not None
+            and cbl1_doc is not None
+            and cbl2_doc is not None
+            and cbl3_doc is not None
+            and cbl1_doc.body.get("title")
             == cbl2_doc.body.get("title")
             == cbl3_doc.body.get("title")
             == sg_doc.body.get("title")
@@ -542,7 +551,11 @@ class TestNoConflicts(CBLTestClass):
             "posts", "post_1000", collection="posts"
         )
         assert (
-            cbl1_doc.body.get("title")
+            sg_doc is not None
+            and cbl1_doc is not None
+            and cbl2_doc is not None
+            and cbl3_doc is not None
+            and cbl1_doc.body.get("title")
             == cbl2_doc.body.get("title")
             == cbl3_doc.body.get("title")
             == sg_doc.body.get("title")
