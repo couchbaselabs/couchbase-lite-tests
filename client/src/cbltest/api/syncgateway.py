@@ -793,11 +793,14 @@ class SyncGateway:
                     current_doc = await self.get_document(
                         db_name, update.id, scope, collection
                     )
-                    current_body = dict(current_doc.body)
-                    current_body.update(update.to_json())
-                    current_body["_id"] = update.id
-                    if update.rev:
-                        current_body["_rev"] = update.rev
+                    if current_doc is not None:
+                        current_body = dict(current_doc.body)
+                        current_body.update(update.to_json())
+                        current_body["_id"] = update.id
+                        if update.rev:
+                            current_body["_rev"] = update.rev
+                    else:
+                        current_body = update.to_json()
                 except Exception:
                     current_body = update.to_json()
                 merged_updates.append(
