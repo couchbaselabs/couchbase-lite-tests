@@ -806,9 +806,7 @@ class TestDeltaSync(CBLTestClass):
         cloud = CouchbaseCloud(
             cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
         )
-        await cloud.configure_dataset(
-            dataset_path, "short_expiry", ["delta_sync_with_expiry"]
-        )
+        await cloud.configure_dataset(dataset_path, "short_expiry", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `short_expiry` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
