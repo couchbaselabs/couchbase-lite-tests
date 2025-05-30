@@ -28,8 +28,13 @@ import com.couchbase.lite.mobiletest.util.FileUtils;
 public final class TestContext implements AutoCloseable {
     private static final String TAG = "CONTEXT";
 
+    private static final String DEFAULT_DATASET_VERSION = "3.2";
+
+
     @NonNull
     private final String client;
+    @NonNull
+    private final String datasetVersion;
     @Nullable
     private String testName;
     @Nullable
@@ -47,7 +52,11 @@ public final class TestContext implements AutoCloseable {
     @Nullable
     private Map<String, URLEndpointListener> openEndptListeners;
 
-    TestContext(@NonNull String client) { this.client = client; }
+    TestContext(@NonNull String client, @Nullable String datasetVersion) {
+        this.client = client;
+        // !!! Unimplemented: this is completely ignored
+        this.datasetVersion = (datasetVersion == null) ? DEFAULT_DATASET_VERSION : datasetVersion;
+    }
 
     @Override
     public void close() {
@@ -68,6 +77,9 @@ public final class TestContext implements AutoCloseable {
 
     @NonNull
     public String getClient() { return client; }
+
+    @NonNull
+    public String getDatasetVersion() { return datasetVersion; }
 
     public void setTestName(@Nullable String testName) { this.testName = testName; }
 
