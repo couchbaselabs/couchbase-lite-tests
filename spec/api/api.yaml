@@ -865,7 +865,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StartListenerResponse'
+                $ref: '#/components/schemas/Replicator'
         '400':
           $ref: '#/components/responses/Error'
         '404':
