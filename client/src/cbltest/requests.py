@@ -37,6 +37,9 @@ class TestServerRequestType(Enum):
     LOG = "PostLogRequest"
     START_LISTENER = "PostStartListenerRequest"
     STOP_LISTENER = "PostStopListenerRequest"
+    START_MULTIPEER_REPLICATOR = "PostStartMultipeerReplicatorRequest"
+    STOP_MULTIPEER_REPLICATOR = "PostStopMultipeerReplicatorRequest"
+    MULTIPEER_REPLICATOR_STATUS = "PostGetMultipeerReplicatorStatusRequest"
 
     def __str__(self) -> str:
         return self.value

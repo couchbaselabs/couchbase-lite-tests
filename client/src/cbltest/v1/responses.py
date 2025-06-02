@@ -232,6 +232,55 @@ class PostStartReplicatorResponse(TestServerResponse):
         self.__replicator_id = cast(str, body.get(self.__id_key))
 
 
+class ReplicatorStatusBody:
+    """
+    A class representing the body of a replicator status response.
+    This is used to encapsulate the common properties of a replicator status.
+    """
+
+    __activity_key: Final[str] = "activity"
+    __progress_key: Final[str] = "progress"
+    __replicator_error_key: Final[str] = "error"
+    __documents_key: Final[str] = "documents"
+
+    @property
+    def activity(self) -> ReplicatorActivityLevel:
+        """Gets the activity level of the replicator"""
+        return self.__activity
+
+    @property
+    def progress(self) -> ReplicatorProgress:
+        """Gets the current progress of the replicator"""
+        return self.__progress
+
+    @property
+    def replicator_error(self) -> ErrorResponseBody | None:
+        """Gets the error that occurred during replication, if any"""
+        return self.__replicator_error
+
+    @property
+    def documents(self) -> list[ReplicatorDocumentEntry]:
+        """Gets the unseen list of documents replicated previously.  Note
+        that once viewed it will be cleared"""
+        return self.__documents
+
+    def __init__(self, body: dict):
+        if self.__activity_key not in body:
+            return
+
+        self.__activity = ReplicatorActivityLevel[
+            cast(str, body.get(self.__activity_key)).upper()
+        ]
+        self.__progress = ReplicatorProgress(cast(dict, body.get(self.__progress_key)))
+        self.__replicator_error = ErrorResponseBody.create(
+            body.get(self.__replicator_error_key)
+        )
+        docs = _get_typed(body, self.__documents_key, list)
+        self.__documents = (
+            [ReplicatorDocumentEntry(d) for d in docs] if docs is not None else []
+        )
+
+
 class PostGetReplicatorStatusResponse(TestServerResponse):
     """
     A POST /getReplicatorStatus response as specified in version 1 of the
@@ -266,48 +315,30 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
         }
     """
 
-    __activity_key: Final[str] = "activity"
-    __progress_key: Final[str] = "progress"
-    __replicator_error_key: Final[str] = "error"
-    __documents_key: Final[str] = "documents"
-
     @property
     def activity(self) -> ReplicatorActivityLevel:
         """Gets the activity level of the replicator"""
-        return self.__activity
+        return self.__status.activity
 
     @property
     def progress(self) -> ReplicatorProgress:
         """Gets the current progress of the replicator"""
-        return self.__progress
+        return self.__status.progress
 
     @property
     def replicator_error(self) -> ErrorResponseBody | None:
         """Gets the error that occurred during replication, if any"""
-        return self.__replicator_error
+        return self.__status.replicator_error
 
     @property
     def documents(self) -> list[ReplicatorDocumentEntry]:
         """Gets the unseen list of documents replicated previously.  Note
         that once viewed it will be cleared"""
-        return self.__documents
+        return self.__status.documents
 
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "getReplicatorStatus")
-        if self.__activity_key not in body:
-            return
-
-        self.__activity = ReplicatorActivityLevel[
-            cast(str, body.get(self.__activity_key)).upper()
-        ]
-        self.__progress = ReplicatorProgress(cast(dict, body.get(self.__progress_key)))
-        self.__replicator_error = ErrorResponseBody.create(
-            body.get(self.__replicator_error_key)
-        )
-        docs = _get_typed(body, self.__documents_key, list)
-        self.__documents = (
-            [ReplicatorDocumentEntry(d) for d in docs] if docs is not None else []
-        )
+        self.__status = ReplicatorStatusBody(body)
 
 
 class PostPerformMaintenanceResponse(TestServerResponse):
@@ -434,3 +465,93 @@ class PostStopListenerResponse(TestServerResponse):
 
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, 1, body, "stopListener")
+
+
+class PostStartMultipeerReplicatorResponse(TestServerResponse):
+    """
+    A POST /startMultipeerReplicator response as specified in version 1 of the
+    [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
+
+    Example Body::
+        {
+            "id": "123e0000-e89b-12d3-a456-426614174000"
+        }
+    """
+
+    __id_key: Final[str] = "id"
+
+    @property
+    def replicator_id(self) -> str:
+        """Gets the ID of the multipeer replicator that was started"""
+        return self.__replicator_id
+
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "startMultipeerReplicator")
+        self.__replicator_id = cast(str, body.get(self.__id_key))
+
+
+class PostStopMultipeerReplicatorResponse(TestServerResponse):
+    """
+    A POST /stopMultipeerReplicator response as specified in version 1 of the
+    [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
+    """
+
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "stopMultipeerReplicator")
+
+
+class MultipeerReplicatorStatusEntry:
+    """
+    A class representing a single entry in the multipeer replicator status response.
+    """
+
+    __peer_id_key: Final[str] = "peerID"
+    __status_key: Final[str] = "status"
+
+    @property
+    def peer_id(self) -> str:
+        """Gets the peer ID of the replicator"""
+        return self.__peer_id
+
+    @property
+    def status(self) -> ReplicatorStatusBody:
+        """Gets the status of the replicator"""
+        return self.__status
+
+    def __init__(self, body: dict):
+        assert isinstance(body, dict), (
+            "Invalid MultipeerReplicatorStatusEntry received (not an object)"
+        )
+
+        self.__peer_id = _assert_string_entry(body, self.__peer_id_key)
+        self.__status = ReplicatorStatusBody(body.get(self.__status_key, {}))
+
+
+class PostGetMultipeerReplicatorStatusResponse(TestServerResponse):
+    """
+    A POST /getMultipeerReplicatorStatus response as specified in version 1 of the
+    [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
+
+    Example Body::
+    {
+    "replicators": [
+        {
+            "peerID": "1234567890abcdef",
+            "status": <replicator status>,
+        }
+    ]
+    """
+
+    __replicators_key: Final[str] = "replicators"
+
+    @property
+    def replicators(self) -> list[MultipeerReplicatorStatusEntry]:
+        """Gets the list of multipeer replicator status entries"""
+        return self.__replicators
+
+    def __init__(self, status_code: int, uuid: str, body: dict):
+        super().__init__(status_code, uuid, 1, body, "getMultipeerReplicatorStatus")
+        self.__replicators: list[MultipeerReplicatorStatusEntry] = []
+        if self.__replicators_key in body:
+            for entry in body[self.__replicators_key]:
+                self.__replicators.append(MultipeerReplicatorStatusEntry(entry))

@@ -747,6 +747,143 @@ class PostStopListenerRequestBody(TestServerRequestBody):
         return {"id": self.__id}
 
 
+class PostStartMultipeerReplicatorRequestBody(TestServerRequestBody):
+    """
+    The body of a POST /startMultipeerReplicator request as specified in version 1 of the
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+
+    Example Body::
+
+        {
+            "peerGroupID": "com.couchbase.testing",
+            "database": "db1",
+            "collections": [
+                {
+                "names": [
+                    "store.cloths",
+                    "store.shoes"
+                ],
+                "channels": [
+                    "A",
+                    "B"
+                ],
+                "documentIDs": [
+                    "doc1",
+                    "doc2"
+                ],
+                "pushFilter": {
+                    "name": "documentIDs",
+                    "params": {
+                    "documentIDs": [
+                        "doc1",
+                        "doc2"
+                    ]
+                    }
+                },
+                "pullFilter": {
+                    "name": "documentIDs",
+                    "params": {
+                    "documentIDs": [
+                        "doc1",
+                        "doc2"
+                    ]
+                    }
+                },
+                "conflictResolver": {
+                    "name": "merge",
+                    "params": {
+                    "property": "region"
+                    }
+                }
+                }
+            ]
+            }
+    """
+
+    @property
+    def peerGroupID(self) -> str:
+        """Gets the peer group ID for the replicator"""
+        return self.__peerGroupID
+
+    @property
+    def database(self) -> str:
+        """Gets the database for the replicator"""
+        return self.__database
+
+    @property
+    def collections(self) -> list[ReplicatorCollectionEntry]:
+        """Gets the collections for the replicator"""
+        return self.__collections
+
+    def __init__(
+        self,
+        peerGroupID: str,
+        database: str,
+        collections: list[ReplicatorCollectionEntry],
+    ):
+        super().__init__(1)
+        self.__peerGroupID = peerGroupID
+        self.__database = database
+        self.__collections = collections
+
+    def to_json(self) -> Any:
+        return {
+            "peerGroupID": self.__peerGroupID,
+            "database": self.__database,
+            "collections": self.__collections,
+        }
+
+
+class PostStopMultipeerReplicatorRequestBody(TestServerRequestBody):
+    """
+    The body of a POST /stopMultipeerReplicator request as specified in version 1 of the
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+
+    Example Body::
+
+    {
+        "id": "123e4567-e89b-12d3-a456-426614174000"
+    }
+    """
+
+    @property
+    def id(self) -> str:
+        """The ID of the multipeer replicator to stop (returned from /startMultipeerReplicator)"""
+        return self.__id
+
+    def __init__(self, id: str):
+        super().__init__(1)
+        self.__id = id
+
+    def to_json(self) -> Any:
+        return {"id": self.__id}
+
+
+class PostGetMultipeerReplicatorStatusRequestBody(TestServerRequestBody):
+    """
+    The body of a POST /getMultipeerReplicatorStatus request as specified in version 1 of the
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+
+    Example Body::
+
+    {
+        "id": "123e4567-e89b-12d3-a456-426614174000"
+    }
+    """
+
+    @property
+    def id(self) -> str:
+        """The ID of the multipeer replicator to stop (returned from /startMultipeerReplicator)"""
+        return self.__id
+
+    def __init__(self, id: str):
+        super().__init__(1)
+        self.__id = id
+
+    def to_json(self) -> Any:
+        return {"id": self.__id}
+
+
 # Below this point are all of the concrete test server request types
 # Remember the note from the top of this file about the actual type of the payload
 class PostResetRequest(TestServerRequest):
