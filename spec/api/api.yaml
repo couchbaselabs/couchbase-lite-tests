@@ -846,7 +846,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: ['peerGroupID', 'database', 'collections']
+              required: ['peerGroupID', 'database', 'collections', 'identity']
               properties:
                 peerGroupID:
                   type: string
