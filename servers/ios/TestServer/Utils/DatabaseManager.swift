@@ -282,11 +282,9 @@ class DatabaseManager {
     public func startMultipeerReplicator(config: ContentTypes.MultipeerReplicatorConfiguration) throws -> UUID {
         Log.log(level: .debug, message: "Starting Multipeer Replicator")
         
-        let identity = try DatabaseManager.identity(for: config)
+        let identity = try DatabaseManager.multipeerReplicatorIdentity(for: config)
         
-        let authenticator = MultipeerCertificateAuthenticator { peer, certs in
-            return true
-        }
+        let authenticator = try DatabaseManager.multipeerAuthenticator(for: config.authenticator)
         
         var collectionConfigs: [MultipeerCollectionConfiguration] = []
         for replColl in config.collections {
@@ -667,34 +665,40 @@ class DatabaseManager {
         }
     }
     
-    private static func identity(for config: ContentTypes.MultipeerReplicatorConfiguration) throws -> TLSIdentity {
-        var allCollections: [String] = []
-        for collection in config.collections {
-            collection.names.forEach { allCollections.append($0) }
+    private static func multipeerReplicatorIdentity(for config: ContentTypes.MultipeerReplicatorConfiguration) throws -> TLSIdentity {
+        let label = "ios-multipeer-\(config.peerGroupID)"
+        
+        guard let data = Data(base64Encoded: config.identity.data) else {
+            throw TestServerError.badRequest("Invalid multipeer replictor's identity data")
         }
         
-        let input = "multipeer-\(config.peerGroupID)-\(config.database)-\(allCollections.joined(separator: ","))"
-        let data = Data(input.utf8)
-        let digest = Insecure.SHA1.hash(data: data)
-        let label = digest.map { String(format: "%02x", $0) }.joined()
-        
-        if let identity = try TLSIdentity.identity(withLabel: label) {
-            if identity.expiration > Date().addingTimeInterval(60 * 60 * 1 /* 60 Mins */) {
-                return identity
-            } else {
-                try TLSIdentity.deleteIdentity(withLabel: label)
+        try TLSIdentity.deleteIdentity(withLabel: label)
+        return try TLSIdentity.importIdentity(withData: data, password: config.identity.password, label: label)
+    }
+    
+    private static func multipeerAuthenticator(for config: ContentTypes.MultipeerReplicatorCAAuthenticator?) throws -> MultipeerCertificateAuthenticator {
+        guard let auth = config else {
+            return MultipeerCertificateAuthenticator { peer, certs in
+                return true
             }
         }
         
-        let keyUsages: KeyUsages = [.clientAuth, .serverAuth]
-        let attrs = [
-            certAttrCommonName: "CBLiteTests-\(label)"
-        ]
-        let expiration = Date().addingTimeInterval(60 * 60 * 2 /* 120 Mins */)
-        return try TLSIdentity.createIdentity(
-            for: keyUsages,
-            attributes: attrs,
-            expiration: expiration,
-            label: label)
+        var lines = auth.certificate
+            .components(separatedBy: .newlines)
+            .filter { !$0.contains("-----BEGIN CERTIFICATE-----") &&
+                      !$0.contains("-----END CERTIFICATE-----") &&
+                      !$0.isEmpty }
+        
+        let certData = lines.joined()
+
+        guard let derData = Data(base64Encoded: certData) else {
+            throw TestServerError.badRequest("Failed to convert multipeer authenticator's root certificate from PEM to DER")
+        }
+        
+        guard let rootCert = SecCertificateCreateWithData(nil, derData as CFData) else {
+            throw TestServerError.badRequest("Invalid multipeer authenticator's root certificate")
+        }
+        
+        return MultipeerCertificateAuthenticator(rootCerts: [rootCert])
     }
 }
