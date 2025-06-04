@@ -119,7 +119,7 @@ class JarBridge(JavaBridge):
     def uninstall(self, location: str) -> None:
         pass
 
-    def get_ip(self, location):
+    def _get_ip(self, location) -> str | None:
         if location != "localhost":
             raise ValueError("JarBridge only supports running on localhost")
 
@@ -179,7 +179,7 @@ class JettyBridge(JavaBridge):
     def uninstall(self, location: str) -> None:
         pass
 
-    def get_ip(self, location):
+    def _get_ip(self, location) -> str | None:
         if location != "localhost":
             raise ValueError("JettyBridge only supports running on localhost")
 

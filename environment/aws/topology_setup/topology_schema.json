@@ -115,6 +115,10 @@
                     "download": {
                         "type": "boolean",
                         "default": false
+                    },
+                    "ip_hint": {
+                        "type": "string",
+                        "default": ""
                     }
                 },
                 "required": ["location", "cbl_version", "platform", "dataset_version"],

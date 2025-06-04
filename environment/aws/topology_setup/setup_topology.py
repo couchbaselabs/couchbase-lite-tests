@@ -336,6 +336,10 @@ class TestServerInput:
     def download(self) -> bool:
         return self.__download
 
+    @property
+    def ip_hint(self) -> str | None:
+        return self.__ip_hint
+
     def __init__(
         self,
         location: str,
@@ -343,12 +347,15 @@ class TestServerInput:
         dataset_version: str,
         platform: str,
         download: bool,
+        *,
+        ip_hint: str | None = None,
     ):
         self.__location = location
         self.__cbl_version = cbl_version
         self.__dataset_version = dataset_version
         self.__platform = platform
         self.__download = download
+        self.__ip_hint = ip_hint
 
 
 class TestServerConfig:
@@ -476,6 +483,7 @@ class TopologyConfig:
                             raw_server["dataset_version"],
                             raw_server["platform"],
                             cast(bool, raw_server.get("download", False)),
+                            ip_hint=raw_server.get("ip_hint"),
                         )
                     )
 
@@ -648,7 +656,9 @@ class TopologyConfig:
             bridge.validate(test_server_input.location)
             self.__test_servers.append(
                 TestServerConfig(
-                    bridge.get_ip(test_server_input.location),
+                    bridge.get_ip(
+                        test_server_input.location, fallback=test_server_input.ip_hint
+                    ),
                     test_server_input.cbl_version,
                     test_server_input.dataset_version,
                     test_server_input.platform,
@@ -674,7 +684,9 @@ class TopologyConfig:
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
             port = 5555 if test_server_input.platform.startswith("dotnet") else 8080
-            ip = bridge.get_ip(test_server_input.location)
+            ip = bridge.get_ip(
+                test_server_input.location, fallback=test_server_input.ip_hint
+            )
 
             success = False
             for _ in range(0, 30):
