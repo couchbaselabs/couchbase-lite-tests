@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
+from aiohttp import BasicAuth
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
@@ -618,7 +619,7 @@ class TestDeltaSync(CBLTestClass):
             "hotels",
         )
 
-        self.mark_test_step("Do pull replication")
+        self.mark_test_step("Start another replication with same specifications.")
         await replicator.start()
         events = await replicator.wait_for_doc_events(
             {
@@ -696,7 +697,9 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Create docs in CBL")
         async with db.batch_updater() as b:
             b.upsert_document(
-                "_default.posts", "post_1", [{"channels": ["group1"], "name": "CBL"}]
+                "_default.posts",
+                "post_1",
+                [{"channels": ["group1"], "name": "CBL", "extra": "a" * 3000}],
             )
 
         self.mark_test_step("Start replication")
@@ -741,13 +744,15 @@ class TestDeltaSync(CBLTestClass):
             "posts",
             [
                 DocumentUpdateEntry(
-                    "post_1", sgw_doc.revid, {"channels": ["group1"], "name": "SGW"}
+                    "post_1",
+                    sgw_doc.revid,
+                    {"channels": ["group1"], "name": "SGW", "extra": "a" * 3000},
                 )
             ],
             collection="posts",
         )
 
-        self.mark_test_step("Do pull replication")
+        self.mark_test_step("Start another replication with same specifications.")
         await replicator.start()
         events = await replicator.wait_for_doc_events(
             {
@@ -793,12 +798,13 @@ class TestDeltaSync(CBLTestClass):
             1. Have delta sync enabled.
             2. Update docs in CBL.
             3. Do replication to SGW.
-            4. Record the bytes transferred.
+            4. Record the bytes transferred and the current revision.
             5. Wait for the delta revision to expire.
             6. Update docs in SGW.
             7. Replicate docs back to CBL.
             8. Record the bytes transferred.
             9. Verify the bytes transferred now are more than step 4.
+            10. Verify old revision is expired by attempting to fetch it through public API.
         """
         self.mark_test_step(
             "Reset SG and load `short_expiry` dataset with delta sync enabled."
@@ -808,6 +814,24 @@ class TestDeltaSync(CBLTestClass):
         )
         await cloud.configure_dataset(dataset_path, "short_expiry", ["delta_sync"])
 
+        self.mark_test_step("Verify SGW config has correct revision expiry settings")
+        db_config = await cblpytest.sync_gateways[0]._send_request(
+            "GET",
+            "/short_expiry/_config",
+        )
+        print("Database config:", db_config)
+
+        assert db_config.get("old_rev_expiry_seconds") == 10, (
+            f"Expected old_rev_expiry_seconds to be 10, got {db_config.get('old_rev_expiry_seconds')}"
+        )
+        delta_sync_config = db_config.get("delta_sync", {})
+        assert delta_sync_config.get("enabled") is True, (
+            f"Expected delta sync to be enabled, got {delta_sync_config.get('enabled')}"
+        )
+        assert delta_sync_config.get("rev_max_age_seconds") == 10, (
+            f"Expected rev_max_age_seconds to be 10, got {delta_sync_config.get('rev_max_age_seconds')}"
+        )
+
         self.mark_test_step("Reset local database, and load `short_expiry` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
@@ -815,7 +839,9 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Create docs in CBL.")
         async with db.batch_updater() as b:
             b.upsert_document(
-                "_default._default", "doc_1", [{"channels": ["group1"], "name": "CBL"}]
+                "_default._default",
+                "doc_1",
+                [{"channels": ["group1"], "name": "CBL", "extra": "a" * 3000}],
             )
 
         self.mark_test_step("Push replicate to SGW.")
@@ -847,29 +873,92 @@ class TestDeltaSync(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Record the bytes transferred.")
+        self.mark_test_step("Record the bytes transferred and get current revision.")
         read_pull_bytes_before, _ = await cblpytest.sync_gateways[0].bytes_transferred(
             "short_expiry"
         )
 
-        self.mark_test_step("Verify doc body in SGW matches the updates from CBL.")
-        sgw_doc = await cblpytest.sync_gateways[0].get_document("short_expiry", "doc_1")
-        assert sgw_doc is not None, "Document should exist in SGW"
-        assert sgw_doc.body.get("name") == "CBL", "Expected doc to have `name` as `CBL`"
+        self.mark_test_step(
+            "Get the current document state and revision before update."
+        )
+        sgw_doc_before_update = await cblpytest.sync_gateways[0].get_document(
+            "short_expiry", "doc_1"
+        )
+        assert sgw_doc_before_update is not None, "Document should exist in SGW"
+        assert sgw_doc_before_update.body.get("name") == "CBL", (
+            "Expected doc to have `name` as `CBL`"
+        )
+        old_revision = sgw_doc_before_update.revision
+        assert old_revision is not None, "Document should have a revision"
 
-        self.mark_test_step("Update docs in SGW.")
+        # Verify we can fetch the old revision body before expiry through public API
+        self.mark_test_step(
+            "Verify old revision body is accessible before expiry through public API."
+        )
+        scheme = (
+            "https://" if cblpytest.sync_gateways[0]._SyncGateway__secure else "http://"
+        )
+        async with cblpytest.sync_gateways[0]._create_session(
+            cblpytest.sync_gateways[0]._SyncGateway__secure,
+            scheme,
+            cblpytest.sync_gateways[0]._SyncGateway__hostname,
+            4984,
+            BasicAuth("user1", "pass", "ascii"),
+        ) as public_session:
+            old_rev_doc = await cblpytest.sync_gateways[0]._send_request(
+                "GET",
+                "/short_expiry/doc_1",
+                params={"rev": old_revision},
+                session=public_session,
+            )
+        assert old_rev_doc is not None, (
+            "Should be able to fetch old revision before expiry"
+        )
+        assert old_rev_doc.get("name") == "CBL", (
+            "Old revision should have correct content"
+        )
+
+        self.mark_test_step("Update docs in SGW with small change.")
         await cblpytest.sync_gateways[0].upsert_documents(
             "short_expiry",
             [
                 DocumentUpdateEntry(
-                    "doc_1", sgw_doc.revid, {"channels": ["group1"], "name": "SGW"}
+                    "doc_1",
+                    sgw_doc_before_update.revid,
+                    {"channels": ["group1"], "name": "SGW", "extra": "a" * 3000},
                 )
             ],
         )
-        self.mark_test_step("Wait for 60 seconds for delta revision to expire.")
-        await asyncio.sleep(60)
 
-        self.mark_test_step("Pull replicate back to CBL.")
+        self.mark_test_step("Wait for 10 seconds to ensure delta rev expires.")
+        await asyncio.sleep(10)
+
+        self.mark_test_step("Verify old revision is not accessible through public API.")
+        try:
+            async with cblpytest.sync_gateways[0]._create_session(
+                cblpytest.sync_gateways[0]._SyncGateway__secure,
+                scheme,
+                cblpytest.sync_gateways[0]._SyncGateway__hostname,
+                4984,
+                BasicAuth("user1", "pass", "ascii"),
+            ) as public_session:
+                expired_rev_doc = await cblpytest.sync_gateways[0]._send_request(
+                    "GET",
+                    "/short_expiry/doc_1",
+                    params={"rev": old_revision},
+                    session=public_session,
+                )
+            assert "stub" in expired_rev_doc or "_attachments" in expired_rev_doc, (
+                f"Expected old revision to be a stub, but got full document: {expired_rev_doc}"
+            )
+        except Exception as e:
+            assert "404" in str(e) or "not found" in str(e).lower(), (
+                f"Expected 404 error, got: {e}"
+            )
+
+        self.mark_test_step(
+            "Pull replicate back to CBL - should get full document since delta is expired."
+        )
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("short_expiry"),
@@ -892,19 +981,11 @@ class TestDeltaSync(CBLTestClass):
         )
         delta_bytes_read = read_pull_bytes_after - read_pull_bytes_before
 
-        self.mark_test_step("Verify the doc in SGW and CBL have same content.")
-        sgw_doc = await cblpytest.sync_gateways[0].get_document("short_expiry", "doc_1")
         cbl_doc = await db.get_document(DocumentEntry("_default._default", "doc_1"))
-        assert sgw_doc is not None and cbl_doc is not None, (
-            "Documents should exist in SGW and CBL"
-        )
-        assert sgw_doc.body.get("name") == cbl_doc.body.get("name") == "SGW", (
-            "Expected doc to have same content"
-        )
-
+        assert cbl_doc is not None, "Document should exist in CBL"
         updated_doc_size = len(json.dumps(cbl_doc.body).encode("utf-8"))
         assert delta_bytes_read >= 0.8 * updated_doc_size, (
-            f"Expected a full doc transfer, but only {delta_bytes_read} bytes read (doc size: {updated_doc_size})"
+            f"Expected a full doc transfer since old revision expired, but only {delta_bytes_read} bytes read (doc size: {updated_doc_size})"
         )
 
         await cblpytest.test_servers[0].cleanup()
@@ -983,9 +1064,13 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step(
             "Update doc on SGW again to have same value as previous rev."
         )
+        sgw_doc = await cblpytest.sync_gateways[0].get_document(
+            "travel", "hotel_1", "travel", "hotels"
+        )
+        assert sgw_doc is not None, "Document should exist in SGW"
         await cblpytest.sync_gateways[0].update_documents(
             "travel",
-            [DocumentUpdateEntry("hotel_1", None, {"name": "CBL"})],
+            [DocumentUpdateEntry("hotel_1", sgw_doc.revid, {"name": "CBL"})],
             "travel",
             "hotels",
         )

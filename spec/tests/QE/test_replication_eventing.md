@@ -8,11 +8,34 @@ Test push replication of a large document (>20MB) from Couchbase Lite to Sync Ga
 ### Steps
 1. Reset SG and load `posts` dataset.
 2. Reset local database, and load `posts` dataset.
-3. Start push-pull replication.
+3. Start a replicator:
+   * endpoint: `/posts`
+   * collections: `_default._default`
+   * type: push-and-pull
+   * continuous: false
+   * enableDocumentListener: true
+   * credentials: user1/pass
 4. Wait for replication to complete.
-5. Create document with a large attachment (20MB).
-6. Verify document was created successfully.
-7. Verify document content.
-8. Start push one-shot replication to SGW.
+5. Create document with a large attachment:
+   * Create a new document with ID "large_doc"
+   * Add text content and metadata
+   * Attach a 20MB binary file
+6. Verify document was created successfully:
+   * Check document exists in local database
+   * Verify attachment is accessible
+7. Verify document content:
+   * Check text content is correct
+   * Verify metadata is present
+   * Validate attachment size is 20MB
+8. Start a replicator:
+   * endpoint: `/posts`
+   * collections: `_default._default`
+   * type: push
+   * continuous: false
+   * enableDocumentListener: true
+   * credentials: user1/pass
 9. Wait until the replicator is stopped.
-10. Verify document was not replicated.
+10. Verify document was not replicated:
+    * Check replicator error indicates document size limit exceeded
+    * Verify document is not present in Sync Gateway
+    * Validate error message contains size limit information

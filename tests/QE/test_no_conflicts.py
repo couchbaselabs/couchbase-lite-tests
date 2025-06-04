@@ -35,7 +35,7 @@ class TestNoConflicts(CBLTestClass):
             1. Create docs in SG.
             2. Pull replication (continuous) to CBL.
             3. Update docs in SG and CBL.
-            4. Push/pull replication (continuous) to CBL.
+            4. Push replication (continuous) to CBL.
             5. Verify docs can resolve conflicts and should be able to replicate docs to CBL.
             6. Update docs through CBL.
             7. Verify docs got replicated to SGW with CBL updates.
@@ -102,23 +102,26 @@ class TestNoConflicts(CBLTestClass):
             ),
         )
 
-        self.mark_test_step(
-            "Start Push Pull replication between SGW and CBL (continuous)"
-        )
+        self.mark_test_step("Start Push replication between SGW and CBL (continuous)")
         replicator2 = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
+            replicator_type=ReplicatorType.PUSH,
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
         )
         await replicator2.start()
 
-        self.mark_test_step("Wait until the replicator is idle")
-        stat = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert stat.error is None, (
-            f"Error waiting for replicator: ({stat.error.domain} / {stat.error.code}) {stat.error.message}"
+        self.mark_test_step("Wait until the replicators are idle")
+        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+        status2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
+        assert status2.error is None, (
+            f"Error waiting for replicator: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
         )
 
         self.mark_test_step("Verify updated doc count in CBL")
@@ -149,10 +152,14 @@ class TestNoConflicts(CBLTestClass):
             db, "post_1000", [{"channels": ["group1"], "title": "CBL Update 2"}]
         )
 
-        self.mark_test_step("Wait until the replicator is idle")
-        stat2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert stat2.error is None, (
-            f"Error waiting for replicator: ({stat2.error.domain} / {stat2.error.code}) {stat2.error.message}"
+        self.mark_test_step("Wait until the replicators are idle")
+        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+        status2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
+        assert status2.error is None, (
+            f"Error waiting for replicator: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
         )
 
         self.mark_test_step("Verify docs got replicated to SGW with CBL updates")

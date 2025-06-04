@@ -28,12 +28,12 @@ class TestReplicatorEncryptionHook(CBLTestClass):
     ):
         """
         @summary: Testing  dict and array encrypted values are present in 10-15th level of
-        complex doc and replicated should detected values without any errors.
-            1. Have SG and CBL up and running
-            2. Create a complex document with encryption property (Array, and Dict)
+        complex doc and replication should detect values without any errors.
+            1. Have SG and CBL up and running.
+            2. Create a complex document with encryption property (Array, and Dict).
             3. Start the replicator and make sure documents are replicated on SG.
-            4. Verify encrypted fields and Verify data is encrypted.
-            5. Verify encrypted value at 15th level are detected by replicator and shown correctly on sg.
+            4. Verify encrypted fields and data is encrypted.
+            5. Verify encrypted value at 15th level are detected by replicator and shown correctly on SG.
         """
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
 
@@ -155,7 +155,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             1. Have delta sync enabled.
             2. Create docs with encrypted field in CBL.
             3. Do push-pull replication to SGW.
-            4. Update docs in CBL & SGW.
+            4. Update docs in SGW.
             5. Replicate docs using pull replication.
             6. Verify entire document is replicated, as they have encrypted fields.
         """
@@ -212,7 +212,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
                 "hotel_1",
                 [
                     {
-                        "name": "CBL update 1",
+                        "name": "CBL",
                         "encrypted_field": EncryptedValue("secret_password"),
                     }
                 ],
@@ -245,16 +245,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             "Encrypted value should be present"
         )
 
-        self.mark_test_step("Update that document in CBL & SGW")
-        async with db.batch_updater() as b:
-            b.upsert_document(
-                "travel.hotels",
-                "hotel_1",
-                {
-                    "name": "SGW update 2",
-                    "encrypted_field": EncryptedValue("secret_password"),
-                },
-            )
+        self.mark_test_step("Update that document in SGW")
         await cblpytest.sync_gateways[0].update_documents(
             "travel",
             [
@@ -262,7 +253,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
                     "hotel_1",
                     None,
                     {
-                        "name": "CBL update 2",
+                        "name": "SGW",
                         "encrypted_field": EncryptedValue("secret_password"),
                     },
                 )
@@ -291,7 +282,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             "travel"
         )
 
-        self.mark_test_step("Verify bandwidth is saved for other documents")
+        self.mark_test_step("Verify entire document is replicated.")
         lite_all_docs = await db.get_all_documents("travel.hotels")
         total_docs = len(lite_all_docs["travel.hotels"])
         repl_status = await replicator.get_status()
@@ -304,13 +295,13 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             f"All documents ({total_docs}) were processed instead of just the mutated ones ({processed_docs})"
         )
         sgw_doc = await cblpytest.sync_gateways[0].get_document(
-            "travel", "hotel_2", "travel", "hotels"
+            "travel", "hotel_1", "travel", "hotels"
         )
         assert sgw_doc is not None, "Document should exist in SGW"
         updated_doc_bytes = len(json.dumps(sgw_doc.body).encode("utf-8"))
         delta_bytes = bytes_written_after - bytes_written_before
-        assert delta_bytes < updated_doc_bytes, (
-            f"Expected delta to be less than the full doc size, but got {delta_bytes} bytes (doc size: {updated_doc_bytes})"
+        assert delta_bytes >= 0.8 * updated_doc_bytes, (
+            f"Expected delta to be at least 80% of the full doc size, but got {delta_bytes} bytes (doc size: {updated_doc_bytes})"
         )
 
         await cblpytest.test_servers[0].cleanup()

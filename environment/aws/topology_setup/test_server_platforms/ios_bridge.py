@@ -310,8 +310,6 @@ class iOSBridge(PlatformBridge):
                 check=True,
                 capture_output=True,
             )
-            click.echo("STDOUT:\n" + result.stdout.decode())
-            click.echo("STDERR:\n" + result.stderr.decode())
         except subprocess.CalledProcessError as e:
             click.echo(
                 f"Failed to get processes. Skipping termination. Error:\n{e.stderr.decode('utf-8')}"
