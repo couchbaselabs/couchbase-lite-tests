@@ -5,8 +5,6 @@
 //  Created by Pasin Suriyentrakorn on 5/30/25.
 //
 
-import Foundation
-
 import Vapor
 
 extension ContentTypes {
@@ -14,5 +12,7 @@ extension ContentTypes {
         let peerGroupID: String
         let database: String
         let collections: [ReplicationCollection]
+        let identity: MultipeerReplicatorIdentity
+        let authenticator: MultipeerReplicatorCAAuthenticator?
     }
 }
