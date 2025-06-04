@@ -54,7 +54,7 @@ class TestServer : ObservableObject {
         setupRoutes()
     }
     
-    /// Implement API v1.2.0 (No support for start/stop listener - 1.1.0, and dynamic dataset - 1.1.1 yet)
+    /// Implement API v1.2.1 (No support for start/stop listener - 1.1.0, and dynamic dataset - 1.1.1 yet)
     private func setupRoutes() {
         app.get("", use: Handlers.getRoot)
         app.post("newSession", use: Handlers.newSession)
