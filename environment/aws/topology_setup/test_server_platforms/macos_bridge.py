@@ -107,7 +107,7 @@ class macOSBridge(PlatformBridge):
         self.validate(location)
         click.echo("No action needed for uninstalling macOS app")
 
-    def get_ip(self, location: str) -> str:
+    def _get_ip(self, location: str) -> str | None:
         """
         Retrieve the IP address of the specified location.
 

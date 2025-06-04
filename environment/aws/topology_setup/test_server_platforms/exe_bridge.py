@@ -136,7 +136,7 @@ class ExeBridge(PlatformBridge):
         """
         click.echo("No action needed for uninstalling executable")
 
-    def get_ip(self, location: str) -> str:
+    def _get_ip(self, location: str) -> str | None:
         """
         Retrieve the IP address of the specified location.
 
