@@ -945,3 +945,17 @@ class SyncGateway:
         """
         if not self.__admin_session.closed:
             await self.__admin_session.close()
+
+    async def create_public_session(
+        self, auth: BasicAuth | None = None
+    ) -> ClientSession:
+        """Creates a session using the public port (4984)
+
+        Args:
+            auth: Optional authentication to use for the session
+
+        Returns:
+            A new ClientSession instance
+        """
+        scheme = "https://" if self.__secure else "http://"
+        return self._create_session(self.__secure, scheme, self.__hostname, 4984, auth)

@@ -891,26 +891,23 @@ class TestDeltaSync(CBLTestClass):
         old_revision = sgw_doc_before_update.revision
         assert old_revision is not None, "Document should have a revision"
 
-        # Verify we can fetch the old revision body before expiry through public API
         self.mark_test_step(
             "Verify old revision body is accessible before expiry through public API."
         )
-        scheme = (
-            "https://" if cblpytest.sync_gateways[0]._SyncGateway__secure else "http://"
+        sg = cblpytest.sync_gateways[0]
+        public_session = await sg.create_public_session(
+            BasicAuth("user1", "pass", "ascii")
         )
-        async with cblpytest.sync_gateways[0]._create_session(
-            cblpytest.sync_gateways[0]._SyncGateway__secure,
-            scheme,
-            cblpytest.sync_gateways[0]._SyncGateway__hostname,
-            4984,
-            BasicAuth("user1", "pass", "ascii"),
-        ) as public_session:
-            old_rev_doc = await cblpytest.sync_gateways[0]._send_request(
+        try:
+            old_rev_doc = await sg._send_request(
                 "GET",
                 "/short_expiry/doc_1",
                 params={"rev": old_revision},
                 session=public_session,
             )
+        finally:
+            await public_session.close()
+
         assert old_rev_doc is not None, (
             "Should be able to fetch old revision before expiry"
         )
@@ -935,22 +932,21 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Verify old revision is not accessible through public API.")
         try:
-            async with cblpytest.sync_gateways[0]._create_session(
-                cblpytest.sync_gateways[0]._SyncGateway__secure,
-                scheme,
-                cblpytest.sync_gateways[0]._SyncGateway__hostname,
-                4984,
-                BasicAuth("user1", "pass", "ascii"),
-            ) as public_session:
-                expired_rev_doc = await cblpytest.sync_gateways[0]._send_request(
+            public_session = await sg.create_public_session(
+                BasicAuth("user1", "pass", "ascii")
+            )
+            try:
+                expired_rev_doc = await sg._send_request(
                     "GET",
                     "/short_expiry/doc_1",
                     params={"rev": old_revision},
                     session=public_session,
                 )
-            assert "stub" in expired_rev_doc or "_attachments" in expired_rev_doc, (
-                f"Expected old revision to be a stub, but got full document: {expired_rev_doc}"
-            )
+                assert "stub" in expired_rev_doc or "_attachments" in expired_rev_doc, (
+                    f"Expected old revision to be a stub, but got full document: {expired_rev_doc}"
+                )
+            finally:
+                await public_session.close()
         except Exception as e:
             assert "404" in str(e) or "not found" in str(e).lower(), (
                 f"Expected 404 error, got: {e}"
