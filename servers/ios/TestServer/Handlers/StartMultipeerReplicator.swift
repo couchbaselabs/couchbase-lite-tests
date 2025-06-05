@@ -18,7 +18,9 @@ extension Handlers {
         var config = ContentTypes.MultipeerReplicatorConfiguration(
             peerGroupID: request.peerGroupID,
             database: request.database,
-            collections: request.collections)
+            collections: request.collections,
+            identity: request.identity,
+            authenticator: request.authenticator)
         
         let id = try dbManager.startMultipeerReplicator(config: config)
         
