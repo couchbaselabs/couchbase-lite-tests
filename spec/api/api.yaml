@@ -46,6 +46,9 @@ info:
       ```
 
     Changes
+    1.2.1 (06/04/2025)
+    * Add authenticator property to [/startMultipeerReplicator](#operation/startMultipeerReplicator)
+
     1.2.0 (04/09/2025)
     * Add [/startMultipeerReplicator](#operation/startMultipeerReplicator),
     * Add [/stopMultipeerReplicator](#operation/stopMultipeerReplicator) endpoint
@@ -131,7 +134,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 1.2.0
+  version: 1.2.1
 tags:
   - name: API
     description: The API endpoints of the test server
@@ -833,16 +836,17 @@ paths:
         - API
       summary: Starts a Multipeer replicator
       description: |-
-        Starts a P2P listener so that the device can act as the passive side of a P2P replication.
+        Starts a multipeer replicator to create a mesh of connected clients.
       operationId: startMultipeerReplicator
       requestBody:
         description: |-
-          The request object containing the collections to share and, optionally, the port to listen on.
+          The request object containing the collections to share and the peer group ID.  Optionally,
+          it can contain an authenticator as well.  The default (null) behavior is accept all connections.
         content:
           application/json:
             schema:
               type: object
-              required: ['peerGroupID', 'database', 'collections']
+              required: ['peerGroupID', 'database', 'collections', 'identity']
               properties:
                 peerGroupID:
                   type: string
@@ -854,6 +858,10 @@ paths:
                   type: array
                   items:
                     $ref: "#/components/schemas/ReplicationCollection"
+                identity:
+                  $ref: '#/components/schemas/MultipeerReplicatorIdentity'
+                authenticator:
+                  $ref: '#/components/schemas/MultipeerReplicatorCAAuthenticator'
         required: true
       responses:
         '200':
@@ -1276,6 +1284,38 @@ components:
                 example: '1234567890abcdef'
               status:
                 $ref: '#/components/schemas/ReplicatorStatus'
+    MultipeerReplicatorIdentity:
+      description: |-
+        MultipeerReplicatorIdentity is used to specify a TLS certificate and key particular
+        for a multipeer replciator so that it can identify itself.
+      type: object
+      required: ['encoding', 'data']
+      properties:
+        encoding:
+          type: string
+          enum: ['PKCS12']
+          description: The type of data contained in the data field.
+        data:
+          type: string
+          format: byte
+          description: Base-64 encoded data of the format specified in encoding
+        password:
+          type: string
+          example: 'pass'
+          description: The password if the data is password protected
+    MultipeerReplicatorCAAuthenticator:
+      description: |-
+        MultipeerReplicatorCAAuthenticator is used to authenticate the replicator using a CA certificate.
+        The certificate is expected to be in PEM format, and any accepted client must have a certificate
+        signed by the CA certificate.
+      type: object
+      required: ['type', 'certificate']
+      properties:
+        'type':
+          type: string
+          enum: ['CA-CERT']
+        certificate:
+          type: string
     ResetConfiguration:
       description: |-
         ResetConfiguration describes how the databases will be setup after the reset.
