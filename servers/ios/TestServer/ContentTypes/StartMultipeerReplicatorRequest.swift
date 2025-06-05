@@ -12,5 +12,7 @@ extension ContentTypes {
         let peerGroupID: String
         let database: String
         let collections: [ReplicationCollection]
+        let identity: MultipeerReplicatorIdentity
+        let authenticator: MultipeerReplicatorCAAuthenticator?
     }
 }
