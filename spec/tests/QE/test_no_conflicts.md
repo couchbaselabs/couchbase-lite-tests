@@ -10,10 +10,9 @@ Test concurrent updates to the same document in both Sync Gateway and Couchbase 
 2. Reset local database and load `posts` dataset
 3. Start a replicator:
    * endpoint: `/posts`
-   * collections: `_default._default`
+   * collections: `_default.posts`
    * type: pull
    * continuous: true
-   * enableDocumentListener: true
    * credentials: user1/pass
 4. Wait until the replicator is idle
 6. Update docs concurrently:
@@ -21,10 +20,9 @@ Test concurrent updates to the same document in both Sync Gateway and Couchbase 
    * In CBL: `"title"`: `"CBL Update"`
 7. Start another replicator:
    * endpoint: `/posts`
-   * collections: `_default._default`
+   * collections: `_default.posts`
    * type: push
    * continuous: true
-   * enableDocumentListener: true
    * credentials: user1/pass
 8. Wait until the replicators are idle.
 9. Verify updated doc count in CBL
@@ -51,17 +49,15 @@ Test concurrent updates and replication across three Couchbase Lite databases (3
      * Add doc in "group2"
 4. Start a replicator between DB1 and DB2:
    * endpoint: DB2 URL
-   * collections: `_default._default`
+   * collections: `_default.posts`
    * type: push-and-pull
    * continuous: true
-   * enableDocumentListener: true
 5. Wait until the replicator is idle
 6. Start a replicator between DB1 and DB3:
    * endpoint: DB3 URL
-   * collections: `_default._default`
+   * collections: `_default.posts`
    * type: push-and-pull
    * continuous: false
-   * enableDocumentListener: true
 7. Wait until the replicator is idle
 8. Update docs concurrently:
    * In DB1: `"CBL1 Update 1"`
@@ -70,13 +66,13 @@ Test concurrent updates and replication across three Couchbase Lite databases (3
 9. Wait until the replicators are idle
 10. Start a replicator between DB3 and SGW:
     * endpoint: `/posts`
-    * collections: `_default._default`
+    * collections: `_default.posts`
     * type: push-and-pull
     * continuous: true
     * enableDocumentListener: true
     * credentials: user1/pass
 11. Wait until the replicator is idle
-12. Verify replication was successful and check document content in sync-gateway.
+12. Verify replication was successful and document content in SGW.
 
 ## #3 test_multiple_cbls_updates_concurrently_with_pull
 
@@ -90,16 +86,12 @@ Test concurrent updates and replication across three Couchbase Lite databases, s
 4. Start replicators for all 3 CBLs:
    * For each CBL (DB1, DB2, DB3):
      * endpoint: `/posts`
-     * collections: `_default._default`
+     * collections: `_default.posts`
      * type: pull
      * continuous: false
-     * enableDocumentListener: true
      * credentials: user1/pass
 5. Wait until the replicators stop
-6. Verify docs replicated to all 3 CBLs:
-   * Check channel-1 posts in all DBs
-   * Verify channel-2 posts and attachments
-   * Validate channel-3 posts and nested content
+6. Verify docs replicated to all 3 CBLs
 7. Update docs concurrently:
    * In SGW: `"title": "SGW Update 1"`
    * In DB1: `"title": "CBL1 Update 1"`
@@ -108,15 +100,14 @@ Test concurrent updates and replication across three Couchbase Lite databases, s
 8. Start replicators for all 3 CBLs:
    * For each CBL (DB1, DB2, DB3):
      * endpoint: `/posts`
-     * collections: `_default._default`
+     * collections: `_default.posts`
      * type: push-and-pull
      * continuous: true
-     * enableDocumentListener: true
      * credentials: user1/pass
 9. Wait until the replicators are idle
 10. Verify docs replicated to all 3 CBLs:
     * Check doc bodies are consistent across all 3 CBLs and SGW
-11. Update docs through all 3 CBLs:
+11. Update docs concurrently through all 3 CBLs:
     * In DB1: `"title": "CBL1 Update 2"`
     * In DB2: `"title": "CBL2 Update 2"`
     * In DB3: `"title": "CBL3 Update 2"`

@@ -11,20 +11,21 @@ Verify push/pull replication works with large data and delta sync. Ensures that 
 3. Start a replicator:
    * endpoint: `/travel`
    * collections: `travel.airlines`, `travel.airports`, `travel.hotels`
-   * type: push-and-pull
+   * type: pull
    * continuous: false
    * credentials: user1/pass
 4. Wait until the replicator stops.
 5. Check that all docs are replicated correctly.
 6. Modify docs in CBL:
-   * Update 2 airlines in `travel.airlines` with large text content
-   * Add attachments to 2 airports in `travel.airports`
-7. Start a replicator:
+   * Update a doc in `travel.airlines` with text content
+   * Add attachments to another doc in `travel.airports`
+7. Start another replicator:
    * endpoint: `/travel`
    * collections: `travel.airlines`, `travel.airports`, `travel.hotels`
    * type: push-and-pull
    * continuous: false
    * credentials: user1/pass
+   * enable_document_listener: True
 8. Wait until the replicator stops.
 9. Record the bytes transferred
 10. Verify the new document is present in SGW
@@ -44,17 +45,17 @@ Verify delta sync works with nested documents. Ensures that only changed nested 
 ### Steps
 1. Reset SG and load `travel` dataset with delta sync enabled
 2. Reset local database, and load `travel` dataset.
-3. Start a replicator:
+3. Start a pull replicator:
    * endpoint: `/travel`
    * collections: `travel.airlines`, `travel.routes`
-   * type: push-and-pull
+   * type: pull
    * continuous: false
    * credentials: user1/pass
 4. Wait until the replicator stops.
 5. Check that all docs are replicated correctly.
 6. Modify docs in CBL:
    * Update nested schedule in `travel.routes`
-7. Start a replicator:
+7. Start another replicator:
    * endpoint: `/travel`
    * collections: `travel.airlines`, `travel.routes`
    * type: push-and-pull
@@ -64,7 +65,7 @@ Verify delta sync works with nested documents. Ensures that only changed nested 
 9. Record the bytes transferred
 10. Verify the nested document is present in SGW
 11. Update docs in SGW:
-    * Update different nested schedule fields in `travel.routes`
+    * Update nested fields in `travel.routes`
 12. Start the same replicator again:
 13. Wait until the replicator stops.
 14. Record the bytes transferred
@@ -80,7 +81,7 @@ Verify delta sync works with documents containing large UTF-8 strings. Ensures t
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator:
    * endpoint: `/travel`
-   * collections: `travel.landmarks`
+   * collections: `travel.hotels`
    * type: push-and-pull
    * continuous: false
    * credentials: user1/pass
@@ -88,22 +89,12 @@ Verify delta sync works with documents containing large UTF-8 strings. Ensures t
 5. Check that all docs are replicated correctly.
 6. Create docs in CBL:
    * A `name` field : `CBL` and a `body` with large UTF-8 descriptions (Chinese, Japanese characters, emoji-rich descriptions)
-7. Start a replicator:
-   * endpoint: `/travel`
-   * collections: `travel.landmarks`
-   * type: push
-   * continuous: false
-   * credentials: user1/pass
+7. Start the same replicator again.
 8. Wait until the replicator stops.
 9. Record the bytes transferred.
 9. Update docs in SGW :
    * Keeping the body same but the `name` field changed to `SGW`.
-10. Start a replicator:
-    * endpoint: `/travel`
-    * collections: `travel.landmarks`
-    * type: pull
-    * continuous: false
-    * credentials: user1/pass
+10. Start the same replicator again.
 11. Wait until the replicator stops.
 12. Record the bytes transferred again this time.
 13. Verify only delta is updated while replicating and updating that document to CBL with a new name and same body.
@@ -161,13 +152,8 @@ Verify delta sync behavior when toggling delta sync enabled/disabled. Ensures th
 22. Wait until the replicator stops.
 23. Record the bytes transferred.
 24. Update docs in SGW:
-    * Modify content of the new doc.
-25. Start a replicator:
-    * endpoint: `/posts`
-    * collections: `_default._default`
-    * type: push-and-pull
-    * continuous: false
-    * credentials: user1/pass
+    * Modify the `name` field of the new doc.
+25. Start the same replicator again.
 26. Wait until the replicator stops.
 27. Record the bytes transferred
 28. Verify delta transferred equivalent to doc size.
@@ -181,32 +167,35 @@ Verify that after revision expiry, any document update (even a small change) res
 1. Reset SG and load `short_expiry` dataset with delta sync enabled.
    * has a `old_rev_expiry_seconds` of 10 seconds.
    * has a rev_cache size of 1.
-2. Reset local database, and load `short_expiry` dataset.
-3. Create doc in CBL:
+2. Verify SGW config has correct revision expiry settings.
+3. Reset local database, and load `short_expiry` dataset.
+4. Create doc in CBL:
    * Add a new document with large text content:
      * `"name": "CBL"`
      * `"extra": "a" * 3000` (large content)
-4. Start a replicator:
+5. Start a replicator:
    * endpoint: `/short_expiry`
    * collections: `_default._default`
    * type: push
    * continuous: false
    * credentials: user1/pass
-5. Wait until the replicator stops.
-6. Record the bytes transferred.
-7. Verify doc body in SGW matches the updates from CBL.
-8. Update docs in SGW:
+6. Wait until the replicator stops.
+7. Record the bytes transferred.
+8. Get the current document state and revision before update.
+9. Verify old revision body is accessible before expiry through public API.
+10. Update docs in SGW:
    * Modify content in document "doc_1": `"name": "SGW"` (small change)
-9. Wait for 10 seconds to ensure both delta sync revision and old revision have expired.
-10. Pull replicate back to CBL:
+11. Wait for 10 seconds to ensure delta rev expires.
+12. Verify old revision is not accessible through public API.
+13. Pull replicate back to CBL:
     * endpoint: `/short_expiry`
     * collections: `_default._default`
     * type: pull
     * continuous: false
     * credentials: user1/pass
-12. Wait until the replicator stops.
-13. Record the bytes transferred post expiry.
-14. Verify:
+14. Wait until the replicator stops.
+15. Record the bytes transferred post expiry.
+16. Verify:
     * The transferred bytes are approximately equal to the full document size (>3000 bytes)
     * This indicates SGW correctly sent the full document after revision expiry
     * The small change forced a full document transfer due to expired revision

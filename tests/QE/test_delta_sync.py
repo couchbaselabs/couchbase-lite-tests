@@ -48,7 +48,14 @@ class TestDeltaSync(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("Start a replicator")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.airlines`, `travel.airports`, `travel.hotels`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -78,7 +85,11 @@ class TestDeltaSync(CBLTestClass):
             f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])}"
         )
 
-        self.mark_test_step("Modify docs in CBL with and without attachment")
+        self.mark_test_step("""
+            Modify docs in CBL:
+                * Update a doc in `travel.airlines` with text content
+                * Add attachments to another doc in `travel.airports`
+        """)
         async with db.batch_updater() as b:
             b.upsert_document("travel.hotels", "hotel_1", [{"name": "CBL"}])
             b.upsert_document(
@@ -107,7 +118,15 @@ class TestDeltaSync(CBLTestClass):
                 ],
             )
 
-        self.mark_test_step("Do push_pull replication")
+        self.mark_test_step("""
+            Start another replicator:
+                * endpoint: `/travel`
+                * collections: `travel.airlines`, `travel.airports`, `travel.hotels`
+                * type: push-and-pull
+                * continuous: false
+                * credentials: user1/pass
+                * enable_document_listener: True
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -136,7 +155,11 @@ class TestDeltaSync(CBLTestClass):
         assert doc is not None, "Document should exist in SGW"
         assert doc.body.get("name") == "CBL", "Document should have the correct name"
 
-        self.mark_test_step("Update docs in SGW  with and without attachment")
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Update 2 airlines in `travel.airlines` with different text content
+                * Modify attachments in 2 airports in `travel.airports`
+        """)
         updates = [
             DocumentUpdateEntry("hotel_1", None, {"name": "SGW"}),
             DocumentUpdateEntry(
@@ -167,7 +190,7 @@ class TestDeltaSync(CBLTestClass):
             "travel", updates, "travel", "hotels"
         )
 
-        self.mark_test_step("Do push_pull replication")
+        self.mark_test_step("Start the same replicator again.")
         await replicator.start()
         events = await replicator.wait_for_doc_events(
             {
@@ -247,7 +270,14 @@ class TestDeltaSync(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("Start a replicator")
+        self.mark_test_step("""
+            Start a pull replicator:
+                * endpoint: `/travel`
+                * collections: `travel.airlines`, `travel.routes`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -277,7 +307,10 @@ class TestDeltaSync(CBLTestClass):
             f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])}"
         )
 
-        self.mark_test_step("Modify docs in CBL with nested docs")
+        self.mark_test_step("""
+            Modify docs in CBL:
+                * Update nested schedule in `travel.routes`
+        """)
         async with db.batch_updater() as b:
             b.upsert_document(
                 "travel.hotels",
@@ -285,7 +318,14 @@ class TestDeltaSync(CBLTestClass):
                 [{"name": "CBL", "nested": {"name": "I am a nested field"}}],
             )
 
-        self.mark_test_step("Do push_pull replication")
+        self.mark_test_step("""
+            Start another replicator:
+                * endpoint: `/travel`
+                * collections: `travel.airlines`, `travel.routes`
+                * type: push-and-pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -317,7 +357,10 @@ class TestDeltaSync(CBLTestClass):
             "Nested document should have the correct name"
         )
 
-        self.mark_test_step("Update docs in SGW with nested docs")
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Update nested fields in `travel.routes`
+        """)
         updates = [
             DocumentUpdateEntry(
                 "hotel_1",
@@ -329,7 +372,7 @@ class TestDeltaSync(CBLTestClass):
             "travel", updates, "travel", "hotels"
         )
 
-        self.mark_test_step("Do push_pull replication")
+        self.mark_test_step("Start the same replicator again:")
         await replicator.start()
         events = await replicator.wait_for_doc_events(
             {
@@ -397,7 +440,14 @@ class TestDeltaSync(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("Start a replicator")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: push-and-pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -427,14 +477,18 @@ class TestDeltaSync(CBLTestClass):
             f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
         )
 
-        self.mark_test_step("Create docs in CBL")
+        self.mark_test_step("""
+            Create docs in CBL:
+                * A `name` field : `CBL` and a `body` with large UTF-8 description
+                    (Chinese, Japanese characters, emoji-rich descriptions)
+        """)
         utf8_body = "東京🚀🌏Привет世界مرحبا"
         async with db.batch_updater() as b:
             b.upsert_document(
                 "travel.hotels", "hotel_1", [{"name": "CBL", "utf8": utf8_body}]
             )
 
-        self.mark_test_step("Do push replication to SGW")
+        self.mark_test_step("Start the same replicator again.")
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
@@ -450,7 +504,10 @@ class TestDeltaSync(CBLTestClass):
             "travel", "hotel_1", "travel", "hotels"
         )
         assert sgw_doc is not None, "Document should exist in SGW"
-        self.mark_test_step("Update docs in SGW/CBL with utf8 strings")
+        self.mark_test_step("""
+            Update docs in SGW :
+                * Keeping the body same but the `name` field changed to `SGW`.
+        """)
         updates = [
             DocumentUpdateEntry(
                 "hotel_1",
@@ -465,7 +522,7 @@ class TestDeltaSync(CBLTestClass):
             "travel", updates, "travel", "hotels"
         )
 
-        self.mark_test_step("Do pull replication")
+        self.mark_test_step("Start the same replicator again.")
         await replicator.start()
         events = await replicator.wait_for_doc_events(
             {
@@ -485,12 +542,15 @@ class TestDeltaSync(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Record the bytes transferred")
+        self.mark_test_step("Record the bytes transferred again this time.")
         bytes_pull_after, _ = await cblpytest.sync_gateways[0].bytes_transferred(
             "travel"
         )
 
-        self.mark_test_step("Verify only delta is updated.")
+        self.mark_test_step("""
+            Verify only delta is updated while replicating and updating that document to CBL,
+                with a new name and same body.
+        """)
         cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_1"))
         assert cbl_doc is not None, "Document should exist in CBL"
         updated_doc_size = len(json.dumps(cbl_doc.body).encode("utf-8"))
@@ -534,7 +594,14 @@ class TestDeltaSync(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("Start a replicator")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -564,13 +631,23 @@ class TestDeltaSync(CBLTestClass):
             f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])}"
         )
 
-        self.mark_test_step("Create docs in CBL")
+        self.mark_test_step("""
+            Create docs in CBL:
+                * `name`: `CBL` and a big value for a key: `extra`.
+        """)
         async with db.batch_updater() as b:
             b.upsert_document(
                 "travel.hotels", "hotel_1", [{"name": "CBL", "extra": "a" * 3000}]
             )
 
-        self.mark_test_step("Start replication")
+        self.mark_test_step("""
+            Start another replicator this time:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: push-and-pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -603,7 +680,10 @@ class TestDeltaSync(CBLTestClass):
             "travel"
         )
 
-        self.mark_test_step("Update doc on SGW")
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Modify only the key `name`: `SGW`.
+        """)
         sgw_doc = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_1", "travel", "hotels"
         )
@@ -619,7 +699,7 @@ class TestDeltaSync(CBLTestClass):
             "hotels",
         )
 
-        self.mark_test_step("Start another replication with same specifications.")
+        self.mark_test_step("Start the same replicator again.")
         await replicator.start()
         events = await replicator.wait_for_doc_events(
             {
@@ -658,13 +738,22 @@ class TestDeltaSync(CBLTestClass):
         )
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step("Reset local database, and load `posts` dataset.")
+        self.mark_test_step(
+            "Reset local database, and load `posts` dataset without delta sync."
+        )
         dbs = await cblpytest.test_servers[0].create_and_reset_db(
             ["db1"], dataset="posts"
         )
         db = dbs[0]
 
-        self.mark_test_step("Start a replicator")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/posts`
+                * collections: `_default._default`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("posts"),
@@ -694,7 +783,10 @@ class TestDeltaSync(CBLTestClass):
             f"Incorrect number of initial documents replicated (expected 5; got {len(lite_all_docs['_default.posts'])})"
         )
 
-        self.mark_test_step("Create docs in CBL")
+        self.mark_test_step("""
+            Create docs in CBL:
+                * Add a new doc.
+        """)
         async with db.batch_updater() as b:
             b.upsert_document(
                 "_default.posts",
@@ -702,7 +794,14 @@ class TestDeltaSync(CBLTestClass):
                 [{"channels": ["group1"], "name": "CBL", "extra": "a" * 3000}],
             )
 
-        self.mark_test_step("Start replication")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/posts`
+                * collections: `_default._default`
+                * type: push-and-pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("posts"),
@@ -735,7 +834,10 @@ class TestDeltaSync(CBLTestClass):
             "posts"
         )
 
-        self.mark_test_step("Update doc on SGW")
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Modify the `name` field of the new doc.
+        """)
         sgw_doc = await cblpytest.sync_gateways[0].get_document(
             "posts", "post_1", collection="posts"
         )
@@ -752,7 +854,7 @@ class TestDeltaSync(CBLTestClass):
             collection="posts",
         )
 
-        self.mark_test_step("Start another replication with same specifications.")
+        self.mark_test_step("Start the same replicator again.")
         await replicator.start()
         events = await replicator.wait_for_doc_events(
             {
@@ -806,9 +908,11 @@ class TestDeltaSync(CBLTestClass):
             9. Verify the bytes transferred now are more than step 4.
             10. Verify old revision is expired by attempting to fetch it through public API.
         """
-        self.mark_test_step(
-            "Reset SG and load `short_expiry` dataset with delta sync enabled."
-        )
+        self.mark_test_step("""
+            Reset SG and load `short_expiry` dataset with delta sync enabled.
+                * has a `old_rev_expiry_seconds` of 10 seconds.
+                * has a rev_cache size of 1.
+        """)
         cloud = CouchbaseCloud(
             cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
         )
@@ -836,7 +940,12 @@ class TestDeltaSync(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
-        self.mark_test_step("Create docs in CBL.")
+        self.mark_test_step("""
+            Create doc in CBL:
+                * Add a new document with large text content:
+                    * `"name": "CBL"`
+                    * `"extra": "a" * 3000` (large content)
+        """)
         async with db.batch_updater() as b:
             b.upsert_document(
                 "_default._default",
@@ -844,7 +953,14 @@ class TestDeltaSync(CBLTestClass):
                 [{"channels": ["group1"], "name": "CBL", "extra": "a" * 3000}],
             )
 
-        self.mark_test_step("Push replicate to SGW.")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/short_expiry`
+                * collections: `_default._default`
+                * type: push
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("short_expiry"),
@@ -873,7 +989,7 @@ class TestDeltaSync(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Record the bytes transferred and get current revision.")
+        self.mark_test_step("Record the bytes transferred.")
         read_pull_bytes_before, _ = await cblpytest.sync_gateways[0].bytes_transferred(
             "short_expiry"
         )
@@ -915,7 +1031,10 @@ class TestDeltaSync(CBLTestClass):
             "Old revision should have correct content"
         )
 
-        self.mark_test_step("Update docs in SGW with small change.")
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Modify content in document "doc_1": `"name": "SGW"` (small change)
+        """)
         await cblpytest.sync_gateways[0].upsert_documents(
             "short_expiry",
             [
@@ -952,9 +1071,14 @@ class TestDeltaSync(CBLTestClass):
                 f"Expected 404 error, got: {e}"
             )
 
-        self.mark_test_step(
-            "Pull replicate back to CBL - should get full document since delta is expired."
-        )
+        self.mark_test_step("""
+            Pull replicate back to CBL:
+                * endpoint: `/short_expiry`
+                * collections: `_default._default`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("short_expiry"),
@@ -977,6 +1101,12 @@ class TestDeltaSync(CBLTestClass):
         )
         delta_bytes_read = read_pull_bytes_after - read_pull_bytes_before
 
+        self.mark_test_step("""
+            Verify:
+                * The transferred bytes are approximately equal to the full document size (>3000 bytes)
+                * This indicates SGW correctly sent the full document after revision expiry
+                * The small change forced a full document transfer due to expired revision
+        """)
         cbl_doc = await db.get_document(DocumentEntry("_default._default", "doc_1"))
         assert cbl_doc is not None, "Document should exist in CBL"
         updated_doc_size = len(json.dumps(cbl_doc.body).encode("utf-8"))
@@ -1014,7 +1144,14 @@ class TestDeltaSync(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("Do initial push_pull replication.")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: push-and-pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -1036,11 +1173,14 @@ class TestDeltaSync(CBLTestClass):
             f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
         )
 
-        self.mark_test_step("Update doc on CBL.")
+        self.mark_test_step("""
+            Update doc in CBL:
+                * Add a new doc with body: `"name": "CBL"`.
+        """)
         async with db.batch_updater() as b:
             b.upsert_document("travel.hotels", "hotel_1", [{"name": "CBL"}])
 
-        self.mark_test_step("Replicate to SGW.")
+        self.mark_test_step("Start the same replicator again.")
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
@@ -1049,7 +1189,10 @@ class TestDeltaSync(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Update doc on SGW with same body.")
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Update the same hotel document with identical content
+        """)
         await cblpytest.sync_gateways[0].update_documents(
             "travel",
             [DocumentUpdateEntry("hotel_1", None, {"name": "CBL"})],
@@ -1057,9 +1200,10 @@ class TestDeltaSync(CBLTestClass):
             "hotels",
         )
 
-        self.mark_test_step(
-            "Update doc on SGW again to have same value as previous rev."
-        )
+        self.mark_test_step("""
+            Update docs in SGW again:
+                * Update the same hotel document with same content as previous revision
+        """)
         sgw_doc = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_1", "travel", "hotels"
         )
@@ -1071,7 +1215,7 @@ class TestDeltaSync(CBLTestClass):
             "hotels",
         )
 
-        self.mark_test_step("Replicate docs with continuous replication.")
+        self.mark_test_step("Start a continuous replicator.")
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -1088,9 +1232,10 @@ class TestDeltaSync(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step(
-            "Update doc on CBL again to have same value as previous rev."
-        )
+        self.mark_test_step("""
+            Update docs in CBL:
+                * Update the same hotel document with identical content again
+        """)
         async with db.batch_updater() as b:
             b.upsert_document("travel.hotels", "hotel_1", [{"name": "CBL"}])
 
@@ -1144,7 +1289,14 @@ class TestDeltaSync(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("Setup a push-pull replicator.")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: push-and-pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -1166,11 +1318,21 @@ class TestDeltaSync(CBLTestClass):
             f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
         )
 
-        self.mark_test_step("Update doc on CBL.")
+        self.mark_test_step("""
+            Update doc in CBL:
+                * Modify a hotel document with small changes
+        """)
         async with db.batch_updater() as b:
             b.upsert_document("travel.hotels", "hotel_1", [{"name": "CBL"}])
 
-        self.mark_test_step("Push replicate to SGW.")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: push
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -1192,7 +1354,10 @@ class TestDeltaSync(CBLTestClass):
             "travel"
         )
 
-        self.mark_test_step("Update doc on SGW with larger body.")
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Update the same hotel document with much larger content (>2x original size)
+        """)
         doc = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_1", "travel", "hotels"
         )
@@ -1206,7 +1371,14 @@ class TestDeltaSync(CBLTestClass):
             "hotels",
         )
 
-        self.mark_test_step("Pull replicate to CBL.")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),

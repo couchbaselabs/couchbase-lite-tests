@@ -10,10 +10,9 @@ Test replication of documents with deeply nested encrypted fields, ensuring encr
 2. Reset local database, and load `posts` dataset.
 3. Start a replicator:
    * endpoint: `/posts`
-   * collections: `_default._default`
+   * collections: `_default.posts`
    * type: pull
    * continuous: false
-   * enableDocumentListener: true
    * encryption_hook: true
    * credentials: user1/pass
 4. Wait until the replicator stops.
@@ -35,14 +34,7 @@ Test replication of documents with deeply nested encrypted fields, ensuring encr
      }
      ```
    * Apply encryption hook to "encrypted_field" at 15th level
-7. Start a replicator:
-    * endpoint: `/posts`
-    * collections: `_default._default`
-    * type: push
-    * continuous: false
-    * enableDocumentListener: true
-    * encryption_hook: true
-    * credentials: user1/pass
+7. Start the same replicator again.
 8. Wait until the replicator stops.
 9. Check that the document is in SGW:
     * Verify document exists
@@ -62,8 +54,6 @@ Verify that delta sync does not work when an encryption callback hook is present
     * collections: `travel.hotels`
     * type: push-and-pull
     * continuous: true
-    * enableDocumentListener: true
-    * encryption_hook: true
     * credentials: user1/pass
 4. Wait until the replicator stops.
 5. Check that all docs are replicated correctly.
@@ -71,14 +61,7 @@ Verify that delta sync does not work when an encryption callback hook is present
     * with ID "hotel_1" with body:
         * `"name": "CBL"`
         * `"encrypted_field": EncryptedValue("secret_password")`
-7. Start a replicator:
-    * endpoint: `/travel`
-    * collections: `travel.hotels`
-    * type: push
-    * continuous: false
-    * enableDocumentListener: true
-    * encryption_hook: true
-    * credentials: user1/pass
+7. Start the same replicator again.
 8. Wait until the replicator is idle.
 9. Record the bytes transferred.
 10. Verify the new document in SGW exists
@@ -91,4 +74,4 @@ Verify that delta sync does not work when an encryption callback hook is present
     * enableDocumentListener: true
     * credentials: user1/pass
 13. Record the bytes transferred.
-14. Verify delta sync was not used for document with encrypted fields, hence the transferred bytes correspond to approximately the whole document size itself.
+14. Verify entire document is replicated.

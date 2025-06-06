@@ -49,7 +49,14 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("Replicate to CBL from SGW")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/posts`
+                * collections: `_default.posts`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("posts"),
@@ -78,9 +85,25 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             ["_default.posts"],
         )
 
-        self.mark_test_step(
-            "Create document in CBL with encrypted value at the 15th level of nesting"
-        )
+        self.mark_test_step("""
+            Create document in CBL:
+                * Create a new document with deeply nested structure:
+                  ```json
+                  {
+                    "level1": {
+                      "level2": {
+                        "level3": {
+                          // ... continue nesting ...
+                          "level15": {
+                            "encrypted_field": "sensitive_data"
+                          }
+                        }
+                      }
+                    }
+                  }
+                  ```
+                * Apply encryption hook to "encrypted_field" at 15th level
+        """)
         async with db.batch_updater() as b:
             b.upsert_document(
                 "_default.posts",
@@ -121,7 +144,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
                 ],
             )
 
-        self.mark_test_step("Replicate to SGW from CBL")
+        self.mark_test_step("Start the same replicator again")
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
@@ -134,7 +157,12 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             f"Incorrect number of initial documents replicated (expected 6; got {len(lite_all_docs['_default.posts'])}"
         )
 
-        self.mark_test_step("Check that the document is in SGW")
+        self.mark_test_step("""
+            Check that the document is in SGW:
+                * Verify document exists
+                * Verify encrypted field is properly encrypted
+                * Validate nested structure is preserved
+        """)
         doc = await cblpytest.sync_gateways[0].get_document(
             "posts", "post_1000", collection="posts"
         )
@@ -175,7 +203,14 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         )
         db = dbs[0]
 
-        self.mark_test_step("Start a push-pull replicator (continuous)")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: push-and-pull
+                * continuous: true
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),
@@ -205,7 +240,12 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             ["travel.hotels"],
         )
 
-        self.mark_test_step("Create a document with encrypted field in CBL")
+        self.mark_test_step("""
+            Create a document in CBL:
+                * with ID "hotel_1" with body:
+                    * `"name": "CBL"`
+                    * `"encrypted_field": EncryptedValue("secret_password")`
+        """)
         async with db.batch_updater() as b:
             b.upsert_document(
                 "travel.hotels",
@@ -218,7 +258,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
                 ],
             )
 
-        self.mark_test_step("Replicate to SGW from CBL")
+        self.mark_test_step("Start the same replicator again.")
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle.")
@@ -232,7 +272,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             "travel"
         )
 
-        self.mark_test_step("Verify the new document is present in SGW")
+        self.mark_test_step("Verify the new document in SGW exists.")
         lite_all_docs = await db.get_all_documents("travel.hotels")
         assert len(lite_all_docs["travel.hotels"]) == 701, (
             f"Incorrect number of new documents replicated (expected 701; got {len(lite_all_docs['travel.hotels'])})"
@@ -245,7 +285,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             "Encrypted value should be present"
         )
 
-        self.mark_test_step("Update that document in SGW")
+        self.mark_test_step('Update document in SGW: `"name": "SGW"`.')
         await cblpytest.sync_gateways[0].update_documents(
             "travel",
             [
@@ -262,7 +302,14 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             "hotels",
         )
 
-        self.mark_test_step("Replicate that document using pull replication")
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
         replicator = Replicator(
             db,
             cblpytest.sync_gateways[0].replication_url("travel"),

@@ -10,10 +10,9 @@ Test push replication of a large document (>20MB) from Couchbase Lite to Sync Ga
 2. Reset local database, and load `posts` dataset.
 3. Start a replicator:
    * endpoint: `/posts`
-   * collections: `_default._default`
+   * collections: `_default.posts`
    * type: push-and-pull
    * continuous: false
-   * enableDocumentListener: true
    * credentials: user1/pass
 4. Wait for replication to complete.
 5. Create document with a large attachment:
@@ -29,10 +28,9 @@ Test push replication of a large document (>20MB) from Couchbase Lite to Sync Ga
    * Validate attachment size is 20MB
 8. Start a replicator:
    * endpoint: `/posts`
-   * collections: `_default._default`
+   * collections: `_default.posts`
    * type: push
    * continuous: false
-   * enableDocumentListener: true
    * credentials: user1/pass
 9. Wait until the replicator is stopped.
 10. Verify document was not replicated:
