@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, pkcs12
 from cryptography.x509 import (
     BasicConstraints,
@@ -18,7 +19,9 @@ class CertKeyPair:
     A class representing a certificate and its associated private key.
     """
 
-    def __init__(self, certificate: Certificate, private_key: Ed25519PrivateKey):
+    def __init__(
+        self, certificate: Certificate, private_key: ec.EllipticCurvePrivateKey
+    ):
         self.certificate = certificate
         self.private_key = private_key
 
@@ -44,7 +47,7 @@ class CertKeyPair:
 
 
 def create_ca_certificate(CN: str) -> CertKeyPair:
-    private_key = Ed25519PrivateKey.generate()
+    private_key = ec.generate_private_key(ec.SECP256R1())
     cn_attribute = Name([NameAttribute(NameOID.COMMON_NAME, CN)])
     not_valid_before = datetime.now(timezone.utc)
     not_valid_after = not_valid_before + timedelta(days=1)
@@ -58,7 +61,7 @@ def create_ca_certificate(CN: str) -> CertKeyPair:
         .not_valid_before(not_valid_before)
         .not_valid_after(not_valid_after)
         .add_extension(BasicConstraints(ca=True, path_length=None), critical=True)
-        .sign(private_key, None)
+        .sign(private_key, hashes.SHA256())
     )
 
     return CertKeyPair(ca_certificate, private_key)
@@ -67,7 +70,7 @@ def create_ca_certificate(CN: str) -> CertKeyPair:
 def create_leaf_certificate(
     CN: str, *, issuer_data: CertKeyPair | None = None
 ) -> CertKeyPair:
-    private_key = Ed25519PrivateKey.generate()
+    private_key = ec.generate_private_key(ec.SECP256R1())
     cn_attribute = Name([NameAttribute(NameOID.COMMON_NAME, CN)])
     not_valid_before = datetime.now(timezone.utc)
     not_valid_after = not_valid_before + timedelta(days=1)
@@ -82,7 +85,7 @@ def create_leaf_certificate(
         .serial_number(random_serial_number())
         .not_valid_before(not_valid_before)
         .not_valid_after(not_valid_after)
-        .sign(signing_key, None)
+        .sign(signing_key, hashes.SHA256())
     )
 
     return CertKeyPair(leaf_certificate, private_key)
