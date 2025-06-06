@@ -30,17 +30,6 @@ class TestNoConflicts(CBLTestClass):
     async def test_sg_cbl_updates_concurrently_with_push_pull(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary:
-            1. Create docs in SG.
-            2. Pull replication (continuous) to CBL.
-            3. Update docs in SG and CBL.
-            4. Push replication (continuous) to CBL.
-            5. Verify docs can resolve conflicts and should be able to replicate docs to CBL.
-            6. Update docs through CBL.
-            7. Verify docs got replicated to SGW with CBL updates.
-            8. Add verification of SGW.
-        """
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(
             cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
@@ -192,25 +181,11 @@ class TestNoConflicts(CBLTestClass):
         )
 
         await cblpytest.test_servers[0].cleanup()
-        self.mark_test_step("...COMPLETED...")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_cbls_updates_concurrently_with_push(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary:
-            1. Create docs in CBL DB1, DB2, DB3 associated with its own channel.
-            2. Replicate docs from CBL DB1 to DB2 with push pull and continous.
-            3. Wait until replication is done.
-            4. Replicate docs from CBL DB1 to DB3.
-            5. Wait until replication is done with push pull and continous.
-            6. update docs on CBL DB1, DB2, DB3.
-            7. Now update docs concurrently on all 3 CBL DBs.
-            8. Wait until replication is done.
-            9. Replicate docs from CBL DB3 to sg with push pull and continous.
-            10. Verify all docs replicated to sync-gateway.
-        """
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(
             cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
@@ -375,23 +350,11 @@ class TestNoConflicts(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
         await cblpytest.test_servers[1].cleanup()
         await cblpytest.test_servers[2].cleanup()
-        self.mark_test_step("...COMPLETED...")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_cbls_updates_concurrently_with_pull(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary:
-            1. Create docs in SG.
-            2. Do Pull replication to 3 CBLs
-            3. update docs in SG and all 3 CBL.
-            4. PUSH and PULL replication to CBLs
-            5. Verify docs can resolve conflicts and should able to replicate docs to CBL
-            6. Update docs through all 3 CBLs
-            7. Verify docs can be updated
-            8. Add verification of sync-gateway
-        """
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = CouchbaseCloud(
             cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
@@ -644,4 +607,3 @@ class TestNoConflicts(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
         await cblpytest.test_servers[1].cleanup()
         await cblpytest.test_servers[2].cleanup()
-        self.mark_test_step("...COMPLETED...")

@@ -26,15 +26,6 @@ class TestReplicatorEncryptionHook(CBLTestClass):
     async def test_replication_complex_doc_encryption(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary: Testing  dict and array encrypted values are present in 10-15th level of
-        complex doc and replication should detect values without any errors.
-            1. Have SG and CBL up and running.
-            2. Create a complex document with encryption property (Array, and Dict).
-            3. Start the replicator and make sure documents are replicated on SG.
-            4. Verify encrypted fields and data is encrypted.
-            5. Verify encrypted value at 15th level are detected by replicator and shown correctly on SG.
-        """
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
 
         self.mark_test_step("Reset SG and load `posts` dataset")
@@ -172,21 +163,11 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         )
 
         await cblpytest.test_servers[0].cleanup()
-        self.mark_test_step("...COMPLETED...")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_with_encryption(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary: Verify Delta sync do not work when encryption callback hook is present.
-            1. Have delta sync enabled.
-            2. Create docs with encrypted field in CBL.
-            3. Do push-pull replication to SGW.
-            4. Update docs in SGW.
-            5. Replicate docs using pull replication.
-            6. Verify entire document is replicated, as they have encrypted fields.
-        """
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
 
         self.mark_test_step(
@@ -352,4 +333,3 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         )
 
         await cblpytest.test_servers[0].cleanup()
-        self.mark_test_step("...COMPLETED...")

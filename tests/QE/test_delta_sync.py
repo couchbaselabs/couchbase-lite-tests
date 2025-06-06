@@ -26,14 +26,6 @@ class TestDeltaSync(CBLTestClass):
     async def test_delta_sync_replication(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary: Verify push/pull replication works with large data
-            1. Create docs in CBL
-            2. Do push_pull replication
-            3. update docs in SGW  with/without attachment
-            4. Do push/pull replication
-            5. Verify number of docs updated using delta sync.
-        """
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
@@ -242,20 +234,11 @@ class TestDeltaSync(CBLTestClass):
         )
 
         await cblpytest.test_servers[0].cleanup()
-        self.mark_test_step("...COMPLETED...")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_nested_doc(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary: Verify delta sync works with nested documents
-            1. Create docs in CBL with nested docs.
-            2. Do push_pull replication.
-            3. Update docs in SGW with nested docs.
-            4. Do push/pull replication
-            5. Verify delta sync stats shows number of docs updated using delta sync.
-        """
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
@@ -411,21 +394,11 @@ class TestDeltaSync(CBLTestClass):
         )
 
         await cblpytest.test_servers[0].cleanup()
-        self.mark_test_step("...COMPLETED...")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_utf8_strings(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary: Verify delta sync works with UTF-8 strings
-            1. Have delta sync enabled
-            2. Create docs in CBL
-            3. Do push replication to SGW
-            4. update docs in SGW/CBL with utf8 strings
-            5. replicate docs using pull replication
-            6. Verify that docs replicated successfully and only delta is replicated
-        """
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
@@ -560,26 +533,11 @@ class TestDeltaSync(CBLTestClass):
         )
 
         await cblpytest.test_servers[0].cleanup()
-        self.mark_test_step("...COMPLETED...")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_enabled_disabled(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary: Verify delta sync works with enabled and disabled delta sync
-            1. Have delta sync enabled.
-            2. Create docs in CBL.
-            3. Do PUSH replication to SGW.
-            4. Update docs in SGW.
-            5. Replicate docs using PULL replication.
-            6. Verify stats shows number of docs updated with delta sync.
-            7. Reset SG and load `posts` dataset with delta sync disabled.
-            8. Reset local database, and load `posts` dataset.
-            9. Create docs in CBL.
-            10. Start replication.
-            11. Verify stats shows number of docs updated.
-        """
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
@@ -889,25 +847,11 @@ class TestDeltaSync(CBLTestClass):
         )
 
         await cblpytest.test_servers[0].cleanup()
-        self.mark_test_step("...COMPLETED...")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_within_expiry(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary: Verify delta sync works within expiry time
-            1. Have delta sync enabled.
-            2. Update docs in CBL.
-            3. Do replication to SGW.
-            4. Record the bytes transferred and the current revision.
-            5. Wait for the delta revision to expire.
-            6. Update docs in SGW.
-            7. Replicate docs back to CBL.
-            8. Record the bytes transferred.
-            9. Verify the bytes transferred now are more than step 4.
-            10. Verify old revision is expired by attempting to fetch it through public API.
-        """
         self.mark_test_step("""
             Reset SG and load `short_expiry` dataset with delta sync enabled.
                 * has a `old_rev_expiry_seconds` of 10 seconds.
@@ -919,11 +863,7 @@ class TestDeltaSync(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "short_expiry", ["delta_sync"])
 
         self.mark_test_step("Verify SGW config has correct revision expiry settings")
-        db_config = await cblpytest.sync_gateways[0]._send_request(
-            "GET",
-            "/short_expiry/_config",
-        )
-        print("Database config:", db_config)
+        db_config = await cblpytest.sync_gateways[0].get_database_config("short_expiry")
 
         assert db_config.get("old_rev_expiry_seconds") == 10, (
             f"Expected old_rev_expiry_seconds to be 10, got {db_config.get('old_rev_expiry_seconds')}"
@@ -1011,18 +951,9 @@ class TestDeltaSync(CBLTestClass):
             "Verify old revision body is accessible before expiry through public API."
         )
         sg = cblpytest.sync_gateways[0]
-        public_session = await sg.create_public_session(
-            BasicAuth("user1", "pass", "ascii")
+        old_rev_doc = await sg.get_document_revision_public(
+            "short_expiry", "doc_1", old_revision, BasicAuth("user1", "pass", "ascii")
         )
-        try:
-            old_rev_doc = await sg._send_request(
-                "GET",
-                "/short_expiry/doc_1",
-                params={"rev": old_revision},
-                session=public_session,
-            )
-        finally:
-            await public_session.close()
 
         assert old_rev_doc is not None, (
             "Should be able to fetch old revision before expiry"
@@ -1051,21 +982,15 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Verify old revision is not accessible through public API.")
         try:
-            public_session = await sg.create_public_session(
-                BasicAuth("user1", "pass", "ascii")
+            expired_rev_doc = await sg.get_document_revision_public(
+                "short_expiry",
+                "doc_1",
+                old_revision,
+                BasicAuth("user1", "pass", "ascii"),
             )
-            try:
-                expired_rev_doc = await sg._send_request(
-                    "GET",
-                    "/short_expiry/doc_1",
-                    params={"rev": old_revision},
-                    session=public_session,
-                )
-                assert "stub" in expired_rev_doc or "_attachments" in expired_rev_doc, (
-                    f"Expected old revision to be a stub, but got full document: {expired_rev_doc}"
-                )
-            finally:
-                await public_session.close()
+            assert "stub" in expired_rev_doc or "_attachments" in expired_rev_doc, (
+                f"Expected old revision to be a stub, but got full document: {expired_rev_doc}"
+            )
         except Exception as e:
             assert "404" in str(e) or "not found" in str(e).lower(), (
                 f"Expected 404 error, got: {e}"
@@ -1115,21 +1040,11 @@ class TestDeltaSync(CBLTestClass):
         )
 
         await cblpytest.test_servers[0].cleanup()
-        self.mark_test_step("...COMPLETED...")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_with_no_deltas(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary: Testing a specific case where an update to a document doesn't produce any changes at all (i.e. empty delta)
-            1. Create new docs in CBL/ SGW
-            2. Do push_pull one shot replication to SGW
-            3. Update doc on SGW/CBL
-            4. Update doc on SGW/CBL again to have same value as rev-1
-            5. update same doc in SGW/cbl which still has rev-1
-            6. Verify the body of the doc matches with sgw and cbl
-        """
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled."
         )
@@ -1258,23 +1173,11 @@ class TestDeltaSync(CBLTestClass):
         )
 
         await cblpytest.test_servers[0].cleanup()
-        self.mark_test_step("...COMPLETED...")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_larger_than_doc(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary: Verify delta sync works when the delta is larger than the doc
-            1. Have delta sync enabled.
-            2. Create docs in CBL.
-            3. Do push replication to SGW.
-            4. Get delta stats.
-            5. Update docs in SGW, update has to be larger than doc in bytes.
-            6. Replicate docs to CBL.
-            7. Get delta stats.
-            8. Verify full doc is replicated. Delta size at step 7 should be same as step 4.
-        """
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled."
         )
@@ -1416,4 +1319,3 @@ class TestDeltaSync(CBLTestClass):
         )
 
         await cblpytest.test_servers[0].cleanup()
-        self.mark_test_step("...COMPLETED...")

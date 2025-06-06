@@ -946,16 +946,62 @@ class SyncGateway:
         if not self.__admin_session.closed:
             await self.__admin_session.close()
 
-    async def create_public_session(
-        self, auth: BasicAuth | None = None
-    ) -> ClientSession:
-        """Creates a session using the public port (4984)
+    async def get_database_config(self, db_name: str) -> dict[str, Any]:
+        """
+        Gets the configuration for a specific database from the admin API.
 
         Args:
-            auth: Optional authentication to use for the session
+            db_name: The name of the database to get configuration for
 
         Returns:
-            A new ClientSession instance
+            Dictionary containing the database configuration
         """
+        _assert_not_null(db_name, "db_name")
+        with self.__tracer.start_as_current_span(
+            "get_database_config", attributes={"cbl.database.name": db_name}
+        ):
+            return await self._send_request("GET", f"/{db_name}/_config")
+
+    async def get_document_revision_public(
+        self,
+        db_name: str,
+        doc_id: str,
+        revision: str,
+        auth: BasicAuth,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> dict[str, Any]:
+        """
+        Gets a specific revision of a document using the public API with user authentication.
+
+        Args:
+            db_name: The name of the database
+            doc_id: The document ID
+            revision: The specific revision to retrieve
+            auth: User authentication credentials
+            scope: The scope name (defaults to "_default")
+            collection: The collection name (defaults to "_default")
+
+        Returns:
+            Dictionary containing the document at the specified revision
+
+        Raises:
+            CblSyncGatewayBadResponseError: If the document or revision is not found
+        """
+        _assert_not_null(db_name, "db_name")
+        _assert_not_null(doc_id, "doc_id")
+        _assert_not_null(revision, "revision")
+        _assert_not_null(auth, "auth")
+
+        path = (
+            f"/{db_name}/{scope}.{collection}/{doc_id}"
+            if scope != "_default" or collection != "_default"
+            else f"/{db_name}/{doc_id}"
+        )
+        params = {"rev": revision}
+
         scheme = "https://" if self.__secure else "http://"
-        return self._create_session(self.__secure, scheme, self.__hostname, 4984, auth)
+        async with self._create_session(
+            self.__secure, scheme, self.__hostname, 4984, auth
+        ) as session:
+            return await self._send_request("GET", path, params=params, session=session)

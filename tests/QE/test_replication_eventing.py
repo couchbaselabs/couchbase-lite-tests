@@ -23,14 +23,6 @@ class TestReplicationEventing(CBLTestClass):
     async def test_push_replication_for_20mb_doc(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        """
-        @summary:
-            1. Create a large doc in CBL : 20MB.
-            2. Replicate to SG using push one-shot replication.
-            3. Start push one-shot replication and start replication event listener.
-            4. Check the error is thrown in replication event changes
-                as CBS can't have doc greater than 20mb.
-        """
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = CouchbaseCloud(
             cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
@@ -152,4 +144,3 @@ class TestReplicationEventing(CBLTestClass):
             print(e)
 
         await cblpytest.test_servers[0].cleanup()
-        self.mark_test_step("...COMPLETED...")
