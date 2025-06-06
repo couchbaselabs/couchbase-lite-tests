@@ -7,6 +7,8 @@ from cryptography.x509 import (
     BasicConstraints,
     Certificate,
     CertificateBuilder,
+    ExtendedKeyUsage,
+    ExtendedKeyUsageOID,
     Name,
     NameAttribute,
     NameOID,
@@ -85,6 +87,12 @@ def create_leaf_certificate(
         .serial_number(random_serial_number())
         .not_valid_before(not_valid_before)
         .not_valid_after(not_valid_after)
+        .add_extension(
+            ExtendedKeyUsage(
+                [ExtendedKeyUsageOID.CLIENT_AUTH, ExtendedKeyUsageOID.SERVER_AUTH]
+            ),
+            critical=False,
+        )
         .sign(signing_key, hashes.SHA256())
     )
 
