@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
+import requests
 from aiohttp import BasicAuth, ClientSession, TCPConnector
 from deprecated import deprecated
 from opentelemetry.trace import get_tracer
@@ -427,6 +428,25 @@ class SyncGateway:
         _assert_not_null(db_name, "db_name")
         return urljoin(self.__replication_url, db_name)
 
+    async def bytes_transferred(self, dataset_name: str) -> tuple[int, int]:
+        """
+        Gets the bytes transferred for a given dataset
+
+        :param dataset_name: The name of the dataset to get the bytes transferred for
+        """
+        resp = requests.get(
+            urljoin(self.__admin_url, "_expvar"),
+            verify=False,
+            auth=("admin", "password"),
+        )
+        resp.raise_for_status()
+        expvars = resp.json()
+
+        db_stats = expvars["syncgateway"]["per_db"][dataset_name]["database"]
+        doc_reads_bytes = db_stats["doc_reads_bytes_blip"]
+        doc_writes_bytes = db_stats["doc_writes_bytes_blip"]
+        return doc_reads_bytes, doc_writes_bytes
+
     async def _put_database(
         self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0
     ) -> None:
@@ -740,6 +760,61 @@ class SyncGateway:
                 JSONDictionary(body),
             )
 
+    async def upsert_documents(
+        self,
+        db_name: str,
+        updates: list[DocumentUpdateEntry],
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> None:
+        """
+        Upserts a list of documents on Sync Gateway.
+        Its different from update_documents in that it will not overwrite the doc body in case the
+            doc already exists.
+        It will preserve the existing body fields and only add / update whatever is being passed,
+            like the behaviour shown by the function batch_upsert used in CBL updates.
+
+        :param db_name: The name of the DB endpoint to upsert
+        :param updates: A list of upserts to perform
+        :param scope: The scope that the upserts will be applied to (default '_default')
+        :param collection: The collection that the upserts will be applied to (default '_default')
+        """
+        with self.__tracer.start_as_current_span(
+            "update_documents",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+            },
+        ):
+            merged_updates = []
+            for update in updates:
+                try:
+                    current_doc = await self.get_document(
+                        db_name, update.id, scope, collection
+                    )
+                    if current_doc is not None:
+                        current_body = dict(current_doc.body)
+                        current_body.update(update.to_json())
+                        current_body["_id"] = update.id
+                        if update.rev:
+                            current_body["_rev"] = update.rev
+                    else:
+                        current_body = update.to_json()
+                except Exception:
+                    current_body = update.to_json()
+                merged_updates.append(
+                    DocumentUpdateEntry(update.id, update.rev, current_body)
+                )
+
+            await self._rewrite_rev_ids(db_name, merged_updates, scope, collection)
+            body = {"docs": list(u.to_json() for u in merged_updates)}
+            await self._send_request(
+                "post",
+                f"/{db_name}.{scope}.{collection}/_bulk_docs",
+                JSONDictionary(body),
+            )
+
     @deprecated("Only should be used until 4.0 SGW gets close to GA")
     async def _replaced_revid(
         self, doc_id: str, revid: str, db_name: str, scope: str, collection: str
@@ -870,3 +945,63 @@ class SyncGateway:
         """
         if not self.__admin_session.closed:
             await self.__admin_session.close()
+
+    async def get_database_config(self, db_name: str) -> dict[str, Any]:
+        """
+        Gets the configuration for a specific database from the admin API.
+
+        Args:
+            db_name: The name of the database to get configuration for
+
+        Returns:
+            Dictionary containing the database configuration
+        """
+        _assert_not_null(db_name, "db_name")
+        with self.__tracer.start_as_current_span(
+            "get_database_config", attributes={"cbl.database.name": db_name}
+        ):
+            return await self._send_request("GET", f"/{db_name}/_config")
+
+    async def get_document_revision_public(
+        self,
+        db_name: str,
+        doc_id: str,
+        revision: str,
+        auth: BasicAuth,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> dict[str, Any]:
+        """
+        Gets a specific revision of a document using the public API with user authentication.
+
+        Args:
+            db_name: The name of the database
+            doc_id: The document ID
+            revision: The specific revision to retrieve
+            auth: User authentication credentials
+            scope: The scope name (defaults to "_default")
+            collection: The collection name (defaults to "_default")
+
+        Returns:
+            Dictionary containing the document at the specified revision
+
+        Raises:
+            CblSyncGatewayBadResponseError: If the document or revision is not found
+        """
+        _assert_not_null(db_name, "db_name")
+        _assert_not_null(doc_id, "doc_id")
+        _assert_not_null(revision, "revision")
+        _assert_not_null(auth, "auth")
+
+        path = (
+            f"/{db_name}/{scope}.{collection}/{doc_id}"
+            if scope != "_default" or collection != "_default"
+            else f"/{db_name}/{doc_id}"
+        )
+        params = {"rev": revision}
+
+        scheme = "https://" if self.__secure else "http://"
+        async with self._create_session(
+            self.__secure, scheme, self.__hostname, 4984, auth
+        ) as session:
+            return await self._send_request("GET", path, params=params, session=session)
