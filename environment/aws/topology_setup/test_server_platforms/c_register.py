@@ -73,15 +73,15 @@ class CTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @abstractmethod
     def cbl_filename(self, version: str) -> str:
         pass
 
     def _copy_dataset(self) -> None:
-        copy_dataset(C_TEST_SERVER_DIR / "assets", self.dataset_version)
+        copy_dataset(C_TEST_SERVER_DIR / "assets")
 
 
 class CTestServer_Desktop(CTestServer):
@@ -172,8 +172,8 @@ class CTestServer_iOS(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -264,7 +264,9 @@ class CTestServer_iOS(CTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_ios_{self.dataset_version}.zip"
+        return (
+            f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        )
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -317,8 +319,8 @@ class CTestServer_Android(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -393,7 +395,7 @@ class CTestServer_Android(CTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_android_{self.dataset_version}.apk"
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -439,9 +441,7 @@ class CTestServer_Android(CTestServer):
             / "release"
             / "app-release.apk"
         )
-        zip_path = (
-            apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
-        )
+        zip_path = apk_path.parents[5] / "testserver_android.apk"
         shutil.copy(apk_path, zip_path)
         return str(zip_path)
 
@@ -466,8 +466,8 @@ class CTestServer_Windows(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -488,7 +488,7 @@ class CTestServer_Windows(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_windows_{self.dataset_version}.zip"
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-windows-x86_64.zip"
@@ -527,8 +527,8 @@ class CTestServer_macOS(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-macos.zip"
@@ -552,7 +552,7 @@ class CTestServer_macOS(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_macos_{self.dataset_version}.zip"
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -587,8 +587,8 @@ class CTestServer_Linux(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str, arch: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str, arch: str):
+        super().__init__(version)
         self.__arch = arch
 
     @property
@@ -613,7 +613,7 @@ class CTestServer_Linux(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_linux-{self.__arch}_{self.dataset_version}.tar.gz"
+        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_linux-{self.__arch}.tar.gz"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -660,5 +660,5 @@ class CTestServer_Linux_x86_64(CTestServer_Linux):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version, "x86_64")
+    def __init__(self, version: str):
+        super().__init__(version, "x86_64")

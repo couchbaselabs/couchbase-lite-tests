@@ -58,8 +58,8 @@ class SwiftTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-swift_xc_enterprise_{version}.zip"
@@ -87,10 +87,7 @@ class SwiftTestServer(TestServer):
 
     def _copy_dataset(self) -> None:
         dest_dir = SWIFT_TEST_SERVER_DIR / "Assets"
-        copy_dataset(
-            dest_dir,
-            self.dataset_version,
-        )
+        copy_dataset(dest_dir)
 
 
 @TestServer.register("swift_ios")
@@ -102,8 +99,8 @@ class SwiftTestServer_iOS(SwiftTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -124,7 +121,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-ios/{version_parts[0]}/{version_parts[1]}/testserver_ios_{self.dataset_version}.zip"
+        return f"couchbase-lite-ios/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
 
     def build(self) -> None:
         self._copy_dataset()

@@ -103,9 +103,8 @@ class TestServer(ABC):
 
     __registry: dict[str, type[TestServer]] = {}
 
-    def __init__(self, version: str, dataset_version: str) -> None:
+    def __init__(self, version: str) -> None:
         self.__version = version
-        self.__dataset_version = dataset_version
         self._downloaded = False
 
     @classmethod
@@ -146,7 +145,7 @@ class TestServer(ABC):
         return decorator
 
     @classmethod
-    def create(cls, name: str, version: str, dataset_version: str) -> TestServer:
+    def create(cls, name: str, version: str) -> TestServer:
         """
         Create an instance of a registered test server subclass.
 
@@ -166,7 +165,7 @@ class TestServer(ABC):
         if name not in cls.__registry:
             raise ValueError(f"Unknown test server type: {name}")
 
-        return cls.__registry[name](version, dataset_version)
+        return cls.__registry[name](version)
 
     @property
     def version(self) -> str:
@@ -177,16 +176,6 @@ class TestServer(ABC):
             str: The version of the test server.
         """
         return self.__version
-
-    @property
-    def dataset_version(self) -> str:
-        """
-        Get the dataset version of the test server.
-
-        Returns:
-            str: The dataset version of the test server.
-        """
-        return self.__dataset_version
 
     @property
     @abstractmethod
@@ -282,9 +271,13 @@ class TestServer(ABC):
         pass
 
 
-def copy_dataset(dest_dir: Path, version: str):
-    header(f"Copying dataset resources v{version}")
-    db_dir = TEST_SERVER_DIR.parent / "dataset" / "server" / "dbs" / version
+def copy_dataset(dest_dir: Path):
+    header("Copying dataset resources")
+    click.secho(
+        "WARNING: This call is deprecated, and the server should not need this anymore.",
+        fg="yellow",
+    )
+    db_dir = TEST_SERVER_DIR.parent / "dataset" / "server" / "dbs" / "3.2"
     blob_dir = TEST_SERVER_DIR.parent / "dataset" / "server" / "blobs"
 
     dest_db_dir = dest_dir / "dbs"
