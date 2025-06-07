@@ -3,9 +3,9 @@ from typing import cast
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.database import Database
-from cbltest.api.replicator import (
-    ReplicatorCollectionEntry,
-)
+from cbltest.api.multipeer_replicator_types import MultipeerReplicatorAuthenticator
+from cbltest.api.replicator import ReplicatorCollectionEntry
+from cbltest.api.x509_certificate import CertKeyPair, create_leaf_certificate
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import TestServerRequestType
 from cbltest.v1.requests import (
@@ -55,11 +55,19 @@ class MultipeerReplicator:
         """Gets the collections for the replicator"""
         return self.__collections
 
+    @property
+    def identity(self) -> CertKeyPair:
+        """Gets the identity used by the replicator"""
+        return self.__identity
+
     def __init__(
         self,
         peerGroupID: str,
         database: Database,
         collections: list[ReplicatorCollectionEntry],
+        *,
+        authenticator: MultipeerReplicatorAuthenticator | None = None,
+        identity: CertKeyPair | None = None,
     ):
         assert database._request_factory.version == 1, (
             "This version of the cbl test API requires request API v1"
@@ -68,6 +76,10 @@ class MultipeerReplicator:
         self.__request_factory = database._request_factory
         self.__peerGroupID = peerGroupID
         self.__database = database
+        self.__authenticator = authenticator
+        self.__identity = (
+            identity if identity is not None else create_leaf_certificate("anonymous")
+        )
         assert len(collections) > 0, "At least one collection is required"
         self.__collections = collections
         self.__tracer = get_tracer(__name__, VERSION)
@@ -79,7 +91,11 @@ class MultipeerReplicator:
         """
         with self.__tracer.start_as_current_span("start_multipeer_replicator"):
             payload = PostStartMultipeerReplicatorRequestBody(
-                self.__peerGroupID, self.__database.name, self.__collections
+                self.__peerGroupID,
+                self.__database.name,
+                self.__collections,
+                self.__identity,
+                authenticator=self.__authenticator,
             )
 
             req = self.__request_factory.create_request(

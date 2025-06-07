@@ -1,14 +1,17 @@
+import base64
 from enum import Enum
 from typing import Any, cast
 from uuid import UUID
 
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.jsonserializable import JSONSerializable
+from cbltest.api.multipeer_replicator_types import MultipeerReplicatorAuthenticator
 from cbltest.api.replicator_types import (
     ReplicatorAuthenticator,
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
+from cbltest.api.x509_certificate import CertKeyPair
 from cbltest.assertions import _assert_not_null
 from cbltest.logging import cbl_warning
 from cbltest.requests import TestServerRequest, TestServerRequestBody
@@ -796,8 +799,17 @@ class PostStartMultipeerReplicatorRequestBody(TestServerRequestBody):
                     }
                 }
                 }
-            ]
+            ],
+            "identity": {
+                "encoding": "PKCS12",
+                "data": "string",
+                "password": "pass"
+            },
+            "authenticator": {
+                "type": "CA-CERT",
+                "certificate": "string"
             }
+        }
     """
 
     @property
@@ -820,18 +832,32 @@ class PostStartMultipeerReplicatorRequestBody(TestServerRequestBody):
         peerGroupID: str,
         database: str,
         collections: list[ReplicatorCollectionEntry],
+        identity: CertKeyPair,
+        *,
+        authenticator: MultipeerReplicatorAuthenticator | None = None,
     ):
         super().__init__(1)
         self.__peerGroupID = peerGroupID
         self.__database = database
         self.__collections = collections
+        self.__identity = identity
+        self.__authenticator = authenticator
 
     def to_json(self) -> Any:
-        return {
+        json = {
             "peerGroupID": self.__peerGroupID,
             "database": self.__database,
             "collections": self.__collections,
+            "identity": {
+                "encoding": "PKCS12",
+                "data": base64.b64encode(self.__identity.pfx_bytes()).decode("utf-8"),
+            },
         }
+
+        if self.__authenticator is not None:
+            json["authenticator"] = self.__authenticator.to_json()
+
+        return json
 
 
 class PostStopMultipeerReplicatorRequestBody(TestServerRequestBody):
