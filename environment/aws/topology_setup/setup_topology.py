@@ -679,10 +679,12 @@ class TopologyConfig:
             bridge.run(test_server_input.location)
             port = 5555 if test_server_input.platform.startswith("dotnet") else 8080
             ip = bridge.get_ip(test_server_input.location)
+
+            success = False
             for _ in range(0, 30):
                 try:
                     requests.get(f"http://{ip}:{port}")
-                    return
+                    success = True
                 except requests.exceptions.ConnectionError:
                     click.secho(
                         f"Failed to connect to test server at {ip}:{port}, retrying in 1s...",
@@ -691,9 +693,10 @@ class TopologyConfig:
                     sleep(1)
                     pass
 
-            raise RuntimeError(
-                f"Test server failed to start at {test_server_input.location}"
-            )
+            if not success:
+                raise RuntimeError(
+                    f"Test server failed to start at {test_server_input.location}"
+                )
 
     def stop_test_servers(self):
         """

@@ -121,8 +121,10 @@ def setup_test(
             },
         }
         topology["tag"] = topology_tag
-        topology["test_servers"][0]["cbl_version"] = cbl_version
-        topology["test_servers"][0]["dataset_version"] = dataset_version
+        for ts in topology["test_servers"]:
+            ts["cbl_version"] = cbl_version
+            ts["dataset_version"] = dataset_version
+
         with open(topology_file_out, "w") as fout:
             json.dump(topology, fout, indent=4)
 
