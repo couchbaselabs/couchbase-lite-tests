@@ -176,7 +176,7 @@ class AndroidBridge(PlatformBridge):
             capture_output=False,
         )
 
-    def get_ip(self, location: str) -> str:
+    def _get_ip(self, location: str) -> str | None:
         """
         Retrieve the IP address of the specified device.
 
@@ -211,4 +211,4 @@ class AndroidBridge(PlatformBridge):
             if "inet" in line:
                 return line.lstrip().split(" ")[1].split("/")[0]
 
-        raise RuntimeError(f"Could not determine IP address of '{location}'")
+        return None
