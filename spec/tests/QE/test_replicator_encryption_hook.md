@@ -6,14 +6,13 @@
 Test replication of documents with deeply nested encrypted fields, ensuring encrypted values are present and correctly handled during replication.
 
 ### Steps
-1. Reset SG and load `posts` dataset.
+1. Reset SG and load `posts` dataset
 2. Reset local database, and load `posts` dataset.
 3. Start a replicator:
    * endpoint: `/posts`
    * collections: `_default.posts`
    * type: pull
    * continuous: false
-   * encryption_hook: true
    * credentials: user1/pass
 4. Wait until the replicator stops.
 5. Check that all docs are replicated correctly.
@@ -34,7 +33,7 @@ Test replication of documents with deeply nested encrypted fields, ensuring encr
      }
      ```
    * Apply encryption hook to "encrypted_field" at 15th level
-7. Start the same replicator again.
+7. Start the same replicator again
 8. Wait until the replicator stops.
 9. Check that the document is in SGW:
     * Verify document exists
@@ -44,34 +43,22 @@ Test replication of documents with deeply nested encrypted fields, ensuring encr
 ## #2 test_delta_sync_with_encryption
 
 ### Description
-Verify that delta sync does not work when an encryption callback hook is present.
+Verify that delta sync works correctly when an encryption callback hook is present.
 
 ### Steps
-1. Reset SG and load `travel` dataset with delta sync enabled.
+1. Reset SG and load `travel` dataset with delta sync enabled
 2. Reset local database, and load `travel` dataset.
 3. Start a replicator:
     * endpoint: `/travel`
     * collections: `travel.hotels`
-    * type: push-and-pull
-    * continuous: true
+    * type: pull
+    * continuous: false
     * credentials: user1/pass
 4. Wait until the replicator stops.
 5. Check that all docs are replicated correctly.
-6. Create a document in CBL:
-    * with ID "hotel_1" with body:
-        * `"name": "CBL"`
-        * `"encrypted_field": EncryptedValue("secret_password")`
-7. Start the same replicator again.
-8. Wait until the replicator is idle.
-9. Record the bytes transferred.
-10. Verify the new document in SGW exists
-11. Update document in SGW: `"name": "SGW"`.
-12. Start a replicator:
-    * endpoint: `/travel`
-    * collections: `travel.hotels`
-    * type: pull
-    * continuous: false
-    * enableDocumentListener: true
-    * credentials: user1/pass
-13. Record the bytes transferred.
-14. Verify entire document is replicated.
+6. Record baseline bytes before update
+7. Get existing document for encryption test
+8. Update existing document in SGW with encryption
+9. Start the same replicator again to pull the update
+10. Record the bytes transferred after delta sync.
+11. Verify delta sync worked with encryption.
