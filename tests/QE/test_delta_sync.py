@@ -101,7 +101,7 @@ class TestDeltaSync(CBLTestClass):
                 {"name": "Updated Hotel"},
             )
         ]
-        await cblpytest.sync_gateways[0].upsert_documents(
+        await cblpytest.sync_gateways[0].update_documents(
             "travel", updates, "travel", "hotels"
         )
 
@@ -228,7 +228,7 @@ class TestDeltaSync(CBLTestClass):
                 {"name": "SGW", "nested": {"name": "I am a nested field"}},
             )
         ]
-        await cblpytest.sync_gateways[0].upsert_documents(
+        await cblpytest.sync_gateways[0].update_documents(
             "travel", updates, "travel", "hotels"
         )
 
@@ -361,7 +361,7 @@ class TestDeltaSync(CBLTestClass):
                 {"utf8": utf8_body},
             )
         ]
-        await cblpytest.sync_gateways[0].upsert_documents(
+        await cblpytest.sync_gateways[0].update_documents(
             "travel", updates, "travel", "hotels"
         )
 
@@ -484,7 +484,7 @@ class TestDeltaSync(CBLTestClass):
         updates = [
             DocumentUpdateEntry("hotel_400", original_doc.revid, {"name": "SGW"})
         ]
-        await cblpytest.sync_gateways[0].upsert_documents(
+        await cblpytest.sync_gateways[0].update_documents(
             "travel", updates, "travel", "hotels"
         )
 
@@ -580,12 +580,11 @@ class TestDeltaSync(CBLTestClass):
             "posts"
         )
 
-        self.mark_test_step("Get existing document for comparison")
-        existing_doc = await cblpytest.sync_gateways[0].get_document(
+        self.mark_test_step("Get existing document size for comparison")
+        original_doc = await cblpytest.sync_gateways[0].get_document(
             "posts", "post_1", collection="posts"
         )
-        assert existing_doc is not None, "Document should exist in SGW"
-        original_doc_size = len(json.dumps(existing_doc.body).encode("utf-8"))
+        assert original_doc is not None, "Document should exist in SGW"
 
         self.mark_test_step("""
             Update docs in SGW:
@@ -596,7 +595,7 @@ class TestDeltaSync(CBLTestClass):
             [
                 DocumentUpdateEntry(
                     "post_1",
-                    existing_doc.revid,
+                    original_doc.revid,
                     {"channels": ["group1"], "name": "SGW"},
                 )
             ],
@@ -640,9 +639,10 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step(
             "Verify delta transferred equivalent to doc size (full doc transfer)."
         )
+        updated_doc_size = len(json.dumps(updated_cbl_doc.body).encode("utf-8"))
         delta_bytes_transferred = bytes_read_after - bytes_read_before
-        assert delta_bytes_transferred >= 0.8 * original_doc_size, (
-            f"Expected a full doc transfer, but only {delta_bytes_transferred} bytes read (doc size: {original_doc_size})"
+        assert delta_bytes_transferred >= 0.8 * updated_doc_size, (
+            f"Expected a full doc transfer, but only {delta_bytes_transferred} bytes read (doc size: {updated_doc_size})"
         )
 
         await cblpytest.test_servers[0].cleanup()
@@ -752,7 +752,7 @@ class TestDeltaSync(CBLTestClass):
             Update docs in SGW:
                 * Modify content in document "doc1": `"name": "SGW"` (small change)
         """)
-        await cblpytest.sync_gateways[0].upsert_documents(
+        await cblpytest.sync_gateways[0].update_documents(
             "short_expiry",
             [
                 DocumentUpdateEntry(
@@ -872,7 +872,7 @@ class TestDeltaSync(CBLTestClass):
         original_doc = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
-        await cblpytest.sync_gateways[0].upsert_documents(
+        await cblpytest.sync_gateways[0].update_documents(
             "travel",
             [DocumentUpdateEntry("hotel_400", original_doc.revid, {})],
             "travel",
@@ -967,7 +967,7 @@ class TestDeltaSync(CBLTestClass):
                 * Update the same hotel document with much larger content (>2x original size)
         """)
         large_doc_body = "X" * 2_000_000
-        await cblpytest.sync_gateways[0].upsert_documents(
+        await cblpytest.sync_gateways[0].update_documents(
             "travel",
             [
                 DocumentUpdateEntry(

@@ -112,9 +112,9 @@ Verify delta sync behavior when toggling delta sync enabled/disabled. Ensures th
     * continuous: false
     * credentials: user1/pass
 17. Wait until the replicator stops.
-18. Verify docs are replicated correctly
-19. Record the bytes transferred
-20. Get existing document for comparison
+18. Verify docs are replicated correctly.
+19. Record the bytes transferred.
+20. Get existing document size for comparison
 21. Update docs in SGW:
     * Modify the `name` field of the new doc.
 22. Start the same replicator again.
