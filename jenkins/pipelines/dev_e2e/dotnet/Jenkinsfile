@@ -24,6 +24,29 @@ pipeline {
                 }
             }
         }
+        stage('Prebuild Servers') {
+            steps {
+                script {
+                    def platforms = [
+                        'dotnet_windows', 'dotnet_ios', 'dotnet_android', 'dotnet_macos'
+                    ]
+                    def parallelBuilds = [:]
+                    for(p in platforms) {
+                        parallelBuilds[p] = {
+                            build job: 'prebuild-test-server',
+                            parameters: [
+                                string(name: 'PLATFORM', value: p),
+                                string(name: 'VERSION', value: params.VERSION),
+                                string(name: 'BLD_NUM', value: params.BLD_NUM)
+                            ],
+                            wait: true,
+                            propagate: true
+                        }
+                    }
+                    parallel parallelBuilds
+                }
+            }
+        }
         stage('Desktop') {
             parallel {
                 stage("Windows") {
