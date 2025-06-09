@@ -42,7 +42,7 @@ pipeline {
                             .\\venv\\Scripts\\activate
                             pip install uv
                             uv pip install -r environment/aws/requirements.txt
-                            python environment/aws/topology_setup/build_test_server.py \$env:PLATFORM \$env:VERSION-\$env:BLD_NUM --ci
+                            python environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:CBL_VERSION-\$env:CBL_BUILD --ci
                             deactivate
                         """
                     } else {
@@ -53,7 +53,7 @@ pipeline {
                             source venv/bin/activate
                             pip install uv
                             uv pip install -r "environment/aws/requirements.txt"
-                            python "environment/aws/topology_setup/build_test_server.py" $PLATFORM $VERSION-$BLD_NUM --ci
+                            python "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $CBL_VERSION-$CBL_BUILD --ci
                             deactivate
                         """
                     }
