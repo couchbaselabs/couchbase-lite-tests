@@ -642,9 +642,7 @@ class TopologyConfig:
         """
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
-                test_server_input.platform,
-                test_server_input.cbl_version,
-                test_server_input.dataset_version,
+                test_server_input.platform, test_server_input.cbl_version
             )
             bridge = test_server.create_bridge()
             bridge.validate(test_server_input.location)
@@ -663,9 +661,7 @@ class TopologyConfig:
         """
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
-                test_server_input.platform,
-                test_server_input.cbl_version,
-                test_server_input.dataset_version,
+                test_server_input.platform, test_server_input.cbl_version
             )
 
             if test_server_input.download:
@@ -705,9 +701,7 @@ class TopologyConfig:
         TestServer.initialize()
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
-                test_server_input.platform,
-                test_server_input.cbl_version,
-                test_server_input.dataset_version,
+                test_server_input.platform, test_server_input.cbl_version
             )
             bridge = test_server.create_bridge()
             bridge.validate(test_server_input.location)

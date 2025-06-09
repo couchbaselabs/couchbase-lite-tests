@@ -162,11 +162,10 @@ class JarBridge(JavaBridge):
 
 
 class JettyBridge(JavaBridge):
-    def __init__(self, cbl_version: str, dataset_version: str):
+    def __init__(self, cbl_version: str):
         super().__init__()
 
         self.__cbl_version = cbl_version
-        self.__dataset_version = dataset_version
         self.__gradle_path = JAK_TEST_SERVER_DIR / "webservice" / "gradlew"
         if platform.system() == "Windows":
             self.__gradle_path = self.__gradle_path.with_suffix(".bat")
@@ -200,7 +199,7 @@ class JettyBridge(JavaBridge):
             str(self.__gradle_path),
             "jettyStart",
             f"-PcblVersion={self.__cbl_version}",
-            f"-PdatasetVersion={self.__dataset_version}",
+            "-PdatasetVersion=3.2",
         ]
         if platform.system() != "Windows":
             args.insert(0, "nohup")
@@ -228,7 +227,7 @@ class JettyBridge(JavaBridge):
             str(self.__gradle_path),
             "appStop",
             f"-PcblVersion={self.__cbl_version}",
-            f"-PdatasetVersion={self.__dataset_version}",
+            "-PdatasetVersion=3.2",
         ]
         subprocess.run(
             args, cwd=self.__gradle_path.parent, check=check_result, capture_output=True
@@ -248,8 +247,8 @@ class JAKTestServer(TestServer):
     def test_server_path(self) -> str:
         pass
 
-    def __init__(self, version: str, dataset_version: str, gradle_target: str = "jar"):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str, gradle_target: str = "jar"):
+        super().__init__(version)
         self.__gradle_target = gradle_target
 
     def _copy_dataset(self) -> None:
@@ -258,9 +257,9 @@ class JAKTestServer(TestServer):
         # and instead only copy the one that is going to be built
         # so that way there is no need to keep a manual list of versions
         # here.
-        dest_dir = JAK_TEST_SERVER_DIR / "assets" / self.dataset_version
+        dest_dir = JAK_TEST_SERVER_DIR / "assets" / "3.2"
         dest_dir.mkdir(0o755, parents=True, exist_ok=True)
-        copy_dataset(dest_dir, self.dataset_version)
+        copy_dataset(dest_dir)
 
     def build(self) -> None:
         """
@@ -275,7 +274,7 @@ class JAKTestServer(TestServer):
             str(gradle_path.resolve()),
             self.__gradle_target,
             f"-PcblVersion={self.version}",
-            f"-PdatasetVersion={self.dataset_version}",
+            "-PdatasetVersion=3.2",
         ]
         if platform.system() == "Windows":
             args.append("--no-daemon")
@@ -292,8 +291,8 @@ class JAKTestServer_Android(JAKTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version, "assembleRelease")
+    def __init__(self, version: str):
+        super().__init__(version, "assembleRelease")
 
     @property
     def test_server_path(self) -> str:
@@ -318,7 +317,7 @@ class JAKTestServer_Android(JAKTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-android/{version_parts[0]}/{version_parts[1]}/testserver_android_{self.dataset_version}.apk"
+        return f"couchbase-lite-android/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
     def create_bridge(self) -> PlatformBridge:
         """
@@ -362,9 +361,7 @@ class JAKTestServer_Android(JAKTestServer):
             / "release"
             / "app-release.apk"
         )
-        zip_path = (
-            apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
-        )
+        zip_path = apk_path.parents[5] / "testserver_android.apk"
         shutil.copy(apk_path, zip_path)
         return str(zip_path)
 
@@ -382,8 +379,8 @@ class JAKTestServer_Android(JAKTestServer):
 
 @TestServer.register("jak_desktop")
 class JAKTestServer_Desktop(JAKTestServer):
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
         with open(JAK_TEST_SERVER_DIR / "version.txt") as f:
             self.__server_version = f.read().strip()
 
@@ -410,7 +407,7 @@ class JAKTestServer_Desktop(JAKTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
+        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/CBLTestServer-Java-Desktop.jar"
 
     def create_bridge(self):
         jar_path = (
@@ -419,7 +416,7 @@ class JAKTestServer_Desktop(JAKTestServer):
                 / "downloaded"
                 / self.platform
                 / self.version
-                / f"CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
+                / "CBLTestServer-Java-Desktop.jar"
             )
             if self._downloaded
             else str(
@@ -453,10 +450,7 @@ class JAKTestServer_Desktop(JAKTestServer):
 
         # The server version is not going to be known when downloading from latestbuilds,
         # and the CBL version will be built into the path on latestbuilds, so remove both
-        copy_path = (
-            jar_path.parents[5]
-            / f"CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
-        )
+        copy_path = jar_path.parents[5] / "CBLTestServer-Java-Desktop.jar"
         shutil.copy(jar_path, copy_path)
         return str(copy_path)
 
@@ -474,8 +468,8 @@ class JAKTestServer_Desktop(JAKTestServer):
 
 @TestServer.register("jak_webservice")
 class JAKTestServer_WebService(JAKTestServer):
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def test_server_path(self) -> str:
@@ -498,7 +492,7 @@ class JAKTestServer_WebService(JAKTestServer):
         )
 
     def create_bridge(self):
-        return JettyBridge(self.version, self.dataset_version)
+        return JettyBridge(self.version)
 
     def compress_package(self):
         raise NotImplementedError(
