@@ -3,16 +3,16 @@ pipeline {
 
     parameters {
         choice(
-            name: 'PLATFORM',
+            name: 'TS_PLATFORM',
             choices: ['dotnet_windows', 'dotnet_macos', 'dotnet_ios', 'dotnet_android', 'jak_android', 'jak_desktop', 'jak_webservice', 'swift_ios', 'c_ios', 'c_android', 'c_linux_x86_64', 'c_macos', 'c_windows'],
             description: 'The test server platform to build'
         )
         string(
-            name: 'VERSION',
+            name: 'CBL_VERSION',
             description: 'The version of CBL to use'
         )
         string(
-            name: 'BLD_NUM',
+            name: 'CBL_BUILD',
             description: 'The build of CBL to use'
         )
     }
@@ -22,8 +22,8 @@ pipeline {
             agent any
             steps {
                 script {
-                    if (!params.PLATFORM || !params.VERSION || !params.BLD_NUM) {
-                        error("One or more required parameters are not set. Please set PLATFORM, VERSION, BLD_NUM.")
+                    if (!params.TS_PLATFORM || !params.CBL_VERSION || !params.CBL_BUILD) {
+                        error("One or more required parameters are not set. Please set TS_PLATFORM, CBL_VERSION, CBL_BUILD.")
                     }
                 }
             }
@@ -31,12 +31,12 @@ pipeline {
 
         stage('Build') {
             agent {
-                label getNodeForPlatform(params.PLATFORM)
+                label getNodeForPlatform(params.TS_PLATFORM)
             }
             steps {
                 script {
-                    currentBuild.displayName = "${params.PLATFORM} ${params.VERSION}-${params.BLD_NUM}"
-                    if (params.PLATFORM.contains("windows")) {
+                    currentBuild.displayName = "${params.TS_PLATFORM} ${params.CBL_VERSION}-${params.CBL_BUILD}"
+                    if (params.TS_PLATFORM.contains("windows")) {
                         pwsh """
                             python -m venv venv
                             .\\venv\\Scripts\\activate

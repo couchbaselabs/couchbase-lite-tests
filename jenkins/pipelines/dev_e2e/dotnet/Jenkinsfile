@@ -33,9 +33,9 @@ pipeline {
                         parallelBuilds[p] = {
                             build job: 'prebuild-test-server',
                             parameters: [
-                                string(name: 'PLATFORM', value: p),
-                                string(name: 'VERSION', value: params.CBL_VERSION),
-                                string(name: 'BLD_NUM', value: params.CBL_BUILD)
+                                string(name: 'TS_PLATFORM', value: p),
+                                string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                                string(name: 'CBL_BUILD', value: params.CBL_BUILD)
                             ],
                             wait: true,
                             propagate: true
