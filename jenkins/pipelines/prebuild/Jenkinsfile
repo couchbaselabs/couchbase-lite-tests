@@ -22,8 +22,8 @@ pipeline {
             agent any
             steps {
                 script {
-                    if (!params.PLATFORM || !params.VERSION || !params.BLD_NUM || !params.DATASET_VERSION) {
-                        error("One or more required parameters are not set. Please set PLATFORM, VERSION, BLD_NUM, and DATASET_VERSION.")
+                    if (!params.PLATFORM || !params.VERSION || !params.BLD_NUM) {
+                        error("One or more required parameters are not set. Please set PLATFORM, VERSION, BLD_NUM.")
                     }
                 }
             }
