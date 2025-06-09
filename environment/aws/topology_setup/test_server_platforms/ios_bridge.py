@@ -374,7 +374,7 @@ class iOSBridge(PlatformBridge):
                         fg="yellow",
                     )
 
-    def get_ip(self, location: str) -> str:
+    def _get_ip(self, location: str) -> str | None:
         """
         Retrieve the IP address of the specified device.
 
@@ -414,4 +414,4 @@ class iOSBridge(PlatformBridge):
             if mac_address in line:
                 return line.split(" ")[1].strip("()")
 
-        raise RuntimeError(f"Could not determine IP address of '{location}'")
+        return None
