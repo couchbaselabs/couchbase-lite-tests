@@ -36,8 +36,8 @@ pipeline {
                             build job: 'prebuild-test-server',
                             parameters: [
                                 string(name: 'PLATFORM', value: p),
-                                string(name: 'VERSION', value: params.VERSION),
-                                string(name: 'BLD_NUM', value: params.BLD_NUM)
+                                string(name: 'VERSION', value: params.CBL_VERSION),
+                                string(name: 'BLD_NUM', value: params.CBL_BUILD)
                             ],
                             wait: true,
                             propagate: true
