@@ -260,10 +260,11 @@ class TestDeltaSync(CBLTestClass):
         assert updated_cbl_doc.body.get("name") == "SGW", (
             f"Expected updated name, got: {updated_cbl_doc.body.get('name')}"
         )
+        nested_data = updated_cbl_doc.body.get("nested")
         assert (
-            updated_cbl_doc.body.get("nested").get("name") == "I am a nested field"
+            nested_data is not None and nested_data.get("name") == "I am a nested field"
         ), (
-            f"Expected updated nested field, got: {updated_cbl_doc.body.get('nested').get('name')}"
+            f"Expected updated nested field, got: {nested_data.get('name') if nested_data else None}"
         )
 
         self.mark_test_step("Record the bytes transferred")
@@ -872,6 +873,7 @@ class TestDeltaSync(CBLTestClass):
         original_doc = await cblpytest.sync_gateways[0].get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
+        assert original_doc is not None, "Document hotel_400 should exist"
         await cblpytest.sync_gateways[0].update_documents(
             "travel",
             [DocumentUpdateEntry("hotel_400", original_doc.revid, {})],
