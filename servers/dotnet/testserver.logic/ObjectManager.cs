@@ -1,6 +1,7 @@
 ﻿using Couchbase.Lite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Nito.AsyncEx;
 using System.IO.Compression;
 using System.Net;
 using System.Text.Json;
@@ -17,7 +18,7 @@ namespace TestServer
         private readonly Dictionary<string, Database> _activeDatabases = new();
         private readonly Dictionary<string, IDisposable> _activeDisposables = new();
         private readonly HashSet<object> _keepAlives = new();
-        private readonly AutoReaderWriterLock _lock = new AutoReaderWriterLock();
+        private readonly AsyncReaderWriterLock _lock = new AsyncReaderWriterLock();
         private readonly string _datasetVersion;
         private readonly HttpClient _httpClient = new HttpClient();
 
@@ -32,7 +33,7 @@ namespace TestServer
 
         public void Reset()
         {
-            using var l = _lock.GetWriteLock();
+            using var l = _lock.WriterLock();
 
             foreach (var db in _activeDatabases) {
                 try {
@@ -58,7 +59,7 @@ namespace TestServer
         public async Task LoadDatabase(string? datasetName, IEnumerable<string> targetDbNames, IEnumerable<string>? collections = null)
         {
             IEnumerable<string> targetsToCreate = default!;
-            using (var rl = _lock.GetReadLock()) {
+            using (var rl = _lock.ReaderLock()) {
                 targetsToCreate = targetDbNames.Where(x => !_activeDatabases.ContainsKey(x));
                 if (!targetsToCreate.Any()) {
                     return;
@@ -104,7 +105,7 @@ namespace TestServer
                 throw new JsonException($"Request for nonexistent dataset '{datasetName}'");
             }
             var destinationZip = Path.Combine(FilesDirectory, $"{datasetName}.cblite2.zip");
-            using var wl = _lock.GetWriteLock();
+            using var wl = _lock.WriterLock();
             if (File.Exists(destinationZip)) {
                 File.Delete(destinationZip);
             }
@@ -185,7 +186,7 @@ namespace TestServer
                 throw new ApplicationException($"Unable to download item '{relativePath}'", ex);
             }
 
-            using var wl = _lock.GetWriteLock();
+            using var wl = await _lock.WriterLockAsync();
             using (var fout = File.Create(downloadedPath)) {
                 await retVal.CopyToAsync(fout).ConfigureAwait(false);
             }
