@@ -6,7 +6,7 @@ function New-Venv {
         [string]$PythonVersion = "3.10"
     )
 
-    python -m pip install uv
+    python -m pip install uv --user
     python -m uv venv --python $PythonVersion $Directory
     . "$Directory\Scripts\activate.ps1"
     python -m ensurepip --upgrade
