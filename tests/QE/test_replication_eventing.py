@@ -11,7 +11,6 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorBasicAuthenticator,
     ReplicatorCollectionEntry,
-    ReplicatorType,
 )
 
 
@@ -23,30 +22,30 @@ class TestReplicationEventing(CBLTestClass):
     async def test_push_replication_for_20mb_doc(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
-        self.mark_test_step("Reset SG and load `posts` dataset.")
+        self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = CouchbaseCloud(
             cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
         )
-        await cloud.configure_dataset(dataset_path, "posts")
+        await cloud.configure_dataset(dataset_path, "names")
 
-        self.mark_test_step("Reset local database, and load `posts` dataset.")
+        self.mark_test_step("Reset local database, and load `names` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="posts"
+            ["db1"], dataset="names"
         )
         db = dbs[0]
 
         self.mark_test_step("""
             Start a replicator:
-                * endpoint: `/posts`
-                * collections: `_default.posts`
+                * endpoint: `/names`
+                * collections: `_default._default`
                 * type: push-and-pull
                 * continuous: false
                 * credentials: user1/pass
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("posts"),
-            collections=[ReplicatorCollectionEntry(["_default.posts"])],
+            cblpytest.sync_gateways[0].replication_url("names"),
+            collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
         )
@@ -66,7 +65,7 @@ class TestReplicationEventing(CBLTestClass):
         """)
         async with db.batch_updater() as b:
             b.upsert_document(
-                "_default.posts",
+                "_default._default",
                 "large_doc",
                 new_blobs={"image": "xl1.jpg"},
             )
@@ -76,7 +75,7 @@ class TestReplicationEventing(CBLTestClass):
                 * Check document exists in local database
                 * Verify attachment is accessible
         """)
-        doc = await db.get_document(DocumentEntry("_default.posts", "large_doc"))
+        doc = await db.get_document(DocumentEntry("_default._default", "large_doc"))
         assert doc is not None, "Document not found after update"
 
         self.mark_test_step("""
@@ -89,22 +88,7 @@ class TestReplicationEventing(CBLTestClass):
         blob_dict = doc.body.get("image")
         assert isinstance(blob_dict, dict), "image is not a dict"
 
-        self.mark_test_step("""
-            Start a replicator:
-                * endpoint: `/posts`
-                * collections: `_default.posts`
-                * type: push
-                * continuous: false
-                * credentials: user1/pass
-        """)
-        replicator = Replicator(
-            db,
-            cblpytest.sync_gateways[0].replication_url("posts"),
-            collections=[ReplicatorCollectionEntry(["_default.posts"])],
-            replicator_type=ReplicatorType.PUSH,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
-        )
+        self.mark_test_step("Start the same replicator again.")
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -117,17 +101,10 @@ class TestReplicationEventing(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("""
-            Verify document was not replicated:
-                * Check replicator error indicates document size limit exceeded
-                * Verify document is not present in Sync Gateway
-                * Validate error message contains size limit information
-        """)
-        docs_after = await db.get_all_documents("_default.posts")
-        sgw_docs_after = await cblpytest.sync_gateways[0].get_all_documents(
-            "posts", collection="posts"
-        )
-        assert len(sgw_docs_after.rows) < len(docs_after["_default.posts"]), (
+        self.mark_test_step("Verify document was not replicated.")
+        docs_after = await db.get_all_documents("_default._default")
+        sgw_docs_after = await cblpytest.sync_gateways[0].get_all_documents("names")
+        assert len(sgw_docs_after.rows) < len(docs_after["_default._default"]), (
             f"Expected no successful document updates but found {len(sgw_docs_after.rows)}"
         )
         large_doc = next(
@@ -136,9 +113,7 @@ class TestReplicationEventing(CBLTestClass):
         assert large_doc is None, "Large document should not be replicated"
         try:
             with pytest.raises(Exception) as excinfo:
-                await cblpytest.sync_gateways[0].get_document(
-                    "posts", "large_doc", collection="_default.posts"
-                )
+                await cblpytest.sync_gateways[0].get_document("names", "large_doc")
             assert "404" in str(excinfo.value) or "returned 404" in str(excinfo.value)
         except Exception as e:
             print(e)

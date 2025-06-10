@@ -6,11 +6,11 @@
 Test push replication of a large document (>20MB) from Couchbase Lite to Sync Gateway, and verify that an error is thrown for oversized documents.
 
 ### Steps
-1. Reset SG and load `posts` dataset.
-2. Reset local database, and load `posts` dataset.
+1. Reset SG and load `names` dataset.
+2. Reset local database, and load `names` dataset.
 3. Start a replicator:
-   * endpoint: `/posts`
-   * collections: `_default.posts`
+   * endpoint: `/names`
+   * collections: `_default._default`
    * type: push-and-pull
    * continuous: false
    * credentials: user1/pass
@@ -26,12 +26,7 @@ Test push replication of a large document (>20MB) from Couchbase Lite to Sync Ga
    * Check text content is correct
    * Verify metadata is present
    * Validate attachment size is 20MB
-8. Start a replicator:
-   * endpoint: `/posts`
-   * collections: `_default.posts`
-   * type: push
-   * continuous: false
-   * credentials: user1/pass
+8. Start the same replicator again.
 9. Wait until the replicator is stopped.
 10. Verify document was not replicated:
     * Check replicator error indicates document size limit exceeded

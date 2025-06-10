@@ -44,7 +44,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             Start a replicator:
                 * endpoint: `/posts`
                 * collections: `_default.posts`
-                * type: pull
+                * type: push-and-pull
                 * continuous: false
                 * credentials: user1/pass
         """)
@@ -52,7 +52,6 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             db,
             cblpytest.sync_gateways[0].replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
-            replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
             enable_document_listener=True,
@@ -73,7 +72,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         await compare_local_and_remote(
             db,
             cblpytest.sync_gateways[0],
-            ReplicatorType.PULL,
+            ReplicatorType.PUSH_AND_PULL,
             "posts",
             ["_default.posts"],
         )
@@ -117,9 +116,11 @@ class TestReplicatorEncryptionHook(CBLTestClass):
                                                                 "nest_11": {
                                                                     "nest_12": {
                                                                         "nest_13": {
-                                                                            "nest_14": EncryptedValue(
-                                                                                "secret_password"
-                                                                            )
+                                                                            "nest_14": {
+                                                                                "encrypted_field": EncryptedValue(
+                                                                                    "secret_password"
+                                                                                )
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
@@ -152,16 +153,50 @@ class TestReplicatorEncryptionHook(CBLTestClass):
 
         self.mark_test_step("""
             Check that the document is in SGW:
-                * Verify document exists
-                * Verify encrypted field is properly encrypted
-                * Validate nested structure is preserved
+                * Verify document exists.
+                * Verify the innermost field is properly encrypted.
+                * Validate nested structure is preserved.
         """)
         doc = await cblpytest.sync_gateways[0].get_document(
             "posts", "post_1000", collection="posts"
         )
         assert doc is not None, "Document should exist in SGW"
-        assert doc.body.get("encrypted_field") is not None, (
-            "Encrypted value should be present"
+        nest1 = doc.body.get("nest_1")
+        assert nest1 is not None, "Parent field should be present"
+        nest2 = nest1.get("nest_2")
+        assert nest2 is not None, "1st nested field should be present"
+        nest3 = nest2.get("nest_3")
+        assert nest3 is not None, "2nd nested field should be present"
+        nest4 = nest3.get("nest_4")
+        assert nest4 is not None, "3rd nested field should be present"
+        nest5 = nest4.get("nest_5")
+        assert nest5 is not None, "4th nested field should be present"
+        nest6 = nest5.get("nest_6")
+        assert nest6 is not None, "5th nested field should be present"
+        nest7 = nest6.get("nest_7")
+        assert nest7 is not None, "6th nested field should be present"
+        nest8 = nest7.get("nest_8")
+        assert nest8 is not None, "7th nested field should be present"
+        nest9 = nest8.get("nest_9")
+        assert nest9 is not None, "8th nested field should be present"
+        nest10 = nest9.get("nest_10")
+        assert nest10 is not None, "9th nested field should be present"
+        nest11 = nest10.get("nest_11")
+        assert nest11 is not None, "10th nested field should be present"
+        nest12 = nest11.get("nest_12")
+        assert nest12 is not None, "11th nested field should be present"
+        nest13 = nest12.get("nest_13")
+        assert nest13 is not None, "12th nested field should be present"
+        nest14 = nest13.get("nest_14")
+        assert nest14 is not None, "13th nested field should be present"
+        assert "encrypted_field" not in nest14, (
+            "The document was pushed without encryption"
+        )
+        assert "encrypted$encrypted_field" in nest14, (
+            "The document was pushed with encryption, but the encrypted field is not present"
+        )
+        assert nest14["encrypted$encrypted_field"]["ciphertext"] != "secret_password", (
+            "The document was pushed with encryption, but the value is still plaintext"
         )
 
         await cblpytest.test_servers[0].cleanup()

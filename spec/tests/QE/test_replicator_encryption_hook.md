@@ -36,9 +36,9 @@ Test replication of documents with deeply nested encrypted fields, ensuring encr
 7. Start the same replicator again
 8. Wait until the replicator stops.
 9. Check that the document is in SGW:
-    * Verify document exists
-    * Verify encrypted field is properly encrypted
-    * Validate nested structure is preserved
+    * Verify document exists.
+    * Verify the innermost field is properly encrypted.
+    * Validate nested structure is preserved.
 
 ## #2 test_delta_sync_with_encryption
 
