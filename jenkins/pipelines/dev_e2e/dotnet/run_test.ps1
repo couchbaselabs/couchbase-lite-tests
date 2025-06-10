@@ -11,9 +11,9 @@ $ErrorActionPreference = "Stop"
 
 Install-DotNet
 
-python -m venv venv
+pip install uv --user
+uv venv --python 3.10 venv
 .\venv\Scripts\activate
-pip install uv
 uv pip install -r $AWS_ENVIRONMENT_DIR\requirements.txt
 $python_args = @("windows", $Version, $DatasetVersion, $SgwVersion)
 if ($null -ne $PrivateKeyPath) {
