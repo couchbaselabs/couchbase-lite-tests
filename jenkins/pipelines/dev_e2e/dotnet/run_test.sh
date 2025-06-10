@@ -42,7 +42,8 @@ prepare_dotnet
 
 create_venv venv
 source venv/bin/activate
-pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
+pip install uv
+uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
 if [ -n "$private_key_path" ]; then
     python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $dataset_version $sgw_version --private_key $private_key_path
 else
@@ -50,6 +51,6 @@ else
 fi
 
 pushd $DEV_E2E_TESTS_DIR
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 pytest -v --no-header --config config.json
 deactivate
