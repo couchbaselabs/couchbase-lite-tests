@@ -1,5 +1,18 @@
 # This script should be imported at the beginning of testing and teardown scripts
 
+function New-Venv {
+    param(
+        [string]$Directory,
+        [string]$PythonVersion = "3.10"
+    )
+
+    python -m pip install uv
+    python -m uv venv --python $PythonVersion $Directory
+    . "$Directory\Scripts\activate.ps1"
+    python -m ensurepip --upgrade
+    python -m pip install --upgrade pip uv
+    deactivate
+}
 function Find-Dir {
     param (
         [string]$TargetDir
@@ -60,4 +73,5 @@ Write-Box -Content $content -Title "Defining the following values:"
 
 Export-ModuleMember -Variable PIPELINES_DIR, TESTS_DIR, `
 ENVIRONMENT_DIR, SHARED_PIPELINES_DIR, DEV_E2E_PIPELINES_DIR, `
-DEV_E2E_TESTS_DIR, QE_PIPELINES_DIR, QE_TESTS_DIR, AWS_ENVIRONMENT_DIR
+DEV_E2E_TESTS_DIR, QE_PIPELINES_DIR, QE_TESTS_DIR, AWS_ENVIRONMENT_DIR `
+-Func New-Venv

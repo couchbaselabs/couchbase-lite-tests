@@ -6,11 +6,15 @@ function create_venv() {
         exit 1
     fi
 
-    PYTHON_VERSION=$(python3 -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
     REQUIRED_VERSION="${2:-3.10}"
 
-    pip install uv
-    uv venv --python $REQUIRED_VERSION $1
+    python3 -m pip install uv
+    python3 -m uv venv --python $REQUIRED_VERSION $1
+    source "$1/bin/activate"
+    python -m ensurepip --upgrade
+    python -m pip install --upgrade pip
+    python -m pip install --upgrade uv
+    deactivate
 }
 
 find_dir() {
