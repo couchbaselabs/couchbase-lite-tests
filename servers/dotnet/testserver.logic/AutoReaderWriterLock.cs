@@ -12,6 +12,8 @@
         private abstract class Impl : IDisposable
         {
             private readonly ReaderWriterLockSlim _lock;
+            private bool _upgraded;
+            private bool _disposed;
 
             protected Impl(ReaderWriterLockSlim l)
             {
@@ -25,11 +27,25 @@
 
             public void Upgrade()
             {
+                if(_upgraded) {
+                    throw new InvalidOperationException("Cannot upgrade lock that is already upgraded.");
+                }
+
                 _lock.EnterWriteLock();
+                _upgraded = true;
             }
 
             public void Dispose()
             {
+                if(_disposed) {
+                    return;
+                }
+
+                _disposed = true;
+                if(_upgraded) {
+                    _lock.ExitWriteLock();
+                }
+
                 ExitLock(_lock);
             }
         }
