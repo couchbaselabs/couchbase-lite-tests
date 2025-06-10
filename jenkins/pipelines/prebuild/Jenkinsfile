@@ -33,9 +33,16 @@ pipeline {
             agent {
                 label getNodeForPlatform(params.TS_PLATFORM)
             }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
+            }
             steps {
                 script {
                     currentBuild.displayName = "${params.TS_PLATFORM} ${params.CBL_VERSION}-${params.CBL_BUILD}"
+                    if (params.TS_PLATFORM.contains("ios")) {
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                    }
+
                     if (params.TS_PLATFORM.contains("windows")) {
                         pwsh """
                             python -m venv venv
