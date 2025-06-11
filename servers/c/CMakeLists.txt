@@ -69,12 +69,14 @@ if(APPLE)
             testserver PRIVATE
             src/support/Device+Apple.mm
             src/support/Files+Apple.mm
+            src/support/FileDownloader+Apple.mm
     )
 else()
     target_sources(
             testserver PRIVATE
             src/support/Device.cpp
             src/support/Files.cpp
+            src/support/FileDownloader.cpp
     )
 endif()
 
@@ -86,6 +88,15 @@ target_link_libraries(
         zip
         ixwebsocket
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # For FileDownloader on linux platform
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(
+            testserver PRIVATE
+            OpenSSL::SSL
+            OpenSSL::Crypto)
+endif()
 
 target_include_directories(
         testserver PRIVATE
@@ -143,5 +154,3 @@ install(
         PATTERN "*"
         PATTERN ".gitkeep" EXCLUDE
 )
-
-

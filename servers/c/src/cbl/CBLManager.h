@@ -23,9 +23,11 @@ struct CBLDatabase;
 namespace ts::cbl {
     class CBLManager {
     public:
-        /// Constructor
+        /// Constructor & Destructor
 
-        CBLManager(const std::string &databaseDir, const std::string &assetDir);
+        CBLManager(const std::string &databaseDir, const std::string &assetDir, const std::string& datasetVersion);
+
+        ~CBLManager();
 
         /// Database
 
@@ -90,7 +92,7 @@ namespace ts::cbl {
     private:
         CBLDatabase *databaseUnlocked(const std::string &name);
 
-        FLSliceResult getServerCert();
+        std::string downloadDatasetFileIfNecessary(const std::string &relativePath);
 
         void
         addDocumentReplication(const std::string &id, const std::vector<ReplicatedDocument> &docs);
@@ -100,6 +102,7 @@ namespace ts::cbl {
 
         std::string _databaseDir;
         std::string _assetDir;
+        std::string _datasetVersion;
 
         /** Map of dataset name and extracted dataset path */
         std::unordered_map<std::string, std::string> _extDatasetPaths;
