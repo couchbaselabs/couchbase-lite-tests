@@ -17,6 +17,27 @@ function create_venv() {
     deactivate
 }
 
+function stop_venv() {
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+        echo "Deactivating virtual environment..."
+        deactivate
+    fi
+}
+
+function move_artifacts() {
+    if [ -z "${TS_ARTIFACTS_DIR:-}" ]; then
+        echo "Warning: TS_ARTIFACTS_DIR environment variable is not set. Artifacts will not be moved."
+        return
+    fi
+
+    local src_dir=$(realpath $(dirname "$0")/../../tests/dev_e2e)
+    local dst_dir="$src_dir/$TS_ARTIFACTS_DIR"
+
+    mkdir -p "$dst_dir"
+    mv "$src_dir/session.log" "$dst_dir/session.log" || true
+    mv "$src_dir/http_log" "$dst_dir/http_log" || true
+}
+
 find_dir() {
     local dir=$(realpath $(dirname "$0"))
     while [ "$dir" != "/" ]; do

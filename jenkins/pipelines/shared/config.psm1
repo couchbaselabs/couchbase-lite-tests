@@ -13,6 +13,30 @@ function New-Venv {
     python -m pip install --upgrade pip uv
     deactivate
 }
+
+function Stop-Venv {
+    if ($env:VIRTUAL_ENV) {
+        Write-Host "Deactivating virtual environment..."
+        deactivate
+    }
+}
+
+function Move-Artifacts {
+    if($null -eq $env:TS_ARTIFACTS_DIR) {
+        Write-Host "Warning: TS_ARTIFACTS_DIR environment variable is not set. Artifacts will not be moved."
+        return
+    }
+
+    $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\dev_e2e).Path
+    $DST_DIR = "$SRC_DIR\$env:TS_ARTIFACTS_DIR"
+    if (-not (Test-Path -Path $DST_DIR)) {
+        New-Item -ItemType Directory -Path $DST_DIR | Out-Null
+    }
+
+    Move-Item -Path "$SRC_DIR\session.log" -Destination "$DST_DIR\session.log" -Force
+    Move-Item -Path "$SRC_DIR\http_log" -Destination "$DST_DIR\http_log" -Force
+}
+
 function Find-Dir {
     param (
         [string]$TargetDir
@@ -74,4 +98,4 @@ Write-Box -Content $content -Title "Defining the following values:"
 Export-ModuleMember -Variable PIPELINES_DIR, TESTS_DIR, `
 ENVIRONMENT_DIR, SHARED_PIPELINES_DIR, DEV_E2E_PIPELINES_DIR, `
 DEV_E2E_TESTS_DIR, QE_PIPELINES_DIR, QE_TESTS_DIR, AWS_ENVIRONMENT_DIR `
--Func New-Venv
+-Func New-Venv, Stop-Venv, Move-Artifacts

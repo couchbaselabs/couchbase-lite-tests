@@ -40,9 +40,10 @@ sgw_version=$4
 
 prepare_dotnet
 
+stop_venv
 create_venv venv
 source venv/bin/activate
-pip install uv
+trap stop_venv EXIT
 uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
 if [ -n "$private_key_path" ]; then
     python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $dataset_version $sgw_version --private_key $private_key_path
@@ -53,4 +54,3 @@ fi
 pushd $DEV_E2E_TESTS_DIR
 uv pip install -r requirements.txt
 pytest -v --no-header --config config.json
-deactivate

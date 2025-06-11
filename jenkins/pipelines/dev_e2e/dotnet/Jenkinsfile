@@ -50,12 +50,15 @@ pipeline {
                 }
             }
         }
-        stage('Desktop') {
+        stage('Run Tests') {
             parallel {
                 stage("Windows") {
                     agent { label 'mob-e2e-win-01' }
                     options {
                         lock("mob-e2e-win-01")
+                    }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'windows'
                     }
                     steps {
                         timeout(time: 60, unit: 'MINUTES') {
@@ -67,8 +70,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 pwsh 'jenkins\\pipelines\\dev_e2e\\dotnet\\teardown.ps1'
                             }
-                            archiveArtifacts artifacts: 'tests\\dev_e2e\\session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests\\dev_e2e\\http_log\\*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests\\dev_e2e\\windows\\**', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
@@ -81,6 +83,7 @@ pipeline {
                         KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
                         DEVELOPER_DIR="/Applications/Xcode.app"
                         MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
+                        TS_ARTIFACTS_DIR = 'macos'
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
@@ -93,56 +96,57 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/dotnet/teardown.sh'
                             }
-                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/macos/**', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
-            }
-        }
-        stage('iOS') {
-            options {
-                lock("mob-e2e-iphone-01")
-            }
-            environment { 
-                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
-                DEVELOPER_DIR="/Applications/Xcode.app"
-                MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
-            }
-            agent { label 'mob-e2e-mac-01' }
-            steps {
-                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
-                }
-            }
-            post {
-                always {
-                    timeout(time: 5, unit: 'MINUTES') {
-                        sh 'jenkins/pipelines/dev_e2e/dotnet/teardown.sh'
+                stage('iOS') {
+                    options {
+                        lock("mob-e2e-iphone-01")
                     }
-                    archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
-                }
-            }
-        }
-        stage('Android') {
-            options {
-                lock("mob-e2e-android-01") 
-            }
-            agent { label 'mob-e2e-mac-01' }
-            steps {
-                timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} android '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
-                }
-            }
-            post {
-                always {
-                    timeout(time: 5, unit: 'MINUTES') {
-                        sh 'jenkins/pipelines/dev_e2e/dotnet/teardown.sh'
+                    environment { 
+                        KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
+                        DEVELOPER_DIR="/Applications/Xcode.app"
+                        MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
+                        TS_ARTIFACTS_DIR = 'ios'
                     }
-                    archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                    agent { label 'mob-e2e-mac-01' }
+                    steps {
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post {
+                        always {
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/dev_e2e/dotnet/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/dev_e2e/ios/**', fingerprint: true, allowEmptyArchive: true
+                        }
+                    }
+                }
+                stage('Android') {
+                    options {
+                        lock("mob-e2e-android-01") 
+                    }
+                    agent { label 'mob-e2e-mac-01' }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'android'
+                    }
+                    steps {
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} android '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post {
+                        always {
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/dev_e2e/dotnet/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/dev_e2e/android/**', fingerprint: true, allowEmptyArchive: true
+                        }
+                    }
                 }
             }
         }
