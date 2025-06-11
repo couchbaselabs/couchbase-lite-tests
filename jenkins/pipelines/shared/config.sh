@@ -30,8 +30,10 @@ function move_artifacts() {
         return
     fi
 
-    local src_dir=$(realpath $(dirname "$0")/../../tests/dev_e2e)
+    local src_dir=$(realpath $(dirname "${BASH_SOURCE[0]}")/../../../tests/dev_e2e)
     local dst_dir="$src_dir/$TS_ARTIFACTS_DIR"
+
+    echo "Moving artifacts to $dst_dir"
 
     mkdir -p "$dst_dir"
     mv "$src_dir/session.log" "$dst_dir/session.log" || true

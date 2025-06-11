@@ -33,6 +33,8 @@ function Move-Artifacts {
         New-Item -ItemType Directory -Path $DST_DIR | Out-Null
     }
 
+    Write-Host "Moving artifacts to $DST_DIR"
+
     Move-Item -Path "$SRC_DIR\session.log" -Destination "$DST_DIR\session.log" -Force
     Move-Item -Path "$SRC_DIR\http_log" -Destination "$DST_DIR\http_log" -Force
 }
