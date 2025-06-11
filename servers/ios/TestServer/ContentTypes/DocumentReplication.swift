@@ -6,6 +6,7 @@
 //
 
 import Vapor
+import CouchbaseLiteSwift
 
 //DocumentReplication:
 //      type: object
@@ -53,5 +54,19 @@ extension ContentTypes {
     enum DocumentReplicationFlags : String, Codable {
         case deleted = "deleted"
         case accessRemoved = "accessRemoved"
+    }
+}
+
+extension ContentTypes.DocumentReplication {
+    init(doc: CouchbaseLiteSwift.ReplicatedDocument, isPush: Bool) {
+        var flags: [ContentTypes.DocumentReplicationFlags] = []
+        if doc.flags.contains(.accessRemoved) { flags.append(.accessRemoved) }
+        if doc.flags.contains(.deleted) { flags.append(.deleted) }
+        
+        self.collection = "\(doc.scope).\(doc.collection)"
+        self.documentID = doc.id
+        self.isPush = isPush
+        self.flags = flags
+        self.error = doc.error.map(TestServerError.cblError)
     }
 }
