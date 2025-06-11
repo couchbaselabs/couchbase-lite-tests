@@ -30,6 +30,9 @@ pipeline {
                     options {
                         lock('mob-e2e-mac-01')
                     }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'macos'
+                    }
                     steps {
                         echo "Run macOS Test"
                         timeout(time: 60, unit: 'MINUTES') {
@@ -42,8 +45,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
                             }
-                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/macOS/**', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
@@ -53,7 +55,8 @@ pipeline {
                         lock('mob-e2e-iphone-01')
                     }
                     environment { 
-                        KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
+                        KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
+                        TS_ARTIFACTS_DIR = 'ios'
                     }
                     steps {
                         // Unlock keychain:
@@ -69,8 +72,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
                             } 
-                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/ios/**', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
@@ -78,6 +80,9 @@ pipeline {
                     agent { label 'mob-e2e-mac-01' }
                     options {
                         lock('mob-e2e-android-01')
+                    }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'android'
                     }
                     steps {
                         echo "Run Android Test"
@@ -91,8 +96,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
                             }
-                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/android/**', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
@@ -100,6 +104,9 @@ pipeline {
                     agent { label 'mob-e2e-deb-02' }
                     options {
                         lock('mob-e2e-deb-02')
+                    }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'linux_x86_64'
                     }
                     steps {
                         echo "Run linux Test"
@@ -113,8 +120,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
                             }
-                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/linux_x86_64/**', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
@@ -134,8 +140,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 pwsh 'jenkins\\pipelines\\dev_e2e\\c\\teardown.ps1'
                             }
-                            archiveArtifacts artifacts: 'tests\\dev_e2e\\session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests\\dev_e2e\\http_log\\*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests\\dev_e2e\\windows\\**', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }

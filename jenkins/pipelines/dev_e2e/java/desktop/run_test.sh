@@ -27,9 +27,11 @@ cbl_version=$1
 dataset_version=$2
 sgw_version=$3
 
+stop_venv
 create_venv venv
 source venv/bin/activate
-pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
+trap stop_venv EXIT
+uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
 if [ -n "$private_key_path" ]; then
     python3 $SCRIPT_DIR/setup_test.py $cbl_version $dataset_version $sgw_version --private_key $private_key_path
 else
@@ -37,6 +39,6 @@ else
 fi
 
 pushd $DEV_E2E_TESTS_DIR
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
 deactivate

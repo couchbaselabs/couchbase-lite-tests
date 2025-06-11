@@ -6,24 +6,38 @@ function create_venv() {
         exit 1
     fi
 
-    PYTHON_VERSION=$(python3 -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
-    REQUIRED_VERSION="3.10"
+    REQUIRED_VERSION="${2:-3.10}"
 
-    rm -rf $1
-    if [[ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]]; then
-        if command -v python$REQUIRED_VERSION &> /dev/null; then
-            echo "python3 is not high enough version ($PYTHON_VERSION < $REQUIRED_VERSION)."
-            echo "Using python$REQUIRED_VERSION instead."
-            python${REQUIRED_VERSION} -m venv $1
-        else
-            echo "Error: Python $REQUIRED_VERSION or higher is required, but not found."
-            echo "Checked python3 and python$REQUIRED_VERSION."
-            exit 1
-        fi
-    else 
-        echo "python3 is high enough version ($PYTHON_VERSION >= $REQUIRED_VERSION)."
-        python3 -m venv $1
+    python3 -m pip install uv
+    python3 -m uv venv --python $REQUIRED_VERSION $1
+    source "$1/bin/activate"
+    python -m ensurepip --upgrade
+    python -m pip install --upgrade pip
+    python -m pip install --upgrade uv
+    deactivate
+}
+
+function stop_venv() {
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+        echo "Deactivating virtual environment..."
+        deactivate
     fi
+}
+
+function move_artifacts() {
+    if [ -z "${TS_ARTIFACTS_DIR:-}" ]; then
+        echo "Warning: TS_ARTIFACTS_DIR environment variable is not set. Artifacts will not be moved."
+        return
+    fi
+
+    local src_dir=$(realpath $(dirname "${BASH_SOURCE[0]}")/../../../tests/dev_e2e)
+    local dst_dir="$src_dir/$TS_ARTIFACTS_DIR"
+
+    echo "Moving artifacts to $dst_dir"
+
+    mkdir -p "$dst_dir"
+    mv "$src_dir/session.log" "$dst_dir/session.log" || true
+    mv "$src_dir/http_log" "$dst_dir/http_log" || true
 }
 
 find_dir() {

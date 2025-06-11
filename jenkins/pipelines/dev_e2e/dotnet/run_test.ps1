@@ -11,9 +11,11 @@ $ErrorActionPreference = "Stop"
 
 Install-DotNet
 
-python -m venv venv
-.\venv\Scripts\activate
-pip install -r $AWS_ENVIRONMENT_DIR\requirements.txt
+Stop-Venv
+New-Venv venv
+. venv\Scripts\activate.ps1
+trap { Stop-Venv; break }
+uv pip install -r $AWS_ENVIRONMENT_DIR\requirements.txt
 $python_args = @("windows", $Version, $DatasetVersion, $SgwVersion)
 if ($null -ne $PrivateKeyPath) {
     $python_args += "--private_key"
@@ -26,11 +28,14 @@ if($LASTEXITCODE -ne 0) {
 }
 
 Push-Location $DEV_E2E_TESTS_DIR
-pip install -r requirements.txt
-pytest -v --no-header --config config.json
-$saved_exit = $LASTEXITCODE
-deactivate
-Pop-Location
+try {
+    uv pip install -r requirements.txt
+    pytest -v --no-header --config config.json
+    $saved_exit = $LASTEXITCODE
+    deactivate
+} finally {
+    Pop-Location
+}
 
 # FIXME: Find another way to do this so this is not hardcoded here
 taskkill /F /IM "testserver.cli.exe"

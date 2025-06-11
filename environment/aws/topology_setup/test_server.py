@@ -213,15 +213,16 @@ class TestServer(ABC):
         Raises:
             FileNotFoundError: If the test server package is not found on the latestbuilds server.
         """
+        url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.latestbuilds_path}"
+        header(f"Downloading {url}")
         download_dir = DOWNLOADED_TEST_SERVER_DIR / self.platform / self.version
         download_dir.mkdir(parents=True, exist_ok=True)
         if (download_dir / ".downloaded").exists():
             click.secho("Already downloaded", fg="green")
             click.echo()
+            self._downloaded = True
             return
 
-        url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.latestbuilds_path}"
-        header(f"Downloading {url}")
         response = requests.head(url)
         if response.status_code == 404:
             raise FileNotFoundError(f"Test server not found at {url}")
