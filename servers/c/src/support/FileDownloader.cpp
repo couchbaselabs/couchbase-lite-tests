@@ -18,6 +18,8 @@ namespace ts::support {
             throw std::runtime_error("Failed to download file from URL '" + url + "' : " + std::to_string(hr));
         }
 #elif defined(__ANDROID__)
+        // To avoid depending on TLS libraries like OpenSSL at the NDK level,
+        // use JNI to delegate the file download to the Java FileDownloader implementation.
         bool didAttach = false;
         JNIEnv* env = ts::jni::getJNIEnv(&didAttach);
         if (!env) {
