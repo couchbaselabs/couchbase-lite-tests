@@ -84,14 +84,12 @@ set(LIB_SRC
 
 add_library(testserver SHARED ${LIB_SRC})
 
-#if(NOT DEFINED CBL_VERSION)
-#    message(FATAL_ERROR "Please set CBL_VERSION to the version of Couchbase Lite you are using.")
-#endif()
+if(NOT DEFINED CBL_VERSION)
+    message(FATAL_ERROR "Please set CBL_VERSION to the version of Couchbase Lite you are using.")
+endif()
 
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE NEVER)
-#find_package(CouchbaseLite ${CBL_VERSION} REQUIRED PATHS ${PROJECT_SOURCE_DIR}/lib/libcblite-${CBL_VERSION})
-
-find_package(CouchbaseLite 3.2.1 REQUIRED PATHS ${PROJECT_SOURCE_DIR}/lib/libcblite-3.2.1)
+find_package(CouchbaseLite ${CBL_VERSION} REQUIRED PATHS ${PROJECT_SOURCE_DIR}/lib/libcblite-${CBL_VERSION})
 
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
