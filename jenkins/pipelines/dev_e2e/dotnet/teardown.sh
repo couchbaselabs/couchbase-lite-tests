@@ -5,7 +5,8 @@ set -euo pipefail
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source $SCRIPT_DIR/../../shared/config.sh
 export PYTHONPATH=$SCRIPT_DIR/../../../
-pushd $AWS_ENVIRONMENT_DIR  
+pushd $AWS_ENVIRONMENT_DIR
+move_artifacts
 
 stop_venv
 create_venv venv
