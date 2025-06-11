@@ -98,6 +98,15 @@ namespace ts::cbl {
             }
             _contextMaps.clear();
         }
+
+        // Release Listener:
+        {
+            lock_guard <mutex> lock(_mutex);
+            for (auto listener : _listeners) {
+                CBLURLEndpointListener_Release(listener.second);
+            }
+            _listeners.clear();
+        }
     }
 
     void CBLManager::createDatabaseWithDataset(const string &dbName, const string &datasetName) {
@@ -502,6 +511,63 @@ namespace ts::cbl {
             return result;
         }
         return nullopt;
+    }
+
+    /// URLEndpointListener
+
+    string CBLManager::startListener(const string &database, vector<std::string>collNames, int port) {
+        lock_guard <mutex> lock(_mutex);
+
+        CBLError error{};
+
+        auto db = databaseUnlocked(database);
+
+        vector<CBLCollection*> collections;
+        DEFER {
+                  for (auto &collection: collections) {
+                      CBLCollection_Release(collection);
+                  }
+              };
+
+        for (auto &collName: collNames) {
+            auto spec = CollectionSpec(collName);
+            auto collection = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
+            checkCBLError(error);
+            checkNotNull(collection, "Collection " + spec.fullName() + " Not Found");
+            collections.push_back(collection);
+        }
+
+        CBLURLEndpointListenerConfiguration config{};
+        config.collections = collections.data();
+        config.collectionCount = collections.size();
+        config.port = port;
+
+        auto listener = CBLURLEndpointListener_Create(&config, &error);
+        if (!listener) {
+            throw CBLException(error);
+        }
+
+        if (!CBLURLEndpointListener_Start(listener, &error)) {
+            throw CBLException(error);
+        }
+
+        string id = "@urlendpointlistener::" + to_string(++_listenerID);
+        _listeners[id] = listener;
+        return id;
+    }
+
+    CBLURLEndpointListener *CBLManager::listener(const std::string &id) {
+        lock_guard <mutex> lock(_mutex);
+        auto it = _listeners.find(id);
+        return it != _listeners.end() ? it->second : nullptr;
+    }
+
+    void CBLManager::stopListener(const std::string &id) {
+        lock_guard <mutex> lock(_mutex);
+        auto it = _listeners.find(id);
+        if (it != _listeners.end()) {
+            CBLURLEndpointListener_Stop(it->second);
+        }
     }
 
     /// Snapshot

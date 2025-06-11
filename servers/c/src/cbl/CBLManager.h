@@ -81,6 +81,14 @@ namespace ts::cbl {
 
         std::optional<ReplicatorStatus> replicatorStatus(const std::string &id);
 
+        /// Listener
+
+        std::string startListener(const std::string &database, std::vector<std::string>collections, int port);
+
+        CBLURLEndpointListener *listener(const std::string &id);
+
+        void stopListener(const std::string &id);
+
         /// Snapshot
 
         Snapshot *createSnapshot();
@@ -140,5 +148,11 @@ namespace ts::cbl {
         std::unordered_map<std::string, std::unique_ptr<ReplicatorContext>> _contextMaps;
 
         std::unordered_map<std::string, std::unique_ptr<Snapshot>> _snapShots;
+
+        /* Listener id number */
+        int64_t _listenerID = 0;
+
+        /* Listener map */
+        std::unordered_map<std::string, CBLURLEndpointListener*> _listeners;
     };
 }

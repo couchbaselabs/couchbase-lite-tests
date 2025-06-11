@@ -163,7 +163,7 @@ namespace ts::log {
     // Log
     static const char *const kTestServerLogDomainName = "TS";
 
-    static const char *const kCBLLogDomainName[] = {"DB", "Query", "Sync", "WS"};
+    static const char *const kCBLLogDomainName[] = {"DB", "Query", "Sync", "WS", "Listener"};
 
     static LogLevel sLogLevel = LogLevel::none;
 
