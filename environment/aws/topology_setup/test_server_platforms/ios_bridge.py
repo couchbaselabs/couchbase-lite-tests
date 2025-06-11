@@ -259,67 +259,92 @@ class iOSBridge(PlatformBridge):
 
     def __stop_devicectl(self, location: str) -> None:
         click.echo("Finding PID of test server...")
-        result = subprocess.run(
-            [
-                "xcrun",
-                "devicectl",
-                "device",
-                "info",
-                "apps",
-                "--device",
-                location,
-                "--bundle-id",
-                self.__app_id,
-                "--hide-headers",
-                "--hide-default-columns",
-                "--columns",
-                "path",
-            ],
-            check=True,
-            capture_output=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "xcrun",
+                    "devicectl",
+                    "device",
+                    "info",
+                    "apps",
+                    "--device",
+                    location,
+                    "--bundle-id",
+                    self.__app_id,
+                    "--hide-headers",
+                    "--hide-default-columns",
+                    "--columns",
+                    "path",
+                ],
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError as e:
+            click.secho(
+                f"App not found or devicectl failed. Skipping termination. Error:\n{e.stderr.decode('utf-8')}",
+                fg="yellow",
+            )
+            return
 
         stdout = result.stdout.decode("utf-8").splitlines()
+        if not stdout:
+            click.secho(
+                "App not found in device list. Skipping termination.", fg="yellow"
+            )
+            return
+
         app_path = stdout[-1].strip()
         click.echo(f"\tApp Path: {app_path}")
 
-        result = subprocess.run(
-            [
-                "xcrun",
-                "devicectl",
-                "device",
-                "info",
-                "processes",
-                "--device",
-                location,
-            ],
-            check=True,
-            capture_output=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "xcrun",
+                    "devicectl",
+                    "device",
+                    "info",
+                    "processes",
+                    "--device",
+                    location,
+                ],
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError as e:
+            click.echo(
+                f"Failed to get processes. Skipping termination. Error:\n{e.stderr.decode('utf-8')}"
+            )
+            return
 
         stdout = result.stdout.decode("utf-8").splitlines()
-        app_path_line = next((line for line in stdout if app_path in line), "error")
+        app_path_line = next((line for line in stdout if app_path in line), None)
 
-        if app_path_line == "error":
-            raise RuntimeError(f"Failed to find PID in output: {stdout}")
+        if not app_path_line:
+            click.echo("Could not find PID line for app. Skipping termination.")
+            return
 
         pid = app_path_line.split(" ")[0]
         click.echo(f"\tPID {pid}")
-        subprocess.run(
-            [
-                "xcrun",
-                "devicectl",
-                "device",
-                "process",
-                "terminate",
-                "--device",
-                location,
-                "--pid",
-                pid,
-            ],
-            check=True,
-            capture_output=True,
-        )
+        try:
+            subprocess.run(
+                [
+                    "xcrun",
+                    "devicectl",
+                    "device",
+                    "process",
+                    "terminate",
+                    "--device",
+                    location,
+                    "--pid",
+                    pid,
+                ],
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError as e:
+            click.echo(
+                f"Failed to terminate process. Continuing. Error:\n{e.stderr.decode('utf-8')}"
+            )
 
     def __stop_xharness(self, location: str) -> None:
         if not PID_FILE.exists():
