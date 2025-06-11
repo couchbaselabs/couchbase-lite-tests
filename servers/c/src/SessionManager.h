@@ -1,11 +1,9 @@
 #pragma once
 
-// cbl
 #include "CBLManager.h"
 #include "Error.h"
 #include "UUID.h"
 
-// lib
 #include <string>
 #include <memory>
 #include <mutex>
@@ -37,7 +35,9 @@ namespace ts {
     public:
         explicit SessionManager(const TestServer* testServer)
         : _testServer(testServer)
-        { }
+        {
+            init();
+        }
 
         std::shared_ptr<Session> createSession(const std::string &id, const std::string &datasetVersion);
 
@@ -46,6 +46,11 @@ namespace ts {
         std::shared_ptr<Session> getSession(const std::string &id) const;
 
     private:
+        void init();
+
+        std::string sessionsRootDirectory() const;
+        std::string createSessionDirectory(const std::string &id);
+
         mutable std::mutex _mutex;
         const TestServer *_testServer{nullptr};
         std::unordered_map<std::string, std::shared_ptr<Session>> _sessions;

@@ -18,7 +18,7 @@ namespace ts {
         static constexpr unsigned short PORT = 8080;
 
         struct Context {
-            std::string databaseDir;
+            std::string filesDir;
             std::string assetsDir;
         };
 
