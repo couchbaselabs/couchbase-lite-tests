@@ -70,7 +70,9 @@ namespace ts::support {
 #ifdef __ANDROID__
         return androidContext()->assetsDir;
 #endif
-        auto current = filesystem::path(getExecutablePath()).parent_path() / ".." / "assets";
-        return current.string();
+        auto dir = filesystem::path(getExecutablePath()).parent_path() / ".." / "assets";
+        filesystem::create_directory(dir); // Ensure that it exists
+        return dir.string();
     }
+
 }

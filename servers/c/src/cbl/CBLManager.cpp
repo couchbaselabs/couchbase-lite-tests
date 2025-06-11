@@ -5,6 +5,7 @@
 #include "Defer.h"
 #include "Define.h"
 #include "Error.h"
+#include "FileDownloader.h"
 #include "Precondition.h"
 #include "StringUtil.h"
 #include "ZipUtil.h"
@@ -15,17 +16,15 @@
 #include <utility>
 
 using namespace std;
-using namespace filesystem;
-
 using namespace ts::support;
 using namespace ts::support::precond;
 using namespace ts::support::error;
 
-#define DB_FILE_EXT ".cblite2"
-#define DB_FILE_ZIP_EXT ".cblite2.zip"
-#define DB_FILE_ZIP_EXTRACTED_DIR "extracted"
-#define ASSET_DBS_DIR "dbs"
-#define ASSET_BLOBS_DIR "blobs"
+namespace fs = std::filesystem;
+
+#define DATASET_BASE_URL "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/"
+#define DATASET_DOWNLOAD_DIR "download"
+#define DATASET_EXTRACTED_DIR "extracted"
 
 namespace ts::cbl {
     static FLSliceResult xor_cipher(FLSlice input) {
@@ -43,18 +42,22 @@ namespace ts::cbl {
         return xor_cipher(input);
     }
 
-
     static FLSliceResult xor_decryptor(void* context, FLString scope, FLString collection, 
         FLString documentID, FLDict properties, FLString keyPath, FLSlice input, FLString algorithm, 
         FLString keyID, CBLError* error) {
         return xor_cipher(input);
     }
 
-    /// Constructor
+    /// Constructor & Destructor
 
-    CBLManager::CBLManager(const string &databaseDir, const string &assetDir) {
+    CBLManager::CBLManager(const string &databaseDir, const string &assetDir, const std::string& datasetVersion) {
         _databaseDir = databaseDir;
         _assetDir = assetDir;
+        _datasetVersion = datasetVersion;
+    }
+
+    CBLManager::~CBLManager() {
+        reset();
     }
 
     /// Database
@@ -104,19 +107,23 @@ namespace ts::cbl {
         }
 
         string fromDbPath;
-        auto dbAssetPath = path(_assetDir).append(ASSET_DBS_DIR);
-        auto zipFilePath = path(dbAssetPath).append(datasetName + DB_FILE_ZIP_EXT);
-        if (filesystem::exists(zipFilePath)) {
-            if (auto it = _extDatasetPaths.find(datasetName); it != _extDatasetPaths.end()) {
-                fromDbPath = it->second;
-            } else {
-                auto extDirPath = path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
-                zip::extractZip(zipFilePath.string(), extDirPath.string());
-                fromDbPath = extDirPath.append(datasetName + DB_FILE_EXT).string();
-                _extDatasetPaths[datasetName] = fromDbPath;
-            }
+        if (auto it = _extDatasetPaths.find(datasetName); it != _extDatasetPaths.end()) {
+            fromDbPath = it->second;
         } else {
-            fromDbPath = dbAssetPath.append(datasetName + DB_FILE_EXT).string();
+            auto relativeZipPath = fs::path("dbs") / _datasetVersion / (datasetName + ".cblite2.zip");
+            auto datasetZipFile = downloadDatasetFileIfNecessary(relativeZipPath.string());
+
+            if (!fs::exists(datasetZipFile)) {
+                throw std::logic_error("Dataset not found: " + datasetZipFile);
+            }
+
+            fs::path extDirPath = fs::path(_databaseDir) / DATASET_EXTRACTED_DIR;
+            zip::extractZip(datasetZipFile, extDirPath.string());
+
+            fs::path extractedDbPath = extDirPath / (datasetName + ".cblite2");
+            fromDbPath = extractedDbPath.string();
+
+            _extDatasetPaths[datasetName] = fromDbPath;
         }
 
         CBLError error{};
@@ -130,12 +137,11 @@ namespace ts::cbl {
         }
 
         // Copy:
-        if (!fromDbPath.empty()) {
-            if (!CBL_CopyDatabase(FLS(fromDbPath), FLS(dbName), &config, &error)) {
-                throw CBLException(error);
-            }
+        if (!CBL_CopyDatabase(FLS(fromDbPath), FLS(dbName), &config, &error)) {
+            throw CBLException(error);
         }
 
+        // Open:
         CBLDatabase *db = CBLDatabase_Open(FLS(dbName), &config, &error);
         if (!db) {
             throw CBLException(error);
@@ -213,6 +219,24 @@ namespace ts::cbl {
         return doc;
     }
 
+    /// Dataset
+
+    string CBLManager::downloadDatasetFileIfNecessary(const string &relativePath) {
+        auto datasetPath = fs::path(_databaseDir).append(DATASET_DOWNLOAD_DIR).append(relativePath);
+        if (fs::exists(datasetPath)) {
+            return datasetPath;
+        }
+
+        auto datasetDir = datasetPath.parent_path();
+        if (!fs::exists(datasetDir)) {
+            fs::create_directories(datasetDir);
+        }
+
+        auto datasetURL = string(DATASET_BASE_URL) + relativePath;
+        FileDownloader::download(datasetURL, datasetPath);
+        return datasetPath;
+    }
+
     /// Blob
 
     bool CBLManager::blobExists(const CBLDatabase *db, FLDict blobDict) {
@@ -233,8 +257,8 @@ namespace ts::cbl {
     }
 
     CBLBlob *CBLManager::blob(const string &name, CBLDatabase *db) {
-        auto blobPath = path(_assetDir).append(ASSET_BLOBS_DIR).append(name);
-        ifstream ifs(blobPath.string(), ios::in | ios::binary);
+        auto blobPath = downloadDatasetFileIfNecessary("blobs/" + name);
+        ifstream ifs(blobPath, ios::in | ios::binary);
         if (!ifs.is_open()) {
             throw logic_error("Blob '" + name + "' not found in dataset");
         }
