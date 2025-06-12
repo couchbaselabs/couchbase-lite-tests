@@ -15,11 +15,6 @@ pipeline {
             name: 'CBL_BUILD',
             description: 'The build of CBL to use'
         )
-        string(
-            name: 'BRANCH',
-            description: 'The branch to use for the test server build',
-            defaultValue: 'main'
-        )
     }
 
     stages {
@@ -44,6 +39,26 @@ pipeline {
             steps {
                 script {
                     currentBuild.displayName = "${params.TS_PLATFORM} ${params.CBL_VERSION}-${params.CBL_BUILD}"
+                    def matcher = (params.CBL_VERSION =~ /^(\d+)\.(\d+)/)
+                    if (!matcher) {
+                        error "CBL_VERSION format is invalid: ${params.CBL_VERSION}"
+                    }
+
+                    def majorMinor = "${matcher[0][1]}.${matcher[0][2]}"
+                    def branchName = "release/${majorMinor}"
+
+                    // Check if e.g. release/3.2 exists in the repo
+                    def branchExists = sh(
+                        script: "git branch -a --list '*/${branchName}' 'remotes/origin/${branchName}' | grep -q '${branchName}'",
+                        returnStatus: true
+                    ) == 0
+
+                    if(!branchExists) {
+                        branchName = 'main'
+                    }
+
+                    echo "Build will come from branch ${branchName}"
+                    
                     if (params.TS_PLATFORM.contains("ios")) {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                     }
