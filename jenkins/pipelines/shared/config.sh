@@ -22,8 +22,6 @@ function create_venv() {
         python3 -m uv venv --python $REQUIRED_VERSION $1
     fi
 
-    python3 -m pip install uv
-    python3 -m uv venv --python $REQUIRED_VERSION $1
     source "$1/bin/activate"
     python -m ensurepip --upgrade
     python -m pip install --upgrade pip
