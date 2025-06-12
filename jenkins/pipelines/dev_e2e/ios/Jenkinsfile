@@ -19,6 +19,20 @@ pipeline {
                 }
             }
         }
+        stage('Prebuild Server') {
+            steps {
+                script {
+                    build job: 'prebuild-test-server',
+                    parameters: [
+                        string(name: 'TS_PLATFORM', value: 'swift_ios'),
+                        string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                        string(name: 'CBL_BUILD', value: params.CBL_BUILD)
+                    ],
+                    wait: true,
+                    propagate: true
+                }
+            }
+        }
         stage('Run Test') {
             agent { label 'mob-e2e-mac-01' }
             options {
