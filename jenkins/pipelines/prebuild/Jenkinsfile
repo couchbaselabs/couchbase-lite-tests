@@ -15,6 +15,11 @@ pipeline {
             name: 'CBL_BUILD',
             description: 'The build of CBL to use'
         )
+        string(
+            name: 'BRANCH',
+            description: 'The branch to use for the test server build',
+            defaultValue: 'main'
+        )
     }
 
     stages {
