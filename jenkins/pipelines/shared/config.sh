@@ -7,6 +7,20 @@ function create_venv() {
     fi
 
     REQUIRED_VERSION="${2:-3.10}"
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        # Linux doesn't allow systemwide pip installs, and
+        # doesn't have a uv apt package so I am forced to
+        # install it like this
+        if ! command -v uv >/dev/null 2>&1; then
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            source $HOME/.local/bin/env
+        fi
+
+        uv venv --python $REQUIRED_VERSION $1
+    else
+        python3 -m pip install uv
+        python3 -m uv venv --python $REQUIRED_VERSION $1
+    fi
 
     python3 -m pip install uv
     python3 -m uv venv --python $REQUIRED_VERSION $1

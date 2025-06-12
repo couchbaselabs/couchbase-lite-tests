@@ -1,4 +1,5 @@
 #include "FileDownloader.h"
+#include <stdexcept>
 
 #if defined(_WIN32)
 #include <urlmon.h>

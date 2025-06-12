@@ -233,7 +233,7 @@ namespace ts::cbl {
     string CBLManager::downloadDatasetFileIfNecessary(const string &relativePath) {
         auto datasetPath = fs::path(_databaseDir).append(DATASET_DOWNLOAD_DIR).append(relativePath);
         if (fs::exists(datasetPath)) {
-            return datasetPath;
+            return datasetPath.string();
         }
 
         auto datasetDir = datasetPath.parent_path();
@@ -242,8 +242,8 @@ namespace ts::cbl {
         }
 
         auto datasetURL = string(DATASET_BASE_URL) + relativePath;
-        FileDownloader::download(datasetURL, datasetPath);
-        return datasetPath;
+        FileDownloader::download(datasetURL, datasetPath.string());
+        return datasetPath.string();
     }
 
     /// Blob
