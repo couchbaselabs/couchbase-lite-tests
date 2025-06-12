@@ -327,7 +327,13 @@ class JAKTestServer_Android(JAKTestServer):
             PlatformBridge: The platform bridge.
         """
         path = (
-            JAK_TEST_SERVER_DIR
+            TEST_SERVER_DIR
+            / "downloaded"
+            / self.platform
+            / self.version
+            / "testserver_android.apk"
+            if self._downloaded
+            else JAK_TEST_SERVER_DIR
             / self.test_server_path
             / "app"
             / "build"
