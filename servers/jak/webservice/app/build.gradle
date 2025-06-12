@@ -19,11 +19,9 @@ import org.apache.tools.ant.filters.ReplaceTokens
 plugins {
     id 'java'
     id 'kotlin'
-    id 'war'
     id 'checkstyle'
     id 'pmd'
     id 'com.github.spotbugs'
-    id 'org.gretty'
     id "com.dorongold.task-tree" version "4.0.1"
 }
 
@@ -92,12 +90,6 @@ java {
 compileKotlin.kotlinOptions.jvmTarget = "1.8"
 compileTestKotlin.kotlinOptions.jvmTarget = "1.8"
 
-war {
-    archiveBaseName = "CBLTestServer-Java"
-    archiveAppendix = "WS"
-    archiveVersion = "${SERVER_VERSION}_${COUCHBASE_LITE_VERSION}"
-}
-
 repositories {
     if (USE_LOCAL_MAVEN) { mavenLocal() }
     else {
@@ -112,13 +104,10 @@ dependencies {
     compileOnly 'androidx.annotation:annotation:1.5.0'
     compileOnly "com.github.spotbugs:spotbugs-annotations:${SPOTBUGS_VERSION}"
 
-    providedCompile 'jakarta.servlet:jakarta.servlet-api:4.0.2'
-
-    providedCompile "com.couchbase.lite:${COUCHBASE_LITE_LIB}:${COUCHBASE_LITE_VERSION}"
-
+    implementation "com.couchbase.lite:${COUCHBASE_LITE_LIB}:${COUCHBASE_LITE_VERSION}"
     implementation 'com.squareup.moshi:moshi:1.14.0'
- 
-    implementation "com.squareup.okhttp3:okhttp:${OKHTTP_VERSION}"
+    implementation 'org.eclipse.jetty:jetty-server:11.0.15'
+    implementation 'org.eclipse.jetty:jetty-servlet:11.0.15'
 
     testImplementation 'junit:junit:4.13.2'
 }
@@ -134,11 +123,6 @@ task generateServerInfo(type: Copy) {
 project.afterEvaluate {
     compileJava.dependsOn generateServerInfo
     compileKotlin.dependsOn generateServerInfo
-}
-
-gretty {
-    contextPath = '/'
-    httpPort = 8080
 }
 
 def FILE_FILTER = ['**/gen/**', "okhttp3/**", "org/json/**"]
@@ -242,6 +226,20 @@ spotbugs { toolVersion = SPOTBUGS_VERSION }
                 setDestination(file("${REPORTS_DIR}/spotbugs.html"))
             }
         }
+    }
+}
+
+jar {
+    archiveBaseName = "CBLTestServer-Java"
+    archiveAppendix = "WebService"
+    archiveVersion = "${SERVER_VERSION}_${COUCHBASE_LITE_VERSION}"
+
+    manifest { attributes('Main-Class': 'com.couchbase.lite.javaws.mobiletest.TestServerApp') }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    } {
+        exclude "META-INF/**"
+        exclude "module-info.class"
     }
 }
 
