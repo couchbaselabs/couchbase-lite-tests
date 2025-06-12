@@ -54,5 +54,7 @@ rm -rf http_log testserver.log
 uv pip install -r requirements.txt
 
 echo "Run the tests"
-adb shell input keyevent KEYCODE_WAKEUP
+# To re-enable this, this script needs to become aware of the 
+# serial number of the device, which is not currently passed
+#adb shell input keyevent KEYCODE_WAKEUP
 pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
