@@ -43,6 +43,17 @@ struct TestServerError : Error, Codable {
         return TestServerError(domain: .TESTSERVER, code: 400, message: "Bad request")
     }
     
+    static func fromError(_ error: Error) -> TestServerError {
+        if let error = error as? TestServerError {
+            return error
+        }
+        
+        if let error = error as NSError? {
+            return TestServerError(domain: .TESTSERVER, code: error.code, message: error.localizedDescription)
+        }
+        return badRequest(error.localizedDescription)
+    }
+    
     static let cblDBNotOpen = TestServerError(domain: .CBL, code: CBLError.notOpen, message: "Database is not open.")
     static let docNotFoundErr = TestServerError(domain: .TESTSERVER, code: 404, message: "Document not found")
     static let internalErr = TestServerError(domain: .TESTSERVER, code: 500, message: "Internal server error.")
