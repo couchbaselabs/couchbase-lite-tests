@@ -13,8 +13,11 @@ extension Handlers {
             throw TestServerError.badRequest("Request body does not match the 'NewSession' scheme.")
         }
         
-        let session = try req.application.sessionManager.createSession(id: newSession.id)
-        Log.logToConsole(level: .info, message: "Start new session with id : \(session.id)");
+        let session = try req.application.sessionManager.createSession(
+            id: newSession.id, datasetVersion: newSession.dataset_version)
+        
+        Log.logToConsole(level: .info, message:
+            "Start new session with id : \(newSession.id) and dataset : \(newSession.dataset_version)");
         
         if let logging = newSession.logging {
             guard let url = URL(string: "ws://\(logging.url)/openLogStream") else {

@@ -15,6 +15,7 @@ extension ContentTypes {
     
     struct NewSession : Content {
         let id: String
+        let dataset_version: String
         let logging: Logging?
     }
 }

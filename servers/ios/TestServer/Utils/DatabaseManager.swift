@@ -9,11 +9,30 @@ import CouchbaseLiteSwift
 import ZipArchive
 
 class DatabaseManager {
+    private let kDatasetBaseURL = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/"
+    private let kDatasetDownloadDirectory = "downloads"
+    private let kDatasetExtractedDirectory = "extracted"
+    
+    private let databaseDirectory: String
+    private let datasetVersion: String
+    
     private var databases : [ String : Database ] = [:]
     private var replicators : [ UUID : Replicator ] = [:]
     private var replicatorDocuments : [ UUID : [ContentTypes.DocumentReplication] ] = [:]
     
-    public init() { }
+    
+    public init(directory: String, datasetVersion: String) {
+        self.databaseDirectory = directory
+        self.datasetVersion = datasetVersion
+    }
+    
+    deinit {
+        do {
+            try reset()
+        } catch {
+            Log.log(level: .error, message: "Failed to reset database manager : \(error)")
+        }
+    }
     
     @discardableResult
     public func addCollection(dbName: String, scope: String, name: String) throws -> Collection {
@@ -300,17 +319,6 @@ class DatabaseManager {
         }
     }
     
-    public func blobFileExists(forBlob blob: Blob, inDB dbName: String) throws -> Bool {
-        guard let db = databases[dbName]
-        else { throw TestServerError.cblDBNotOpen }
-        
-        do {
-            return try db.getBlob(properties: blob.properties) != nil
-        } catch(let error as NSError) {
-            throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
-        }
-    }
-    
     public func closeDatabase(withName dbName: String) throws {
         Log.log(level: .debug, message: "Closing database '\(dbName)'")
         guard let database = databases[dbName]
@@ -333,13 +341,8 @@ class DatabaseManager {
     public func createDatabase(dbName: String, dataset: String) throws {
         Log.log(level: .debug, message: "Create Database \(dbName) with dataset \(dataset)")
         
-        // For the first time called, reset the temp directory for extracting the dataset
-        if databases.isEmpty {
-            try DatabaseManager.resetExtractedDatasetDir()
-        }
-        
         // Load database with the dataset
-        try DatabaseManager.loadDataset(withName: dataset, dbName: dbName)
+        try loadDataset(withName: dataset, dbName: dbName)
         
         // Open database
         do {
@@ -353,11 +356,6 @@ class DatabaseManager {
     
     public func createDatabase(dbName: String, collections: [String] = []) throws {
         Log.log(level: .debug, message: "Create Database \(dbName) with collections \(collections)")
-        
-        // For the first time called, reset the temp directory for extracting the dataset
-        if databases.isEmpty {
-            try DatabaseManager.resetExtractedDatasetDir()
-        }
         
         // For any reasons if the database exists, delete it.
         if Database.exists(withName: dbName) {
@@ -407,28 +405,29 @@ class DatabaseManager {
         return try ReplicationConflictResolverFactory.getResolver(withName: resolver.name, params: resolver.params)
     }
     
-    private static func loadDataset(withName name: String, dbName: String) throws {
+    private func loadDataset(withName name: String, dbName: String) throws {
         Log.log(level: .debug, message: "Loading dataset '\(name)' into DB '\(dbName)'")
         
-        let res = ("dbs" as NSString).appendingPathComponent(name)
-        guard let datasetZipURL = Bundle.main.url(forResource: res, withExtension: "cblite2.zip") else {
-            Log.log(level: .error, message: "Failed to load dataset, dataset '\(name)' does not exist.")
-            throw TestServerError(domain: .TESTSERVER, code: 400, message: "Dataset does not exist")
-        }
-        Log.log(level: .debug, message: "Found dataset at \(datasetZipURL.absoluteString)")
+        let datasetRelativePath = URL(fileURLWithPath: "dbs")
+            .appendingPathComponent(datasetVersion)
+            .appendingPathComponent("\(name).cblite2.zip")
+            .relativePath
+            
+        let datasetZipURL = try downloadDatasetFileIfNecessary(relativePath: datasetRelativePath)
+        Log.log(level: .debug, message: "Load dataset at \(datasetZipURL.path)")
         
-        // datasetZipURL is "../x.cblite2.zip", datasetURL is "../x.cblite2"
         let fm = FileManager()
         
-        // If the dataset has not been unzipped previously
-        let extDir = DatabaseManager.extractedDatasetDir()
-        let dbFileName = datasetZipURL.deletingPathExtension().lastPathComponent
-        let extDatasetPath = (extDir as NSString).appendingPathComponent(dbFileName)
-        if(!fm.fileExists(atPath: extDatasetPath)) {
+        let extractedDatasetDir = URL(filePath: databaseDirectory)
+            .appendingPathComponent(kDatasetExtractedDirectory)
+        
+        let extractedDatasetPath = extractedDatasetDir
+            .appendingPathComponent(datasetZipURL.deletingPathExtension().lastPathComponent)
+            .path
+        
+        if(!fm.fileExists(atPath: extractedDatasetPath)) {
             Log.log(level: .debug, message: "Unzipping dataset \(datasetZipURL.lastPathComponent)")
-            // Unzip dataset archive
-            guard SSZipArchive.unzipFile(atPath: datasetZipURL.relativePath, toDestination: extDir)
-            else {
+            guard SSZipArchive.unzipFile(atPath: datasetZipURL.path, toDestination: extractedDatasetDir.path) else {
                 Log.log(level: .error, message: "Error while unzipping dataset at \(datasetZipURL.absoluteString)")
                 throw TestServerError(domain: .CBL, code: CBLError.cantOpenFile, message: "Couldn't unzip dataset archive.")
             }
@@ -440,8 +439,8 @@ class DatabaseManager {
         }
         
         do {
-            Log.log(level: .debug, message: "Attempting to copy dataset from \(extDatasetPath)")
-            try Database.copy(fromPath: extDatasetPath, toDatabase: dbName, withConfig: nil)
+            Log.log(level: .debug, message: "Attempting to copy dataset from \(extractedDatasetPath)")
+            try Database.copy(fromPath: extractedDatasetPath, toDatabase: dbName, withConfig: nil)
             Log.log(level: .debug, message: "Dataset '\(name)' successfully copied to DB '\(dbName)'")
         } catch(let error as NSError) {
             Log.log(level: .error, message: "Failed to copy dataset due to CBL error: \(error)")
@@ -449,20 +448,66 @@ class DatabaseManager {
         }
     }
     
-    private static func extractedDatasetDir() -> String {
-        return (NSTemporaryDirectory() as NSString).appendingPathComponent("TestServer-iOS-Dataset");
+    private func datasetRelativePath(for name: String, version: String) -> String {
+        return "dbs/\(version)/\(name).cblite2.zip"
     }
     
-    private static func resetExtractedDatasetDir() throws {
-        let dir = extractedDatasetDir()
-        if FileManager.default.fileExists(atPath: dir) {
-            try! FileManager.default.removeItem(atPath: dir)
+    private func downloadDatasetFileIfNecessary(relativePath: String) throws -> URL {
+        let datasetPath = URL(filePath: databaseDirectory)
+            .appendingPathComponent(kDatasetDownloadDirectory)
+            .appendingPathComponent(relativePath)
+        
+        let fm = FileManager.default
+        
+        if (fm.fileExists(atPath: datasetPath.path)) {
+            Log.log(level: .debug, message: "Skipping download, dataset already exists at pat \(datasetPath.path)")
+            return datasetPath
         }
         
+        let parentDir = datasetPath.deletingLastPathComponent()
+        if (!fm.fileExists(atPath: parentDir.path)) {
+            try fm.createDirectory(at: parentDir, withIntermediateDirectories: true)
+        }
+        
+        guard let url = URL(string: relativePath, relativeTo: URL(string: kDatasetBaseURL)) else {
+            throw TestServerError.badRequest("Invalid dataset path : \(relativePath)")
+        }
+        
+        Log.log(level: .info, message: "Downloading dataset from \(url.absoluteString)")
+        try FileDownloader.download(url: url, to: datasetPath.path)
+        
+        return datasetPath
+    }
+    
+    public func loadBlob(filename: String) throws -> Blob {
+        let blobRelativePath = URL(fileURLWithPath: "blobs")
+            .appendingPathComponent(filename)
+            .relativePath
+        
+        let blobFileURL = try downloadDatasetFileIfNecessary(relativePath: blobRelativePath)
+        Log.log(level: .debug, message: "Load blob from \(blobFileURL.path)")
+        
+        let contentType: String = {
+            switch blobFileURL.pathExtension {
+            case "jpeg", "jpg": return "image/jpeg"
+            default: return "application/octet-stream"
+            }
+        }()
+        
         do {
-            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            return try Blob(contentType: contentType, fileURL: blobFileURL)
         } catch(let error as NSError) {
-            Log.log(level: .error, message: "Failed to create temp directory for extracting dataset zip files: \(error)")
+            throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
+        }
+    }
+    
+    public func blobFileExists(forBlob blob: Blob, inDB dbName: String) throws -> Bool {
+        guard let db = databases[dbName]
+        else { throw TestServerError.cblDBNotOpen }
+        
+        do {
+            return try db.getBlob(properties: blob.properties) != nil
+        } catch(let error as NSError) {
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }

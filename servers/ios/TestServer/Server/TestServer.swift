@@ -12,6 +12,7 @@ class TestServer : ObservableObject {
     var app : Vapor.Application
     
     public static let maxAPIVersion = 1
+    
     public static let serverID = UUID()
     
     init(port: Int) {
@@ -20,11 +21,10 @@ class TestServer : ObservableObject {
             try LoggingSystem.bootstrap(from: &env)
             Log.initialize()
             
-            let databaseManager = DatabaseManager()
-            let sessionManager = SessionManager(databaseManager: databaseManager)
+            let urls = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+            let sessionManager = try SessionManager(filesDirectory: urls[0])
             
             app = Application(env)
-            app.storage[DatabaseManagerKey.self] = databaseManager
             app.storage[SessionManagerKey.self] = sessionManager
             configure(port: port)
         } catch {
@@ -73,19 +73,11 @@ class TestServer : ObservableObject {
     }
 }
 
-private struct DatabaseManagerKey: StorageKey {
-    typealias Value = DatabaseManager
-}
-
 private struct SessionManagerKey: StorageKey {
     typealias Value = SessionManager
 }
 
 extension Vapor.Application {
-    var databaseManager : DatabaseManager {
-        self.storage.get(DatabaseManagerKey.self)!
-    }
-    
     var sessionManager : SessionManager {
         return self.storage.get(SessionManagerKey.self)!
     }

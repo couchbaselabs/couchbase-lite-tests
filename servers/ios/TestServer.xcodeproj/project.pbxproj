@@ -7,12 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		4009847F2D11F9F60029F26E /* blobs in Resources */ = {isa = PBXBuildFile; fileRef = 4009847E2D11F9F60029F26E /* blobs */; };
-		400984812D11FA0B0029F26E /* dbs in Resources */ = {isa = PBXBuildFile; fileRef = 400984802D11FA0B0029F26E /* dbs */; };
 		4029C4A02CB88E0300C34775 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4029C49F2CB88E0300C34775 /* SessionManager.swift */; };
 		404619D02CB9A761003835C7 /* NewSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619CF2CB9A761003835C7 /* NewSession.swift */; };
 		404619D22CB9A985003835C7 /* NewSessionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619D12CB9A985003835C7 /* NewSessionHandler.swift */; };
 		4055CAA02CDC33A400EDD0CB /* IPAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4055CA9F2CDC33A400EDD0CB /* IPAddress.swift */; };
+		409F45302DFA7BC900BB7851 /* FileDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F452F2DFA7BC900BB7851 /* FileDownloader.swift */; };
 		40AA34992CAF5D20004F4D08 /* StopReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34982CAF5D20004F4D08 /* StopReplicator.swift */; };
 		40AA349D2CAF6755004F4D08 /* CollectionSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */; };
 		40AA34A12CAF6BE4004F4D08 /* ReplicationConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A02CAF6BE4004F4D08 /* ReplicationConflictResolver.swift */; };
@@ -93,12 +92,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		4009847E2D11F9F60029F26E /* blobs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = blobs; path = ../../Assets/blobs; sourceTree = "<group>"; };
-		400984802D11FA0B0029F26E /* dbs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = dbs; path = ../../Assets/dbs; sourceTree = "<group>"; };
 		4029C49F2CB88E0300C34775 /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
 		404619CF2CB9A761003835C7 /* NewSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSession.swift; sourceTree = "<group>"; };
 		404619D12CB9A985003835C7 /* NewSessionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionHandler.swift; sourceTree = "<group>"; };
 		4055CA9F2CDC33A400EDD0CB /* IPAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPAddress.swift; sourceTree = "<group>"; };
+		409F452F2DFA7BC900BB7851 /* FileDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDownloader.swift; sourceTree = "<group>"; };
 		40A219D62CDC3E790038204C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		40AA34982CAF5D20004F4D08 /* StopReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopReplicator.swift; sourceTree = "<group>"; };
 		40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionSpec.swift; sourceTree = "<group>"; };
@@ -177,15 +175,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		4009844B2D11F3710029F26E /* Assets */ = {
-			isa = PBXGroup;
-			children = (
-				4009847E2D11F9F60029F26E /* blobs */,
-				400984802D11FA0B0029F26E /* dbs */,
-			);
-			path = Assets;
-			sourceTree = "<group>";
-		};
 		40BDA7452AF1BFCC008DB256 = {
 			isa = PBXGroup;
 			children = (
@@ -206,7 +195,6 @@
 		40BDA7502AF1BFCC008DB256 /* TestServer */ = {
 			isa = PBXGroup;
 			children = (
-				4009844B2D11F3710029F26E /* Assets */,
 				40BDA8C92AF20AAB008DB256 /* ContentTypes */,
 				40BDA7ED2AF1C13B008DB256 /* Handlers */,
 				40BDA7F82AF1C13B008DB256 /* Middleware */,
@@ -274,6 +262,7 @@
 				40BDA80E2AF1C15C008DB256 /* AnyCodable.swift */,
 				40AA34B52CAFB28E004F4D08 /* CertUtil.swift */,
 				40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */,
+				409F452F2DFA7BC900BB7851 /* FileDownloader.swift */,
 				40BDA7632AF1C0AF008DB256 /* DatabaseManager.swift */,
 				40BDA80B2AF1C15C008DB256 /* DocComparison.swift */,
 				40BDA8082AF1C15C008DB256 /* DocumentUpdater.swift */,
@@ -399,8 +388,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				400984812D11FA0B0029F26E /* dbs in Resources */,
-				4009847F2D11F9F60029F26E /* blobs in Resources */,
 				40BDA7592AF1BFCD008DB256 /* Preview Assets.xcassets in Resources */,
 				40BDA7562AF1BFCD008DB256 /* Assets.xcassets in Resources */,
 			);
@@ -487,6 +474,7 @@
 				40BDA8052AF1C13B008DB256 /* TestServerErrorMiddleware.swift in Sources */,
 				40BDA8042AF1C13B008DB256 /* GetAllDocuments.swift in Sources */,
 				40BDA8F12AF20AAB008DB256 /* UpdateRequest.swift in Sources */,
+				409F45302DFA7BC900BB7851 /* FileDownloader.swift in Sources */,
 				40BDA8ED2AF20AAB008DB256 /* TestServerError.swift in Sources */,
 				40BDA8142AF1C15C008DB256 /* KeyPathParser.swift in Sources */,
 				40C7A5652CA4AFB40053ADCB /* RunQueryConfiguration.swift in Sources */,
