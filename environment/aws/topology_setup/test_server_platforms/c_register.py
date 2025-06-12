@@ -243,8 +243,7 @@ class CTestServer_iOS(CTestServer):
                 cast(BytesIO, xcodebuild_proc.stdout).close()
 
                 xcpretty_proc.wait()
-                if xcpretty_proc.returncode != 0 or xcodebuild_proc.returncode != 0:
-                    click.echo(xcodebuild_proc.stderr.read().decode())
+                if xcpretty_proc.returncode != 0:
                     raise RuntimeError("Build failed")
 
     @property
