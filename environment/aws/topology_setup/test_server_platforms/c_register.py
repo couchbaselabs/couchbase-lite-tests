@@ -44,11 +44,7 @@ from environment.aws.common.io import (
 )
 from environment.aws.common.output import header
 from environment.aws.topology_setup.cbl_library_downloader import CBLLibraryDownloader
-from environment.aws.topology_setup.test_server import (
-    TEST_SERVER_DIR,
-    TestServer,
-    copy_dataset,
-)
+from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
 
 from .android_bridge import AndroidBridge
 from .exe_bridge import ExeBridge
@@ -79,9 +75,6 @@ class CTestServer(TestServer):
     @abstractmethod
     def cbl_filename(self, version: str) -> str:
         pass
-
-    def _copy_dataset(self) -> None:
-        copy_dataset(C_TEST_SERVER_DIR / "assets")
 
 
 class CTestServer_Desktop(CTestServer):
@@ -115,7 +108,6 @@ class CTestServer_Desktop(CTestServer):
         """
         Build the C test server.
         """
-        self._copy_dataset()
         shutil.rmtree(LIB_DIR, ignore_errors=True)
         self._download_cbl()
         header("Building C test server")
@@ -219,7 +211,6 @@ class CTestServer_iOS(CTestServer):
 
     def build(self):
         self._download_cbl()
-        self._copy_dataset()
         header("Building")
         env = os.environ.copy()
         env["LANG"] = "en_US.UTF-8"
@@ -252,7 +243,8 @@ class CTestServer_iOS(CTestServer):
                 cast(BytesIO, xcodebuild_proc.stdout).close()
 
                 xcpretty_proc.wait()
-                if xcpretty_proc.returncode != 0:
+                if xcpretty_proc.returncode != 0 or xcodebuild_proc.returncode != 0:
+                    click.echo(xcodebuild_proc.stderr.read().decode())
                     raise RuntimeError("Build failed")
 
     @property
@@ -372,7 +364,6 @@ class CTestServer_Android(CTestServer):
         Build the C test server.
         """
         self._download_cbl()
-        self._copy_dataset()
         gradle_path = C_TEST_SERVER_DIR / "platforms" / "android" / "gradlew"
         if platform.system() == "Windows":
             gradle_path = gradle_path.with_suffix(".bat")
