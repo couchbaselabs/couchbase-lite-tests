@@ -4,8 +4,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -16,29 +21,40 @@ import com.couchbase.lite.Database;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.URLEndpointListener;
 import com.couchbase.lite.mobiletest.changes.Snapshot;
+import com.couchbase.lite.mobiletest.endpoints.v1.Session;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.DocReplListener;
 import com.couchbase.lite.mobiletest.services.Log;
+import com.couchbase.lite.mobiletest.trees.TypedList;
+import com.couchbase.lite.mobiletest.trees.TypedMap;
 import com.couchbase.lite.mobiletest.util.FileUtils;
+import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
-public final class TestContext implements AutoCloseable {
+public final class TestContext {
     private static final String TAG = "CONTEXT";
 
-    private static final String DEFAULT_DATASET_VERSION = "3.2";
+    private static final String KEY_COLLECTIONS = "collections";
+    private static final String KEY_DATASET = "dataset";
 
+    private static final Set<String> LEGAL_DATABASE_KEYS;
+    static {
+        final Set<String> l = new HashSet<>();
+        l.add(KEY_COLLECTIONS);
+        l.add(KEY_DATASET);
+        LEGAL_DATABASE_KEYS = Collections.unmodifiableSet(l);
+    }
 
     @NonNull
-    private final String client;
+    private final Session session;
     @NonNull
-    private final String datasetVersion;
-    @Nullable
-    private String testName;
-    @Nullable
-    private File dbDir;
+    private final String testName;
+    @NonNull
+    private final File dbDir;
+
     @Nullable
     private Map<String, Database> openDbs;
     @Nullable
@@ -52,14 +68,33 @@ public final class TestContext implements AutoCloseable {
     @Nullable
     private Map<String, URLEndpointListener> openEndptListeners;
 
-    TestContext(@NonNull String client, @Nullable String datasetVersion) {
-        this.client = client;
-        // !!! Unimplemented: this is completely ignored
-        this.datasetVersion = (datasetVersion == null) ? DEFAULT_DATASET_VERSION : datasetVersion;
+    public TestContext(@NonNull TestApp app, @NonNull Session session, @NonNull String testName) {
+        this.session = session;
+        this.testName = testName;
+
+        final File dbDir = new File(session.getRootDir(), "dbs");
+        if (!dbDir.mkdirs()) { throw new ServerError("Failed creating test db directory: " + dbDir); }
+        this.dbDir = dbDir;
+
+        app.getDbSvc().init(this);
+        app.getReplSvc().init(this);
+        app.getListenerService().init(this);
+
+        Log.p(TAG, ">>>>> START TEST: " + testName);
     }
 
-    @Override
-    public void close() {
+    @NonNull
+    public Session getSession() { return session; }
+
+    @NonNull
+    public String getTestName() { return testName; }
+
+    @NonNull
+    public File getDbDir() { return dbDir; }
+
+    public void close(@NonNull TestApp app) {
+        Log.p(TAG, "<<<<< END TEST: " + testName);
+
         // belt
         openDocListeners = null;
 
@@ -73,27 +108,11 @@ public final class TestContext implements AutoCloseable {
         closeCollections();
 
         deleteDbs();
+
+        app.clearReplSvc();
+        app.clearListenerService();
+        app.clearDbSvc();
     }
-
-    @NonNull
-    public String getClient() { return client; }
-
-    @NonNull
-    public String getDatasetVersion() { return datasetVersion; }
-
-    public void setTestName(@Nullable String testName) { this.testName = testName; }
-
-    @Nullable
-    public String getTestName() { return testName; }
-
-
-    public void setDbDir(@NonNull File dbDir) {
-        if (this.dbDir != null) { throw new ServerError("Attempt to replace the db dir"); }
-        this.dbDir = dbDir;
-    }
-
-    @Nullable
-    public File getDbDir() { return dbDir; }
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
     public void addDb(@NonNull String name, @NonNull Database db) {
@@ -105,6 +124,44 @@ public final class TestContext implements AutoCloseable {
         }
         if (dbs.containsKey(name)) { throw new ClientError("Attempt to replace an open database"); }
         dbs.put(name, db);
+    }
+
+    public void createDbs(@NonNull DatabaseService dbSvc, @Nullable TypedMap databases) {
+        if ((databases == null) || databases.isEmpty()) { return; }
+
+        final Set<String> dbNames = databases.getKeys();
+        for (String dbName: dbNames) {
+            final TypedMap dbDesc = databases.getMap(dbName);
+
+            if ((dbDesc == null) || dbDesc.isEmpty()) {
+                createDb(this, dbSvc, dbName, null);
+                continue;
+            }
+
+            dbDesc.validate(LEGAL_DATABASE_KEYS);
+
+            final String dataset = dbDesc.getString(KEY_DATASET);
+            if (dataset != null) {
+                if (dbDesc.containsKey(KEY_COLLECTIONS)) {
+                    throw new ClientError(
+                        "Both collections and dataset specified for database " + dbName + " in reset");
+                }
+
+                if (StringUtils.isEmpty(dataset)) {
+                    throw new ClientError("No dataset is specified for database " + dbName + " in reset");
+                }
+                dbSvc.installDataset(this, dataset, dbName);
+
+                continue;
+            }
+
+            final TypedList collections = dbDesc.getList(KEY_COLLECTIONS);
+            if ((collections == null) || collections.isEmpty()) {
+                throw new ClientError("Null or empty collections list for database " + dbName + " in reset");
+            }
+
+            createDb(this, dbSvc, dbName, collections);
+        }
     }
 
     @Nullable
@@ -206,6 +263,22 @@ public final class TestContext implements AutoCloseable {
         return (endptListeners == null) ? null : endptListeners.get(id);
     }
 
+    private static void createDb(
+        @NonNull TestContext ctxt,
+        @NonNull DatabaseService svc,
+        @NonNull String dbName,
+        @Nullable TypedList collections) {
+        final List<String[]> collFqns = new ArrayList<>();
+        if (collections != null) {
+            for (int i = 0; i < collections.size(); i++) {
+                final String fqn = collections.getString(i);
+                if (fqn == null) { throw new ClientError("Null collection for database " + dbName + " in reset"); }
+                collFqns.add(DatabaseService.parseCollectionFullName(fqn));
+            }
+        }
+        svc.installDatabase(ctxt, dbName, collFqns);
+    }
+
     private void stopRepls() {
         final Map<String, Replicator> liveRepls = openRepls;
         openRepls = null;
@@ -233,7 +306,6 @@ public final class TestContext implements AutoCloseable {
 
     private void deleteDbs() {
         final File liveDbDir = dbDir;
-        dbDir = null;
 
         final Map<String, Database> liveDbs = openDbs;
         openDbs = null;
@@ -254,7 +326,7 @@ public final class TestContext implements AutoCloseable {
             }
         }
 
-        if ((liveDbDir != null) && !new FileUtils().deleteRecursive(liveDbDir)) {
+        if (!new FileUtils().deleteRecursive(liveDbDir)) {
             Log.err(TAG, "Failed deleting db dir on reset: " + liveDbDir);
         }
     }

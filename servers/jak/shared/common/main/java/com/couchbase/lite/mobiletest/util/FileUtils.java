@@ -20,6 +20,7 @@ import androidx.annotation.NonNull;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,9 +35,18 @@ import com.couchbase.lite.mobiletest.services.Log;
 
 
 public class FileUtils {
+    public static final String ZIP_EXTENSION = ".zip";
+
+
     private static final String TAG = "FILE_UTIL";
 
     private final byte[] buffer = new byte[1024];
+
+    // New stream constructors are supported only in API 26+
+    @NonNull
+    public FileInputStream asStream(@NonNull File file) throws FileNotFoundException {
+        return new FileInputStream(file);
+    }
 
     @NonNull
     public byte[] readToByteArray(@NonNull InputStream in) {
@@ -92,11 +102,15 @@ public class FileUtils {
         }
     }
 
+    public void unzip(@NonNull File src, @NonNull File dest) throws IOException { unzip(asStream(src), dest); }
+
     public void unzip(@NonNull InputStream src, @NonNull File dest) throws IOException {
+        File root = null;
         try (InputStream in = src; ZipInputStream zis = new ZipInputStream(in)) {
             ZipEntry ze = zis.getNextEntry();
             while (ze != null) {
                 final File newFile = new File(dest, ze.getName());
+                if (root == null) { root = newFile; }
                 if (ze.isDirectory()) { mkPath(newFile); }
                 else {
                     final String parent = newFile.getParent();
@@ -107,7 +121,7 @@ public class FileUtils {
             }
             zis.closeEntry();
         }
-        Log.p(TAG, "Unzipped file " + dest);
+        Log.p(TAG, "Unzipped file " + root);
     }
 
     private void addFilesList(@NonNull File dir, @NonNull List<String> files) {
