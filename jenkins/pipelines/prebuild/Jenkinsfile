@@ -1,6 +1,8 @@
 pipeline {
     agent none
-
+    options {
+        skipDefaultCheckout()
+    }
     parameters {
         choice(
             name: 'TS_PLATFORM',
@@ -19,16 +21,40 @@ pipeline {
 
     stages {
         stage('Validate Parameters') {
-            agent any
             steps {
                 script {
                     if (!params.TS_PLATFORM || !params.CBL_VERSION || !params.CBL_BUILD) {
                         error("One or more required parameters are not set. Please set TS_PLATFORM, CBL_VERSION, CBL_BUILD.")
                     }
+                    currentBuild.displayName = "${params.TS_PLATFORM} ${params.CBL_VERSION}-${params.CBL_BUILD}"
                 }
             }
         }
+        stage("Determine Branch") {
+            steps {
+                script {
+                    def matcher = (params.CBL_VERSION =~ /^(\d+)\.(\d+)/)
+                    if (!matcher) {
+                        error "CBL_VERSION format is invalid: ${params.CBL_VERSION}"
+                    }
 
+                    def majorMinor = "${matcher[0][1]}.${matcher[0][2]}"
+                    env.BUILD_BRANCH = "release/${majorMinor}"
+
+                    // Check if e.g. release/3.2 exists in the repo
+                    def branchExists = sh(
+                        script: "git branch -a --list '*/${env.BUILD_BRANCH}' 'remotes/origin/${env.BUILD_BRANCH}' | grep -q '${env.BUILD_BRANCH}'",
+                        returnStatus: true
+                    ) == 0
+
+                    if(!branchExists) {
+                        env.BUILD_BRANCH = 'main'
+                    }
+
+                    echo "Build will come from branch ${env.BUILD_BRANCH}"
+                }
+            }
+        }
         stage('Build') {
             agent {
                 label getNodeForPlatform(params.TS_PLATFORM)
@@ -37,28 +63,12 @@ pipeline {
                 KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
             }
             steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${env.BUILD_BRANCH}"]],
+                    userRemoteConfigs: [[url: 'https://github.com/couchbaselabs/couchbase-lite-tests']]
+                ])
                 script {
-                    currentBuild.displayName = "${params.TS_PLATFORM} ${params.CBL_VERSION}-${params.CBL_BUILD}"
-                    def matcher = (params.CBL_VERSION =~ /^(\d+)\.(\d+)/)
-                    if (!matcher) {
-                        error "CBL_VERSION format is invalid: ${params.CBL_VERSION}"
-                    }
-
-                    def majorMinor = "${matcher[0][1]}.${matcher[0][2]}"
-                    def branchName = "release/${majorMinor}"
-
-                    // Check if e.g. release/3.2 exists in the repo
-                    def branchExists = sh(
-                        script: "git branch -a --list '*/${branchName}' 'remotes/origin/${branchName}' | grep -q '${branchName}'",
-                        returnStatus: true
-                    ) == 0
-
-                    if(!branchExists) {
-                        branchName = 'main'
-                    }
-
-                    echo "Build will come from branch ${branchName}"
-                    
                     if (params.TS_PLATFORM.contains("ios")) {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                     }
