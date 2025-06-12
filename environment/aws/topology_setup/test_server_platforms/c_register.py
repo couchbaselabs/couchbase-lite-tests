@@ -275,12 +275,14 @@ class CTestServer_iOS(CTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        path = (
-            IOS_BUILD_DIR / "Build" / "Products" / "Release-iphoneos" / "TestServer.app"
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else IOS_BUILD_DIR / "Build" / "Products" / "Release-iphoneos"
         )
 
         return iOSBridge(
-            str(path),
+            str(prefix / "TestServer.app"),
             "com.couchbase.CBLTestServer",
         )
 
@@ -405,7 +407,13 @@ class CTestServer_Android(CTestServer):
             PlatformBridge: The platform bridge.
         """
         path = (
-            C_TEST_SERVER_DIR
+            TEST_SERVER_DIR
+            / "downloaded"
+            / self.platform
+            / self.version
+            / "testserver_android.apk"
+            if self._downloaded
+            else C_TEST_SERVER_DIR
             / "platforms"
             / "android"
             / "app"
@@ -500,9 +508,12 @@ class CTestServer_Windows(CTestServer_Desktop):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        return ExeBridge(
-            str(BUILD_DIR / "out" / "bin" / "testserver.exe"),
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else BUILD_DIR / "out" / "bin"
         )
+        return ExeBridge(str(prefix / "testserver.exe"))
 
     def compress_package(self) -> str:
         """
@@ -561,9 +572,12 @@ class CTestServer_macOS(CTestServer_Desktop):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        return ExeBridge(
-            str(BUILD_DIR / "out" / "bin" / "testserver"),
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else BUILD_DIR / "out" / "bin"
         )
+        return ExeBridge(str(prefix / "testserver"))
 
     def compress_package(self) -> str:
         """
@@ -622,9 +636,12 @@ class CTestServer_Linux(CTestServer_Desktop):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        return ExeBridge(
-            str(BUILD_DIR / "out" / "bin" / "testserver"),
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else BUILD_DIR / "out" / "bin"
         )
+        return ExeBridge(str(prefix / "testserver"))
 
     def compress_package(self) -> str:
         """
