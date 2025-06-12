@@ -132,8 +132,6 @@ if(MSVC)
     )
 endif()
 
-file(COPY assets DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-
 install(
         TARGETS testserver
         RUNTIME DESTINATION bin
@@ -145,12 +143,4 @@ file(GLOB CBLITE_FILES "${CBLITE_PARENT_DIR}/*cblite*")
 install(
         FILES ${CBLITE_FILES}
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-)
-
-install(
-        DIRECTORY assets
-        DESTINATION ${CMAKE_INSTALL_PREFIX}
-        FILES_MATCHING
-        PATTERN "*"
-        PATTERN ".gitkeep" EXCLUDE
 )

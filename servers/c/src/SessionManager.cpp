@@ -12,7 +12,7 @@ using namespace ts::log;
 
 namespace ts {
     std::string SessionManager::sessionsRootDirectory() const {
-        return fs::path(_testServer->context().filesDir) / "sessions";
+        return (fs::path(_testServer->context().filesDir) / "sessions").string();
     }
 
     void SessionManager::init() {
@@ -29,7 +29,7 @@ namespace ts {
             throw std::runtime_error("Failed to create session directory '" + sessionDir.string() + "'");
         }
         Log::log(LogLevel::info, "Session directory created at '%s'", sessionDir.string().c_str());
-        return sessionDir;
+        return sessionDir.string();
     }
 
     std::shared_ptr<Session> SessionManager::createSession(const std::string &id,

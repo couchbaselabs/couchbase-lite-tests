@@ -44,11 +44,7 @@ from environment.aws.common.io import (
 )
 from environment.aws.common.output import header
 from environment.aws.topology_setup.cbl_library_downloader import CBLLibraryDownloader
-from environment.aws.topology_setup.test_server import (
-    TEST_SERVER_DIR,
-    TestServer,
-    copy_dataset,
-)
+from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
 
 from .android_bridge import AndroidBridge
 from .exe_bridge import ExeBridge
@@ -79,9 +75,6 @@ class CTestServer(TestServer):
     @abstractmethod
     def cbl_filename(self, version: str) -> str:
         pass
-
-    def _copy_dataset(self) -> None:
-        copy_dataset(C_TEST_SERVER_DIR / "assets")
 
 
 class CTestServer_Desktop(CTestServer):
@@ -115,7 +108,6 @@ class CTestServer_Desktop(CTestServer):
         """
         Build the C test server.
         """
-        self._copy_dataset()
         shutil.rmtree(LIB_DIR, ignore_errors=True)
         self._download_cbl()
         header("Building C test server")
@@ -219,7 +211,6 @@ class CTestServer_iOS(CTestServer):
 
     def build(self):
         self._download_cbl()
-        self._copy_dataset()
         header("Building")
         env = os.environ.copy()
         env["LANG"] = "en_US.UTF-8"
@@ -275,12 +266,14 @@ class CTestServer_iOS(CTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        path = (
-            IOS_BUILD_DIR / "Build" / "Products" / "Release-iphoneos" / "TestServer.app"
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else IOS_BUILD_DIR / "Build" / "Products" / "Release-iphoneos"
         )
 
         return iOSBridge(
-            str(path),
+            str(prefix / "TestServer.app"),
             "com.couchbase.CBLTestServer",
         )
 
@@ -370,7 +363,6 @@ class CTestServer_Android(CTestServer):
         Build the C test server.
         """
         self._download_cbl()
-        self._copy_dataset()
         gradle_path = C_TEST_SERVER_DIR / "platforms" / "android" / "gradlew"
         if platform.system() == "Windows":
             gradle_path = gradle_path.with_suffix(".bat")
@@ -405,7 +397,13 @@ class CTestServer_Android(CTestServer):
             PlatformBridge: The platform bridge.
         """
         path = (
-            C_TEST_SERVER_DIR
+            TEST_SERVER_DIR
+            / "downloaded"
+            / self.platform
+            / self.version
+            / "testserver_android.apk"
+            if self._downloaded
+            else C_TEST_SERVER_DIR
             / "platforms"
             / "android"
             / "app"
@@ -500,9 +498,12 @@ class CTestServer_Windows(CTestServer_Desktop):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        return ExeBridge(
-            str(BUILD_DIR / "out" / "bin" / "testserver.exe"),
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else BUILD_DIR / "out" / "bin"
         )
+        return ExeBridge(str(prefix / "testserver.exe"))
 
     def compress_package(self) -> str:
         """
@@ -561,9 +562,12 @@ class CTestServer_macOS(CTestServer_Desktop):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        return ExeBridge(
-            str(BUILD_DIR / "out" / "bin" / "testserver"),
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else BUILD_DIR / "out" / "bin"
         )
+        return ExeBridge(str(prefix / "testserver"))
 
     def compress_package(self) -> str:
         """
@@ -622,9 +626,12 @@ class CTestServer_Linux(CTestServer_Desktop):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        return ExeBridge(
-            str(BUILD_DIR / "out" / "bin" / "testserver"),
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else BUILD_DIR / "out" / "bin"
         )
+        return ExeBridge(str(prefix / "testserver"))
 
     def compress_package(self) -> str:
         """
