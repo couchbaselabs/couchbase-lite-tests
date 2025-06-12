@@ -42,12 +42,13 @@ pipeline {
                     env.BUILD_BRANCH = "release/${majorMinor}"
 
                     // Check if e.g. release/3.2 exists in the repo
-                    def branchExists = sh(
-                        script: "git branch -a --list '*/${env.BUILD_BRANCH}' 'remotes/origin/${env.BUILD_BRANCH}' | grep -q '${env.BUILD_BRANCH}'",
-                        returnStatus: true
-                    ) == 0
+                    def apiUrl = "https://api.github.com/repos/couchbaselabs/couchbase-lite-tests/branches/${env.BUILD_BRANCH}"
+                    def response = httpRequest(
+                        url: apiUrl,
+                        validResponseCodes: '200,404'
+                    )
 
-                    if(!branchExists) {
+                    if (response.status != 200) {
                         env.BUILD_BRANCH = 'main'
                     }
 
