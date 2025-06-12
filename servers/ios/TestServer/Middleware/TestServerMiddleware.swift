@@ -95,3 +95,19 @@ class TestServerMiddleware : AsyncMiddleware {
         return try application.sessionManager.getSession(id: clientID)
     }
 }
+
+extension Vapor.Request {
+    var session : Session {
+        guard let s = self.storage.get(SessionKey.self) else {
+            fatalError("No session found in request")
+        }
+        return s
+    }
+    
+    var databaseManager : DatabaseManager {
+        guard let manager = self.session.databaseManager else {
+            fatalError("Get database manager from temp session is not supported")
+        }
+        return manager
+    }
+}

@@ -10,23 +10,28 @@ import Vapor
 
 struct Session {
     let id: String
-    let databaseManager: DatabaseManager
+    let databaseManager: DatabaseManager?
     let sessionManager: SessionManager
 }
 
 class SessionManager {
-    private let databaseManager: DatabaseManager
+    private let fileDirectory: URL
     
     private let queue = DispatchQueue(label: "SessionManager", attributes: .concurrent)
     
     private var sessions: [String: Session] = [:]
     
-    init(databaseManager: DatabaseManager) {
-        self.databaseManager = databaseManager
+    private var sessionsDirectory: URL {
+        return fileDirectory.appendingPathComponent("sessions")
+    }
+    
+    init(filesDirectory: URL) throws {
+        self.fileDirectory = filesDirectory
+        try resetSessionsDirectory()
     }
     
     @discardableResult
-    func createSession(id: String) throws -> Session {
+    func createSession(id: String, datasetVersion: String) throws -> Session {
         return try queue.sync(flags: .barrier) {
             if sessions[id] != nil {
                 throw TestServerError.badRequest("Session '\(id)' already exists")
@@ -35,15 +40,18 @@ class SessionManager {
             // We will only maintain one session at a time. This may change in the future
             sessions.removeAll()
             
+            let dir = try createSessionDirectory(for: id)
+            let manager = DatabaseManager(directory: dir.path(), datasetVersion: datasetVersion)
+            
             // Using shared Database manager at least for now.
-            let session = Session(id: id, databaseManager: databaseManager, sessionManager: self)
+            let session = Session(id: id, databaseManager: manager, sessionManager: self)
             sessions[id] = session
             return session
         }
     }
     
     func createTempSession() -> Session {
-        return Session(id: UUID().uuidString, databaseManager: databaseManager, sessionManager: self)
+        return Session(id: UUID().uuidString, databaseManager: nil, sessionManager: self)
     }
     
     func getSession(id: String) throws -> Session {
@@ -53,5 +61,20 @@ class SessionManager {
             }
             return session
         }
+    }
+    
+    private func resetSessionsDirectory() throws {
+        let fileManager = FileManager.default
+        let dir = sessionsDirectory
+        if fileManager.fileExists(atPath: dir.path) {
+            try fileManager.removeItem(at: dir)
+        }
+        try fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+    }
+    
+    private func createSessionDirectory(for id: String) throws -> URL {
+        let dir = sessionsDirectory.appendingPathComponent(id)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+        return dir
     }
 }
