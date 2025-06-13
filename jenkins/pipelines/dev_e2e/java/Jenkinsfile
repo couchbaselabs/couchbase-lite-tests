@@ -66,7 +66,7 @@ pipeline {
                         echo "=== Run OSX Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} macos ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                             """
                         }
                         echo "=== OSX Desktop Tests Complete"
@@ -126,7 +126,7 @@ pipeline {
                         echo "=== Run Linux Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} linux ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                             """
                         }
                         echo "=== Linux Desktop Tests Complete"
@@ -157,7 +157,7 @@ pipeline {
                         echo "=== Run OSX Web Service Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} macos ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                             """
                         }
                         echo "=== OSX Web Service Tests Complete"
@@ -219,7 +219,7 @@ pipeline {
                         echo "=== Run Linux Web Service Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} linux ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                             """
                         }
                         echo "=== Linux Web Service Tests Complete"
