@@ -256,7 +256,7 @@ class TestServer(ABC):
         pass
 
     @abstractmethod
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a platform bridge for the test server.
 

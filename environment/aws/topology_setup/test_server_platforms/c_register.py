@@ -15,7 +15,7 @@ Functions:
         Build the C test server.
     compress_package(self) -> str:
         Compress the C test server package.
-    create_bridge(self) -> PlatformBridge:
+    create_bridge(self, **kwargs) -> PlatformBridge:
         Create a bridge for the C test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
@@ -259,7 +259,7 @@ class CTestServer_iOS(CTestServer):
             f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
         )
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
@@ -389,7 +389,7 @@ class CTestServer_Android(CTestServer):
         version_parts = self.version.split("-")
         return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
@@ -491,7 +491,7 @@ class CTestServer_Windows(CTestServer_Desktop):
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-c-enterprise-{version}-windows-x86_64.zip"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
@@ -555,7 +555,7 @@ class CTestServer_macOS(CTestServer_Desktop):
         version_parts = self.version.split("-")
         return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
@@ -619,7 +619,7 @@ class CTestServer_Linux(CTestServer_Desktop):
         version_parts = self.version.split("-")
         return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_linux-{self.__arch}.tar.gz"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 

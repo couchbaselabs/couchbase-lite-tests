@@ -12,7 +12,7 @@ Functions:
         Build the Swift test server.
     compress_package(self) -> str:
         Compress the Swift test server package.
-    create_bridge(self) -> PlatformBridge:
+    create_bridge(self, **kwargs) -> PlatformBridge:
         Create a bridge for the Swift test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
@@ -161,7 +161,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
                 if xcpretty_proc.returncode != 0:
                     raise RuntimeError("Build failed")
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the Swift test server to be able to install, run, etc.
 

@@ -15,7 +15,7 @@ Functions:
         Build the .NET test server.
     compress_package(self) -> str:
         Compress the .NET test server package.
-    create_bridge(self) -> PlatformBridge:
+    create_bridge(self, **kwargs) -> PlatformBridge:
         Create a bridge for the .NET test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
@@ -274,7 +274,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
         version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the .NET test server to be able to install, run, etc.
 
@@ -381,7 +381,7 @@ class DotnetTestServer_Android(DotnetTestServer):
         version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the .NET test server to be able to install, run, etc.
 
@@ -482,7 +482,7 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
         version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the .NET test server to be able to install, run, etc.
 
@@ -590,7 +590,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
         version_parts = self.version.split("-")
         return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the .NET test server to be able to install, run, etc.
 

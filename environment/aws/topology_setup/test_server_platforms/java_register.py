@@ -14,7 +14,7 @@ Functions:
         Build the Java test server.
     compress_package(self) -> str:
         Compress the Java test server package.
-    create_bridge(self) -> PlatformBridge:
+    create_bridge(self, **kwargs) -> PlatformBridge:
         Create a bridge for the Java test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
@@ -319,7 +319,7 @@ class JAKTestServer_Android(JAKTestServer):
         version_parts = self.version.split("-")
         return f"couchbase-lite-android/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the Android test server to be able to install, run, etc.
 
@@ -444,7 +444,7 @@ class JAKTestServer_Desktop(JAKTestServer_NonAndroid):
     def __init__(self, version: str):
         super().__init__(version, "Desktop")
 
-    def create_bridge(self):
+    def create_bridge(self, **kwargs):
         jar_path = (
             str(
                 TEST_SERVER_DIR
@@ -471,8 +471,8 @@ class JAKTestServer_WebService(JAKTestServer_NonAndroid):
     def __init__(self, version: str):
         super().__init__(version, "WebService")
 
-    def create_bridge(self):
-        if not self._downloaded:
+    def create_bridge(self, **kwargs):
+        if not self._downloaded and not kwargs.get("downloaded", False):
             return JettyBridge(self.version)
 
         return JarBridge(

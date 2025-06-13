@@ -715,7 +715,11 @@ class TopologyConfig:
             test_server = TestServer.create(
                 test_server_input.platform, test_server_input.cbl_version
             )
-            bridge = test_server.create_bridge()
+
+            # This is a smell in that some platforms have a different
+            # bridge implementation based on built vs downloaded.  Pass
+            # in this information here as a hint
+            bridge = test_server.create_bridge(downloaded=test_server_input.download)
             bridge.validate(test_server_input.location)
             bridge.stop(test_server_input.location)
 
