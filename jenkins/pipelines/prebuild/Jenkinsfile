@@ -1,8 +1,8 @@
 pipeline {
     agent none
-    options {
-        skipDefaultCheckout()
-    }
+    // options {
+    //     skipDefaultCheckout()
+    // }
     parameters {
         choice(
             name: 'TS_PLATFORM',
