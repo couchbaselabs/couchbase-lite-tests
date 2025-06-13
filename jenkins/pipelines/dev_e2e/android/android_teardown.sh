@@ -7,7 +7,9 @@ source $SCRIPT_DIR/../../shared/config.sh
 
 export PYTHONPATH=$SCRIPT_DIR/../../../
 pushd $AWS_ENVIRONMENT_DIR
+stop_venv
 create_venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+trap stop_venv EXIT
+uv pip install -r requirements.txt
 python3 ./stop_backend.py --topology topology_setup/topology.json
