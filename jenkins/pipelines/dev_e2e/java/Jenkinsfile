@@ -21,6 +21,33 @@ pipeline {
             }
         }
 
+         stage('Prebuild Servers') {
+            steps {
+                script {
+                    def platforms = [
+                        'jak_desktop', 'jak_webservice'
+                    ]
+                    def parallelBuilds = [:]
+                    for(p in platforms) {
+                        // Groovy stupidness.  Need to set a local variable here
+                        // to avoid late binding (all jobs use dotnet_macos).
+                        def platform = p
+                        parallelBuilds[platform] = {
+                            build job: 'prebuild-test-server',
+                            parameters: [
+                                string(name: 'TS_PLATFORM', value: platform),
+                                string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                                string(name: 'CBL_BUILD', value: params.CBL_BUILD)
+                            ],
+                            wait: true,
+                            propagate: true
+                        }
+                    }
+                    parallel parallelBuilds
+                }
+            }
+        }
+
         // If Jenkins will actually run things in parallel, we will, at least for now
         // need to use locks to protect platform tests from corrupting each other's back ends.
         // Might as well use them here, for exactly the same purpose.
