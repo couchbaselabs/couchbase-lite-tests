@@ -1,8 +1,8 @@
 pipeline {
     agent none
-    // options {
-    //     skipDefaultCheckout()
-    // }
+    options {
+        skipDefaultCheckout()
+    }
     parameters {
         choice(
             name: 'TS_PLATFORM',
@@ -30,32 +30,32 @@ pipeline {
                 }
             }
         }
-        // stage("Determine Branch") {
-        //     steps {
-        //         script {
-        //             def matcher = (params.CBL_VERSION =~ /^(\d+)\.(\d+)/)
-        //             if (!matcher) {
-        //                 error "CBL_VERSION format is invalid: ${params.CBL_VERSION}"
-        //             }
+        stage("Determine Branch") {
+            steps {
+                script {
+                    def match = (params.CBL_VERSION =~ /^(\d+)\.(\d+)/)[0]
+                    if (!match) {
+                        error "CBL_VERSION format is invalid: ${params.CBL_VERSION}"
+                    }
 
-        //             def majorMinor = "${matcher[0][1]}.${matcher[0][2]}"
-        //             env.BUILD_BRANCH = "release/${majorMinor}"
+                    def majorMinor = "${match[1]}.${match[2]}"
+                    env.BUILD_BRANCH = "release/${majorMinor}"
 
-        //             // Check if e.g. release/3.2 exists in the repo
-        //             def apiUrl = "https://api.github.com/repos/couchbaselabs/couchbase-lite-tests/branches/${env.BUILD_BRANCH}"
-        //             def response = httpRequest(
-        //                 url: apiUrl,
-        //                 validResponseCodes: '200,404'
-        //             )
+                    // Check if e.g. release/3.2 exists in the repo
+                    def apiUrl = "https://api.github.com/repos/couchbaselabs/couchbase-lite-tests/branches/${env.BUILD_BRANCH}"
+                    def response = httpRequest(
+                        url: apiUrl,
+                        validResponseCodes: '200,404'
+                    )
 
-        //             if (response.status != 200) {
-        //                 env.BUILD_BRANCH = 'main'
-        //             }
+                    if (response.status != 200) {
+                        env.BUILD_BRANCH = 'main'
+                    }
 
-        //             echo "Build will come from branch ${env.BUILD_BRANCH}"
-        //         }
-        //     }
-        // }
+                    echo "Build will come from branch ${env.BUILD_BRANCH}"
+                }
+            }
+        }
         stage('Build') {
             agent {
                 label getNodeForPlatform(params.TS_PLATFORM)
@@ -64,11 +64,11 @@ pipeline {
                 KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
             }
             steps {
-                // checkout([
-                //     $class: 'GitSCM',
-                //     branches: [[name: "*/${env.BUILD_BRANCH}"]],
-                //     userRemoteConfigs: [[url: 'https://github.com/couchbaselabs/couchbase-lite-tests']]
-                // ])
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${env.BUILD_BRANCH}"]],
+                    userRemoteConfigs: [[url: 'https://github.com/couchbaselabs/couchbase-lite-tests']]
+                ])
                 script {
                     if (params.TS_PLATFORM.contains("ios")) {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
