@@ -382,7 +382,7 @@ class JAKTestServer_NonAndroid(JAKTestServer):
         super().__init__(version)
         self.__jar_name = jar_name
         with open(JAK_TEST_SERVER_DIR / "version.txt") as f:
-            self.__server_version = f.read().strip()
+            self._server_version = f.read().strip()
 
     @property
     def platform(self) -> str:
@@ -418,7 +418,7 @@ class JAKTestServer_NonAndroid(JAKTestServer):
             / "app"
             / "build"
             / "libs"
-            / f"CBLTestServer-Java-{self.__jar_name}-{self.__server_version}_{self.version}.jar"
+            / f"CBLTestServer-Java-{self.__jar_name}-{self._server_version}_{self.version}.jar"
         )
 
         # The server version is not going to be known when downloading from latestbuilds,
@@ -460,7 +460,7 @@ class JAKTestServer_Desktop(JAKTestServer_NonAndroid):
                 / "app"
                 / "build"
                 / "libs"
-                / f"CBLTestServer-Java-Desktop-{self.__server_version}_{self.version}.jar"
+                / f"CBLTestServer-Java-Desktop-{self._server_version}_{self.version}.jar"
             )
         )
         return JarBridge(jar_path, self.version)
