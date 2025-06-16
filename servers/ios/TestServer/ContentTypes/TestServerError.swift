@@ -51,7 +51,13 @@ struct TestServerError : Error, Codable {
         if let error = error as NSError? {
             return TestServerError(domain: .TESTSERVER, code: error.code, message: error.localizedDescription)
         }
+        
         return badRequest(error.localizedDescription)
+    }
+
+    static func cblError(_ error: Error) -> TestServerError {
+        let err = error as NSError
+        return TestServerError(domain: .CBL, code: err.code, message: err.localizedDescription)
     }
     
     static let cblDBNotOpen = TestServerError(domain: .CBL, code: CBLError.notOpen, message: "Database is not open.")
