@@ -13,7 +13,7 @@ extension Handlers {
             throw TestServerError.badRequest("Request body is not a valid startMultipeerReplicator Request.")
         }
         
-        let dbManager = req.application.databaseManager
+        let dbManager = req.databaseManager
         
         var config = ContentTypes.MultipeerReplicatorConfiguration(
             peerGroupID: request.peerGroupID,
