@@ -12,7 +12,7 @@ extension Handlers {
         guard let repl = try? req.content.decode(ContentTypes.Replicator.self) else {
             throw TestServerError.badRequest("Request body does not match the 'Replicator' schema.") }
         
-        let dbManager = req.application.databaseManager
+        let dbManager = req.databaseManager
         guard let status = dbManager.multipeerReplicatorStatus(forID: repl.id) else {
             throw TestServerError.badRequest("MultipeerReplicator with ID '\(repl.id)' does not exist.")
         }
