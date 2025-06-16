@@ -288,7 +288,7 @@ class DatabaseManager {
             guard let strongSelf = self else { return }
             var docs: [ContentTypes.DocumentReplication] = []
             docRepl.documents.forEach { doc in
-                docs.append(ContentTypes.DocumentReplication.init(doc: doc, isPush: !docRepl.incoming))
+                docs.append(ContentTypes.DocumentReplication.init(doc: doc, isPush: docRepl.isPush))
             }
             strongSelf.peerReplicatorDocuments[id, default: [:]][docRepl.peerID, default: []] += docs
         }
