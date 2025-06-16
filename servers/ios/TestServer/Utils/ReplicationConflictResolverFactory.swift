@@ -8,29 +8,49 @@
 import Foundation
 import CouchbaseLiteSwift
 
+public protocol AnyConflictResolver {
+    func resolve(peerID: PeerID?, conflict: Conflict) -> Document?
+}
+
+struct ConflictResolver: ConflictResolverProtocol, MultipeerConflictResolver {
+    private let resolver: AnyConflictResolver
+    
+    init(_ resolver: AnyConflictResolver) {
+        self.resolver = resolver
+    }
+    
+    func resolve(conflict: Conflict) -> Document? {
+        return resolver.resolve(peerID: nil, conflict: conflict)
+    }
+    
+    func resolve(peerID: PeerID, conflict: Conflict) -> Document? {
+        return resolver.resolve(peerID: peerID, conflict: conflict)
+    }
+}
+
 struct ReplicationConflictResolverFactory {
-    struct LocalWinsResolver : ConflictResolverProtocol {
-        func resolve(conflict: Conflict) -> Document? {
+    struct LocalWinsResolver : AnyConflictResolver {
+        func resolve(peerID: PeerID?, conflict: Conflict) -> Document? {
             return conflict.localDocument
         }
     }
     
-    struct RemoteWinsResolver : ConflictResolverProtocol {
-        func resolve(conflict: Conflict) -> Document? {
+    struct RemoteWinsResolver : AnyConflictResolver {
+        func resolve(peerID: PeerID?, conflict: Conflict) -> Document? {
             return conflict.remoteDocument
         }
     }
     
-    struct DeleteResolver : ConflictResolverProtocol {
-        func resolve(conflict: Conflict) -> Document? {
+    struct DeleteResolver : AnyConflictResolver {
+        func resolve(peerID: PeerID?, conflict: Conflict) -> Document? {
             return nil
         }
     }
     
-    struct MergeResolver : ConflictResolverProtocol {
+    struct MergeResolver : AnyConflictResolver {
         let property: String
         
-        func resolve(conflict: Conflict) -> Document? {
+        func resolve(peerID: PeerID?, conflict: Conflict) -> Document? {
             if conflict.localDocument == nil || conflict.remoteDocument == nil {
                 return nil
             }
@@ -51,25 +71,25 @@ struct ReplicationConflictResolverFactory {
         case merge = "merge"
     }
     
-    static func getResolver(withName name: String, params: Dictionary<String, AnyCodable>? = nil)
-    throws -> ConflictResolverProtocol {
+    static func getResolver(
+        withName name: String,
+        params: Dictionary<String, AnyCodable>? = nil) throws -> ConflictResolver {
         guard let type = ConflictResolverType(rawValue: name) else {
             throw TestServerError.badRequest("Could not find conflict resolver with name '\(name)'")
         }
         
         switch type {
         case .localWins:
-            return LocalWinsResolver()
+            return ConflictResolver(LocalWinsResolver())
         case .removeWins:
-            return RemoteWinsResolver()
+            return ConflictResolver(RemoteWinsResolver())
         case .delete:
-            return DeleteResolver()
+            return ConflictResolver(DeleteResolver())
         case .merge:
             guard let property = params?["property"]?.value as? String else {
                 throw TestServerError.badRequest("The property parameter is missing for the merge conflict resolver")
             }
-            return MergeResolver(property: property)
+            return ConflictResolver(MergeResolver(property: property))
         }
     }
 }
-

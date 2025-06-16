@@ -7,6 +7,7 @@
 
 import CouchbaseLiteSwift
 import ZipArchive
+import CryptoKit
 
 class DatabaseManager {
     private let kDatasetBaseURL = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/"
@@ -17,8 +18,18 @@ class DatabaseManager {
     private let datasetVersion: String
     
     private var databases : [ String : Database ] = [:]
+    
     private var replicators : [ UUID : Replicator ] = [:]
-    private var replicatorDocuments : [ UUID : [ContentTypes.DocumentReplication] ] = [:]
+    private var replicatorDocuments : [ UUID : [ ContentTypes.DocumentReplication ] ] = [:]
+    private var replicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
+    
+    private var multipeerReplicators : [ UUID : MultipeerReplicator ] = [:]
+    private var peerReplicatorStatus : [ UUID : [ PeerID: Replicator.Status ] ] = [:]
+    private var peerReplicatorStatusToken : [ UUID : ListenerToken ] = [:]
+    private var peerReplicatorDocuments : [ UUID : [ PeerID: [ ContentTypes.DocumentReplication ] ] ] = [:]
+    private var peerReplicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
+    
+    private let listenerQueue = DispatchQueue(label: "DatabaseManagerListenerQueue")
     
     
     public init(directory: String, datasetVersion: String) {
@@ -128,10 +139,10 @@ class DatabaseManager {
                 collConfig.channels = configColl.channels
                 collConfig.documentIDs = configColl.documentIDs
                 if let pullFilter = configColl.pullFilter {
-                    collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter)
+                    collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter).toReplicationFilter()
                 }
                 if let pushFilter = configColl.pushFilter {
-                    collConfig.pushFilter = try DatabaseManager.getCBLReplicationFilter(from: pushFilter)
+                    collConfig.pushFilter = try DatabaseManager.getCBLReplicationFilter(from: pushFilter).toReplicationFilter()
                 }
                 if let resolver = configColl.conflictResolver {
                     collConfig.conflictResolver = try DatabaseManager.getCBLReplicationConflictResolver(from: resolver)
@@ -151,9 +162,10 @@ class DatabaseManager {
         // Whenever a document is replicated, add it to the replicatorDocuments dict
         if(config.enableDocumentListener) {
             replicatorDocuments[replicatorID] = []
-            replicator.addDocumentReplicationListener({ [weak self] docChange in
-                guard self != nil
-                else { return }
+            
+            let listenerToken = replicator.addDocumentReplicationListener(withQueue: listenerQueue) { [weak self] docChange in
+                guard let strongSelf = self else { return }
+                
                 for doc in docChange.documents {
                     var docFlags: [ContentTypes.DocumentReplicationFlags] = []
                     
@@ -172,7 +184,7 @@ class DatabaseManager {
                         error = TestServerError(domain: .CBL, code: docError.code, message: docError.localizedDescription)
                     }
                     
-                    self!.replicatorDocuments[replicatorID]?.append(
+                    strongSelf.replicatorDocuments[replicatorID]?.append(
                         ContentTypes.DocumentReplication(
                             collection: "\(doc.scope).\(doc.collection)",
                             documentID: doc.id,
@@ -181,7 +193,9 @@ class DatabaseManager {
                             error: error)
                     )
                 }
-            })
+            }
+            
+            replicatorDocumentsToken[replicatorID] = listenerToken
         }
         
         replicator.start(reset: reset)
@@ -202,47 +216,127 @@ class DatabaseManager {
     
     public func replicatorStatus(forID replID: UUID) -> ContentTypes.ReplicatorStatus? {
         Log.log(level: .debug, message: "Fetching Replicator status for ID \(replID)")
-        guard let replicator = replicators[replID]
-        else {
-            Log.log(level: .debug, message: "Failed to fetch Replicator status, Replicator with ID \(replID) not found.")
-            return nil
+        
+        var status: ContentTypes.ReplicatorStatus?
+        
+        listenerQueue.sync {
+            guard let replicator = replicators[replID] else {
+                Log.log(level: .debug, message: "Failed to fetch Replicator status, Replicator with ID \(replID) not found.")
+                return
+            }
+            
+            var docs: [ContentTypes.DocumentReplication] = replicatorDocuments[replID] ?? []
+            
+            replicatorDocuments[replID] = [] // Reset after return per spec
+            
+            status = ContentTypes.ReplicatorStatus(status: replicator.status, docs: docs)
+            Log.log(level: .debug, message: "Succeessfully fetched Replicator status for ID \(replID): \(status!.description)")
         }
         
-        var activity: ContentTypes.ReplicatorActivity = .STOPPED
+        return status
+    }
+    
+    public func startMultipeerReplicator(config: ContentTypes.MultipeerReplicatorConfiguration) throws -> UUID {
+        Log.log(level: .debug, message: "Starting Multipeer Replicator")
         
-        switch replicator.status.activity {
-        case .busy:
-            activity = .BUSY
-        case .connecting:
-            activity = .CONNECTING
-        case .idle:
-            activity = .IDLE
-        case .offline:
-            activity = .OFFLINE
-        case .stopped:
-            activity = .STOPPED
-        @unknown default:
-            fatalError("Encountered unknown enum value from CBLReplicator.status.activity")
+        let identity = try DatabaseManager.identity(for: config)
+        
+        let authenticator = MultipeerCertificateAuthenticator { peer, certs in
+            return true
         }
         
-        let progress = ContentTypes.ReplicatorStatus.Progress(completed: replicator.status.progress.completed == replicator.status.progress.total)
-        
-        var error: TestServerError? = nil
-        if let replError = replicator.status.error as NSError? {
-            error = TestServerError(domain: .CBL, code: replError.code, message: replError.localizedDescription)
+        var collectionConfigs: [MultipeerCollectionConfiguration] = []
+        for replColl in config.collections {
+            for name in replColl.names {
+                guard let collection = try self.collection(name, inDB: config.database) else {
+                    Log.log(level: .error, message: "Failed to start Multipeer Replicator as collection '\(name)' does not exist in \(config.database).")
+                    throw TestServerError.badRequest("Collection '\(name)' does not exist in \(config.database).")
+                }
+                
+                var collConfig = MultipeerCollectionConfiguration(collection: collection)
+                
+                collConfig.documentIDs = replColl.documentIDs
+                
+                if let pullFilter = replColl.pullFilter {
+                    collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter).toMultipeerReplicationFilter()
+                }
+                if let pushFilter = replColl.pushFilter {
+                    collConfig.pushFilter = try DatabaseManager.getCBLReplicationFilter(from: pushFilter).toMultipeerReplicationFilter()
+                }
+                if let resolver = replColl.conflictResolver {
+                    collConfig.conflictResolver = try DatabaseManager.getCBLReplicationConflictResolver(from: resolver)
+                }
+                
+                collectionConfigs.append(collConfig)
+            }
         }
         
-        var documents: [ContentTypes.DocumentReplication]? = nil
+        let conf = MultipeerReplicatorConfiguration(
+            peerGroupID: config.peerGroupID,
+            identity: identity,
+            authenticator: authenticator,
+            collections: collectionConfigs)
         
-        if let replicatedDocuments = replicatorDocuments[replID] {
-            documents = replicatedDocuments
-            // Clear documents that have already been returned, per spec
-            replicatorDocuments[replID] = []
+        let id = UUID()
+        
+        let multipeerReplicator = try MultipeerReplicator(config: conf)
+        
+        let listenerToken = multipeerReplicator.addPeerReplicatorStatusListener(on: listenerQueue) { [weak self] status in
+            guard let strongSelf = self else { return }
+            strongSelf.peerReplicatorStatus[id, default: [:]][status.peerID] = status.status
         }
         
-        let status = ContentTypes.ReplicatorStatus(activity: activity, progress: progress, documents: documents, error: error)
+        let docReplToken = multipeerReplicator.addPeerDocumentReplicationListener(on: listenerQueue) { [weak self] docRepl in
+            guard let strongSelf = self else { return }
+            var docs: [ContentTypes.DocumentReplication] = []
+            docRepl.documents.forEach { doc in
+                docs.append(ContentTypes.DocumentReplication.init(doc: doc, isPush: !docRepl.incoming))
+            }
+            strongSelf.peerReplicatorDocuments[id, default: [:]][docRepl.peerID, default: []] += docs
+        }
         
-        Log.log(level: .debug, message: "Succeessfully fetched Replicator status for ID \(replID): \(status.description)")
+        multipeerReplicator.start()
+        
+        multipeerReplicators[id] = multipeerReplicator
+        peerReplicatorStatusToken[id] = listenerToken
+        peerReplicatorDocumentsToken[id] = docReplToken
+        
+        return id
+    }
+    
+    public func stopMultipeerReplicator(forID id: UUID) throws {
+        Log.log(level: .debug, message: "Stop Multipeer Replicator for ID \(id) is requested.")
+        guard let replicator = multipeerReplicators[id] else {
+            throw TestServerError.badRequest("Multipeer Replicator ID'\(id)' does not exist.")
+        }
+        replicator.stop()
+        Log.log(level: .debug, message: "Stop Multipeer Replicator for ID \(id) is successfully requested.")
+    }
+    
+    public func multipeerReplicatorStatus(forID id: UUID) -> ContentTypes.MultipeerReplicatorStatus? {
+        Log.log(level: .debug, message: "Getting MultipeerReplicator Status for ID \(id)")
+        
+        var status: ContentTypes.MultipeerReplicatorStatus?
+        
+        listenerQueue.sync {
+            guard let repl = multipeerReplicators[id] else {
+                Log.log(level: .debug, message: "Failed to get MultipeerReplicator Status, MultipeerReplicator with ID \(id) not found.")
+                return
+            }
+            
+            var replicators: [ContentTypes.PeerReplicatorStatus] = []
+            
+            if let statuses = peerReplicatorStatus[id] {
+                statuses.forEach { peerID, status in
+                    let docs = peerReplicatorDocuments[id]?[peerID] ?? []
+                    let replStatus = ContentTypes.ReplicatorStatus.init(status: status, docs: docs)
+                    replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus))
+                    peerReplicatorDocuments[id]?[peerID] = [] // Reset after return per spec
+                }
+            }
+            
+            status = ContentTypes.MultipeerReplicatorStatus.init(replicators: replicators)
+        }
         
         return status
     }
@@ -384,6 +478,21 @@ class DatabaseManager {
             try? Database.delete(withName: dbName)
         }
         databases.removeAll()
+        
+        // Reset all replicators:
+        replicators.removeAll()
+        replicatorDocuments.removeAll()
+        replicatorDocumentsToken.removeAll()
+        
+        // Reset all multipeer replicators:
+        multipeerReplicators.values.forEach { $0.stop() } // Temporary until all close database also stops multipeer replicator
+        multipeerReplicators.removeAll()
+        
+        peerReplicatorStatus.removeAll()
+        peerReplicatorStatusToken.removeAll()
+        
+        peerReplicatorDocuments.removeAll()
+        peerReplicatorDocumentsToken.removeAll()
     }
     
     private static func getCBLAuthenticator(from auth: ReplicatorAuthenticator) throws -> Authenticator {
@@ -397,11 +506,11 @@ class DatabaseManager {
         }
     }
     
-    private static func getCBLReplicationFilter(from filter: ContentTypes.ReplicationFilter) throws -> ReplicationFilter {
+    private static func getCBLReplicationFilter(from filter: ContentTypes.ReplicationFilter) throws -> AnyReplicationFilter {
         return try ReplicationFilterFactory.getFilter(withName: filter.name, params: filter.params)
     }
     
-    private static func getCBLReplicationConflictResolver(from resolver: ContentTypes.ReplicationConflictResolver) throws -> ConflictResolverProtocol {
+    private static func getCBLReplicationConflictResolver(from resolver: ContentTypes.ReplicationConflictResolver) throws -> ConflictResolver {
         return try ReplicationConflictResolverFactory.getResolver(withName: resolver.name, params: resolver.params)
     }
     
@@ -511,5 +620,35 @@ class DatabaseManager {
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
+    
+    private static func identity(for config: ContentTypes.MultipeerReplicatorConfiguration) throws -> TLSIdentity {
+        var allCollections: [String] = []
+        for collection in config.collections {
+            collection.names.forEach { allCollections.append($0) }
+        }
+        
+        let input = "multipeer-\(config.peerGroupID)-\(config.database)-\(allCollections.joined(separator: ","))"
+        let data = Data(input.utf8)
+        let digest = Insecure.SHA1.hash(data: data)
+        let label = digest.map { String(format: "%02x", $0) }.joined()
+        
+        if let identity = try TLSIdentity.identity(withLabel: label) {
+            if identity.expiration > Date().addingTimeInterval(60 * 60 * 1 /* 60 Mins */) {
+                return identity
+            } else {
+                try TLSIdentity.deleteIdentity(withLabel: label)
+            }
+        }
+        
+        let keyUsages: KeyUsages = [.clientAuth, .serverAuth]
+        let attrs = [
+            certAttrCommonName: "CBLiteTests-\(label)"
+        ]
+        let expiration = Date().addingTimeInterval(60 * 60 * 2 /* 120 Mins */)
+        return try TLSIdentity.createIdentity(
+            for: keyUsages,
+            attributes: attrs,
+            expiration: expiration,
+            label: label)
+    }
 }
-	
