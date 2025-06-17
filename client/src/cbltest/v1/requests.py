@@ -847,7 +847,7 @@ class PostStartMultipeerReplicatorRequestBody(TestServerRequestBody):
         json = {
             "peerGroupID": self.__peerGroupID,
             "database": self.__database,
-            "collections": self.__collections,
+            "collections": [c.to_json() for c in self.collections],
             "identity": {
                 "encoding": "PKCS12",
                 "data": base64.b64encode(self.__identity.pfx_bytes()).decode("utf-8"),
@@ -1083,4 +1083,37 @@ class PostStopListenerRequest(TestServerRequest):
     def __init__(self, uuid: UUID, payload: PostStopListenerRequestBody):
         super().__init__(
             1, uuid, "stopListener", PostStopListenerRequestBody, payload=payload
+        )
+
+class PostStartMultipeerReplicatorRequest(TestServerRequest):
+    """
+    A POST /startMultipeerReplicator request as specified in version 1 of the
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+    """
+
+    def __init__(self, uuid: UUID, payload: PostStartMultipeerReplicatorRequestBody):
+        super().__init__(
+            1, uuid, "startMultipeerReplicator", PostStartMultipeerReplicatorRequestBody, payload=payload
+        )
+
+class PostStopMultipeerReplicatorRequest(TestServerRequest):
+    """
+    A POST /startMultipeerReplicator request as specified in version 1 of the
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+    """
+
+    def __init__(self, uuid: UUID, payload: PostStopMultipeerReplicatorRequestBody):
+        super().__init__(
+            1, uuid, "stopMultipeerReplicator", PostStopMultipeerReplicatorRequestBody, payload=payload
+        )
+
+class PostGetMultipeerReplicatorStatusRequest(TestServerRequest):
+    """
+    A POST /getMultipeerReplicatorStatus request as specified in version 1 of the
+    `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
+    """
+
+    def __init__(self, uuid: UUID, payload: PostGetMultipeerReplicatorStatusRequestBody):
+        super().__init__(
+            1, uuid, "getMultipeerReplicatorStatus", PostGetMultipeerReplicatorStatusRequestBody, payload=payload
         )

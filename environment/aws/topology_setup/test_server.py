@@ -310,5 +310,34 @@ class TestServer(ABC):
         """
         pass
 
+    def _check_downloaded(self, location: Path) -> bool:
+        """
+        Check if the C test server package is already downloaded.
+
+        Args:
+            location (Path): The path to the downloaded package.
+
+        Returns:
+            bool: True if the package is downloaded, False otherwise.
+        """
+        if (location / self.__version_filename).exists():
+            with open(location / self.__version_filename, "r") as f:
+                saved_version = f.read().strip()
+                return saved_version == self.version
+
+        return False
+
+    def _mark_downloaded(self, location: Path) -> None:
+        """
+        Mark the C test server package as downloaded.
+
+        Args:
+            location (Path): The path to the downloaded package.
+            version (str): The version of the test server.
+            build (int): The build number of the test server.
+        """
+        with open(location / self.__version_filename, "w") as f:
+            f.write(self.version)
+
 
 assert __name__ != "__main__", "This module is not meant to be run directly"
