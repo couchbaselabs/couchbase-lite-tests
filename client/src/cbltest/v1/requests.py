@@ -851,6 +851,7 @@ class PostStartMultipeerReplicatorRequestBody(TestServerRequestBody):
             "identity": {
                 "encoding": "PKCS12",
                 "data": base64.b64encode(self.__identity.pfx_bytes()).decode("utf-8"),
+                "password": self.__identity.password,
             },
         }
 
