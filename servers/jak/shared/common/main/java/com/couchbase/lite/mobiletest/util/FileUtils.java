@@ -34,6 +34,7 @@ import java.util.zip.ZipOutputStream;
 import com.couchbase.lite.mobiletest.services.Log;
 
 
+@SuppressWarnings("PMD.AvoidFileStream")
 public class FileUtils {
     public static final String ZIP_EXTENSION = ".zip";
 

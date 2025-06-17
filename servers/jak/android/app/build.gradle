@@ -201,7 +201,7 @@ task checkstyle(type: Checkstyle) {
 
 /////// PMD
 pmd {
-    toolVersion '6.26.0'
+    toolVersion '6.55.0'
     ruleSets = []
 }
 task pmd(type: Pmd) {

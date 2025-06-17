@@ -16,7 +16,6 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 
@@ -46,20 +45,23 @@ public class TestServerApp extends HttpServlet {
     private transient GetDispatcher getDispatcher;
     private transient PostDispatcher postDispatcher;
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
         // Create a basic Jetty server instance
-        Server server = new Server(8080);
+        final Server server = new Server(8080);
 
         // Set up a servlet context and map servlets
-        ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
+        final ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
         server.setHandler(context);
 
         context.addServlet(TestServerApp.class, "/");
 
         // Start the server
-        server.start();
-        server.join();
+        try {
+            server.start();
+            server.join();
+        }
+        catch (Exception e) { throw new IllegalStateException("Failed starting the server", e); }
     }
 
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")

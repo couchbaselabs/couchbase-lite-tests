@@ -152,7 +152,7 @@ public class Session {
         final TestContext oldContext = curSession.context;
         if (oldContext != null) { oldContext.close(app); }
 
-        String testName = req.getString(KEY_TEST_NAME);
+        final String testName = req.getString(KEY_TEST_NAME);
         final TestContext newCtxt = (testName == null) ? null : new TestContext(app, curSession, testName);
         curSession.context = newCtxt;
 

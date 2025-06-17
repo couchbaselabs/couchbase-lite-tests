@@ -56,7 +56,6 @@
 
     <!-- ERROR PRONE -->
     <rule ref="category/java/errorprone.xml">
-        <exclude name="BeanMembersShouldSerialize" />
         <exclude name="CompareObjectsWithEquals" />
         <exclude name="NullAssignment" />
         <exclude name="AssignmentInOperand" />
@@ -68,6 +67,8 @@
         <exclude name="AvoidFieldNameMatchingTypeName" />open
         <exclude name="MissingSerialVersionUID" />
         <exclude name="AvoidFieldNameMatchingMethodName" />
+        <exclude name="ReturnEmptyCollectionRatherThanNull" />
+        <exclude name="TestClassWithoutTestCases" />
     </rule>
     <rule ref="category/java/errorprone.xml/AvoidDuplicateLiterals">
         <properties>
@@ -88,48 +89,47 @@
     <rule ref="category/java/bestpractices.xml">
         <exclude name="AbstractClassWithoutAbstractMethod" />
         <exclude name="SwitchStmtsShouldHaveDefault" />
-        <exclude name="AvoidReassigningParameters" />
+        <exclude name="GuardLogStatement" />
         <exclude name="UseVarargs" />
+
+        <!-- Enable these someday... -->
+        <exclude name="AvoidReassigningParameters" />
+        <exclude name="UnusedFormalParameter" />
     </rule>
 
 
     <!-- DESIGN -->
     <rule ref="category/java/design.xml">
         <exclude name="ExcessiveImports" />
-        <exclude name="ExcessiveClassLength" />
         <exclude name="LoosePackageCoupling" />
         <exclude name="NcssCount" />
         <exclude name="TooManyMethods" />
         <exclude name="UseObjectForClearerAPI" />
         <exclude name="DataClass" />
         <exclude name="GodClass" />
+
+        <!-- Enable these someday... -->
         <exclude name="LawOfDemeter" />
         <exclude name="AvoidCatchingGenericException" />
-    </rule>
-    <rule ref="category/java/design.xml/CyclomaticComplexity">
-        <properties>
-            <property name="classReportLevel" value="500" />
-            <property name="methodReportLevel" value="50" />
-        </properties>
-    </rule>
-    <rule ref="category/java/design.xml/NPathComplexity">
-        <properties>
-            <property name="reportLevel" value="1200" />
-        </properties>
     </rule>
     <rule ref="category/java/design.xml/AvoidDeeplyNestedIfStmts">
         <properties>
             <property name="problemDepth" value="4" />
         </properties>
     </rule>
+    <rule ref="category/java/design.xml/CyclomaticComplexity">
+        <properties>
+            <property name="methodReportLevel" value="20" />
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/CognitiveComplexity">
+        <properties>
+            <property name="reportLevel" value="30" />
+        </properties>
+    </rule>
     <rule ref="category/java/design.xml/ExcessiveImports">
         <properties>
             <property name="minimum" value="50.0" />
-        </properties>
-    </rule>
-    <rule ref="category/java/design.xml/ExcessiveClassLength">
-        <properties>
-            <property name="minimum" value="2000.0" />
         </properties>
     </rule>
     <rule ref="category/java/design.xml/NcssCount">
@@ -149,6 +149,8 @@
     <rule ref="category/java/multithreading.xml">
         <exclude name="DoNotUseThreads" />
         <exclude name="AvoidUsingVolatile" />
+
+        <!-- Enable these someday... -->
         <exclude name="AvoidSynchronizedAtMethodLevel" />
         <exclude name="UseConcurrentHashMap" />
     </rule>
@@ -159,7 +161,6 @@
         <exclude name="UseStringBufferForStringAppends" />
         <exclude name="AvoidInstantiatingObjectsInLoops" />
         <exclude name="AvoidFileStream" />
-        <exclude name="SimplifyStartsWith" />
     </rule>
 
 
@@ -169,13 +170,16 @@
 
     <!-- DOCUMENTATION -->
     <rule ref="category/java/documentation.xml">
-        <exclude name="CommentSize" />
         <exclude name="CommentRequired" />
+        <exclude name="UncommentedEmptyConstructor" />
+
+        <!-- Enable these someday... -->
+        <exclude name="UncommentedEmptyMethodBody" />
     </rule>
 
     <rule ref="category/java/documentation.xml/CommentSize">
         <properties>
-            <property name="maxLines" value="40" />
+            <property name="maxLines" value="100" />
             <property name="maxLineLength" value="120" />
         </properties>
     </rule>

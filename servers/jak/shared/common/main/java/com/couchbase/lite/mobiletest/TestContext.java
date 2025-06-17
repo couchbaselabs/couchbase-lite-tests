@@ -34,6 +34,7 @@ import com.couchbase.lite.mobiletest.util.FileUtils;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
+@SuppressWarnings("PMD.CyclomaticComplexity")
 public final class TestContext {
     private static final String TAG = "CONTEXT";
 

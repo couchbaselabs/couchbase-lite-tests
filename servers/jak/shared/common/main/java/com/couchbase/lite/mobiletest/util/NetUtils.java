@@ -49,8 +49,9 @@ public final class NetUtils {
 
     private static final String TAG = "NET_UTIL";
 
-    private static final String ASSET_URL_BASE
-        = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/";
+    private static final String GITHUB_BASE_URL  = "https://media.githubusercontent.com/media/";
+    private static final String ASSET_BASE_URL
+        = GITHUB_BASE_URL + "couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/";
 
     public enum Scope {LOOPBACK, LOCAL, ROUTABLE}
 
@@ -65,7 +66,7 @@ public final class NetUtils {
 
     // Fetch a file from the given path.  If it doesn't look like a URL, add the default base URL.
     public static void fetchFile(@NonNull String path, @NonNull File destFile) throws IOException {
-        final URL url = new URL((path.startsWith("http") ? path : ASSET_URL_BASE + path));
+        final URL url = new URL((path.startsWith("http") ? path : ASSET_BASE_URL + path));
         try (FileOutputStream out = new FileOutputStream(destFile); InputStream in = url.openStream()) {
             out.getChannel().transferFrom(Channels.newChannel(in), 0, Long.MAX_VALUE);
         }

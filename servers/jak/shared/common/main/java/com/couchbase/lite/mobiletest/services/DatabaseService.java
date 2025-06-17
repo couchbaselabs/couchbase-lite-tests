@@ -239,6 +239,7 @@ public final class DatabaseService {
     // downloaded datasets are always zipped
     // the name of the dataset file for a given database is *always* <database>.cblite2.zip
     // if the dataset is specified as a URI, the name of the dataset file is the last thing in the URI path
+    @SuppressWarnings("PMD.PrematureDeclaration")
     public void installDataset(@NonNull TestContext ctxt, @NonNull String dataset, @NonNull String dbName) {
         final File dbDir = getSafeDbDir(ctxt, dbName);
 

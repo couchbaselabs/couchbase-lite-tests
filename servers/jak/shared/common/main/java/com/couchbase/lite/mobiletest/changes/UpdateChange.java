@@ -104,6 +104,7 @@ public final class UpdateChange extends Change {
     // Assume:
     // if the blob is specified as a URI, the name of the blob file is the last thing in the URI path
     // if the blob is zipped, the name of the blob is just the blob file name without the .zip extension
+    @SuppressWarnings("PMD.NPathComplexity")
     @NonNull
     private Blob getBlob(@NonNull String content) {
         final Session session = TestApp.getApp().getSession();
