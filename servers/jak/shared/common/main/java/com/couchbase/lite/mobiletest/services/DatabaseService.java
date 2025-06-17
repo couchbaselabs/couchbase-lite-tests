@@ -35,21 +35,21 @@ import com.couchbase.lite.Document;
 import com.couchbase.lite.Result;
 import com.couchbase.lite.ResultSet;
 import com.couchbase.lite.internal.core.C4Database;
-import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
+import com.couchbase.lite.mobiletest.endpoints.v1.Session;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.HTTPStatus;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.util.FileUtils;
+import com.couchbase.lite.mobiletest.util.NetUtils;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 public final class DatabaseService {
     private static final String TAG = "DB_SVC";
 
-    private static final String ZIP_EXTENSION = ".zip";
     private static final String DB_EXTENSION = C4Database.DB_EXTENSION;
     private static final String DB_DIR = "dbs/";
 
@@ -119,12 +119,7 @@ public final class DatabaseService {
     // Instance members
 
     public void init(@NonNull TestContext ctxt) {
-        final String testDir = "tests_" + StringUtils.randomString(6);
-        final File dbDir = new File(TestApp.getApp().getFilesDir(), testDir);
-        if (!dbDir.mkdirs() || !dbDir.canWrite()) {
-            throw new ServerError("Could not create db directory in init: " + dbDir);
-        }
-        ctxt.setDbDir(dbDir);
+        // nothing to do here...
     }
 
     @NonNull
@@ -228,14 +223,9 @@ public final class DatabaseService {
         return results;
     }
 
-    // New stream constructors are supported only in API 26+
     public void installDatabase(@NonNull TestContext ctxt, @NonNull String dbName, List<String[]> collFQNs) {
-        final File dbDir = ctxt.getDbDir();
-        if (dbDir == null) { throw new ServerError("Cannot find test directory on install dataset"); }
-
-        if (Database.exists(dbName, dbDir)) { throw new ClientError("Database already exists: " + dbName); }
-
-        final Database db = openDb(ctxt, dbName);
+        final File dbDir = getSafeDbDir(ctxt, dbName);
+        final Database db = openDb(ctxt, dbDir, dbName);
         for (String[] fqn: collFQNs) {
             try { db.createCollection(fqn[1], fqn[0]); }
             catch (CouchbaseLiteException e) {
@@ -244,55 +234,85 @@ public final class DatabaseService {
         }
     }
 
-    // New stream constructors are supported only in API 26+
-    public void installDataset(@NonNull TestContext ctxt, @NonNull String datasetName, @NonNull String dbName) {
-        final File dbDir = ctxt.getDbDir();
-        if (dbDir == null) { throw new ServerError("Cannot find test directory on install dataset"); }
-
-        if (Database.exists(datasetName, dbDir)) { throw new ClientError("Database already exists: " + dbName); }
+    // Support datasets specified either as a URI or as a dataset name
+    // Assume:
+    // downloaded datasets are always zipped
+    // the name of the dataset file for a given database is *always* <database>.cblite2.zip
+    // if the dataset is specified as a URI, the name of the dataset file is the last thing in the URI path
+    @SuppressWarnings("PMD.PrematureDeclaration")
+    public void installDataset(@NonNull TestContext ctxt, @NonNull String dataset, @NonNull String dbName) {
+        final File dbDir = getSafeDbDir(ctxt, dbName);
 
         final FileUtils fileUtils = new FileUtils();
+        final Session session = ctxt.getSession();
+        final File tmpDir = session.getTmpDir();
 
-        final File unzipDir = new File(dbDir, "tmp");
-        if (unzipDir.exists() && !fileUtils.deleteRecursive(unzipDir)) {
-            throw new ServerError("Failed deleting unzip tmp directory");
+        final String datasetUri;
+        final String datasetDbName;
+        final String datasetDbFileName;
+        final String datasetFileName;
+        if (!NetUtils.isURI(dataset)) {
+            datasetDbName = dataset;
+            datasetDbFileName = dataset + DB_EXTENSION;
+            datasetFileName = dataset + DB_EXTENSION + FileUtils.ZIP_EXTENSION;
+            datasetUri = DB_DIR + session.getDatasetVersion() + "/" + datasetFileName;
         }
-        if (!unzipDir.mkdirs()) { throw new ServerError("Failed creating unzip tmp directory"); }
+        else {
+            datasetUri = dataset;
+            datasetFileName = NetUtils.getFileFromURI(dataset);
+            datasetDbFileName = StringUtils.stripSuffix(datasetFileName, FileUtils.ZIP_EXTENSION);
+            datasetDbName = StringUtils.stripSuffix(datasetDbFileName, DB_EXTENSION);
+        }
 
-        final String dbFullName = datasetName + DB_EXTENSION;
-        try (InputStream in = TestApp.getApp().getAsset(DB_DIR + dbFullName + ZIP_EXTENSION)) {
-            fileUtils.unzip(in, unzipDir);
+        // If the dataset database is sitting there, we just need to copy it.
+        // If it isn't we need to download it and unzip it.
+        if (!Database.exists(datasetDbName, tmpDir)) {
+            final File datasetFile = new File(tmpDir, datasetFileName);
+            Log.p(TAG, "Fetching dataset: " + datasetUri + " to " + datasetFile);
+            try { NetUtils.fetchFile(datasetUri, datasetFile); }
+            catch (IOException e) { throw new ServerError("Failed downloading dataset: " + datasetUri, e); }
+
+            try (InputStream in = fileUtils.asStream(datasetFile)) { fileUtils.unzip(in, tmpDir); }
+            catch (IOException e) { throw new ServerError("Failed unzipping dataset: " + datasetFile, e); }
+
+            // delete the empty husk
+            if (!datasetFile.delete()) { Log.p(TAG, "Failed deleting dataset zipfile: " + datasetFile); }
         }
-        catch (IOException e) { throw new ServerError("Failed unzipping dataset: " + datasetName, e); }
 
         try {
             Database.copy(
-                new File(unzipDir, dbFullName),
+                new File(tmpDir, datasetDbFileName),
                 dbName,
                 new DatabaseConfiguration().setDirectory(dbDir.getPath()));
         }
         catch (CouchbaseLiteException e) {
-            throw new CblApiFailure("Failed copying dataset: " + datasetName + " to " + dbName, e);
+            throw new CblApiFailure("Failed copying dataset db: " + datasetDbFileName + " to " + dbName, e);
         }
 
-        openDb(ctxt, dbName);
+        openDb(ctxt, dbDir, dbName);
     }
 
     @NonNull
-    private Database openDb(@NonNull TestContext ctxt, @NonNull String name) {
-        Database db = ctxt.getDb(name);
-        if (db != null) { return db; }
+    private File getSafeDbDir(@Nullable TestContext ctxt, @NonNull String dbName) {
+        if (ctxt == null) { throw new ClientError("Attempt to get db directory with no test context"); }
 
         final File dbDir = ctxt.getDbDir();
-        if (dbDir == null) { throw new ServerError("Cannot find test directory for open"); }
+        if ((ctxt.getDb(dbName) != null) || (Database.exists(dbName, dbDir))) {
+            throw new ClientError("Database " + dbName + " already exists in directory: " + dbDir);
+        }
 
+        return dbDir;
+    }
+
+    @NonNull
+    private Database openDb(@NonNull TestContext ctxt, @NonNull File dbDir, @NonNull String name) {
         final DatabaseConfiguration dbConfig = new DatabaseConfiguration().setDirectory(dbDir.getPath());
-        try { db = new Database(name, dbConfig); }
+        try {
+            final Database db = new Database(name, dbConfig);
+            ctxt.addDb(name, db);
+            return db;
+        }
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed opening database: " + name, e); }
-
-        ctxt.addDb(name, db);
-
-        return db;
     }
 
     private boolean closeDbInternal(@NonNull TestContext ctxt, @NonNull String name) {

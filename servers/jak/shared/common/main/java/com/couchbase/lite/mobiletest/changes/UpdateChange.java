@@ -18,7 +18,9 @@ package com.couchbase.lite.mobiletest.changes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
@@ -28,15 +30,24 @@ import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.MutableDocument;
 import com.couchbase.lite.mobiletest.TestApp;
+import com.couchbase.lite.mobiletest.endpoints.v1.Session;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
+import com.couchbase.lite.mobiletest.services.Log;
+import com.couchbase.lite.mobiletest.util.FileUtils;
+import com.couchbase.lite.mobiletest.util.NetUtils;
+import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 public final class UpdateChange extends Change {
+    private static final String TAG = "DB_UDATE";
+
+    private static final String BLOB_DIR = "blobs/";
+
     private static final String EXT_JPEG = ".jpg";
     private static final String MIME_JPEG = "image/jpeg";
-    private static final String DIR_BLOB = "blobs/";
     private static final String MIME_OCTET = "application/octet-stream";
 
     @NonNull
@@ -73,17 +84,9 @@ public final class UpdateChange extends Change {
         }
 
         if (!blobs.isEmpty()) {
-            final TestApp app = TestApp.getApp();
             for (Map.Entry<String, String> blob: blobs.entrySet()) {
                 final String content = blob.getValue();
-                try {
-                    parser.parse(blob.getKey()).set(
-                        data,
-                        new Blob(
-                            content.endsWith(EXT_JPEG) ? MIME_JPEG : MIME_OCTET,
-                            app.getAsset(DIR_BLOB + content)));
-                }
-                catch (IOException e) { throw new ClientError("No such blob content: " + DIR_BLOB + content, e); }
+                parser.parse(blob.getKey()).set(data, getBlob(content));
             }
         }
 
@@ -95,5 +98,46 @@ public final class UpdateChange extends Change {
         final Document doc = dbSvc.getDocOrNull(collection, docId);
         try { collection.save(applyChange(collection, doc)); }
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed saving updated document", e); }
+    }
+
+    // Support blobs specified either as a URI or as a blob name and blobs that are either zipped or not.
+    // Assume:
+    // if the blob is specified as a URI, the name of the blob file is the last thing in the URI path
+    // if the blob is zipped, the name of the blob is just the blob file name without the .zip extension
+    @SuppressWarnings("PMD.NPathComplexity")
+    @NonNull
+    private Blob getBlob(@NonNull String content) {
+        final Session session = TestApp.getApp().getSession();
+        if (session == null) { throw new ClientError("Attempt to resolve blob content with no session"); }
+
+        final FileUtils fileUtils = new FileUtils();
+        final File tmpDir = session.getTmpDir();
+        final boolean isUri = NetUtils.isURI(content);
+
+        // If the blob file is sitting there and we just need to add it.
+        // If it isn't we need to download it and, if the download is zipped, we need to unzip it.
+        String blobFileName = (!isUri) ? content : NetUtils.getFileFromURI(content);
+        File blobFile = new File(tmpDir, blobFileName);
+        if (!blobFile.exists()) {
+            final String blobUri = (isUri) ? content : BLOB_DIR + content;
+            Log.p(TAG, "Fetching blob: " + blobUri + " to " + blobFile);
+            try { NetUtils.fetchFile(blobUri, blobFile); }
+            catch (IOException e) { throw new ServerError("Failed fetching blob: " + blobUri, e); }
+
+            if (blobFileName.endsWith(FileUtils.ZIP_EXTENSION)) {
+                final File zipFile = blobFile;
+
+                blobFileName = StringUtils.stripSuffix(blobFileName, FileUtils.ZIP_EXTENSION);
+                blobFile = new File(tmpDir, blobFileName);
+                try (InputStream in = fileUtils.asStream(zipFile)) { fileUtils.unzip(zipFile, blobFile); }
+                catch (IOException e) { throw new ServerError("Failed unzipping blob: " + blobFileName, e); }
+
+                // delete the empty husk
+                if (!zipFile.delete()) { Log.p(TAG, "Failed deleting blob zipfile: " + zipFile); }
+            }
+        }
+
+        try { return new Blob(blobFileName.endsWith(EXT_JPEG) ? MIME_JPEG : MIME_OCTET, fileUtils.asStream(blobFile)); }
+        catch (IOException e) { throw new ServerError("Failed creating blob from file: " + blobFile, e); }
     }
 }

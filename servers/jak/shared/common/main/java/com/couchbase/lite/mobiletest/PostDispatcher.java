@@ -54,41 +54,47 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
         super(app);
 
         // build the dispatch table
-        addEndpoint(1, "/reset", (c, r) -> new Session(app).reset(c, r));
-        addEndpoint(1, "/getAllDocuments", (c, r) -> new GetAllDocs(app.getDbSvc()).getAllDocs(app.getSession(c), r));
-        addEndpoint(1, "/getDocument", (c, r) -> new GetDocument(app.getDbSvc()).getDocument(app.getSession(c), r));
-        addEndpoint(1, "/updateDatabase", (c, r) -> new UpdateDb(app.getDbSvc()).updateDb(app.getSession(c), r));
+        addEndpoint(1, "/newSession", (c, r) -> new Session(app, c).newSession(r));
+        addEndpoint(1, "/reset", (c, r) -> new Session(app, c).reset(r));
+        addEndpoint(1, "/log", (c, r) -> new Logger().log(app.getTestContext(c), r));
+        addEndpoint(1, "/updateDatabase", (c, r) -> new UpdateDb(app.getDbSvc()).updateDb(app.getTestContext(c), r));
+        addEndpoint(1, "/runQuery", (c, r) -> new RunQuery(app.getDbSvc()).runQuery(app.getTestContext(c), r));
+        addEndpoint(1, "/getDocument", (c, r) -> new GetDocument(app.getDbSvc()).getDocument(app.getTestContext(c), r));
+        addEndpoint(1, "/verifyDocuments", (c, r) -> new VerifyDocs(app.getDbSvc()).verify(app.getTestContext(c), r));
+        addEndpoint(
+            1,
+            "/snapshotDocuments",
+            (c, r) -> new SnapshotDocs(app.getDbSvc()).snapshot(app.getTestContext(c), r));
+        addEndpoint(
+            1,
+            "/getAllDocuments",
+            (c, r) -> new GetAllDocs(app.getDbSvc()).getAllDocs(app.getTestContext(c), r));
         addEndpoint(
             1,
             "/startReplicator",
-            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).createRepl(app.getSession(c), r));
-        addEndpoint(
-            1,
-            "/stopReplicator",
-            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).stopRepl(app.getSession(c), r));
+            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).createRepl(app.getTestContext(c), r));
         addEndpoint(
             1,
             "/getReplicatorStatus",
-            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).getReplStatus(app.getSession(c), r));
+            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).getReplStatus(app.getTestContext(c), r));
+        addEndpoint(
+            1,
+            "/stopReplicator",
+            (c, r) -> new ReplicatorManager(app.getDbSvc(), app.getReplSvc()).stopRepl(app.getTestContext(c), r));
         addEndpoint(
             1,
             "/startListener",
             (c, r) -> new EndptListenerManager(app.getDbSvc(), app.getListenerService())
-                .startListener(app.getSession(c), r));
+                .startListener(app.getTestContext(c), r));
         addEndpoint(
             1,
             "/stopListener",
             (c, r) -> new EndptListenerManager(app.getDbSvc(), app.getListenerService())
-                .stopListener(app.getSession(c), r));
-        addEndpoint(1, "/snapshotDocuments", (c, r) -> new SnapshotDocs(app.getDbSvc()).snapshot(app.getSession(c), r));
-        addEndpoint(1, "/verifyDocuments", (c, r) -> new VerifyDocs(app.getDbSvc()).verify(app.getSession(c), r));
+                .stopListener(app.getTestContext(c), r));
         addEndpoint(
             1,
             "/performMaintenance",
-            (c, r) -> new PerformMaintenance(app.getDbSvc()).doMaintenance(app.getSession(c), r));
-        addEndpoint(1, "/newSession", (c, r) -> new Session(app).newSession(c, r));
-        addEndpoint(1, "/runQuery", (c, r) -> new RunQuery(app.getDbSvc()).runQuery(app.getSession(c), r));
-        addEndpoint(1, "/log", (c, r) -> new Logger().log(app.getSession(c), r));
+            (c, r) -> new PerformMaintenance(app.getDbSvc()).doMaintenance(app.getTestContext(c), r));
     }
 
     // This method returns a Reply.  Be sure to close it!

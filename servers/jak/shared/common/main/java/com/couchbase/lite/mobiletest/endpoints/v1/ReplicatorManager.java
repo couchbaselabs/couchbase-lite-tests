@@ -151,6 +151,7 @@ class MergeResolver implements ConfigurableConflictResolver {
     }
 }
 
+@SuppressWarnings("PMD.CyclomaticComplexity")
 public class ReplicatorManager {
     private static final String TAG = "REPL_MGR_V1";
 

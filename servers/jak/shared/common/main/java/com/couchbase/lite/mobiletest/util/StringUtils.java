@@ -40,6 +40,11 @@ public final class StringUtils {
     public static boolean isEmpty(@Nullable String str) { return (str == null) || str.isEmpty(); }
 
     @NonNull
+    public static String stripSuffix(@NonNull String str, @NonNull String suffix) {
+        return (!str.endsWith(suffix)) ? str : str.substring(0, str.length() - suffix.length());
+    }
+
+    @NonNull
     public static String randomString(int len) {
         final char[] buf = new char[len];
         for (int idx = 0; idx < buf.length; ++idx) { buf[idx] = CHARS[RANDOM.get().nextInt(CHARS.length)]; }

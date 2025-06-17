@@ -35,7 +35,6 @@ ext {
 
     SHARED_DIR = "${ROOT_DIR}/shared"
     ETC_DIR = "${ROOT_DIR}/etc"
-    ASSETS_ROOT = "${ROOT_DIR}/assets"
 
     REPORTS_DIR = "${buildDir}/reports"
 
@@ -49,19 +48,13 @@ if (!(COUCHBASE_LITE_VERSION =~ /^\d{1,2}\.\d{1,2}\.\d{1,2}([ab.]\d)?-/)) {
 // If it is a snapshot, it is in maven local
 def USE_LOCAL_MAVEN = COUCHBASE_LITE_VERSION.endsWith("SNAPSHOT")
 
-def DATASET_VERSION = project.hasProperty("datasetVersion") ? datasetVersion : ""
-if (!(DATASET_VERSION =~ /^\d{1,2}\.\d{1,2}/)) {
-    throw new InvalidUserDataException("!!! Bad dataset version: ${DATASET_VERSION}")
-}
-def ASSETS_DIR = "${ASSETS_ROOT}/${DATASET_VERSION}"
-
 // Set -Pverbose to get full console logs for tests
 def VERBOSE = project.hasProperty("verbose")
 
 def COUCHBASE_LITE_LIB = 'couchbase-lite-java-ee'
 if (USE_LOCAL_MAVEN) { COUCHBASE_LITE_LIB += "-macos" }
 
-println "Building test server ${SERVER_VERSION}@${SERVER_BUILD} for Desktop CBL Java ${COUCHBASE_LITE_VERSION} with ${DATASET_VERSION} data"
+println "Building test server ${SERVER_VERSION}@${SERVER_BUILD} for Desktop CBL Java ${COUCHBASE_LITE_VERSION}"
 
 group 'com.couchbase.lite.mobiletest'
 version = SERVER_VERSION
@@ -80,7 +73,6 @@ java {
                 "${SHARED_DIR}/server/main/java"
             ]
             resources.srcDirs = [
-                ASSETS_DIR,
                 "${SHARED_DIR}/assets"
             ]
         }
@@ -192,7 +184,7 @@ task checkstyle(type: Checkstyle, dependsOn: generateServerInfo) {
 
 /////// PMD
 pmd {
-    toolVersion '6.26.0'
+    toolVersion '6.55.0'
     ruleSets = []
 }
 task pmd(type: Pmd, dependsOn: generateServerInfo) {

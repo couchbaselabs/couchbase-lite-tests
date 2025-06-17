@@ -73,7 +73,7 @@ public class TreeReduce<T> {
     }
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
-    @SuppressWarnings("ConstantConditions")
+    @SuppressWarnings({"ConstantConditions", "PMD.NPathComplexity"})
     @NonNull
     public T reduce(@NonNull TypedMap map, @NonNull MapOp<T> block, @NonNull T acc) {
         T ret = acc;
@@ -134,7 +134,7 @@ public class TreeReduce<T> {
     }
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
-    @SuppressWarnings("ConstantConditions")
+    @SuppressWarnings({"ConstantConditions", "PMD.NPathComplexity"})
     @NonNull
     public T reduce(@NonNull TypedList list, @NonNull ListOp<T> block, @NonNull T acc)  {
         T ret = acc;

@@ -18,7 +18,10 @@ package com.couchbase.lite.mobiletest.util;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -28,7 +31,9 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.channels.Channels;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -44,6 +49,10 @@ public final class NetUtils {
 
     private static final String TAG = "NET_UTIL";
 
+    private static final String GITHUB_BASE_URL  = "https://media.githubusercontent.com/media/";
+    private static final String ASSET_BASE_URL
+        = GITHUB_BASE_URL + "couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/";
+
     public enum Scope {LOOPBACK, LOCAL, ROUTABLE}
 
     @SuppressFBWarnings("SE_COMPARATOR_SHOULD_BE_SERIALIZABLE")
@@ -52,6 +61,14 @@ public final class NetUtils {
             if (a1 instanceof Inet4Address && !(a2 instanceof Inet4Address)) { return -1; }
             if (a2 instanceof Inet4Address && !(a1 instanceof Inet4Address)) { return 1; }
             return getAddrScope(a2).compareTo(getAddrScope(a1));
+        }
+    }
+
+    // Fetch a file from the given path.  If it doesn't look like a URL, add the default base URL.
+    public static void fetchFile(@NonNull String path, @NonNull File destFile) throws IOException {
+        final URL url = new URL((path.startsWith("http") ? path : ASSET_BASE_URL + path));
+        try (FileOutputStream out = new FileOutputStream(destFile); InputStream in = url.openStream()) {
+            out.getChannel().transferFrom(Channels.newChannel(in), 0, Long.MAX_VALUE);
         }
     }
 
@@ -75,6 +92,18 @@ public final class NetUtils {
         return null;
     }
 
+    public static boolean isURI(@NonNull String path) { return path.startsWith("http"); }
+
+    @NonNull
+    public static String getFileFromURI(@NonNull String path) {
+        if (!path.startsWith("http")) { return path; }
+        final int n = path.lastIndexOf('/');
+        return (n < 0) ? path : path.substring(n + 1);
+    }
+
+    // Old version:
+    //    final List<InetAddress> addrs = getLocalAddresses();
+    //    return (addrs == null) ? null : asString(addrs.get(0));
     @Nullable
     public static String getLocalAddress() {
         try (Socket socket = new Socket()) {
@@ -82,9 +111,6 @@ public final class NetUtils {
             return socket.getLocalAddress().getHostAddress();
         }
         catch (IOException e) { return null; }
-// Old version:
-//        final List<InetAddress> addrs = NetUtils.getLocalAddresses();
-//        return (addrs == null) ? null : asString(addrs.get(0));
     }
 
     // Get a list of addresses for this host, sorted by usefulness

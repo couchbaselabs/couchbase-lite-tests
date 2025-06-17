@@ -212,7 +212,7 @@ public class Snapshot {
         compareDocContent(collName, docId, actualContent, "", expectedContent, actualContent, change, diffs);
     }
 
-    @SuppressWarnings({"unchecked", "PMD.ExcessiveMethodLength"})
+    @SuppressWarnings({"unchecked", "PMD.ExcessiveMethodLength", "PMD.NPathComplexity"})
     private void compareDocContent(
         @NonNull String collName,
         @NonNull String docId,
@@ -322,7 +322,7 @@ public class Snapshot {
         }
     }
 
-    @SuppressWarnings({"unchecked", "PMD.ExcessiveMethodLength", "PMD.NPathComplexity"})
+    @SuppressWarnings({"unchecked", "PMD.ExcessiveMethodLength", "PMD.NPathComplexity", "PMD.CognativeComplexity"})
     private void compareDocContent(
         @NonNull String collName,
         @NonNull String docId,
