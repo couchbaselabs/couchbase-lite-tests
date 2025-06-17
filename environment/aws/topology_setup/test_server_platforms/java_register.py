@@ -38,11 +38,7 @@ import requests
 
 from environment.aws.common.io import download_progress_bar, unzip_directory
 from environment.aws.common.output import header
-from environment.aws.topology_setup.test_server import (
-    TEST_SERVER_DIR,
-    TestServer,
-    copy_dataset,
-)
+from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
 
 from .android_bridge import AndroidBridge
 from .platform_bridge import PlatformBridge
@@ -251,21 +247,10 @@ class JAKTestServer(TestServer):
         super().__init__(version)
         self.__gradle_target = gradle_target
 
-    def _copy_dataset(self) -> None:
-        # The original script this was ported from copied all versions
-        # regardless of what was being built.  I opted to not do this
-        # and instead only copy the one that is going to be built
-        # so that way there is no need to keep a manual list of versions
-        # here.
-        dest_dir = JAK_TEST_SERVER_DIR / "assets" / "3.2"
-        dest_dir.mkdir(0o755, parents=True, exist_ok=True)
-        copy_dataset(dest_dir)
-
     def build(self) -> None:
         """
         Build the JAK test server.
         """
-        self._copy_dataset()
         gradle_path = JAK_TEST_SERVER_DIR / self.test_server_path / "gradlew"
         if platform.system() == "Windows":
             gradle_path = gradle_path.with_suffix(".bat")
