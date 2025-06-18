@@ -426,6 +426,8 @@ class DatabaseManager {
             try? Database.delete(withName: dbName)
         }
         databases.removeAll()
+        replicators.removeAll()
+        listeners.removeAll()
     }
     
     private static func getCBLAuthenticator(from auth: ReplicatorAuthenticator) throws -> Authenticator {
