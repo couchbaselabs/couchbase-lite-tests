@@ -10,6 +10,6 @@ import Vapor
 extension ContentTypes {
 struct Listener : Content {
         let id: UUID
-        let port: Int
+        let port: UInt16?
     }
 }
