@@ -42,9 +42,6 @@ public class TestServerApp extends HttpServlet {
     // Servlets are serializable...
     private static final long serialVersionUID = 42L;
 
-    private transient GetDispatcher getDispatcher;
-    private transient PostDispatcher postDispatcher;
-
     public static void main(String[] args) {
         // Create a basic Jetty server instance
         final Server server = new Server(8080);
@@ -63,6 +60,10 @@ public class TestServerApp extends HttpServlet {
         }
         catch (Exception e) { throw new IllegalStateException("Failed starting the server", e); }
     }
+
+
+    private transient GetDispatcher getDispatcher;
+    private transient PostDispatcher postDispatcher;
 
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")
     @Override
