@@ -1086,6 +1086,7 @@ class PostStopListenerRequest(TestServerRequest):
             1, uuid, "stopListener", PostStopListenerRequestBody, payload=payload
         )
 
+
 class PostStartMultipeerReplicatorRequest(TestServerRequest):
     """
     A POST /startMultipeerReplicator request as specified in version 1 of the
@@ -1094,8 +1095,13 @@ class PostStartMultipeerReplicatorRequest(TestServerRequest):
 
     def __init__(self, uuid: UUID, payload: PostStartMultipeerReplicatorRequestBody):
         super().__init__(
-            1, uuid, "startMultipeerReplicator", PostStartMultipeerReplicatorRequestBody, payload=payload
+            1,
+            uuid,
+            "startMultipeerReplicator",
+            PostStartMultipeerReplicatorRequestBody,
+            payload=payload,
         )
+
 
 class PostStopMultipeerReplicatorRequest(TestServerRequest):
     """
@@ -1105,8 +1111,13 @@ class PostStopMultipeerReplicatorRequest(TestServerRequest):
 
     def __init__(self, uuid: UUID, payload: PostStopMultipeerReplicatorRequestBody):
         super().__init__(
-            1, uuid, "stopMultipeerReplicator", PostStopMultipeerReplicatorRequestBody, payload=payload
+            1,
+            uuid,
+            "stopMultipeerReplicator",
+            PostStopMultipeerReplicatorRequestBody,
+            payload=payload,
         )
+
 
 class PostGetMultipeerReplicatorStatusRequest(TestServerRequest):
     """
@@ -1114,7 +1125,13 @@ class PostGetMultipeerReplicatorStatusRequest(TestServerRequest):
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
-    def __init__(self, uuid: UUID, payload: PostGetMultipeerReplicatorStatusRequestBody):
+    def __init__(
+        self, uuid: UUID, payload: PostGetMultipeerReplicatorStatusRequestBody
+    ):
         super().__init__(
-            1, uuid, "getMultipeerReplicatorStatus", PostGetMultipeerReplicatorStatusRequestBody, payload=payload
+            1,
+            uuid,
+            "getMultipeerReplicatorStatus",
+            PostGetMultipeerReplicatorStatusRequestBody,
+            payload=payload,
         )

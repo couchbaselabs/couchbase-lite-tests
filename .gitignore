@@ -18,3 +18,4 @@ session.log
 http_log
 .terraform
 servers/downloaded
+.version
