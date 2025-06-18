@@ -9,8 +9,15 @@ import Foundation
 
 extension Handlers {
     static let startListener: EndpointHandler<ContentTypes.Listener> = { req throws in
-        // TODO: Implement this
+        guard let listenerStartRq = try? req.content.decode(ContentTypes.StartListenerRequest.self) else {
+            throw TestServerError.badRequest("Request body is not a valid startListener Request.")
+        }
         
-        return ContentTypes.Listener(id: 'invalid', port: 0)
+        Log.log(level: .debug, message: "Starting Listener with config: \(listenerStartRq.description)")
+        
+        let dbManager = req.databaseManager
+        let id = try dbManager.startListener(dbName: listenerStartRq.database, collections: listenerStartRq.collections, port: listenerStartRq.port)
+        
+        return ContentTypes.Listener(id: id, port: listenerStartRq.port)
     }
 }

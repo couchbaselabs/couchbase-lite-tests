@@ -19,6 +19,7 @@ class DatabaseManager {
     private var databases : [ String : Database ] = [:]
     private var replicators : [ UUID : Replicator ] = [:]
     private var replicatorDocuments : [ UUID : [ContentTypes.DocumentReplication] ] = [:]
+    private var listeners: [ UUID : URLEndpointListener ] = [:]
     
     
     public init(directory: String, datasetVersion: String) {
@@ -70,6 +71,47 @@ class DatabaseManager {
             Log.log(level: .error, message: "Failed to run query due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
+    }
+    
+    public func startListener(dbName: String, collections: [String], port: UInt16?) throws -> UUID {
+        var collectionsArr: [Collection] = []
+        
+        guard let database = databases[dbName]
+        else {
+            Log.log(level: .error, message: "Failed to start Listener, database '\(dbName)' does not exist")
+            throw TestServerError.cblDBNotOpen
+        }
+        
+        for collName in collections {
+            guard let coll = try collection(collName, inDB: database)
+            else {
+                Log.log(level: .error, message: "Failed to start Listener, Collection '\(collName)' does not exist in \(dbName).")
+                throw TestServerError.badRequest("Collection '\(collName)' does not exist in \(dbName).")
+            }
+            collectionsArr.append(coll)
+        }
+        
+        var listenerConfig = URLEndpointListenerConfiguration(collections: collectionsArr)
+        listenerConfig.port = port
+        
+        let listener = URLEndpointListener(config: listenerConfig)
+        
+        let listenerID = UUID()
+        listeners[listenerID] = listener
+        
+        try listener.start()
+        Log.log(level: .debug, message: "EndpointListener started successfully with ID \(listenerID)")
+        
+        return listenerID
+    }
+    
+    public func stopListener(forID listenerID: UUID) throws {
+        Log.log(level: .debug, message: "Stop EndpointListener for ID \(listenerID) is requested.")
+        guard let listener = listeners[listenerID] else {
+            throw TestServerError.badRequest("EndpointListener with ID '\(listenerID)' does not exist.")
+        }
+        listener.stop()
+        Log.log(level: .debug, message: "Stop EndpointListener for ID \(listenerID) is successfully requested.")
     }
     
     public func startReplicator(config: ContentTypes.ReplicatorConfiguration, reset: Bool) throws -> UUID {
@@ -384,6 +426,8 @@ class DatabaseManager {
             try? Database.delete(withName: dbName)
         }
         databases.removeAll()
+        replicators.removeAll()
+        listeners.removeAll()
     }
     
     private static func getCBLAuthenticator(from auth: ReplicatorAuthenticator) throws -> Authenticator {
