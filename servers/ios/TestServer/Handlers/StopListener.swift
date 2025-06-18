@@ -9,8 +9,13 @@
 import Vapor
 
 extension Handlers {
-    static let stopReplicator: EndpointHandlerEmptyResponse = { req throws in
-        // TODO: Implement this
+    static let stopListener: EndpointHandlerEmptyResponse = { req throws in
+        guard let requestedEndpointListener = try? req.content.decode(ContentTypes.Listener.self) else {
+            throw TestServerError.badRequest("Request body does not match the 'Listener' schema.")
+        }
+        
+        let dbManager = req.databaseManager
+        try dbManager.stopListener(forID: requestedEndpointListener.id)
         
         return Response(status: .ok)
     }

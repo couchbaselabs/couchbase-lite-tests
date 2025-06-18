@@ -71,6 +71,8 @@ class TestServer : ObservableObject {
         app.post("performMaintenance", use: Handlers.performMaintenance)
         app.post("getMultipeerReplicatorStatus", use: Handlers.getMultipperReplicatorStatus)
         app.post("runQuery", use: Handlers.runQuery)
+        app.post("startListener", use: Handlers.startListener)
+        app.post("stopListener", use: Handlers.stopListener)
         
         Log.log(level: .debug, message: "Server configured with the following routes: \n\(app.routes.description)")
     }
