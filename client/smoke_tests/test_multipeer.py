@@ -18,8 +18,11 @@ class TestMultipeerReplicator:
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
         multipeer = MultipeerReplicator(
-            "com.couchbase.testing", db, [ReplicatorCollectionEntry(["_default._default"])]
+            "couchtest", db, [ReplicatorCollectionEntry(["_default._default"])]
         )
         await multipeer.start()
-        await asyncio.sleep(5)
+        await asyncio.sleep(2)
+        status = await multipeer.get_status()
+        assert status is not None, "A started multipeer replicator should have a status"
+        assert len(status.replicators) == 0, "Nothing should be found"
         await multipeer.stop()

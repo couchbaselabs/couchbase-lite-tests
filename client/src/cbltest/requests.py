@@ -290,8 +290,9 @@ class RequestFactory:
         the JSON configuration file)"""
         writer = get_next_writer()
         url = self.__server_urls[index]
+        header = f"{r} @ TS-{index}"
         writer.write_begin(
-            str(r), r.payload.serialize() if r.payload is not None else ""
+            header, r.payload.serialize() if r.payload is not None else ""
         )
 
         try:
