@@ -1,0 +1,18 @@
+{
+    "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
+    "test_servers": [
+        {
+            "platform": "swift_ios",
+            "cbl_version": "{{ios_version}}",
+            "dataset_version": "{{dataset_version}}",
+            "location": "00008110-000E544201D1401E"
+        },
+        {
+            "platform": "jak_android",
+            "cbl_version": "{{android_version}}",
+            "dataset_version": "{{dataset_version}}",
+            "location": "RZCW30G4YLW"
+        }
+    ],
+    "include": "../../../../environment/aws/topology_setup/default_topology.json"
+} 
