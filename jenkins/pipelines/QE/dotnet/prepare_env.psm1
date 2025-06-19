@@ -1,0 +1,2 @@
+Invoke-WebRequest https://raw.githubusercontent.com/couchbaselabs/couchbase-mobile-tools/refs/heads/master/dotnet_testing_env/prepare_dotnet.psm1 -OutFile $PSScriptRoot/prepare_dotnet.psm1
+Import-Module $PSScriptRoot/prepare_dotnet.psm1 -Force
