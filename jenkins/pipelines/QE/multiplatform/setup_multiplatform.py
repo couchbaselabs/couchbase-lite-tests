@@ -6,7 +6,10 @@ import subprocess
 import sys
 from io import TextIOWrapper
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
+
+SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
+sys.path.append(str(SCRIPT_DIR.parents[3]))
 
 import click
 import requests
@@ -14,10 +17,7 @@ import requests
 from environment.aws.start_backend import script_entry as start_backend
 from jenkins.pipelines.shared.setup_test import TopologyConfig
 
-SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
-
 if __name__ == "__main__":
-    sys.path.append(str(SCRIPT_DIR.parents[3]))
     if isinstance(sys.stdout, TextIOWrapper):
         cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
@@ -249,38 +249,55 @@ def parse_platform_key(platform_key: str) -> tuple[str, str | None]:
 
 def compose_multiplatform_topology(
     platform_versions: dict[str, dict[str, str]], dataset_version: str
-) -> dict:
+) -> dict[str, Any]:
     """
-    Compose a multiplatform topology from individual platform topologies.
+    Compose a multiplatform topology from platform-specific topology files.
 
     Args:
-        platform_versions: Dictionary of platform versions keyed by platform
+        platform_versions: Dictionary of platform versions, builds, and target OS
         dataset_version: Dataset version to use
 
     Returns:
-        Combined topology dictionary
+        Composed topology dictionary
     """
-    composed_topology = {
-        "test_servers": [],  # Initialize as empty list
-        "sync_gateways": [],
-        "couchbase_servers": [],
+    composed_topology: dict[str, Any] = {
+        "$schema": "topology_schema.json",
+        "test_servers": [],
+        "include": "default_topology.json",
     }
 
     for platform_key, version_info in platform_versions.items():
         platform, target_os = parse_platform_key(platform_key)
+
+        if target_os:
+            click.echo(
+                f"Loading topology for {platform_key} ({platform} on {target_os})..."
+            )
+        else:
+            click.echo(f"Loading topology for {platform_key}...")
+
+        # Get topology files for this platform with OS specification
         topology_files = get_platform_topology_files(platform, target_os)
 
         if not topology_files:
-            click.secho(
-                f"Warning: No topology files found for {platform_key}", fg="yellow"
-            )
+            if target_os:
+                click.secho(
+                    f"Warning: No topology files found for {platform} on {target_os}",
+                    fg="yellow",
+                )
+            else:
+                click.secho(
+                    f"Warning: No topology files found for {platform}", fg="yellow"
+                )
             continue
 
+        # Use the first available topology (or the specific OS topology if found)
+        topology_file = topology_files[0]
+        click.echo(f"Using topology: {topology_file.name}")
+
         try:
-            # Load and merge each topology file
-            for topology_file in topology_files:
-                with open(topology_file) as f:
-                    platform_topology = json.load(f)
+            with open(topology_file) as f:
+                platform_topology = json.load(f)
 
                 # Extract test servers from platform topology
                 if "test_servers" in platform_topology:
