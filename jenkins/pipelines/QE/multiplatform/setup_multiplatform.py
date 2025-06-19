@@ -43,7 +43,7 @@ SUPPORTED_PLATFORMS = {
 }
 
 
-def fetch_latest_build(platform: str, version: str) -> int:
+def fetch_latest_build(platform: str, version: str) -> str:
     """
     Fetch the latest successful build number for a platform and version.
 
@@ -52,7 +52,7 @@ def fetch_latest_build(platform: str, version: str) -> int:
         version: CBL version (e.g., 3.2.3)
 
     Returns:
-        Build number as integer
+        Build number as string
 
     Raises:
         Exception if API call fails or no build found
@@ -83,7 +83,7 @@ def fetch_latest_build(platform: str, version: str) -> int:
         if build_number is None:
             raise ValueError(f"No BuildNumber found in response: {data}")
 
-        return int(build_number)
+        return str(build_number)  # Convert to string before returning
 
     except Exception as e:
         raise Exception(f"Failed to fetch latest build for {platform} v{version}: {e}")
@@ -175,7 +175,9 @@ def parse_platform_versions(
     return platforms
 
 
-def get_platform_topology_files(platform_key: str, target_os: str = None) -> list[Path]:
+def get_platform_topology_files(
+    platform_key: str, target_os: str | None = None
+) -> list[Path]:
     """
     Get appropriate topology files for a platform, with optional OS specification.
 
@@ -228,7 +230,7 @@ def get_platform_topology_files(platform_key: str, target_os: str = None) -> lis
     return []
 
 
-def parse_platform_key(platform_key: str) -> tuple[str, str]:
+def parse_platform_key(platform_key: str) -> tuple[str, str | None]:
     """
     Parse a platform key back into platform and target_os.
 
@@ -236,7 +238,7 @@ def parse_platform_key(platform_key: str) -> tuple[str, str]:
         platform_key: Key like "dotnet_windows", "ios", "c_linux"
 
     Returns:
-        Tuple of (platform, target_os)
+        Tuple of (platform, target_os) where target_os may be None
     """
     if "_" in platform_key:
         platform, target_os = platform_key.split("_", 1)
@@ -249,64 +251,47 @@ def compose_multiplatform_topology(
     platform_versions: dict[str, dict[str, str]], dataset_version: str
 ) -> dict:
     """
-    Compose a multiplatform topology from platform-specific topology files.
+    Compose a multiplatform topology from individual platform topologies.
 
     Args:
-        platform_versions: Dictionary of platform versions, builds, and target OS
+        platform_versions: Dictionary of platform versions keyed by platform
         dataset_version: Dataset version to use
 
     Returns:
-        Composed topology dictionary
+        Combined topology dictionary
     """
     composed_topology = {
-        "$schema": "topology_schema.json",
-        "test_servers": [],
-        "include": "default_topology.json",
+        "test_servers": [],  # Initialize as empty list
+        "sync_gateways": [],
+        "couchbase_servers": [],
     }
 
     for platform_key, version_info in platform_versions.items():
         platform, target_os = parse_platform_key(platform_key)
-
-        if target_os:
-            click.echo(
-                f"Loading topology for {platform_key} ({platform} on {target_os})..."
-            )
-        else:
-            click.echo(f"Loading topology for {platform_key}...")
-
-        # Get topology files for this platform with OS specification
         topology_files = get_platform_topology_files(platform, target_os)
 
         if not topology_files:
-            if target_os:
-                click.secho(
-                    f"Warning: No topology files found for {platform} on {target_os}",
-                    fg="yellow",
-                )
-            else:
-                click.secho(
-                    f"Warning: No topology files found for {platform}", fg="yellow"
-                )
+            click.secho(
+                f"Warning: No topology files found for {platform_key}", fg="yellow"
+            )
             continue
 
-        # Use the first available topology (or the specific OS topology if found)
-        topology_file = topology_files[0]
-        click.echo(f"Using topology: {topology_file.name}")
-
         try:
-            with open(topology_file) as f:
-                platform_topology = json.load(f)
+            # Load and merge each topology file
+            for topology_file in topology_files:
+                with open(topology_file) as f:
+                    platform_topology = json.load(f)
 
-            # Extract test servers from platform topology
-            if "test_servers" in platform_topology:
-                for server in platform_topology["test_servers"]:
-                    # Update with our version and dataset
-                    server["cbl_version"] = version_info["full_version"]
-                    server["dataset_version"] = dataset_version
-                    composed_topology["test_servers"].append(server)
-                    click.echo(
-                        f"Added {server['platform']} server for {platform_key} with CBL {version_info['full_version']}"
-                    )
+                # Extract test servers from platform topology
+                if "test_servers" in platform_topology:
+                    for server in platform_topology["test_servers"]:
+                        # Update with our version and dataset
+                        server["cbl_version"] = version_info["full_version"]
+                        server["dataset_version"] = dataset_version
+                        composed_topology["test_servers"].append(server)
+                        click.echo(
+                            f"Added {server['platform']} server for {platform_key} with CBL {version_info['full_version']}"
+                        )
 
         except Exception as e:
             click.secho(f"Error loading topology for {platform_key}: {e}", fg="red")
