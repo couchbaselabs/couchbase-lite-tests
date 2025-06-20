@@ -95,6 +95,8 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
             1,
             "/performMaintenance",
             (c, r) -> new PerformMaintenance(app.getDbSvc()).doMaintenance(app.getTestContext(c), r));
+
+        PlatformDispatcher.addPostEndpoints(this, app);
     }
 
     // This method returns a Reply.  Be sure to close it!
