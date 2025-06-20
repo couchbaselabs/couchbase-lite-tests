@@ -2,22 +2,24 @@ pipeline {
     agent none
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '3.2.3', description: 'Couchbase Lite Version')
-        string(name: 'CBL_BUILD', defaultValue: '6', description: 'Couchbase Lite Build Number')
-        string(name: 'CBL_DATASET_VERSION', defaultValue: '3.2', description: "The dataset version to use (e.g. 3.2 or 4.0)")
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '6', description: 'Couchbase Lite Build Number')
+        string(name: 'PLATFORM', defaultValue: 'ios', description: "The platform to test (e.g. ios, android, windows, linux)")
         string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
     }
     options {
         timeout(time: 60, unit: 'MINUTES')
+        ansiColor('xterm')
+        timestamps()
     }
     stages {
         stage('Init') {
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
                     if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
+                    if (params.PLATFORM == '') { error "PLATFORM is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "c ${params.CBL_VERSION}-${params.CBL_BUILD} (#${currentBuild.number})"
+                    currentBuild.displayName = "c ${params.CBL_VERSION}-${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
                     currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION}"
                 }
             }

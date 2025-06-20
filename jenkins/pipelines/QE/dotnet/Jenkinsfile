@@ -1,12 +1,13 @@
 pipeline {
     agent none
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
-        string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
-        string(name: 'CBL_DATASET_VERSION', defaultValue: '3.2', description: 'The version of the Couchbase Lite datasets to use')
+        string(name: 'CBL_VERSION', defaultValue: '3.2.3', description: 'Couchbase Lite Version')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '6', description: 'Couchbase Lite Build Number')
+        string(name: 'PLATFORM', defaultValue: 'ios', description: "The platform to test (e.g. ios, windows)")
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
     }
     options {
+        timeout(time: 60, unit: 'MINUTES')
         ansiColor('xterm')
         timestamps()
     }
@@ -15,38 +16,68 @@ pipeline {
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
                     if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
+                    if (params.PLATFORM == '') { error "PLATFORM is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "dotnet ${params.CBL_VERSION}-${params.CBL_BUILD}"
+                    currentBuild.displayName = "dotnet ${params.CBL_VERSION}-${params.CBL_DATASET_VERSION}"
                     currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION} / SGW: ${params.SGW_VERSION}"
                 }
             }
         }
-        stage('Desktop') {
-            stage("Windows") {
-                agent { label 'net-windows-client-sync-gateway-agent' }
-                environment {
-                    KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
-                    PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                    AWS_PROFILE = "mobile-for-now"
-                }
-                steps {
-                    timeout(time: 60, unit: 'MINUTES') {
-                        pwsh "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
+        stage('Run Tests') {
+            parallel {
+                stage("iOS") {
+                    agent { label 'mac-mini-new' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        AWS_PROFILE = "mobile-for-now"
+                    }
+                    steps {
+                        // Unlock keychain:
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        echo "Run iOS Test"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ${params.CBL_DATASET_VERSION} ${params.PLATFORM} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post {
+                        always {
+                            echo "Teardown iOS Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh "jenkins/pipelines/QE/dotnet/teardown.sh"
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
+                        }
                     }
                 }
-                post { 
-                    always { 
-                        timeout(time: 5, unit: 'MINUTES') {
-                            pwsh 'jenkins\\pipelines\\QE\\dotnet\\teardown.ps1'
+                stage("Windows") {
+                    agent { label 'net-windows-client-sync-gateway-agent' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        AWS_PROFILE = "mobile-for-now"
+                    }
+                    steps {
+                        timeout(time: 60, unit: 'MINUTES') {
+                            pwsh "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -DatasetVersion ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
                         }
-                        archiveArtifacts artifacts: 'tests\\QE\\session.log', fingerprint: true, allowEmptyArchive: true
-                        archiveArtifacts artifacts: 'tests\\QE\\http_log\\*', fingerprint: true, allowEmptyArchive: true
+                    }
+                    post {
+                        always { 
+                            echo "Teardown Windows Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                pwsh 'jenkins\\pipelines\\QE\\dotnet\\teardown.ps1'
+                            }
+                            archiveArtifacts artifacts: 'tests\\QE\\session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests\\QE\\http_log\\*', fingerprint: true, allowEmptyArchive: true
+                        }
                     }
                 }
             }
         }
+    }
     post {
         failure {
             mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
