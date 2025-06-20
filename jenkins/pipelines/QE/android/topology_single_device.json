@@ -5,7 +5,7 @@
             "platform": "jak_android",
             "cbl_version": "{{version}}",
             "dataset_version": "{{dataset_version}}",
-            "location": "RZCW30G4YLW"
+            "location": "HT79F1A00593"
         }
     ],
     "include": "../../../../environment/aws/topology_setup/default_topology.json"
