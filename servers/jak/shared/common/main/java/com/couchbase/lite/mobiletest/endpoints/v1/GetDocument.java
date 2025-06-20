@@ -65,12 +65,12 @@ public class GetDocument {
 
         final TypedMap docSpec = req.getMap(KEY_DOCUMENTS);
         if (docSpec == null) { throw new ClientError("No document specified for getDocument"); }
-        req.validate(LEGAL_DOC_SPEC_KEYS);
+        docSpec.validate(LEGAL_DOC_SPEC_KEYS);
 
-        final String collectionName = req.getString(KEY_COLLECTION);
+        final String collectionName = docSpec.getString(KEY_COLLECTION);
         if (collectionName == null) { throw new ClientError("No collection specified for getDocument"); }
 
-        final String docId = req.getString(KEY_DOC_ID);
+        final String docId = docSpec.getString(KEY_DOC_ID);
         if (docId == null) { throw new ClientError("No document id specified for getDocument"); }
 
         return dbSvc.getDocument(ctxt, dbName, collectionName, docId);
