@@ -1,7 +1,6 @@
 pipeline {
     agent none
     parameters {
-        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
         string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'CBL_DATASET_VERSION', defaultValue: '3.2', description: 'The version of the Couchbase Lite datasets to use')
@@ -19,7 +18,7 @@ pipeline {
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
                     if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD}-${CBL_EDITION}"
+                    currentBuild.displayName = "dotnet ${params.CBL_VERSION}-${params.CBL_BUILD}"
                     currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION} / SGW: ${params.SGW_VERSION}"
                 }
             }

@@ -1,0 +1,165 @@
+pipeline {
+    agent none
+    parameters {
+        string(name: 'CBL_VERSION', defaultValue: '3.2.3', description: 'Couchbase Lite Version')
+        string(name: 'CBL_BUILD', defaultValue: '6', description: 'Couchbase Lite Build Number')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '3.2', description: "The dataset version to use (e.g. 3.2 or 4.0)")
+        string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
+    }
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    currentBuild.displayName = "c ${params.CBL_VERSION}-${params.CBL_BUILD} (#${currentBuild.number})"
+                    currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION}"
+                }
+            }
+        }
+        stage('Run Tests') {
+            parallel {
+                // Not sure if this is needed, removing it for now
+                // stage('macOS') {
+                //     agent { label 'mob-e2e-mac-01' }
+                //     environment {
+                //         KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                //         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                //         AWS_PROFILE = "mobile-for-now"
+                //     }
+                //     steps {
+                //         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                //         echo "Run macOS Test"
+                //         timeout(time: 60, unit: 'MINUTES') {
+                //             sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} macos '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                //         }
+                //     }
+                //     post { 
+                //         always { 
+                //             echo "Teardown macOS Test"
+                //             timeout(time: 5, unit: 'MINUTES') {
+                //                 sh 'jenkins/pipelines/QE/c/teardown.sh'
+                //             }
+                //             archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
+                //             archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
+                //         }
+                //     }
+                // }
+                /////////////////////////////////////////////////////
+                stage('iOS') {
+                    agent { label 'mac-mini-new' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        AWS_PROFILE = "mobile-for-now"
+                    }
+                    steps {
+                        // Unlock keychain:
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        echo "Run iOS Test"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown iOS Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/c/teardown.sh'
+                            } 
+                            archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
+                        }
+                    }
+                }
+                stage('Android') {
+                    agent { label 'mac-laptop1-new' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        AWS_PROFILE = "mobile-for-now"
+                    }
+                    steps {
+                        // Unlock keychain:
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        echo "Run Android Test"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} android '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown Android Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/c/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
+                        }
+                    }
+                }
+                stage('linux') {
+                    agent { label 'cbl-java-desktop-centos-7-2' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        AWS_PROFILE = "mobile-for-now"
+                    }
+                    steps {
+                        // Unlock keychain:
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        echo "Run linux Test"
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} linux_x86_64 '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown linux Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/c/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
+                        }
+                    }
+                }
+                stage('windows') {
+                    agent { label 'net-windows-client-sync-gateway-agent' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        AWS_PROFILE = "mobile-for-now"
+                    }
+                    steps {
+                        // Unlock keychain:
+                        pwsh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        timeout(time: 60, unit: 'MINUTES') {
+                            pwsh "jenkins\\pipelines\\QE\\c\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
+                        }
+                    }
+                    post { 
+                        always { 
+                            echo "Teardown Windows Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                pwsh 'jenkins\\pipelines\\QE\\c\\teardown.ps1'
+                            }
+                            archiveArtifacts artifacts: 'tests\\QE\\session.log', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests\\QE\\http_log\\*', fingerprint: true, allowEmptyArchive: true
+                        }
+                    }
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+        }
+    }
+}

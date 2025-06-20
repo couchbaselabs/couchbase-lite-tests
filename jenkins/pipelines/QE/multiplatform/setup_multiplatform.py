@@ -188,46 +188,44 @@ def get_platform_topology_files(
     Returns:
         List of topology file paths to use
     """
-    QE_dir = SCRIPT_DIR.parents[1] / "QE" / platform_key
+    # For multiplatform setup, always use the multiplatform topology file
+    multiplatform_topology = SCRIPT_DIR / "topology.json"
 
-    if platform_key == "ios":
-        # iOS has single topology
-        topology_file = QE_dir / "topology_single_device.json"
-        return [topology_file] if topology_file.exists() else []
+    if multiplatform_topology.exists():
+        return [multiplatform_topology]
 
-    elif platform_key == "android":
-        # Android has single topology
-        topology_file = QE_dir / "topology_single_device.json"
-        return [topology_file] if topology_file.exists() else []
+    # Fallback to individual platform topology files if multiplatform topology doesn't exist
+    topology_files = []
 
-    elif platform_key in ["dotnet", "java", "c"]:
-        # Multi-OS platforms - check for topologies directory
-        topologies_dir = QE_dir / "topologies"
-        if not topologies_dir.exists():
-            # Fallback to single topology file
-            topology_file = QE_dir / "topology_single_device.json"
-            return [topology_file] if topology_file.exists() else []
+    # Base topology file patterns to search for
+    topology_patterns = [
+        f"topology_{platform_key}.json",
+        "topology_single_device.json",
+        "topology_single_host.json",
+        "topology.json",
+    ]
 
-        topology_files = []
+    # Platform-specific directories to search
+    platform_dirs = []
 
-        if target_os:
-            # Specific OS requested
-            if target_os == "linux":
-                # Handle Linux variants
-                linux_files = list(topologies_dir.glob("topology_single_linux*.json"))
-                if linux_files:
-                    topology_files.extend(linux_files)
-            else:
-                topology_file = topologies_dir / f"topology_single_{target_os}.json"
+    if target_os:
+        # If target OS is specified, look in platform_targetOS directory
+        platform_dirs.append(SCRIPT_DIR.parent / f"{platform_key}_{target_os}")
+        platform_dirs.append(SCRIPT_DIR.parent / platform_key / target_os)
+
+    # Always check the base platform directory
+    platform_dirs.append(SCRIPT_DIR.parent / platform_key)
+
+    for platform_dir in platform_dirs:
+        if platform_dir.exists():
+            for pattern in topology_patterns:
+                topology_file = platform_dir / pattern
                 if topology_file.exists():
                     topology_files.append(topology_file)
-        else:
-            # Default: use all available topologies for the platform
-            topology_files = list(topologies_dir.glob("topology_single_*.json"))
+                    # Return the first match for each directory
+                    break
 
-        return topology_files
-
-    return []
+    return topology_files
 
 
 def parse_platform_key(platform_key: str) -> tuple[str, str | None]:
@@ -266,6 +264,15 @@ def compose_multiplatform_topology(
         "include": "default_topology.json",
     }
 
+    # Create a mapping of platform names to their expected test server platforms
+    platform_to_server_map = {
+        "android": "jak_android",
+        "ios": "swift_ios",
+        "dotnet": ["dotnet_windows", "dotnet_macos", "dotnet_ios", "dotnet_android"],
+        "java": ["jak_desktop", "jak_webservice"],
+        "c": ["c_windows", "c_macos", "c_linux_x86_64", "c_ios", "c_android"],
+    }
+
     for platform_key, version_info in platform_versions.items():
         platform, target_os = parse_platform_key(platform_key)
 
@@ -299,16 +306,26 @@ def compose_multiplatform_topology(
             with open(topology_file) as f:
                 platform_topology = json.load(f)
 
-                # Extract test servers from platform topology
+                # Get the expected server platform(s) for this platform
+                expected_server_platforms = platform_to_server_map.get(
+                    platform_key, [platform_key]
+                )
+                if isinstance(expected_server_platforms, str):
+                    expected_server_platforms = [expected_server_platforms]
+
+                # Extract test servers from platform topology that match this platform
                 if "test_servers" in platform_topology:
                     for server in platform_topology["test_servers"]:
-                        # Update with our version and dataset
-                        server["cbl_version"] = version_info["full_version"]
-                        server["dataset_version"] = dataset_version
-                        composed_topology["test_servers"].append(server)
-                        click.echo(
-                            f"Added {server['platform']} server for {platform_key} with CBL {version_info['full_version']}"
-                        )
+                        # Only add servers that match the current platform being processed
+                        server_platform = server.get("platform", "")
+                        if server_platform in expected_server_platforms:
+                            # Update with our version and dataset
+                            server["cbl_version"] = version_info["full_version"]
+                            server["dataset_version"] = dataset_version
+                            composed_topology["test_servers"].append(server)
+                            click.echo(
+                                f"Added {server['platform']} server for {platform_key} with CBL {version_info['full_version']}"
+                            )
 
         except Exception as e:
             click.secho(f"Error loading topology for {platform_key}: {e}", fg="red")

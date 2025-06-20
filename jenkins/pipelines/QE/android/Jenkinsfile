@@ -1,7 +1,6 @@
 pipeline {
     agent none
     parameters {
-        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
         string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'CBL_DATASET_VERSION', defaultValue: '', description: "The dataset version to use")
@@ -15,14 +14,13 @@ pipeline {
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
                     if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "android-${CBL_EDITION} ${params.CBL_VERSION}-${params.CBL_BUILD}/${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
+                    currentBuild.displayName = "android ${params.CBL_VERSION}-${params.CBL_BUILD}/${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
                 }
             }
         }
         stage('Android') {
             agent { label 'mac-laptop1-new' }
             environment {
-                ln -sf /usr/local/bin/python3.10 /tmp/python3
                 KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
                 ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
                 PATH = "\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
