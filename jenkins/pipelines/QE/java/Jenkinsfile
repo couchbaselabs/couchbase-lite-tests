@@ -1,0 +1,110 @@
+
+pipeline {
+    agent none
+    parameters {
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
+        string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '', description: "The dataset version to use")
+        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    currentBuild.displayName = "java ${params.CBL_VERSION}-${params.CBL_BUILD}/${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
+                }
+            }
+        }
+
+        stage('Prebuild Servers') {
+            steps {
+                script {
+                    def platforms = [
+                        'jak_desktop', 'jak_webservice'
+                    ]
+                    def parallelBuilds = [:]
+                    for(p in platforms) {
+                        // Groovy stupidness.  Need to set a local variable here
+                        // to avoid late binding (all jobs use dotnet_macos).
+                        def platform = p
+                        parallelBuilds[platform] = {
+                            build job: 'prebuild-test-server',
+                            parameters: [
+                                string(name: 'TS_PLATFORM', value: platform),
+                                string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                                string(name: 'CBL_BUILD', value: params.CBL_BUILD)
+                            ],
+                            wait: true,
+                            propagate: true
+                        }
+                    }
+                    parallel parallelBuilds
+                }
+            }
+        }
+
+        stage('Tests') {
+            parallel {
+                stage('Linux Desktop Test') {
+                    agent { label 'cbl-java-desktop-centos-7-2' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        AWS_PROFILE = "mobile-for-now"
+                    }
+                    steps {
+                        echo "=== Run Linux Desktop Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
+                        }
+                        echo "=== Linux Desktop Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Linux Desktop Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/java/desktop/**', fingerprint: true, allowEmptyArchive: true
+                            echo "=== Linux Desktop Test Teardown Complete"
+                        }
+                    }
+                }
+                stage('Linux Web Service Test') {
+                    agent { label 'cbl-java-webservice-centos-7' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        AWS_PROFILE = "mobile-for-now"
+                    }
+                    steps {
+                        echo "=== Run Linux Web Service Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
+                        }
+                        echo "=== Linux Web Service Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Linux Web Service Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/java/webservice/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/java/webservice/**', fingerprint: true, allowEmptyArchive: true
+                            echo "=== Linux Web Service Test Teardown Complete"
+                        }
+                    }
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+        }
+    }
+}

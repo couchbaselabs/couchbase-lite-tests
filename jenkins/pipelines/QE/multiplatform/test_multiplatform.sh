@@ -43,7 +43,7 @@ function list_available_tests() {
 function usage() {
     echo "Usage: $0 \"platform1:version1[:build1] platform2:version2[:build2]...\" <dataset_version> <sgw_version> <private_key_path> [test_name]"
     echo ""
-    echo "Supported platforms: android, ios, dotnet, c"
+    echo "Supported platforms: android, ios, dotnet, c, java"
     echo ""
     echo "Examples:"
     echo "  # Auto-fetch latest builds with default test:"
@@ -132,11 +132,11 @@ for config in "${PLATFORM_ARRAY[@]}"; do
     
     # Validate platform
     case "$platform" in
-        android|ios|dotnet|c)
+        android|ios|dotnet|c|java)
             ;;
         *)
             echo "❌ Error: Unsupported platform: $platform"
-            echo "   Supported platforms: android, ios, dotnet, c"
+            echo "   Supported platforms: android, ios, dotnet, c, java"
             exit 1
             ;;
     esac
@@ -242,6 +242,7 @@ for platform in "${UNIQUE_PLATFORMS[@]}"; do
         ios) echo "🍎 iOS: CBL test server running" ;;
         dotnet) echo "🔷 .NET: CBL test server running" ;;
         c) echo "⚙️ C: CBL test server running" ;;
+        java) echo "☕ Java: CBL test server running" ;;
     esac
 done
 

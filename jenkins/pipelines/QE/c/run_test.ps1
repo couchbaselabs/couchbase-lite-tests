@@ -5,11 +5,9 @@ param (
     [Parameter()][string]$PrivateKeyPath
 )
 
-Import-Module $PSScriptRoot/../../shared/config.psm1 -Force
-Import-Module $PSScriptRoot/prepare_env.psm1 -Force
 $ErrorActionPreference = "Stop" 
 
-Install-DotNet
+Import-Module $PSScriptRoot\..\..\shared\config.psm1 -Force
 
 python -m venv venv
 .\venv\Scripts\activate
@@ -27,13 +25,11 @@ if($LASTEXITCODE -ne 0) {
 
 Push-Location $QE_TESTS_DIR
 pip install -r requirements.txt
-pytest -v --no-header --config config.json
+pytest -v --no-header -W ignore::DeprecationWarning --config config.json
 $saved_exit = $LASTEXITCODE
 deactivate
 Pop-Location
 
-# FIXME: Find another way to do this so this is not hardcoded here
-taskkill /F /IM "testserver.cli.exe"
 if($saved_exit -ne 0) {
     throw "Testing failed!"
 }
