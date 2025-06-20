@@ -35,7 +35,7 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 @SuppressWarnings("PMD.CyclomaticComplexity")
-public final class TestContext {
+public abstract class BaseTestContext {
     private static final String TAG = "CONTEXT";
 
     private static final String KEY_COLLECTIONS = "collections";
@@ -69,7 +69,7 @@ public final class TestContext {
     @Nullable
     private Map<String, URLEndpointListener> openEndptListeners;
 
-    public TestContext(@NonNull TestApp app, @NonNull Session session, @NonNull String testName) {
+    public BaseTestContext(@NonNull TestApp app, @NonNull Session session, @NonNull String testName) {
         this.session = session;
         this.testName = testName;
 
@@ -77,9 +77,9 @@ public final class TestContext {
         if (!dbDir.mkdirs()) { throw new ServerError("Failed creating test db directory: " + dbDir); }
         this.dbDir = dbDir;
 
-        app.getDbSvc().init(this);
-        app.getReplSvc().init(this);
-        app.getListenerService().init(this);
+        app.getDbSvc().init(getTestContext());
+        app.getReplSvc().init(getTestContext());
+        app.getListenerService().init(getTestContext());
 
         Log.p(TAG, ">>>>> START TEST: " + testName);
     }
@@ -103,17 +103,19 @@ public final class TestContext {
         openSnapshots = null;
 
         stopRepls();
-
         stopEndptListeners();
-
         closeCollections();
-
         deleteDbs();
 
+        // all state should be here.
+        // but just in case...
         app.clearReplSvc();
         app.clearListenerService();
         app.clearDbSvc();
     }
+
+    @NonNull
+    protected abstract TestContext getTestContext();
 
     @SuppressFBWarnings("NP_NULL_ON_SOME_PATH")
     public void addDb(@NonNull String name, @NonNull Database db) {
@@ -135,7 +137,7 @@ public final class TestContext {
             final TypedMap dbDesc = databases.getMap(dbName);
 
             if ((dbDesc == null) || dbDesc.isEmpty()) {
-                createDb(this, dbSvc, dbName, null);
+                createDb(dbSvc, dbName, null);
                 continue;
             }
 
@@ -151,7 +153,7 @@ public final class TestContext {
                 if (StringUtils.isEmpty(dataset)) {
                     throw new ClientError("No dataset is specified for database " + dbName + " in reset");
                 }
-                dbSvc.installDataset(this, dataset, dbName);
+                dbSvc.installDataset(getTestContext(), dataset, dbName);
 
                 continue;
             }
@@ -161,7 +163,7 @@ public final class TestContext {
                 throw new ClientError("Null or empty collections list for database " + dbName + " in reset");
             }
 
-            createDb(this, dbSvc, dbName, collections);
+            createDb(dbSvc, dbName, collections);
         }
     }
 
@@ -175,6 +177,28 @@ public final class TestContext {
     public Database removeDb(@NonNull String name) {
         final Map<String, Database> dbs = openDbs;
         return (dbs == null) ? null : dbs.remove(name);
+    }
+
+    @NonNull
+    public String addSnapshot(@NonNull Snapshot snapshot) {
+        final String snapshotId = UUID.randomUUID().toString();
+        Map<String, Snapshot> snapshots = openSnapshots;
+        if (openSnapshots == null) {
+            snapshots = new HashMap<>();
+            openSnapshots = snapshots;
+        }
+        snapshots.put(snapshotId, snapshot);
+        return snapshotId;
+    }
+
+    @NonNull
+    public Snapshot getSnapshot(@NonNull String id) {
+        final Map<String, Snapshot> snapshots = openSnapshots;
+        if (snapshots != null) {
+            final Snapshot snapshot = snapshots.get(id);
+            if (snapshot != null) { return snapshot; }
+        }
+        throw new ClientError("No such snapshot: " + id);
     }
 
     @Nullable
@@ -226,28 +250,6 @@ public final class TestContext {
         return (docListeners == null) ? null : docListeners.get(id);
     }
 
-    @NonNull
-    public String addSnapshot(@NonNull Snapshot snapshot) {
-        final String snapshotId = UUID.randomUUID().toString();
-        Map<String, Snapshot> snapshots = openSnapshots;
-        if (openSnapshots == null) {
-            snapshots = new HashMap<>();
-            openSnapshots = snapshots;
-        }
-        snapshots.put(snapshotId, snapshot);
-        return snapshotId;
-    }
-
-    @NonNull
-    public Snapshot getSnapshot(@NonNull String id) {
-        final Map<String, Snapshot> shapshots = openSnapshots;
-        if (shapshots != null) {
-            final Snapshot snapshot = shapshots.get(id);
-            if (snapshot != null) { return snapshot; }
-        }
-        throw new ClientError("No such snapshot: " + id);
-    }
-
     public void addEndptListener(@NonNull String id, @NonNull URLEndpointListener listener) {
         Map<String, URLEndpointListener> endptListeners = openEndptListeners;
         if (endptListeners == null) {
@@ -264,8 +266,7 @@ public final class TestContext {
         return (endptListeners == null) ? null : endptListeners.get(id);
     }
 
-    private static void createDb(
-        @NonNull TestContext ctxt,
+    private void createDb(
         @NonNull DatabaseService svc,
         @NonNull String dbName,
         @Nullable TypedList collections) {
@@ -277,32 +278,7 @@ public final class TestContext {
                 collFqns.add(DatabaseService.parseCollectionFullName(fqn));
             }
         }
-        svc.installDatabase(ctxt, dbName, collFqns);
-    }
-
-    private void stopRepls() {
-        final Map<String, Replicator> liveRepls = openRepls;
-        openRepls = null;
-        if (liveRepls == null) { return; }
-        for (Replicator repl: liveRepls.values()) {
-            if (repl != null) { repl.stop(); }
-        }
-    }
-
-    private void stopEndptListeners() {
-        final Map<String, URLEndpointListener> liveEndptListeners = openEndptListeners;
-        openEndptListeners = null;
-        if (liveEndptListeners == null) { return; }
-        for (URLEndpointListener listener: liveEndptListeners.values()) {
-            if (listener != null) { listener.stop(); }
-        }
-    }
-
-    private void closeCollections() {
-        final Map<String, Collection> liveCollections = openCollections;
-        openCollections = null;
-        if (liveCollections == null) { return; }
-        for (Collection collection: liveCollections.values()) { collection.close(); }
+        svc.installDatabase(getTestContext(), dbName, collFqns);
     }
 
     private void deleteDbs() {
@@ -329,6 +305,31 @@ public final class TestContext {
 
         if (!new FileUtils().deleteRecursive(liveDbDir)) {
             Log.err(TAG, "Failed deleting db dir on reset: " + liveDbDir);
+        }
+    }
+
+    private void closeCollections() {
+        final Map<String, Collection> liveCollections = openCollections;
+        openCollections = null;
+        if (liveCollections == null) { return; }
+        for (Collection collection: liveCollections.values()) { collection.close(); }
+    }
+
+    private void stopRepls() {
+        final Map<String, Replicator> liveRepls = openRepls;
+        openRepls = null;
+        if (liveRepls == null) { return; }
+        for (Replicator repl: liveRepls.values()) {
+            if (repl != null) { repl.stop(); }
+        }
+    }
+
+    private void stopEndptListeners() {
+        final Map<String, URLEndpointListener> liveEndptListeners = openEndptListeners;
+        openEndptListeners = null;
+        if (liveEndptListeners == null) { return; }
+        for (URLEndpointListener listener: liveEndptListeners.values()) {
+            if (listener != null) { listener.stop(); }
         }
     }
 }
