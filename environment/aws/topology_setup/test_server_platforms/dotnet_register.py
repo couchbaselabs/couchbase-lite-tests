@@ -90,6 +90,10 @@ class DotnetTestServer(TestServer):
         return None
 
     @property
+    def product(self) -> str:
+        return "couchbase-lite-net"
+
+    @property
     @abstractmethod
     def publish(self) -> bool:
         """
@@ -272,7 +276,9 @@ class DotnetTestServer_iOS(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        return (
+            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        )
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -379,7 +385,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -480,7 +486,7 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -588,7 +594,9 @@ class DotnetTestServer_macOS(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        return (
+            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        )
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """

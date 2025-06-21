@@ -86,10 +86,6 @@ def main() -> None:
 
     args = parser.parse_args()
     server = TestServer.create(args.platform, args.version)
-    if "-" not in args.version:
-        raise ValueError(
-            f"Invalid version {args.version}, must be in the form x.y.z-build"
-        )
 
     if args.ci and upload_exists(server):
         click.secho("Server already exists on latestbuilds, skipping build", fg="green")
