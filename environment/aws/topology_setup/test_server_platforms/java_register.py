@@ -284,6 +284,10 @@ class JAKTestServer_Android(JAKTestServer):
         return "android"
 
     @property
+    def product(self) -> str:
+        return "couchbase-lite-android"
+
+    @property
     def platform(self) -> str:
         """
         Get the platform name.
@@ -302,7 +306,7 @@ class JAKTestServer_Android(JAKTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-android/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -380,6 +384,10 @@ class JAKTestServer_NonAndroid(JAKTestServer):
         return f"jak_{self.__jar_name.lower()}"
 
     @property
+    def product(self) -> str:
+        return "couchbase-lite-java"
+
+    @property
     def test_server_path(self) -> str:
         return self.__jar_name.lower()
 
@@ -392,7 +400,7 @@ class JAKTestServer_NonAndroid(JAKTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/CBLTestServer-Java-{self.__jar_name}.jar"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/CBLTestServer-Java-{self.__jar_name}.jar"
 
     def compress_package(self):
         """

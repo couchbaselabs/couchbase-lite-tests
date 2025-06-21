@@ -46,6 +46,7 @@ import importlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
+from typing import Final
 
 import click
 import requests
@@ -101,10 +102,38 @@ class TestServer(ABC):
     """
 
     __registry: dict[str, type[TestServer]] = {}
+    __version_filename: Final[str] = ".version"
+    __build_no_cache: dict[str, dict[str, str]] = {}
 
     def __init__(self, version: str) -> None:
-        self.__version = version
+        if self.product not in self.__build_no_cache:
+            self.__build_no_cache[self.product] = {}
+
+        self.__version = self.__normalize_version(version)
         self._downloaded = False
+
+    def __normalize_version(self, version: str) -> str:
+        if "-" in version:
+            return version
+
+        click.secho(
+            f"Version {version} does not contain a build number, looking up latest good build...",
+            fg="yellow",
+        )
+
+        if version in self.__build_no_cache[self.product]:
+            build_no = self.__build_no_cache[self.product][version]
+            click.secho(f"Found latest good build: {build_no} [CACHED]", fg="blue")
+            return f"{version}-{build_no}"
+
+        resp = requests.get(
+            f"http://proget.build.couchbase.com:8080/api/get_version?product={self.product}&version={version}"
+        )
+        resp.raise_for_status()
+        build_no = resp.json()["BuildNumber"]
+        click.secho(f"Found latest good build: {build_no}", fg="green")
+        self.__build_no_cache[self.product][version] = build_no
+        return f"{version}-{build_no}"
 
     @classmethod
     def initialize(cls) -> None:
@@ -184,6 +213,17 @@ class TestServer(ABC):
 
         Returns:
             str: The platform of the test server.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def product(self) -> str:
+        """
+        Get the product name of the test server (for use with gvr and latestbuidls)
+
+        Returns:
+            str: The product name of the test server.
         """
         pass
 
