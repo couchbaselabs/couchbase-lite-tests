@@ -60,6 +60,10 @@ class SwiftTestServer(TestServer):
     def __init__(self, version: str):
         super().__init__(version)
 
+    @property
+    def product(self) -> str:
+        return "couchbase-lite-ios"
+
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-swift_xc_enterprise_{version}.zip"
 
@@ -76,7 +80,7 @@ class SwiftTestServer(TestServer):
 
         download_file = DOWNLOAD_DIR / "framework.zip"
         downloader = CBLLibraryDownloader(
-            "couchbase-lite-ios",
+            self.product,
             f"{self.cbl_filename(self.version)}",
             version_parts[0],
             int(version_parts[1]) if len(version_parts) > 1 else 0,
@@ -121,7 +125,9 @@ class SwiftTestServer_iOS(SwiftTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-ios/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        return (
+            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        )
 
     def build(self) -> None:
         self._download_cbl()

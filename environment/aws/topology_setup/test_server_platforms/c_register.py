@@ -76,6 +76,10 @@ class CTestServer(TestServer):
     def cbl_filename(self, version: str) -> str:
         pass
 
+    @property
+    def product(self) -> str:
+        return "couchbase-lite-c"
+
 
 class CTestServer_Desktop(CTestServer):
     def _download_cbl(self) -> None:
@@ -98,7 +102,7 @@ class CTestServer_Desktop(CTestServer):
 
         download_file = DOWNLOAD_DIR / f"framework.{ext}"
         downloader = CBLLibraryDownloader(
-            "couchbase-lite-c",
+            self.product,
             self.cbl_filename(self.version),
             version_parts[0],
             build,
@@ -184,7 +188,7 @@ class CTestServer_iOS(CTestServer):
         return "c_ios"
 
     def cbl_filename(self, version: str) -> str:
-        return f"couchbase-lite-c-enterprise-{version}-ios.zip"
+        return f"{self.product}-enterprise-{version}-ios.zip"
 
     def _download_cbl(self):
         header(f"Downloading CBL library {self.version}")
@@ -200,7 +204,7 @@ class CTestServer_iOS(CTestServer):
 
         download_file = DOWNLOAD_DIR / "framework.zip"
         downloader = CBLLibraryDownloader(
-            "couchbase-lite-c",
+            self.product,
             self.cbl_filename(self.version),
             version_parts[0],
             build,
@@ -267,7 +271,7 @@ class CTestServer_iOS(CTestServer):
         """
         version_parts = self.version.split("-")
         return (
-            f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
         )
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
@@ -337,7 +341,7 @@ class CTestServer_Android(CTestServer):
         return "c_android"
 
     def cbl_filename(self, version: str) -> str:
-        return f"couchbase-lite-c-enterprise-{version}-android.zip"
+        return f"{self.product}-enterprise-{version}-android.zip"
 
     def _download_cbl(self):
         android_lib_dir = (
@@ -363,7 +367,7 @@ class CTestServer_Android(CTestServer):
 
         download_file = DOWNLOAD_DIR / "framework.zip"
         downloader = CBLLibraryDownloader(
-            "couchbase-lite-c",
+            self.product,
             self.cbl_filename(self.version),
             version_parts[0],
             build,
@@ -403,7 +407,7 @@ class CTestServer_Android(CTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -502,10 +506,10 @@ class CTestServer_Windows(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
 
     def cbl_filename(self, version: str) -> str:
-        return f"couchbase-lite-c-enterprise-{version}-windows-x86_64.zip"
+        return f"{self.product}-enterprise-{version}-windows-x86_64.zip"
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -548,7 +552,7 @@ class CTestServer_macOS(CTestServer_Desktop):
         super().__init__(version)
 
     def cbl_filename(self, version: str) -> str:
-        return f"couchbase-lite-c-enterprise-{version}-macos.zip"
+        return f"{self.product}-enterprise-{version}-macos.zip"
 
     @property
     def platform(self) -> str:
@@ -569,7 +573,9 @@ class CTestServer_macOS(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        return (
+            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        )
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -622,7 +628,7 @@ class CTestServer_Linux(CTestServer_Desktop):
         return f"c_linux_{self.__arch}"
 
     def cbl_filename(self, version: str) -> str:
-        return f"couchbase-lite-c-enterprise-{version}-linux-{self.__arch}.tar.gz"
+        return f"{self.product}-enterprise-{version}-linux-{self.__arch}.tar.gz"
 
     @property
     def latestbuilds_path(self) -> str:
@@ -633,7 +639,7 @@ class CTestServer_Linux(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_linux-{self.__arch}.tar.gz"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_linux-{self.__arch}.tar.gz"
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
