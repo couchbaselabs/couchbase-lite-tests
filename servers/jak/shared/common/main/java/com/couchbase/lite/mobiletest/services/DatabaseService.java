@@ -168,7 +168,7 @@ public final class DatabaseService {
     }
 
     @NonNull
-    public Map<String, Object> getDocument(
+    public Document getDocument(
         @NonNull TestContext ctxt,
         @NonNull String dbName,
         @NonNull String collName,
@@ -179,7 +179,14 @@ public final class DatabaseService {
                 HTTPStatus.NOT_FOUND,
                 "Document not found: " + getDocumentFQN(dbName, collName, docId));
         }
-        return doc.toMap();
+
+       return doc;
+    }
+
+    public String getRevisionHistory(Document doc) {
+        try  { return doc.getRevisionHistory(); }
+        catch (CouchbaseLiteException ignore) { }
+        return "<unknown>";
     }
 
     @NonNull
