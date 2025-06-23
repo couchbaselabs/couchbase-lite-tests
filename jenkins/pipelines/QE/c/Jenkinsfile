@@ -57,6 +57,7 @@ pipeline {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         AWS_PROFILE = "mobile-for-now"
+                        TS_ARTIFACTS_DIR = 'c_ios'
                     }
                     steps {
                         // Unlock keychain:
@@ -72,8 +73,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/c/teardown.sh'
                             } 
-                            archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/QE/c_ios/**/*', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
@@ -83,6 +83,7 @@ pipeline {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         AWS_PROFILE = "mobile-for-now"
+                        TS_ARTIFACTS_DIR = 'c_android'
                     }
                     steps {
                         // Unlock keychain:
@@ -98,8 +99,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/c/teardown.sh'
                             }
-                            archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/QE/c_android/**/*', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
@@ -109,6 +109,7 @@ pipeline {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         AWS_PROFILE = "mobile-for-now"
+                        TS_ARTIFACTS_DIR = 'c_linux'
                     }
                     steps {
                         // Unlock keychain:
@@ -124,8 +125,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/c/teardown.sh'
                             }
-                            archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/QE/c_linux/**/*', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
@@ -135,6 +135,7 @@ pipeline {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         AWS_PROFILE = "mobile-for-now"
+                        TS_ARTIFACTS_DIR = 'c_windows'
                     }
                     steps {
                         // Unlock keychain:
@@ -149,8 +150,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 pwsh 'jenkins\\pipelines\\QE\\c\\teardown.ps1'
                             }
-                            archiveArtifacts artifacts: 'tests\\QE\\session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests\\QE\\http_log\\*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests\\QE\\c_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }

@@ -34,6 +34,7 @@ pipeline {
                 ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
                 PATH = "\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 AWS_PROFILE = "mobile-for-now"
+                TS_ARTIFACTS_DIR = 'android'
             }
             steps {
                 // Unlock keychain:
@@ -49,8 +50,7 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/android/android_teardown.sh"
                     }
-                    archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/QE/android/**/*', fingerprint: true, allowEmptyArchive: true
                 }
             }
         }

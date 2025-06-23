@@ -52,6 +52,7 @@ pipeline {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         AWS_PROFILE = "mobile-for-now"
+                        TS_ARTIFACTS_DIR = 'java_desktop'
                     }
                     steps {
                         echo "=== Run Linux Desktop Tests"
@@ -66,7 +67,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'
                             }
-                            archiveArtifacts artifacts: 'tests/QE/java/desktop/**', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/QE/java_desktop/**/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Linux Desktop Test Teardown Complete"
                         }
                     }
@@ -77,6 +78,7 @@ pipeline {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         AWS_PROFILE = "mobile-for-now"
+                        TS_ARTIFACTS_DIR = 'java_webservice'
                     }
                     steps {
                         echo "=== Run Linux Web Service Tests"
@@ -91,7 +93,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/java/webservice/teardown.sh'
                             }
-                            archiveArtifacts artifacts: 'tests/QE/java/webservice/**', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/QE/java_webservice/**/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Linux Web Service Test Teardown Complete"
                         }
                     }

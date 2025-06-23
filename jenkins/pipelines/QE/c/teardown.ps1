@@ -1,6 +1,8 @@
 $env:PYTHONPATH = "$PSScriptRoot\..\..\..\"
 Import-Module $PSScriptRoot\..\..\shared\config.psm1 -Global
 Push-Location $AWS_ENVIRONMENT_DIR
+Move-Artifacts
+
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
