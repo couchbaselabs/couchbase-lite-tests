@@ -36,8 +36,8 @@ esac
 
 echo "Fetching latest successful build for $PLATFORM v$VERSION..." >&2
 
-# Use IP address instead of hostname to avoid DNS issues
-BUILD_NO=$(curl -s "http://172.23.113.15:8080/api/get_version?product=couchbase-lite-${PROGET_PLATFORM}&version=${VERSION}&ee=true" | jq -r .BuildNumber)
+# Use IP address instead of hostname to avoid DNS issues (it works while being connected to vpn.couchbase.com)
+BUILD_NO=$(curl -s "http://proget.build.couchbase.com:8080/api/get_version?product=couchbase-lite-${PROGET_PLATFORM}&version=${VERSION}&ee=true" | jq -r .BuildNumber)
 
 if [ "${BUILD_NO}" == "null" ] || [ "${BUILD_NO}" == "" ]; then
     echo "No latest successful build found for ${PLATFORM} v${VERSION}" >&2

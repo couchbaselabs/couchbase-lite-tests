@@ -136,7 +136,7 @@ def parse_platform_configs(platform_configs: str) -> dict:
     Parse platform configuration string into a dictionary of versions.
 
     Args:
-        platform_configs: String like "android:3.2.3:6 ios:3.1.5" or "multiplatform"
+        platform_configs: String like "android:3.2.3-6 ios:3.1.5" or "multiplatform"
 
     Returns:
         Dict mapping platform names to full versions with build numbers
@@ -152,15 +152,8 @@ def parse_platform_configs(platform_configs: str) -> dict:
             parts = config.split(":")
             platform = parts[0]
 
-            if len(parts) >= 3:
-                # Format: platform:version:build -> version-build
-                version = f"{parts[1]}-{parts[2]}"
-            elif len(parts) == 2:
-                # Format: platform:version -> version-1 (default build)
-                version = f"{parts[1]}-1"
-            else:
-                version = parts[1]
-
+            # Use version as-is (whether it has build number or not)
+            version = parts[1]
             versions[platform.lower()] = version
     return versions
 

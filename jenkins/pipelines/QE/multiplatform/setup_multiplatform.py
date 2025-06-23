@@ -72,8 +72,8 @@ def fetch_latest_build(platform: str, version: str) -> str:
     product_name = f"couchbase-lite-{platform_map[platform]}"
 
     try:
-        # Use IP address instead of hostname to avoid DNS issues
-        url = f"http://172.23.113.15:8080/api/get_version?product={product_name}&version={version}&ee=true"
+        # Use IP address instead of hostname to avoid DNS issues (it works while being connected to vpn.couchbase.com)
+        url = f"http://proget.build.couchbase.com:8080/api/get_version?product={product_name}&version={version}&ee=true"
         response = requests.get(url, timeout=30)
         response.raise_for_status()
 
@@ -97,9 +97,9 @@ def parse_platform_versions(
 
     Supports multiple formats:
     - android:3.2.3 (auto-fetch latest build)
-    - android:3.2.3:6 (explicit build)
+    - android:3.2.3-6 (explicit build)
     - dotnet:windows:3.2.0 (auto-fetch for specific OS)
-    - dotnet:windows:3.2.0:8 (explicit build for specific OS)
+    - dotnet:windows:3.2.0-8 (explicit build for specific OS)
 
     Args:
         platform_versions: Space-separated platform specifications
@@ -123,15 +123,27 @@ def parse_platform_versions(
 
         # Handle different platform specification formats
         if platform in ["dotnet", "c"] and len(parts) >= 3:
-            # Format: platform:target_os:version[:build]
+            # Format: platform:target_os:version[-build]
             target_os = parts[1]
-            version = parts[2]
-            build = parts[3] if len(parts) > 3 else None
+            version_build = parts[2]
+
+            # Check if version contains build number
+            if "-" in version_build:
+                version, build = version_build.split("-", 1)
+            else:
+                version = version_build
+                build = None
         else:
-            # Format: platform:version[:build]
+            # Format: platform:version[-build]
             target_os = None  # Will be set to default later
-            version = parts[1]
-            build = parts[2] if len(parts) > 2 else None
+            version_build = parts[1]
+
+            # Check if version contains build number
+            if "-" in version_build:
+                version, build = version_build.split("-", 1)
+            else:
+                version = version_build
+                build = None
 
         # Auto-fetch build if not specified
         if build is None:
@@ -140,14 +152,9 @@ def parse_platform_versions(
                     build = fetch_latest_build(platform, version)
                     build = str(build)  # Convert to string for consistency
                 except Exception as e:
-                    click.secho(
-                        f"Warning: Failed to fetch build number for {platform} v{version}: {e}",
-                        fg="yellow",
-                    )
-                    build = "1"  # Fallback
-                    click.secho(
-                        f"Using build number '{build}' as fallback for {platform}",
-                        fg="yellow",
+                    raise click.BadParameter(
+                        f"Failed to fetch build number for {platform} v{version}: {e}. "
+                        f"Please specify build number explicitly (e.g., {platform}:{version}-<build>)"
                     )
             else:
                 # When auto-fetch is disabled but no explicit build provided, error
@@ -393,7 +400,9 @@ def run_platform_specific_setup(
             if "-" in full_version:
                 version, build_num = full_version.split("-", 1)
             else:
-                version, build_num = full_version, "1"
+                raise click.BadParameter(
+                    f"iOS platform requires explicit build number. Please specify as ios:{full_version}-<build>"
+                )
 
             cmd = [
                 "bash",
@@ -484,7 +493,7 @@ def setup_multiplatform_test(
     config_file_in: Path,
     topology_tag: str,
     private_key: str | None = None,
-    couchbase_version: str = "7.6",
+    couchbase_version: str = "7.6.4",
     public_key_name: str = "jborden",
     setup_dir: str = "QE",
     auto_fetch_builds: bool = True,
@@ -548,7 +557,6 @@ def setup_multiplatform_test(
 @click.argument("platform_versions")
 @click.argument("dataset_version")
 @click.argument("sgw_version")
-@click.argument("private_key_path", required=False)
 @click.option(
     "--no-auto-fetch", is_flag=True, help="Disable automatic build number fetching"
 )
@@ -559,7 +567,6 @@ def main(
     platform_versions: str,
     dataset_version: str,
     sgw_version: str,
-    private_key_path: str | None,
     no_auto_fetch: bool,
     setup_only: bool,
 ):
@@ -569,15 +576,14 @@ def main(
     PLATFORM_VERSIONS: Space-separated list of platform specifications
     DATASET_VERSION: CBL dataset version to use
     SGW_VERSION: Sync Gateway version to use
-    PRIVATE_KEY_PATH: Optional path to SSH private key
     """
+    private_key_path = os.path.expanduser("~/.ssh/jborden.pem")
 
     click.secho("🚀 Multiplatform CBL Setup", fg="blue", bold=True)
     click.secho(f"Platform specifications: {platform_versions}", fg="cyan")
     click.secho(f"Dataset version: {dataset_version}", fg="cyan")
     click.secho(f"SGW version: {sgw_version}", fg="cyan")
-    if private_key_path:
-        click.secho(f"Private key: {private_key_path}", fg="cyan")
+    click.secho(f"Private key: {private_key_path} (hardcoded)", fg="cyan")
     click.echo()
 
     try:

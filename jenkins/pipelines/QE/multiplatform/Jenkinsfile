@@ -7,8 +7,8 @@ pipeline {
             description: 'Platform versions in two supported formats:\n' +
                         '1. Auto-fetch (recommended): platform1:version1 platform2:version2\n' +
                         '   Example: "ios:3.2.3 android:3.2.4"\n' +
-                        '2. Explicit builds: platform1:version1:build1 platform2:version2:build2\n' +
-                        '   Example: "ios:3.2.3:1 android:3.2.4:2"\n' +
+                        '2. Explicit builds: platform1:version1-build1 platform2:version2-build2\n' +
+                        '   Example: "ios:3.2.3-1 android:3.2.4-2"\n' +
                         'Supported platforms: ios, android, dotnet, java, c'
         )
         string(
@@ -22,11 +22,7 @@ pipeline {
             description: 'Sync Gateway Version'
         )
 
-        string(
-            name: 'PRIVATE_KEY_PATH',
-            defaultValue: '~/.ssh/jborden.pem',
-            description: 'Path to private key for SSH connections'
-        )
+
         string(
             name: 'CBL_TEST_NAME',
             defaultValue: 'test_no_conflicts::TestNoConflicts::test_multiple_cbls_updates_concurrently_with_pull',
@@ -62,14 +58,80 @@ pipeline {
                     def platformSpecs = params.PLATFORM_VERSIONS.split(' ')
                     platformSpecs.each { spec ->
                         def parts = spec.split(':')
-                        if (parts.size() < 2 || parts.size() > 3) {
-                            error("Invalid platform specification: ${spec}. Expected format: platform:version[:build]")
+                        if (parts.size() < 2 || parts.size() > 2) {
+                            error("Invalid platform specification: ${spec}. Expected format: platform:version[-build]")
                         }
-                        if (parts.size() == 2) {
-                            echo "Will auto-fetch latest build for ${parts[0]} v${parts[1]}"
+                        // Check if version contains build number (version-build format)
+                        def versionPart = parts[1]
+                        if (versionPart.contains('-')) {
+                            def versionBuildParts = versionPart.split('-')
+                            if (versionBuildParts.size() != 2) {
+                                error("Invalid version-build format in: ${spec}. Expected format: platform:version-build")
+                            }
+                            echo "Will deploy CBL ${versionBuildParts[0]}-${versionBuildParts[1]} to ${parts[0]} platform"
                         } else {
-                            echo "Will deploy CBL ${parts[1]}-${parts[2]} to ${parts[0]} platform"
+                            echo "Will auto-fetch latest build for ${parts[0]} v${versionPart}"
                         }
+                    }
+                }
+            }
+        }
+        stage('Prebuild Servers') {
+            steps {
+                script {
+                    // Parse platform versions to determine which test servers to prebuild
+                    def platformSpecs = params.PLATFORM_VERSIONS.split(' ')
+                    def platformsToBuild = []
+                    
+                    // Map platform names to their test server platforms
+                    def platformMapping = [
+                        'ios': ['swift_ios'],
+                        'android': ['jak_android'],
+                        'dotnet': ['dotnet_ios', 'dotnet_windows', 'dotnet_macos', 'dotnet_android'],
+                        'java': ['jak_desktop', 'jak_webservice'],
+                        'c': ['c_ios', 'c_android', 'c_linux_x86_64', 'c_windows', 'c_macos']
+                    ]
+                    
+                    platformSpecs.each { spec ->
+                        def parts = spec.split(':')
+                        def platform = parts[0]
+                        def versionPart = parts[1]
+                        
+                        // Extract version (with or without build number)
+                        def cblVersion = versionPart
+                        
+                        // Add all test server platforms for this platform
+                        if (platformMapping.containsKey(platform)) {
+                            platformMapping[platform].each { serverPlatform ->
+                                if (!platformsToBuild.contains(serverPlatform)) {
+                                    platformsToBuild.add(serverPlatform)
+                                }
+                            }
+                        }
+                    }
+                    
+                    echo "Will prebuild test servers for platforms: ${platformsToBuild.join(', ')}"
+                    
+                    // Build all required test server platforms in parallel
+                    def parallelBuilds = [:]
+                    platformsToBuild.each { platform ->
+                        parallelBuilds[platform] = {
+                            // For multiplatform, we'll use a generic version since each platform may have different versions
+                            // The actual version assignment happens during test setup
+                            build job: 'prebuild-test-server',
+                            parameters: [
+                                string(name: 'TS_PLATFORM', value: platform),
+                                string(name: 'CBL_VERSION', value: '3.2.3'), // Generic version for prebuild
+                            ],
+                            wait: true,
+                            propagate: true
+                        }
+                    }
+                    
+                    if (parallelBuilds.size() > 0) {
+                        parallel parallelBuilds
+                    } else {
+                        echo "No test servers to prebuild"
                     }
                 }
             }
@@ -86,7 +148,7 @@ pipeline {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run Multiplatform Test"
                 timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/multiplatform/test_multiplatform.sh ${params.PLATFORM_VERSIONS} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ${params.PRIVATE_KEY_PATH} ${params.CBL_TEST_NAME}"
+                    sh "jenkins/pipelines/QE/multiplatform/test_multiplatform.sh ${params.PLATFORM_VERSIONS} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ${params.CBL_TEST_NAME}"
                 }
             }
         }

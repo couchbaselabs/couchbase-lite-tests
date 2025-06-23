@@ -51,7 +51,7 @@ if [ $# -gt 4 ]; then
     fi
 fi
 
-# prepare_dotnet
+prepare_dotnet
 
 create_venv venv
 source venv/bin/activate

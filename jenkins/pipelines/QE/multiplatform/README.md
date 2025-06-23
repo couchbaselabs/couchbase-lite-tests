@@ -19,22 +19,22 @@ This directory contains scripts and configurations for running Couchbase Lite (C
 
 #### Auto-Fetch Mode (Recommended)
 ```bash
-./test_multiplatform.sh "ios:3.2.3 android:3.1.5 dotnet:3.2.0" 3.2 3.2.3 ~/.ssh/jborden.pem
+./test_multiplatform.sh "ios:3.2.3 android:3.1.5 dotnet:3.2.0" 3.2 3.2.3
 ```
 
 #### OS-Specific Mode
 ```bash
-./test_multiplatform.sh "ios:3.2.3 dotnet:windows:3.2.0 c:linux:3.2.1" 3.2 3.2.3 ~/.ssh/jborden.pem
+./test_multiplatform.sh "ios:3.2.3 dotnet:windows:3.2.0 c:linux:3.2.1" 3.2 3.2.3
 ```
 
 #### Explicit Build Mode
 ```bash
-./test_multiplatform.sh "ios:3.2.3:6 android:3.1.5:10 dotnet:3.2.0:8" 3.2 3.2.3 ~/.ssh/jborden.pem
+./test_multiplatform.sh "ios:3.2.3-6 android:3.1.5-10 dotnet:3.2.0-8" 3.2 3.2.3
 ```
 
 #### OS-Specific with Explicit Builds
 ```bash
-./test_multiplatform.sh "dotnet:windows:3.2.0:8 c:linux:3.2.1:5" 3.2 3.2.3 ~/.ssh/jborden.pem
+./test_multiplatform.sh "dotnet:windows:3.2.0-8 c:linux:3.2.1-5" 3.2 3.2.3
 ```
 
 ### Parameters
@@ -42,13 +42,13 @@ This directory contains scripts and configurations for running Couchbase Lite (C
 1. **PLATFORM_VERSIONS**: Space-separated list of platform specifications
    - **Auto-fetch format**: `platform:version` (recommended)
    - **OS-specific format**: `platform:os:version` (for multi-OS platforms)
-   - **Explicit format**: `platform:version:build`
-   - **OS-specific explicit**: `platform:os:version:build`
+   - **Explicit format**: `platform:version-build`
+   - **OS-specific explicit**: `platform:os:version-build`
    - **Examples**: 
      - Auto-fetch: `"ios:3.2.3 android:3.1.5"`
      - OS-specific: `"dotnet:windows:3.2.0 c:linux:3.2.1"`
-     - Explicit: `"ios:3.2.3:6 android:3.1.5:10"`
-     - OS-specific explicit: `"dotnet:windows:3.2.0:8 c:linux:3.2.1:5"`
+     - Explicit: `"ios:3.2.3-6 android:3.1.5-10"`
+     - OS-specific explicit: `"dotnet:windows:3.2.0-8 c:linux:3.2.1-5"`
    - **Supported platforms**: `ios`, `android`, `dotnet`, `java`, `c`
    - **Supported OS**: `windows`, `macos`, `linux`, `android`, `ios`
 
@@ -56,7 +56,9 @@ This directory contains scripts and configurations for running Couchbase Lite (C
 
 3. **SGW_VERSION**: Sync Gateway version (e.g., `3.2.3`)
 
-4. **PRIVATE_KEY_PATH**: Path to SSH private key (optional)
+4. **TEST_NAME**: Optional test name to run (defaults to `test_delta_sync.py::TestDeltaSync::test_delta_sync_replication`)
+
+**Note**: SSH private key is hardcoded to `~/.ssh/jborden.pem`
 
 ### Platform Mapping
 
@@ -105,43 +107,43 @@ The system automatically:
 ### iOS and Android Testing (Auto-Fetch)
 ```bash
 # Automatically gets latest successful builds
-./test_multiplatform.sh "ios:3.2.3 android:3.1.5" 3.2 3.2.3 ~/.ssh/jborden.pem
+./test_multiplatform.sh "ios:3.2.3 android:3.1.5" 3.2 3.2.3
 ```
 
 ### iOS and Android Testing (Explicit)
 ```bash
 # Uses specific build numbers
-./test_multiplatform.sh "ios:3.2.3:6 android:3.1.5:10" 3.2 3.2.3 ~/.ssh/jborden.pem
+./test_multiplatform.sh "ios:3.2.3-6 android:3.1.5-10" 3.2 3.2.3
 ```
 
 ### Full Platform Matrix (Auto-Fetch)
 ```bash
 # Gets latest builds for all platforms
-./test_multiplatform.sh "ios:3.2.3 android:3.1.5 dotnet:3.2.0 java:3.1.8 c:3.2.1" 3.2 3.2.3 ~/.ssh/jborden.pem
+./test_multiplatform.sh "ios:3.2.3 android:3.1.5 dotnet:3.2.0 java:3.1.8 c:3.2.1" 3.2 3.2.3
 ```
 
 ### OS-Specific Platform Testing
 ```bash
 # Specify exact OS variants for multi-OS platforms
-./test_multiplatform.sh "ios:3.2.3 dotnet:windows:3.2.0 dotnet:macos:3.2.0 c:linux:3.2.1" 3.2 3.2.3 ~/.ssh/jborden.pem
+./test_multiplatform.sh "ios:3.2.3 dotnet:windows:3.2.0 dotnet:macos:3.2.0 c:linux:3.2.1" 3.2 3.2.3
 ```
 
 ### Mixed Mode (Auto-Fetch + Explicit + OS-Specific)
 ```bash
 # iOS auto-fetch, Android explicit build, .NET Windows-specific
-./test_multiplatform.sh "ios:3.2.3 android:3.1.5:10 dotnet:windows:3.2.0" 3.2 3.2.3 ~/.ssh/jborden.pem
+./test_multiplatform.sh "ios:3.2.3 android:3.1.5-10 dotnet:windows:3.2.0" 3.2 3.2.3
 ```
 
 ### Single Platform Testing
 ```bash
 # Single platform with auto-fetch
-./test_multiplatform.sh "ios:3.2.3" 3.2 3.2.3 ~/.ssh/jborden.pem
+./test_multiplatform.sh "ios:3.2.3" 3.2 3.2.3
 ```
 
-### Disable Auto-Fetch
+### Using Custom Test
 ```bash
-# Force explicit build numbers only
-./test_multiplatform.sh "ios:3.2.3:6 android:3.1.5:10" 3.2 3.2.3 ~/.ssh/jborden.pem true
+# Specify custom test to run
+./test_multiplatform.sh "ios:3.2.3-6 android:3.1.5-10" 3.2 3.2.3 "test_no_conflicts.py::TestNoConflicts::test_multiple_cbls_updates_concurrently_with_push"
 ```
 
 ## Jenkins Integration
@@ -159,7 +161,7 @@ The system automatically fetches the latest successful build numbers using the C
 
 - **Endpoint**: `http://proget.build.couchbase.com:8080/api/get_version`
 - **Parameters**: `product=couchbase-lite-{platform}&version={version}&ee=true`
-- **Fallback**: Uses build number "1" if API call fails
+- **Error Handling**: Fails if API call fails - no fallback behavior
 - **Benefits**: Always uses the most recent healthy builds without manual tracking
 
 ### Manual Build Lookup
@@ -223,7 +225,7 @@ multiplatform/
 
 ### Common Issues
 
-1. **Invalid Platform Specification**: Ensure format is `platform:version[:build]`
+1. **Invalid Platform Specification**: Ensure format is `platform:version[-build]`
 2. **Missing Private Key**: Verify SSH key path and permissions
 3. **Platform Not Found**: Check platform name mapping in setup script
 4. **Version Resolution**: Ensure specified versions exist in build system
@@ -234,7 +236,7 @@ multiplatform/
 Set environment variable for verbose output:
 ```bash
 export DEBUG=1
-./test_multiplatform.sh "ios:3.2.3" 3.2 3.2.3 ~/.ssh/jborden.pem
+./test_multiplatform.sh "ios:3.2.3" 3.2 3.2.3
 ```
 
 ## Contributing

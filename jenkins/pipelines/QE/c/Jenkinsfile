@@ -2,7 +2,7 @@ pipeline {
     agent none
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '3.2.3', description: 'Couchbase Lite Version')
-        string(name: 'CBL_DATASET_VERSION', defaultValue: '6', description: 'Couchbase Lite Build Number')
+        string(name: 'CBL_DATASET_VERSION', defaultValue: '3.2', description: 'The dataset version to use (e.g. 3.2 or 4.0)')
         string(name: 'PLATFORM', defaultValue: 'ios', description: "The platform to test (e.g. ios, android, windows, linux)")
         string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
     }
@@ -19,40 +19,38 @@ pipeline {
                     if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
                     if (params.PLATFORM == '') { error "PLATFORM is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "c ${params.CBL_VERSION}-${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
+                    currentBuild.displayName = "c ${params.CBL_VERSION}/${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
                     currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION}"
+                }
+            }
+        }
+        stage('Prebuild Servers') {
+            steps {
+                script {
+                    def platforms = [
+                        'c_ios', 'c_android', 'c_linux_x86_64', 'c_windows'
+                    ]
+                    def parallelBuilds = [:]
+                    for(p in platforms) {
+                        // Groovy stupidness.  Need to set a local variable here
+                        // to avoid late binding (all jobs use the same platform).
+                        def platform = p
+                        parallelBuilds[platform] = {
+                            build job: 'prebuild-test-server',
+                            parameters: [
+                                string(name: 'TS_PLATFORM', value: platform),
+                                string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                            ],
+                            wait: true,
+                            propagate: true
+                        }
+                    }
+                    parallel parallelBuilds
                 }
             }
         }
         stage('Run Tests') {
             parallel {
-                // Not sure if this is needed, removing it for now
-                // stage('macOS') {
-                //     agent { label 'mob-e2e-mac-01' }
-                //     environment {
-                //         KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
-                //         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                //         AWS_PROFILE = "mobile-for-now"
-                //     }
-                //     steps {
-                //         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                //         echo "Run macOS Test"
-                //         timeout(time: 60, unit: 'MINUTES') {
-                //             sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} macos '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
-                //         }
-                //     }
-                //     post { 
-                //         always { 
-                //             echo "Teardown macOS Test"
-                //             timeout(time: 5, unit: 'MINUTES') {
-                //                 sh 'jenkins/pipelines/QE/c/teardown.sh'
-                //             }
-                //             archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
-                //             archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
-                //         }
-                //     }
-                // }
-                /////////////////////////////////////////////////////
                 stage('iOS') {
                     agent { label 'mac-mini-new' }
                     environment {
@@ -65,7 +63,7 @@ pipeline {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "Run iOS Test"
                         timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ${params.CBL_DATASET_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                         }
                     }
                     post { 
@@ -91,7 +89,7 @@ pipeline {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "Run Android Test"
                         timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} android '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ${params.CBL_DATASET_VERSION} android '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                         }
                     }
                     post { 
@@ -117,7 +115,7 @@ pipeline {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "Run linux Test"
                         timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} linux_x86_64 '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ${params.CBL_DATASET_VERSION} linux_x86_64 '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                         }
                     }
                     post { 
@@ -142,7 +140,7 @@ pipeline {
                         // Unlock keychain:
                         pwsh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         timeout(time: 60, unit: 'MINUTES') {
-                            pwsh "jenkins\\pipelines\\QE\\c\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
+                            pwsh "jenkins\\pipelines\\QE\\c\\run_test.ps1 -Version ${params.CBL_VERSION} -Dataset ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
                         }
                     }
                     post { 

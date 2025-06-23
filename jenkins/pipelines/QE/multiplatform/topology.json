@@ -11,7 +11,7 @@
             "platform": "jak_android",
             "cbl_version": "{{android_version}}",
             "dataset_version": "{{dataset_version}}",
-            "location": "RZCW30G4YLW"
+            "location": "RZCT31DWZEV"
         }
     ],
     "include": "../../../../environment/aws/topology_setup/default_topology.json"

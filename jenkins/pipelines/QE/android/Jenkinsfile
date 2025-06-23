@@ -16,6 +16,17 @@ pipeline {
                 }
             }
         }
+        stage('Prebuild Servers') {
+            steps {
+                build job: 'prebuild-test-server',
+                parameters: [
+                    string(name: 'TS_PLATFORM', value: 'jak_android'),
+                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                ],
+                wait: true,
+                propagate: true
+            }
+        }
         stage('Android') {
             agent { label 'mac-laptop1-new' }
             environment {
