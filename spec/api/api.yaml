@@ -46,6 +46,11 @@ info:
       ```
 
     Changes
+    2.0.0 (06/13/2025)
+    * This is a breaking change: CBLTest-API-Version is now "2"
+    * deprecate dataset_version
+    * In ResetConfiguration, change the value for the "dataset" key to a url.
+
     1.2.1 (06/04/2025)
     * Add authenticator property to [/startMultipeerReplicator](#operation/startMultipeerReplicator)
 
@@ -330,20 +335,21 @@ paths:
         - **updatedBlobs**:
 
           A dictionary whose keys are the key paths into the document to be updated with the blob objects and values are
-          the blob file names listed in the blob dataset.
+          the urls from which to retrieve the blobs to be put at the key path location.
 
           The logic to update blobs is similar to the logic when updating properties. The value at the location specified
-          by the keypath is replaced with the blob object in the object regardless of its type. When a path in the keypath
-          refers to a non-existent property, the key is added and  its value set as a dictionary or an array depending on
+          by the keypath is replaced with the blob object regardless of the value's type. When a path in the keypath
+          refers to a non-existent property, the key is added and its value set as a dictionary or an array depending on
           the type of the path. When a path in the keypath includes an array index that is out of bounds, the array
           is padded with nulls until it is exactly large enough to make the specified index legal.
 
-          The blob object is created from the content of the blob file refered by the blob file name, the dictionary value
-          associated with each key path. If the blob file name refers to non-existing blob file, 400 request error will
-          be returned.
+          The blob object is created from the content of the blob file to which the blob url refers: the value associated
+          with the keypath in the request.  If the name of the file retrieved from the url ends with the extension ".zip"
+          the file is unzipped, first, to recover the blob.   If the blob file name refers to non-existing blob file,
+          a 400 request error will be returned.
 
           The content_type of the blob used when creating a blob object can be detected from the blob file name's extension
-          as the following rules:
+          (after it is unzipped, if necessary) according to the following rules:
             * "image/jpeg" for the .jpg
             * "application/octet-stream" for others
 
@@ -1044,10 +1050,10 @@ components:
             example: ['people[22].address', 'people[3]']
         updatedBlobs:
           description: A dictionary whose keys are the key paths into the document to be updated with the
-            blob objects and values are the blob keys in the dataset.
+            blob objects and values are the urls from which to obtain the blob files.
           type: object
           additionalProperties: {}
-          example: {'photo.thumbnail': 's1.jpg'}
+          example: {'photo.thumbnail': 'https://media.githubusercontent.com/media/blob/s1.jpg'}
     Error:
       type: object
       required: ['domain', 'code']
@@ -1084,10 +1090,6 @@ components:
           description: The Session ID to appear in the header of all subsequent requests
           type: string
           example: 'c64aae38-87c1c-4524-823a-e267fc39c3c4'
-        dataset_version:
-          description: The version of the dataset to use for this session (default 3.2)
-          type: string
-          example: 4.0
         logging:
           type: object
           required: ['url', 'tag']
@@ -1327,9 +1329,9 @@ components:
             * Null or an empty dictionary for creating an empty database.
             * A dictionary contains a single key named "collections", with a list of the collection names
               as its value, for creating a database with those collections.
-            * A dictionary contains a single key named contains a key named "dataset",
-              with a dataset name as its value, for creating a database from the specified dataset
-              which is a prebuilt database. '
+            * A dictionary that contains the single key "dataset",
+              whose value is the url for a dataset.  A dataset is a file named <dbname>.cblite2.zip
+              which when unzipped is the prebuilt database named <dbname>.
       type: object
       properties:
         test:
@@ -1356,10 +1358,13 @@ components:
                     example: ["_default.employees", "_default.departments"]
               - properties:
                   dataset:
-                    description: 'Dataset name. Cannot be used together with collections.'
+                    description: 'Dataset url. Cannot be used together with collections.'
                     type: string
-                    example: "travel"
-          example: {'db1': {}, 'db2': {'collections': ["_default.employees"]}, 'db3': {'dataset': "travel"}}
+                    example: "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/4.0/travel.cblite2.zip"
+          example: {
+            'db1': {},
+            'db2': {'collections': ["_default.employees"]},
+            'db3': {'dataset': "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/4.0/travel.cblite2.zip"}}
     ServerInfo:
       type: object
       required: ['version', 'apiVersion', 'cbl', 'device']
