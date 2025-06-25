@@ -1,0 +1,161 @@
+pipeline {
+    agent none
+    parameters {
+        string(
+            name: 'PLATFORM_VERSIONS',
+            defaultValue: 'ios:3.2.3 android:3.2.4',
+            description: 'Platform versions in two supported formats:\n' +
+                        '1. Auto-fetch (recommended): platform1:version1 platform2:version2\n' +
+                        '   Example: "ios:3.2.3 android:3.2.4"\n' +
+                        '2. Explicit builds: platform1:version1-build1 platform2:version2-build2\n' +
+                        '   Example: "ios:3.2.3-1 android:3.2.4-2"\n' +
+                        'Supported platforms: ios, android, dotnet, java, c'
+        )
+        string(
+            name: 'CBL_DATASET_VERSION',
+            defaultValue: '3.2',
+            description: 'CBL Dataset Version'
+        )
+        string(
+            name: 'SGW_VERSION',
+            defaultValue: '3.2.3',
+            description: 'Sync Gateway Version'
+        )
+
+
+        string(
+            name: 'CBL_TEST_NAME',
+            defaultValue: 'test_no_conflicts::TestNoConflicts::test_multiple_cbls_updates_concurrently_with_pull',
+            description: 'Name of the test to run, leave empty to run all tests, or just mention a directory name[::class name] to run tests in that directory[::class]'
+        )
+        booleanParam(
+            name: 'DISABLE_AUTO_FETCH',
+            defaultValue: false,
+            description: 'Disable automatic fetching of latest successful builds (requires explicit build numbers in PLATFORM_VERSIONS)'
+        )
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.PLATFORM_VERSIONS == '') { error "PLATFORM_VERSIONS is required" }
+                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    currentBuild.displayName = "${params.PLATFORM_VERSIONS}-${params.SGW_VERSION} (#${currentBuild.number})"
+                    currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION}"
+                }
+            }
+        }
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    echo "Platform Versions: ${params.PLATFORM_VERSIONS}"
+                    echo "Dataset Version: ${params.CBL_DATASET_VERSION}"
+                    echo "SGW Version: ${params.SGW_VERSION}"
+                    echo "Auto-fetch builds: ${!params.DISABLE_AUTO_FETCH}"
+                    
+                    // Validate platform versions format
+                    def platformSpecs = params.PLATFORM_VERSIONS.split(' ')
+                    platformSpecs.each { spec ->
+                        def parts = spec.split(':')
+                        if (parts.size() < 2 || parts.size() > 2) {
+                            error("Invalid platform specification: ${spec}. Expected format: platform:version[-build]")
+                        }
+                        // Check if version contains build number (version-build format)
+                        def versionPart = parts[1]
+                        if (versionPart.contains('-')) {
+                            def versionBuildParts = versionPart.split('-')
+                            if (versionBuildParts.size() != 2) {
+                                error("Invalid version-build format in: ${spec}. Expected format: platform:version-build")
+                            }
+                            echo "Will deploy CBL ${versionBuildParts[0]}-${versionBuildParts[1]} to ${parts[0]} platform"
+                        } else {
+                            echo "Will auto-fetch latest build for ${parts[0]} v${versionPart}"
+                        }
+                    }
+                }
+            }
+        }
+        stage('Prebuild Servers') {
+            steps {
+                script {
+                    // Parse platform versions to determine which test servers to prebuild
+                    def platformSpecs = params.PLATFORM_VERSIONS.split(' ')
+                    def platformsToBuild = []
+                    
+                    // Map platform names to their test server platforms
+                    def platformMapping = [
+                        'ios': ['swift_ios'],
+                        'android': ['jak_android'],
+                        'dotnet': ['dotnet_ios', 'dotnet_windows', 'dotnet_macos', 'dotnet_android'],
+                        'java': ['jak_desktop', 'jak_webservice'],
+                        'c': ['c_ios', 'c_android', 'c_linux_x86_64', 'c_windows', 'c_macos']
+                    ]
+                    
+                    platformSpecs.each { spec ->
+                        def parts = spec.split(':')
+                        def platform = parts[0]
+                        def versionPart = parts[1]
+                        
+                        // Extract version (with or without build number)
+                        def cblVersion = versionPart
+                        
+                        // Add all test server platforms for this platform
+                        if (platformMapping.containsKey(platform)) {
+                            platformMapping[platform].each { serverPlatform ->
+                                if (!platformsToBuild.contains(serverPlatform)) {
+                                    platformsToBuild.add(serverPlatform)
+                                }
+                            }
+                        }
+                    }
+                    
+                    echo "Will prebuild test servers for platforms: ${platformsToBuild.join(', ')}"
+                    
+                    // Build all required test server platforms in parallel
+                    def parallelBuilds = [:]
+                    platformsToBuild.each { platform ->
+                        parallelBuilds[platform] = {
+                            // For multiplatform, we'll use a generic version since each platform may have different versions
+                            // The actual version assignment happens during test setup
+                            build job: 'prebuild-test-server',
+                            parameters: [
+                                string(name: 'TS_PLATFORM', value: platform),
+                                string(name: 'CBL_VERSION', value: '3.2.3'), // Generic version for prebuild
+                            ],
+                            wait: true,
+                            propagate: true
+                        }
+                    }
+                    
+                    if (parallelBuilds.size() > 0) {
+                        parallel parallelBuilds
+                    } else {
+                        echo "No test servers to prebuild"
+                    }
+                }
+            }
+        }
+        stage('Setup and Run Tests') {
+            agent { label 'mac-mini-new' }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                AWS_PROFILE = "mobile-for-now"
+            }
+            steps {
+                // Unlock keychain:
+                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                echo "Run Multiplatform Test"
+                timeout(time: 60, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/QE/multiplatform/test_multiplatform.sh ${params.PLATFORM_VERSIONS} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ${params.CBL_TEST_NAME}"
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+        }
+    }
+} 

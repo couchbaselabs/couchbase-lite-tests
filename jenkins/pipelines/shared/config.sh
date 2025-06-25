@@ -42,7 +42,22 @@ function move_artifacts() {
         return
     fi
 
-    local src_dir=$(realpath $(dirname "${BASH_SOURCE[0]}")/../../../tests/dev_e2e)
+    # Determine if we're in dev_e2e or QE based on current directory
+    local current_dir=$(pwd)
+    if [[ "$current_dir" == *"/dev_e2e"* ]]; then
+        local src_dir=$(realpath $(dirname "${BASH_SOURCE[0]}")/../../../tests/dev_e2e)
+    elif [[ "$current_dir" == *"/QE"* ]]; then
+        local src_dir=$(realpath $(dirname "${BASH_SOURCE[0]}")/../../../tests/QE)
+    else
+        # Fallback: try to detect from the directory structure
+        local script_dir=$(dirname "${BASH_SOURCE[0]}")
+        if [[ "$script_dir" == *"/QE/"* ]]; then
+            local src_dir=$(realpath $(dirname "${BASH_SOURCE[0]}")/../../../tests/QE)
+        else
+            local src_dir=$(realpath $(dirname "${BASH_SOURCE[0]}")/../../../tests/dev_e2e)
+        fi
+    fi
+    
     local dst_dir="$src_dir/$TS_ARTIFACTS_DIR"
 
     echo "Moving artifacts to $dst_dir"

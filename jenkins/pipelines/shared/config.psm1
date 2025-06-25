@@ -27,7 +27,22 @@ function Move-Artifacts {
         return
     }
 
-    $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\dev_e2e).Path
+    # Determine if we're in dev_e2e or QE based on current directory
+    $currentDir = (Get-Location).Path
+    if ($currentDir -like "*\dev_e2e*") {
+        $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\dev_e2e).Path
+    } elseif ($currentDir -like "*\QE*") {
+        $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\QE).Path
+    } else {
+        # Fallback: try to detect from the script directory structure
+        $scriptDir = $PSScriptRoot
+        if ($scriptDir -like "*\QE\*") {
+            $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\QE).Path
+        } else {
+            $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\dev_e2e).Path
+        }
+    }
+    
     $DST_DIR = "$SRC_DIR\$env:TS_ARTIFACTS_DIR"
     if (-not (Test-Path -Path $DST_DIR)) {
         New-Item -ItemType Directory -Path $DST_DIR | Out-Null
@@ -35,8 +50,12 @@ function Move-Artifacts {
 
     Write-Host "Moving artifacts to $DST_DIR"
 
-    Move-Item -Path "$SRC_DIR\session.log" -Destination "$DST_DIR\session.log" -Force
-    Move-Item -Path "$SRC_DIR\http_log" -Destination "$DST_DIR\http_log" -Force
+    if (Test-Path "$SRC_DIR\session.log") {
+        Move-Item -Path "$SRC_DIR\session.log" -Destination "$DST_DIR\session.log" -Force
+    }
+    if (Test-Path "$SRC_DIR\http_log") {
+        Move-Item -Path "$SRC_DIR\http_log" -Destination "$DST_DIR\http_log" -Force
+    }
 }
 
 function Find-Dir {
