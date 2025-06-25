@@ -51,7 +51,7 @@ def setup_test(
     setup_dir: str = "dev_e2e",
 ) -> None:
     """
-    Sets up a testing environment with the specified CBL version, dataset version, and Sync Gateway version.
+    Sets up a testing environment with the specified CBL version and Sync Gateway version.
     """
     config_file_out = SCRIPT_DIR.parents[2] / "tests" / setup_dir / "config.json"
     topology_file_out = (
