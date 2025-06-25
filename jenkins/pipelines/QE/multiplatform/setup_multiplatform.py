@@ -26,19 +26,19 @@ if __name__ == "__main__":
 SUPPORTED_PLATFORMS = {
     "android": {
         "script_path": "../android/android_tests.sh",
-        "param_format": "simple",  # version, dataset_version, sgw_version, [private_key], [--setup-only]
+        "param_format": "simple",  # version, sgw_version, [private_key], [--setup-only]
     },
     "ios": {
         "script_path": "../ios/test.sh",
-        "param_format": "ios",  # edition, version, build, dataset_version, sgw_version, private_key, [--setup-only]
+        "param_format": "ios",  # edition, version, build, sgw_version, private_key, [--setup-only]
     },
     "dotnet": {
         "script_path": "../dotnet/run_test.sh",
-        "param_format": "target_os",  # version, dataset_version, target_os, sgw_version, [private_key], [--setup-only]
+        "param_format": "target_os",  # version, target_os, sgw_version, [private_key], [--setup-only]
     },
     "c": {
         "script_path": "../c/run_test.sh",
-        "param_format": "target_os",  # version, dataset_version, target_os, sgw_version, [private_key], [--setup-only]
+        "param_format": "target_os",  # version, target_os, sgw_version, [private_key], [--setup-only]
     },
 }
 
@@ -253,14 +253,13 @@ def parse_platform_key(platform_key: str) -> tuple[str, str | None]:
 
 
 def compose_multiplatform_topology(
-    platform_versions: dict[str, dict[str, str]], dataset_version: str
+    platform_versions: dict[str, dict[str, str]],
 ) -> dict[str, Any]:
     """
     Compose a multiplatform topology from platform-specific topology files.
 
     Args:
         platform_versions: Dictionary of platform versions, builds, and target OS
-        dataset_version: Dataset version to use
 
     Returns:
         Composed topology dictionary
@@ -326,9 +325,8 @@ def compose_multiplatform_topology(
                         # Only add servers that match the current platform being processed
                         server_platform = server.get("platform", "")
                         if server_platform in expected_server_platforms:
-                            # Update with our version and dataset
+                            # Update with our version
                             server["cbl_version"] = version_info["full_version"]
-                            server["dataset_version"] = dataset_version
                             composed_topology["test_servers"].append(server)
                             click.echo(
                                 f"Added {server['platform']} server for {platform_key} with CBL {version_info['full_version']}"
@@ -344,7 +342,6 @@ def compose_multiplatform_topology(
 def run_platform_specific_setup(
     platform_key: str,
     full_version: str,
-    dataset_version: str,
     sgw_version: str,
     private_key: str | None = None,
     target_os: str | None = None,
@@ -355,7 +352,6 @@ def run_platform_specific_setup(
     Args:
         platform_key: Platform identifier (ios, android, dotnet, java, c)
         full_version: Full CBL version (e.g., "3.2.3-6")
-        dataset_version: Dataset version
         sgw_version: Sync Gateway version
         private_key: Optional private key path
         target_os: Optional target OS (windows, macos, linux, etc.)
@@ -380,13 +376,13 @@ def run_platform_specific_setup(
     if platform_key == "android":
         main_script = QE_dir / "android_tests.sh"
         if main_script.exists():
-            # Android script expects: <cbl_version> <dataset_version> <sg_version> [private_key_path]
+            # Android script expects: <cbl_version> <sg_version> [private_key_path]
             # Android expects combined version (e.g., "3.2.3-6")
-            cmd = ["bash", str(main_script), full_version, dataset_version, sgw_version]
+            cmd = ["bash", str(main_script), full_version, sgw_version]
             if private_key:
                 cmd.append(private_key)
             else:
-                cmd.append("")  # Android script expects 4 parameters
+                cmd.append("")  # Android script expects 3 parameters
             click.echo(f"Running: {' '.join(cmd)}")
             subprocess.run(cmd, check=True, cwd=str(QE_dir))
         else:
@@ -395,7 +391,7 @@ def run_platform_specific_setup(
     elif platform_key == "ios":
         main_script = QE_dir / "test.sh"
         if main_script.exists():
-            # iOS test.sh expects: <edition> <version> <build_num> <dataset_version> <sgw_version> [private_key]
+            # iOS test.sh expects: <edition> <version> <build_num> <sgw_version> [private_key]
             # iOS needs SEPARATE version and build number parameters
             if "-" in full_version:
                 version, build_num = full_version.split("-", 1)
@@ -410,13 +406,12 @@ def run_platform_specific_setup(
                 "enterprise",
                 version,
                 build_num,
-                dataset_version,
                 sgw_version,
             ]
             if private_key:
                 cmd.append(private_key)
             else:
-                cmd.append("")  # iOS script expects 6 parameters
+                cmd.append("")  # iOS script expects 5 parameters
             click.echo(f"Running: {' '.join(cmd)}")
             subprocess.run(cmd, check=True, cwd=str(QE_dir))
         else:
@@ -427,14 +422,13 @@ def run_platform_specific_setup(
         if target_os == "windows":
             main_script = QE_dir / "run_test.ps1"
             if main_script.exists():
-                # .NET expects: <version> <dataset_version> <platform> <sgw_version> [private_key_path]
+                # .NET expects: <version> <platform> <sgw_version> [private_key_path]
                 # .NET expects combined version (e.g., "3.2.3-6")
                 cmd = [
                     "powershell",
                     "-File",
                     str(main_script),
                     full_version,
-                    dataset_version,
                     target_os or "windows",
                     sgw_version,
                 ]
@@ -451,7 +445,6 @@ def run_platform_specific_setup(
                     "bash",
                     str(main_script),
                     full_version,
-                    dataset_version,
                     target_os or "macos",
                     sgw_version,
                 ]
@@ -466,13 +459,12 @@ def run_platform_specific_setup(
         # Java and C platforms
         main_script = QE_dir / "run_test.sh"
         if main_script.exists():
-            # C expects: <version> <dataset_version> <platform> <sgw_version> [private_key_path]
+            # C expects: <version> <platform> <sgw_version> [private_key_path]
             # C expects combined version (e.g., "3.2.3-6")
             cmd = [
                 "bash",
                 str(main_script),
                 full_version,
-                dataset_version,
                 target_os or "linux",
                 sgw_version,
             ]
@@ -488,7 +480,6 @@ def run_platform_specific_setup(
 
 def setup_multiplatform_test(
     platform_versions_str: str,
-    dataset_version: str,
     sgw_version: str,
     config_file_in: Path,
     topology_tag: str,
@@ -525,7 +516,7 @@ def setup_multiplatform_test(
         platform_versions_dict[platform_key] = {
             "full_version": f"{platform_info['version']}-{platform_info['build']}"
         }
-    topology = compose_multiplatform_topology(platform_versions_dict, dataset_version)
+    topology = compose_multiplatform_topology(platform_versions_dict)
 
     # Set topology defaults (use versions as-is for local testing)
     topology["defaults"] = {
@@ -555,7 +546,6 @@ def setup_multiplatform_test(
 
 @click.command()
 @click.argument("platform_versions")
-@click.argument("dataset_version")
 @click.argument("sgw_version")
 @click.option(
     "--no-auto-fetch", is_flag=True, help="Disable automatic build number fetching"
@@ -565,7 +555,6 @@ def setup_multiplatform_test(
 )
 def main(
     platform_versions: str,
-    dataset_version: str,
     sgw_version: str,
     no_auto_fetch: bool,
     setup_only: bool,
@@ -574,14 +563,12 @@ def main(
     Setup multiplatform CBL testing environment.
 
     PLATFORM_VERSIONS: Space-separated list of platform specifications
-    DATASET_VERSION: CBL dataset version to use
     SGW_VERSION: Sync Gateway version to use
     """
     private_key_path = os.path.expanduser("~/.ssh/jborden.pem")
 
     click.secho("🚀 Multiplatform CBL Setup", fg="blue", bold=True)
     click.secho(f"Platform specifications: {platform_versions}", fg="cyan")
-    click.secho(f"Dataset version: {dataset_version}", fg="cyan")
     click.secho(f"SGW version: {sgw_version}", fg="cyan")
     click.secho(f"Private key: {private_key_path} (hardcoded)", fg="cyan")
     click.echo()
@@ -591,7 +578,6 @@ def main(
         config_file_in = SCRIPT_DIR / "config_multiplatform.json"
         setup_multiplatform_test(
             platform_versions,
-            dataset_version,
             sgw_version,
             config_file_in,
             "multiplatform",

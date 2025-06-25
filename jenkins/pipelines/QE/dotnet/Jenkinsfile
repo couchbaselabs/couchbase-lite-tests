@@ -2,7 +2,6 @@ pipeline {
     agent none
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '3.2.3', description: 'Couchbase Lite Version')
-        string(name: 'CBL_DATASET_VERSION', defaultValue: '6', description: 'Couchbase Lite Build Number')
         string(name: 'PLATFORM', defaultValue: 'ios', description: "The platform to test (e.g. ios, windows)")
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
     }
@@ -16,11 +15,10 @@ pipeline {
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
                     if (params.PLATFORM == '') { error "PLATFORM is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "dotnet ${params.CBL_VERSION}-${params.CBL_DATASET_VERSION}"
-                    currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION} / SGW: ${params.SGW_VERSION}"
+                    currentBuild.displayName = "dotnet ${params.CBL_VERSION}"
+                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
                 }
             }
         }
@@ -64,7 +62,7 @@ pipeline {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "Run iOS Test"
                         timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ${params.CBL_DATASET_VERSION} ${params.PLATFORM} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ${params.PLATFORM} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
                         }
                     }
                     post {
@@ -87,7 +85,7 @@ pipeline {
                     }
                     steps {
                         timeout(time: 60, unit: 'MINUTES') {
-                            pwsh "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -DatasetVersion ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
+                            pwsh "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
                         }
                     }
                     post {
