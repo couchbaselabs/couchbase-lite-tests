@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, pkcs12
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, pkcs12
 from cryptography.x509 import (
     BasicConstraints,
     Certificate,
@@ -22,21 +22,36 @@ class CertKeyPair:
     """
 
     def __init__(
-        self, certificate: Certificate, private_key: ec.EllipticCurvePrivateKey
+        self,
+        certificate: Certificate,
+        private_key: pkcs12.PKCS12PrivateKeyTypes,
+        *,
+        password: str = "couchbase",
     ):
         self.certificate = certificate
         self.private_key = private_key
+        self.password = password
 
     def pfx_bytes(self) -> bytes:
         """
         Returns the certificate and private key in PFX format.
         """
+        # At least at iOS 16, AES is not supported for PFX encryption,
+        # so we have to fallback to this.  Furthermore SHA256 is not
+        # supported either so we have to use SHA1.
+        enc = (
+            PrivateFormat.PKCS12.encryption_builder()
+            .key_cert_algorithm(pkcs12.PBES.PBESv1SHA1And3KeyTripleDESCBC)
+            .hmac_hash(hashes.SHA1())
+            .build(self.password.encode())
+        )
+
         ret_val = pkcs12.serialize_key_and_certificates(
             name=b"cbltest",
             key=self.private_key,
             cert=self.certificate,
             cas=None,
-            encryption_algorithm=NoEncryption(),
+            encryption_algorithm=enc,
         )
 
         return ret_val
@@ -49,7 +64,10 @@ class CertKeyPair:
 
 
 def create_ca_certificate(CN: str) -> CertKeyPair:
-    private_key = ec.generate_private_key(ec.SECP256R1())
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
     cn_attribute = Name([NameAttribute(NameOID.COMMON_NAME, CN)])
     not_valid_before = datetime.now(timezone.utc)
     not_valid_after = not_valid_before + timedelta(days=1)
@@ -72,7 +90,10 @@ def create_ca_certificate(CN: str) -> CertKeyPair:
 def create_leaf_certificate(
     CN: str, *, issuer_data: CertKeyPair | None = None
 ) -> CertKeyPair:
-    private_key = ec.generate_private_key(ec.SECP256R1())
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
     cn_attribute = Name([NameAttribute(NameOID.COMMON_NAME, CN)])
     not_valid_before = datetime.now(timezone.utc)
     not_valid_after = not_valid_before + timedelta(days=1)

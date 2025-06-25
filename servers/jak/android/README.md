@@ -1,14 +1,18 @@
-# This app complies with Couchbase Lite Test Server REST API v1.1,1
+# Android test server
+This app complies with Couchbase Lite Test Server REST API v1.2.1
 
 # Running the project
-1. Open build.gradle with Android Studio
-2. Use MainActivity.kt to launch the app
+1. Open build.gradle as a project with Android Studio
+2. Select an attached phone or start an emulator
+3. Use the arrow in the gutter next to the class declaration in MainActivity.kt to launch the app (or use the Run menu)
 
-Updating CBL API references -
-* Go to App level build.gradle and change the "COUCHBASE_LITE_VERSION" variable to update API references
+There are two ways of setting the version of CBL Android to be tested:
 
-Note - We are using NanoHttpServer to run a http server.
-To change the reference APIs modify the below line in app level build.gradle
-==> compile "org.nanohttpd:nanohttpd:2.3.2-SNAPSHOT" <==
+- On your local machine, in ~/.gradle/gradle.properties define `cblVersion`.  E.g., `cblVersion=3.3.0-33`
+- At compile time, define the property `cblVersion` on the command line.  E.g., `./gradlew assemble -PcblVersion=...`
 
+Note - This project uses NanoHttpServer to run an http server.  That project seems to be moribund.  If you ever need to change the version used here, change this line:
 
+    implementation "org.nanohttpd:nanohttpd:2.3.2-SNAPSHOT"
+    
+... in app/build.gradle

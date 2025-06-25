@@ -12,6 +12,14 @@
 		404619D22CB9A985003835C7 /* NewSessionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619D12CB9A985003835C7 /* NewSessionHandler.swift */; };
 		4055CAA02CDC33A400EDD0CB /* IPAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4055CA9F2CDC33A400EDD0CB /* IPAddress.swift */; };
 		409F45302DFA7BC900BB7851 /* FileDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F452F2DFA7BC900BB7851 /* FileDownloader.swift */; };
+		409F43F82DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F43F72DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift */; };
+		409F43FC2DEA373E00BB7851 /* StartMultipeerReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F43FB2DEA373E00BB7851 /* StartMultipeerReplicator.swift */; };
+		409F44002DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F43FF2DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift */; };
+		409F44022DEA823A00BB7851 /* StopMultipeerReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F44012DEA823A00BB7851 /* StopMultipeerReplicator.swift */; };
+		409F44172DEE187600BB7851 /* GetMultipeerReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F44162DEE187600BB7851 /* GetMultipeerReplicatorStatus.swift */; };
+		409F442C2DEE228300BB7851 /* MultipeerReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F442B2DEE228300BB7851 /* MultipeerReplicatorStatus.swift */; };
+		409F443D2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F443C2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift */; };
+		409F443F2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F443E2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift */; };
 		40AA34992CAF5D20004F4D08 /* StopReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34982CAF5D20004F4D08 /* StopReplicator.swift */; };
 		40AA349D2CAF6755004F4D08 /* CollectionSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */; };
 		40AA34A12CAF6BE4004F4D08 /* ReplicationConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A02CAF6BE4004F4D08 /* ReplicationConflictResolver.swift */; };
@@ -101,6 +109,14 @@
 		404619D12CB9A985003835C7 /* NewSessionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionHandler.swift; sourceTree = "<group>"; };
 		4055CA9F2CDC33A400EDD0CB /* IPAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPAddress.swift; sourceTree = "<group>"; };
 		409F452F2DFA7BC900BB7851 /* FileDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDownloader.swift; sourceTree = "<group>"; };
+		409F43F72DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartMultipeerReplicatorRequest.swift; sourceTree = "<group>"; };
+		409F43FB2DEA373E00BB7851 /* StartMultipeerReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartMultipeerReplicator.swift; sourceTree = "<group>"; };
+		409F43FF2DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorConfiguration.swift; sourceTree = "<group>"; };
+		409F44012DEA823A00BB7851 /* StopMultipeerReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopMultipeerReplicator.swift; sourceTree = "<group>"; };
+		409F44162DEE187600BB7851 /* GetMultipeerReplicatorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetMultipeerReplicatorStatus.swift; sourceTree = "<group>"; };
+		409F442B2DEE228300BB7851 /* MultipeerReplicatorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorStatus.swift; sourceTree = "<group>"; };
+		409F443C2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorCAAuthenticator.swift; sourceTree = "<group>"; };
+		409F443E2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorIdentity.swift; sourceTree = "<group>"; };
 		40A219D62CDC3E790038204C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		40AA34982CAF5D20004F4D08 /* StopReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopReplicator.swift; sourceTree = "<group>"; };
 		40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionSpec.swift; sourceTree = "<group>"; };
@@ -239,6 +255,7 @@
 			children = (
 				40BDA7F72AF1C13B008DB256 /* GetAllDocuments.swift */,
 				40AA34A42CAF94A4004F4D08 /* GetDocument.swift */,
+				409F44162DEE187600BB7851 /* GetMultipeerReplicatorStatus.swift */,
 				40BDA7F62AF1C13B008DB256 /* GetReplicatorStatus.swift */,
 				40BDA7F02AF1C13B008DB256 /* GetRootHandler.swift */,
 				40BDA7F32AF1C13B008DB256 /* Handler.swift */,
@@ -247,7 +264,9 @@
 				40BDA7EE2AF1C13B008DB256 /* ResetHandler.swift */,
 				40C7A5622CA4AF5C0053ADCB /* RunQuery.swift */,
 				40BDA7F42AF1C13B008DB256 /* SnapshotDocuments.swift */,
+				409F43FB2DEA373E00BB7851 /* StartMultipeerReplicator.swift */,
 				40BDA7EF2AF1C13B008DB256 /* StartReplicator.swift */,
+				409F44012DEA823A00BB7851 /* StopMultipeerReplicator.swift */,
 				40AA34982CAF5D20004F4D08 /* StopReplicator.swift */,
 				AED567682E01BBBE00007993 /* StartListener.swift */,
 				AED5676A2E01BBD100007993 /* StopListener.swift */,
@@ -306,6 +325,10 @@
 				40BDA8D92AF20AAB008DB256 /* DocumentID.swift */,
 				40BDA8D22AF20AAB008DB256 /* DocumentReplication.swift */,
 				40AA34A62CAF9BC8004F4D08 /* GetDocumentRequest.swift */,
+				409F443C2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift */,
+				409F43FF2DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift */,
+				409F443E2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift */,
+				409F442B2DEE228300BB7851 /* MultipeerReplicatorStatus.swift */,
 				404619CF2CB9A761003835C7 /* NewSession.swift */,
 				40BDA8D32AF20AAB008DB256 /* PerformMaintenanceConfiguration.swift */,
 				40C7A5662CA4B15B0053ADCB /* QueryResults.swift */,
@@ -323,6 +346,7 @@
 				40BDA8DC2AF20AAB008DB256 /* ServerInfo.swift */,
 				40BDA8CF2AF20AAB008DB256 /* SnapshotID.swift */,
 				40BDA8CC2AF20AAB008DB256 /* SnapshotRequest.swift */,
+				409F43F72DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift */,
 				40BDA8CD2AF20AAB008DB256 /* StartReplicatorRequest.swift */,
 				40BDA8D72AF20AAB008DB256 /* TestServerError.swift */,
 				40BDA8DB2AF20AAB008DB256 /* UpdateRequest.swift */,
@@ -448,11 +472,15 @@
 				40BDA8132AF1C15C008DB256 /* ReplicationFilterFactory.swift in Sources */,
 				40BDA8EC2AF20AAB008DB256 /* VerifyRequest.swift in Sources */,
 				40BDA8062AF1C13B008DB256 /* TestServerMiddleware.swift in Sources */,
+				409F43F82DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift in Sources */,
+				409F443D2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift in Sources */,
 				AED5676F2E01BC1D00007993 /* StartListenerRequest.swift in Sources */,
 				40BDA8F22AF20AAB008DB256 /* ServerInfo.swift in Sources */,
 				40BDA8F42AF20AAB008DB256 /* DatabaseUpdateItem.swift in Sources */,
 				40BDA8002AF1C13B008DB256 /* Handler.swift in Sources */,
+				409F44022DEA823A00BB7851 /* StopMultipeerReplicator.swift in Sources */,
 				40BDA7FC2AF1C13B008DB256 /* StartReplicator.swift in Sources */,
+				409F44172DEE187600BB7851 /* GetMultipeerReplicatorStatus.swift in Sources */,
 				40BDA7FE2AF1C13B008DB256 /* VerifyDocuments.swift in Sources */,
 				40BDA7FD2AF1C13B008DB256 /* GetRootHandler.swift in Sources */,
 				40BDA7FB2AF1C13B008DB256 /* ResetHandler.swift in Sources */,
@@ -470,6 +498,7 @@
 				40AA34A12CAF6BE4004F4D08 /* ReplicationConflictResolver.swift in Sources */,
 				40BDA8E72AF20AAB008DB256 /* CollectionDocuments.swift in Sources */,
 				40C7A5672CA4B15B0053ADCB /* QueryResults.swift in Sources */,
+				409F44002DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift in Sources */,
 				EACC964D2AF3F8B500999C70 /* CBLVersion.swift in Sources */,
 				40AA34992CAF5D20004F4D08 /* StopReplicator.swift in Sources */,
 				404619D22CB9A985003835C7 /* NewSessionHandler.swift in Sources */,
@@ -477,6 +506,7 @@
 				40BDA8022AF1C13B008DB256 /* PerformMaintenance.swift in Sources */,
 				40BDA8032AF1C13B008DB256 /* GetReplicatorStatus.swift in Sources */,
 				40BDA8012AF1C13B008DB256 /* SnapshotDocuments.swift in Sources */,
+				409F443F2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift in Sources */,
 				40BDA8E42AF20AAB008DB256 /* ContentTypes.swift in Sources */,
 				40BDA8152AF1C15C008DB256 /* AnyCodable.swift in Sources */,
 				40AA34A32CAF8C4C004F4D08 /* ReplicationConflictResolverFactory.swift in Sources */,
@@ -493,8 +523,10 @@
 				40BDA8ED2AF20AAB008DB256 /* TestServerError.swift in Sources */,
 				AED5676D2E01BC1100007993 /* Listener.swift in Sources */,
 				40BDA8142AF1C15C008DB256 /* KeyPathParser.swift in Sources */,
+				409F43FC2DEA373E00BB7851 /* StartMultipeerReplicator.swift in Sources */,
 				40C7A5652CA4AFB40053ADCB /* RunQueryConfiguration.swift in Sources */,
 				40C7A5632CA4AF5C0053ADCB /* RunQuery.swift in Sources */,
+				409F442C2DEE228300BB7851 /* MultipeerReplicatorStatus.swift in Sources */,
 				4055CAA02CDC33A400EDD0CB /* IPAddress.swift in Sources */,
 				40BDA8EE2AF20AAB008DB256 /* ResetConfiguration.swift in Sources */,
 				40BDA8EB2AF20AAB008DB256 /* ReplicatorConfiguration.swift in Sources */,

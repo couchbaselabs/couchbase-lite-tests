@@ -95,6 +95,11 @@ class CTestServer_Desktop(CTestServer):
         filename = self.cbl_filename(self.version)
         ext = ".tar.gz" if filename.endswith(".tar.gz") else ".zip"
         DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+
+        if self._check_downloaded(LIB_DIR):
+            header(f"CBL library {self.version} already downloaded")
+            return
+
         download_file = DOWNLOAD_DIR / f"framework.{ext}"
         downloader = CBLLibraryDownloader(
             self.product,
@@ -107,6 +112,7 @@ class CTestServer_Desktop(CTestServer):
             unzip_directory(download_file, LIB_DIR)
         else:
             untar_directory(download_file, LIB_DIR)
+        self._mark_downloaded(LIB_DIR)
 
     def build(self) -> None:
         """
@@ -192,6 +198,10 @@ class CTestServer_iOS(CTestServer):
             build = int(version_parts[1])
 
         DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+        if self._check_downloaded(IOS_FRAMEWORKS_DIR):
+            header(f"CBL library {self.version} already downloaded")
+            return
+
         download_file = DOWNLOAD_DIR / "framework.zip"
         downloader = CBLLibraryDownloader(
             self.product,
@@ -212,6 +222,7 @@ class CTestServer_iOS(CTestServer):
             cwd=IOS_VENDOR_DIR / "cmake",
             check=True,
         )
+        self._mark_downloaded(IOS_FRAMEWORKS_DIR)
 
     def build(self):
         self._download_cbl()
@@ -350,6 +361,10 @@ class CTestServer_Android(CTestServer):
             build = int(version_parts[1])
 
         DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+        if self._check_downloaded(android_lib_dir):
+            header(f"CBL library {self.version} already downloaded")
+            return
+
         download_file = DOWNLOAD_DIR / "framework.zip"
         downloader = CBLLibraryDownloader(
             self.product,
@@ -361,6 +376,7 @@ class CTestServer_Android(CTestServer):
         shutil.rmtree(android_lib_dir, ignore_errors=True)
         android_lib_dir.mkdir(0o755)
         unzip_directory(download_file, android_lib_dir)
+        self._mark_downloaded(android_lib_dir)
 
     def build(self) -> None:
         """

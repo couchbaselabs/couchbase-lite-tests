@@ -54,7 +54,7 @@ class TestServer : ObservableObject {
         setupRoutes()
     }
     
-    /// Implement API v1.0.0
+    /// Implement API v1.2.1 (No support for start/stop listener - 1.1.0, and dynamic dataset - 1.1.1 yet)
     private func setupRoutes() {
         app.get("", use: Handlers.getRoot)
         app.post("newSession", use: Handlers.newSession)
@@ -66,7 +66,10 @@ class TestServer : ObservableObject {
         app.post("verifyDocuments", use: Handlers.verifyDocuments)
         app.post("startReplicator", use: Handlers.startReplicator)
         app.post("getReplicatorStatus", use: Handlers.getReplicatorStatus)
+        app.post("startMultipeerReplicator", use: Handlers.startMultipeerReplicator)
+        app.post("stopMultipeerReplicator", use: Handlers.stopMultipeerReplicator)
         app.post("performMaintenance", use: Handlers.performMaintenance)
+        app.post("getMultipeerReplicatorStatus", use: Handlers.getMultipperReplicatorStatus)
         app.post("runQuery", use: Handlers.runQuery)
         app.post("startListener", use: Handlers.startListener)
         app.post("stopListener", use: Handlers.stopListener)

@@ -74,6 +74,10 @@ class SwiftTestServer(TestServer):
         header(f"Downloading CBL library {self.version}")
         version_parts = self.version.split("-")
         DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+        if self._check_downloaded(FRAMEWORKS_DIR):
+            header(f"CBL library {self.version} already downloaded")
+            return
+
         download_file = DOWNLOAD_DIR / "framework.zip"
         downloader = CBLLibraryDownloader(
             self.product,
@@ -87,6 +91,7 @@ class SwiftTestServer(TestServer):
         )
         unzip_directory(download_file, FRAMEWORKS_DIR)
         download_file.unlink()
+        self._mark_downloaded(FRAMEWORKS_DIR)
 
 
 @TestServer.register("swift_ios")
