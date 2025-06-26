@@ -4,7 +4,6 @@ pipeline {
         choice(name: 'CBL_PLATFORM', choices: ['all', 'c', 'android', 'java', 'ios', 'dotnet'], description: 'CBL Platform')
         string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'CBL Version')
         string(name: 'CBL_BUILD', defaultValue: '0', description: 'CBL Build Number, Use 0 for the latest successful build')
-        string(name: 'CBL_DATASET_VERSION', defaultValue: '4.0', description: "The dataset version to use (e.g. 3.2 or 4.0)")
         string(name: 'SGW_VERSION', defaultValue: '4.0.0', description: 'The version of Sync Gateway to use')
         booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force Triggering Test Job(s)') 
     }
@@ -45,7 +44,6 @@ pipeline {
                                 def platform = env.CBL_PLATFORM
                                 def version = params.CBL_VERSION
                                 def buildNo = params.CBL_BUILD
-                                def datasetVersion = params.CBL_DATASET_VERSION
                                 def sgwVersion = params.SGW_VERSION
                                 def force = params.FORCE_TRIGGER
                                 def sgwUrl = ""
@@ -98,12 +96,11 @@ pipeline {
                                 // Trigger Test Job:
                                 if (triggerTestJob) {
                                     def jobName = "staging-e2e-test-${platform}"
-                                    echo "Triggering '${jobName}' job for ${platform} v${version}-${buildNo} with dataset ${datasetVersion}"
+                                    echo "Triggering '${jobName}' job for ${platform} v${version}-${buildNo}"
 
                                     build job: jobName, parameters: [
                                         string(name: "CBL_VERSION", value: version),
                                         string(name: "CBL_BUILD", value: buildNo),
-                                        string(name: "CBL_DATASET_VERSION", value: datasetVersion),
                                         string(name: "SGW_URL", value: sgwUrl),
                                         string(name: "SGW_VERSION", value: sgwVersion)
                                     ], wait: false

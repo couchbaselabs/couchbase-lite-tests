@@ -1,6 +1,5 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
-    [Parameter(Mandatory=$true)][string]$DatasetVersion,
     [Parameter(Mandatory=$true)][string]$SgwVersion,
     [Parameter()][string]$PrivateKeyPath
 )
@@ -12,7 +11,7 @@ Import-Module $PSScriptRoot\..\..\shared\config.psm1 -Force
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r $AWS_ENVIRONMENT_DIR\requirements.txt
-$python_args = @("windows", $Version, $DatasetVersion, $SgwVersion)
+$python_args = @("windows", $Version, $SgwVersion)
 if ($null -ne $PrivateKeyPath) {
     $python_args += "--private_key"
     $python_args += $PrivateKeyPath

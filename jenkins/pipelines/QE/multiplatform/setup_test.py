@@ -23,7 +23,6 @@ from jenkins.pipelines.shared.setup_test import resolved_version
 
 def setup_multiplatform_test(
     platform_versions: dict,
-    dataset_version: str,
     sgw_version: str,
     private_key: str | None = None,
     couchbase_version: str = "7.6",
@@ -35,7 +34,6 @@ def setup_multiplatform_test(
 
     Args:
         platform_versions: Dict mapping platform names to their versions (e.g., {"ios": "3.1.5", "android": "3.2.3"})
-        dataset_version: CBL dataset version to use
         sgw_version: Sync Gateway version to use
         private_key: Optional SSH private key path
         couchbase_version: Couchbase Server version
@@ -93,10 +91,6 @@ def setup_multiplatform_test(
 
             # Replace template variables with actual platform versions
             for ts in topology["test_servers"]:
-                # Replace dataset version template
-                if ts.get("dataset_version") == "{{dataset_version}}":
-                    ts["dataset_version"] = dataset_version
-
                 # Replace platform-specific CBL version templates
                 platform = ts.get("platform", "")
                 if (
@@ -160,7 +154,6 @@ def parse_platform_configs(platform_configs: str) -> dict:
 
 @click.command()
 @click.argument("platform_configs")
-@click.argument("dataset_version")
 @click.argument("sgw_version")
 @click.option(
     "--private_key",
@@ -168,7 +161,6 @@ def parse_platform_configs(platform_configs: str) -> dict:
 )
 def cli_entry(
     platform_configs: str,
-    dataset_version: str,
     sgw_version: str,
     private_key: str | None,
 ) -> None:
@@ -176,7 +168,6 @@ def cli_entry(
     Setup multiplatform testing environment with platform-specific CBL versions.
 
     PLATFORM_CONFIGS: Space-separated platform specifications (e.g., "android:3.2.3 ios:3.1.5")
-    DATASET_VERSION: CBL dataset version to use
     SGW_VERSION: Sync Gateway version to use
     """
     # Parse platform versions from the configuration string
@@ -188,7 +179,6 @@ def cli_entry(
 
     setup_multiplatform_test(
         platform_versions,
-        dataset_version,
         sgw_version,
         private_key,
         setup_dir="QE",

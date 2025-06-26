@@ -4,7 +4,6 @@ pipeline {
         choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
         string(name: 'CBL_VERSION', defaultValue: '3.2.0', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
-        string(name: 'CBL_DATASET_VERSION', defaultValue: '', description: "The dataset version to use (e.g. 3.2 or 4.0)")
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
     }
     options {
@@ -16,10 +15,9 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
-                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
                     currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD}-${CBL_EDITION} (#${currentBuild.number})"
-                    currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION}"
+                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
                 }
             }
         }
@@ -62,7 +60,7 @@ pipeline {
                     steps {
                         echo "Run macOS Test"
                         timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} macos '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} macos '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                         }
                     }
                     post { 
@@ -89,7 +87,7 @@ pipeline {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "Run iOS Test"
                         timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                         }
                     }
                     post { 
@@ -113,7 +111,7 @@ pipeline {
                     steps {
                         echo "Run Android Test"
                         timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} android '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} android '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                         }
                     }
                     post { 
@@ -137,7 +135,7 @@ pipeline {
                     steps {
                         echo "Run linux Test"
                         timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} linux_x86_64 '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} linux_x86_64 '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                         }
                     }
                     post { 
@@ -157,7 +155,7 @@ pipeline {
                     }
                     steps {
                         timeout(time: 60, unit: 'MINUTES') {
-                            pwsh "jenkins\\pipelines\\dev_e2e\\c\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -Dataset ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
+                            pwsh "jenkins\\pipelines\\dev_e2e\\c\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
                         }
                     }
                     post { 

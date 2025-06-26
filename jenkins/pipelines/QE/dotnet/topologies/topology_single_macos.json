@@ -4,7 +4,6 @@
         {
             "platform": "dotnet_macos",
             "cbl_version": "{{version}}",
-            "dataset_version": "{{dataset_version}}",
             "location": "localhost"
         }
     ],

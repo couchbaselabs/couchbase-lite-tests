@@ -3,7 +3,6 @@ pipeline {
     agent none
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
-        string(name: 'CBL_DATASET_VERSION', defaultValue: '', description: "The dataset version to use")
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
     }
     stages {
@@ -11,9 +10,8 @@ pipeline {
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "java ${params.CBL_VERSION}/${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
+                    currentBuild.displayName = "java ${params.CBL_VERSION} (#${currentBuild.number})"
                 }
             }
         }
@@ -57,7 +55,7 @@ pipeline {
                     steps {
                         echo "=== Run Linux Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
                         }
                         echo "=== Linux Desktop Tests Complete"
                     }
@@ -83,7 +81,7 @@ pipeline {
                     steps {
                         echo "=== Run Linux Web Service Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/java/webservice/run_test.sh ${params.CBL_VERSION} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/QE/java/webservice/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
                         }
                         echo "=== Linux Web Service Tests Complete"
                     }

@@ -4,7 +4,6 @@
         {
             "platform": "dotnet_android",
             "cbl_version": "{{version}}",
-            "dataset_version": "{{dataset_version}}",
             "location": "1BCACS00001MX3"
         }
     ],
