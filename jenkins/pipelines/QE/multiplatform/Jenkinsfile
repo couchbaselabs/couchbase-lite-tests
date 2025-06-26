@@ -12,11 +12,6 @@ pipeline {
                         'Supported platforms: ios, android, dotnet, java, c'
         )
         string(
-            name: 'CBL_DATASET_VERSION',
-            defaultValue: '3.2',
-            description: 'CBL Dataset Version'
-        )
-        string(
             name: 'SGW_VERSION',
             defaultValue: '3.2.3',
             description: 'Sync Gateway Version'
@@ -39,10 +34,9 @@ pipeline {
             steps {
                 script {
                     if (params.PLATFORM_VERSIONS == '') { error "PLATFORM_VERSIONS is required" }
-                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
                     currentBuild.displayName = "${params.PLATFORM_VERSIONS}-${params.SGW_VERSION} (#${currentBuild.number})"
-                    currentBuild.description = "Dataset: ${params.CBL_DATASET_VERSION}"
+                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
                 }
             }
         }
@@ -50,7 +44,6 @@ pipeline {
             steps {
                 script {
                     echo "Platform Versions: ${params.PLATFORM_VERSIONS}"
-                    echo "Dataset Version: ${params.CBL_DATASET_VERSION}"
                     echo "SGW Version: ${params.SGW_VERSION}"
                     echo "Auto-fetch builds: ${!params.DISABLE_AUTO_FETCH}"
                     
@@ -148,7 +141,7 @@ pipeline {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run Multiplatform Test"
                 timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/multiplatform/test_multiplatform.sh ${params.PLATFORM_VERSIONS} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ${params.CBL_TEST_NAME}"
+                    sh "jenkins/pipelines/QE/multiplatform/test_multiplatform.sh ${params.PLATFORM_VERSIONS} ${params.SGW_VERSION} ${params.CBL_TEST_NAME}"
                 }
             }
         }

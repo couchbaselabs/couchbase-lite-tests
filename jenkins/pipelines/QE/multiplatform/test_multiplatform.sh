@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Multiplatform CBL test runner
-# Usage: ./test_multiplatform.sh "platform1:version1[-build1] platform2:version2[-build2]..." <dataset_version> <sgw_version> [test_name]
+# Usage: ./test_multiplatform.sh "platform1:version1[-build1] platform2:version2[-build2]..." <sgw_version> [test_name]
 # Examples:
-#   ./test_multiplatform.sh "android:3.2.3 ios:3.1.5" 3.2 3.2.3
-#   ./test_multiplatform.sh "android:3.2.3 ios:3.1.5" 3.2 3.2.3 "test_delta_sync.py::TestDeltaSync::test_delta_sync_replication"
+#   ./test_multiplatform.sh "android:3.2.3 ios:3.1.5" 3.2.3
+#   ./test_multiplatform.sh "android:3.2.3 ios:3.1.5" 3.2.3 "test_delta_sync.py::TestDeltaSync::test_delta_sync_replication"
 
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
@@ -41,20 +41,20 @@ function list_available_tests() {
 }
 
 function usage() {
-    echo "Usage: $0 \"platform1:version1[-build1] platform2:version2[-build2]...\" <dataset_version> <sgw_version> [test_name]"
+    echo "Usage: $0 \"platform1:version1[-build1] platform2:version2[-build2]...\" <sgw_version> [test_name]"
     echo ""
     echo "Supported platforms: android, ios, dotnet, c, java"
     echo "Private key: ${HOME}/.ssh/jborden.pem (hardcoded)"
     echo ""
     echo "Examples:"
     echo "  # Auto-fetch latest builds with default test:"
-    echo "  $0 \"android:3.2.3 ios:3.1.5\" 3.2 3.2.3"
+    echo "  $0 \"android:3.2.3 ios:3.1.5\" 3.2.3"
     echo ""
     echo "  # With specific test:"
-    echo "  $0 \"android:3.2.3 ios:3.1.5\" 3.2 3.2.3 \"test_no_conflicts.py::TestNoConflicts::test_multiple_cbls_updates_concurrently_with_push\""
+    echo "  $0 \"android:3.2.3 ios:3.1.5\" 3.2.3 \"test_no_conflicts.py::TestNoConflicts::test_multiple_cbls_updates_concurrently_with_push\""
     echo ""
     echo "  # With explicit builds:"
-    echo "  $0 \"android:3.2.3 ios:3.1.5-6\" 3.2 3.2.3"
+    echo "  $0 \"android:3.2.3 ios:3.1.5-6\" 3.2.3"
     echo ""
     echo "  # List available tests:"
     echo "  $0 --list-tests"
@@ -74,24 +74,18 @@ if [ $# -eq 1 ] && [ "$1" = "--list-tests" ]; then
     exit 0
 fi
 
-if [ $# -lt 3 ] || [ $# -gt 4 ]; then
+if [ $# -lt 2 ] || [ $# -gt 3 ]; then
     usage
 fi
 
 PLATFORM_CONFIGS="$1"
-DATASET_VERSION="$2"
-SG_VERSION="$3"
+SG_VERSION="$2"
 PRIVATE_KEY_PATH="${HOME}/.ssh/jborden.pem"
-TEST_NAME="${4:-test_delta_sync.py::TestDeltaSync::test_delta_sync_replication}"
+TEST_NAME="${3:-test_delta_sync.py::TestDeltaSync::test_delta_sync_replication}"
 
 # Validate inputs
 if [ -z "$PLATFORM_CONFIGS" ]; then
     echo "❌ Error: Platform configurations cannot be empty"
-    usage
-fi
-
-if [ -z "$DATASET_VERSION" ]; then
-    echo "❌ Error: Dataset version cannot be empty"
     usage
 fi
 
@@ -108,7 +102,6 @@ fi
 echo "🚀 MULTIPLATFORM CBL TEST SETUP"
 echo "==============================="
 echo "📋 Platform configurations: $PLATFORM_CONFIGS"
-echo "📊 Dataset version: $DATASET_VERSION"
 echo "🔄 SG version: $SG_VERSION"
 echo "🔑 Private key: $PRIVATE_KEY_PATH"
 echo "🧪 Test: $TEST_NAME"
@@ -184,7 +177,7 @@ pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
 
 # Use the centralized multiplatform setup script
 echo "🚀 Running multiplatform setup..."
-python3 setup_multiplatform.py "$PLATFORM_CONFIGS" "$DATASET_VERSION" "$SG_VERSION" --setup-only
+python3 setup_multiplatform.py "$PLATFORM_CONFIGS" "$SG_VERSION" --setup-only
 SETUP_SUCCESS=$?
 
 deactivate
