@@ -41,7 +41,6 @@ def resolved_version(product: str, version: str) -> str:
 
 def setup_test(
     cbl_version: str,
-    dataset_version: str,
     sgw_version: str,
     topology_file_in: Path,
     config_file_in: Path,
@@ -52,7 +51,7 @@ def setup_test(
     setup_dir: str = "dev_e2e",
 ) -> None:
     """
-    Sets up a testing environment with the specified CBL version, dataset version, and Sync Gateway version.
+    Sets up a testing environment with the specified CBL version and Sync Gateway version.
     """
     config_file_out = SCRIPT_DIR.parents[2] / "tests" / setup_dir / "config.json"
     topology_file_out = (
@@ -124,7 +123,6 @@ def setup_test(
         topology["tag"] = topology_tag
         for ts in topology["test_servers"]:
             ts["cbl_version"] = cbl_version
-            ts["dataset_version"] = dataset_version
 
         with open(topology_file_out, "w") as fout:
             json.dump(topology, fout, indent=4)

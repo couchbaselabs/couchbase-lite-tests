@@ -20,7 +20,6 @@ from jenkins.pipelines.shared.setup_test import setup_test
 @click.command()
 @click.argument("platform")
 @click.argument("cbl_version")
-@click.argument("dataset_version")
 @click.argument("sgw_version")
 @click.option(
     "--cbs_version",
@@ -34,14 +33,12 @@ from jenkins.pipelines.shared.setup_test import setup_test
 def cli_entry(
     platform: str,
     cbl_version: str,
-    dataset_version: str,
     sgw_version: str,
     private_key: str | None,
     cbs_version: str,
 ) -> None:
     setup_test(
         cbl_version,
-        dataset_version,
         sgw_version,
         SCRIPT_DIR / "topologies" / f"topology_single_{platform}.json",
         SCRIPT_DIR / "config_aws.json",

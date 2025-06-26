@@ -4,7 +4,6 @@
         {
             "platform": "jak_android",
             "cbl_version": "{{version}}",
-            "dataset_version": "{{dataset_version}}",
             "location": "HT79F1A00593"
         }
     ],
