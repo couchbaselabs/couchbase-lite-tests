@@ -47,6 +47,7 @@ import com.couchbase.lite.mobiletest.util.NetUtils;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
+@SuppressWarnings("PMD.CyclomaticComplexity")
 public final class DatabaseService {
     private static final String TAG = "DB_SVC";
 
@@ -183,9 +184,13 @@ public final class DatabaseService {
        return doc;
     }
 
-    public String getRevisionHistory(Document doc) {
-        try  { return doc.getRevisionHistory(); }
-        catch (CouchbaseLiteException ignore) { }
+    @NonNull
+    public String getRevisionHistory(@NonNull Document doc) {
+        try  {
+            final String revHistory = doc.getRevisionHistory();
+            if (revHistory != null) { return revHistory; }
+        }
+        catch (CouchbaseLiteException e) { Log.err(TAG, "Couldn't get revision history", e); }
         return "<unknown>";
     }
 
