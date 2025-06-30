@@ -4,7 +4,6 @@
         {
             "platform": "dotnet_ios",
             "cbl_version": "<replace-me>",
-            "dataset_version": "<replace-me>",
             "location": "<replace-me>"
         }
     ]

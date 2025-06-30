@@ -118,7 +118,7 @@
                         "default": ""
                     }
                 },
-                "required": ["location", "cbl_version", "platform", "dataset_version"],
+                "required": ["location", "cbl_version", "platform"],
                 "additionalProperties": false
             }
         },
