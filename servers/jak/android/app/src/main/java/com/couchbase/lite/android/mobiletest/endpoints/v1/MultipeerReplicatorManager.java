@@ -24,6 +24,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -39,6 +40,7 @@ import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.KeyStoreUtils;
+import com.couchbase.lite.MultipeerCertificateAuthenticator;
 import com.couchbase.lite.MultipeerCollectionConfiguration;
 import com.couchbase.lite.MultipeerReplicatorConfiguration;
 import com.couchbase.lite.MutableArray;
@@ -300,6 +302,12 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
 
         final TypedMap authSpec = config.getMap(KEY_AUTHENTICATOR);
         if (authSpec != null) { addCertificateAuthenticator(authSpec, builder); }
+        else { builder.setAuthenticator(new MultipeerCertificateAuthenticator(new MultipeerCertificateAuthenticator.AuthenticationDelegate() {
+            @Override
+            public boolean authenticate(@NonNull PeerInfo.PeerId peer, @NonNull List<X509Certificate> certs) {
+                return true;
+            }
+        })); }
 
         return builder.build();
     }
