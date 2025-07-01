@@ -6,21 +6,18 @@ function create_venv() {
         exit 1
     fi
 
+    # I've given up trying to use pip at this point
+    # It's utterly useless for system and even homebrew python
+    # installs as it just whines that I need to install packages
+    # using the system package manager.  This happens on both
+    # macOS and Linux now...
     REQUIRED_VERSION="${2:-3.10}"
-    if [[ "$(uname -s)" == "Linux" ]]; then
-        # Linux doesn't allow systemwide pip installs, and
-        # doesn't have a uv apt package so I am forced to
-        # install it like this
-        if ! command -v uv >/dev/null 2>&1; then
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            source $HOME/.local/bin/env
-        fi
-
-        uv venv --python $REQUIRED_VERSION $1
-    else
-        python3 -m pip install uv
-        python3 -m uv venv --python $REQUIRED_VERSION $1
+    if ! command -v uv >/dev/null 2>&1; then
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        source $HOME/.local/bin/env
     fi
+
+    uv venv --python $REQUIRED_VERSION $1
 
     source "$1/bin/activate"
     python -m ensurepip --upgrade
