@@ -480,7 +480,7 @@ class TopologyConfig:
                         TestServerInput(
                             raw_server["location"],
                             raw_server["cbl_version"],
-                            raw_server["dataset_version"],
+                            raw_server.get("dataset_version", "3.2"),
                             raw_server["platform"],
                             cast(bool, raw_server.get("download", False)),
                             ip_hint=raw_server.get("ip_hint"),

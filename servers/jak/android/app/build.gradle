@@ -124,12 +124,12 @@ repositories {
     else {
         maven {
             url 'https://proget.sc.couchbase.com/maven2/internalmaven'
-            content { includeGroupByRegex "com\\.couchbase\\.lite.*" }
+            content { 
+                includeGroupByRegex "com\\.couchbase\\.lite.*"
+                includeGroupByRegex "org\\.nanohttpd.*"
+            }
         }
     }
-
-    // Home of NanoHTTP
-    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
 
     google()
     mavenCentral()
