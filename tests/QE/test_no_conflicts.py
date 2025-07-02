@@ -22,7 +22,7 @@ async def update_cbl(cbl_db, doc_id, data):
         b.upsert_document("_default.posts", doc_id, data)
 
 
-@pytest.mark.min_test_servers(3)
+@pytest.mark.min_test_servers(2)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestNoConflicts(CBLTestClass):
@@ -221,9 +221,9 @@ class TestNoConflicts(CBLTestClass):
                     * Add doc in "group2"
         """)
         await asyncio.gather(
-            update_cbl(db1, "post_1000", [{"channels": "group1"}]),
-            update_cbl(db2, "post_1000", [{"channels": "group1"}]),
-            update_cbl(db3, "post_1000", [{"channels": "group2"}]),
+            update_cbl(db1, "post_1000", [{"channels": ["group1"]}]),
+            update_cbl(db2, "post_1000", [{"channels": ["group1"]}]),
+            update_cbl(db3, "post_1000", [{"channels": ["group2"]}]),
         )
 
         listener2 = Listener(db2, ["_default.posts"], 59840)
@@ -239,7 +239,7 @@ class TestNoConflicts(CBLTestClass):
         """)
         repl1 = Replicator(
             db1,
-            cblpytest.test_servers[1].replication_url("db2", 59840),
+            cblpytest.test_servers[1].replication_url("db2", 8080),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
@@ -282,13 +282,13 @@ class TestNoConflicts(CBLTestClass):
         """)
         await asyncio.gather(
             update_cbl(
-                db1, "post_1000", [{"channels": "group1", "title": "CBL1 Update 1"}]
+                db1, "post_1000", [{"channels": ["group1"], "title": "CBL1 Update 1"}]
             ),
             update_cbl(
-                db2, "post_1000", [{"channels": "group1", "title": "CBL2 Update 1"}]
+                db2, "post_1000", [{"channels": ["group1"], "title": "CBL2 Update 1"}]
             ),
             update_cbl(
-                db3, "post_1000", [{"channels": "group2", "title": "CBL3 Update 1"}]
+                db3, "post_1000", [{"channels": ["group2"], "title": "CBL3 Update 1"}]
             ),
         )
 
@@ -383,7 +383,7 @@ class TestNoConflicts(CBLTestClass):
         self.mark_test_step("Create a new doc in SG: `post_1000`.")
         await cblpytest.sync_gateways[0].update_documents(
             "posts",
-            [DocumentUpdateEntry("post_1000", None, {"channels": "group1"})],
+            [DocumentUpdateEntry("post_1000", None, {"channels": ["group1"]})],
             collection="posts",
         )
 
@@ -400,7 +400,7 @@ class TestNoConflicts(CBLTestClass):
             db1,
             cblpytest.sync_gateways[0].replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
-            replicator_type=ReplicatorType.PULL,
+            continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
         )
@@ -409,7 +409,7 @@ class TestNoConflicts(CBLTestClass):
             db2,
             cblpytest.sync_gateways[0].replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
-            replicator_type=ReplicatorType.PULL,
+            continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
         )
@@ -418,22 +418,22 @@ class TestNoConflicts(CBLTestClass):
             db3,
             cblpytest.sync_gateways[0].replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
-            replicator_type=ReplicatorType.PULL,
+            continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
         )
         await repl3.start()
 
-        self.mark_test_step("Wait until the replicators stop")
-        status = await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
+        self.mark_test_step("Wait until the replicators are idle")
+        status = await repl1.wait_for(ReplicatorActivityLevel.IDLE)
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
-        status = await repl2.wait_for(ReplicatorActivityLevel.STOPPED)
+        status = await repl2.wait_for(ReplicatorActivityLevel.IDLE)
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
-        status = await repl3.wait_for(ReplicatorActivityLevel.STOPPED)
+        status = await repl3.wait_for(ReplicatorActivityLevel.IDLE)
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
@@ -444,7 +444,7 @@ class TestNoConflicts(CBLTestClass):
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
         assert cbl1_doc.id == cbl2_doc.id == cbl3_doc.id, (
             f"Wrong document ID in CBL docs (expected 'post_1000'; \
-                got CBL1: {cbl1_doc.id}, CBL2: {cbl2_doc.id}, CBL3: {cbl3_doc.id})"
+                got CBL1: {cbl1_doc.id}, CBL2: {cbl2_doc.id}, CBL3: {cbl3_doc.id}"
         )
 
         self.mark_test_step("""
@@ -461,58 +461,21 @@ class TestNoConflicts(CBLTestClass):
                     DocumentUpdateEntry(
                         "post_1000",
                         None,
-                        {"channels": "group1", "title": "SGW Update 1"},
+                        {"channels": ["group1"], "title": "SGW Update 1"},
                     )
                 ],
                 collection="posts",
             ),
             update_cbl(
-                db1, "post_1000", [{"channels": "group1", "title": "CBL1 Update 1"}]
+                db1, "post_1000", [{"channels": ["group1"], "title": "CBL1 Update 1"}]
             ),
             update_cbl(
-                db2, "post_1000", [{"channels": "group1", "title": "CBL2 Update 1"}]
+                db2, "post_1000", [{"channels": ["group1"], "title": "CBL2 Update 1"}]
             ),
             update_cbl(
-                db3, "post_1000", [{"channels": "group1", "title": "CBL3 Update 1"}]
+                db3, "post_1000", [{"channels": ["group1"], "title": "CBL3 Update 1"}]
             ),
         )
-
-        self.mark_test_step("""
-            Start replicators for all 3 CBLs:
-                * For each CBL (DB1, DB2, DB3):
-                    * endpoint: `/posts`
-                    * collections: `_default.posts`
-                    * type: push-and-pull
-                    * continuous: true
-                    * credentials: user1/pass
-        """)
-        repl1 = Replicator(
-            db1,
-            cblpytest.sync_gateways[0].replication_url("posts"),
-            collections=[ReplicatorCollectionEntry(["_default.posts"])],
-            continuous=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
-        )
-        await repl1.start()
-        repl2 = Replicator(
-            db2,
-            cblpytest.sync_gateways[0].replication_url("posts"),
-            collections=[ReplicatorCollectionEntry(["_default.posts"])],
-            continuous=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
-        )
-        await repl2.start()
-        repl3 = Replicator(
-            db3,
-            cblpytest.sync_gateways[0].replication_url("posts"),
-            collections=[ReplicatorCollectionEntry(["_default.posts"])],
-            continuous=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
-        )
-        await repl3.start()
 
         self.mark_test_step("Wait until the replicators are idle")
         status = await repl1.wait_for(ReplicatorActivityLevel.IDLE)
@@ -558,13 +521,13 @@ class TestNoConflicts(CBLTestClass):
         """)
         await asyncio.gather(
             update_cbl(
-                db1, "post_1000", [{"channels": "group1", "title": "CBL1 Update 2"}]
+                db1, "post_1000", [{"channels": ["group1"], "title": "CBL1 Update 2"}]
             ),
             update_cbl(
-                db2, "post_1000", [{"channels": "group1", "title": "CBL2 Update 2"}]
+                db2, "post_1000", [{"channels": ["group1"], "title": "CBL2 Update 2"}]
             ),
             update_cbl(
-                db3, "post_1000", [{"channels": "group1", "title": "CBL3 Update 2"}]
+                db3, "post_1000", [{"channels": ["group1"], "title": "CBL3 Update 2"}]
             ),
         )
 
