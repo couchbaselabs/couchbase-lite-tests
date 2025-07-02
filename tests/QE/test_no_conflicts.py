@@ -22,7 +22,7 @@ async def update_cbl(cbl_db, doc_id, data):
         b.upsert_document("_default.posts", doc_id, data)
 
 
-@pytest.mark.min_test_servers(2)
+@pytest.mark.min_test_servers(3)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestNoConflicts(CBLTestClass):
