@@ -1,4 +1,5 @@
 import asyncio
+import random
 from random import randint
 
 import pytest
@@ -372,6 +373,7 @@ class TestMultipeer(CBLTestClass):
         logger.info("All multipeer replicators stopped")
         logger.info("Successfully completed test_network_partition")
 
+
     @pytest.mark.asyncio(loop_scope="session")
     async def test_scalable_conflict_resolution(self, cblpytest: CBLPyTest):
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
@@ -420,3 +422,172 @@ class TestMultipeer(CBLTestClass):
 
         self.mark_test_step("Stopping multipeer replicator on all devices")
         await asyncio.gather(*[mp.stop() for mp in multipeer_replicators])
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_dynamic_peer_addition_removal(self, cblpytest: CBLPyTest):
+        self.mark_test_step("Reset local database and load `empty` dataset on all devices")
+        reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
+        all_devices_dbs = await asyncio.gather(*reset_tasks)
+        all_dbs = [dbs[0] for dbs in all_devices_dbs]
+
+        # Ensure we have at least 6 devices
+        assert len(all_dbs) >= 6, f"Need at least 6 devices, got {len(all_dbs)}"
+
+        # Calculate device distribution
+        total_devices = len(all_dbs)
+        initial_devices = max(3, total_devices // 2)  # At least 3, up to half of total
+        additional_devices = min(3, total_devices - initial_devices)  # Up to 3 additional
+        devices_to_remove = min(2, initial_devices // 3)  # Remove 1-2 devices
+
+        # Split devices
+        initial_dbs = all_dbs[:initial_devices]
+        additional_dbs = all_dbs[initial_devices : initial_devices + additional_devices]
+
+        logger.info(
+            f"Using {len(initial_dbs)} initial devices, {len(additional_dbs)} additional devices, will remove {devices_to_remove} devices"
+        )
+
+        self.mark_test_step("Add documents to initial devices")
+
+        # Add documents to initial devices
+        for device_idx, db in enumerate(initial_dbs, 1):
+            doc_num = 1
+            async with db.batch_updater() as b:
+                for _ in range(20):  # 20 docs per device
+                    b.upsert_document(
+                        "_default._default",
+                        f"device{device_idx}-doc{doc_num}",
+                        [{"random": randint(1, 100000)}],
+                    )
+                    doc_num += 1
+
+        total_initial_docs = len(initial_dbs) * 20
+        logger.info(f"Added {total_initial_docs} documents to initial devices")
+
+        self.mark_test_step("Start multipeer replicator on initial devices")
+
+        # Start replicators on initial devices
+        initial_replicators = [
+            MultipeerReplicator(
+                "dynamic-mesh", db, [ReplicatorCollectionEntry(["_default._default"])]
+            )
+            for db in initial_dbs
+        ]
+        start_tasks = [replicator.start() for replicator in initial_replicators]
+        await asyncio.gather(*start_tasks)
+
+        logger.info(f"Started multipeer replicator on {len(initial_dbs)} initial devices")
+
+        # Wait for some initial replication progress (not all devices, just a few)
+        devices_to_wait = max(1, len(initial_dbs) // 2)  # Wait for half of initial devices
+        for i, replicator in enumerate(initial_replicators[:devices_to_wait]):
+            status = await replicator.wait_for_idle()
+            assert all(r.status.replicator_error is None for r in status.replicators), (
+                "Multipeer replicator should not have any errors"
+            )
+            logger.info(f"Initial device {i + 1} reached idle status")
+
+        logger.info(f"{devices_to_wait} initial devices reached idle status")
+
+        self.mark_test_step("Add additional devices to the mesh")
+
+        # Add documents to additional devices
+        for device_idx, db in enumerate(additional_dbs, len(initial_dbs) + 1):
+            doc_num = 1
+            async with db.batch_updater() as b:
+                for _ in range(20):  # 20 docs per device
+                    b.upsert_document(
+                        "_default._default",
+                        f"device{device_idx}-doc{doc_num}",
+                        [{"random": randint(1, 100000)}],
+                    )
+                    doc_num += 1
+
+        total_additional_docs = len(additional_dbs) * 20
+        logger.info(f"Added {total_additional_docs} documents to additional devices")
+
+        # Start replicators on additional devices
+        additional_replicators = [
+            MultipeerReplicator(
+                "dynamic-mesh", db, [ReplicatorCollectionEntry(["_default._default"])]
+            )
+            for db in additional_dbs
+        ]
+        start_tasks = [replicator.start() for replicator in additional_replicators]
+        await asyncio.gather(*start_tasks)
+
+        logger.info(f"Started multipeer replicator on {len(additional_dbs)} additional devices")
+
+        # Wait a short time for replication to start, then remove devices
+        await asyncio.sleep(2)  # Give replication a moment to begin
+
+        self.mark_test_step(
+            f"Remove {devices_to_remove} random devices from the mesh while replication is active"
+        )
+
+        # Randomly select devices to remove (mix of initial and additional devices)
+        all_replicators = initial_replicators + additional_replicators
+        devices_to_remove_indices = random.sample(range(len(all_replicators)), devices_to_remove)
+        devices_to_remove_indices.sort(reverse=True)  # Remove from highest index first
+
+        removed_replicators = []
+        remaining_replicators = []
+        remaining_dbs = []
+
+        for i, replicator in enumerate(all_replicators):
+            if i in devices_to_remove_indices:
+                removed_replicators.append(replicator)
+                logger.info(f"Selected device {i + 1} for removal during active replication")
+            else:
+                remaining_replicators.append(replicator)
+                remaining_dbs.append(all_dbs[i])
+
+        # Stop the selected replicators while replication is still happening
+        await asyncio.gather(*[replicator.stop() for replicator in removed_replicators])
+
+        logger.info(
+            f"Removed {len(removed_replicators)} devices from the mesh during active replication"
+        )
+
+        self.mark_test_step("Wait for remaining devices to stabilize after removal")
+
+        # Wait for remaining devices to reach idle
+        for i, replicator in enumerate(remaining_replicators):
+            status = await replicator.wait_for_idle()
+            assert all(r.status.replicator_error is None for r in status.replicators), (
+                "Multipeer replicator should not have any errors"
+            )
+            logger.info(f"Remaining device {i + 1} reached idle status")
+
+        logger.info(f"All {len(remaining_replicators)} remaining devices reached idle status")
+
+        self.mark_test_step("Verify remaining devices achieve full data consistency")
+
+        # Check all remaining devices have all documents
+        all_docs_results = await asyncio.gather(
+            *[db.get_all_documents("_default._default") for db in remaining_dbs]
+        )
+        total_expected_docs = total_initial_docs + total_additional_docs
+
+        for i, docs in enumerate(all_docs_results):
+            actual_count = len(docs["_default._default"])
+            assert actual_count == total_expected_docs, (
+                f"Device {i + 1} should have {total_expected_docs} docs, got {actual_count}"
+            )
+            logger.info(f"Device {i + 1} has {actual_count} documents")
+
+        # Verify all devices have identical content
+        for i, docs in enumerate(all_docs_results[1:], 2):
+            assert compare_doc_results_p2p(
+                all_docs_results[0]["_default._default"], docs["_default._default"]
+            ), f"Device {i} should have the same content as device 1"
+
+        logger.info(
+            f"Verified all {len(remaining_replicators)} remaining devices have {total_expected_docs} documents with identical content"
+        )
+
+        # Cleanup remaining replicators
+        await asyncio.gather(*[replicator.stop() for replicator in remaining_replicators])
+
+        logger.info("All remaining multipeer replicators stopped")
+        logger.info("Successfully completed test_dynamic_peer_addition_removal")
