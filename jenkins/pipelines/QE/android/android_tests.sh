@@ -2,7 +2,7 @@
 # Build the Android test server, deploy it, and run the tests
 
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
-set -eu # No pipefail because piping yes always "fails" with SIGPIPE
+set -eu
 
 BUILD_TOOLS_VERSION='34.0.0'
 SDK_MGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
@@ -37,9 +37,11 @@ done
 STATUS=0
 
 echo "Install Android SDK"
-yes | ${SDK_MGR} --channel=1 --licenses > /dev/null 2>&1
+yes | ${SDK_MGR} --channel=1 --licenses
 ${SDK_MGR} --channel=1 --install "build-tools;${BUILD_TOOLS_VERSION}"
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
+
+echo "Setup backend..."
 
 create_venv venv
 source venv/bin/activate
@@ -62,12 +64,13 @@ pushd $SCRIPT_DIR
 python3 logcat.py &
 echo $! > logcat.pid
 
+# Run Tests
+echo "Run tests..."
 pushd $QE_TESTS_DIR > /dev/null
-rm -rf venv http_log testserver.log
 create_venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-echo "Run the tests"
 adb shell input keyevent KEYCODE_WAKEUP
-pytest --maxfail=7 -W ignore::DeprecationWarning --config
+pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
+deactivate
+popd > /dev/null
