@@ -64,11 +64,61 @@ struct ReplicationConflictResolverFactory {
         }
     }
     
+    struct MergeDictResolver : AnyConflictResolver {
+        let property: String
+        
+        func resolve(peerID: PeerID?, conflict: Conflict) -> Document? {
+            if conflict.localDocument == nil || conflict.remoteDocument == nil {
+                return nil
+            }
+            
+            let doc = conflict.remoteDocument!.toMutable()
+            
+            guard let localDict = conflict.localDocument!.dictionary(forKey: property) else {
+                return doc.setString("Both values are not dictionary", forKey: property)
+            }
+            
+            guard let remoteDict = conflict.remoteDocument!.dictionary(forKey: property) else {
+                return doc.setString("Both values are not dictionary", forKey: property)
+            }
+            
+            let mergedDict = MutableDictionaryObject()
+            
+            for key in localDict {
+                mergedDict.setValue(localDict.value(forKey: key), forKey: key)
+            }
+            
+            for key in remoteDict {
+                let remoteValue = remoteDict.value(forKey: key)!
+                if let curValue = mergedDict.value(forKey: key) {
+                    if !isEquals(curValue, remoteValue) {
+                        return doc.setString("Conflicting values found at key named '\(key)'", forKey: property)
+                    }
+                }
+                mergedDict.setValue(remoteValue, forKey: key)
+            }
+            
+            return doc.setValue(mergedDict, forKey: property)
+        }
+        
+        private func isEquals(_ lhs: Any, _ rhs: Any) -> Bool {
+            switch (lhs, rhs) {
+            case let (l as String, r as String): return l == r
+            case let (l as NSNumber, r as NSNumber): return l == r
+            case let (l as DictionaryObject, r as DictionaryObject): return l == r
+            case let (l as ArrayObject, r as ArrayObject): return l == r
+            case let (l as Blob, r as Blob): return l == r
+            default: return false
+            }
+        }
+    }
+    
     private enum ConflictResolverType : String {
         case localWins = "local-wins"
         case removeWins = "remote-wins"
         case delete = "delete"
         case merge = "merge"
+        case mergeDict = "merge-dict"
     }
     
     static func getResolver(
@@ -90,6 +140,11 @@ struct ReplicationConflictResolverFactory {
                 throw TestServerError.badRequest("The property parameter is missing for the merge conflict resolver")
             }
             return ConflictResolver(MergeResolver(property: property))
+        case .mergeDict:
+            guard let property = params?["property"]?.value as? String else {
+                throw TestServerError.badRequest("The property parameter is missing for the merge-dict conflict resolver")
+            }
+            return ConflictResolver(MergeDictResolver(property: property))
         }
     }
 }
