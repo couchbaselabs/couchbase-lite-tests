@@ -6,8 +6,9 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.multipeer_replicator import MultipeerReplicator
-from cbltest.api.replicator_types import ReplicatorCollectionEntry
+from cbltest.api.replicator_types import (ReplicatorCollectionEntry, ReplicatorConflictResolver)
 from cbltest.api.test_functions import compare_doc_results_p2p
+from cbltest.api.database_types import DocumentEntry
 
 import logging
 
@@ -447,7 +448,8 @@ class TestMultipeer(CBLTestClass):
         """)
         for idx, db in enumerate(all_dbs):
             device_key = f"device{idx + 1}"
-            await db.upsert_document("_default._default","conflict1",{"counter": {device_key:1}})
+            async with db.batch_updater() as b:
+                await b.upsert_document("_default._default", "conflict1", [{"counter": {device_key: 1}}])
 
         self.mark_test_step("Start multipeer replication with merge conflict resolver")
 
@@ -455,7 +457,9 @@ class TestMultipeer(CBLTestClass):
             MultipeerReplicator(
                 "couchtest",
                 db,
-                ReplicatorCollectionEntry(["_default._default"],conflict_resolver= ReplicatorConflictResolver("merge", {"property": "counter"})),
+                [ReplicatorCollectionEntry(["_default._default"], conflict_resolver=ReplicatorConflictResolver("merge",
+                                                                                                               {
+                                                                                                                   "property": "counter"}))],
             )
             for db in all_dbs
         ]
@@ -469,14 +473,16 @@ class TestMultipeer(CBLTestClass):
 
         self.mark_test_step("Verify conflict1 is resolved identically on all devices with 15 device keys")
         results = await asyncio.gather(
-            *[db.get_document("_default._default", "conflict1") for db in all_dbs]
+            *[db.get_document(DocumentEntry("_default._default", "conflict1")) for db in all_dbs]
         )
         expected_keys = {f"device{i + 1}" for i in range(len(all_dbs))}
         for doc in results:
-            counter = doc["conflict1"]["counter"]
-            assert set(counter.keys()) == expected_keys, "All 15 device keys must be present"
+            counter = doc.body["counter"]
+            print(counter)
+        for doc in results:
+            assert set(counter.keys()) == expected_keys, "All device keys must be present"
             assert all(value == 1 for value in counter.values()), "Each key's value must be 1"
-            assert results[0]["_rev"]==doc["_rev"], f"revision IDs dont match for {doc}"
+            assert results[0]["_rev"] == doc["_rev"], f"revision IDs dont match for {doc}"
 
         self.mark_test_step("Stopping multipeer replicator on all devices")
         await asyncio.gather(*[mp.stop() for mp in multipeer_replicators])
