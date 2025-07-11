@@ -46,6 +46,9 @@ info:
       ```
 
     Changes
+    2.0.1 (07/10/2025)
+    * Add Merge-Dict Conflict Resolver
+
     2.0.0 (06/13/2025)
     * This is a breaking change: CBLTest-API-Version is now "2"
     * deprecate dataset_version
