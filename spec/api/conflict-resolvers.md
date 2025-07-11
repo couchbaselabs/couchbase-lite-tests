@@ -46,11 +46,11 @@ Performs a merge of the specified dictionary property by combining the two dicti
 
 * If one of the values is not a dictionary, the merged value will be set as:
     ```
-    {property: "Both values are not dictionary"}
+    {"error": "Both values are not dictionary"}
     ```
 * For any duplicated keys, the values must be the same, otherwise, the merged value will be set as:
     ```
-    {property: "Conflicting values found at key named 'key-name'"}
+    {"error": "Conflicting values found at key named 'key-name'"}
     ```
 
 **name** : `merge-dict`

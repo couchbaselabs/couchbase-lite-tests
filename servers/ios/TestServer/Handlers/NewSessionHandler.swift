@@ -32,9 +32,9 @@ extension Handlers {
             
             let remoteLogger = RemoteLogger(url: url, headers: headers)
             try remoteLogger.connect(timeout: 10)
-            Log.useCustomLogger(remoteLogger)
+            Log.useRemoteLogger(remoteLogger)
         } else {
-            Log.useDefaultLogger()
+            Log.useConsoleLogger()
         }
         
         return Response(status: .ok)
