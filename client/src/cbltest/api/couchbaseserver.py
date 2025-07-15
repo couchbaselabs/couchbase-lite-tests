@@ -176,3 +176,36 @@ class CouchbaseServer:
                 pass
 
             return list(dict(result) for result in query_obj.execute())
+    def upsert_document(
+        self,
+        bucket: str,
+        doc_id: str,
+        document: dict,
+        scope: str= "_default",
+        collection: str= "_default",
+    ) -> None:
+        """
+        Inserts a document into the specified bucket.scope.collection.
+
+        :param bucket: The bucket name.
+        :param scope: The scope name.
+        :param collection: The collection name.
+        :param doc_id: The document ID.
+        :param document: The document content (a dictionary).
+        """
+        with self.__tracer.start_as_current_span("insert_document",
+            attributes={
+                "cbl.bucket.name": bucket,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id
+            },
+        ):
+            try:
+                bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
+                coll = bucket_obj.scope(scope).collection(collection)
+                coll.upsert(doc_id, document)
+            except Exception as e:
+                raise CblTestError(
+                    f"Failed to insert document '{doc_id}' into {bucket}.{scope}.{collection}: {e}"
+                )
