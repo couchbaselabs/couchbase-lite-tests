@@ -54,7 +54,7 @@ class TestServer : ObservableObject {
         setupRoutes()
     }
     
-    /// Implement API v1.2.1 (No support for start/stop listener - 1.1.0, and dynamic dataset - 1.1.1 yet)
+    /// Implement API v1.2.1 + Merge-Dict Conflict Resolver defined in 2.0.1.
     private func setupRoutes() {
         app.get("", use: Handlers.getRoot)
         app.post("newSession", use: Handlers.newSession)
