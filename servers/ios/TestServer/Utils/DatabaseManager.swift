@@ -571,7 +571,7 @@ class DatabaseManager {
         
         let fm = FileManager()
         
-        let extractedDatasetDir = URL(filePath: databaseDirectory)
+        let extractedDatasetDir = URL(fileURLWithPath: databaseDirectory)
             .appendingPathComponent(kDatasetExtractedDirectory)
         
         let extractedDatasetPath = extractedDatasetDir
@@ -606,7 +606,7 @@ class DatabaseManager {
     }
     
     private func downloadDatasetFileIfNecessary(relativePath: String) throws -> URL {
-        let datasetPath = URL(filePath: databaseDirectory)
+        let datasetPath = URL(fileURLWithPath: databaseDirectory)
             .appendingPathComponent(kDatasetDownloadDirectory)
             .appendingPathComponent(relativePath)
         

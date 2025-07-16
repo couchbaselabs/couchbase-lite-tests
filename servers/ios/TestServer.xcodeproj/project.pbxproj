@@ -11,7 +11,6 @@
 		404619D02CB9A761003835C7 /* NewSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619CF2CB9A761003835C7 /* NewSession.swift */; };
 		404619D22CB9A985003835C7 /* NewSessionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619D12CB9A985003835C7 /* NewSessionHandler.swift */; };
 		4055CAA02CDC33A400EDD0CB /* IPAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4055CA9F2CDC33A400EDD0CB /* IPAddress.swift */; };
-		409F45302DFA7BC900BB7851 /* FileDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F452F2DFA7BC900BB7851 /* FileDownloader.swift */; };
 		409F43F82DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F43F72DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift */; };
 		409F43FC2DEA373E00BB7851 /* StartMultipeerReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F43FB2DEA373E00BB7851 /* StartMultipeerReplicator.swift */; };
 		409F44002DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F43FF2DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift */; };
@@ -20,6 +19,7 @@
 		409F442C2DEE228300BB7851 /* MultipeerReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F442B2DEE228300BB7851 /* MultipeerReplicatorStatus.swift */; };
 		409F443D2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F443C2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift */; };
 		409F443F2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F443E2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift */; };
+		409F45302DFA7BC900BB7851 /* FileDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F452F2DFA7BC900BB7851 /* FileDownloader.swift */; };
 		40AA34992CAF5D20004F4D08 /* StopReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34982CAF5D20004F4D08 /* StopReplicator.swift */; };
 		40AA349D2CAF6755004F4D08 /* CollectionSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */; };
 		40AA34A12CAF6BE4004F4D08 /* ReplicationConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A02CAF6BE4004F4D08 /* ReplicationConflictResolver.swift */; };
@@ -108,7 +108,6 @@
 		404619CF2CB9A761003835C7 /* NewSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSession.swift; sourceTree = "<group>"; };
 		404619D12CB9A985003835C7 /* NewSessionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionHandler.swift; sourceTree = "<group>"; };
 		4055CA9F2CDC33A400EDD0CB /* IPAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPAddress.swift; sourceTree = "<group>"; };
-		409F452F2DFA7BC900BB7851 /* FileDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDownloader.swift; sourceTree = "<group>"; };
 		409F43F72DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartMultipeerReplicatorRequest.swift; sourceTree = "<group>"; };
 		409F43FB2DEA373E00BB7851 /* StartMultipeerReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartMultipeerReplicator.swift; sourceTree = "<group>"; };
 		409F43FF2DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorConfiguration.swift; sourceTree = "<group>"; };
@@ -117,6 +116,7 @@
 		409F442B2DEE228300BB7851 /* MultipeerReplicatorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorStatus.swift; sourceTree = "<group>"; };
 		409F443C2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorCAAuthenticator.swift; sourceTree = "<group>"; };
 		409F443E2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorIdentity.swift; sourceTree = "<group>"; };
+		409F452F2DFA7BC900BB7851 /* FileDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDownloader.swift; sourceTree = "<group>"; };
 		40A219D62CDC3E790038204C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		40AA34982CAF5D20004F4D08 /* StopReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopReplicator.swift; sourceTree = "<group>"; };
 		40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionSpec.swift; sourceTree = "<group>"; };
@@ -677,7 +677,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -709,7 +709,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

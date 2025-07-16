@@ -41,7 +41,12 @@ class SessionManager {
             sessions.removeAll()
             
             let dir = try createSessionDirectory(for: id)
-            let manager = DatabaseManager(directory: dir.path(), datasetVersion: datasetVersion)
+            let manager: DatabaseManager
+            if #available(iOS 16.0, *) {
+                manager = DatabaseManager(directory: dir.path(), datasetVersion: datasetVersion)
+            } else {
+                manager = DatabaseManager(directory: dir.path, datasetVersion: datasetVersion)
+            }
             
             // Using shared Database manager at least for now.
             let session = Session(id: id, databaseManager: manager, sessionManager: self)
