@@ -444,12 +444,12 @@ class TestMultipeer(CBLTestClass):
 
         self.mark_test_step("""
             Insert conflict1 on each device with its unique key in 'counter':
-            {"counter": {"deviceX": 1}}
+            {"counter": {"deviceX": X}}
         """)
         for idx, db in enumerate(all_dbs):
             device_key = f"device{idx + 1}"
             async with db.batch_updater() as b:
-                await b.upsert_document("_default._default", "conflict1", [{"counter": {device_key: 1}}])
+                await b.upsert_document("_default._default", "conflict1", [{"counter": {device_key: idx}}])
 
         self.mark_test_step("Start multipeer replication with merge conflict resolver")
 
@@ -457,7 +457,7 @@ class TestMultipeer(CBLTestClass):
             MultipeerReplicator(
                 "couchtest",
                 db,
-                [ReplicatorCollectionEntry(["_default._default"], conflict_resolver=ReplicatorConflictResolver("merge",
+                [ReplicatorCollectionEntry(["_default._default"], conflict_resolver=ReplicatorConflictResolver("merge-dict",
                                                                                                                {
                                                                                                                    "property": "counter"}))],
             )
