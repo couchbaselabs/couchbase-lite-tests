@@ -83,7 +83,7 @@ class MultipeerReplicator:
         self.__database = database
         self.__authenticator = authenticator
         self.__identity = (
-            identity if identity is not None else create_leaf_certificate("anonymous")
+            identity if identity is not None else create_leaf_certificate(f"Test Server {self.__index}")
         )
         assert len(collections) > 0, "At least one collection is required"
         self.__collections = collections
