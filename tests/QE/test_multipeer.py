@@ -655,3 +655,71 @@ class TestMultipeer(CBLTestClass):
 
         logger.info("All remaining multipeer replicators stopped")
         logger.info("Successfully completed test_dynamic_peer_addition_removal")
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_large_document_replication(self, cblpytest: CBLPyTest):
+        self.mark_test_step("Reset local database and load `empty` dataset on all devices")
+
+        reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
+        all_devices_dbs = await asyncio.gather(*reset_tasks)
+        all_dbs = [dbs[0] for dbs in all_devices_dbs]
+
+        logger.info("Created databases on all devices")
+
+        self.mark_test_step("Add 10 large documents with xl1.jpg blob to the database on device 1")
+        db1 = all_dbs[0]
+
+        async with db1.batch_updater() as b:
+            for i in range(1, 11):  # Add 10 documents
+                b.upsert_document(
+                    "_default._default",
+                    f"large_doc{i}",
+                    new_blobs={"image": "xl1.jpg"}
+                )
+
+        logger.info("Added 10 large documents with xl1.jpg blob")
+
+        self.mark_test_step("Start multipeer replicator on all devices")
+        multipeer_replicators = [
+            MultipeerReplicator(
+                "large-doc-mesh", db, [ReplicatorCollectionEntry(["_default._default"])]
+            )
+            for db in all_dbs
+        ]
+        
+        mpstart_tasks = [multipeer.start() for multipeer in multipeer_replicators]
+        await asyncio.gather(*mpstart_tasks)
+
+        logger.info("Started multipeer replicator on all devices")
+
+        self.mark_test_step("Wait for idle status on all devices")
+        for device_idx, multipeer in enumerate(multipeer_replicators[1:], 2):
+            status = await multipeer.wait_for_idle()
+            assert all(r.status.replicator_error is None for r in status.replicators), (
+                "Multipeer replicator should not have any errors"
+            )
+            logger.info(f"Device {device_idx} reached idle status")
+
+        self.mark_test_step("Check that all device databases have the same content")
+
+        all_docs_collection = [
+            db.get_all_documents("_default._default") for db in all_dbs
+        ]
+        all_docs_results = await asyncio.gather(*all_docs_collection)
+        
+        # Verify document count on each device
+        for device_idx, docs in enumerate(all_docs_results, 1):
+            doc_count = len(docs["_default._default"])
+            assert doc_count == 10, f"Device {device_idx} should have 10 docs, got {doc_count}"
+            logger.info(f"Device {device_idx} has {doc_count} documents")
+
+        # Verify content matches across all devices
+        for device_idx, docs in enumerate(all_docs_results[1:], 2):
+            assert compare_doc_results_p2p(
+                all_docs_results[0]["_default._default"], docs["_default._default"]
+            ), f"Device {device_idx} content does not match device 1"
+
+        await asyncio.gather(*[multipeer.stop() for multipeer in multipeer_replicators])
+
+        logger.info("All multipeer replicators stopped")
+        logger.info("Successfully completed test_large_document_replication")
