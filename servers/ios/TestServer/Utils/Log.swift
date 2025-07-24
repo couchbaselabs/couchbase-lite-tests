@@ -40,19 +40,45 @@ public class Log {
     }
     
     public static func log(level: LogLevel, message: String) {
+        if(shouldFilter(level: level, domain: nil, message: message)) {
+            return
+        }
+        
         sLogQueue.async {
             sLogger.log(level: level, domain: "TS", message: message)
         }
     }
     
     public static func logToConsole(level: LogLevel,  message: String) {
+        if(shouldFilter(level: level, domain: nil, message: message)) {
+            return
+        }
+        
         sConsoleLogger.log(level: level, domain: "TS", message: message)
     }
     
     fileprivate static func log(level: LogLevel, domain: LogDomain, message: String) {
+        if(shouldFilter(level: level, domain: domain, message: message)) {
+            return
+        }
+        
         sLogQueue.async {
             sLogger.log(level: level, domain: domain.name, message: message)
         }
+    }
+    
+    private static func shouldFilter(level: LogLevel, domain: LogDomain?, message: String) -> Bool {
+        #if !INCLUDE_DEBUG
+        if(level == .debug) {
+            return true
+        }
+        #endif
+        
+        if(message.contains("mbedTLS(S)")) {
+            return true;
+        }
+        
+        return false
     }
 }
 
@@ -138,7 +164,7 @@ public class RemoteLogger: LoggerProtocol {
         lock.lock()
         defer { lock.unlock() }
         
-        let msg = "[\(level.osLogType)] \(domain): \(message)"
+        let msg = "[\(level.osLogType.stringValue)] \(domain): \(message)"
         webSocketTask?.send(URLSessionWebSocketTask.Message.string(msg)) { error in
             if let error = error {
                 Log.logToConsole(level: .error, message: "RemoteLogger: Cannot Send Log Message: \(error)")
@@ -163,7 +189,10 @@ extension LogLevel {
         case .info: return .info
         case .warning: return .error
         case .error: return .error
-        default: return .info
+        case .none:
+            fatalError(".none is not convertible to an OSLogType.")
+        @unknown default:
+            fatalError("Unknown LogLevel case: \(self). Please add explicit handling for this case.")
         }
     }
 }
@@ -175,7 +204,24 @@ extension LogDomain {
         case .query: return "query"
         case .replicator: return "replicator"
         case .network: return "network"
-        default: return self.rawValue == 16 ? "listener" : "database"
+        case .listener: return "listener"
+        case .peerDiscovery: return "discovery"
+        case .multipeer: return "multipeer"
+        @unknown default:
+            fatalError("Unknown LogDomain case : \(self). Please add explicit handling for this case.")
+        }
+    }
+}
+
+extension OSLogType {
+    var stringValue: String {
+        switch self {
+        case .debug: return "DEBUG"
+        case .info: return "INFO"
+        case .default: return "DEFAULT"
+        case .error: return "ERROR"
+        case .fault: return "FAULT"
+        default: return "UNKNOWN"
         }
     }
 }
