@@ -10,7 +10,7 @@ import os
 import CouchbaseLiteSwift
 
 public protocol LoggerProtocol {
-    func writeLog(level: LogLevel, domain: String, message: String)
+    func log(level: LogLevel, domain: String, message: String)
     func close()
 }
 
@@ -22,8 +22,7 @@ public class Log {
     private init () { }
     
     public static func initialize() {
-        let logSink = CustomLogger()
-        LogSinks.custom = CustomLogSink(level: .verbose, logSink: logSink)
+        Database.log.custom = CBLLogger(level: .verbose)
     }
         
     public static func useDefaultLogger() {
@@ -41,37 +40,64 @@ public class Log {
     }
     
     public static func log(level: LogLevel, message: String) {
+        if(shouldFilter(level: level, domain: nil, message: message)) {
+            return
+        }
+        
         sLogQueue.async {
-            sLogger.writeLog(level: level, domain: "TS", message: message)
+            sLogger.log(level: level, domain: "TS", message: message)
         }
     }
     
     public static func logToConsole(level: LogLevel,  message: String) {
-        sConsoleLogger.writeLog(level: level, domain: "TS", message: message)
+        if(shouldFilter(level: level, domain: nil, message: message)) {
+            return
+        }
+        
+        sConsoleLogger.log(level: level, domain: "TS", message: message)
     }
     
-    fileprivate static func writeLog(level: LogLevel, domain: LogDomain, message: String) {
-        sLogQueue.async {
-            sLogger.writeLog(level: level, domain: domain.name, message: message)
+    fileprivate static func log(level: LogLevel, domain: LogDomain, message: String) {
+        if(shouldFilter(level: level, domain: domain, message: message)) {
+            return
         }
+        
+        sLogQueue.async {
+            sLogger.log(level: level, domain: domain.name, message: message)
+        }
+    }
+    
+    private static func shouldFilter(level: LogLevel, domain: LogDomain?, message: String) -> Bool {
+        #if !INCLUDE_DEBUG
+        if(level == .debug) {
+            return true
+        }
+        #endif
+        
+        if(message.contains("mbedTLS(S)")) {
+            return true;
+        }
+        
+        return false
     }
 }
 
-private class CustomLogger : LogSinkProtocol {
-    var lines: [String] = []
-    private let queue = DispatchQueue(label: "CustomLogger.lines.queue")
+private class CBLLogger : CouchbaseLiteSwift.Logger {
+    let level: LogLevel
     
-    func writeLog(level: LogLevel, domain: LogDomain, message: String) {
-        queue.async {
-            self.lines.append(message)
-        }
+    init(level: LogLevel) {
+        self.level = level
+    }
+    
+    func log(level: CouchbaseLiteSwift.LogLevel, domain: LogDomain, message: String) {
+        Log.log(level: level, domain: domain, message: message)
     }
 }
 
 private class ConsoleLogger: LoggerProtocol {
     let logger = os.Logger()
     
-    func writeLog(level: LogLevel, domain: String, message: String) {
+    func log(level: LogLevel, domain: String, message: String) {
         logger.log(level: level.osLogType, "[\(domain)] \(message)")
     }
 
@@ -134,11 +160,11 @@ public class RemoteLogger: LoggerProtocol {
         }
     }
     
-    public func writeLog(level: LogLevel, domain: String, message: String) {
+    public func log(level: LogLevel, domain: String, message: String) {
         lock.lock()
         defer { lock.unlock() }
         
-        let msg = "[\(level.osLogType)] \(domain): \(message)"
+        let msg = "[\(level.osLogType.stringValue)] \(domain): \(message)"
         webSocketTask?.send(URLSessionWebSocketTask.Message.string(msg)) { error in
             if let error = error {
                 Log.logToConsole(level: .error, message: "RemoteLogger: Cannot Send Log Message: \(error)")
@@ -163,7 +189,10 @@ extension LogLevel {
         case .info: return .info
         case .warning: return .error
         case .error: return .error
-        default: return .info
+        case .none:
+            fatalError(".none is not convertible to an OSLogType.")
+        @unknown default:
+            fatalError("Unknown LogLevel case: \(self). Please add explicit handling for this case.")
         }
     }
 }
@@ -175,7 +204,24 @@ extension LogDomain {
         case .query: return "query"
         case .replicator: return "replicator"
         case .network: return "network"
-        default: return self.rawValue == 16 ? "listener" : "database"
+        case .listener: return "listener"
+        case .peerDiscovery: return "discovery"
+        case .multipeer: return "multipeer"
+        @unknown default:
+            fatalError("Unknown LogDomain case : \(self). Please add explicit handling for this case.")
+        }
+    }
+}
+
+extension OSLogType {
+    var stringValue: String {
+        switch self {
+        case .debug: return "DEBUG"
+        case .info: return "INFO"
+        case .default: return "DEFAULT"
+        case .error: return "ERROR"
+        case .fault: return "FAULT"
+        default: return "UNKNOWN"
         }
     }
 }

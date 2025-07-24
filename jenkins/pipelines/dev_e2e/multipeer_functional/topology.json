@@ -4,26 +4,22 @@
         {
             "platform": "jak_android",
             "cbl_version": "{{version}}",
-            "location": "1BCACS00001MX3",
-            "download": true
+            "location": "1BCACS00001MX3"
         },
         {
             "platform": "swift_ios",
             "cbl_version": "{{version}}",
-            "location": "00008110-000A48A63E10401E",
-            "download": true
+            "location": "00008110-000A48A63E10401E"
         },
         {
             "platform": "jak_android",
             "cbl_version": "{{version}}",
-            "location": "RFCY217B0CA",
-            "download": true
+            "location": "RFCY217B0CA"
         },
         {
             "platform": "swift_ios",
             "cbl_version": "{{version}}",
-            "location": "422841e97a85afc19bc869f216a5a81db9903ea6",
-            "download": true
+            "location": "422841e97a85afc19bc869f216a5a81db9903ea6"
         }
     ]
 } 
