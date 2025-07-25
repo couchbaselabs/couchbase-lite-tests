@@ -40,7 +40,10 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     yield
 
     test_server_info = await cblpytest.test_servers[0].get_info()
-    sgw_version = await cblpytest.sync_gateways[0].get_version()
+    sgw_version: str = "n/a"
+    if len(cblpytest.sync_gateways) > 0:
+        sgw_version_parts = await cblpytest.sync_gateways[0].get_version()
+        sgw_version = f"{sgw_version_parts.version}-{sgw_version_parts.build_number}"
     os_name = (
         test_server_info.device["systemName"]
         if "systemName" in test_server_info.device
@@ -50,7 +53,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
         test_server_info.cbl,
         os_name,
         test_server_info.library_version,
-        f"{sgw_version.version}-{sgw_version.build_number}",
+        sgw_version
     )
     pytestconfig.pluginmanager.unregister(uploader)
 

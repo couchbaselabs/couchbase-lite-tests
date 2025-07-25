@@ -1,0 +1,85 @@
+pipeline {
+    agent none
+    parameters {
+        string(
+            name: 'CBL_VERSION',
+            defaultValue: '3.3.0',
+            description: 'The version of the library to use on all platforms'
+        )
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    currentBuild.displayName = "${params.CBL_VERSION} (#${currentBuild.number})"
+                }
+            }
+        }
+        stage('Prebuild Servers') {
+            steps {
+                script {
+                    // Parse platform versions to determine which test servers to prebuild
+                    def platformSpecs = params.PLATFORM_VERSIONS.split(' ')
+                    def platformsToBuild = ["swift_ios", "jak_android"]
+                    
+                    // Build all required test server platforms in parallel
+                    def parallelBuilds = [:]
+                    platformsToBuild.each { platform ->
+                        parallelBuilds[platform] = {
+                            // For multiplatform, we'll use a generic version since each platform may have different versions
+                            // The actual version assignment happens during test setup
+                            build job: 'prebuild-test-server',
+                            parameters: [
+                                string(name: 'TS_PLATFORM', value: platform),
+                                string(name: 'CBL_VERSION', value: ${params.CBL_VERSION}), // Generic version for prebuild
+                            ],
+                            wait: true,
+                            propagate: true
+                        }
+                    }
+                    
+                    if (parallelBuilds.size() > 0) {
+                        parallel parallelBuilds
+                    } else {
+                        echo "No test servers to prebuild"
+                    }
+                }
+            }
+        }
+        stage('Setup and Run Tests') {
+            agent { label 'mob-e2e-mac-01' }
+            options {
+                lock("mob-e2e-iphone-01")
+                lock("mob-e2e-iphone-02")
+                lock("mob-e2e-android-01")
+                lock("mob-e2e-android-02")
+            }
+            environment { 
+                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
+            }
+            steps {
+                // Unlock keychain:
+                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                timeout(time: 60, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/dev_e2e/multipeer_functional/test.sh 3.2.3 --global-version ${params.CBL_VERSION}"
+                }
+            }
+
+            post { 
+                always { 
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh 'jenkins/pipelines/dev_e2e/multipeer_functional/teardown.sh'
+                    }
+                    archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "jim.borden@couchbase.com";
+        }
+    }
+} 
