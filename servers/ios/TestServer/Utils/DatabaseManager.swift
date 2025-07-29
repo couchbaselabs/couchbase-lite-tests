@@ -268,7 +268,7 @@ class DatabaseManager {
                 return
             }
             
-            var docs: [ContentTypes.DocumentReplication] = replicatorDocuments[replID] ?? []
+            let docs: [ContentTypes.DocumentReplication] = replicatorDocuments[replID] ?? []
             
             replicatorDocuments[replID] = [] // Reset after return per spec
             
@@ -360,7 +360,7 @@ class DatabaseManager {
         var status: ContentTypes.MultipeerReplicatorStatus?
         
         listenerQueue.sync {
-            guard let repl = multipeerReplicators[id] else {
+            if multipeerReplicators[id] == nil {
                 Log.log(level: .debug, message: "Failed to get MultipeerReplicator Status, MultipeerReplicator with ID \(id) not found.")
                 return
             }
@@ -368,12 +368,14 @@ class DatabaseManager {
             var replicators: [ContentTypes.PeerReplicatorStatus] = []
             
             if let statuses = peerReplicatorStatus[id] {
-                statuses.forEach { peerID, status in
+                for (peerID, status) in statuses {
                     let docs = peerReplicatorDocuments[id]?[peerID] ?? []
                     let replStatus = ContentTypes.ReplicatorStatus.init(status: status, docs: docs)
                     replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus))
                     peerReplicatorDocuments[id]?[peerID] = [] // Reset after return per spec
                 }
+                // Remove disconected peers with stopped replicators so their statuses are not included next time.
+                peerReplicatorStatus[id] = statuses.filter { $0.value.activity != .stopped }
             }
             
             status = ContentTypes.MultipeerReplicatorStatus.init(replicators: replicators)
@@ -683,7 +685,7 @@ class DatabaseManager {
             }
         }
         
-        var lines = auth.certificate
+        let lines = auth.certificate
             .components(separatedBy: .newlines)
             .filter { !$0.contains("-----BEGIN CERTIFICATE-----") &&
                       !$0.contains("-----END CERTIFICATE-----") &&
