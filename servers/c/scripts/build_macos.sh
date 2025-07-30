@@ -14,7 +14,7 @@ VERSION=${2}
 BLD_NUM=${3}
 DATASET_VERSION=${4}
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/../build"
 LIB_DIR="${SCRIPT_DIR}/../lib"
 
@@ -28,8 +28,8 @@ LIB_DIR="${SCRIPT_DIR}/../lib"
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
 pushd "${BUILD_DIR}" > /dev/null
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j8 install
+cmake -DCMAKE_BUILD_TYPE=Release -DCBL_VERSION=${VERSION} -GNinja ..
+ninja install
 
 # Copy libcblite to
 cp "${LIB_DIR}"/libcblite/lib/libcblite*.dylib out/bin/

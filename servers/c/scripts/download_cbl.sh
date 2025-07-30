@@ -14,6 +14,8 @@ EDITION=${2}
 VERSION=${3}
 BLD_NUM=${4}
 
+echo "Downloading CBL-C ${PLATFORM} ${EDITION} ${VERSION}-${BLD_NUM}"
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 DOWNLOAD_DIR="${SCRIPT_DIR}/../download"
 LIB_DIR="${SCRIPT_DIR}/../lib"
@@ -33,10 +35,12 @@ then
     if [ "$BLD_NUM" == "0" ]
     then
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-macos.zip
-        curl -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
+	echo $ZIP_FILENAME
+        curl --fail -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
     else
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-${BLD_NUM}-macos.zip
-        curl -O http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-c/${VERSION}/${BLD_NUM}/${ZIP_FILENAME}
+	echo $ZIP_FILENAME
+        curl --fail -O http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-c/${VERSION}/${BLD_NUM}/${ZIP_FILENAME}
     fi
     unzip ${ZIP_FILENAME}
     rm -rf "${LIB_DIR}/libcblite"
@@ -54,10 +58,10 @@ then
     if [ "$BLD_NUM" == "0" ]
     then
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-linux-${OS_ARCH}.tar.gz
-        curl -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
+        curl --fail -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
     else
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-${BLD_NUM}-linux-${OS_ARCH}.tar.gz
-        curl -O http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-c/${VERSION}/${BLD_NUM}/${ZIP_FILENAME}
+        curl --fail -O http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-c/${VERSION}/${BLD_NUM}/${ZIP_FILENAME}
     fi
     tar xvf ${ZIP_FILENAME}
     rm -rf "${LIB_DIR}/libcblite"
@@ -69,11 +73,11 @@ then
     if [ "$BLD_NUM" == "0" ]
     then
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-ios.zip
-        curl -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
+        curl --fail -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
         echo "https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}"
     else
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-${BLD_NUM}-ios.zip
-        curl -O http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-c/${VERSION}/${BLD_NUM}/${ZIP_FILENAME}
+        curl --fail -O http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-c/${VERSION}/${BLD_NUM}/${ZIP_FILENAME}
     fi
     unzip ${ZIP_FILENAME}
     rm -rf "${IOS_FRAMEWORKS_DIR}/CouchbaseLite.xcframework"
@@ -90,10 +94,10 @@ then
     if [ "${BLD_NUM}" = "0" ]
     then
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-android.zip
-        curl -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
+        curl --fail -O https://packages.couchbase.com/releases/couchbase-lite-c/${VERSION}/${ZIP_FILENAME}
     else
         ZIP_FILENAME=couchbase-lite-c-${EDITION}-${VERSION}-${BLD_NUM}-android.zip
-        curl -O http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-c/${VERSION}/${BLD_NUM}/${ZIP_FILENAME}
+        curl --fail -O http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-c/${VERSION}/${BLD_NUM}/${ZIP_FILENAME}
     fi
     unzip ${ZIP_FILENAME}
     rm -rf "${ANDROID_CPP_DIR}/lib/libcblite"
