@@ -1,3 +1,4 @@
+*NOTE*: The docker backend is no longer supported.  It probably still functions but you use it with no warranty!  If it works for you that's great, but all future development is going into the much more scalable AWS backend.
 
 ## Commands
 
