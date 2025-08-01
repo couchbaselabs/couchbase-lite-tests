@@ -49,6 +49,14 @@ Host *.amazonaws.com
     StrictHostKeyChecking accept-new
 ```
 
+Furthermore, you will need to set the default key for these addresses to be the key you intend to use to connect to the EC2 instances (i.e. the private key you created above).  If it's your default key (id_rsa, etc) then this step is not needed but that's not usually the case.  This is to work around a docker limitation that doesn't allow specifying a key when it connects via ssh.
+
+```
+Host *.amazonaws.com
+    StrictHostKeyChecking accept-new
+    IdentityFile <path/to/key>
+```
+
 ### AWS Credentials
 
 You will need to set up your Amazon AWS credentials so that terraform can use them.  As a Couchbase Employee the easiest way to do this is to set them up as described on the AWS SSO page that can be accessed via the Okta landing page.  The easiest result (option 2 on the resulting page) looks something like the following added to `$HOME/.aws/credentials`
@@ -66,6 +74,10 @@ aws_session_token=<redacted>
 ### Git LFS
 
 As stated in the top level README of this repo, Git LFS must be installed so that the datasets and blobs are properly pulled for building test servers.  
+
+### Terraform
+
+The AWS instances are set up using [terraform](https://developer.hashicorp.com/terraform/install), so it must be installed.
 
 ### Xcode 16.0 or higher (iOS only)
 
