@@ -18,7 +18,7 @@ class _HttpLogWriter:
 
         mod_num = num % 100
         self.__fname_prefix = f"{mod_num:02d}_{test_name}"
-        self.__folder_name = f"{(num // 10000000) * 10000000:08d}"
+        self.__folder_name = f"{(num // 100) * 100:08d}"
 
     def __get_path(self, suffix: str) -> Path:
         (self.__record_path / self.__folder_name).mkdir(parents=True, exist_ok=True)
