@@ -40,6 +40,15 @@
                             "default": "3.2.2"
                         }
                     }
+                },
+                "es": {
+                    "type": "object",
+                    "properties": {
+                        "version": {
+                            "type": "string",
+                            "default": "1.0.0"
+                        }
+                    }
                 }
             },
             "additionalProperties": false
@@ -77,6 +86,19 @@
                     }
                 },
                 "required": ["cluster"],
+                "additionalProperties": false
+            }
+        },
+        "edge_servers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "$comment": "The default here is 1.0.0 but can be changed with the schema defaults.es.version"
+                    }
+                },
                 "additionalProperties": false
             }
         },
