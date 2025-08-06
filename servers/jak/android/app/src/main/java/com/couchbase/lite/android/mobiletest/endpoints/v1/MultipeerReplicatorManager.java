@@ -301,7 +301,7 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
         final Map<PeerInfo.PeerId, PeerReplicatorStatus> neighbors = replSvc.getStatus(ctxt, replId);
         final Map<String, Object> peerInfoMap = new HashMap<>();
         neighbors.forEach((key, value) -> {
-            peerInfoMap.put(KEY_ID, key);
+            peerInfoMap.put(KEY_ID, key.toString());
             peerInfoMap.put(KEY_STATUS, parseReplStatus(value.getStatus(), null));
             peerInfoList.add(peerInfoMap);
         });
