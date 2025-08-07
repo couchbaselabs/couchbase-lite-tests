@@ -329,6 +329,7 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
                 throw new ClientError("Multipeer Replicator specifies a null or empty list of collection names@" + i);
             }
 
+            List<MultipeerCollectionConfiguration> collectionConfigs = new ArrayList<>();
             // All of the collections named in the array get the same configuration
             for (int j = 0; j < collectionNames.size(); j++) {
                 final String collectionName = collectionNames.getString(j);
@@ -338,8 +339,10 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
                 final MultipeerCollectionConfiguration.Builder collectionBuilder
                     = new MultipeerCollectionConfiguration.Builder(dbSvc.getCollection(ctxt, db, collectionName));
 
-                configBuilder.addCollection(buildCollectionConfig(collectionsSpec, collectionBuilder));
+                collectionConfigs.add(buildCollectionConfig(collectionsSpec, collectionBuilder));
             }
+
+            configBuilder.setCollections(collectionConfigs);
         }
     }
 
