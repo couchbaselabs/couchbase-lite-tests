@@ -62,7 +62,7 @@ pipeline {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/dev_e2e/multipeer_functional/test.sh 3.2.3 --global-version ${params.CBL_VERSION}"
+                    sh "jenkins/pipelines/dev_e2e/multipeer_functional/test.sh --global-version ${params.CBL_VERSION}"
                 }
             }
 

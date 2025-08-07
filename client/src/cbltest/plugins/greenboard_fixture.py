@@ -50,10 +50,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
         else ""
     )
     uploader.upload(
-        test_server_info.cbl,
-        os_name,
-        test_server_info.library_version,
-        sgw_version
+        test_server_info.cbl, os_name, test_server_info.library_version, sgw_version
     )
     pytestconfig.pluginmanager.unregister(uploader)
 

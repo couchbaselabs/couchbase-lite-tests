@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
 
-import click
 import os
 import sys
 from pathlib import Path
+
+import click
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(str(SCRIPT_DIR.parents[3]))
 
 from jenkins.pipelines.shared.setup_test import setup_test_multi
 
+
 def print_platform_spec(label: str, value: str | None) -> None:
     if value is not None:
         click.secho(f"    {label}: {value}", fg="cyan")
 
+
 def edit_platform_map(dict: dict[str, str], key: str, value: str | None) -> None:
     if value is not None:
         dict[key] = value
+
 
 @click.command()
 @click.option("--ios", help="The version of iOS to use")
@@ -25,8 +29,9 @@ def edit_platform_map(dict: dict[str, str], key: str, value: str | None) -> None
 @click.option("--java", help="The version of Java to use")
 @click.option("--c", help="The version of C to use")
 @click.option("--global-version", help="The default version for all platforms")
-@click.option("--private-key-path", help="The path to the private key file (if not default)")
-@click.argument("sgw_version")
+@click.option(
+    "--private-key-path", help="The path to the private key file (if not default)"
+)
 def main(
     ios: str | None,
     android: str | None,
@@ -34,18 +39,16 @@ def main(
     java: str | None,
     c: str | None,
     global_version: str | None,
-    sgw_version: str,
-    private_key_path: str | None
+    private_key_path: str | None,
 ):
     click.secho("🚀 Multiplatform CBL Setup", fg="blue", bold=True)
-    click.secho(f"Platform specifications:", fg="cyan")
+    click.secho("Platform specifications:", fg="cyan")
     print_platform_spec("Global Version", global_version)
     print_platform_spec("iOS", ios)
     print_platform_spec("Android", android)
     print_platform_spec(".NET", dotnet)
     print_platform_spec("Java", java)
     print_platform_spec("C", c)
-    print_platform_spec("Sync Gateway Version", sgw_version)
     print_platform_spec("Private Key Path", private_key_path)
     click.echo()
 
@@ -56,7 +59,7 @@ def main(
             "android": global_version,
             "dotnet": global_version,
             "java": global_version,
-            "c": global_version
+            "c": global_version,
         }
 
     edit_platform_map(platform_map, "ios", ios)
@@ -71,18 +74,17 @@ def main(
         topology_file_in = SCRIPT_DIR / "topology.json"
         setup_test_multi(
             platform_map,
-            sgw_version,
+            "3.2.4",  # Doesn't matter, we don't use SGW in these tests
             topology_file_in,
             config_file_in,
             "multipeer_functional",
-            private_key_path
+            private_key_path,
         )
-        click.secho(
-            "🎉 Setup completed successfully!", fg="green", bold=True
-        )
+        click.secho("🎉 Setup completed successfully!", fg="green", bold=True)
     except Exception as e:
         click.secho(f"💥 Setup failed: {e}", fg="red", bold=True)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

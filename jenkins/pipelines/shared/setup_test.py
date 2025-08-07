@@ -23,23 +23,25 @@ from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 
+
 def ts_to_topology(ts_platform: str) -> str:
     if ts_platform.startswith("swift"):
         return "ios"
-    
+
     if ts_platform == "jak_android":
         return "android"
-    
+
     if ts_platform.startswith("jak_"):
         return "java"
-    
+
     if ts_platform.startswith("dotnet_"):
         return "dotnet"
-    
+
     if ts_platform.startswith("c_"):
         return "c"
-    
+
     raise ValueError(f"Unknown test server platform: {ts_platform}")
+
 
 def resolved_version(product: str, version: str) -> str:
     if len(version.split(".")) >= 3:
@@ -55,11 +57,13 @@ def resolved_version(product: str, version: str) -> str:
 
     return cast(str, r.json()["version"])
 
+
 def get_platform_version(version_map: dict[str, str], platform: str) -> str:
     if platform in version_map:
         return version_map[platform]
-    
+
     raise ValueError(f"Platform {platform} not found in version map: {version_map}")
+
 
 def setup_test_multi(
     cbl_version_map: dict[str, str],
@@ -145,14 +149,16 @@ def setup_test_multi(
         topology["tag"] = topology_tag
         for ts in topology["test_servers"]:
             platform = cast(str, ts.get("platform"))
-            ts["cbl_version"] = get_platform_version(cbl_version_map, ts_to_topology(platform))
+            ts["cbl_version"] = get_platform_version(
+                cbl_version_map, ts_to_topology(platform)
+            )
 
         with open(topology_file_out, "w") as fout:
             json.dump(topology, fout, indent=4)
 
-    topology = TopologyConfig(str(topology_file_out))
+    topology_obj = TopologyConfig(str(topology_file_out))
     start_backend(
-        topology,
+        topology_obj,
         public_key_name,
         str(config_file_in),
         private_key=private_key,
@@ -179,7 +185,7 @@ def setup_test(
         "android": cbl_version,
         "java": cbl_version,
         "dotnet": cbl_version,
-        "c": cbl_version
+        "c": cbl_version,
     }
 
     setup_test_multi(
@@ -191,7 +197,7 @@ def setup_test(
         private_key,
         couchbase_version,
         public_key_name,
-        setup_dir
+        setup_dir,
     )
 
 

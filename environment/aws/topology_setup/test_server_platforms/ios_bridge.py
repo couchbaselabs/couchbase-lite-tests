@@ -51,9 +51,14 @@ else:
     XHARNESS_PATH = Path.home() / ".dotnet" / "tools" / "xharness"
 
 SCRIPT_PATH = Path(__file__).resolve().parent
-PID_FILE = SCRIPT_PATH / "ios_pid.txt"
-
 _xharness_devices: set[str] = set()
+
+
+def _ios_pid_file_path(location: str) -> Path:
+    """
+    Returns the path to the PID file for iOS applications.
+    """
+    return SCRIPT_PATH / f"ios_pid_{location}.txt"
 
 
 class iOSBridge(PlatformBridge):
@@ -229,7 +234,8 @@ class iOSBridge(PlatformBridge):
         click.echo(result.stdout)
 
     def __run_xharness(self, location: str) -> None:
-        PID_FILE.unlink() if PID_FILE.exists() else None
+        pid_file = _ios_pid_file_path(location)
+        pid_file.unlink() if pid_file.exists() else None
         result = subprocess.run(
             [
                 str(XHARNESS_PATH),
@@ -254,7 +260,7 @@ class iOSBridge(PlatformBridge):
         else:
             raise RuntimeError("Failed to extract PID from XHarness output")
 
-        with open(PID_FILE, "w") as file:
+        with open(pid_file, "w") as file:
             file.write(pid)
 
     def __stop_devicectl(self, location: str) -> None:
@@ -347,10 +353,11 @@ class iOSBridge(PlatformBridge):
             )
 
     def __stop_xharness(self, location: str) -> None:
-        if not PID_FILE.exists():
+        pid_file = _ios_pid_file_path(location)
+        if not pid_file.exists():
             raise RuntimeError("PID file not found, cannot stop test server")
 
-        with open(PID_FILE) as file:
+        with open(pid_file) as file:
             pid = file.read().strip()
 
         click.echo(f"\t...PID {pid}")
