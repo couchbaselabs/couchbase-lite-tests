@@ -18,23 +18,32 @@ package com.couchbase.lite.android.mobiletest.services;
 import androidx.annotation.NonNull;
 
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.DocumentFlag;
+import com.couchbase.lite.ListenerToken;
 import com.couchbase.lite.MultipeerCollectionConfiguration;
 import com.couchbase.lite.MultipeerReplicator;
 import com.couchbase.lite.MultipeerReplicatorConfiguration;
 import com.couchbase.lite.PeerInfo;
+import com.couchbase.lite.PeerReplicatorStatus;
+import com.couchbase.lite.ReplicatorActivityLevel;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 
 
 public class MultipeerReplicatorService {
+    private final Map<String, Map<PeerInfo.PeerId, PeerReplicatorStatus>> statusMap = new HashMap<>();
+    private final Map<String, ListenerToken> listenerTokens = new HashMap<>();
+
     private static class DeletedDocFilter implements MultipeerCollectionConfiguration.ReplicationFilter {
         @Override
         public boolean filtered(
@@ -68,6 +77,17 @@ public class MultipeerReplicatorService {
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed creating multipeer replicator", e); }
 
         final String replId = UUID.randomUUID().toString();
+        statusMap.put(replId, new HashMap<>());
+
+        listenerTokens.put(replId, repl.addPeerReplicatorStatusListener(status -> {
+            Map<PeerInfo.PeerId, PeerReplicatorStatus> myStatusMap = statusMap.get(replId);
+            if(myStatusMap == null) {
+                throw new ServerError("Null status map");
+            }
+
+            myStatusMap.put(status.getPeer(), status);
+        }));
+
         ctxt.addMultipeerRepl(replId, repl);
         repl.start();
 
@@ -75,10 +95,15 @@ public class MultipeerReplicatorService {
     }
 
     @NonNull
-    public Set<PeerInfo.PeerId> getNeighbors(@NonNull TestContext ctxt, @NonNull String id) {
-        final MultipeerReplicator repl = ctxt.getMultipeerRepl(id);
-        if (repl == null) { throw new ClientError("No such replicator: " + id); }
-        return repl.getNeighborPeers();
+    public Map<PeerInfo.PeerId, PeerReplicatorStatus> getStatus(@NonNull TestContext ctxt, @NonNull String id) {
+        final Map<PeerInfo.PeerId, PeerReplicatorStatus> myStatusMap = statusMap.get(id);
+        if (myStatusMap == null) { throw new ClientError("No such multipeer replicator: " + id); }
+        final Map<PeerInfo.PeerId, PeerReplicatorStatus> retVal = new HashMap<>(myStatusMap);
+
+        // Remove disconnected peers with stopped replicators so their statuses are not included next time.
+        myStatusMap.entrySet().removeIf((entry) ->
+                entry.getValue().getStatus().getActivityLevel() == ReplicatorActivityLevel.STOPPED);
+        return retVal;
     }
 
     @NonNull
@@ -91,9 +116,15 @@ public class MultipeerReplicatorService {
     // Unlike a standard replicator, a multipeer replicator cannot be restarted
     // When it is stopped we delete it from the context.
     public void stopReplicator(TestContext ctxt, @NonNull String id) {
+        final ListenerToken token = listenerTokens.remove(id);
+        if(token != null) {
+            token.close();
+        }
+
         final MultipeerReplicator repl = ctxt.removeMultipeerRepl(id);
         if (repl == null) { throw new ClientError("No such multipeer replicator: " + id); }
         repl.stop();
+        statusMap.remove(id);
     }
 
     @NonNull

@@ -107,7 +107,7 @@ public final class NetUtils {
     @Nullable
     public static String getLocalAddress() {
         try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress("google.com", 80));
+            socket.connect(new InetSocketAddress("8.8.8.8", 53));
             return socket.getLocalAddress().getHostAddress();
         }
         catch (IOException e) { return null; }

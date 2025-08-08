@@ -46,6 +46,7 @@ import com.couchbase.lite.MultipeerReplicatorConfiguration;
 import com.couchbase.lite.MutableArray;
 import com.couchbase.lite.MutableDocument;
 import com.couchbase.lite.PeerInfo;
+import com.couchbase.lite.PeerReplicatorStatus;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.android.mobiletest.services.MultipeerReplicatorService;
 import com.couchbase.lite.internal.utils.PlatformUtils;
@@ -244,14 +245,13 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
         if (replId == null) { throw new ClientError("Replicator id not specified"); }
 
         final List<Map<String, Object>> peerInfoList = new ArrayList<>();
-        final Set<PeerInfo.PeerId> neighbors = replSvc.getNeighbors(ctxt, replId);
-        for (PeerInfo.PeerId neighbor: neighbors) {
-            final PeerInfo peerInfo = replSvc.getPeerStatus(ctxt, replId, neighbor);
-            final Map<String, Object> peerInfoMap = new HashMap<>();
-            peerInfoMap.put(KEY_ID, peerInfo.getPeerId().toString());
-            peerInfoMap.put(KEY_STATUS, parseReplStatus(peerInfo.getReplicatorStatus(), null));
+        final Map<PeerInfo.PeerId, PeerReplicatorStatus> neighbors = replSvc.getStatus(ctxt, replId);
+        final Map<String, Object> peerInfoMap = new HashMap<>();
+        neighbors.forEach((key, value) -> {
+            peerInfoMap.put(KEY_ID, key.toString());
+            peerInfoMap.put(KEY_STATUS, parseReplStatus(value.getStatus(), null));
             peerInfoList.add(peerInfoMap);
-        }
+        });
 
         final Map<String, Object> resp = new HashMap<>();
         resp.put(KEY_REPLICATORS, peerInfoList);
@@ -329,6 +329,7 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
                 throw new ClientError("Multipeer Replicator specifies a null or empty list of collection names@" + i);
             }
 
+            List<MultipeerCollectionConfiguration> collectionConfigs = new ArrayList<>();
             // All of the collections named in the array get the same configuration
             for (int j = 0; j < collectionNames.size(); j++) {
                 final String collectionName = collectionNames.getString(j);
@@ -338,8 +339,10 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
                 final MultipeerCollectionConfiguration.Builder collectionBuilder
                     = new MultipeerCollectionConfiguration.Builder(dbSvc.getCollection(ctxt, db, collectionName));
 
-                configBuilder.addCollection(buildCollectionConfig(collectionsSpec, collectionBuilder));
+                collectionConfigs.add(buildCollectionConfig(collectionsSpec, collectionBuilder));
             }
+
+            configBuilder.setCollections(collectionConfigs);
         }
     }
 
