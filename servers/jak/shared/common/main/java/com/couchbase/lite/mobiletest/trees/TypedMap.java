@@ -24,12 +24,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.couchbase.lite.mobiletest.errors.ClientError;
+import com.couchbase.lite.mobiletest.services.Log;
 
 
 public class TypedMap extends TypedCollection {
     @NonNull
     private final Map<String, Object> data;
+
+    @NonNull
+    private final String TAG = "TYPMAP";
 
     public TypedMap() { this(new HashMap<>()); }
 
@@ -52,7 +55,8 @@ public class TypedMap extends TypedCollection {
     public void validate(@NonNull Set<String> expected) {
         final Set<String> keys = getKeys();
         keys.removeAll(expected);
-        if (!keys.isEmpty()) { throw new ClientError("Unexpected keys: " + String.join(",", keys)); }
+
+        if (!keys.isEmpty()) { Log.p(TAG, "Unexpected keys: " + String.join(",", keys)); }
     }
 
     @Nullable
