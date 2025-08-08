@@ -4,6 +4,8 @@
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -eu # No pipefail because piping yes always "fails" with SIGPIPE
 
+export UV_PYTHON="3.10"
+
 BUILD_TOOLS_VERSION='34.0.0'
 SDK_MGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -30,15 +32,10 @@ yes | ${SDK_MGR} --channel=1 --licenses > /dev/null 2>&1
 ${SDK_MGR} --channel=1 --install "build-tools;${BUILD_TOOLS_VERSION}"
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
-stop_venv
-create_venv venv
-source venv/bin/activate
-trap stop_venv EXIT
-uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
 if [ -n "$private_key_path" ]; then
-    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION --private_key $private_key_path
+    uv run --project $AWS_ENVIRONMENT_DIR/pyproject.toml python $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION --private_key $private_key_path
 else
-    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
+    uv run --project $AWS_ENVIRONMENT_DIR/pyproject.toml python $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 fi
 
 echo "Start logcat"
@@ -54,4 +51,4 @@ echo "Run the tests"
 # To re-enable this, this script needs to become aware of the 
 # serial number of the device, which is not currently passed
 #adb shell input keyevent KEYCODE_WAKEUP
-pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
+uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json

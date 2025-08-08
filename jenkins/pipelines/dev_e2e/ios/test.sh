@@ -11,23 +11,18 @@ private_key_path=${5}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
+export UV_PYTHON="3.10"
 
 echo "Setup backend..."
 
-stop_venv
-create_venv venv
-source venv/bin/activate
-trap stop_venv EXIT
-uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
 if [ -n "$private_key_path" ]; then
-    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $SGW_VERSION --private_key $private_key_path
+    uv run --project $AWS_ENVIRONMENT_DIR/pyproject.toml $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $SGW_VERSION --private_key $private_key_path
 else
-    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $SGW_VERSION
+    uv run --project $AWS_ENVIRONMENT_DIR/pyproject.toml $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $SGW_VERSION
 fi
 
 # Run Tests :
 echo "Run tests..."
 
 pushd "${DEV_E2E_TESTS_DIR}" > /dev/null
-uv pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json
+uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json

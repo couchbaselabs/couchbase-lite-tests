@@ -1,0 +1,26 @@
+{
+    "$schema": "environment/aws/topology_setup/topology_schema.json",
+    "test_servers": [
+        {
+            "platform": "jak_android",
+            "cbl_version": "3.3.0",
+            "location": "R5CWB18X32M"
+        },
+        {
+            "platform": "swift_ios",
+            "cbl_version": "3.3.0",
+            "location": "a30eb9b2916eb79ffc490fa27b5993c84596622d",
+            "ip_hint": "192.168.117.104"
+        }
+    ],
+    "defaults": {
+        "cbs": {
+            "version": "7.6.6"
+        },
+        "sgw": {
+            "version": "3.2.3"
+        }
+    },
+    "include": "environment/aws/topology_setup/default_topology.json",
+    "tag": "multipeer_functional"
+}

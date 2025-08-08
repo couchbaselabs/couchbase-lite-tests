@@ -11,16 +11,10 @@ echo "🔧 PHASE 1: SETTING UP CBL TEST SERVERS"
 echo "======================================="
 cd "$SCRIPT_DIR"
 
-# Create virtual environment for setup
-create_venv venv
-source venv/bin/activate
-uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-
 # Use the centralized multiplatform setup script
 echo "🚀 Running setup..."
-python3 setup_test.py $@
+uv run --project $AWS_ENVIRONMENT_DIR/pyproject.toml setup_test.py $@
 SETUP_SUCCESS=$?
-deactivate
 
 if [ $SETUP_SUCCESS -ne 0 ]; then
     echo "💥 SETUP PHASE FAILED!"
@@ -37,11 +31,8 @@ echo "🧪 PHASE 2: RUNNING MULTIPEER FUNCTIONAL TESTS"
 echo "========== PYTEST OUTPUT START =========="
 
 pushd "${DEV_E2E_TESTS_DIR}" > /dev/null
-create_venv venv
-source venv/bin/activate
-uv pip install -r requirements.txt
 
-if pytest -v --no-header --config config.json test_multipeer.py; then
+if uv run pytest -v --no-header --config config.json test_multipeer.py; then
     echo "========== PYTEST OUTPUT END =========="
     echo ""
     echo "🎉 COORDINATED TEST PASSED!"
@@ -53,7 +44,6 @@ else
     TEST_RESULT=1
 fi
 
-deactivate
 popd > /dev/null
 
 # Final results

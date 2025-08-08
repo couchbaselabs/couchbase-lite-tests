@@ -5,6 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source $SCRIPT_DIR/../../../shared/config.sh
+export UV_PYTHON="3.10"
 
 function usage() {
     echo "Usage: $0 <version> <sgw_version> [private_key_path]"
@@ -25,18 +26,11 @@ fi
 cbl_version=$1
 sgw_version=$2
 
-stop_venv
-create_venv venv
-source venv/bin/activate
-trap stop_venv EXIT
-uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
 if [ -n "$private_key_path" ]; then
-    python3 $SCRIPT_DIR/setup_test.py $cbl_version $sgw_version --private_key $private_key_path
+    uv run --project $AWS_ENVIRONMENT_DIR/pyproject.toml $SCRIPT_DIR/setup_test.py $cbl_version $sgw_version --private_key $private_key_path
 else
-    python3 $SCRIPT_DIR/setup_test.py $cbl_version $sgw_version
+    uv run --project $AWS_ENVIRONMENT_DIR/pyproject.toml $SCRIPT_DIR/setup_test.py $cbl_version $sgw_version
 fi
 
 pushd $DEV_E2E_TESTS_DIR
-uv pip install -r requirements.txt
-pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
-deactivate
+uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json

@@ -1,0 +1,17 @@
+[project]
+name = "test-runner"
+version = "1.0.0"
+requires-python = ">=3.10"
+dependencies = [
+    "cbltest",
+    "pytest-asyncio>=1.1.0",
+]
+
+[tool.uv.sources]
+cbltest = { path = "../../client" }
+
+[dependency-groups]
+dev = [
+    "mypy>=1.17.1",
+    "ruff>=0.12.8",
+]

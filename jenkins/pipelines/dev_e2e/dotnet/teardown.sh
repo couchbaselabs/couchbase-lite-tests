@@ -8,11 +8,4 @@ export PYTHONPATH=$SCRIPT_DIR/../../../
 pushd $AWS_ENVIRONMENT_DIR
 move_artifacts
 
-stop_venv
-create_venv venv
-source venv/bin/activate
-
-trap stop_venv EXIT
-
-uv pip install -r requirements.txt
-python3 ./stop_backend.py --topology topology_setup/topology.json
+uv run ./stop_backend.py --topology topology_setup/topology.json

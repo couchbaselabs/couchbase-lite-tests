@@ -27,18 +27,11 @@ cbl_version=$1
 platform=$2
 sgw_version=$3
 
-stop_venv
-create_venv venv
-source venv/bin/activate
-trap stop_venv EXIT
-uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
 if [ -n "$private_key_path" ]; then
-    python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version --private_key $private_key_path
+    uv run --project $AWS_ENVIRONMENT_DIR/pyproject.toml python $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version --private_key $private_key_path
 else
-    python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
+    uv run --project $AWS_ENVIRONMENT_DIR/pyproject.toml python $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
 fi
 
 pushd $DEV_E2E_TESTS_DIR
-uv pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json
-deactivate
+uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json

@@ -1,0 +1,157 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
+    "title": "CBL Tester Configuration",
+    "description": "The schema for configuration the python test client for Couchbase Lite",
+    "type": "object",
+    "properties": {
+        "test-servers": {
+            "description": "Fully qualified URLs (including ports) of running test servers",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "description": "The properties of a running test server",
+                "properties": {
+                    "url": {
+                        "description": "The URL of the test server to use (including port)",
+                        "type": "string"
+                    },
+                    "dataset_version": {
+                        "description": "The version of the dataset this test server will use",
+                        "type": "string"
+                    }
+                }
+            },
+            "uniqueItems": true
+        },
+        "sync-gateways": {
+            "description": "Information about running Sync Gateway instances",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "description": "The hostname and ports of a running Sync Gateway instance",
+                "properties": {
+                    "hostname": {
+                        "description": "The hostname of the Sync Gateway instance",
+                        "type": "string"
+                    },
+                    "port": {
+                        "description": "The normal operations port of the Sync Gateway instance",
+                        "type": "integer",
+                        "default": 4984
+                    },
+                    "admin_port": {
+                        "description": "The admin operations port of the Sync Gateway instance",
+                        "type": "integer",
+                        "default": 4985
+                    },
+                    "rbac_user": {
+                        "description": "The Couchbase Server RBAC user that SGW uses to connect",
+                        "type": "string",
+                        "default": "admin"
+                    },
+                    "rbac_password": {
+                        "description": "The Couchbase Server RBAC password that SGW uses to connect",
+                        "type": "string",
+                        "default": "password"
+                    },
+                    "tls": {
+                        "description": "Whether or not the sync gateway is using TLS",
+                        "type": "boolean",
+                        "default": false
+                    }
+                },
+                "required": ["hostname"],
+                "uniqueItems": true
+            }
+        },
+        "edge-servers": {
+            "description": "Information about running Edge Server instances",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "description": "The hostname and ports of a running Edge Server instance",
+                "properties": {
+                    "hostname": {
+                        "description": "The hostname of the Edge Server instance",
+                        "type": "string"
+                    },
+                    "port": {
+                        "description": "The normal operations port of the Edge Server instance",
+                        "type": "integer",
+                        "default": 59840
+                    },
+                    "tls": {
+                        "description": "Whether or not the Edge Server is using TLS",
+                        "type": "boolean",
+                        "default": false
+                    }
+                },
+                "required": ["hostname"],
+                "uniqueItems": true
+            }
+        },
+        "couchbase-servers": {
+            "description": "The properties of the running Couchbase Server clusters",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "description": "The properties of a Couchbase server cluster",
+                "properties": {
+                    "hostname": {
+                        "description": "The hostname of the Couchbase server cluster instance",
+                        "type": "string"
+                    },
+                    "admin_user": {
+                        "description": "The admin username for the cluster",
+                        "type": "string",
+                        "default": "Administrator"
+                    },
+                    "admin_password": {
+                        "description": "The admin password for the cluster",
+                        "type": "string",
+                        "default": "password"
+                    }
+                },
+                "required": ["hostname"],
+                "uniqueItems": true
+            }
+        },
+        "load-balancers": {
+            "type": "array",
+            "description": "The load balancer addresses to use",
+            "items": {
+                "type": "string",
+                "description": "The hostname of the load balancer to use (no scheme)"
+            },
+            "uniqueItems": true
+        },
+        "api-version": {
+            "type": "integer",
+            "description": "The version of the rest API to use when sending requests"
+        },
+        "greenboard": {
+            "type": "object",
+            "description": "Information about the greenboard bucket to upload results to",
+            "properties": {
+                "hostname": {
+                    "type": "string",
+                    "description": "The URL of the bucket to upload results to"
+                },
+                "username": {
+                    "type": "string",
+                    "description": "The username to authenticate as for writing results"
+                },
+                "password": {
+                    "type": "string",
+                    "description": "The password to authenticate with for writing results"
+                }
+            },
+            "required": ["hostname", "username", "password"]
+        },
+        "logslurp": {
+            "type": "string",
+            "description": "The URL to the logslurp server used for consolidating logs"
+        }
+    }
+}

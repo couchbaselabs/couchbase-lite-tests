@@ -6,16 +6,16 @@ function create_venv() {
         exit 1
     fi
 
+    echo 
+    echo "=== create_venv is no longer needed, use uv run instead ==="
+    echo
+
     # I've given up trying to use pip at this point
     # It's utterly useless for system and even homebrew python
     # installs as it just whines that I need to install packages
     # using the system package manager.  This happens on both
     # macOS and Linux now...
     REQUIRED_VERSION="${2:-3.10}"
-    if ! command -v uv >/dev/null 2>&1; then
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        source $HOME/.local/bin/env
-    fi
 
     uv venv --python $REQUIRED_VERSION $1
 
@@ -27,6 +27,10 @@ function create_venv() {
 }
 
 function stop_venv() {
+    echo 
+    echo "=== stop_venv is no longer needed, use uv run instead ==="
+    echo
+
     if [ -n "${VIRTUAL_ENV:-}" ]; then
         echo "Deactivating virtual environment..."
         deactivate
@@ -93,6 +97,11 @@ print_box() {
     done
     echo "$border"
 }
+
+if ! command -v uv >/dev/null 2>&1; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    source $HOME/.local/bin/env
+fi
 
 readonly PIPELINES_DIR=$(find_dir pipelines) || exit 1
 readonly TESTS_DIR=$(find_dir tests) || exit 1
