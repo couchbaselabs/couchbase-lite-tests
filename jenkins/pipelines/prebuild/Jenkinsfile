@@ -74,10 +74,11 @@ pipeline {
                     userRemoteConfigs: [[url: 'https://github.com/couchbaselabs/couchbase-lite-tests']]
                 ])
                 script {
+                    def fullVersion
                     if (!params.CBL_BUILD) {
-                        def fullVersion = "${params.CBL_VERSION}"
+                        fullVersion = "${params.CBL_VERSION}"
                     } else {
-                        def fullVersion = "${params.CBL_VERSION}-${params.CBL_BUILD}"
+                        fullVersion = "${params.CBL_VERSION}-${params.CBL_BUILD}"
                     }
 
                     withEnv(["FULL_CBL_VERSION=${fullVersion}"]) {
