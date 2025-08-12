@@ -23,10 +23,14 @@ pipeline {
         stage('Validate Parameters') {
             steps {
                 script {
-                    if (!params.TS_PLATFORM || !params.CBL_VERSION || !params.CBL_BUILD) {
+                    if (!params.TS_PLATFORM || !params.CBL_VERSION) {
                         error("One or more required parameters are not set. Please set TS_PLATFORM, CBL_VERSION, CBL_BUILD.")
                     }
-                    currentBuild.displayName = "${params.TS_PLATFORM} ${params.CBL_VERSION}-${params.CBL_BUILD}"
+                    if(!params.CBL_BUILD) {
+                        currentBuild.displayName = "${params.TS_PLATFORM} ${params.CBL_VERSION}"
+                    } else {
+                        currentBuild.displayName = "${params.TS_PLATFORM} ${params.CBL_VERSION}-${params.CBL_BUILD}"
+                    }
                 }
             }
         }
@@ -70,30 +74,38 @@ pipeline {
                     userRemoteConfigs: [[url: 'https://github.com/couchbaselabs/couchbase-lite-tests']]
                 ])
                 script {
-                    if (params.TS_PLATFORM.contains("ios")) {
-                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                    if (!params.CBL_BUILD) {
+                        fullVersion = "${params.CBL_VERSION}"
+                    } else {
+                        fullVersion = "${params.CBL_VERSION}-${params.CBL_BUILD}"
                     }
 
-                    if (params.TS_PLATFORM.contains("windows")) {
-                        pwsh """
-                            python -m venv venv
-                            .\\venv\\Scripts\\activate
-                            pip install uv
-                            uv pip install -r environment/aws/requirements.txt
-                            python environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:CBL_VERSION-\$env:CBL_BUILD --ci
-                            deactivate
-                        """
-                    } else {
-                        sh """#!/bin/bash -e
+                    withEnv(["FULL_CBL_VERSION=${fullVersion}"]) {
+                        if (params.TS_PLATFORM.contains("ios")) {
+                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        }
 
-                            source jenkins/pipelines/shared/config.sh
-                            create_venv venv
-                            source venv/bin/activate
-                            pip install uv
-                            uv pip install -r "environment/aws/requirements.txt"
-                            python "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $CBL_VERSION-$CBL_BUILD --ci
-                            deactivate
-                        """
+                        if (params.TS_PLATFORM.contains("windows")) {
+                            pwsh """
+                                python -m venv venv
+                                .\\venv\\Scripts\\activate
+                                pip install uv
+                                uv pip install -r environment/aws/requirements.txt
+                                python environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
+                                deactivate
+                            """
+                        } else {
+                            sh """#!/bin/bash -e
+
+                                source jenkins/pipelines/shared/config.sh
+                                create_venv venv
+                                source venv/bin/activate
+                                pip install uv
+                                uv pip install -r "environment/aws/requirements.txt"
+                                python "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_VERSION --ci
+                                deactivate
+                            """
+                        }
                     }
                 }
             }
