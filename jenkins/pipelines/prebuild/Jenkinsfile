@@ -75,9 +75,9 @@ pipeline {
                 ])
                 script {
                     if (!params.CBL_BUILD) {
-                        fullVersion = "${params.CBL_VERSION}"
+                        def fullVersion = "${params.CBL_VERSION}"
                     } else {
-                        fullVersion = "${params.CBL_VERSION}-${params.CBL_BUILD}"
+                        def fullVersion = "${params.CBL_VERSION}-${params.CBL_BUILD}"
                     }
 
                     withEnv(["FULL_CBL_VERSION=${fullVersion}"]) {
