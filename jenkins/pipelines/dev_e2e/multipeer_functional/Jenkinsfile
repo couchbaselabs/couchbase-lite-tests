@@ -20,7 +20,6 @@ pipeline {
             steps {
                 script {
                     // Parse platform versions to determine which test servers to prebuild
-                    def platformSpecs = params.PLATFORM_VERSIONS.split(' ')
                     def platformsToBuild = ["swift_ios", "jak_android"]
                     
                     // Build all required test server platforms in parallel
