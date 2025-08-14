@@ -20,7 +20,6 @@ pipeline {
             steps {
                 script {
                     // Parse platform versions to determine which test servers to prebuild
-                    def platformSpecs = params.PLATFORM_VERSIONS.split(' ')
                     def platformsToBuild = ["swift_ios", "jak_android"]
                     
                     // Build all required test server platforms in parallel
@@ -32,7 +31,7 @@ pipeline {
                             build job: 'prebuild-test-server',
                             parameters: [
                                 string(name: 'TS_PLATFORM', value: platform),
-                                string(name: 'CBL_VERSION', value: ${params.CBL_VERSION}), // Generic version for prebuild
+                                string(name: 'CBL_VERSION', value: "${params.CBL_VERSION}"), // Generic version for prebuild
                             ],
                             wait: true,
                             propagate: true
@@ -50,10 +49,7 @@ pipeline {
         stage('Setup and Run Tests') {
             agent { label 'mob-e2e-mac-01' }
             options {
-                lock("mob-e2e-iphone-01")
-                lock("mob-e2e-iphone-02")
-                lock("mob-e2e-android-01")
-                lock("mob-e2e-android-02")
+                lock('mob-e2e-iphone-01,mob-e2e-iphone-02,mob-e2e-android-01,mob-e2e-android-02')
             }
             environment { 
                 KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
