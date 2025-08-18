@@ -3,7 +3,7 @@ pipeline {
     parameters {
         string(
             name: 'PLATFORM_VERSIONS',
-            defaultValue: 'ios:3.2.3 android:3.2.4',
+            defaultValue: 'ios:3.3.0 android:3.3.0',
             description: 'Platform versions in two supported formats:\n' +
                         '1. Auto-fetch (recommended): platform1:version1 platform2:version2\n' +
                         '   Example: "ios:3.2.3 android:3.2.4"\n' +
@@ -114,7 +114,7 @@ pipeline {
                             build job: 'prebuild-test-server',
                             parameters: [
                                 string(name: 'TS_PLATFORM', value: platform),
-                                string(name: 'CBL_VERSION', value: '3.2.3'), // Generic version for prebuild
+                                string(name: 'CBL_VERSION', value: '3.3.0'), // Generic version for prebuild
                             ],
                             wait: true,
                             propagate: true
@@ -130,11 +130,11 @@ pipeline {
             }
         }
         stage('Setup and Run Tests') {
-            agent { label 'mac-mini-new' }
+            agent { label 'mob-e2e-mac-01' }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
-                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                AWS_PROFILE = "mobile-for-now"
+                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
+                PATH = "/Users/qe_mobile_india/.local/bin:/Library/Java/JavaVirtualMachines/temurin-11.jdk/Contents/Home/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Users/qe_mobile_india/.dotnet/tools"
+                AWS_PROFILE = "default"
             }
             steps {
                 // Unlock keychain:
@@ -148,7 +148,7 @@ pipeline {
     }
     post {
         failure {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "barkha.goyal@couchbase.com";
         }
     }
 } 
