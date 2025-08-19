@@ -1,5 +1,5 @@
-Usage
-=====
+TDK Usage
+=========
 
 Getting started
 ---------------
@@ -19,7 +19,11 @@ Test Parameters
 
 These are not defined by the TDK, but rather the test writer (with possible help from TDK devs).  The parameters make use of the concept of `pytest fixtures <https://docs.pytest.org/en/stable/explanation/fixtures.html>`_ and so the tests can use as many or as few as they prefer.  Currently, the tests in the TDK repo define several fixtures as follows:
 
-- *cblpytest* : Probably the most important fixture of them all.  This contains a preconfigured top level object which is a factory for all other classes that the test will use (see the above Getting Started section)
 - *dataset_path* : The path on disk to the data files that the TDK will make use of (such as sync gateway configuration files, etc)
 
-The above are all defined in a file called ``conftest.py`` at the root of a directory containing tests
+The above is defined in a file called ``conftest.py`` at the root of a directory containing tests
+
+Orchestrator Usage
+------------------
+
+See the `following README <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/environment/aws/README.md>`_ for more information about orchestration but the basic idea for those looking to make use of the AWS orchestrator is to create a topology file, and then pass it to a function called ``start_backend`` along with some other information.  You can see an example of this in the `.NET Test Setup Script <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/jenkins/pipelines/dotnet/setup_test.py>`_.  
