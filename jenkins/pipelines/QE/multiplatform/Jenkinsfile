@@ -115,7 +115,7 @@ pipeline {
                             parameters: [
                                 string(name: 'TS_PLATFORM', value: platform),
                                 string(name: 'CBL_VERSION', value: '3.3.0'), // Generic version for prebuild
-                                string(name: 'CBL_BUILD', value:'67'),
+                                string(name: 'CBL_BUILD', value:versionPart),
                             ],
                             wait: true,
                             propagate: true
