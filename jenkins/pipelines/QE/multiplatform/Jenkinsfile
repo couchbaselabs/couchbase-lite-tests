@@ -111,11 +111,12 @@ pipeline {
                         parallelBuilds[platform] = {
                             // For multiplatform, we'll use a generic version since each platform may have different versions
                             // The actual version assignment happens during test setup
+
                             build job: 'prebuild-test-server',
                             parameters: [
                                 string(name: 'TS_PLATFORM', value: platform),
                                 string(name: 'CBL_VERSION', value: '3.3.0'), // Generic version for prebuild
-                                string(name: 'CBL_BUILD', value:versionPart),
+                                string(name: 'CBL_BUILD', value: '67'),
                             ],
                             wait: true,
                             propagate: true
