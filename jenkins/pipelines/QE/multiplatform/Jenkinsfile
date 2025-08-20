@@ -28,6 +28,12 @@ pipeline {
             defaultValue: false,
             description: 'Disable automatic fetching of latest successful builds (requires explicit build numbers in PLATFORM_VERSIONS)'
         )
+        booleanParam(
+            name: 'DISABLE_PREBUILD',
+            defaultValue: false,
+            description: 'Disable automatic prebuilding of testserver)'
+        )
+
     }
     stages {
         stage('Init') {
@@ -123,7 +129,7 @@ pipeline {
                         }
                     }
                     
-                    if (parallelBuilds.size() > 0) {
+                    if (parallelBuilds.size() > 0 && !params.DISABLE_PREBUILD) {
                         parallel parallelBuilds
                     } else {
                         echo "No test servers to prebuild"
