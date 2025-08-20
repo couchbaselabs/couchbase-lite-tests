@@ -141,7 +141,8 @@ pipeline {
             agent { label 'mob-e2e-mac-01' }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
-                PATH = "/Users/qe_mobile_india/.local/bin:/Library/Java/JavaVirtualMachines/temurin-11.jdk/Contents/Home/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Users/qe_mobile_india/.dotnet/tools:/opt/homebrew/opt/dotnet"
+                DOTNET_ROOT="/opt/homebrew/opt/dotnet/libexec"
+                PATH = "/Users/qe_mobile_india/.local/bin:/Library/Java/JavaVirtualMachines/temurin-11.jdk/Contents/Home/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Users/qe_mobile_india/.dotnet/tools:/opt/homebrew/opt/dotnet:${DOTNET_ROOT}:${PATH}"
                 AWS_PROFILE = "default"
             }
             steps {
@@ -155,8 +156,11 @@ pipeline {
         }
     }
     post {
-        cleanup{
+        cleanup {
+        agent { label 'mob-e2e-mac-01' }
+        steps {
             sh "jenkins/pipelines/QE/multiplatform/teardown.sh"
         }
+    }
     }
 } 
