@@ -135,7 +135,7 @@ pipeline {
             agent { label 'mob-e2e-mac-01' }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
-                PATH = "/Users/qe_mobile_india/.local/bin:/Library/Java/JavaVirtualMachines/temurin-11.jdk/Contents/Home/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Users/qe_mobile_india/.dotnet/tools"
+                PATH = "/Users/qe_mobile_india/.local/bin:/Library/Java/JavaVirtualMachines/temurin-11.jdk/Contents/Home/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Users/qe_mobile_india/.dotnet/tools:/opt/homebrew/opt/dotnet"
                 AWS_PROFILE = "default"
             }
             steps {
