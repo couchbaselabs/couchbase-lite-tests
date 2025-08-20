@@ -155,7 +155,7 @@ pipeline {
         }
     }
     post {
-        steps{
+        cleanup{
             sh "jenkins/pipelines/QE/multiplatform/teardown.sh"
         }
         failure {
