@@ -770,6 +770,8 @@ class TopologyConfig:
             hostnames (List[str]): The list of load balancer hostnames.
         """
         if len(self.__sync_gateways) == 0:
+            return
+        if len(self.__sync_gateways) == 0:
             raise Exception(
                 "apply_sgw_hostnames must be called prior to apply_lb_hostnames"
             )
