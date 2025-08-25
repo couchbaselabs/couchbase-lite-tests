@@ -206,18 +206,14 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
                 return doc.setString(docProp, "Both values are not dictionary");
             }
 
-            final MutableDictionary mergedDict = new MutableDictionary();
-            for(String key : localDict) {
-                mergedDict.setValue(docProp, localDict.getValue(key));
-            }
-
+            final MutableDictionary mergedDict = localDict.toMutable();
             for(String key : remoteDict) {
                 final Object remoteValue = remoteDict.getValue(key);
                 if(mergedDict.contains(key) && !Objects.equals(remoteValue, mergedDict.getValue(key))) {
                     return doc.setString(key, String.format("Conflicting values found at key named %s", key));
                 }
 
-                mergedDict.setValue(docProp, remoteValue);
+                mergedDict.setValue(key, remoteValue);
             }
 
             return doc.setDictionary(docProp, mergedDict);
