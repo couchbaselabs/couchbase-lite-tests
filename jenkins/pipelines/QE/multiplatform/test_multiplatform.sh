@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Multiplatform CBL test runner
-# Usage: ./test_multiplatform.sh "platform1:version1[-build1] platform2:version2[-build2]..." <sgw_version> [test_name]
+# Usage: ./test_multiplatform.sh "platform1:version1[-build1] platform2:version2[-build2]..." <sgw_version> [test_name] topology-file
 # Examples:
 #   ./test_multiplatform.sh "android:3.2.3 ios:3.1.5" 3.2.3
 #   ./test_multiplatform.sh "android:3.2.3 ios:3.1.5" 3.2.3 "test_delta_sync.py::TestDeltaSync::test_delta_sync_replication"
@@ -41,7 +41,7 @@ function list_available_tests() {
 }
 
 function usage() {
-    echo "Usage: $0 \"platform1:version1[-build1] platform2:version2[-build2]...\" <sgw_version> [test_name]"
+    echo "Usage: $0 \"platform1:version1[-build1] platform2:version2[-build2]...\" <sgw_version> [test_name] topology-file"
     echo ""
     echo "Supported platforms: android, ios, dotnet, c, java"
     echo "Private key: ${HOME}/.ssh/jborden.pem (hardcoded)"
@@ -74,7 +74,7 @@ if [ $# -eq 1 ] && [ "$1" = "--list-tests" ]; then
     exit 0
 fi
 
-if [ $# -lt 2 ] || [ $# -gt 3 ]; then
+if [ $# -lt 2 ] || [ $# -gt 4 ]; then
     usage
 fi
 
@@ -82,6 +82,7 @@ PLATFORM_CONFIGS="$1"
 SG_VERSION="$2"
 PRIVATE_KEY_PATH="${HOME}/.ssh/jborden.pem"
 TEST_NAME="${3:-test_delta_sync.py::TestDeltaSync::test_delta_sync_replication}"
+TOPOLOGY_FILE="${4:-topology.json}"
 
 # Validate inputs
 if [ -z "$PLATFORM_CONFIGS" ]; then
@@ -99,13 +100,18 @@ if [ ! -f "$PRIVATE_KEY_PATH" ]; then
     exit 1
 fi
 
+if [ ! -f "$TOPOLOGY_FILE" ]; then
+    echo "❌ Error: Topology file not found: $TOPOLOGY_FILE"
+    exit 1
+fi
+
 echo "🚀 MULTIPLATFORM CBL TEST SETUP"
 echo "==============================="
 echo "📋 Platform configurations: $PLATFORM_CONFIGS"
 echo "🔄 SG version: $SG_VERSION"
 echo "🔑 Private key: $PRIVATE_KEY_PATH"
 echo "🧪 Test: $TEST_NAME"
-echo ""
+echo " Topology: $TOPOLOGY_FILE"
 
 # Parse platform configurations
 IFS=' ' read -ra PLATFORM_ARRAY <<< "$PLATFORM_CONFIGS"
@@ -177,7 +183,7 @@ pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
 
 # Use the centralized multiplatform setup script
 echo "🚀 Running multiplatform setup..."
-python3 setup_multiplatform.py "$PLATFORM_CONFIGS" "$SG_VERSION" --setup-only
+python3 setup_multiplatform.py "$PLATFORM_CONFIGS" "$SG_VERSION" "$TOPOLOGY_FILE" --setup-only
 SETUP_SUCCESS=$?
 
 deactivate

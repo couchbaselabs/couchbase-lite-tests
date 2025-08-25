@@ -183,7 +183,7 @@ def parse_platform_versions(
 
 
 def get_platform_topology_files(
-        platform_key: str, target_os: str | None = None
+        platform_key: str, target_os: str | None = None, topology_file: str = "topology.json"
 ) -> list[Path]:
     """
     Get appropriate topology files for a platform, with optional OS specification.
@@ -191,12 +191,13 @@ def get_platform_topology_files(
     Args:
         platform_key: Platform identifier (ios, android, dotnet, java, c)
         target_os: Optional OS specification (windows, macos, linux, android, ios)
+        topology_file: Optional topology file
 
     Returns:
         List of topology file paths to use
     """
     # For multiplatform setup, always use the multiplatform topology file
-    multiplatform_topology = SCRIPT_DIR / "topology.json"
+    multiplatform_topology = SCRIPT_DIR / topology_file
 
     if multiplatform_topology.exists():
         return [multiplatform_topology]
@@ -253,13 +254,14 @@ def parse_platform_key(platform_key: str) -> tuple[str, str | None]:
 
 
 def compose_multiplatform_topology(
-        platform_versions: dict[str, dict[str, str]],
+        platform_versions: dict[str, dict[str, str]], topology_file: str | None = None
 ) -> dict[str, Any]:
     """
     Compose a multiplatform topology from platform-specific topology files.
 
     Args:
         platform_versions: Dictionary of platform versions, builds, and target OS
+        topology_file: Optional topology file else it picks default topology file
 
     Returns:
         Composed topology dictionary
@@ -286,7 +288,7 @@ def compose_multiplatform_topology(
         click.echo(f"Loading topology for {platform_key}...")
 
         # Get topology files for this platform
-        topology_files = get_platform_topology_files(platform_key)
+        topology_files = get_platform_topology_files(platform_key,topology_file=topology_file)
         if not topology_files:
             click.secho(
                 f"Warning: No topology files found for {platform_key}, skipping...",
@@ -411,6 +413,7 @@ def setup_multiplatform_test(
         public_key_name: str = "jborden",
         setup_dir: str = "QE",
         auto_fetch_builds: bool = True,
+        topology_file: str | None = None,
 ) -> None:
     """
     Sets up a multiplatform testing environment with platform-specific CBL versions and topologies.
@@ -445,7 +448,7 @@ def setup_multiplatform_test(
         platform_versions_dict[platform_key] = {
             "full_version": f"{platform_info['version']}-{platform_info['build']}"
         }
-    topology = compose_multiplatform_topology(platform_versions_dict)
+    topology = compose_multiplatform_topology(platform_versions_dict, topology_file=topology_file)
 
     # Set topology defaults (use versions as-is for local testing)
     topology["defaults"] = {
@@ -487,6 +490,7 @@ def setup_multiplatform_test(
 @click.command()
 @click.argument("platform_versions")
 @click.argument("sgw_version")
+@click.argument("topology_file", required=False)
 @click.option(
     "--no-auto-fetch", is_flag=True, help="Disable automatic build number fetching"
 )
@@ -496,14 +500,17 @@ def setup_multiplatform_test(
 def main(
         platform_versions: str,
         sgw_version: str,
-        no_auto_fetch: bool,
-        setup_only: bool,
+        topology_file: str | None = None,
+        no_auto_fetch: bool = False,
+        setup_only: bool=False,
 ):
     """
     Setup multiplatform CBL testing environment.
 
     PLATFORM_VERSIONS: Space-separated list of platform specifications
     SGW_VERSION: Sync Gateway version to use
+    Optional:
+    topology_file: Topology file to use
     """
     private_key_path = os.path.expanduser("~/.ssh/jborden.pem")
 
@@ -523,6 +530,7 @@ def main(
             "multiplatform",
             private_key_path,
             auto_fetch_builds=not no_auto_fetch,
+            topology_file=topology_file
         )
         click.secho(
             "🎉 Multiplatform setup completed successfully!", fg="green", bold=True
