@@ -82,7 +82,7 @@ PLATFORM_CONFIGS="$1"
 SG_VERSION="$2"
 PRIVATE_KEY_PATH="${HOME}/.ssh/jborden.pem"
 TEST_NAME="${3:-test_delta_sync.py::TestDeltaSync::test_delta_sync_replication}"
-TOPOLOGY_FILE="${4:-topology.json}"
+TOPOLOGY_FILE="$SCRIPT_DIR/${4:-topology.json}"
 
 # Validate inputs
 if [ -z "$PLATFORM_CONFIGS" ]; then
