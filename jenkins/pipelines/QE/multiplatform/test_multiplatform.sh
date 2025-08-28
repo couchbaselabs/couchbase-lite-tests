@@ -172,7 +172,7 @@ echo ""
 # Phase 1: Setup all platforms using centralized multiplatform setup
 echo "🔧 PHASE 1: SETTING UP CBL TEST SERVERS"
 echo "======================================="
-
+echo "org.gradle.java.home=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home" >> $SCRIPT_DIR/../../../../servers/jak/android/gradle.properties
 echo "🏗️ Using centralized multiplatform setup..."
 cd "$SCRIPT_DIR"
 
