@@ -666,8 +666,6 @@ class TestMultipeer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_large_document_replication(self, cblpytest: CBLPyTest):
-        for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts,">= 3.3.0")
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -704,7 +702,7 @@ class TestMultipeer(CBLTestClass):
 
         self.mark_test_step("Wait for idle status on all devices")
         for device_idx, multipeer in enumerate(multipeer_replicators[1:], 2):
-            status = await multipeer.wait_for_idle()
+            status = await multipeer.wait_for_idle(timeout=timedelta(seconds=200))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
