@@ -3,7 +3,7 @@ import sys
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any, Callable
+from typing import Any, Callable, Dict, List
 
 
 class JSONGenerator:

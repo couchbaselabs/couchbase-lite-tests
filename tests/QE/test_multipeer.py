@@ -1,16 +1,19 @@
 import asyncio
+import logging
 import random
-from random import randint
 from datetime import timedelta
+from random import randint
+
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.multipeer_replicator import MultipeerReplicator
-from cbltest.api.replicator_types import (ReplicatorCollectionEntry, ReplicatorConflictResolver)
-from cbltest.api.test_functions import compare_doc_results_p2p
 from cbltest.api.database_types import DocumentEntry
-
-import logging
+from cbltest.api.multipeer_replicator import MultipeerReplicator
+from cbltest.api.replicator_types import (
+    ReplicatorCollectionEntry,
+    ReplicatorConflictResolver,
+)
+from cbltest.api.test_functions import compare_doc_results_p2p
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +158,6 @@ class TestMultipeer(CBLTestClass):
         # Distribute remainder devices across groups
         group1_size = group_size + (1 if remainder > 0 else 0)
         group2_size = group_size + (1 if remainder > 1 else 0)
-        group3_size = group_size
 
         group1_dbs = all_dbs[:group1_size]
         group2_dbs = all_dbs[group1_size : group1_size + group2_size]
@@ -469,7 +471,7 @@ class TestMultipeer(CBLTestClass):
                 status = await mp.wait_for_idle(timeout=timedelta(seconds=60))
                 assert all(r.status.replicator_error is None for r in status.replicators), \
                     "Multipeer replicator should not have any errors"
-        except:
+        except Exception:
             self.mark_test_step("Replication staus fetch timed out")
 
         self.mark_test_step("Verify conflict1 is resolved identically on all devices with 15 device keys")

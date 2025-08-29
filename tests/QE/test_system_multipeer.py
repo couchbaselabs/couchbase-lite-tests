@@ -1,22 +1,14 @@
 import asyncio
-from enum import Enum
-from random import randint
-import uuid
-import time
 import random
-import sys
-from datetime import timedelta, datetime
-from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any, Callable
+from datetime import datetime, timedelta
+from pathlib import Path
+
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.multipeer_replicator import MultipeerReplicator
-from cbltest.api.replicator_types import ReplicatorCollectionEntry
-from cbltest.api.test_functions import compare_doc_results_p2p
-from pathlib import Path
 from cbltest.api.cloud import CouchbaseCloud
-from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.api.json_generator import JSONGenerator
+from cbltest.api.multipeer_replicator import MultipeerReplicator
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -24,8 +16,8 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
-from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.api.json_generator import JSONGenerator
+from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.api.test_functions import compare_doc_results_p2p, compare_local_and_remote
 
 
 @pytest.mark.min_test_servers(2)
@@ -160,7 +152,7 @@ class TestSystemMultipeer(CBLTestClass):
             for multipeer in multipeer_replicators:
                 try:
                     status = await multipeer.wait_for_idle(timeout=timedelta(seconds=100))
-                except:
+                except Exception:
                     self.mark_test_step("Replication staus fetch timed out")
                 assert all(r.status.replicator_error is None for r in status.replicators), (
                     "Multipeer replicator should not have any errors"
