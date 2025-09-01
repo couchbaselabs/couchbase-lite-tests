@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import random
 from datetime import timedelta
 from random import randint
@@ -15,8 +14,6 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.test_functions import compare_doc_results_p2p
 
-logger = logging.getLogger(__name__)
-
 
 @pytest.mark.min_test_servers(2)
 class TestMultipeer(CBLTestClass):
@@ -28,19 +25,13 @@ class TestMultipeer(CBLTestClass):
         all_devices_dbs = await asyncio.gather(*reset_tasks)
         all_dbs = [dbs[0] for dbs in all_devices_dbs]
 
-        logger.info("Created databases on all devices")
-
         self.mark_test_step("Add 20 documents to the database on device 1")
 
         db1 = all_dbs[0]
 
         async with db1.batch_updater() as b:
             for i in range(1, 21):
-                b.upsert_document(
-                    "_default._default", f"doc{i}", [{"random": randint(1, 100000)}]
-                )
-
-        logger.info("Added 20 documents to the database on device 1")
+                b.upsert_document("_default._default", f"doc{i}", [{"random": randint(1, 100000)}])
 
         self.mark_test_step("Start multipeer replicator on all devices")
         multipeer_replicators = [
@@ -52,8 +43,6 @@ class TestMultipeer(CBLTestClass):
         mpstart_tasks = [multipeer.start() for multipeer in multipeer_replicators]
         await asyncio.gather(*mpstart_tasks)
 
-        logger.info("Started multipeer replicator on all devices")
-
         self.mark_test_step("Wait for idle status on all devices")
         for multipeer in multipeer_replicators[1:]:
             status = await multipeer.wait_for_idle()
@@ -63,9 +52,7 @@ class TestMultipeer(CBLTestClass):
 
         self.mark_test_step("Check that all device databases have the same content")
 
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
             assert compare_doc_results_p2p(
@@ -73,10 +60,6 @@ class TestMultipeer(CBLTestClass):
             ), "All databases should have the same content"
 
         await asyncio.gather(*[multipeer.stop() for multipeer in multipeer_replicators])
-
-        logger.info("All multipeer replicators stopped")
-        logger.info("Successfully completed test_large_mesh_sanity")
-    
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_large_mesh_consistency(self, cblpytest: CBLPyTest):
@@ -87,10 +70,8 @@ class TestMultipeer(CBLTestClass):
 
         all_dbs = [dbs[0] for dbs in all_devices_dbs]
 
-        logger.info("Created databases on all devices")
-
         self.mark_test_step("Add 50 documents to the database on all devices")
-        
+
         for device_idx, db in enumerate(all_dbs, 1):
             doc_num = 1
             async with db.batch_updater() as b:
@@ -102,8 +83,6 @@ class TestMultipeer(CBLTestClass):
                     )
                     doc_num += 1
 
-        logger.info("Added 50 documents to the database on all devices")
-
         self.mark_test_step("Start multipeer replicator on all devices")
         multipeer_replicators = [
             MultipeerReplicator(
@@ -114,8 +93,6 @@ class TestMultipeer(CBLTestClass):
         mpstart_tasks = [multipeer.start() for multipeer in multipeer_replicators]
         await asyncio.gather(*mpstart_tasks)
 
-        logger.info("Started multipeer replicator on all devices")
-
         self.mark_test_step("Wait for idle status on all devices")
         for multipeer in multipeer_replicators:
             status = await multipeer.wait_for_idle()
@@ -124,21 +101,14 @@ class TestMultipeer(CBLTestClass):
             )
 
         self.mark_test_step("Check that all device databases have the same content")
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
             assert compare_doc_results_p2p(
                 all_docs_results[0]["_default._default"], all_docs["_default._default"]
             ), "All databases should have the same content"
 
-        logger.info("All databases have the same content")
-
         await asyncio.gather(*[multipeer.stop() for multipeer in multipeer_replicators])
-
-        logger.info("All multipeer replicators stopped")
-        logger.info("Successfully completed test_large_mesh_consistency")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_network_partition(self, cblpytest: CBLPyTest):
@@ -162,10 +132,6 @@ class TestMultipeer(CBLTestClass):
         group1_dbs = all_dbs[:group1_size]
         group2_dbs = all_dbs[group1_size : group1_size + group2_size]
         group3_dbs = all_dbs[group1_size + group2_size :]
-
-        logger.info(
-            f"Split {total_devices} devices into 3 groups: {len(group1_dbs)}, {len(group2_dbs)}, {len(group3_dbs)}"
-        )
 
         self.mark_test_step("Add unique documents to each peer group")
 
@@ -214,10 +180,6 @@ class TestMultipeer(CBLTestClass):
         total_docs_group2 = len(group2_dbs) * docs_per_device_group2
         total_docs_group3 = len(group3_dbs) * docs_per_device_group3
 
-        logger.info(
-            f"Added {total_docs_group1}, {total_docs_group2}, {total_docs_group3} documents to groups 1, 2, 3 respectively"
-        )
-
         self.mark_test_step("Start multipeer replicators with different peer groups")
 
         # Start replicators with different peer groups
@@ -238,8 +200,6 @@ class TestMultipeer(CBLTestClass):
         all_replicators = group1_replicators + group2_replicators + group3_replicators
         start_tasks = [replicator.start() for replicator in all_replicators]
         await asyncio.gather(*start_tasks)
-
-        logger.info("Started multipeer replicators with different peer groups")
 
         # Wait for initial replication within each group
         for replicator in all_replicators:
@@ -273,8 +233,6 @@ class TestMultipeer(CBLTestClass):
                 f"Group 3 should only see {len(group3_dbs) - 1} peers, got {group3_peer_count}"
             )
 
-        logger.info("Verified groups are properly isolated from each other")
-
         self.mark_test_step("Verify each group can see its own documents")
         # Check group 1 can see its own documents
         if group1_dbs:
@@ -305,8 +263,6 @@ class TestMultipeer(CBLTestClass):
                 assert len(docs["_default._default"]) == total_docs_group3, (
                     f"Group 3 should have {total_docs_group3} docs, got {len(docs['_default._default'])}"
                 )
-
-        logger.info("Verified each group can see its own documents")
 
         self.mark_test_step("Verify each group has expected documents")
         # Check group 1 has expected docs
@@ -339,10 +295,6 @@ class TestMultipeer(CBLTestClass):
                     f"Group 3 should have {total_docs_group3} docs, got {len(docs['_default._default'])}"
                 )
 
-        logger.info(
-            f"Verified each group has {total_docs_group1}, {total_docs_group2}, {total_docs_group3} documents"
-        )
-
         self.mark_test_step("Stop group 2 replicators and restart with group 1's peer ID")
         # Stop group 2 replicators
         if group2_replicators:
@@ -357,8 +309,6 @@ class TestMultipeer(CBLTestClass):
             ]
             start_tasks = [replicator.start() for replicator in group2_replicators]
             await asyncio.gather(*start_tasks)
-
-            logger.info("Restarted group 2 with group 1's peer ID")
 
         # Wait for replication between group 1 and group 2
         all_replicators = group1_replicators + group2_replicators + group3_replicators
@@ -381,8 +331,6 @@ class TestMultipeer(CBLTestClass):
                     f"Combined group should have {expected_combined} docs, got {len(docs['_default._default'])}"
                 )
 
-            logger.info(f"Verified group 1 and group 2 devices have {expected_combined} documents")
-
         self.mark_test_step("Stop group 3 replicators and restart with group 1's peer ID")
         # Stop group 3 replicators
         if group3_replicators:
@@ -397,8 +345,6 @@ class TestMultipeer(CBLTestClass):
             ]
             start_tasks = [replicator.start() for replicator in group3_replicators]
             await asyncio.gather(*start_tasks)
-
-            logger.info("Restarted group 3 with group 1's peer ID")
 
         # Wait for replication across all groups
         all_replicators = group1_replicators + group2_replicators + group3_replicators
@@ -425,14 +371,7 @@ class TestMultipeer(CBLTestClass):
                 all_docs_results[0]["_default._default"], docs["_default._default"]
             ), "All databases should have the same content"
 
-        logger.info(
-            f"Verified all {total_devices} devices have {total_expected_docs} documents with identical content"
-        )
-
         await asyncio.gather(*[replicator.stop() for replicator in all_replicators])
-
-        logger.info("All multipeer replicators stopped")
-        logger.info("Successfully completed test_network_partition")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_scalable_conflict_resolution(self, cblpytest: CBLPyTest):
@@ -517,10 +456,6 @@ class TestMultipeer(CBLTestClass):
         initial_dbs = all_dbs[:initial_devices]
         additional_dbs = all_dbs[initial_devices : initial_devices + additional_devices]
 
-        logger.info(
-            f"Using {len(initial_dbs)} initial devices, {len(additional_dbs)} additional devices, will remove {devices_to_remove} devices"
-        )
-
         self.mark_test_step("Add documents to initial devices")
 
         # Add documents to initial devices
@@ -536,7 +471,6 @@ class TestMultipeer(CBLTestClass):
                     doc_num += 1
 
         total_initial_docs = len(initial_dbs) * 20
-        logger.info(f"Added {total_initial_docs} documents to initial devices")
 
         self.mark_test_step("Start multipeer replicator on initial devices")
 
@@ -550,8 +484,6 @@ class TestMultipeer(CBLTestClass):
         start_tasks = [replicator.start() for replicator in initial_replicators]
         await asyncio.gather(*start_tasks)
 
-        logger.info(f"Started multipeer replicator on {len(initial_dbs)} initial devices")
-
         # Wait for some initial replication progress (not all devices, just a few)
         devices_to_wait = max(1, len(initial_dbs) // 2)  # Wait for half of initial devices
         for i, replicator in enumerate(initial_replicators[:devices_to_wait]):
@@ -559,9 +491,6 @@ class TestMultipeer(CBLTestClass):
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
-            logger.info(f"Initial device {i + 1} reached idle status")
-
-        logger.info(f"{devices_to_wait} initial devices reached idle status")
 
         self.mark_test_step("Add additional devices to the mesh")
 
@@ -578,7 +507,6 @@ class TestMultipeer(CBLTestClass):
                     doc_num += 1
 
         total_additional_docs = len(additional_dbs) * 20
-        logger.info(f"Added {total_additional_docs} documents to additional devices")
 
         # Start replicators on additional devices
         additional_replicators = [
@@ -589,8 +517,6 @@ class TestMultipeer(CBLTestClass):
         ]
         start_tasks = [replicator.start() for replicator in additional_replicators]
         await asyncio.gather(*start_tasks)
-
-        logger.info(f"Started multipeer replicator on {len(additional_dbs)} additional devices")
 
         # Wait a short time for replication to start, then remove devices
         await asyncio.sleep(2)  # Give replication a moment to begin
@@ -611,17 +537,12 @@ class TestMultipeer(CBLTestClass):
         for i, replicator in enumerate(all_replicators):
             if i in devices_to_remove_indices:
                 removed_replicators.append(replicator)
-                logger.info(f"Selected device {i + 1} for removal during active replication")
             else:
                 remaining_replicators.append(replicator)
                 remaining_dbs.append(all_dbs[i])
 
         # Stop the selected replicators while replication is still happening
         await asyncio.gather(*[replicator.stop() for replicator in removed_replicators])
-
-        logger.info(
-            f"Removed {len(removed_replicators)} devices from the mesh during active replication"
-        )
 
         self.mark_test_step("Wait for remaining devices to stabilize after removal")
 
@@ -631,9 +552,6 @@ class TestMultipeer(CBLTestClass):
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
-            logger.info(f"Remaining device {i + 1} reached idle status")
-
-        logger.info(f"All {len(remaining_replicators)} remaining devices reached idle status")
 
         self.mark_test_step("Verify remaining devices achieve full data consistency")
 
@@ -648,7 +566,6 @@ class TestMultipeer(CBLTestClass):
             assert actual_count == total_expected_docs, (
                 f"Device {i + 1} should have {total_expected_docs} docs, got {actual_count}"
             )
-            logger.info(f"Device {i + 1} has {actual_count} documents")
 
         # Verify all devices have identical content
         for i, docs in enumerate(all_docs_results[1:], 2):
@@ -656,15 +573,8 @@ class TestMultipeer(CBLTestClass):
                 all_docs_results[0]["_default._default"], docs["_default._default"]
             ), f"Device {i} should have the same content as device 1"
 
-        logger.info(
-            f"Verified all {len(remaining_replicators)} remaining devices have {total_expected_docs} documents with identical content"
-        )
-
         # Cleanup remaining replicators
         await asyncio.gather(*[replicator.stop() for replicator in remaining_replicators])
-
-        logger.info("All remaining multipeer replicators stopped")
-        logger.info("Successfully completed test_dynamic_peer_addition_removal")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_large_document_replication(self, cblpytest: CBLPyTest):
@@ -674,20 +584,14 @@ class TestMultipeer(CBLTestClass):
         all_devices_dbs = await asyncio.gather(*reset_tasks)
         all_dbs = [dbs[0] for dbs in all_devices_dbs]
 
-        logger.info("Created databases on all devices")
-
         self.mark_test_step("Add 10 large documents with xl1.jpg blob to the database on device 1")
         db1 = all_dbs[0]
 
         async with db1.batch_updater() as b:
             for i in range(1, 11):  # Add 10 documents
                 b.upsert_document(
-                    "_default._default",
-                    f"large_doc{i}",
-                    new_blobs={"image": "xl1.jpg"}
+                    "_default._default", f"large_doc{i}", new_blobs={"image": "xl1.jpg"}
                 )
-
-        logger.info("Added 10 large documents with xl1.jpg blob")
 
         self.mark_test_step("Start multipeer replicator on all devices")
         multipeer_replicators = [
@@ -700,28 +604,22 @@ class TestMultipeer(CBLTestClass):
         mpstart_tasks = [multipeer.start() for multipeer in multipeer_replicators]
         await asyncio.gather(*mpstart_tasks)
 
-        logger.info("Started multipeer replicator on all devices")
-
         self.mark_test_step("Wait for idle status on all devices")
         for device_idx, multipeer in enumerate(multipeer_replicators[1:], 2):
             status = await multipeer.wait_for_idle(timeout=timedelta(seconds=200))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
-            logger.info(f"Device {device_idx} reached idle status")
 
         self.mark_test_step("Check that all device databases have the same content")
 
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        
+
         # Verify document count on each device
         for device_idx, docs in enumerate(all_docs_results, 1):
             doc_count = len(docs["_default._default"])
             assert doc_count == 10, f"Device {device_idx} should have 10 docs, got {doc_count}"
-            logger.info(f"Device {device_idx} has {doc_count} documents")
 
         # Verify content matches across all devices
         for device_idx, docs in enumerate(all_docs_results[1:], 2):
@@ -730,6 +628,3 @@ class TestMultipeer(CBLTestClass):
             ), f"Device {device_idx} content does not match device 1"
 
         await asyncio.gather(*[multipeer.stop() for multipeer in multipeer_replicators])
-
-        logger.info("All multipeer replicators stopped")
-        logger.info("Successfully completed test_large_document_replication")
