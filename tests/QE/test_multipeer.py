@@ -134,7 +134,6 @@ class TestMultipeer(CBLTestClass):
         # Distribute remainder devices across groups
         group1_size = group_size + (1 if remainder > 0 else 0)
         group2_size = group_size + (1 if remainder > 1 else 0)
-        group3_size = group_size
 
         group1_dbs = all_dbs[:group1_size]
         group2_dbs = all_dbs[group1_size : group1_size + group2_size]
