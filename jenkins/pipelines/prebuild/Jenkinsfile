@@ -62,10 +62,10 @@ pipeline {
         }
         stage('Build') {
             agent {
-                label 'mac-mini-new'
+                label getNodeForPlatform(params.TS_PLATFORM)
             }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
             }
             steps {
                 checkout([
@@ -111,5 +111,15 @@ pipeline {
                 }
             }
         }
+    }
+}
+
+def getNodeForPlatform(platform) {
+    if (platform.contains("windows")) {
+        return 'mob-e2e-win-01'
+    } else if (platform.contains("linux")) {
+        return 'mob-e2e-deb-02'
+    } else {
+        return 'mob-e2e-mac-01'
     }
 }
