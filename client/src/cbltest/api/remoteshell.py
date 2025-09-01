@@ -49,6 +49,22 @@ class RemoteShellConnection:
         except Exception as e:
             return False
 
+    async def take_offline(self) -> bool:
+        try:
+            command = "sudo iptables -A OUTPUT -d 172.23.96.195 -j REJECT"
+            await self.ssh_client.run(command, check=True)
+            return True
+        except Exception as e:
+            return False
+
+    async def bring_online(self) -> bool:
+        try:
+            command = "sudo iptables -D OUTPUT -d 172.23.96.195 -j REJECT"
+            await self.ssh_client.run(command, check=True)
+            return True
+        except Exception as e:
+            return False
+
     async def reset_db_uuid(self, db_name: str) -> bool:
         try:
             command = f"/opt/couchbase-edge-server/bin/couchbase-edge-server --reset-uuid /opt/couchbase-edge-server/etc/{db_name}.cblite2"
