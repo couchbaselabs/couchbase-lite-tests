@@ -50,7 +50,7 @@ def main(topology: str | None) -> None:
         "-auto-approve",
     ]
 
-    result = subprocess.run(command, capture_output=False, text=True)
+    result = subprocess.run(command, cwd=SCRIPT_DIR, capture_output=False, text=True)
 
     if result.returncode != 0:
         click.secho(

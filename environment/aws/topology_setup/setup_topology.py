@@ -98,6 +98,27 @@ class SyncGatewayDefaults:
         self.__version.set_value(cast(str, sgw_defaults[self.__version_key]))
 
 
+class EdgeServerDefaults:
+    __es_key: Final[str] = "es"
+    __version_key: Final[str] = "version"
+    __default_version: Final[str] = "1.0.0"
+
+    @property
+    def version(self) -> DefaultProperty:
+        return self.__version
+
+    def __init__(self, parent: dict):
+        self.__version = DefaultProperty(self.__default_version)
+        if self.__es_key not in parent:
+            return
+
+        es_default = cast(dict, parent[self.__es_key])
+        if self.__version_key not in es_default:
+            return
+
+        self.__version.set_value(cast(str, es_default[self.__version_key]))
+
+
 class ConfigDefaults:
     __defaults_key: Final[str] = "defaults"
 
@@ -109,6 +130,10 @@ class ConfigDefaults:
     def SyncGateway(self) -> SyncGatewayDefaults:
         return self.__sgw_defaults
 
+    @property
+    def EdgeServer(self) -> EdgeServerDefaults:
+        return self.__es_default
+
     def __init__(self, parent: dict):
         defaults = {}
         if self.__defaults_key in parent:
@@ -116,6 +141,7 @@ class ConfigDefaults:
 
         self.__cbs_defaults = CouchbaseServerDefaults(defaults)
         self.__sgw_defaults = SyncGatewayDefaults(defaults)
+        self.__es_default = EdgeServerDefaults(defaults)
 
     def extend(self, other: "ConfigDefaults"):
         if other.CouchbaseServer.version.is_set:
@@ -133,6 +159,12 @@ class ConfigDefaults:
                 )
 
             self.SyncGateway.version.set_value(other.SyncGateway.version.value)
+
+        if other.EdgeServer.version.is_set:
+            if self.EdgeServer.version.is_set:
+                raise Exception(
+                    "Both main and included file are setting default ES version"
+                )
 
 
 class ClusterConfig:
@@ -215,6 +247,7 @@ class SyncGatewayInput:
 
     Attributes:
         cluster_index (int): The index of the cluster to which the Sync Gateway belongs.
+        version (str): The version of the Sync Gateway instance to install.
     """
 
     @property
@@ -264,6 +297,51 @@ class SyncGatewayConfig:
         self.__hostname = hostname
         self.__internal_hostname = internal_hostname
         self.__cluster_hostname = cluster_hostname
+
+
+class EdgeServerInput:
+    """
+    A class to parse and store input configuration for an Edge Server instance.
+
+    Attributes:
+        version (str): The version of the Edge Server instance to install.
+    """
+
+    @property
+    def version(self) -> str:
+        return self.__version
+
+    def __init__(self, version: str):
+        self.__version = version
+
+
+class EdgeServerConfig:
+    """
+    A class to store the configuration of an Edge Server instance.
+
+    Attributes:
+        version (str): The version of the Edge Server instance to install.
+        hostname (str): The hostname of the Edge Server instance.
+        internal_hostname (str): The EC2 internal hostname of the Edge Server instance.
+        cluster_hostname (str): The hostname of the cluster to which the Edge Server belongs.
+    """
+
+    @property
+    def version(self) -> str:
+        return self.__version
+
+    @property
+    def hostname(self) -> str:
+        return self.__hostname
+
+    @property
+    def internal_hostname(self) -> str:
+        return self.__internal_hostname
+
+    def __init__(self, version: str, hostname: str, internal_hostname: str):
+        self.__version = version
+        self.__hostname = hostname
+        self.__internal_hostname = internal_hostname
 
 
 class LoadBalancerInput:
@@ -409,6 +487,7 @@ class TopologyConfig:
 
     __clusters_key: Final[str] = "clusters"
     __sync_gateways_key: Final[str] = "sync_gateways"
+    __edge_servers_key: Final[str] = "edge_servers"
     __cluster_key: Final[str] = "cluster"
     __test_servers_key: Final[str] = "test_servers"
     __load_balancers_key: Final[str] = "load_balancers"
@@ -427,9 +506,11 @@ class TopologyConfig:
 
         self.__defaults = ConfigDefaults({})
         self.__clusters: list[ClusterConfig] = []
+        self.__cluster_inputs: list[ClusterInput] = []
         self.__sync_gateways: list[SyncGatewayConfig] = []
         self.__sync_gateway_inputs: list[SyncGatewayInput] = []
-        self.__cluster_inputs: list[ClusterInput] = []
+        self.__edge_servers: list[EdgeServerConfig] = []
+        self.__edge_server_inputs: list[EdgeServerInput] = []
         self.__test_server_inputs: list[TestServerInput] = []
         self.__test_servers: list[TestServerConfig] = []
         self.__load_balancers: list[LoadBalancerConfig] = []
@@ -470,6 +551,16 @@ class TopologyConfig:
                     self.__sync_gateway_inputs.append(
                         SyncGatewayInput(cluster_index, version)
                     )
+
+            if self.__edge_servers_key in config:
+                raw_entry = cast(list[dict], config[self.__edge_servers_key])
+                for raw_server in raw_entry:
+                    version = (
+                        cast(str, raw_server[self.__version_key])
+                        if self.__version_key in raw_server
+                        else str(self.__defaults.EdgeServer.version)
+                    )
+                    self.__edge_server_inputs.append(EdgeServerInput(version))
 
             if self.__test_servers_key in config:
                 raw_servers = cast(
@@ -516,6 +607,7 @@ class TopologyConfig:
                 sub_config = TopologyConfig(include_file, self.__defaults)
                 self.__cluster_inputs.extend(sub_config.__cluster_inputs)
                 self.__sync_gateway_inputs.extend(sub_config.__sync_gateway_inputs)
+                self.__edge_server_inputs.extend(sub_config.__edge_server_inputs)
                 self.__load_balancer_inputs.extend(sub_config.__load_balancer_inputs)
                 self.__test_server_inputs.extend(sub_config.__test_server_inputs)
                 if self._wants_logslurp is None:
@@ -533,6 +625,10 @@ class TopologyConfig:
         return len(self.__sync_gateway_inputs)
 
     @property
+    def total_es_count(self) -> int:
+        return len(self.__edge_server_inputs)
+
+    @property
     def total_lb_count(self) -> int:
         return len(self.__load_balancer_inputs)
 
@@ -543,6 +639,10 @@ class TopologyConfig:
     @property
     def sync_gateways(self) -> list[SyncGatewayConfig]:
         return self.__sync_gateways
+
+    @property
+    def edge_servers(self) -> list[EdgeServerConfig]:
+        return self.__edge_servers
 
     @property
     def test_servers(self) -> list[TestServerConfig]:
@@ -618,6 +718,35 @@ class TopologyConfig:
 
         sgw_internal_ips = cast(list[str], json.loads(result.stdout))
         self.apply_sgw_hostnames(sgw_ips, sgw_internal_ips)
+
+        es_command = [
+            "terraform",
+            "output",
+            "-json",
+            "edge_server_instance_public_ips",
+        ]
+        result = subprocess.run(es_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(
+                f"Command '{' '.join(es_command)}' failed with exit status {result.returncode}: {result.stderr}"
+            )
+
+        es_ips = cast(list[str], json.loads(result.stdout))
+
+        es_command = [
+            "terraform",
+            "output",
+            "-json",
+            "edge_server_instance_private_ips",
+        ]
+        result = subprocess.run(es_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(
+                f"Command '{' '.join(es_command)}' failed with exit status {result.returncode}: {result.stderr}"
+            )
+
+        es_internal_ips = cast(list[str], json.loads(result.stdout))
+        self.apply_es_hostnames(es_ips, es_internal_ips)
 
         lb_command = [
             "terraform",
@@ -740,6 +869,22 @@ class TopologyConfig:
             )
             self.__sync_gateways.append(sgw)
 
+    def apply_es_hostnames(self, hostnames: list[str], internal_hostnames: list[str]):
+        """
+        Apply the Edge Server hostnames to the configuration.
+
+        Args:
+            hostnames (List[str]): The list of Edge Server hostnames.
+            internal_hostnames (List[str]): The list of Edge Server internal hostnames.
+        """
+        for es_input in self.__edge_server_inputs:
+            es = EdgeServerConfig(
+                es_input.version,
+                hostnames.pop(0),
+                internal_hostnames.pop(0),
+            )
+            self.__edge_servers.append(es)
+
     def apply_server_hostnames(
         self, server_hostnames: list[str], server_internal_hostnames: list[str]
     ):
@@ -769,6 +914,9 @@ class TopologyConfig:
         Args:
             hostnames (List[str]): The list of load balancer hostnames.
         """
+        if len(hostnames) == 0:
+            return
+
         if len(self.__sync_gateways) == 0:
             return
         if len(self.__sync_gateways) == 0:
@@ -812,6 +960,15 @@ class TopologyConfig:
         if len(self.__sync_gateways) > 0:
             click.echo()
 
+        i = 1
+        for es in self.__edge_servers:
+            click.echo(
+                f"Edge Server {i} ({es.version}): {es.hostname} -> {es.internal_hostname}"
+            )
+            i += 1
+
+        if len(self.__edge_servers) > 0:
+            click.echo()
         i = 1
         for lb in self.__load_balancers:
             click.echo(f"Load Balancer {i}: {lb.hostname}")

@@ -46,6 +46,9 @@ info:
       ```
 
     Changes
+    2.0.2 (07/24/2025)
+    * Add peer ID property to return value of [/startMultipeerReplicator](#operation/startMultipeerReplicator)
+
     2.0.1 (07/10/2025)
     * Add Merge-Dict Conflict Resolver
 
@@ -142,7 +145,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 1.2.1
+  version: 2.0.2
 tags:
   - name: API
     description: The API endpoints of the test server
@@ -882,7 +885,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Replicator'
+                $ref: '#/components/schemas/MultipeerReplicator'
         '400':
           $ref: '#/components/responses/Error'
         '404':
@@ -1274,6 +1277,18 @@ components:
             $ref: '#/components/schemas/DocumentReplication'
         error:
           $ref: '#/components/schemas/Error'
+    MultipeerReplicator:
+      type: object
+      required: ['id', "peerID"]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: '123e4567-e89b-12d3-a456-426614174000'
+        peerID:
+          type: string
+          format: base64
+          example: 'scGCZGP6yPiMsbEn+kXk725S2RoSUeN662CJL+cQDpw='
     MultipeerReplicatorStatus:
       type: object
       required: ['replicators']
