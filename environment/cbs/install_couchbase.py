@@ -22,8 +22,8 @@ RELEASES = {
     'morpheus': '8.0.0'
 }
 
-DEFAULT_VERSION = "7.6.2"
-DEFAULT_BUILD = "3721"
+DEFAULT_VERSION = "7.6.6"
+DEFAULT_BUILD = "6126"
 
 
 # Function to map version to codename
