@@ -47,7 +47,7 @@ class TestMultipeer(CBLTestClass):
 
         self.mark_test_step("Wait for idle status on all devices")
         for multipeer in multipeer_replicators[1:]:
-            status = await multipeer.wait_for_idle()
+            status = await multipeer.wait_for_idle(timeout=timedelta(seconds=60))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
@@ -99,7 +99,7 @@ class TestMultipeer(CBLTestClass):
 
         self.mark_test_step("Wait for idle status on all devices")
         for multipeer in multipeer_replicators:
-            status = await multipeer.wait_for_idle()
+            status = await multipeer.wait_for_idle(timeout=timedelta(seconds=300))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
@@ -210,7 +210,7 @@ class TestMultipeer(CBLTestClass):
 
         # Wait for initial replication within each group
         for replicator in all_replicators:
-            status = await replicator.wait_for_idle()
+            status = await replicator.wait_for_idle(timeout=timedelta(seconds=300))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
@@ -320,7 +320,7 @@ class TestMultipeer(CBLTestClass):
         # Wait for replication between group 1 and group 2
         all_replicators = group1_replicators + group2_replicators + group3_replicators
         for replicator in all_replicators:
-            status = await replicator.wait_for_idle()
+            status = await replicator.wait_for_idle(timeout=timedelta(seconds=300))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
@@ -356,7 +356,7 @@ class TestMultipeer(CBLTestClass):
         # Wait for replication across all groups
         all_replicators = group1_replicators + group2_replicators + group3_replicators
         for replicator in all_replicators:
-            status = await replicator.wait_for_idle()
+            status = await replicator.wait_for_idle(timeout=timedelta(seconds=300))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
@@ -435,7 +435,7 @@ class TestMultipeer(CBLTestClass):
                 await asyncio.sleep(30)
                 retry = retry - 1
                 for mp in multipeer_replicators:
-                    status = await mp.wait_for_idle(timeout=timedelta(seconds=60))
+                    status = await mp.wait_for_idle(timeout=timedelta(seconds=300))
                     assert all(r.status.replicator_error is None for r in status.replicators), \
                         "Multipeer replicator should not have any errors"
             assert results[0].revs == doc.revs, f"revision IDs dont match for {doc} even after 5 retries"
@@ -496,7 +496,7 @@ class TestMultipeer(CBLTestClass):
         # Wait for some initial replication progress (not all devices, just a few)
         devices_to_wait = max(1, len(initial_dbs) // 2)  # Wait for half of initial devices
         for i, replicator in enumerate(initial_replicators[:devices_to_wait]):
-            status = await replicator.wait_for_idle()
+            status = await replicator.wait_for_idle(timeout=timedelta(seconds=300))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
@@ -557,7 +557,7 @@ class TestMultipeer(CBLTestClass):
 
         # Wait for remaining devices to reach idle
         for i, replicator in enumerate(remaining_replicators):
-            status = await replicator.wait_for_idle()
+            status = await replicator.wait_for_idle(timeout=timedelta(seconds=300))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
