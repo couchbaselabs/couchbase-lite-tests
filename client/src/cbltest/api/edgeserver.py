@@ -683,6 +683,19 @@ class EdgeServer:
         await self.__ssh_client.reset_db(local_db_path)
         await self.start_server()
 
+    async def go_offline(self) -> bool:
+        with self.__tracer.start_as_current_span("go offline"):
+            await self.__ssh_client.connect()
+            result = await self.__ssh_client.take_offline()
+            await self.__ssh_client.close()
+            return result
+
+    async def go_online(self) -> bool:
+        with self.__tracer.start_as_current_span("go online"):
+            await self.__ssh_client.connect()
+            result = await self.__ssh_client.bring_online()
+            await self.__ssh_client.close()
+            return result
 
 
 
