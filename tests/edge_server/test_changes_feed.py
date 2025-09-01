@@ -121,7 +121,7 @@ class TestChangesFeed(CBLTestClass):
 
         doc = "doc_5"
         response = await edge_server.delete_document(doc, rev_id, es_db_name)
-        assert response.get("ok"), f"Failed to delete document {doc_id} from Edge Server."
+        assert response.get("ok"), f"Failed to delete document {doc} from Edge Server."
         logger.info(f"Deleted document {doc} from Edge Server.")
 
         self.mark_test_step("Check that deleted documents are visible in changes feed with active_only=False")
