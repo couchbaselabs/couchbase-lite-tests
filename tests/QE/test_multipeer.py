@@ -19,6 +19,8 @@ from cbltest.api.test_functions import compare_doc_results_p2p
 class TestMultipeer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_large_mesh_sanity(self, cblpytest: CBLPyTest):
+        for ts in cblpytest.test_servers:
+            await self.skip_if_cbl_not(ts, ">= 3.3.0")
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -63,6 +65,8 @@ class TestMultipeer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_large_mesh_consistency(self, cblpytest: CBLPyTest):
+        for ts in cblpytest.test_servers:
+            await self.skip_if_cbl_not(ts, ">= 3.3.0")
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -112,6 +116,8 @@ class TestMultipeer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_network_partition(self, cblpytest: CBLPyTest):
+        for ts in cblpytest.test_servers:
+            await self.skip_if_cbl_not(ts, ">= 3.3.0")
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
@@ -438,6 +444,8 @@ class TestMultipeer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_dynamic_peer_addition_removal(self, cblpytest: CBLPyTest):
+        for ts in cblpytest.test_servers:
+            await self.skip_if_cbl_not(ts, ">= 3.3.0")
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
@@ -578,6 +586,8 @@ class TestMultipeer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_large_document_replication(self, cblpytest: CBLPyTest):
+        for ts in cblpytest.test_servers:
+            await self.skip_if_cbl_not(ts, ">= 3.3.0")
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
