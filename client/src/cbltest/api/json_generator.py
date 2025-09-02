@@ -126,7 +126,6 @@ class JSONGenerator:
         """Generate all documents using parallel processing"""
         if size is None:
             size = self.size
-        start = time.time()
 
         doc_ids = [str(uuid.uuid4()) for _ in range(size)]
         documents = self.batch_process(self.generate_document, doc_ids)
@@ -136,7 +135,6 @@ class JSONGenerator:
         self, documents: Dict[str, Any]
     ) -> Dict[str, Dict[str, Any]]:
         """Update all documents with consistent modifications"""
-        start = time.time()
 
         doc_ids = list(documents.keys())
         updated = self.batch_process(self.update_document, doc_ids, documents)
