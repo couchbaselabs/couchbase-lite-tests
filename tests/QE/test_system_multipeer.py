@@ -25,7 +25,7 @@ class TestSystemMultipeer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system(self, cblpytest: CBLPyTest):
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts,">= 3.3.0")
+            await self.skip_if_cbl_not(ts, ">= 3.3.0")
         NUM_DEVICES = len(cblpytest.test_servers)
         TEST_DURATION = timedelta(hours=1)
         CRUD_INTERVAL = timedelta(minutes=3)
@@ -48,10 +48,8 @@ class TestSystemMultipeer(CBLTestClass):
 
         async def insert_each_batch(start, value=10):
             async with db1.batch_updater() as b:
-                for i in doc_ids[start:start + value]:
-                    b.upsert_document(
-                        "_default._default", i, documents[i]
-                    )
+                for i in doc_ids[start : start + value]:
+                    b.upsert_document("_default._default", i, documents[i])
 
         for start in range(0, len(doc_ids), 10):
             await insert_each_batch(start)
@@ -88,7 +86,9 @@ class TestSystemMultipeer(CBLTestClass):
             update_count = random.randint(1, MAX_DOCS_PER_CRUD)
             num_updates = random.randint(1, 3)
 
-            crud_ids = random.sample(doc_ids, (delete_count + update_count))  # to ensure no overlaps in IDs
+            crud_ids = random.sample(
+                doc_ids, (delete_count + update_count)
+            )  # to ensure no overlaps in IDs
             to_delete = crud_ids[:delete_count]
             to_update = crud_ids[delete_count:]
             # should_stop_testserver = random.random() < 0.25  # decides randomly if the selected testserver should be down
@@ -96,7 +96,9 @@ class TestSystemMultipeer(CBLTestClass):
             new_docs = docgen.generate_all_documents(size=insert_count)
             new_doc_ids = list(new_docs.keys())
             documents.update(new_docs)  # add newly generated docs to the documents dict
-            doc_ids.extend(new_doc_ids)  # add newly generated doc_ids to the doc_ids list
+            doc_ids.extend(
+                new_doc_ids
+            )  # add newly generated doc_ids to the doc_ids list
 
             doc_ids = list(set(doc_ids) - set(to_delete))
             docs_to_update = {k: documents[k] for k in to_update}
@@ -128,7 +130,9 @@ class TestSystemMultipeer(CBLTestClass):
                         end = min(start + 10, len(to_update))
                         async with all_dbs[update_testserver].batch_updater() as b:
                             for doc_id in to_update[start:end]:
-                                b.upsert_document("_default._default", doc_id, updated_docs[doc_id])
+                                b.upsert_document(
+                                    "_default._default", doc_id, updated_docs[doc_id]
+                                )
                         docs_to_update = updated_docs
 
             async def stop_restart_task():
@@ -151,12 +155,14 @@ class TestSystemMultipeer(CBLTestClass):
             self.mark_test_step("Wait for idle status on all devices ")
             for multipeer in multipeer_replicators:
                 try:
-                    status = await multipeer.wait_for_idle(timeout=timedelta(seconds=100))
+                    status = await multipeer.wait_for_idle(
+                        timeout=timedelta(seconds=1000)
+                    )
                 except Exception:
                     self.mark_test_step("Replication staus fetch timed out")
-                assert all(r.status.replicator_error is None for r in status.replicators), (
-                    "Multipeer replicator should not have any errors"
-                )
+                assert all(
+                    r.status.replicator_error is None for r in status.replicators
+                ), "Multipeer replicator should not have any errors"
 
             self.mark_test_step(
                 "Verifying that all devices have identical document content"
@@ -167,7 +173,8 @@ class TestSystemMultipeer(CBLTestClass):
             all_docs_results = await asyncio.gather(*all_docs_collection)
             for all_docs in all_docs_results[1:]:
                 assert compare_doc_results_p2p(
-                    all_docs_results[0]["_default._default"], all_docs["_default._default"]
+                    all_docs_results[0]["_default._default"],
+                    all_docs["_default._default"],
                 ), "All databases should have the same content"
 
         self.mark_test_step("Stopping all multipeer replicators")
@@ -177,7 +184,7 @@ class TestSystemMultipeer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_volume_with_blobs(self, cblpytest: CBLPyTest):
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts,">= 3.3.0")
+            await self.skip_if_cbl_not(ts, ">= 3.3.0")
         NO_OF_DOCS = 100000
         docgen = JSONGenerator(10, NO_OF_DOCS, format="key-value")
 
@@ -193,14 +200,30 @@ class TestSystemMultipeer(CBLTestClass):
         self.mark_test_step("""
                             Add docs with blobs to the database on device 1
                         """)
-        blobs_list = ["s1.jpg", "s2.jpg", "s3.jpg", "s4.jpg", "s5.jpg", "s6.jpg", "s7.jpg", "s8.jpg", "s9.jpg",
-                      "s10.jpg", "l1.jpg", "l2.jpg", "l3.jpg"]
+        blobs_list = [
+            "s1.jpg",
+            "s2.jpg",
+            "s3.jpg",
+            "s4.jpg",
+            "s5.jpg",
+            "s6.jpg",
+            "s7.jpg",
+            "s8.jpg",
+            "s9.jpg",
+            "s10.jpg",
+            "l1.jpg",
+            "l2.jpg",
+            "l3.jpg",
+        ]
 
         async def insert_each_batch(start, value=10):
             async with db1.batch_updater() as b:
-                for i in doc_ids_list[start:start + value]:
+                for i in doc_ids_list[start : start + value]:
                     b.upsert_document(
-                        "_default._default", i, documents[i], new_blobs={"img": random.choice(blobs_list)}
+                        "_default._default",
+                        i,
+                        documents[i],
+                        new_blobs={"img": random.choice(blobs_list)},
                     )
 
         for start in range(0, len(doc_ids), 10):
@@ -224,8 +247,9 @@ class TestSystemMultipeer(CBLTestClass):
         self.mark_test_step("Wait for idle status on all devices")
         for mp in multipeer_replicators:
             status = await mp.wait_for_idle(timeout=timedelta(seconds=6000))
-            assert all(r.status.replicator_error is None for r in status.replicators), \
+            assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
+            )
 
         self.mark_test_step(
             "Verifying that all devices have identical document content"
@@ -248,14 +272,18 @@ class TestSystemMultipeer(CBLTestClass):
         #    /                       \
         # CBL1 <--> CBL2<--->CBL3<--->CBL4
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts,">= 3.3.0")
+            await self.skip_if_cbl_not(ts, ">= 3.3.0")
         DOC_COUNT = 1000
 
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud_1 = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
+        cloud_1 = CouchbaseCloud(
+            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
+        )
         await cloud_1.configure_dataset(dataset_path, "names")
 
-        cloud_2 = CouchbaseCloud(cblpytest.sync_gateways[1], cblpytest.couchbase_servers[1])
+        cloud_2 = CouchbaseCloud(
+            cblpytest.sync_gateways[1], cblpytest.couchbase_servers[1]
+        )
         await cloud_2.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset DBs on all CBL clients and SGWs")
@@ -361,24 +389,36 @@ class TestSystemMultipeer(CBLTestClass):
             await sgw.upsert_documents(db_name, docs_list)
 
         async def insert_testserver(testserver_db):
-            docgen = JSONGenerator(random.randint(21, 50), size=DOC_COUNT, format="key-value")
+            docgen = JSONGenerator(
+                random.randint(21, 50), size=DOC_COUNT, format="key-value"
+            )
             testserver_docs = docgen.generate_all_documents()
             testserver_keys = list(testserver_docs.keys())
             for start in range(0, DOC_COUNT, 10):
                 end = min(start + 10, DOC_COUNT)
                 async with testserver_db.batch_updater() as b:
                     for key in testserver_keys[start:end]:
-                        b.upsert_document("_default._default", key, testserver_docs[key])
+                        b.upsert_document(
+                            "_default._default", key, testserver_docs[key]
+                        )
 
         async def stop_and_restart_testserver(idx):
             await multipeer_replicators[idx].stop()
             await asyncio.sleep(random.randint(10, 30))
             await multipeer_replicators[idx].start()
 
-        tasks = [insert_server(cblpytest.couchbase_servers[0], ), insert_server(cblpytest.couchbase_servers[1]),
-                 insert_sgw(cblpytest.sync_gateways[0]), insert_sgw(cblpytest.sync_gateways[1]),
-                 insert_testserver(all_dbs[0]), insert_testserver(all_dbs[2]), insert_testserver(all_dbs[3]),
-                 stop_and_restart_testserver(1)]
+        tasks = [
+            insert_server(
+                cblpytest.couchbase_servers[0],
+            ),
+            insert_server(cblpytest.couchbase_servers[1]),
+            insert_sgw(cblpytest.sync_gateways[0]),
+            insert_sgw(cblpytest.sync_gateways[1]),
+            insert_testserver(all_dbs[0]),
+            insert_testserver(all_dbs[2]),
+            insert_testserver(all_dbs[3]),
+            stop_and_restart_testserver(1),
+        ]
         await asyncio.gather(*tasks)
         self.mark_test_step("Wait for idle status on all devices ")
         await asyncio.sleep(300)

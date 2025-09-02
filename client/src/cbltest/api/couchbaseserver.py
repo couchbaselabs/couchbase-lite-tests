@@ -176,13 +176,14 @@ class CouchbaseServer:
                 pass
 
             return list(dict(result) for result in query_obj.execute())
+
     def upsert_document(
         self,
         bucket: str,
         doc_id: str,
         document: dict,
-        scope: str= "_default",
-        collection: str= "_default",
+        scope: str = "_default",
+        collection: str = "_default",
     ) -> None:
         """
         Inserts a document into the specified bucket.scope.collection.
@@ -193,12 +194,13 @@ class CouchbaseServer:
         :param doc_id: The document ID.
         :param document: The document content (a dictionary).
         """
-        with self.__tracer.start_as_current_span("insert_document",
+        with self.__tracer.start_as_current_span(
+            "insert_document",
             attributes={
                 "cbl.bucket.name": bucket,
                 "cbl.scope.name": scope,
                 "cbl.collection.name": collection,
-                "cbl.document.id": doc_id
+                "cbl.document.id": doc_id,
             },
         ):
             try:

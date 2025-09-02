@@ -90,7 +90,7 @@ def fetch_latest_build(platform: str, version: str) -> str:
 
 
 def parse_platform_versions(
-        platform_versions: str, auto_fetch_builds: bool = True
+    platform_versions: str, auto_fetch_builds: bool = True
 ) -> list[dict]:
     """
     Parse platform version specifications.
@@ -183,7 +183,9 @@ def parse_platform_versions(
 
 
 def get_platform_topology_files(
-        platform_key: str, target_os: str | None = None, topology_file: str = "topology.json"
+    platform_key: str,
+    target_os: str | None = None,
+    topology_file: str = "topology.json",
 ) -> list[Path]:
     """
     Get appropriate topology files for a platform, with optional OS specification.
@@ -254,7 +256,7 @@ def parse_platform_key(platform_key: str) -> tuple[str, str | None]:
 
 
 def compose_multiplatform_topology(
-        platform_versions: dict[str, dict[str, str]], topology_file: str | None = None
+    platform_versions: dict[str, dict[str, str]], topology_file: str | None = None
 ) -> dict[str, Any]:
     """
     Compose a multiplatform topology from platform-specific topology files.
@@ -288,7 +290,9 @@ def compose_multiplatform_topology(
         click.echo(f"Loading topology for {platform_key}...")
 
         # Get topology files for this platform
-        topology_files = get_platform_topology_files(platform_key,topology_file=topology_file)
+        topology_files = get_platform_topology_files(
+            platform_key, topology_file=topology_file
+        )
         if not topology_files:
             click.secho(
                 f"Warning: No topology files found for {platform_key}, skipping...",
@@ -328,8 +332,9 @@ def compose_multiplatform_topology(
                 if "clusters" in platform_topology:
                     composed_topology["clusters"] = platform_topology["clusters"]
                 if "sync_gateways" in platform_topology:
-                    composed_topology["sync_gateways"] = platform_topology["sync_gateways"]
-
+                    composed_topology["sync_gateways"] = platform_topology[
+                        "sync_gateways"
+                    ]
 
         except Exception as e:
             click.secho(f"Error loading topology for {platform_key}: {e}", fg="red")
@@ -339,11 +344,11 @@ def compose_multiplatform_topology(
 
 
 def run_platform_specific_setup(
-        platform_key: str,
-        full_version: str,
-        sgw_version: str,
-        private_key: str | None = None,
-        target_os: str | None = None,
+    platform_key: str,
+    full_version: str,
+    sgw_version: str,
+    private_key: str | None = None,
+    target_os: str | None = None,
 ) -> None:
     """
     Run platform-specific setup scripts.
@@ -404,27 +409,27 @@ def run_platform_specific_setup(
 
 
 def setup_multiplatform_test(
-        platform_versions_str: str,
-        sgw_version: str,
-        config_file_in: Path,
-        topology_tag: str,
-        private_key: str | None = None,
-        couchbase_version: str = "7.6.4",
-        public_key_name: str = "jborden",
-        setup_dir: str = "QE",
-        auto_fetch_builds: bool = True,
-        topology_file: str | None = None,
+    platform_versions_str: str,
+    sgw_version: str,
+    config_file_in: Path,
+    topology_tag: str,
+    private_key: str | None = None,
+    couchbase_version: str = "7.6.4",
+    public_key_name: str = "jborden",
+    setup_dir: str = "QE",
+    auto_fetch_builds: bool = True,
+    topology_file: str | None = None,
 ) -> None:
     """
     Sets up a multiplatform testing environment with platform-specific CBL versions and topologies.
     """
     config_file_out = SCRIPT_DIR.parents[3] / "tests" / setup_dir / "config.json"
     topology_file_out = (
-            SCRIPT_DIR.parents[3]
-            / "environment"
-            / "aws"
-            / "topology_setup"
-            / "topology.json"
+        SCRIPT_DIR.parents[3]
+        / "environment"
+        / "aws"
+        / "topology_setup"
+        / "topology.json"
     )
 
     assert config_file_in.exists() and config_file_in.is_file(), (
@@ -448,7 +453,9 @@ def setup_multiplatform_test(
         platform_versions_dict[platform_key] = {
             "full_version": f"{platform_info['version']}-{platform_info['build']}"
         }
-    topology = compose_multiplatform_topology(platform_versions_dict, topology_file=topology_file)
+    topology = compose_multiplatform_topology(
+        platform_versions_dict, topology_file=topology_file
+    )
 
     # Set topology defaults (use versions as-is for local testing)
     topology["defaults"] = {
@@ -468,7 +475,9 @@ def setup_multiplatform_test(
     # First validate all devices
     topology_config = TopologyConfig(str(topology_file_out))
     for test_server_input in topology_config._TopologyConfig__test_server_inputs:
-        test_server = TestServer.create(test_server_input.platform, test_server_input.cbl_version)
+        test_server = TestServer.create(
+            test_server_input.platform, test_server_input.cbl_version
+        )
         bridge = test_server.create_bridge()
         bridge.validate(test_server_input.location)
 
@@ -498,11 +507,11 @@ def setup_multiplatform_test(
     "--setup-only", is_flag=True, help="Only setup platforms, do not run tests"
 )
 def main(
-        platform_versions: str,
-        sgw_version: str,
-        topology_file: str | None = None,
-        no_auto_fetch: bool = False,
-        setup_only: bool=False,
+    platform_versions: str,
+    sgw_version: str,
+    topology_file: str | None = None,
+    no_auto_fetch: bool = False,
+    setup_only: bool = False,
 ):
     """
     Setup multiplatform CBL testing environment.
@@ -530,7 +539,7 @@ def main(
             "multiplatform",
             private_key_path,
             auto_fetch_builds=not no_auto_fetch,
-            topology_file=topology_file
+            topology_file=topology_file,
         )
         click.secho(
             "🎉 Multiplatform setup completed successfully!", fg="green", bold=True
