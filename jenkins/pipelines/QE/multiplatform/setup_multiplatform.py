@@ -198,8 +198,9 @@ def get_platform_topology_files(
     Returns:
         List of topology file paths to use
     """
+
     # For multiplatform setup, always use the multiplatform topology file
-    multiplatform_topology = SCRIPT_DIR / topology_file
+    multiplatform_topology = SCRIPT_DIR / Path(topology_file)
 
     if multiplatform_topology.exists():
         return [multiplatform_topology]
@@ -229,9 +230,9 @@ def get_platform_topology_files(
     for platform_dir in platform_dirs:
         if platform_dir.exists():
             for pattern in topology_patterns:
-                topology_file = platform_dir / pattern
-                if topology_file.exists():
-                    topology_files.append(topology_file)
+                default_topology_file = platform_dir / Path(pattern)
+                if default_topology_file.exists():
+                    topology_files.append(default_topology_file)
                     # Return the first match for each directory
                     break
 
@@ -256,7 +257,7 @@ def parse_platform_key(platform_key: str) -> tuple[str, str | None]:
 
 
 def compose_multiplatform_topology(
-    platform_versions: dict[str, dict[str, str]], topology_file: str | None = None
+    platform_versions: dict[str, dict[str, str]], topology_file: str = ""
 ) -> dict[str, Any]:
     """
     Compose a multiplatform topology from platform-specific topology files.
@@ -301,11 +302,11 @@ def compose_multiplatform_topology(
             continue
 
         # Use the first topology file found
-        topology_file = topology_files[0]
-        click.echo(f"Using topology: {topology_file.name}")
+        topology_file1 = topology_files[0]
+        click.echo(f"Using topology: {topology_file1.name}")
 
         try:
-            with open(topology_file) as f:
+            with open(topology_file1) as f:
                 platform_topology = json.load(f)
 
                 # Get the expected server platform(s) for this platform
@@ -418,7 +419,7 @@ def setup_multiplatform_test(
     public_key_name: str = "jborden",
     setup_dir: str = "QE",
     auto_fetch_builds: bool = True,
-    topology_file: str | None = None,
+    topology_file: str = "",
 ) -> None:
     """
     Sets up a multiplatform testing environment with platform-specific CBL versions and topologies.
@@ -472,14 +473,7 @@ def setup_multiplatform_test(
     with open(topology_file_out, "w") as fout:
         json.dump(topology, fout, indent=4)
 
-    # First validate all devices
     topology_config = TopologyConfig(str(topology_file_out))
-    for test_server_input in topology_config._TopologyConfig__test_server_inputs:
-        test_server = TestServer.create(
-            test_server_input.platform, test_server_input.cbl_version
-        )
-        bridge = test_server.create_bridge()
-        bridge.validate(test_server_input.location)
 
     # Then start backend and set up devices
     click.secho("\n🔧 PHASE 1: SETTING UP CBL TEST SERVERS", fg="green")
@@ -509,7 +503,7 @@ def setup_multiplatform_test(
 def main(
     platform_versions: str,
     sgw_version: str,
-    topology_file: str | None = None,
+    topology_file: str = "",
     no_auto_fetch: bool = False,
     setup_only: bool = False,
 ):
