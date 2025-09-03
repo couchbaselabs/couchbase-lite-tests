@@ -15,7 +15,6 @@ import click
 import requests
 
 from environment.aws.start_backend import script_entry as start_backend
-from environment.aws.topology_setup.test_server import TestServer
 from jenkins.pipelines.shared.setup_test import TopologyConfig
 
 if __name__ == "__main__":
