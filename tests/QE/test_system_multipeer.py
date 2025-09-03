@@ -427,17 +427,17 @@ class TestSystemMultipeer(CBLTestClass):
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
-        status = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        repl1_status = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
+        assert repl1_status.error is None, (
+            f"Error waiting for replicator: ({repl1_status.error.domain} / {repl1_status.error.code}) {repl1_status.error.message}"
         )
-        status = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        repl2_status = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
+        assert repl2_status.error is None, (
+            f"Error waiting for replicator: ({repl2_status.error.domain} / {repl2_status.error.code}) {repl2_status.error.message}"
         )
-        status = await replicator3.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        repl3_status = await replicator3.wait_for(ReplicatorActivityLevel.IDLE)
+        assert repl3_status.error is None, (
+            f"Error waiting for replicator: ({repl3_status.error.domain} / {repl3_status.error.code}) {repl3_status.error.message}"
         )
 
         self.mark_test_step(
