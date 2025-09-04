@@ -23,7 +23,12 @@ class JSONGenerator:
                               To insert into test-server use format "key-value" .
     """
 
-    def __init__(self, seed:int=random.randint(0, sys.maxsize), size:int=60000, format:str="json"):
+    def __init__(
+        self,
+        seed: int = random.randint(0, sys.maxsize),
+        size: int = 60000,
+        format: str = "json",
+    ):
         self.seed = seed
         self.size = size
         self.format = format
