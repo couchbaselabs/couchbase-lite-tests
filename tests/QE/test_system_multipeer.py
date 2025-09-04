@@ -18,6 +18,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_doc_results_p2p, compare_local_and_remote
+from cbltest.responses import ServerVariant
 
 
 @pytest.mark.min_test_servers(2)
@@ -26,6 +27,9 @@ class TestSystemMultipeer(CBLTestClass):
     async def test_system(self, cblpytest: CBLPyTest):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
+            await self.skip_if_not_platform(
+                ts, ServerVariant.ANDROID | ServerVariant.IOS
+            )
         NUM_DEVICES = len(cblpytest.test_servers)
         TEST_DURATION = timedelta(hours=1)
         CRUD_INTERVAL = timedelta(minutes=3)
@@ -91,8 +95,9 @@ class TestSystemMultipeer(CBLTestClass):
             )  # to ensure no overlaps in IDs
             to_delete = crud_ids[:delete_count]
             to_update = crud_ids[delete_count:]
-            # should_stop_testserver = random.random() < 0.25  # decides randomly if the selected testserver should be down
-            should_stop_testserver = True
+            should_stop_testserver = (
+                random.random() < 0.25
+            )  # decides randomly if the selected testserver should be down
             new_docs = docgen.generate_all_documents(size=insert_count)
             new_doc_ids = list(new_docs.keys())
             documents.update(new_docs)  # add newly generated docs to the documents dict
@@ -185,6 +190,9 @@ class TestSystemMultipeer(CBLTestClass):
     async def test_volume_with_blobs(self, cblpytest: CBLPyTest):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
+            await self.skip_if_not_platform(
+                ts, ServerVariant.ANDROID | ServerVariant.IOS
+            )
         NO_OF_DOCS = 100000
         docgen = JSONGenerator(10, NO_OF_DOCS, format="key-value")
 
@@ -266,6 +274,9 @@ class TestSystemMultipeer(CBLTestClass):
         await asyncio.gather(*[r.stop() for r in multipeer_replicators])
 
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.min_test_servers(5)
+    @pytest.mark.min_sync_gateways(2)
+    @pytest.mark.min_couchbase_servers(2)
     async def test_multipeer_end_to_end(self, cblpytest: CBLPyTest, dataset_path: Path):
         #  CB-server1           CB-server2
         #   SGW1                    SGW2 ----  CBL5
@@ -273,6 +284,9 @@ class TestSystemMultipeer(CBLTestClass):
         # CBL1 <--> CBL2<--->CBL3<--->CBL4
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
+            await self.skip_if_not_platform(
+                ts, ServerVariant.ANDROID | ServerVariant.IOS
+            )
         DOC_COUNT = 1000
 
         self.mark_test_step("Reset SG and load `names` dataset")
@@ -294,9 +308,8 @@ class TestSystemMultipeer(CBLTestClass):
         num_devices = len(cblpytest.test_servers)
         assert num_devices >= 5, "Need at least 5 devices for this test"
 
-        self.mark_test_step("Start push/pull replication with SGW1")
-
         self.mark_test_step("""
+        Start push/pull replication with SGW1
                     Start a replicator:
                         * endpoint: `/names`
                         * collections : `_default._default`
@@ -317,8 +330,8 @@ class TestSystemMultipeer(CBLTestClass):
         )
         await replicator1.start()
 
-        self.mark_test_step("Start push/pull replication with SGW2")
         self.mark_test_step("""
+        Start push/pull replication with SGW2
                             Start a replicator:
                                 * endpoint: `/names`
                                 * collections : `_default._default`
