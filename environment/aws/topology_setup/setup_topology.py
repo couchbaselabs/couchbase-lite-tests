@@ -918,8 +918,6 @@ class TopologyConfig:
             return
 
         if len(self.__sync_gateways) == 0:
-            return
-        if len(self.__sync_gateways) == 0:
             raise Exception(
                 "apply_sgw_hostnames must be called prior to apply_lb_hostnames"
             )
