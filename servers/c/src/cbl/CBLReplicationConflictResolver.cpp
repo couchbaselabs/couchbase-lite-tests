@@ -12,8 +12,8 @@ using namespace ts::support::json_util;
 namespace ts::cbl {
     class LocalWinsConflictResolver : public ConflictResolver {
     public:
-        explicit LocalWinsConflictResolver(const ConflictResolverSpec &spec) : ConflictResolver(
-            spec) {}
+        explicit LocalWinsConflictResolver(const ConflictResolverSpec &spec)
+        : ConflictResolver(spec) {}
 
         const CBLDocument *
         resolve(const CBLDocument *localDoc, const CBLDocument *remoteDoc) override {
@@ -25,8 +25,8 @@ namespace ts::cbl {
 
     class RemoteWinsConflictResolver : public ConflictResolver {
     public:
-        explicit RemoteWinsConflictResolver(const ConflictResolverSpec &spec) : ConflictResolver(
-            spec) {}
+        explicit RemoteWinsConflictResolver(const ConflictResolverSpec &spec)
+        : ConflictResolver(spec) {}
 
         const CBLDocument *
         resolve(const CBLDocument *localDoc, const CBLDocument *remoteDoc) override {
@@ -38,8 +38,8 @@ namespace ts::cbl {
 
     class DeleteConflictResolver : public ConflictResolver {
     public:
-        explicit DeleteConflictResolver(const ConflictResolverSpec &spec) : ConflictResolver(
-            spec) {}
+        explicit DeleteConflictResolver(const ConflictResolverSpec &spec)
+        : ConflictResolver(spec) {}
 
         const CBLDocument *
         resolve(const CBLDocument *localDoc, const CBLDocument *remoteDoc) override {
@@ -51,8 +51,9 @@ namespace ts::cbl {
 
     class MergeConflictResolver : public ConflictResolver {
     public:
-        explicit MergeConflictResolver(const ConflictResolverSpec &spec) : ConflictResolver(
-            spec) {
+        explicit MergeConflictResolver(const ConflictResolverSpec &spec)
+        : ConflictResolver(spec)
+        {
             auto params = ConflictResolver::spec().params;
             _property = GetValue<string>(params, "property");
         }
@@ -61,34 +62,100 @@ namespace ts::cbl {
         resolve(const CBLDocument *localDoc, const CBLDocument *remoteDoc) override {
             if (!localDoc || !remoteDoc) { return nullptr; }
 
-            auto doc = CBLDocument_MutableCopy(remoteDoc);
+            auto mergedDoc = CBLDocument_MutableCopy(remoteDoc);
+            auto mergedValues = FLMutableArray_New();
 
-            FLSlice key = FLStr(_property.data());
-            auto array = FLMutableArray_New();
-            auto prop = CBLDocument_Properties(localDoc);
-            auto value = FLDict_Get(prop, key);
-            if (value) {
-                FLMutableArray_AppendValue(array, value);
+            FLSlice docKey = FLStr(_property.data());
+
+            auto localProps = CBLDocument_Properties(localDoc);
+            auto localValue = FLDict_Get(localProps, docKey);
+            if (localValue) {
+                FLMutableArray_AppendValue(mergedValues, localValue);
             } else {
-                FLMutableArray_AppendNull(array);
+                FLMutableArray_AppendNull(mergedValues);
             }
 
-            prop = CBLDocument_Properties(remoteDoc);
-            value = FLDict_Get(prop, key);
-            if (value) {
-                FLMutableArray_AppendValue(array, value);
+            auto remoteProps = CBLDocument_Properties(remoteDoc);
+            auto remoteValue = FLDict_Get(remoteProps, docKey);
+            if (remoteValue) {
+                FLMutableArray_AppendValue(mergedValues, remoteValue);
             } else {
-                FLMutableArray_AppendNull(array);
+                FLMutableArray_AppendNull(mergedValues);
             }
             
-            auto props = CBLDocument_MutableProperties(doc);
-            FLMutableDict_SetArray(props, key, array);
-            FLMutableArray_Release(array);
-
-            return doc;
+            auto mergedProps = CBLDocument_MutableProperties(mergedDoc);
+            FLMutableDict_SetArray(mergedProps, docKey, mergedValues);
+            FLMutableArray_Release(mergedValues);
+            return mergedDoc;
         }
 
         static string name() { return "merge"; }
+
+    private:
+        string _property;
+    };
+
+    class MergeDictConflictResolver : public ConflictResolver {
+    public:
+        explicit MergeDictConflictResolver(const ConflictResolverSpec &spec)
+        : ConflictResolver(spec)
+        {
+            auto params = ConflictResolver::spec().params;
+            _property = GetValue<string>(params, "property");
+        }
+
+        const CBLDocument *
+        resolve(const CBLDocument *localDoc, const CBLDocument *remoteDoc) override {
+            if (!localDoc || !remoteDoc) { return nullptr; }
+
+            auto mergedDoc = CBLDocument_MutableCopy(remoteDoc);
+            auto mergedProps = CBLDocument_MutableProperties(mergedDoc);
+
+            FLSlice docKey = FLStr(_property.data());
+
+            auto localProps = CBLDocument_Properties(localDoc);
+            auto localDict = FLValue_AsDict(FLDict_Get(localProps, docKey)) ;
+
+            auto remoteProps = CBLDocument_Properties(remoteDoc);
+            auto remoteDict = FLValue_AsDict(FLDict_Get(remoteProps, docKey));
+
+            if (!localDict || !remoteDict) {
+                FLMutableDict_SetString(mergedProps, docKey, FLStr("Both values are not dictionary"));
+                return mergedDoc;
+            }
+
+            auto mergedDict = FLMutableDict_New();
+
+            // Merge Local:
+            {
+                FLDictIterator iter;
+                FLDictIterator_Begin(localDict, &iter);
+                FLValue value;
+                while (nullptr != (value = FLDictIterator_GetValue(&iter))) {
+                    FLString key = FLDictIterator_GetKeyString(&iter);
+                    FLMutableDict_SetValue(mergedDict, key, value);
+                    FLDictIterator_Next(&iter);
+                }
+            }
+
+            // Merge Remote:
+            {
+                FLDictIterator iter;
+                FLDictIterator_Begin(remoteDict, &iter);
+                FLValue value;
+                while (nullptr != (value = FLDictIterator_GetValue(&iter))) {
+                    FLString key = FLDictIterator_GetKeyString(&iter);
+                    FLMutableDict_SetValue(mergedDict, key, value);
+                    FLDictIterator_Next(&iter);
+                }
+            }
+
+            FLMutableDict_SetDict(mergedProps, docKey, mergedDict);
+            FLMutableDict_Release(mergedDict);
+            return mergedDoc;
+        }
+
+        static string name() { return "merge-dict"; }
 
     private:
         string _property;
@@ -103,6 +170,8 @@ namespace ts::cbl {
             return new DeleteConflictResolver(spec);
         } else if (spec.name == MergeConflictResolver::name()) {
             return new MergeConflictResolver(spec);
+        } else if (spec.name == MergeDictConflictResolver::name()) {
+            return new MergeDictConflictResolver(spec);
         }
         return nullptr;
     }
