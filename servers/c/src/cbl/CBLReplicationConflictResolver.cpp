@@ -4,6 +4,8 @@
 #include "CBLHeader.h"
 #include CBL_HEADER(CouchbaseLite.h)
 
+#include "Defer.h"
+#include "Define.h"
 #include "JSON.h"
 
 using namespace std;
@@ -111,7 +113,7 @@ namespace ts::cbl {
             auto mergedDoc = CBLDocument_MutableCopy(remoteDoc);
             auto mergedProps = CBLDocument_MutableProperties(mergedDoc);
 
-            FLSlice docKey = FLStr(_property.data());
+            FLSlice docKey = FLS(_property);
 
             auto localProps = CBLDocument_Properties(localDoc);
             auto localDict = FLValue_AsDict(FLDict_Get(localProps, docKey)) ;
@@ -125,6 +127,7 @@ namespace ts::cbl {
             }
 
             auto mergedDict = FLMutableDict_New();
+            DEFER { FLMutableDict_Release(mergedDict); };
 
             // Merge Local:
             {
@@ -145,13 +148,18 @@ namespace ts::cbl {
                 FLValue value;
                 while (nullptr != (value = FLDictIterator_GetValue(&iter))) {
                     FLString key = FLDictIterator_GetKeyString(&iter);
+                    FLValue currentValue = FLDict_Get(mergedDict, key);
+                    if (currentValue && !FLValue_IsEqual(value, currentValue)) {
+                        string error = "Conflicting values found at key named '" + STR(key) + "'";
+                        FLMutableDict_SetString(mergedProps, docKey, FLS(error));
+                        return mergedDoc;
+                    }
                     FLMutableDict_SetValue(mergedDict, key, value);
                     FLDictIterator_Next(&iter);
                 }
             }
 
             FLMutableDict_SetDict(mergedProps, docKey, mergedDict);
-            FLMutableDict_Release(mergedDict);
             return mergedDoc;
         }
 
