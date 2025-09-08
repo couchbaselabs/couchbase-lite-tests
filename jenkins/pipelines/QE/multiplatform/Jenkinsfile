@@ -156,7 +156,7 @@ pipeline {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run Multiplatform Test"
-                timeout(time: 60, unit: 'MINUTES') {
+                timeout(time: 25, unit: 'HOURS') {
                     sh "jenkins/pipelines/QE/multiplatform/test_multiplatform.sh ${params.PLATFORM_VERSIONS} ${params.SGW_VERSION} ${params.CBL_TEST_NAME} ${params.TOPOLOGY_FILE}"
                 }
             }
