@@ -31,8 +31,8 @@ class TestSystemMultipeer(CBLTestClass):
                 ts, ServerVariant.ANDROID | ServerVariant.IOS
             )
         NUM_DEVICES = len(cblpytest.test_servers)
-        TEST_DURATION = timedelta(hours=1)
-        CRUD_INTERVAL = timedelta(minutes=3)
+        TEST_DURATION = timedelta(hours=24)
+        CRUD_INTERVAL = timedelta(minutes=5)
         NO_OF_DOCS = 1000
         MAX_DOCS_PER_CRUD = 50
         MAX_STOP_TESTSERVERS = int(0.5 * NUM_DEVICES)
