@@ -4,13 +4,15 @@
         {
             "platform": "swift_ios",
             "cbl_version": "{{ios_version}}",
-            "location": "00008110-000E544201D1401E"
+            "location": "00008110-000E544201D1401E",
+            "ip_hint": "172.16.150.155"
         },
         {
-            "platform": "jak_android",
-            "cbl_version": "{{android_version}}",
-            "location": "RZCT31DWZEV"
+            "platform": "swift_ios",
+            "cbl_version": "{{ios_version}}",
+            "location": "34fc12796a401aa57405c12c06c5b51491f9a68d",
+            "ip_hint": "172.16.150.157"
         }
     ],
-    "include": "../../../../environment/aws/topology_setup/default_topology.json"
+    "logslurp": false
 } 

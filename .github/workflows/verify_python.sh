@@ -18,7 +18,7 @@ uv pip install "./client[dev]"
 echo "Checking client files (including smoke tests)..."
 ${VENV_DIR}/bin/python -m mypy client
 echo "Checking tests files..."
-python -m mypy tests
+python -m mypy tests --explicit-package-bases
 cleanup_venv
 
 create_venv
