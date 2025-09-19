@@ -57,6 +57,9 @@ info:
     * deprecate dataset_version
     * In ResetConfiguration, change the value for the "dataset" key to a url.
 
+    1.2.2 (09/19/2025)
+    * Add headers property to ReplicatorConfiguration
+
     1.2.1 (06/04/2025)
     * Add authenticator property to [/startMultipeerReplicator](#operation/startMultipeerReplicator)
 
@@ -1180,6 +1183,12 @@ components:
           description: The default is true.
           type: boolean
           example: false
+        headers:
+          description: HTTP headers to add to the request to the remote server.
+          type: object
+          additionalProperties:
+            type: string
+          example: {'header1': 'value1', 'header2': 'value2'}
         pinnedServerCert:
           description: The PEM representation of the TLS certificate that the remote is using
           type: string
