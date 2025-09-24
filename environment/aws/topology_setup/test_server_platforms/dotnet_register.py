@@ -171,6 +171,10 @@ class DotnetTestServerCli(TestServer):
         """
         pass
 
+    @property
+    def product(self) -> str:
+        return "couchbase-lite-net"
+
     def build(self) -> None:
         """
         Build the .NET CLI test server.
@@ -246,6 +250,16 @@ class DotnetTestServer_iOS(DotnetTestServer):
             str: The .NET framework version.
         """
         return "net8.0-ios"
+
+    @property
+    def rid(self) -> str:
+        """
+        Get the runtime identifier.
+
+        Returns:
+            str: The runtime identifier.
+        """
+        return "win-x64"
 
     @property
     def publish(self) -> bool:

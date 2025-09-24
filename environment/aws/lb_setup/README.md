@@ -2,10 +2,10 @@
 
 The contents of this folder all have to do with deploying and setting up one or more load balancers onto one or more AWS nodes so that at the end it is ready to go for E2E testing.  The steps that it takes are as follows:
 
-1. Transfer configure-system.sh to the remote node
+1. Transfer configure-system.sh and Traefik config files to the remote node
 2. Run configure-system.sh (see later section for details)
 3. Sets up a local docker context that runs over SSH to the remote node
-4. Starts a docker container of nginx, or uses an existing one that it finds
+4. Starts a docker container of Traefik, or uses an existing one that it finds
 
 ## System Configuration
 
