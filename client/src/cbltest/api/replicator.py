@@ -75,6 +75,7 @@ class Replicator:
         enable_document_listener: bool = False,
         enable_auto_purge: bool = True,
         pinned_server_cert: str | None = None,
+        headers: dict[str, str] | None = None,
     ):
         assert database._request_factory.version == 1, (
             "This version of the cbl test API requires request API v1"
@@ -112,6 +113,9 @@ class Replicator:
 
         self.pinned_server_cert: str | None = pinned_server_cert
         """The PEM representation of the certificate that the remote is using"""
+
+        self.headers: dict[str, str] | None = headers
+        """Optional headers to add to the replication requests"""
 
     def add_default_collection(self) -> None:
         """A convenience method for adding the default config for the default collection, if desired"""
