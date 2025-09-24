@@ -5,3 +5,4 @@ types-paramiko==3.5.0.20250516
 tqdm==4.67.1
 types-requests==2.32.0.20250515
 types-tqdm==4.67.0.20250516
+types-pyyaml==6.0.12.20250915
