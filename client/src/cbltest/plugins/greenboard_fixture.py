@@ -25,6 +25,11 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
         yield
         return
 
+    if len(cblpytest.test_servers) == 0:
+        cbl_info("No test servers available, skipping greenboard upload")
+        yield
+        return
+
     uploader = GreenboardUploader(
         cblpytest.config.greenboard_url,
         cblpytest.config.greenboard_username,

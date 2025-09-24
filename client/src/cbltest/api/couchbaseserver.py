@@ -1,6 +1,9 @@
 from datetime import timedelta
 from time import sleep
+from typing import cast
+from urllib.parse import quote_plus, urlparse
 
+import requests
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.exceptions import (
@@ -34,8 +37,13 @@ class CouchbaseServer:
             if "://" not in url:
                 url = f"couchbase://{url}"
 
+            self.__hostname = (
+                urlparse(url).hostname or urlparse(url).netloc.split(":")[0]
+            )
             auth = PasswordAuthenticator(username, password)
             opts = ClusterOptions(auth)
+            self.__username = username
+            self.__password = password
             self.__cluster = Cluster(url, opts)
             self.__cluster.wait_until_ready(timedelta(seconds=10))
 
@@ -176,3 +184,160 @@ class CouchbaseServer:
                 pass
 
             return list(dict(result) for result in query_obj.execute())
+
+    def start_xdcr(self, target: "CouchbaseServer", bucket_name: str) -> None:
+        """
+        Starts an XDCR replication from this cluster to the target cluster
+
+        :param target: The target CouchbaseServer instance to replicate to
+        :param source_bucket: The bucket on this cluster to replicate from
+        :param target_bucket: The bucket on the target cluster to replicate to
+        """
+        with self.__tracer.start_as_current_span(
+            "start_xdcr",
+            attributes={
+                "cbl.bucket": bucket_name,
+                "cbl.target.hostname": target.__hostname,
+            },
+        ):
+            with requests.Session() as session:
+                session.auth = (self.__username, self.__password)
+
+                # Get the existing remote cluster, if any...
+                resp = session.get(
+                    f"http://{self.__hostname}:8091/pools/default/remoteClusters"
+                )
+                resp.raise_for_status()
+                resp_body = resp.json()
+                remote_cluster_uuid: str | None = None
+                for cluster in resp_body:
+                    if (
+                        "name" in cluster
+                        and cast(str, cluster["name"]) == target.__hostname
+                    ):
+                        remote_cluster_uuid = cluster["uuid"]
+                        break
+
+                # https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-active-active-sgw.html#xdcr-active-active-sgw-prerequisites
+                # Set the prerequisite properties.  These return 409 is they are already set.
+                resp = session.post(
+                    f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}",
+                    data={"enableCrossClusterVersioning": "true"},
+                )
+                if resp.status_code != 409:
+                    resp.raise_for_status()
+
+                resp = session.post(
+                    f"http://{target.__hostname}:8091/pools/default/buckets/{bucket_name}",
+                    data={"enableCrossClusterVersioning": "true"},
+                )
+                if resp.status_code != 409:
+                    resp.raise_for_status()
+
+                # https://docs.couchbase.com/server/current/manage/manage-xdcr/create-xdcr-replication.html#create-an-xdcr-replication-with-the-rest-api
+                # Create the remote cluster, if necessary
+                if remote_cluster_uuid is None:
+                    resp = session.post(
+                        f"http://{self.__hostname}:8091/pools/default/remoteClusters",
+                        data={
+                            "username": target.__username,
+                            "password": target.__password,
+                            "hostname": target.__hostname,
+                            "name": target.__hostname,
+                            "demandEncryption": 0,
+                            "mobile": "active",
+                        },
+                    )
+                    resp.raise_for_status()
+
+                needs_replication = True
+                if remote_cluster_uuid is not None:
+                    # If the remote cluster didn't exist, the replication could not have existed
+                    # so skip the lookup.  Otherwise, check for a replication that is already
+                    # going out to the remote cluster in question.
+                    resp = session.get(
+                        f"http://{self.__hostname}:8091/pools/default/tasks"
+                    )
+                    resp.raise_for_status()
+                    for task in resp.json():
+                        if "type" in task and task["type"] == "xdcr":
+                            if "id" in task:
+                                id = task["id"]
+                                if (
+                                    id
+                                    == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}"
+                                ):
+                                    needs_replication = False
+                                    break
+
+                if needs_replication:
+                    resp = session.post(
+                        f"http://{self.__hostname}:8091/controller/createReplication",
+                        data={
+                            "fromBucket": bucket_name,
+                            "toCluster": target.__hostname,
+                            "toBucket": bucket_name,
+                            "replicationType": "continuous",
+                            "compressionLevel": "Auto",
+                        },
+                    )
+                    resp.raise_for_status()
+
+    def stop_xcdr(self, target: "CouchbaseServer", bucket_name: str) -> None:
+        """
+        Stops an XDCR replication from this cluster to the target cluster.  Note
+        that this does not remove the remote cluster.
+
+        :param target: The target CouchbaseServer instance to replicate to
+        :param source_bucket: The bucket on this cluster to replicate from
+        :param target_bucket: The bucket on the target cluster to replicate to
+        """
+        with self.__tracer.start_as_current_span(
+            "stop_xdcr",
+            attributes={
+                "cbl.bucket": bucket_name,
+                "cbl.target.hostname": target.__hostname,
+            },
+        ):
+            with requests.Session() as session:
+                session.auth = (self.__username, self.__password)
+
+                # See if the remote cluster already exists
+                resp = session.get(
+                    f"http://{self.__hostname}:8091/pools/default/remoteClusters"
+                )
+                resp.raise_for_status()
+                resp_body = resp.json()
+                remote_cluster_uuid: str | None = None
+                for cluster in resp_body:
+                    if (
+                        "name" in cluster
+                        and cast(str, cluster["name"]) == target.__hostname
+                    ):
+                        remote_cluster_uuid = cluster["uuid"]
+                        break
+
+                if remote_cluster_uuid is None:
+                    return
+
+                # See if the XDCR already exists
+                resp = session.get(f"http://{self.__hostname}:8091/pools/default/tasks")
+                resp.raise_for_status()
+                xdcr_id: str | None = None
+                for task in resp.json():
+                    if "type" in task and task["type"] == "xdcr":
+                        if "id" in task:
+                            id = task["id"]
+                            if (
+                                id
+                                == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}"
+                            ):
+                                xdcr_id = id
+                                break
+
+                if xdcr_id is not None:
+                    encoded = quote_plus(xdcr_id)
+                    resp = session.delete(
+                        f"http://{self.__hostname}:8091/controller/cancelXDCR/{encoded}",
+                    )
+                    resp.raise_for_status()
