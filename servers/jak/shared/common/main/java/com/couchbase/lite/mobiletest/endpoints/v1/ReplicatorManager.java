@@ -38,6 +38,7 @@ import java.util.function.Supplier;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import com.couchbase.lite.BasicAuthenticator;
+import com.couchbase.lite.Collection;
 import com.couchbase.lite.CollectionConfiguration;
 import com.couchbase.lite.Conflict;
 import com.couchbase.lite.ConflictResolver;
@@ -304,18 +305,13 @@ public class ReplicatorManager extends BaseReplicatorManager {
         if (dbName == null) { throw new ClientError("Replicator configuration doesn't specify a database"); }
 
         final TypedList collections = config.getList(KEY_COLLECTIONS);
-        if (collections == null) {
+        if (collections == null || collections.isEmpty()) {
             throw new ClientError("Replicator configuration doesn't specify a list of collections");
         }
 
         final Database db = dbSvc.getOpenDb(ctxt, dbName);
 
-        final ReplicatorConfiguration replConfig;
-        if (collections.isEmpty()) { replConfig = new ReplicatorConfiguration(db, endpoint); }
-        else {
-            replConfig = new ReplicatorConfiguration(endpoint);
-            addCollections(db, collections, replConfig, ctxt);
-        }
+        final ReplicatorConfiguration replConfig = new ReplicatorConfiguration(addCollections(db, collections, ctxt), endpoint);;
 
         final String replType = config.getString(KEY_TYPE);
         if (replType != null) {
@@ -364,12 +360,12 @@ public class ReplicatorManager extends BaseReplicatorManager {
         return replConfig;
     }
 
-    private void addCollections(
+    private Set<CollectionConfiguration> addCollections(
         @NonNull Database db,
         @NonNull TypedList spec,
-        @NonNull ReplicatorConfiguration replConfig,
         @NonNull TestContext ctxt
     ) {
+        Set<CollectionConfiguration> collectionConfigurations = new HashSet<>();
         for (int i = 0; i < spec.size(); i++) {
             final TypedMap replCollection = spec.getMap(i);
             if (replCollection == null) { throw new ClientError("Replication collection spec is null: " + i); }
@@ -377,16 +373,17 @@ public class ReplicatorManager extends BaseReplicatorManager {
 
             final TypedList collectionNames = replCollection.getList(KEY_NAMES);
             if (collectionNames == null) { throw new ClientError("no collections specified"); }
-
-            replConfig.addCollections(
-                dbSvc.getCollections(ctxt, db, collectionNames),
-                buildCollectionConfig(replCollection));
+            Set<Collection> collections = dbSvc.getCollections(ctxt, db, collectionNames);
+            for (Collection collection : collections) {
+                collectionConfigurations.add(buildCollectionConfig(replCollection, collection));
+            }
         }
+        return collectionConfigurations;
     }
 
     @NonNull
-    private CollectionConfiguration buildCollectionConfig(@NonNull TypedMap spec) {
-        final CollectionConfiguration collectionConfig = new CollectionConfiguration();
+    private CollectionConfiguration buildCollectionConfig(@NonNull TypedMap spec, Collection collection) {
+        final CollectionConfiguration collectionConfig = new CollectionConfiguration(collection);
 
         final List<String> channels = getList(spec.getList(KEY_CHANNELS));
         if (channels != null) { collectionConfig.setChannels(channels); }

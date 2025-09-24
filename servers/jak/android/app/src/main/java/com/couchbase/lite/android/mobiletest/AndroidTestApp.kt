@@ -21,6 +21,7 @@ import android.util.Base64
 import com.couchbase.lite.CouchbaseLite
 import com.couchbase.lite.CouchbaseLiteException
 import com.couchbase.lite.KeyStoreUtils
+import com.couchbase.lite.KeyUsage
 import com.couchbase.lite.TLSIdentity
 import com.couchbase.lite.android.mobiletest.services.MultipeerReplicatorService
 import com.couchbase.lite.internal.core.CBLVersion
@@ -72,7 +73,7 @@ class AndroidTestApp(private val context: Context) : TestApp("Android") {
     @Throws(CouchbaseLiteException::class)
     override fun getCreateIdentity(): TLSIdentity {
         return TLSIdentity.createIdentity(
-            true,
+            setOf(KeyUsage.CLIENT_AUTH, KeyUsage.SERVER_AUTH),
             x509Attributes,
             expirationTime,
             UUID.randomUUID().toString()

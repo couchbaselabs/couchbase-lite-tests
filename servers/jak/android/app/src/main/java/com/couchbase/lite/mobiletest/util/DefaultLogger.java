@@ -24,9 +24,29 @@ import com.couchbase.lite.mobiletest.services.Log;
 
 public class DefaultLogger extends Log.TestLogger {
 
+    public DefaultLogger(@NonNull LogLevel level, @NonNull LogDomain... domains) {
+        super(level, domains);
+    }
+
     @Override
-    public void log(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String message) {
-        // these CBL messages have already been sent to the console
+    public void writeLog(LogLevel level, LogDomain tag, String msg) {
+        switch (level) {
+            case DEBUG:
+                android.util.Log.d(LOG_PREFIX + tag, msg);
+                break;
+            case VERBOSE:
+                android.util.Log.v(LOG_PREFIX + tag, msg);
+                break;
+            case INFO:
+                android.util.Log.i(LOG_PREFIX + tag, msg);
+                break;
+            case WARNING:
+                android.util.Log.w(LOG_PREFIX + tag, msg);
+                break;
+            case ERROR:
+                android.util.Log.e(LOG_PREFIX + tag, msg);
+                break;
+        }
     }
 
     @Override
@@ -34,25 +54,4 @@ public class DefaultLogger extends Log.TestLogger {
         // no-op
     }
 
-    // These are messages from the Test Server: log them to the console
-    @Override
-    public void log(LogLevel level, String tag, String msg, Exception err) {
-        switch (level) {
-            case DEBUG:
-                android.util.Log.d(LOG_PREFIX + tag, msg, err);
-                break;
-            case VERBOSE:
-                android.util.Log.v(LOG_PREFIX + tag, msg, err);
-                break;
-            case INFO:
-                android.util.Log.i(LOG_PREFIX + tag, msg, err);
-                break;
-            case WARNING:
-                android.util.Log.w(LOG_PREFIX + tag, msg, err);
-                break;
-            case ERROR:
-                android.util.Log.e(LOG_PREFIX + tag, msg, err);
-                break;
-        }
-    }
 }

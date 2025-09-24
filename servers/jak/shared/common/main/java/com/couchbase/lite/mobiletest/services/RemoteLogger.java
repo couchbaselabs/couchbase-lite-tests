@@ -88,7 +88,9 @@ public class RemoteLogger extends Log.TestLogger {
     private final String tag;
 
 
-    public RemoteLogger(@NonNull String url, @NonNull String sessionId, @NonNull String tag) {
+    public RemoteLogger(@NonNull String url, @NonNull String sessionId, @NonNull String tag,
+                        @NonNull LogLevel level, @NonNull LogDomain... domains) {
+        super(level, domains); // Pass to BaseLogSink constructor for immutability [attached_file:1]
         this.url = url;
         this.sessionId = sessionId;
         this.tag = tag;
@@ -115,28 +117,18 @@ public class RemoteLogger extends Log.TestLogger {
         }
         catch (InterruptedException ignore) { }
         fail("Failed opening LogSlurper websocket");
+
     }
 
     @Override
-    public void log(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String msg) {
-        log(level, domain.toString(), msg, null);
-    }
-
-    @Override
-    public void log(LogLevel level, String tag, String msg, Exception err) {
+    public void writeLog(LogLevel level, LogDomain domain, String message) {
         final WebSocket socket = webSocket.get();
         if (socket == null) {
             Log.p(TAG, "RemoteLogger is not connected");
             return;
         }
 
-        sendLogMessage(socket, new StringBuilder(tag).append('/').append(level).append(' ').append(msg).toString());
-
-        if (err != null) {
-            final StringWriter sw = new StringWriter();
-            err.printStackTrace(new PrintWriter(sw));
-            sendLogMessage(socket, sw.toString());
-        }
+        sendLogMessage(socket, new StringBuilder(tag).append('/').append(level).append(' ').append(message).toString());
     }
 
     @Override
