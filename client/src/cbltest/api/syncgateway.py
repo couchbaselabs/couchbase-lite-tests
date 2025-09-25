@@ -419,14 +419,18 @@ class SyncGateway:
 
         return ssl.get_server_certificate((self.__hostname, self.__admin_port))
 
-    def replication_url(self, db_name: str):
+    def replication_url(self, db_name: str, load_balancer: str | None = None) -> str:
         """
         Gets the replicator URL (e.g. ws://xxx) for a given db
 
         :param db_name: The DB to replicate with
         """
         _assert_not_null(db_name, "db_name")
-        return urljoin(self.__replication_url, db_name)
+        sgw_address = urljoin(self.__replication_url, db_name)
+        if not load_balancer:
+            return sgw_address
+
+        return sgw_address.replace("wss", "ws").replace(self.__hostname, load_balancer)
 
     async def bytes_transferred(self, dataset_name: str) -> tuple[int, int]:
         """
