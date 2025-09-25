@@ -1,3 +1,4 @@
+import platform
 import subprocess
 import tempfile
 import zipfile
@@ -160,7 +161,7 @@ class CouchbaseServer:
             attributes={"cbl.bucket.name": name, "cbl.backup.source": dataset_name},
         ):
             bin_name = (
-                "cbbackupmgr.exe" if subprocess.os.name == "nt" else "cbbackupmgr"
+                "cbbackupmgr.exe" if platform.system() == "Windows" else "cbbackupmgr"
             )
             cbbackupmgr_path = tools_path / "cbbackupmgr" / tools_version / bin_name
             if not cbbackupmgr_path.exists():
