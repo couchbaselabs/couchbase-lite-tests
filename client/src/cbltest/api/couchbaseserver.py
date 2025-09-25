@@ -1,4 +1,9 @@
+import platform
+import subprocess
+import tempfile
+import zipfile
 from datetime import timedelta
+from pathlib import Path
 from time import sleep
 from typing import cast
 from urllib.parse import quote_plus, urlparse
@@ -134,6 +139,73 @@ class CouchbaseServer:
                 mgr.drop_bucket(name)
             except BucketDoesNotExistException:
                 pass
+
+    def restore_bucket(
+        self,
+        name: str,
+        tools_path: Path,
+        dataset_path: Path,
+        dataset_name: str,
+        *,
+        tools_version: str = "7.6.7",
+        repo_name: str | None = None,
+    ) -> None:
+        """
+        Restores a bucket from a backup source
+
+        :param name: The name of the bucket to restore
+        :param backup_source: The path to the backup source
+        """
+        with self.__tracer.start_as_current_span(
+            "restore_bucket",
+            attributes={"cbl.bucket.name": name, "cbl.backup.source": dataset_name},
+        ):
+            bin_name = (
+                "cbbackupmgr.exe" if platform.system() == "Windows" else "cbbackupmgr"
+            )
+            cbbackupmgr_path = tools_path / "cbbackupmgr" / tools_version / bin_name
+            if not cbbackupmgr_path.exists():
+                raise FileNotFoundError(
+                    "cbbackupmgr not found, please download it with the environment/aws/download_tool script"
+                )
+
+            # For historical reasons, dataset_path is pointing to the Sync Gateway dataset
+            # directory.  This should be changed in the future, but for now to avoid breakage
+            # just find the neighboring couchbase-server directory.
+            data_filepath = (
+                dataset_path / ".." / "couchbase-server" / f"{dataset_name}.zip"
+            )
+            if not data_filepath.exists():
+                raise FileNotFoundError(f"Data file {dataset_name}.zip not found!")
+
+            with tempfile.TemporaryDirectory(prefix="cbl_backup_") as tmpdir:
+                extract_path = Path(tmpdir)
+                try:
+                    with zipfile.ZipFile(data_filepath, "r") as zf:
+                        zf.extractall(extract_path)
+                except zipfile.BadZipFile as e:
+                    raise CblTestError(
+                        f"Backup zip '{data_filepath}' is invalid: {e}"
+                    ) from e
+
+                subprocess.run(
+                    [
+                        cbbackupmgr_path,
+                        "restore",
+                        "-a",
+                        str(extract_path / dataset_name),
+                        "-c",
+                        self.__hostname,
+                        "-r",
+                        repo_name or dataset_name,
+                        "-u",
+                        self.__username,
+                        "-p",
+                        self.__password,
+                        "--auto-create-buckets",
+                    ],
+                    check=True,
+                )
 
     def indexes_count(self, bucket: str) -> int:
         """
