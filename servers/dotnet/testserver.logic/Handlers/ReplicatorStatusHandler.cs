@@ -1,38 +1,29 @@
-﻿using Couchbase.Lite;
+﻿using System.Diagnostics.CodeAnalysis;
+using Couchbase.Lite;
 using Couchbase.Lite.Sync;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Dynamic;
-using System.Linq;
 using System.Net;
-using System.Reflection;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
-using TestServer.Services;
+using System.Text.Json.Serialization;
 using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
-    internal readonly record struct ReplicatorStatusBody
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    [method: JsonConstructor]
+    internal readonly record struct ReplicatorStatusBody(string id)
     {
-        public required string id { get; init; }
-
-        [JsonConstructor]
-        public ReplicatorStatusBody(string id)
-        {
-            this.id = id;
-        }
+        public required string id { get; init; } = id;
     }
 
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct ReplicatorProgressReturnBody(bool completed);
 
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct ErrorReturnBody(string domain, int code, string message);
 
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal record struct ReplicatorStatusReturnBody(string activity, ReplicatorProgressReturnBody progress, 
         IReadOnlyList<DocumentReplicationEvent> documents, ErrorReturnBody? error = null);
 
