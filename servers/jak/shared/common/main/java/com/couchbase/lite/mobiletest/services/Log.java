@@ -46,17 +46,17 @@ public final class Log {
     }
 
     public static void p(String tag, String msg) {
-        log(LogLevel.INFO, tag, msg, null);
+        writeLog(LogLevel.INFO, tag, msg, null);
     }
 
     public static void err(String tag, String msg) {
-        log(LogLevel.ERROR, tag, msg, null);
+        writeLog(LogLevel.ERROR, tag, msg, null);
     }
 
     // ??? shouldn't this be replaced with a thrown exception?
-    public static void err(String tag, String msg, Exception err) { log(LogLevel.ERROR, tag, msg, err); }
+    public static void err(String tag, String msg, Exception err) { writeLog(LogLevel.ERROR, tag, msg, err); }
 
-    private static void log(
+    private static void writeLog(
         @NonNull LogLevel level,
         @NonNull String tag,
         @NonNull String msg,
