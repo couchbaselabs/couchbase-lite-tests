@@ -52,6 +52,7 @@ public class DefaultLogger extends Log.TestLogger {
     @Override
     protected void writeLog(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String message) {
         // these CBL messages have already been sent to the console
+        throw new RuntimeException("Unsupported, Do not call");
     }
 
     @Override

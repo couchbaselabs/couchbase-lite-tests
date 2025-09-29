@@ -53,7 +53,6 @@ public final class Log {
         writeLog(LogLevel.ERROR, tag, msg, null);
     }
 
-    // ??? shouldn't this be replaced with a thrown exception?
     public static void err(String tag, String msg, Exception err) { writeLog(LogLevel.ERROR, tag, msg, err); }
 
     private static void writeLog(
