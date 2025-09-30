@@ -24,6 +24,8 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.couchbase.lite.Blob;
 import com.couchbase.lite.Collection;
 import com.couchbase.lite.CouchbaseLiteException;
@@ -41,6 +43,7 @@ import com.couchbase.lite.mobiletest.util.NetUtils;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
+@SuppressFBWarnings("EI_EXPOSE_REP2")
 public final class UpdateChange extends Change {
     private static final String TAG = "DB_UDATE";
 

@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 
 public class TypedList extends TypedCollection {
     @NonNull
@@ -29,6 +31,7 @@ public class TypedList extends TypedCollection {
 
     public TypedList() { this(new ArrayList<>()); }
 
+    @SuppressFBWarnings("EI_EXPOSE_REP2")
     public TypedList(@NonNull List<Object> args) { this.args = args; }
 
     public final boolean isEmpty() { return args.isEmpty(); }

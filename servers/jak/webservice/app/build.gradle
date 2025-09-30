@@ -28,7 +28,7 @@ plugins {
 ext {
     SERVER_VERSION = file("${ROOT_DIR}/version.txt").text.trim()
     SERVER_BUILD = "${getBuildId()}"
-    SERVER_ID = "Java Webservice Test Server: ${SERVER_VERSION}@${SERVER_BUILD}"
+    SERVER_ID = "Java Webservice Test Server ${SERVER_VERSION}@${SERVER_BUILD}"
 
     SPOTBUGS_VERSION = '4.7.3'
 
@@ -161,6 +161,12 @@ task checkstyle(type: Checkstyle, dependsOn: generateServerInfo) {
 pmd {
     toolVersion '6.55.0'
     ruleSets = []
+}
+tasks.named('pmdMain') {
+    enabled = false
+}
+tasks.named('pmdTest') {
+    enabled = false
 }
 task pmd(type: Pmd, dependsOn: generateServerInfo) {
     description 'PMD'

@@ -2,7 +2,6 @@ package com.couchbase.lite.mobiletest.util;
 
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import java.io.PrintStream;
 import java.time.LocalDateTime;
@@ -20,8 +19,20 @@ public final class DefaultLogger extends Log.TestLogger {
     private static final ThreadLocal<DateTimeFormatter> TS_FORMAT
         = ThreadLocal.withInitial(() -> DateTimeFormatter.ofPattern("MM-dd HH:mm:ss.SSS"));
 
+    public DefaultLogger(@NonNull LogLevel level) {
+        super(level);
+    }
+
+    // These are messages from the Test Server: log them to the console
     @Override
-    public void log(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String message) {
+    public void writeLog(LogLevel level, String tag, String msg, Exception err) {
+        final PrintStream logStream = (LogLevel.WARNING.compareTo(level) >= 0) ? System.err : System.out;
+        logStream.println(formatLog(tag, msg));
+        if (err != null) { err.printStackTrace(logStream); }
+    }
+
+    @Override
+    protected void writeLog(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String message) {
         // these CBL messages have already been sent to the console
     }
 
@@ -29,14 +40,6 @@ public final class DefaultLogger extends Log.TestLogger {
         // no-op
     }
 
-    // These are messages from the Test Server: log them to the console
-    @SuppressWarnings("PMD.CloseResource")
-    @Override
-    public void log(@NonNull LogLevel level, @NonNull String tag, @NonNull String msg, @Nullable Exception err) {
-        final PrintStream logStream = (LogLevel.WARNING.compareTo(level) >= 0) ? System.err : System.out;
-        logStream.println(formatLog(tag, msg));
-        if (err != null) { err.printStackTrace(logStream); }
-    }
 
     @NonNull
     private String formatLog(@NonNull String tag, @NonNull String message) {

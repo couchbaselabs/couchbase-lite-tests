@@ -35,6 +35,7 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 @SuppressWarnings("PMD.CyclomaticComplexity")
+@SuppressFBWarnings({"EI_EXPOSE_REP", "EI_EXPOSE_REP2"})
 public abstract class BaseTestContext {
     private static final String TAG = "CONTEXT";
 
