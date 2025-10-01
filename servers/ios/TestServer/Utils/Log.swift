@@ -22,7 +22,8 @@ public class Log {
     private init () { }
     
     public static func initialize() {
-        Database.log.custom = CBLLogger(level: .verbose)
+        let logSink = Logger()
+        LogSinks.custom = CustomLogSink(level: .verbose, logSink: logSink)
     }
         
     public static func useDefaultLogger() {
@@ -56,15 +57,11 @@ public class Log {
     }
 }
 
-private class CBLLogger : CouchbaseLiteSwift.Logger {
-    let level: LogLevel
+private class Logger : LogSinkProtocol {
+    var lines: [String] = []
     
-    init(level: LogLevel) {
-        self.level = level
-    }
-    
-    func log(level: CouchbaseLiteSwift.LogLevel, domain: LogDomain, message: String) {
-        Log.log(level: level, domain: domain, message: message)
+    func writeLog(level: LogLevel, domain: LogDomain, message: String) {
+        lines.append(message)
     }
 }
 
