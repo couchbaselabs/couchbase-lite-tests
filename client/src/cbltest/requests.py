@@ -298,12 +298,12 @@ class RequestFactory:
         try:
             ret_val = await r.send(url, self.__session)
         except CblTestServerBadResponseError as e:
-            cbl_error(f"Failed to send {r} ({str(e)})")
+            cbl_error(f"Failed to send {r} to {url} ({str(e)})")
             msg = f"{str(e)}\n\n{e.response.serialize()}"
             writer.write_error(msg)
             raise
         except Exception as e:
-            cbl_error(f"Failed to send {r} ({str(e)})")
+            cbl_error(f"Failed to send {r} to {url} ({str(e)})")
             writer.write_error(str(e))
             raise
 
