@@ -3,14 +3,13 @@ package com.couchbase.lite.mobiletest.services;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.couchbase.lite.LogDomain;
 import com.couchbase.lite.LogLevel;
-import com.couchbase.lite.logging.LogSinks;
-import com.couchbase.lite.logging.ConsoleLogSink;
 import com.couchbase.lite.logging.BaseLogSink;
+import com.couchbase.lite.logging.ConsoleLogSink;
+import com.couchbase.lite.logging.LogSinks;
 import com.couchbase.lite.mobiletest.util.DefaultLogger;
 
 
@@ -25,22 +24,13 @@ public final class Log {
     public abstract static class TestLogger extends BaseLogSink implements AutoCloseable {
         public static final String LOG_PREFIX = " CBLTEST/";
 
-        public TestLogger(@NonNull LogLevel level, @NonNull LogDomain... domains) {
-            super(level, Arrays.asList(domains));
+        public TestLogger(@NonNull LogLevel level) {
+            super(level);
         }
 
-        // Log callback: only receives messages at specified level/domains
-        @Override
-        public abstract void writeLog(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String message);
+        public final void writeLog(LogLevel level, String tag, String msg) { writeLog(level, tag, msg, null); }
 
-        public void log(LogLevel level, String tag, String msg) {
-            writeLog(level, LogDomain.DATABASE, LOG_PREFIX + tag + ": " + msg);
-        }
-
-        public void log(LogLevel level, String tag, String msg, Exception err) {
-            String fullMsg = LOG_PREFIX + tag + ": " + msg + (err != null ? (" [exception: " + err.getMessage() + "]") : "");
-            writeLog(level, LogDomain.DATABASE, fullMsg);
-        }
+        public abstract void writeLog(LogLevel level, String tag, String msg, Exception err);
 
         // does not throw
         public abstract void close();
@@ -48,51 +38,43 @@ public final class Log {
 
     private static final AtomicReference<TestLogger> LOGGER = new AtomicReference<>();
 
+
     public static void init() {
-        // Install a new console log sink
-        LogSinks.get().setConsole(new ConsoleLogSink(LogLevel.DEBUG, LogDomain.ALL_DOMAINS));
+        LogSinks.get().setConsole(new ConsoleLogSink(LogLevel.DEBUG, LogDomain.ALL));
         installDefaultLogger();
         p(TAG, "Logging initialized");
     }
 
     public static void p(String tag, String msg) {
-        log(LogLevel.INFO, tag, msg, null);
+        writeLog(LogLevel.INFO, tag, msg, null);
     }
 
     public static void err(String tag, String msg) {
-        log(LogLevel.ERROR, tag, msg, null);
+        writeLog(LogLevel.ERROR, tag, msg, null);
     }
 
-    public static void err(String tag, String msg, Exception err) {
-        log(LogLevel.ERROR, tag, msg, err);
+    public static void err(String tag, String msg, Exception err) { writeLog(LogLevel.ERROR, tag, msg, err); }
+
+    private static void writeLog(
+        @NonNull LogLevel level,
+        @NonNull String tag,
+        @NonNull String msg,
+        @Nullable Exception err) {
+        LOGGER.get().writeLog(level, tag, msg, err);
     }
 
-    private static void log(
-            @NonNull LogLevel level,
-            @NonNull String tag,
-            @NonNull String msg,
-            @Nullable Exception err
-    ) {
-        TestLogger logger = LOGGER.get();
-        if (logger != null) {
-            logger.log(level, tag, msg, err);
-        }
-    }
-
-    public static void installDefaultLogger() {
-        installLogger(new DefaultLogger(LogLevel.DEBUG, LogDomain.DATABASE));
-    }
+    public static void installDefaultLogger() { installLogger(new DefaultLogger(LogLevel.DEBUG)); }
 
     public static void installRemoteLogger(@NonNull String url, @NonNull String sessionId, @NonNull String tag) {
-        err(TAG, "Remote logging not yet supported");
-        installLogger(new RemoteLogger(url, sessionId, tag, LogLevel.DEBUG, LogDomain.DATABASE));
+        Log.err(TAG, "Remote logging not yet supported");
+        final RemoteLogger logger = new RemoteLogger(url, sessionId, tag);
+        logger.connect();
+        installLogger(logger);
     }
 
     private static void installLogger(@NonNull TestLogger logger) {
-        TestLogger oldLogger = LOGGER.getAndSet(logger);
+        final TestLogger oldLogger = LOGGER.getAndSet(logger);
         LogSinks.get().setCustom(logger);
-        if (oldLogger != null) {
-            oldLogger.close();
-        }
+        if (oldLogger != null) { oldLogger.close(); }
     }
 }

@@ -24,34 +24,39 @@ import com.couchbase.lite.mobiletest.services.Log;
 
 public class DefaultLogger extends Log.TestLogger {
 
-    public DefaultLogger(@NonNull LogLevel level, @NonNull LogDomain... domains) {
-        super(level, domains);
+    public DefaultLogger(@NonNull LogLevel level) {
+        super(level);
     }
 
     @Override
-    public void writeLog(LogLevel level, LogDomain tag, String msg) {
+    public void writeLog(LogLevel level, String tag, String msg, Exception err) {
         switch (level) {
             case DEBUG:
-                android.util.Log.d(LOG_PREFIX + tag, msg);
+                android.util.Log.d(LOG_PREFIX + tag, msg, err);
                 break;
             case VERBOSE:
-                android.util.Log.v(LOG_PREFIX + tag, msg);
+                android.util.Log.v(LOG_PREFIX + tag, msg, err);
                 break;
             case INFO:
-                android.util.Log.i(LOG_PREFIX + tag, msg);
+                android.util.Log.i(LOG_PREFIX + tag, msg, err);
                 break;
             case WARNING:
-                android.util.Log.w(LOG_PREFIX + tag, msg);
+                android.util.Log.w(LOG_PREFIX + tag, msg, err);
                 break;
             case ERROR:
-                android.util.Log.e(LOG_PREFIX + tag, msg);
+                android.util.Log.e(LOG_PREFIX + tag, msg, err);
                 break;
         }
+    }
+
+    @Override
+    protected void writeLog(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String message) {
+        // these CBL messages have already been sent to the console
+        throw new RuntimeException("Unsupported, Do not call");
     }
 
     @Override
     public void close() {
         // no-op
     }
-
 }
