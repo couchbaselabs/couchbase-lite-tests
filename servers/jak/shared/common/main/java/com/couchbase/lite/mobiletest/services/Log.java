@@ -26,7 +26,7 @@ public final class Log {
 
         @Override
         @NonNull
-        public final LogLevel getLevel() { return LogLevel.DEBUG; }
+        public final LogLevel getLevel() { return LogLevel.VERBOSE; }
 
         public final void log(LogLevel level, String tag, String msg) { log(level, tag, msg, null); }
 
@@ -41,7 +41,7 @@ public final class Log {
 
     public static void init() {
         final ConsoleLogger consoleLogger = Database.log.getConsole();
-        consoleLogger.setLevel(LogLevel.DEBUG);
+        consoleLogger.setLevel(LogLevel.VERBOSE);
         consoleLogger.setDomains(LogDomain.ALL_DOMAINS);
         Log.installDefaultLogger();
         Log.p(TAG, "Logging initialized");
