@@ -104,6 +104,7 @@ public final class NetUtils {
     // Old version:
     //    final List<InetAddress> addrs = getLocalAddresses();
     //    return (addrs == null) ? null : asString(addrs.get(0));
+    @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
     @Nullable
     public static String getLocalAddress() {
         try (Socket socket = new Socket()) {

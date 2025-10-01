@@ -64,6 +64,7 @@ import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 
 @SuppressWarnings({"PMD.ExcessiveImports", "PMD.CyclomaticComplexity"})
+@SuppressFBWarnings("EI_EXPOSE_REP2")
 public class ReplicatorManager extends BaseReplicatorManager {
     private static final String TAG = "REPL_MGR_V1";
 
@@ -311,7 +312,11 @@ public class ReplicatorManager extends BaseReplicatorManager {
 
         final Database db = dbSvc.getOpenDb(ctxt, dbName);
 
-        final ReplicatorConfiguration replConfig = new ReplicatorConfiguration(addCollections(db, collections, ctxt), endpoint);;
+        final ReplicatorConfiguration replConfig = new ReplicatorConfiguration(
+                addCollections(
+                        db,
+                        collections,
+                        ctxt), endpoint);
 
         final String replType = config.getString(KEY_TYPE);
         if (replType != null) {
@@ -360,6 +365,8 @@ public class ReplicatorManager extends BaseReplicatorManager {
         return replConfig;
     }
 
+    @SuppressWarnings("checkstyle:FinalLocalVariable")
+    @NonNull
     private Set<CollectionConfiguration> addCollections(
         @NonNull Database db,
         @NonNull TypedList spec,
@@ -382,7 +389,7 @@ public class ReplicatorManager extends BaseReplicatorManager {
     }
 
     @NonNull
-    private CollectionConfiguration buildCollectionConfig(@NonNull TypedMap spec, Collection collection) {
+    private CollectionConfiguration buildCollectionConfig(@NonNull TypedMap spec, @NonNull Collection collection) {
         final CollectionConfiguration collectionConfig = new CollectionConfiguration(collection);
 
         final List<String> channels = getList(spec.getList(KEY_CHANNELS));

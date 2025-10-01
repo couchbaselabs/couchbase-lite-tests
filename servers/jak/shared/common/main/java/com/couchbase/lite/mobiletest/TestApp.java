@@ -37,6 +37,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.mobiletest.endpoints.v1.Session;
 import com.couchbase.lite.mobiletest.errors.ClientError;
@@ -48,6 +50,7 @@ import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
+@SuppressFBWarnings({"EI_EXPOSE_REP", "EI_EXPOSE_REP2"})
 public abstract class TestApp {
     public static final String HEADER_REQEST = "CBLTest-Request-ID".toLowerCase(Locale.US);
     public static final String HEADER_CLIENT = "CBLTest-Client-ID".toLowerCase(Locale.US);

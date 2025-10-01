@@ -187,6 +187,12 @@ pmd {
     toolVersion '6.55.0'
     ruleSets = []
 }
+tasks.named('pmdMain') {
+    enabled = false
+}
+tasks.named('pmdTest') {
+    enabled = false
+}
 task pmd(type: Pmd, dependsOn: generateServerInfo) {
     description 'PMD'
     group 'verification'
