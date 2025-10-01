@@ -40,7 +40,7 @@ public final class Log {
 
 
     public static void init() {
-        LogSinks.get().setConsole(new ConsoleLogSink(LogLevel.DEBUG, LogDomain.ALL));
+        LogSinks.get().setConsole(new ConsoleLogSink(LogLevel.VERBOSE, LogDomain.ALL));
         installDefaultLogger();
         p(TAG, "Logging initialized");
     }
@@ -63,7 +63,7 @@ public final class Log {
         LOGGER.get().writeLog(level, tag, msg, err);
     }
 
-    public static void installDefaultLogger() { installLogger(new DefaultLogger(LogLevel.DEBUG)); }
+    public static void installDefaultLogger() { installLogger(new DefaultLogger(LogLevel.VERBOSE)); }
 
     public static void installRemoteLogger(@NonNull String url, @NonNull String sessionId, @NonNull String tag) {
         Log.err(TAG, "Remote logging not yet supported");
