@@ -196,11 +196,13 @@ namespace ts::log {
         sLogger = sConsoleLogger;
         sLogLevel = level;
 
-        CBLLog_SetCallbackLevel((CBLLogLevel) level);
-        CBLLog_SetCallback([](CBLLogDomain domain, CBLLogLevel level, FLString msg) {
+        CBLCustomLogSink logSink {};
+        logSink.level = (CBLLogLevel) level;
+        logSink.callback = [](CBLLogDomain domain, CBLLogLevel level, FLString msg) {
             logToLogger((LogLevel) level, kCBLLogDomainName[domain],
                         static_cast<const char *>(msg.buf));
-        });
+        };
+        CBLLogSinks_SetCustom(logSink);
     }
 
     void Log::useDefaultLogger() {

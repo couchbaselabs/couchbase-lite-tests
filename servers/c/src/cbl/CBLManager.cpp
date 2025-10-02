@@ -416,8 +416,19 @@ namespace ts::cbl {
             config.collections = replCols.data();
             config.collectionCount = replCols.size();
         } else {
-            config.database = db;
+            // For backward compatibility with the tests that don't specify any collections
+            // to use the default collection:
+            auto col = CBLDatabase_DefaultCollection(db, &error);
+            checkCBLError(error);
+
+            CBLReplicationCollection replCol{};
+            replCol.collection = col;
+            replCols.push_back(replCol);
+
+            config.collections = replCols.data();
+            config.collectionCount = replCols.size();
         }
+
         config.replicatorType = params.replicatorType;
         config.continuous = params.continuous;
         config.authenticator = auth;
