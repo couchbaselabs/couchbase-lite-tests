@@ -492,9 +492,15 @@ class TestMultipeer(CBLTestClass):
                     assert all(
                         r.status.replicator_error is None for r in status.replicators
                     ), "Multipeer replicator should not have any errors"
-            assert results[0].revs == doc.revs, (
-                f"revision IDs dont match for {doc} even after 5 retries"
-            )
+                results = await asyncio.gather(
+                    *[
+                        db.get_document(DocumentEntry("_default._default", "conflict1"))
+                        for db in all_dbs
+                    ]
+                )
+                assert results[0].revs == doc.revs, (
+                    f"revision IDs dont match for {doc} even after 5 retries"
+                )
 
         self.mark_test_step("Stopping multipeer replicator on all devices")
         await asyncio.gather(*[mp.stop() for mp in multipeer_replicators])
