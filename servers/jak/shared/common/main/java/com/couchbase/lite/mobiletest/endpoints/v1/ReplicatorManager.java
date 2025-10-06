@@ -42,6 +42,7 @@ import com.couchbase.lite.Collection;
 import com.couchbase.lite.CollectionConfiguration;
 import com.couchbase.lite.Conflict;
 import com.couchbase.lite.ConflictResolver;
+import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.DocumentReplication;
@@ -82,6 +83,7 @@ public class ReplicatorManager extends BaseReplicatorManager {
     private static final String KEY_ENABLE_DOC_LISTENER = "enableDocumentListener";
     private static final String KEY_SESSION_AUTH_ID = "sessionID";
     private static final String KEY_SESSION_AUTH_COOKIE = "cookieName";
+    private static final String KEY_HEADERS = "headers";
     private static final String KEY_ENABLE_AUTOPURGE = "enableAutoPurge";
     private static final String KEY_PINNED_CERT = "pinnedServerCert";
 
@@ -183,6 +185,7 @@ public class ReplicatorManager extends BaseReplicatorManager {
         l.add(KEY_IS_CONTINUOUS);
         l.add(KEY_AUTHENTICATOR);
         l.add(KEY_ENABLE_DOC_LISTENER);
+        l.add(KEY_HEADERS);
         l.add(KEY_ENABLE_AUTOPURGE);
         l.add(KEY_PINNED_CERT);
         LEGAL_CONFIG_KEYS = Collections.unmodifiableSet(l);
@@ -306,17 +309,24 @@ public class ReplicatorManager extends BaseReplicatorManager {
         if (dbName == null) { throw new ClientError("Replicator configuration doesn't specify a database"); }
 
         final TypedList collections = config.getList(KEY_COLLECTIONS);
-        if (collections == null || collections.isEmpty()) {
+        if (collections == null) {
             throw new ClientError("Replicator configuration doesn't specify a list of collections");
         }
 
         final Database db = dbSvc.getOpenDb(ctxt, dbName);
 
-        final ReplicatorConfiguration replConfig = new ReplicatorConfiguration(
-                addCollections(
-                        db,
-                        collections,
-                        ctxt), endpoint);
+        final ReplicatorConfiguration replConfig;
+        if (collections.isEmpty()) {
+            try {
+                replConfig = new ReplicatorConfiguration(
+                        CollectionConfiguration.fromCollections(Set.of(db.getDefaultCollection())),
+                        endpoint);
+            } catch (CouchbaseLiteException e) {
+                throw new ClientError("No collection found");
+            }
+        } else {
+            replConfig = new ReplicatorConfiguration(addCollections(db, collections, ctxt), endpoint);
+        }
 
         final String replType = config.getString(KEY_TYPE);
         if (replType != null) {
@@ -343,6 +353,20 @@ public class ReplicatorManager extends BaseReplicatorManager {
 
         final String pinnedCert = config.getString(KEY_PINNED_CERT);
         if (pinnedCert != null) { replConfig.setPinnedServerX509Certificate(str2X509Cert(pinnedCert)); }
+
+        final TypedMap headers = config.getMap(KEY_HEADERS);
+
+        if (headers != null) {
+            android.util.Log.d("Aniket", "Header not null");
+            final Map<String, String> headerMap = new HashMap<>();
+            for (String key : headers.getKeys()) {
+                final String value = headers.getString(key);
+                if (value != null) {
+                    headerMap.put(key, value);
+                }
+            }
+            replConfig.setHeaders(headerMap);
+        }
 
         final TypedMap authenticator = config.getMap(KEY_AUTHENTICATOR);
         if (authenticator != null) {

@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import timedelta
 
 import pytest
 from cbltest import CBLPyTest
@@ -199,7 +200,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.NONE,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         self.mark_test_step("Wait for the new docs to be pulled to db2")
@@ -217,7 +219,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.NONE,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         self.mark_test_step("Verify that the new docs are in db1")
@@ -323,7 +326,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PUSH,
                     ReplicatorDocumentFlags.NONE,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         await repl2.wait_for_all_doc_events(
@@ -384,7 +388,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PUSH,
                     ReplicatorDocumentFlags.NONE,
                 )
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
         await repl1.wait_for_all_doc_events(
             {
@@ -394,7 +399,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.NONE,
                 )
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         self.mark_test_step("Verify that the doc has been updated in db1")
@@ -468,7 +474,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PUSH,
                     ReplicatorDocumentFlags.NONE,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
         await repl2.wait_for_all_doc_events(
             {
@@ -484,7 +491,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.NONE,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
         repl2.clear_document_updates()
 
@@ -509,7 +517,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.DELETED,
                 )
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         self.mark_test_step(
@@ -603,7 +612,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PUSH,
                     ReplicatorDocumentFlags.NONE,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         await repl2.wait_for_all_doc_events(
@@ -626,7 +636,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.NONE,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
         repl2.clear_document_updates()
 
@@ -666,7 +677,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.DELETED,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         self.mark_test_step(
@@ -788,6 +800,7 @@ class TestFest(CBLTestClass):
                 ),
             },
             max_retries=10,
+            idle_timeout=timedelta(seconds=60)
         )
         assert found is None, (
             "There were unexpected replication events on replicator #1: "
@@ -810,6 +823,7 @@ class TestFest(CBLTestClass):
                 ),
             },
             max_retries=10,
+            idle_timeout=timedelta(seconds=60)
         )
         assert found is None, (
             "There were unexpected replication events on replicator #2: "
@@ -903,6 +917,7 @@ class TestFest(CBLTestClass):
                 ),
             },
             max_retries=10,
+            idle_timeout=timedelta(seconds=60)
         )
         assert found is None, (
             "There were unexpected replication events on replicator #2: "
@@ -951,7 +966,9 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.NONE,
                 ),
-            }
+            },
+            max_retries=10,
+            idle_timeout=timedelta(seconds=60)
         )
 
         self.mark_test_step(
@@ -1071,6 +1088,7 @@ class TestFest(CBLTestClass):
                 ),
             },
             max_retries=10,
+            idle_timeout=timedelta(seconds=60)
         )
         assert found is None, (
             "There were unexpected replication events on replicator #2: "
@@ -1111,7 +1129,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.NONE,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         self.mark_test_step(
@@ -1176,7 +1195,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.DELETED,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         self.mark_test_step("Verify that the new docs are in db1")
@@ -1269,6 +1289,7 @@ class TestFest(CBLTestClass):
                 ),
             },
             max_retries=10,
+            idle_timeout=timedelta(seconds=60)
         )
         assert found is None, (
             "There were unexpected replication events on replicator #2: "
@@ -1309,7 +1330,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.NONE,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         self.mark_test_step(
@@ -1359,7 +1381,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PUSH,
                     ReplicatorDocumentFlags.DELETED,
                 )
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         self.mark_test_step(
@@ -1385,7 +1408,8 @@ class TestFest(CBLTestClass):
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.ACCESS_REMOVED,
                 ),
-            }
+            },
+            idle_timeout=timedelta(seconds=60)
         )
 
         self.mark_test_step(
