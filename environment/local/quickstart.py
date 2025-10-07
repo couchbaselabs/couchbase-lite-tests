@@ -1,9 +1,13 @@
 # Quick start local creates a local development environment with Couchbase Server, Sync Gateway, and Test Server.
+#
+# This currently only supports Mac OS and C test server but could be extended for other platforms.
+#
 # This writes a config.json file to the current directory, which can be used to run pytest.
 
 # Example usage::
 #
-#   uv run -- quick_start_local.py --test-server-type c --cbl-version 3.2.4 --cbl-build-number 9 --dataset-version 3.2
+#   cd couchbase-lite-tests # use toplevel directory of this repo
+#   uv run -- quick_start_local.py --test-server-type c --cbl-version 4.0.0 --cbl-build-number 9 --dataset-version 3.2
 #   uv run pytest --config config.json tests/dev_e2e/test_basic_replication.py
 #
 # /// script
@@ -77,12 +81,18 @@ def write_config() -> None:
 
 def start_testserver(server_type: TestServerType) -> None:
     testserver = (
-        pathlib.Path(__file__).parent / "servers" / server_type / "build" / "testserver"
+        pathlib.Path(__file__).parent.parent.parent
+        / "servers"
+        / server_type
+        / "build"
+        / "testserver"
     )
+    if not testserver.exists():
+        raise FileNotFoundError(f"Test server binary not found at {testserver}")
     subprocess.run(["pkill", "testserver"])
     subprocess.Popen(
         [f"{testserver} 2>&1 > testserver.log"],
-        cwd=pathlib.Path(__file__).parent / "servers" / "c",
+        cwd=pathlib.Path(__file__).parent.parent.parent / "servers" / "c",
         start_new_session=True,
         shell=True,
     )
@@ -103,7 +113,7 @@ def build_testserver(
             "-c",
             f"./scripts/build_macos.sh {edition} {version} {build_number} {dataset_version}",
         ],
-        cwd=pathlib.Path(__file__).parent / "servers" / "c",
+        cwd=pathlib.Path(__file__).parent.parent.parent / "servers" / "c",
         check=True,
     )
 
@@ -111,7 +121,7 @@ def build_testserver(
 def start_containers() -> None:
     subprocess.run(
         ["python", "start_environment.py"],
-        cwd=pathlib.Path(__file__).parent / "environment",
+        cwd=pathlib.Path(__file__).parent.parent,
         check=True,
     )
 
