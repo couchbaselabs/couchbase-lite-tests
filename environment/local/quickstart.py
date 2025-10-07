@@ -7,7 +7,7 @@
 # Example usage::
 #
 #   cd couchbase-lite-tests # use toplevel directory of this repo
-#   uv run -- quick_start_local.py --test-server-type c --cbl-version 4.0.0 --cbl-build-number 9 --dataset-version 3.2
+#   uv run -- environment/local/quickstart.py --test-server-type c --cbl-version 4.0.0 --cbl-build-number 9 --dataset-version 3.2
 #   uv run pytest --config config.json tests/dev_e2e/test_basic_replication.py
 #
 # /// script
