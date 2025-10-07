@@ -7,13 +7,45 @@
 
 import CouchbaseLiteSwift
 import ZipArchive
+import CryptoKit
 
 class DatabaseManager {
-    private var databases : [ String : Database ] = [:]
-    private var replicators : [ UUID : Replicator ] = [:]
-    private var replicatorDocuments : [ UUID : [ContentTypes.DocumentReplication] ] = [:]
+    private let kDatasetBaseURL = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/"
+    private let kDatasetDownloadDirectory = "downloads"
+    private let kDatasetExtractedDirectory = "extracted"
     
-    public init() { }
+    private let databaseDirectory: String
+    private let datasetVersion: String
+    
+    private var databases : [ String : Database ] = [:]
+    
+    private var replicators : [ UUID : Replicator ] = [:]
+    private var replicatorDocuments : [ UUID : [ ContentTypes.DocumentReplication ] ] = [:]
+    private var replicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
+    
+    private var multipeerReplicators : [ UUID : MultipeerReplicator ] = [:]
+    private var peerReplicatorStatus : [ UUID : [ PeerID: Replicator.Status ] ] = [:]
+    private var peerReplicatorStatusToken : [ UUID : ListenerToken ] = [:]
+    private var peerReplicatorDocuments : [ UUID : [ PeerID: [ ContentTypes.DocumentReplication ] ] ] = [:]
+    private var peerReplicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
+    
+    private var listeners: [ UUID : URLEndpointListener ] = [:]
+    
+    private let listenerQueue = DispatchQueue(label: "DatabaseManagerListenerQueue")
+    
+    
+    public init(directory: String, datasetVersion: String) {
+        self.databaseDirectory = directory
+        self.datasetVersion = datasetVersion
+    }
+    
+    deinit {
+        do {
+            try reset()
+        } catch {
+            Log.log(level: .error, message: "Failed to reset database manager : \(error)")
+        }
+    }
     
     @discardableResult
     public func addCollection(dbName: String, scope: String, name: String) throws -> Collection {
@@ -51,6 +83,47 @@ class DatabaseManager {
             Log.log(level: .error, message: "Failed to run query due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
+    }
+    
+    public func startListener(dbName: String, collections: [String], port: UInt16?) throws -> UUID {
+        var collectionsArr: [Collection] = []
+        
+        guard let database = databases[dbName]
+        else {
+            Log.log(level: .error, message: "Failed to start Listener, database '\(dbName)' does not exist")
+            throw TestServerError.cblDBNotOpen
+        }
+        
+        for collName in collections {
+            guard let coll = try collection(collName, inDB: database)
+            else {
+                Log.log(level: .error, message: "Failed to start Listener, Collection '\(collName)' does not exist in \(dbName).")
+                throw TestServerError.badRequest("Collection '\(collName)' does not exist in \(dbName).")
+            }
+            collectionsArr.append(coll)
+        }
+        
+        var listenerConfig = URLEndpointListenerConfiguration(collections: collectionsArr)
+        listenerConfig.port = port
+        
+        let listener = URLEndpointListener(config: listenerConfig)
+        
+        let listenerID = UUID()
+        listeners[listenerID] = listener
+        
+        try listener.start()
+        Log.log(level: .debug, message: "EndpointListener started successfully with ID \(listenerID)")
+        
+        return listenerID
+    }
+    
+    public func stopListener(forID listenerID: UUID) throws {
+        Log.log(level: .debug, message: "Stop EndpointListener for ID \(listenerID) is requested.")
+        guard let listener = listeners[listenerID] else {
+            throw TestServerError.badRequest("EndpointListener with ID '\(listenerID)' does not exist.")
+        }
+        listener.stop()
+        Log.log(level: .debug, message: "Stop EndpointListener for ID \(listenerID) is successfully requested.")
     }
     
     public func startReplicator(config: ContentTypes.ReplicatorConfiguration, reset: Bool) throws -> UUID {
@@ -109,10 +182,10 @@ class DatabaseManager {
                 collConfig.channels = configColl.channels
                 collConfig.documentIDs = configColl.documentIDs
                 if let pullFilter = configColl.pullFilter {
-                    collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter)
+                    collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter).toReplicationFilter()
                 }
                 if let pushFilter = configColl.pushFilter {
-                    collConfig.pushFilter = try DatabaseManager.getCBLReplicationFilter(from: pushFilter)
+                    collConfig.pushFilter = try DatabaseManager.getCBLReplicationFilter(from: pushFilter).toReplicationFilter()
                 }
                 if let resolver = configColl.conflictResolver {
                     collConfig.conflictResolver = try DatabaseManager.getCBLReplicationConflictResolver(from: resolver)
@@ -132,9 +205,10 @@ class DatabaseManager {
         // Whenever a document is replicated, add it to the replicatorDocuments dict
         if(config.enableDocumentListener) {
             replicatorDocuments[replicatorID] = []
-            replicator.addDocumentReplicationListener({ [weak self] docChange in
-                guard self != nil
-                else { return }
+            
+            let listenerToken = replicator.addDocumentReplicationListener(withQueue: listenerQueue) { [weak self] docChange in
+                guard let strongSelf = self else { return }
+                
                 for doc in docChange.documents {
                     var docFlags: [ContentTypes.DocumentReplicationFlags] = []
                     
@@ -153,7 +227,7 @@ class DatabaseManager {
                         error = TestServerError(domain: .CBL, code: docError.code, message: docError.localizedDescription)
                     }
                     
-                    self!.replicatorDocuments[replicatorID]?.append(
+                    strongSelf.replicatorDocuments[replicatorID]?.append(
                         ContentTypes.DocumentReplication(
                             collection: "\(doc.scope).\(doc.collection)",
                             documentID: doc.id,
@@ -162,7 +236,9 @@ class DatabaseManager {
                             error: error)
                     )
                 }
-            })
+            }
+            
+            replicatorDocumentsToken[replicatorID] = listenerToken
         }
         
         replicator.start(reset: reset)
@@ -183,47 +259,127 @@ class DatabaseManager {
     
     public func replicatorStatus(forID replID: UUID) -> ContentTypes.ReplicatorStatus? {
         Log.log(level: .debug, message: "Fetching Replicator status for ID \(replID)")
-        guard let replicator = replicators[replID]
-        else {
-            Log.log(level: .debug, message: "Failed to fetch Replicator status, Replicator with ID \(replID) not found.")
-            return nil
+        
+        var status: ContentTypes.ReplicatorStatus?
+        
+        listenerQueue.sync {
+            guard let replicator = replicators[replID] else {
+                Log.log(level: .debug, message: "Failed to fetch Replicator status, Replicator with ID \(replID) not found.")
+                return
+            }
+            
+            let docs: [ContentTypes.DocumentReplication] = replicatorDocuments[replID] ?? []
+            
+            replicatorDocuments[replID] = [] // Reset after return per spec
+            
+            status = ContentTypes.ReplicatorStatus(status: replicator.status, docs: docs)
+            Log.log(level: .debug, message: "Succeessfully fetched Replicator status for ID \(replID): \(status!.description)")
         }
         
-        var activity: ContentTypes.ReplicatorActivity = .STOPPED
+        return status
+    }
+    
+    public func startMultipeerReplicator(config: ContentTypes.MultipeerReplicatorConfiguration) throws -> UUID {
+        Log.log(level: .debug, message: "Starting Multipeer Replicator")
         
-        switch replicator.status.activity {
-        case .busy:
-            activity = .BUSY
-        case .connecting:
-            activity = .CONNECTING
-        case .idle:
-            activity = .IDLE
-        case .offline:
-            activity = .OFFLINE
-        case .stopped:
-            activity = .STOPPED
-        @unknown default:
-            fatalError("Encountered unknown enum value from CBLReplicator.status.activity")
+        let identity = try DatabaseManager.multipeerReplicatorIdentity(for: config)
+        
+        let authenticator = try DatabaseManager.multipeerAuthenticator(for: config.authenticator)
+        
+        var collectionConfigs: [MultipeerCollectionConfiguration] = []
+        for replColl in config.collections {
+            for name in replColl.names {
+                guard let collection = try self.collection(name, inDB: config.database) else {
+                    Log.log(level: .error, message: "Failed to start Multipeer Replicator as collection '\(name)' does not exist in \(config.database).")
+                    throw TestServerError.badRequest("Collection '\(name)' does not exist in \(config.database).")
+                }
+                
+                var collConfig = MultipeerCollectionConfiguration(collection: collection)
+                
+                collConfig.documentIDs = replColl.documentIDs
+                
+                if let pullFilter = replColl.pullFilter {
+                    collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter).toMultipeerReplicationFilter()
+                }
+                if let pushFilter = replColl.pushFilter {
+                    collConfig.pushFilter = try DatabaseManager.getCBLReplicationFilter(from: pushFilter).toMultipeerReplicationFilter()
+                }
+                if let resolver = replColl.conflictResolver {
+                    collConfig.conflictResolver = try DatabaseManager.getCBLReplicationConflictResolver(from: resolver)
+                }
+                
+                collectionConfigs.append(collConfig)
+            }
         }
         
-        let progress = ContentTypes.ReplicatorStatus.Progress(completed: replicator.status.progress.completed == replicator.status.progress.total)
+        let conf = MultipeerReplicatorConfiguration(
+            peerGroupID: config.peerGroupID,
+            identity: identity,
+            authenticator: authenticator,
+            collections: collectionConfigs)
         
-        var error: TestServerError? = nil
-        if let replError = replicator.status.error as NSError? {
-            error = TestServerError(domain: .CBL, code: replError.code, message: replError.localizedDescription)
+        let id = UUID()
+        
+        let multipeerReplicator = try MultipeerReplicator(config: conf)
+        
+        let listenerToken = multipeerReplicator.addPeerReplicatorStatusListener(on: listenerQueue) { [weak self] status in
+            guard let strongSelf = self else { return }
+            strongSelf.peerReplicatorStatus[id, default: [:]][status.peerID] = status.status
         }
         
-        var documents: [ContentTypes.DocumentReplication]? = nil
-        
-        if let replicatedDocuments = replicatorDocuments[replID] {
-            documents = replicatedDocuments
-            // Clear documents that have already been returned, per spec
-            replicatorDocuments[replID] = []
+        let docReplToken = multipeerReplicator.addPeerDocumentReplicationListener(on: listenerQueue) { [weak self] docRepl in
+            guard let strongSelf = self else { return }
+            var docs: [ContentTypes.DocumentReplication] = []
+            docRepl.documents.forEach { doc in
+                docs.append(ContentTypes.DocumentReplication.init(doc: doc, isPush: docRepl.isPush))
+            }
+            strongSelf.peerReplicatorDocuments[id, default: [:]][docRepl.peerID, default: []] += docs
         }
         
-        let status = ContentTypes.ReplicatorStatus(activity: activity, progress: progress, documents: documents, error: error)
+        multipeerReplicator.start()
         
-        Log.log(level: .debug, message: "Succeessfully fetched Replicator status for ID \(replID): \(status.description)")
+        multipeerReplicators[id] = multipeerReplicator
+        peerReplicatorStatusToken[id] = listenerToken
+        peerReplicatorDocumentsToken[id] = docReplToken
+        
+        return id
+    }
+    
+    public func stopMultipeerReplicator(forID id: UUID) throws {
+        Log.log(level: .debug, message: "Stop Multipeer Replicator for ID \(id) is requested.")
+        guard let replicator = multipeerReplicators[id] else {
+            throw TestServerError.badRequest("Multipeer Replicator ID'\(id)' does not exist.")
+        }
+        replicator.stop()
+        Log.log(level: .debug, message: "Stop Multipeer Replicator for ID \(id) is successfully requested.")
+    }
+    
+    public func multipeerReplicatorStatus(forID id: UUID) -> ContentTypes.MultipeerReplicatorStatus? {
+        Log.log(level: .debug, message: "Getting MultipeerReplicator Status for ID \(id)")
+        
+        var status: ContentTypes.MultipeerReplicatorStatus?
+        
+        listenerQueue.sync {
+            if multipeerReplicators[id] == nil {
+                Log.log(level: .debug, message: "Failed to get MultipeerReplicator Status, MultipeerReplicator with ID \(id) not found.")
+                return
+            }
+            
+            var replicators: [ContentTypes.PeerReplicatorStatus] = []
+            
+            if let statuses = peerReplicatorStatus[id] {
+                for (peerID, status) in statuses {
+                    let docs = peerReplicatorDocuments[id]?[peerID] ?? []
+                    let replStatus = ContentTypes.ReplicatorStatus.init(status: status, docs: docs)
+                    replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus))
+                    peerReplicatorDocuments[id]?[peerID] = [] // Reset after return per spec
+                }
+                // Remove disconected peers with stopped replicators so their statuses are not included next time.
+                peerReplicatorStatus[id] = statuses.filter { $0.value.activity != .stopped }
+            }
+            
+            status = ContentTypes.MultipeerReplicatorStatus.init(replicators: replicators)
+        }
         
         return status
     }
@@ -300,17 +456,6 @@ class DatabaseManager {
         }
     }
     
-    public func blobFileExists(forBlob blob: Blob, inDB dbName: String) throws -> Bool {
-        guard let db = databases[dbName]
-        else { throw TestServerError.cblDBNotOpen }
-        
-        do {
-            return try db.getBlob(properties: blob.properties) != nil
-        } catch(let error as NSError) {
-            throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
-        }
-    }
-    
     public func closeDatabase(withName dbName: String) throws {
         Log.log(level: .debug, message: "Closing database '\(dbName)'")
         guard let database = databases[dbName]
@@ -333,13 +478,8 @@ class DatabaseManager {
     public func createDatabase(dbName: String, dataset: String) throws {
         Log.log(level: .debug, message: "Create Database \(dbName) with dataset \(dataset)")
         
-        // For the first time called, reset the temp directory for extracting the dataset
-        if databases.isEmpty {
-            try DatabaseManager.resetExtractedDatasetDir()
-        }
-        
         // Load database with the dataset
-        try DatabaseManager.loadDataset(withName: dataset, dbName: dbName)
+        try loadDataset(withName: dataset, dbName: dbName)
         
         // Open database
         do {
@@ -353,11 +493,6 @@ class DatabaseManager {
     
     public func createDatabase(dbName: String, collections: [String] = []) throws {
         Log.log(level: .debug, message: "Create Database \(dbName) with collections \(collections)")
-        
-        // For the first time called, reset the temp directory for extracting the dataset
-        if databases.isEmpty {
-            try DatabaseManager.resetExtractedDatasetDir()
-        }
         
         // For any reasons if the database exists, delete it.
         if Database.exists(withName: dbName) {
@@ -386,6 +521,24 @@ class DatabaseManager {
             try? Database.delete(withName: dbName)
         }
         databases.removeAll()
+        
+        // Reset all replicators:
+        replicators.removeAll()
+        replicatorDocuments.removeAll()
+        replicatorDocumentsToken.removeAll()
+        
+        // Reset all listeners:
+        listeners.removeAll()
+        
+        // Reset all multipeer replicators:
+        multipeerReplicators.values.forEach { $0.stop() } // Temporary until all close database also stops multipeer replicator
+        multipeerReplicators.removeAll()
+        
+        peerReplicatorStatus.removeAll()
+        peerReplicatorStatusToken.removeAll()
+        
+        peerReplicatorDocuments.removeAll()
+        peerReplicatorDocumentsToken.removeAll()
     }
     
     private static func getCBLAuthenticator(from auth: ReplicatorAuthenticator) throws -> Authenticator {
@@ -399,36 +552,37 @@ class DatabaseManager {
         }
     }
     
-    private static func getCBLReplicationFilter(from filter: ContentTypes.ReplicationFilter) throws -> ReplicationFilter {
+    private static func getCBLReplicationFilter(from filter: ContentTypes.ReplicationFilter) throws -> AnyReplicationFilter {
         return try ReplicationFilterFactory.getFilter(withName: filter.name, params: filter.params)
     }
     
-    private static func getCBLReplicationConflictResolver(from resolver: ContentTypes.ReplicationConflictResolver) throws -> ConflictResolverProtocol {
+    private static func getCBLReplicationConflictResolver(from resolver: ContentTypes.ReplicationConflictResolver) throws -> ConflictResolver {
         return try ReplicationConflictResolverFactory.getResolver(withName: resolver.name, params: resolver.params)
     }
     
-    private static func loadDataset(withName name: String, dbName: String) throws {
+    private func loadDataset(withName name: String, dbName: String) throws {
         Log.log(level: .debug, message: "Loading dataset '\(name)' into DB '\(dbName)'")
         
-        let res = ("dbs" as NSString).appendingPathComponent(name)
-        guard let datasetZipURL = Bundle.main.url(forResource: res, withExtension: "cblite2.zip") else {
-            Log.log(level: .error, message: "Failed to load dataset, dataset '\(name)' does not exist.")
-            throw TestServerError(domain: .TESTSERVER, code: 400, message: "Dataset does not exist")
-        }
-        Log.log(level: .debug, message: "Found dataset at \(datasetZipURL.absoluteString)")
+        let datasetRelativePath = URL(fileURLWithPath: "dbs")
+            .appendingPathComponent(datasetVersion)
+            .appendingPathComponent("\(name).cblite2.zip")
+            .relativePath
+            
+        let datasetZipURL = try downloadDatasetFileIfNecessary(relativePath: datasetRelativePath)
+        Log.log(level: .debug, message: "Load dataset at \(datasetZipURL.path)")
         
-        // datasetZipURL is "../x.cblite2.zip", datasetURL is "../x.cblite2"
         let fm = FileManager()
         
-        // If the dataset has not been unzipped previously
-        let extDir = DatabaseManager.extractedDatasetDir()
-        let dbFileName = datasetZipURL.deletingPathExtension().lastPathComponent
-        let extDatasetPath = (extDir as NSString).appendingPathComponent(dbFileName)
-        if(!fm.fileExists(atPath: extDatasetPath)) {
+        let extractedDatasetDir = URL(fileURLWithPath: databaseDirectory)
+            .appendingPathComponent(kDatasetExtractedDirectory)
+        
+        let extractedDatasetPath = extractedDatasetDir
+            .appendingPathComponent(datasetZipURL.deletingPathExtension().lastPathComponent)
+            .path
+        
+        if(!fm.fileExists(atPath: extractedDatasetPath)) {
             Log.log(level: .debug, message: "Unzipping dataset \(datasetZipURL.lastPathComponent)")
-            // Unzip dataset archive
-            guard SSZipArchive.unzipFile(atPath: datasetZipURL.relativePath, toDestination: extDir)
-            else {
+            guard SSZipArchive.unzipFile(atPath: datasetZipURL.path, toDestination: extractedDatasetDir.path) else {
                 Log.log(level: .error, message: "Error while unzipping dataset at \(datasetZipURL.absoluteString)")
                 throw TestServerError(domain: .CBL, code: CBLError.cantOpenFile, message: "Couldn't unzip dataset archive.")
             }
@@ -440,8 +594,8 @@ class DatabaseManager {
         }
         
         do {
-            Log.log(level: .debug, message: "Attempting to copy dataset from \(extDatasetPath)")
-            try Database.copy(fromPath: extDatasetPath, toDatabase: dbName, withConfig: nil)
+            Log.log(level: .debug, message: "Attempting to copy dataset from \(extractedDatasetPath)")
+            try Database.copy(fromPath: extractedDatasetPath, toDatabase: dbName, withConfig: nil)
             Log.log(level: .debug, message: "Dataset '\(name)' successfully copied to DB '\(dbName)'")
         } catch(let error as NSError) {
             Log.log(level: .error, message: "Failed to copy dataset due to CBL error: \(error)")
@@ -449,22 +603,104 @@ class DatabaseManager {
         }
     }
     
-    private static func extractedDatasetDir() -> String {
-        return (NSTemporaryDirectory() as NSString).appendingPathComponent("TestServer-iOS-Dataset");
+    private func datasetRelativePath(for name: String, version: String) -> String {
+        return "dbs/\(version)/\(name).cblite2.zip"
     }
     
-    private static func resetExtractedDatasetDir() throws {
-        let dir = extractedDatasetDir()
-        if FileManager.default.fileExists(atPath: dir) {
-            try! FileManager.default.removeItem(atPath: dir)
+    private func downloadDatasetFileIfNecessary(relativePath: String) throws -> URL {
+        let datasetPath = URL(fileURLWithPath: databaseDirectory)
+            .appendingPathComponent(kDatasetDownloadDirectory)
+            .appendingPathComponent(relativePath)
+        
+        let fm = FileManager.default
+        
+        if (fm.fileExists(atPath: datasetPath.path)) {
+            Log.log(level: .debug, message: "Skipping download, dataset already exists at pat \(datasetPath.path)")
+            return datasetPath
         }
         
+        let parentDir = datasetPath.deletingLastPathComponent()
+        if (!fm.fileExists(atPath: parentDir.path)) {
+            try fm.createDirectory(at: parentDir, withIntermediateDirectories: true)
+        }
+        
+        guard let url = URL(string: relativePath, relativeTo: URL(string: kDatasetBaseURL)) else {
+            throw TestServerError.badRequest("Invalid dataset path : \(relativePath)")
+        }
+        
+        Log.log(level: .info, message: "Downloading dataset from \(url.absoluteString)")
+        try FileDownloader.download(url: url, to: datasetPath.path)
+        
+        return datasetPath
+    }
+    
+    public func loadBlob(filename: String) throws -> Blob {
+        let blobRelativePath = URL(fileURLWithPath: "blobs")
+            .appendingPathComponent(filename)
+            .relativePath
+        
+        let blobFileURL = try downloadDatasetFileIfNecessary(relativePath: blobRelativePath)
+        Log.log(level: .debug, message: "Load blob from \(blobFileURL.path)")
+        
+        let contentType: String = {
+            switch blobFileURL.pathExtension {
+            case "jpeg", "jpg": return "image/jpeg"
+            default: return "application/octet-stream"
+            }
+        }()
+        
         do {
-            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            return try Blob(contentType: contentType, fileURL: blobFileURL)
         } catch(let error as NSError) {
-            Log.log(level: .error, message: "Failed to create temp directory for extracting dataset zip files: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
+    
+    public func blobFileExists(forBlob blob: Blob, inDB dbName: String) throws -> Bool {
+        guard let db = databases[dbName]
+        else { throw TestServerError.cblDBNotOpen }
+        
+        do {
+            return try db.getBlob(properties: blob.properties) != nil
+        } catch(let error as NSError) {
+            throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
+        }
+    }
+    
+    private static func multipeerReplicatorIdentity(for config: ContentTypes.MultipeerReplicatorConfiguration) throws -> TLSIdentity {
+        let label = "ios-multipeer-\(config.peerGroupID)"
+        
+        guard let data = Data(base64Encoded: config.identity.data) else {
+            throw TestServerError.badRequest("Invalid multipeer replictor's identity data")
+        }
+        
+        try TLSIdentity.deleteIdentity(withLabel: label)
+        return try TLSIdentity.importIdentity(withData: data, password: config.identity.password, label: label)
+    }
+    
+    private static func multipeerAuthenticator(for config: ContentTypes.MultipeerReplicatorCAAuthenticator?) throws -> MultipeerCertificateAuthenticator {
+        guard let auth = config else {
+            return MultipeerCertificateAuthenticator { peer, certs in
+                return true
+            }
+        }
+        
+        let lines = auth.certificate
+            .components(separatedBy: .newlines)
+            .filter { !$0.contains("-----BEGIN CERTIFICATE-----") &&
+                      !$0.contains("-----END CERTIFICATE-----") &&
+                      !$0.isEmpty }
+        
+        let certData = lines.joined()
+
+        guard let derData = Data(base64Encoded: certData) else {
+            throw TestServerError.badRequest("Failed to convert multipeer authenticator's root certificate from PEM to DER")
+        }
+        
+        guard let rootCert = SecCertificateCreateWithData(nil, derData as CFData) else {
+            throw TestServerError.badRequest("Invalid multipeer authenticator's root certificate")
+        }
+        
+        return MultipeerCertificateAuthenticator(rootCerts: [rootCert])
+    }
 }
-	

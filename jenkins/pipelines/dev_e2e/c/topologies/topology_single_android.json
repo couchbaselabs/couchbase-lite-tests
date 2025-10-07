@@ -4,8 +4,8 @@
         {
             "platform": "c_android",
             "cbl_version": "{{version}}",
-            "dataset_version": "{{dataset_version}}",
-            "location": "1BCACS00001MX3"
+            "location": "1BCACS00001MX3",
+            "download": true
         }
     ],
     "include": "../../../../../environment/aws/topology_setup/default_topology.json"

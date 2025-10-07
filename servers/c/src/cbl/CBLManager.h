@@ -23,9 +23,11 @@ struct CBLDatabase;
 namespace ts::cbl {
     class CBLManager {
     public:
-        /// Constructor
+        /// Constructor & Destructor
 
-        CBLManager(const std::string &databaseDir, const std::string &assetDir);
+        CBLManager(const std::string &databaseDir, const std::string &assetDir, const std::string& datasetVersion);
+
+        ~CBLManager();
 
         /// Database
 
@@ -79,6 +81,14 @@ namespace ts::cbl {
 
         std::optional<ReplicatorStatus> replicatorStatus(const std::string &id);
 
+        /// Listener
+
+        std::string startListener(const std::string &database, std::vector<std::string>collections, int port);
+
+        CBLURLEndpointListener *listener(const std::string &id);
+
+        void stopListener(const std::string &id);
+
         /// Snapshot
 
         Snapshot *createSnapshot();
@@ -90,7 +100,7 @@ namespace ts::cbl {
     private:
         CBLDatabase *databaseUnlocked(const std::string &name);
 
-        FLSliceResult getServerCert();
+        std::string downloadDatasetFileIfNecessary(const std::string &relativePath);
 
         void
         addDocumentReplication(const std::string &id, const std::vector<ReplicatedDocument> &docs);
@@ -100,6 +110,7 @@ namespace ts::cbl {
 
         std::string _databaseDir;
         std::string _assetDir;
+        std::string _datasetVersion;
 
         /** Map of dataset name and extracted dataset path */
         std::unordered_map<std::string, std::string> _extDatasetPaths;
@@ -137,5 +148,11 @@ namespace ts::cbl {
         std::unordered_map<std::string, std::unique_ptr<ReplicatorContext>> _contextMaps;
 
         std::unordered_map<std::string, std::unique_ptr<Snapshot>> _snapShots;
+
+        /* Listener id number */
+        int64_t _listenerID = 0;
+
+        /* Listener map */
+        std::unordered_map<std::string, CBLURLEndpointListener*> _listeners;
     };
 }

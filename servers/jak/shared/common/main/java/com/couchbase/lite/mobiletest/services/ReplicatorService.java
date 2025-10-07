@@ -34,14 +34,14 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
 
 
 public class ReplicatorService {
-    static class DeletedDocFilter implements ReplicationFilter {
+    private static class DeletedDocFilter implements ReplicationFilter {
         @Override
         public boolean filtered(@NonNull Document ignore, @NonNull EnumSet<DocumentFlag> flags) {
             return flags.contains(DocumentFlag.DELETED);
         }
     }
 
-    static class DocIdFilter implements ReplicationFilter {
+    private static class DocIdFilter implements ReplicationFilter {
         @NonNull
         private final Set<String> permittedDocs;
 

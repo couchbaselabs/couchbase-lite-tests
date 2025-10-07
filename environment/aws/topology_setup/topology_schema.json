@@ -40,6 +40,15 @@
                             "default": "3.2.2"
                         }
                     }
+                },
+                "es": {
+                    "type": "object",
+                    "properties": {
+                        "version": {
+                            "type": "string",
+                            "default": "1.0.0"
+                        }
+                    }
                 }
             },
             "additionalProperties": false
@@ -80,6 +89,19 @@
                 "additionalProperties": false
             }
         },
+        "edge_servers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "$comment": "The default here is 1.0.0 but can be changed with the schema defaults.es.version"
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
         "test_servers": {
             "type": "array",
             "items": {
@@ -89,9 +111,6 @@
                         "type": "string"
                     },
                     "cbl_version": {
-                        "type": "string"
-                    },
-                    "dataset_version": {
                         "type": "string"
                     },
                     "platform": {
@@ -115,9 +134,13 @@
                     "download": {
                         "type": "boolean",
                         "default": false
+                    },
+                    "ip_hint": {
+                        "type": "string",
+                        "default": ""
                     }
                 },
-                "required": ["location", "cbl_version", "platform", "dataset_version"],
+                "required": ["location", "cbl_version", "platform"],
                 "additionalProperties": false
             }
         },

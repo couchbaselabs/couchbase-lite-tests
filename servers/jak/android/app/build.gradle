@@ -28,7 +28,6 @@ ext {
 
     SHARED_DIR = "${ROOT_DIR}/shared"
     ETC_DIR = "${ROOT_DIR}/etc"
-    ASSETS_ROOT = "${ROOT_DIR}/assets"
 
     REPORTS_DIR = "${buildDir}/reports"
 
@@ -43,13 +42,7 @@ if (!(COUCHBASE_LITE_VERSION =~ /^\d{1,2}\.\d{1,2}\.\d{1,2}([ab.]\d)?-/)) {
 // If it is a snapshot, it is in maven local
 def USE_LOCAL_MAVEN = COUCHBASE_LITE_VERSION.endsWith("SNAPSHOT")
 
-def DATASET_VERSION = project.hasProperty("datasetVersion") ? datasetVersion : ""
-if (!(DATASET_VERSION =~ /^\d{1,2}\.\d{1,2}/)) {
-    throw new InvalidUserDataException("!!! Bad dataset version: ${DATASET_VERSION}")
-}
-def ASSETS_DIR = "${ASSETS_ROOT}/${DATASET_VERSION}"
-
-println "Building test server ${SERVER_VERSION}@${SERVER_BUILD} for CBL Android ${COUCHBASE_LITE_VERSION} with ${DATASET_VERSION} data"
+println "Building test server ${SERVER_VERSION}@${SERVER_BUILD} for CBL Android ${COUCHBASE_LITE_VERSION}"
 
 android {
     namespace "com.couchbase.lite.android.mobiletest"
@@ -57,11 +50,11 @@ android {
     compileSdk COMPILE_SDK_VERSION
 
     compileOptions {
-        targetCompatibility 1.8
-        sourceCompatibility 1.8
+        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_11
     }
 
-    kotlinOptions { jvmTarget = '1.8' }
+    kotlinOptions { jvmTarget = '11' }
 
     buildFeatures {
         buildConfig = true
@@ -109,7 +102,6 @@ android {
                 "${SHARED_DIR}/server/main/java"
             ]
             assets.srcDirs = [
-                ASSETS_DIR,
                 "${SHARED_DIR}/assets"
             ]
         }
@@ -132,12 +124,12 @@ repositories {
     else {
         maven {
             url 'https://proget.sc.couchbase.com/maven2/internalmaven'
-            content { includeGroupByRegex "com\\.couchbase\\.lite.*" }
+            content { 
+                includeGroupByRegex "com\\.couchbase\\.lite.*"
+                includeGroupByRegex "org\\.nanohttpd.*"
+            }
         }
     }
-
-    // Home of NanoHTTP
-    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
 
     google()
     mavenCentral()
@@ -150,9 +142,9 @@ dependencies {
     implementation "io.insert-koin:koin-core:3.3.3"
     implementation "io.insert-koin:koin-android:3.3.3"
 
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    implementation 'androidx.databinding:databinding-runtime:8.5.2'
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'androidx.databinding:databinding-runtime:8.10.1'
 
     implementation 'com.squareup.moshi:moshi:1.14.0'
 
@@ -209,7 +201,7 @@ task checkstyle(type: Checkstyle) {
 
 /////// PMD
 pmd {
-    toolVersion '6.26.0'
+    toolVersion '6.55.0'
     ruleSets = []
 }
 task pmd(type: Pmd) {

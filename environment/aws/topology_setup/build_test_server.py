@@ -73,7 +73,6 @@ def main() -> None:
     parser = ArgumentParser("Builds a given test server")
     parser.add_argument("platform", type=str, help="The platform to build")
     parser.add_argument("version", type=str, help="The version of CBL to use")
-    parser.add_argument("dataset_version", type=str, help="The dataset version to use")
     parser.add_argument(
         "--upload",
         action="store_true",
@@ -86,11 +85,7 @@ def main() -> None:
     )
 
     args = parser.parse_args()
-    server = TestServer.create(args.platform, args.version, args.dataset_version)
-    if "-" not in args.version:
-        raise ValueError(
-            f"Invalid version {args.version}, must be in the form x.y.z-build"
-        )
+    server = TestServer.create(args.platform, args.version)
 
     if args.ci and upload_exists(server):
         click.secho("Server already exists on latestbuilds, skipping build", fg="green")

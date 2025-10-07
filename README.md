@@ -27,12 +27,44 @@ The system consists of 4 components:
 
 ### Requirements
 
-1. [Docker](https://www.docker.com/get-started)
-2. [Python 3.10+](https://www.python.org/downloads)
-3. [OpenSSL 1.1 for CBS Python SDK](https://docs.couchbase.com/python-sdk/current/hello-world/start-using-sdk.html)
-4. [Git LFS](https://git-lfs.com)
+1. [Python 3.10+](https://www.python.org/downloads)
+2. [OpenSSL 1.1 for CBS Python SDK](https://docs.couchbase.com/python-sdk/current/hello-world/start-using-sdk.html)
+3. [Git LFS](https://git-lfs.com)
 
-### Steps
+### Environment Configuration
+
+The tests use a configuration JSON file to get information about the environment in which they are running. As you might notice, there is a [JSON Schema](https://packages.couchbase.com/couchbase-lite/testserver.schema.json) for it, so that will tell you more about the structure.  Here is an example.
+
+```json
+{
+  "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
+  "api-version": 1,
+  "test-servers": [
+    {
+      "url": "http://<url1>:8080",
+      "dataset_version": "3.2"
+    },
+    {
+      "url": "http://<url2>:8080",
+      "dataset_version": "3.2"
+    }
+  ],
+  "couchbase-servers": [
+    {
+      "hostname": "<url3>"
+    }
+  ],
+  "sync-gateways": [
+    {
+      "hostname": "<url4>"
+    }
+  ]
+}
+```
+
+This particular example indicates that there are two test servers running, along with one Sync Gateway and a Couchbase Server at the URLs provided.  Normally you don't write this file yourself, but rather generate it using [the orchestrator](environment/aws/README.md).
+
+### Steps for Running Tests Only
 
 1. Clone the repository.
    ```

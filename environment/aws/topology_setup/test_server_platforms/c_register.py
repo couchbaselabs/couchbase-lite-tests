@@ -15,7 +15,7 @@ Functions:
         Build the C test server.
     compress_package(self) -> str:
         Compress the C test server package.
-    create_bridge(self) -> PlatformBridge:
+    create_bridge(self, **kwargs) -> PlatformBridge:
         Create a bridge for the C test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
@@ -44,11 +44,7 @@ from environment.aws.common.io import (
 )
 from environment.aws.common.output import header
 from environment.aws.topology_setup.cbl_library_downloader import CBLLibraryDownloader
-from environment.aws.topology_setup.test_server import (
-    TEST_SERVER_DIR,
-    TestServer,
-    copy_dataset,
-)
+from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
 
 from .android_bridge import AndroidBridge
 from .exe_bridge import ExeBridge
@@ -73,15 +69,16 @@ class CTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @abstractmethod
     def cbl_filename(self, version: str) -> str:
         pass
 
-    def _copy_dataset(self) -> None:
-        copy_dataset(C_TEST_SERVER_DIR / "assets", self.dataset_version)
+    @property
+    def product(self) -> str:
+        return "couchbase-lite-c"
 
 
 class CTestServer_Desktop(CTestServer):
@@ -98,9 +95,14 @@ class CTestServer_Desktop(CTestServer):
         filename = self.cbl_filename(self.version)
         ext = ".tar.gz" if filename.endswith(".tar.gz") else ".zip"
         DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+
+        if self._check_downloaded(LIB_DIR):
+            header(f"CBL library {self.version} already downloaded")
+            return
+
         download_file = DOWNLOAD_DIR / f"framework.{ext}"
         downloader = CBLLibraryDownloader(
-            "couchbase-lite-c",
+            self.product,
             self.cbl_filename(self.version),
             version_parts[0],
             build,
@@ -110,12 +112,12 @@ class CTestServer_Desktop(CTestServer):
             unzip_directory(download_file, LIB_DIR)
         else:
             untar_directory(download_file, LIB_DIR)
+        self._mark_downloaded(LIB_DIR)
 
     def build(self) -> None:
         """
         Build the C test server.
         """
-        self._copy_dataset()
         shutil.rmtree(LIB_DIR, ignore_errors=True)
         self._download_cbl()
         header("Building C test server")
@@ -172,8 +174,8 @@ class CTestServer_iOS(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -186,7 +188,7 @@ class CTestServer_iOS(CTestServer):
         return "c_ios"
 
     def cbl_filename(self, version: str) -> str:
-        return f"couchbase-lite-c-enterprise-{version}-ios.zip"
+        return f"{self.product}-enterprise-{version}-ios.zip"
 
     def _download_cbl(self):
         header(f"Downloading CBL library {self.version}")
@@ -196,9 +198,13 @@ class CTestServer_iOS(CTestServer):
             build = int(version_parts[1])
 
         DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+        if self._check_downloaded(IOS_FRAMEWORKS_DIR):
+            header(f"CBL library {self.version} already downloaded")
+            return
+
         download_file = DOWNLOAD_DIR / "framework.zip"
         downloader = CBLLibraryDownloader(
-            "couchbase-lite-c",
+            self.product,
             self.cbl_filename(self.version),
             version_parts[0],
             build,
@@ -216,10 +222,10 @@ class CTestServer_iOS(CTestServer):
             cwd=IOS_VENDOR_DIR / "cmake",
             check=True,
         )
+        self._mark_downloaded(IOS_FRAMEWORKS_DIR)
 
     def build(self):
         self._download_cbl()
-        self._copy_dataset()
         header("Building")
         env = os.environ.copy()
         env["LANG"] = "en_US.UTF-8"
@@ -264,21 +270,25 @@ class CTestServer_iOS(CTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_ios_{self.dataset_version}.zip"
+        return (
+            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        )
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
         Returns:
             PlatformBridge: The platform bridge.
         """
-        path = (
-            IOS_BUILD_DIR / "Build" / "Products" / "Release-iphoneos" / "TestServer.app"
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else IOS_BUILD_DIR / "Build" / "Products" / "Release-iphoneos"
         )
 
         return iOSBridge(
-            str(path),
+            str(prefix / "TestServer.app"),
             "com.couchbase.CBLTestServer",
         )
 
@@ -317,8 +327,8 @@ class CTestServer_Android(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -331,7 +341,7 @@ class CTestServer_Android(CTestServer):
         return "c_android"
 
     def cbl_filename(self, version: str) -> str:
-        return f"couchbase-lite-c-enterprise-{version}-android.zip"
+        return f"{self.product}-enterprise-{version}-android.zip"
 
     def _download_cbl(self):
         android_lib_dir = (
@@ -351,9 +361,13 @@ class CTestServer_Android(CTestServer):
             build = int(version_parts[1])
 
         DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+        if self._check_downloaded(android_lib_dir):
+            header(f"CBL library {self.version} already downloaded")
+            return
+
         download_file = DOWNLOAD_DIR / "framework.zip"
         downloader = CBLLibraryDownloader(
-            "couchbase-lite-c",
+            self.product,
             self.cbl_filename(self.version),
             version_parts[0],
             build,
@@ -362,13 +376,13 @@ class CTestServer_Android(CTestServer):
         shutil.rmtree(android_lib_dir, ignore_errors=True)
         android_lib_dir.mkdir(0o755)
         unzip_directory(download_file, android_lib_dir)
+        self._mark_downloaded(android_lib_dir)
 
     def build(self) -> None:
         """
         Build the C test server.
         """
         self._download_cbl()
-        self._copy_dataset()
         gradle_path = C_TEST_SERVER_DIR / "platforms" / "android" / "gradlew"
         if platform.system() == "Windows":
             gradle_path = gradle_path.with_suffix(".bat")
@@ -393,9 +407,9 @@ class CTestServer_Android(CTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_android_{self.dataset_version}.apk"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
@@ -403,7 +417,13 @@ class CTestServer_Android(CTestServer):
             PlatformBridge: The platform bridge.
         """
         path = (
-            C_TEST_SERVER_DIR
+            TEST_SERVER_DIR
+            / "downloaded"
+            / self.platform
+            / self.version
+            / "testserver_android.apk"
+            if self._downloaded
+            else C_TEST_SERVER_DIR
             / "platforms"
             / "android"
             / "app"
@@ -439,9 +459,7 @@ class CTestServer_Android(CTestServer):
             / "release"
             / "app-release.apk"
         )
-        zip_path = (
-            apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
-        )
+        zip_path = apk_path.parents[5] / "testserver_android.apk"
         shutil.copy(apk_path, zip_path)
         return str(zip_path)
 
@@ -466,8 +484,8 @@ class CTestServer_Windows(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -488,21 +506,24 @@ class CTestServer_Windows(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_windows_{self.dataset_version}.zip"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
 
     def cbl_filename(self, version: str) -> str:
-        return f"couchbase-lite-c-enterprise-{version}-windows-x86_64.zip"
+        return f"{self.product}-enterprise-{version}-windows-x86_64.zip"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
         Returns:
             PlatformBridge: The platform bridge.
         """
-        return ExeBridge(
-            str(BUILD_DIR / "out" / "bin" / "testserver.exe"),
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else BUILD_DIR / "out" / "bin"
         )
+        return ExeBridge(str(prefix / "testserver.exe"))
 
     def compress_package(self) -> str:
         """
@@ -527,11 +548,11 @@ class CTestServer_macOS(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     def cbl_filename(self, version: str) -> str:
-        return f"couchbase-lite-c-enterprise-{version}-macos.zip"
+        return f"{self.product}-enterprise-{version}-macos.zip"
 
     @property
     def platform(self) -> str:
@@ -552,18 +573,23 @@ class CTestServer_macOS(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_macos_{self.dataset_version}.zip"
+        return (
+            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        )
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
         Returns:
             PlatformBridge: The platform bridge.
         """
-        return ExeBridge(
-            str(BUILD_DIR / "out" / "bin" / "testserver"),
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else BUILD_DIR / "out" / "bin"
         )
+        return ExeBridge(str(prefix / "testserver"))
 
     def compress_package(self) -> str:
         """
@@ -587,8 +613,8 @@ class CTestServer_Linux(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str, arch: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str, arch: str):
+        super().__init__(version)
         self.__arch = arch
 
     @property
@@ -602,7 +628,7 @@ class CTestServer_Linux(CTestServer_Desktop):
         return f"c_linux_{self.__arch}"
 
     def cbl_filename(self, version: str) -> str:
-        return f"couchbase-lite-c-enterprise-{version}-linux-{self.__arch}.tar.gz"
+        return f"{self.product}-enterprise-{version}-linux-{self.__arch}.tar.gz"
 
     @property
     def latestbuilds_path(self) -> str:
@@ -613,18 +639,21 @@ class CTestServer_Linux(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-c/{version_parts[0]}/{version_parts[1]}/testserver_linux-{self.__arch}_{self.dataset_version}.tar.gz"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_linux-{self.__arch}.tar.gz"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
         Returns:
             PlatformBridge: The platform bridge.
         """
-        return ExeBridge(
-            str(BUILD_DIR / "out" / "bin" / "testserver"),
+        prefix = (
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version
+            if self._downloaded
+            else BUILD_DIR / "out" / "bin"
         )
+        return ExeBridge(str(prefix / "testserver"))
 
     def compress_package(self) -> str:
         """
@@ -660,5 +689,5 @@ class CTestServer_Linux_x86_64(CTestServer_Linux):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version, "x86_64")
+    def __init__(self, version: str):
+        super().__init__(version, "x86_64")

@@ -15,7 +15,7 @@ Functions:
         Build the .NET test server.
     compress_package(self) -> str:
         Compress the .NET test server package.
-    create_bridge(self) -> PlatformBridge:
+    create_bridge(self, **kwargs) -> PlatformBridge:
         Create a bridge for the .NET test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
@@ -65,8 +65,8 @@ class DotnetTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     @abstractmethod
@@ -88,6 +88,10 @@ class DotnetTestServer(TestServer):
             Optional[str]: The extra arguments for the build command.
         """
         return None
+
+    @property
+    def product(self) -> str:
+        return "couchbase-lite-net"
 
     @property
     @abstractmethod
@@ -153,8 +157,8 @@ class DotnetTestServerCli(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     @abstractmethod
@@ -166,6 +170,10 @@ class DotnetTestServerCli(TestServer):
             str: The runtime identifier.
         """
         pass
+
+    @property
+    def product(self) -> str:
+        return "couchbase-lite-net"
 
     def build(self) -> None:
         """
@@ -220,8 +228,8 @@ class DotnetTestServer_iOS(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -241,7 +249,17 @@ class DotnetTestServer_iOS(DotnetTestServer):
         Returns:
             str: The .NET framework version.
         """
-        return "net8.0-ios"
+        return "net9.0-ios"
+
+    @property
+    def rid(self) -> str:
+        """
+        Get the runtime identifier.
+
+        Returns:
+            str: The runtime identifier.
+        """
+        return "win-x64"
 
     @property
     def publish(self) -> bool:
@@ -272,9 +290,11 @@ class DotnetTestServer_iOS(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        return (
+            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        )
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the .NET test server to be able to install, run, etc.
 
@@ -288,7 +308,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net8.0-ios"
+            / "net9.0-ios"
             / "ios-arm64"
         )
         return iOSBridge(
@@ -309,7 +329,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net8.0-ios"
+            / "net9.0-ios"
             / "ios-arm64"
             / "testserver.app"
         )
@@ -337,8 +357,8 @@ class DotnetTestServer_Android(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -358,7 +378,7 @@ class DotnetTestServer_Android(DotnetTestServer):
         Returns:
             str: The .NET framework version.
         """
-        return "net8.0-android"
+        return "net9.0-android"
 
     @property
     def publish(self) -> bool:
@@ -379,9 +399,9 @@ class DotnetTestServer_Android(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the .NET test server to be able to install, run, etc.
 
@@ -399,7 +419,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net8.0-android"
+            / "net9.0-android"
             / "com.couchbase.dotnet.testserver-Signed.apk"
         )
         return AndroidBridge(
@@ -420,7 +440,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net8.0-android"
+            / "net9.0-android"
             / "com.couchbase.dotnet.testserver-Signed.apk"
         )
         zip_path = apk_path.parents[5] / "testserver_android.apk"
@@ -448,8 +468,8 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -480,9 +500,9 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the .NET test server to be able to install, run, etc.
 
@@ -546,8 +566,8 @@ class DotnetTestServer_macOS(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -567,7 +587,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
         Returns:
             str: The .NET framework version.
         """
-        return "net8.0-maccatalyst"
+        return "net9.0-maccatalyst"
 
     @property
     def publish(self) -> bool:
@@ -588,9 +608,11 @@ class DotnetTestServer_macOS(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-net/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        return (
+            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        )
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the .NET test server to be able to install, run, etc.
 
@@ -604,7 +626,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net8.0-maccatalyst"
+            / "net9.0-maccatalyst"
             / "maccatalyst-x64"
         )
         return macOSBridge(str(prefix / "testserver.app"))
@@ -622,7 +644,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net8.0-maccatalyst"
+            / "net9.0-maccatalyst"
             / "maccatalyst-x64"
             / "testserver.app"
         )

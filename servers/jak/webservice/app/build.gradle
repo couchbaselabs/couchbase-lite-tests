@@ -19,24 +19,21 @@ import org.apache.tools.ant.filters.ReplaceTokens
 plugins {
     id 'java'
     id 'kotlin'
-    id 'war'
     id 'checkstyle'
     id 'pmd'
     id 'com.github.spotbugs'
-    id 'org.gretty'
     id "com.dorongold.task-tree" version "4.0.1"
 }
 
 ext {
     SERVER_VERSION = file("${ROOT_DIR}/version.txt").text.trim()
     SERVER_BUILD = "${getBuildId()}"
-    SERVER_ID = "Java Webservice Test Server: ${SERVER_VERSION}@${SERVER_BUILD}"
+    SERVER_ID = "Java Webservice Test Server ${SERVER_VERSION}@${SERVER_BUILD}"
 
     SPOTBUGS_VERSION = '4.7.3'
 
     SHARED_DIR = "${ROOT_DIR}/shared"
     ETC_DIR = "${ROOT_DIR}/etc"
-    ASSETS_ROOT = "${ROOT_DIR}/assets"
 
     REPORTS_DIR = "${buildDir}/reports"
 
@@ -48,17 +45,13 @@ if (!(COUCHBASE_LITE_VERSION  =~ /^\d{1,2}\.\d{1,2}\.\d{1,2}([ab.]\d)?-/)) { thr
 // If it is a snapshot, it is in maven local
 def USE_LOCAL_MAVEN = COUCHBASE_LITE_VERSION.endsWith("SNAPSHOT")
 
-def DATASET_VERSION = project.hasProperty("datasetVersion") ? datasetVersion : ""
-if (!(DATASET_VERSION  =~ /^\d{1,2}\.\d{1,2}/)) { throw new InvalidUserDataException ("!!! Bad dataset version: ${DATASET_VERSION}") }
-def ASSETS_DIR = "${ASSETS_ROOT}/${DATASET_VERSION}"
-
 // Set -Pverbose to get full console logs for tests
 def VERBOSE = project.hasProperty("verbose")
 
 def COUCHBASE_LITE_LIB = 'couchbase-lite-java-ee'
 if (USE_LOCAL_MAVEN) { COUCHBASE_LITE_LIB += "-macos" }
 
-println "Building test server ${SERVER_VERSION}@${SERVER_BUILD} for Web Service CBL Java ${COUCHBASE_LITE_VERSION} with ${DATASET_VERSION} data"
+println "Building test server ${SERVER_VERSION}@${SERVER_BUILD} for Web Service CBL Java ${COUCHBASE_LITE_VERSION}"
 
 group 'com.couchbase.lite.mobiletest'
 version = SERVER_VERSION
@@ -76,7 +69,6 @@ java {
                 "${SHARED_DIR}/jvm/main/java"
             ]
             resources.srcDirs = [
-                ASSETS_DIR,
                 "${SHARED_DIR}/assets"
             ]
         }
@@ -92,12 +84,6 @@ java {
 compileKotlin.kotlinOptions.jvmTarget = "1.8"
 compileTestKotlin.kotlinOptions.jvmTarget = "1.8"
 
-war {
-    archiveBaseName = "CBLTestServer-Java"
-    archiveAppendix = "WS"
-    archiveVersion = "${SERVER_VERSION}_${COUCHBASE_LITE_VERSION}"
-}
-
 repositories {
     if (USE_LOCAL_MAVEN) { mavenLocal() }
     else {
@@ -112,13 +98,10 @@ dependencies {
     compileOnly 'androidx.annotation:annotation:1.5.0'
     compileOnly "com.github.spotbugs:spotbugs-annotations:${SPOTBUGS_VERSION}"
 
-    providedCompile 'jakarta.servlet:jakarta.servlet-api:4.0.2'
-
-    providedCompile "com.couchbase.lite:${COUCHBASE_LITE_LIB}:${COUCHBASE_LITE_VERSION}"
-
+    implementation "com.couchbase.lite:${COUCHBASE_LITE_LIB}:${COUCHBASE_LITE_VERSION}"
     implementation 'com.squareup.moshi:moshi:1.14.0'
- 
-    implementation "com.squareup.okhttp3:okhttp:${OKHTTP_VERSION}"
+    implementation 'org.eclipse.jetty:jetty-server:11.0.15'
+    implementation 'org.eclipse.jetty:jetty-servlet:11.0.15'
 
     testImplementation 'junit:junit:4.13.2'
 }
@@ -134,11 +117,6 @@ task generateServerInfo(type: Copy) {
 project.afterEvaluate {
     compileJava.dependsOn generateServerInfo
     compileKotlin.dependsOn generateServerInfo
-}
-
-gretty {
-    contextPath = '/'
-    httpPort = 8080
 }
 
 def FILE_FILTER = ['**/gen/**', "okhttp3/**", "org/json/**"]
@@ -181,8 +159,14 @@ task checkstyle(type: Checkstyle, dependsOn: generateServerInfo) {
 
 /////// PMD
 pmd {
-    toolVersion '6.26.0'
+    toolVersion '6.55.0'
     ruleSets = []
+}
+tasks.named('pmdMain') {
+    enabled = false
+}
+tasks.named('pmdTest') {
+    enabled = false
 }
 task pmd(type: Pmd, dependsOn: generateServerInfo) {
     description 'PMD'
@@ -242,6 +226,20 @@ spotbugs { toolVersion = SPOTBUGS_VERSION }
                 setDestination(file("${REPORTS_DIR}/spotbugs.html"))
             }
         }
+    }
+}
+
+jar {
+    archiveBaseName = "CBLTestServer-Java"
+    archiveAppendix = "WebService"
+    archiveVersion = "${SERVER_VERSION}_${COUCHBASE_LITE_VERSION}"
+
+    manifest { attributes('Main-Class': 'com.couchbase.lite.javaws.mobiletest.TestServerApp') }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    } {
+        exclude "META-INF/**"
+        exclude "module-info.class"
     }
 }
 

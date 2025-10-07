@@ -12,7 +12,7 @@ Functions:
         Build the Swift test server.
     compress_package(self) -> str:
         Compress the Swift test server package.
-    create_bridge(self) -> PlatformBridge:
+    create_bridge(self, **kwargs) -> PlatformBridge:
         Create a bridge for the Swift test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
@@ -36,7 +36,6 @@ from environment.aws.topology_setup.test_server import (
     DOWNLOADED_TEST_SERVER_DIR,
     TEST_SERVER_DIR,
     TestServer,
-    copy_dataset,
 )
 
 from .ios_bridge import iOSBridge
@@ -58,8 +57,12 @@ class SwiftTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
+
+    @property
+    def product(self) -> str:
+        return "couchbase-lite-ios"
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-swift_xc_enterprise_{version}.zip"
@@ -71,9 +74,13 @@ class SwiftTestServer(TestServer):
         header(f"Downloading CBL library {self.version}")
         version_parts = self.version.split("-")
         DOWNLOAD_DIR.mkdir(0o755, exist_ok=True)
+        if self._check_downloaded(FRAMEWORKS_DIR):
+            header(f"CBL library {self.version} already downloaded")
+            return
+
         download_file = DOWNLOAD_DIR / "framework.zip"
         downloader = CBLLibraryDownloader(
-            "couchbase-lite-ios",
+            self.product,
             f"{self.cbl_filename(self.version)}",
             version_parts[0],
             int(version_parts[1]) if len(version_parts) > 1 else 0,
@@ -84,13 +91,7 @@ class SwiftTestServer(TestServer):
         )
         unzip_directory(download_file, FRAMEWORKS_DIR)
         download_file.unlink()
-
-    def _copy_dataset(self) -> None:
-        dest_dir = SWIFT_TEST_SERVER_DIR / "Assets"
-        copy_dataset(
-            dest_dir,
-            self.dataset_version,
-        )
+        self._mark_downloaded(FRAMEWORKS_DIR)
 
 
 @TestServer.register("swift_ios")
@@ -102,8 +103,8 @@ class SwiftTestServer_iOS(SwiftTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str):
+        super().__init__(version)
 
     @property
     def platform(self) -> str:
@@ -124,10 +125,11 @@ class SwiftTestServer_iOS(SwiftTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-ios/{version_parts[0]}/{version_parts[1]}/testserver_ios_{self.dataset_version}.zip"
+        return (
+            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        )
 
     def build(self) -> None:
-        self._copy_dataset()
         self._download_cbl()
         header("Building")
         env = os.environ.copy()
@@ -164,7 +166,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
                 if xcpretty_proc.returncode != 0:
                     raise RuntimeError("Build failed")
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the Swift test server to be able to install, run, etc.
 

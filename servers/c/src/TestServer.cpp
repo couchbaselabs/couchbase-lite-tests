@@ -43,8 +43,7 @@ namespace ts {
 #endif
         _context = {filesDir("CBL-C-TestServer", true), assetsDir()};
         _dispatcher = std::make_unique<Dispatcher>(this);
-        _cblManager = std::make_unique<cbl::CBLManager>(_context.databaseDir, _context.assetsDir);
-        _sessionManager = std::make_unique<SessionManager>(_cblManager.get());
+        _sessionManager = std::make_unique<SessionManager>(this);
     }
 
     TestServer::~TestServer() {

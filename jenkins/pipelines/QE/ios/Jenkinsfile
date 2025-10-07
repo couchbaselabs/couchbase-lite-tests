@@ -1,0 +1,62 @@
+pipeline {
+    agent none
+    parameters {
+        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
+        string(name: 'CBL_VERSION', defaultValue: '3.2.3', description: 'Couchbase Lite Version (build number will be auto-fetched)')
+        string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    currentBuild.displayName = "${params.CBL_VERSION}-${CBL_EDITION} (#${currentBuild.number})"
+                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
+                }
+            }
+        }
+        stage('Prebuild Servers') {
+            steps {
+                build job: 'prebuild-test-server',
+                parameters: [
+                    string(name: 'TS_PLATFORM', value: 'swift_ios'),
+                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                ],
+                wait: true,
+                propagate: true
+            }
+        }
+        stage('Run Test') {
+            agent { label 'mac-mini-new' }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                AWS_PROFILE = "mobile-for-now"
+                TS_ARTIFACTS_DIR = 'ios'
+            }
+            steps {
+                // Unlock keychain:
+                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                echo "Run iOS Test"
+                timeout(time: 60, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
+                }
+            }
+            post {
+                always {
+                    echo "Teardown iOS Test"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/QE/ios/teardown.sh"
+                    }
+                    archiveArtifacts artifacts: 'tests/QE/ios/**/*', fingerprint: true, allowEmptyArchive: true
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+        }
+    }
+}

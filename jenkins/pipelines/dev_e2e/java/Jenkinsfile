@@ -5,7 +5,6 @@ pipeline {
         choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
         string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
-        string(name: 'CBL_DATASET_VERSION', defaultValue: '', description: "The dataset version to use")
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
     }
     stages {
@@ -14,9 +13,35 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
-                    if (params.CBL_DATASET_VERSION == '') { error "CBL_DATASET_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "java-${CBL_EDITION} ${params.CBL_VERSION}-${params.CBL_BUILD}/${params.CBL_DATASET_VERSION} (#${currentBuild.number})"
+                    currentBuild.displayName = "java-${CBL_EDITION} ${params.CBL_VERSION}-${params.CBL_BUILD} (#${currentBuild.number})"
+                }
+            }
+        }
+
+         stage('Prebuild Servers') {
+            steps {
+                script {
+                    def platforms = [
+                        'jak_desktop', 'jak_webservice'
+                    ]
+                    def parallelBuilds = [:]
+                    for(p in platforms) {
+                        // Groovy stupidness.  Need to set a local variable here
+                        // to avoid late binding (all jobs use dotnet_macos).
+                        def platform = p
+                        parallelBuilds[platform] = {
+                            build job: 'prebuild-test-server',
+                            parameters: [
+                                string(name: 'TS_PLATFORM', value: platform),
+                                string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                                string(name: 'CBL_BUILD', value: params.CBL_BUILD)
+                            ],
+                            wait: true,
+                            propagate: true
+                        }
+                    }
+                    parallel parallelBuilds
                 }
             }
         }
@@ -32,11 +57,14 @@ pipeline {
                     options {
                         lock("mob-e2e-mac-01")
                     }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'macos_desktop'
+                    }
                     steps {
                         echo "=== Run OSX Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                             """
                         }
                         echo "=== OSX Desktop Tests Complete"
@@ -49,8 +77,7 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/desktop/teardown.sh
                                 '''
                             }
-                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/macos_desktop/**', fingerprint: true, allowEmptyArchive: true
                             echo "=== OSX Desktop Test Teardown Complete"
                         }
                     }
@@ -61,11 +88,14 @@ pipeline {
                     options {
                         lock("mob-e2e-win-01")
                     }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'windows_desktop'
+                    }
                     steps {
                         echo "=== Run Windows Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             pwsh """
-                                jenkins\\pipelines\\dev_e2e\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -DatasetVersion ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
+                                jenkins\\pipelines\\dev_e2e\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
                             """
                         }
                         echo "=== Windows Desktop Tests Complete"
@@ -76,8 +106,7 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 pwsh 'jenkins\\pipelines\\dev_e2e\\java\\desktop\\teardown.ps1'
                             }
-                            archiveArtifacts artifacts: 'tests\\dev_e2e\\session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests\\dev_e2e\\http_log\\*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests\\dev_e2e\\windows_desktop\\**', fingerprint: true, allowEmptyArchive: true
                             echo "=== Windows Desktop Test Teardown Complete"
                         }
                     }
@@ -88,11 +117,14 @@ pipeline {
                     options {
                         lock("mob-e2e-deb-02")
                     }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'linux_desktop'
+                    }
                     steps {
                         echo "=== Run Linux Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                             """
                         }
                         echo "=== Linux Desktop Tests Complete"
@@ -105,8 +137,7 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/desktop/teardown.sh
                                 '''
                             }
-                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/linux_desktop/**', fingerprint: true, allowEmptyArchive: true
                             echo "=== Linux Desktop Test Teardown Complete"
                         }
                     }
@@ -117,11 +148,14 @@ pipeline {
                     options {
                         lock("mob-e2e-mac-01")
                     }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'macos_webservice'
+                    }
                     steps {
                         echo "=== Run OSX Web Service Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                             """
                         }
                         echo "=== OSX Web Service Tests Complete"
@@ -134,8 +168,7 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/webservice/teardown.sh
                                 """
                             }
-                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/macos_webservice/**', fingerprint: true, allowEmptyArchive: true
                             echo "=== OSX Web Service Test Teardown Complete"
                         }
                     }
@@ -146,11 +179,14 @@ pipeline {
                     options {
                         lock("mob-e2e-win-01")
                     }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'windows_webservice'
+                    }
                     steps {
                         echo "=== Run Windows Web Service Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             pwsh """
-                                jenkins\\pipelines\\dev_e2e\\java\\webservice\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -DatasetVersion ${params.CBL_DATASET_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
+                                jenkins\\pipelines\\dev_e2e\\java\\webservice\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
                             """
                         }
                         echo "=== Windows Web Service Tests Complete"
@@ -163,8 +199,7 @@ pipeline {
                                     jenkins\\pipelines\\dev_e2e\\java\\webservice\\teardown.ps1
                                 """
                             }
-                            archiveArtifacts artifacts: 'tests\\dev_e2e\\session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests\\dev_e2e\\http_log\\*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests\\dev_e2e\\windows_webservice\\**', fingerprint: true, allowEmptyArchive: true
                             echo "=== Windows Web Service Test Teardown Complete"
                         }
                     }
@@ -175,11 +210,14 @@ pipeline {
                     options {
                         lock("mob-e2e-deb-02")
                     }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'linux_webservice'
+                    }
                     steps {
                         echo "=== Run Linux Web Service Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.CBL_DATASET_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                             """
                         }
                         echo "=== Linux Web Service Tests Complete"
@@ -192,8 +230,7 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/webservice/teardown.sh
                                 """
                             }
-                            archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/linux_webservice/**', fingerprint: true, allowEmptyArchive: true
                             echo "=== Linux Web Service Test Teardown Complete"
                         }
                     }

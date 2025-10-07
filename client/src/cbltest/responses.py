@@ -109,6 +109,9 @@ class GetRootResponse(TestServerResponse):
                 return ServerVariant.IOS
             elif self.__cbl == "couchbase-lite-java":
                 return ServerVariant.JVM
+            elif self.__cbl == "couchbase-lite-swift":
+                # Treat the new Swift-based test server variant as iOS for compatibility.
+                return ServerVariant.IOS
             else:
                 raise ValueError(f"Unknown test server variant: {self.__cbl}")
 

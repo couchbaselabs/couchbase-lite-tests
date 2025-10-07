@@ -1,6 +1,8 @@
 from abc import ABC
 
 import pytest
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 
 from cbltest.api.testserver import TestServer
 from cbltest.globals import CBLPyTestGlobal
@@ -47,3 +49,16 @@ class CBLTestClass(ABC):
         if variant not in allow_platforms:
             self.__skipped = True
             pytest.skip(f"{variant} is not in the platforms {allow_platforms}")
+
+    async def skip_if_cbl_not(self, server: TestServer, constraint: str):
+        """
+        Skips the test if the CBL version does not match the specified comparison operation and value.
+
+        :param constraint: A string representing the comparison operation and version, e.g., ">= 3.3.0".
+        """
+        version_str = (await server.get_info()).library_version.split("-")[0]
+        version = Version(version_str)
+        spec = SpecifierSet(constraint)
+        if version not in spec:
+            self.__skipped = True
+            pytest.skip(f"CBL {version_str} not {constraint}")

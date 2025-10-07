@@ -1,8 +1,9 @@
 ﻿using Couchbase.Lite;
 using Couchbase.Lite.Sync;
 using System.Collections;
+using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,6 +11,7 @@ using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 using FilterGenerator = Func<IReadOnlyDictionary<string, JsonElement>?, HandlerList.IReplicatorFilter>;
+using FilterFunction = Func<Document, DocumentFlags, bool>; 
 
 internal static partial class HandlerList
 {
@@ -39,7 +41,7 @@ internal static partial class HandlerList
     internal sealed class ReplicatorDocumentIDsFilter : IReplicatorFilter
     {
         private const string DocumentIDsKey = "documentIDs";
-        private Dictionary<string, IReadOnlySet<string>> _allowedDocumentIDs;
+        private readonly Dictionary<string, IReadOnlySet<string>> _allowedDocumentIDs;
 
         public ReplicatorDocumentIDsFilter(IReadOnlyDictionary<string, JsonElement>? args)
         {
@@ -52,14 +54,14 @@ internal static partial class HandlerList
                     HttpStatusCode.BadRequest);
             }
 
-            _allowedDocumentIDs = args[DocumentIDsKey].EnumerateObject().ToDictionary(x => x.Name, x =>
+            _allowedDocumentIDs = args[DocumentIDsKey].EnumerateObject().ToDictionary(x => x.Name, IReadOnlySet<string> (x) =>
             {
                 if (x.Value.ValueKind != JsonValueKind.Array) {
                     throw new ApplicationStatusException($"documentIDs filter documentIDs argument contained invalid list for '{x.Name}'",
                         HttpStatusCode.BadRequest);
                 }
 
-                return (IReadOnlySet<string>)x.Value.EnumerateArray().Select(x => x.ToString()).ToHashSet();
+                return x.Value.EnumerateArray().Select(y => y.ToString()).ToHashSet();
             });
         }
 
@@ -69,14 +71,11 @@ internal static partial class HandlerList
                 throw new ApplicationStatusException("Document had null collection in filter", HttpStatusCode.InternalServerError);
             }
 
-            if(!_allowedDocumentIDs.ContainsKey(doc.Collection.FullName)) {
-                return false;
-            }
-
-            return _allowedDocumentIDs[doc.Collection.FullName].Contains(doc.Id);
+            return _allowedDocumentIDs.TryGetValue(doc.Collection.FullName, out var d) && d.Contains(doc.Id);
         }
     }
 
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct DocumentReplicationEvent
     {
         public required bool isPush { get; init; }
@@ -92,8 +91,8 @@ internal static partial class HandlerList
 
     internal sealed class ReplicatorDocumentListener : IDisposable, IEnumerable<DocumentReplicationEvent>
     {
-        private ListenerToken _listenerToken;
-        private List<DocumentReplicationEventArgs> _events = new List<DocumentReplicationEventArgs>();
+        private readonly ListenerToken _listenerToken;
+        private List<DocumentReplicationEventArgs> _events = [];
 
         public ReplicatorDocumentListener(Replicator replicator)
         {
@@ -132,24 +131,22 @@ internal static partial class HandlerList
                         };
                     }
 
-                    yield return new DocumentReplicationEvent
+                    yield return new()
                     {
                         isPush = entry.IsPush,
                         collection = $"{doc.ScopeName}.{doc.CollectionName}",
                         documentID = doc.Id,
-                        flags = new[] { doc.Flags == 0 ? "None" : doc.Flags.ToString() },
+                        flags = [doc.Flags == 0 ? "None" : doc.Flags.ToString()],
                         error = error
                     };
                 }
             }
         }
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return ((IEnumerable<DocumentReplicationEvent>)this).GetEnumerator();
-        }
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct StartReplicatorAuthenticator
     {
         private const string BasicType = "BASIC";
@@ -164,52 +161,41 @@ internal static partial class HandlerList
         public StartReplicatorAuthenticator(string type, string? username = null, string? password = null)
         {
             this.type = type;
-            if(type == BasicType) {
-                this.username = username ?? throw new JsonException("Missing username property in auth");
-                this.password = password ?? throw new JsonException("Missing password property in auth");
+            if (type != BasicType) {
+                return;
             }
+            
+            this.username = username ?? throw new JsonException("Missing username property in auth");
+            this.password = password ?? throw new JsonException("Missing password property in auth");
         }
 
         public Authenticator CreateAuthenticator()
         {
-            if(type == BasicType) {
-                return new BasicAuthenticator(username, password);
-            }
-
-            throw new NotImplementedException("Non-BASIC auth not implemented");
+            return type == BasicType
+                ? new BasicAuthenticator(username, password)
+                : throw new NotImplementedException("Non-BASIC auth not implemented");
         }
     }
 
-    internal record class StartReplicatorFilter
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    [method: JsonConstructor]
+    internal record StartReplicatorFilter(
+        string name,
+        [property: JsonPropertyName("params")] IReadOnlyDictionary<string, JsonElement>? parameters = null)
     {
-        public required string name { get; init; }
-
-        [JsonPropertyName("params")]
-        public IReadOnlyDictionary<string, JsonElement>? parameters { get; init; }
-
-        [JsonConstructor]
-        public StartReplicatorFilter(string name, IReadOnlyDictionary<string, JsonElement>? parameters = null)
-        {
-            this.name = name;
-            this.parameters = parameters;
-        }
+        public required string name { get; init; } = name;
     }
 
-    internal record class StartReplicatorConflictResolver
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    [method: JsonConstructor]
+    internal record StartReplicatorConflictResolver(
+        string name,
+        [property: JsonPropertyName("params")] IReadOnlyDictionary<string, JsonElement>? parameters = null)
     {
-        public required string name { get; init; }
-
-        [JsonPropertyName("params")]
-        public IReadOnlyDictionary<string, JsonElement>? parameters { get; init; }
-
-        [JsonConstructor]
-        public StartReplicatorConflictResolver(string name, IReadOnlyDictionary<string, JsonElement>? parameters = null)
-        {
-            this.name = name;
-            this.parameters = parameters;
-        }
+        public required string name { get; init; } = name;
     }
 
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct StartReplicatorCollection
     {
         public required IReadOnlyList<string> names { get; init; }
@@ -221,13 +207,13 @@ internal static partial class HandlerList
         public IConflictResolver? ConflictResolver { get; }
 
         [JsonConstructor]
-        public StartReplicatorCollection(IReadOnlyList<string> names, IReadOnlyList<string?>? channels = default,
-             IReadOnlyList<string?>? documentIDs = default, StartReplicatorFilter? pushFilter = null, StartReplicatorFilter? pullFilter = null,
+        public StartReplicatorCollection(IReadOnlyList<string> names, IReadOnlyList<string?>? channels = null,
+             IReadOnlyList<string?>? documentIDs = null, StartReplicatorFilter? pushFilter = null, StartReplicatorFilter? pullFilter = null,
              StartReplicatorConflictResolver? conflictResolver = null)
         {
             this.names = names;
-            this.channels = channels.NotNull().ToList() ?? new List<string>();
-            this.documentIDs = documentIDs.NotNull().ToList() ?? new List<string>();
+            this.channels = channels.NotNull().ToList();
+            this.documentIDs = documentIDs.NotNull().ToList();
             this.pushFilter = pushFilter;
             this.pullFilter = pullFilter;
             this.conflictResolver = conflictResolver;
@@ -253,6 +239,7 @@ internal static partial class HandlerList
     }
 
 
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct StartReplicatorConfig
     {
         public required string database { get; init; }
@@ -303,18 +290,26 @@ internal static partial class HandlerList
         }
     } 
 
-    internal readonly record struct StartReplicatorBody
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    [method: JsonConstructor]
+    internal readonly record struct StartReplicatorBody(StartReplicatorConfig config, bool reset = false)
     {
-        public required StartReplicatorConfig config { get; init; }
+        public required StartReplicatorConfig config { get; init; } = config;
+    }
 
-        public bool reset { get; init; }
-
-        [JsonConstructor]
-        public StartReplicatorBody(StartReplicatorConfig config, bool reset = false)
-        {
-            this.config = config;
-            this.reset = reset;
+    private static FilterFunction? GetFilter(Session session, StartReplicatorFilter? input)
+    {
+        if (input is null) {
+            return null;
         }
+        
+        if(!ReplicatorFilters.FilterMap.TryGetValue(input.name, out var filterGen)) {
+            throw new JsonException($"Unknown push filter {input.name}");
+        }
+
+        var filter = filterGen(input.parameters);
+        session.ObjectManager.KeepAlive(filter);
+        return filter.Execute;
     }
 
     [HttpHandler("startReplicator")]
@@ -330,12 +325,10 @@ internal static partial class HandlerList
             return Task.CompletedTask;
         }
 
-        ReplicatorConfiguration replConfig;
         var endpoint = new URLEndpoint(new Uri(deserializedBody.config.endpoint));
+        var collectionConfigs = new List<CollectionConfiguration>();
         if (deserializedBody.config.collections.Any()) {
-            replConfig = new ReplicatorConfiguration(endpoint);
             foreach (var c in deserializedBody.config.collections) {
-                var collections = new List<Collection>();
                 foreach(var name in c.names) {
                     var spec = CollectionSpec(name);
                     var coll = db.GetCollection(spec.name, spec.scope);
@@ -344,58 +337,34 @@ internal static partial class HandlerList
                         return Task.CompletedTask;
                     }
 
-                    collections.Add(coll);
+                    var collectionConfig = new CollectionConfiguration(coll)
+                    {
+                        Channels = c.channels.Any() ? c.channels.ToImmutableList() : null,
+                        DocumentIDs = c.documentIDs.Any() ? c.documentIDs.ToImmutableList() : null,
+                        PushFilter = GetFilter(session, c.pushFilter),
+                        PullFilter = GetFilter(session, c.pullFilter),
+                        ConflictResolver = c.ConflictResolver
+                    };
+                    collectionConfigs.Add(collectionConfig);
                 }
-                
-
-                var collConfig = new CollectionConfiguration();
-                if(c.channels.Any()) {
-                    collConfig.Channels = c.channels.ToList();
-                }
-
-                if(c.documentIDs.Any()) {
-                    collConfig.DocumentIDs = c.documentIDs.ToList();
-                }
-
-                if(c.pushFilter != null) {
-                    if(!ReplicatorFilters.FilterMap.ContainsKey(c.pushFilter.name)) {
-                        throw new JsonException($"Unknown push filter {c.pushFilter.name}");
-                    }
-
-                    var filter = ReplicatorFilters.FilterMap[c.pushFilter.name](c.pushFilter.parameters);
-                    session.ObjectManager.KeepAlive(filter);
-                    collConfig.PushFilter = filter.Execute;
-                }
-
-                if(c.pullFilter != null) {
-                    if (!ReplicatorFilters.FilterMap.ContainsKey(c.pullFilter.name)) {
-                        throw new JsonException($"Unknown push filter {c.pullFilter.name}");
-                    }
-
-                    var filter = ReplicatorFilters.FilterMap[c.pullFilter.name](c.pullFilter.parameters);
-                    session.ObjectManager.KeepAlive(filter);
-                    collConfig.PullFilter = filter.Execute;
-                }
-
-                collConfig.ConflictResolver = c.ConflictResolver;
-
-                replConfig.AddCollections(collections, collConfig);
             }
         } else {
-            replConfig = new ReplicatorConfiguration(db, endpoint);
+            collectionConfigs = CollectionConfiguration.FromCollections(db.GetDefaultCollection());
         }
 
-        replConfig.Authenticator = deserializedBody.config.authenticator?.CreateAuthenticator();
-        replConfig.Continuous = deserializedBody.config.continuous;
-        replConfig.ReplicatorType = deserializedBody.config.ReplicatorType;
-        replConfig.EnableAutoPurge = deserializedBody.config.enableAutoPurge;
-        if (deserializedBody.config.pinnedServerCert != null) {
-            replConfig.PinnedServerCertificate = new X509Certificate2(Encoding.ASCII.GetBytes(deserializedBody.config.pinnedServerCert));
-        }
+        var replConfig = new ReplicatorConfiguration(collectionConfigs, endpoint)
+        {
+            Authenticator = deserializedBody.config.authenticator?.CreateAuthenticator(),
+            Continuous = deserializedBody.config.continuous,
+            ReplicatorType = deserializedBody.config.ReplicatorType,
+            EnableAutoPurge = deserializedBody.config.enableAutoPurge,
+            PinnedServerCertificate = deserializedBody.config.pinnedServerCert != null 
+                ? new(Encoding.ASCII.GetBytes(deserializedBody.config.pinnedServerCert)) 
+                : null
+        };
 
-        (var repl, var id) = session.ObjectManager.RegisterObject(() => new Replicator(replConfig));
+        var (repl, id) = session.ObjectManager.RegisterObject(() => new Replicator(replConfig));
         if(deserializedBody.config.enableDocumentListener) {
-            var listener = new ReplicatorDocumentListener(repl);
             session.ObjectManager.RegisterObject(() => new ReplicatorDocumentListener(repl), $"{id}_listener");
         }
 

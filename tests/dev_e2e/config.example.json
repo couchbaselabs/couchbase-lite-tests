@@ -1,6 +1,6 @@
 {
     "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
-    "test-servers": ["http://localhost:8080"],
+    "test-servers":  [{"url": "http://localhost:8080", "dataset_version": "3.2"}],
     "sync-gateways": [{"hostname": "localhost"}],
     "couchbase-servers": [{"hostname": "localhost"}],
     "api-version": 1

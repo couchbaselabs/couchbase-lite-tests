@@ -43,10 +43,10 @@ Functions:
 from __future__ import annotations
 
 import importlib
-import shutil
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
+from typing import Final
 
 import click
 import requests
@@ -102,11 +102,38 @@ class TestServer(ABC):
     """
 
     __registry: dict[str, type[TestServer]] = {}
+    __version_filename: Final[str] = ".version"
+    __build_no_cache: dict[str, dict[str, str]] = {}
 
-    def __init__(self, version: str, dataset_version: str) -> None:
-        self.__version = version
-        self.__dataset_version = dataset_version
+    def __init__(self, version: str) -> None:
+        if self.product not in self.__build_no_cache:
+            self.__build_no_cache[self.product] = {}
+
+        self.__version = self.__normalize_version(version)
         self._downloaded = False
+
+    def __normalize_version(self, version: str) -> str:
+        if "-" in version:
+            return version
+
+        click.secho(
+            f"Version {version} does not contain a build number, looking up latest good build...",
+            fg="yellow",
+        )
+
+        if version in self.__build_no_cache[self.product]:
+            build_no = self.__build_no_cache[self.product][version]
+            click.secho(f"Found latest good build: {build_no} [CACHED]", fg="blue")
+            return f"{version}-{build_no}"
+
+        resp = requests.get(
+            f"http://proget.build.couchbase.com:8080/api/get_version?product={self.product}&version={version}"
+        )
+        resp.raise_for_status()
+        build_no = resp.json()["BuildNumber"]
+        click.secho(f"Found latest good build: {build_no}", fg="green")
+        self.__build_no_cache[self.product][version] = build_no
+        return f"{version}-{build_no}"
 
     @classmethod
     def initialize(cls) -> None:
@@ -146,7 +173,7 @@ class TestServer(ABC):
         return decorator
 
     @classmethod
-    def create(cls, name: str, version: str, dataset_version: str) -> TestServer:
+    def create(cls, name: str, version: str) -> TestServer:
         """
         Create an instance of a registered test server subclass.
 
@@ -166,7 +193,7 @@ class TestServer(ABC):
         if name not in cls.__registry:
             raise ValueError(f"Unknown test server type: {name}")
 
-        return cls.__registry[name](version, dataset_version)
+        return cls.__registry[name](version)
 
     @property
     def version(self) -> str:
@@ -179,16 +206,6 @@ class TestServer(ABC):
         return self.__version
 
     @property
-    def dataset_version(self) -> str:
-        """
-        Get the dataset version of the test server.
-
-        Returns:
-            str: The dataset version of the test server.
-        """
-        return self.__dataset_version
-
-    @property
     @abstractmethod
     def platform(self) -> str:
         """
@@ -196,6 +213,17 @@ class TestServer(ABC):
 
         Returns:
             str: The platform of the test server.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def product(self) -> str:
+        """
+        Get the product name of the test server (for use with gvr and latestbuidls)
+
+        Returns:
+            str: The product name of the test server.
         """
         pass
 
@@ -224,15 +252,16 @@ class TestServer(ABC):
         Raises:
             FileNotFoundError: If the test server package is not found on the latestbuilds server.
         """
+        url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.latestbuilds_path}"
+        header(f"Downloading {url}")
         download_dir = DOWNLOADED_TEST_SERVER_DIR / self.platform / self.version
         download_dir.mkdir(parents=True, exist_ok=True)
         if (download_dir / ".downloaded").exists():
             click.secho("Already downloaded", fg="green")
             click.echo()
+            self._downloaded = True
             return
 
-        url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.latestbuilds_path}"
-        header(f"Downloading {url}")
         response = requests.head(url)
         if response.status_code == 404:
             raise FileNotFoundError(f"Test server not found at {url}")
@@ -266,7 +295,7 @@ class TestServer(ABC):
         pass
 
     @abstractmethod
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a platform bridge for the test server.
 
@@ -281,25 +310,34 @@ class TestServer(ABC):
         """
         pass
 
+    def _check_downloaded(self, location: Path) -> bool:
+        """
+        Check if the C test server package is already downloaded.
 
-def copy_dataset(dest_dir: Path, version: str):
-    header(f"Copying dataset resources v{version}")
-    db_dir = TEST_SERVER_DIR.parent / "dataset" / "server" / "dbs" / version
-    blob_dir = TEST_SERVER_DIR.parent / "dataset" / "server" / "blobs"
+        Args:
+            location (Path): The path to the downloaded package.
 
-    dest_db_dir = dest_dir / "dbs"
-    shutil.rmtree(dest_db_dir, ignore_errors=True)
-    dest_db_dir.mkdir(0o755)
-    for db in db_dir.glob("*.zip"):
-        click.echo(f"Copying {db} -> {dest_db_dir / db.name}")
-        shutil.copy2(db, dest_db_dir)
+        Returns:
+            bool: True if the package is downloaded, False otherwise.
+        """
+        if (location / self.__version_filename).exists():
+            with open(location / self.__version_filename, "r") as f:
+                saved_version = f.read().strip()
+                return saved_version == self.version
 
-    dest_blob_dir = dest_dir / "blobs"
-    shutil.rmtree(dest_blob_dir, ignore_errors=True)
-    dest_blob_dir.mkdir(0o755)
-    for blob in blob_dir.iterdir():
-        click.echo(f"Copying {blob} -> {dest_blob_dir / blob.name}")
-        shutil.copy2(blob, dest_blob_dir)
+        return False
+
+    def _mark_downloaded(self, location: Path) -> None:
+        """
+        Mark the C test server package as downloaded.
+
+        Args:
+            location (Path): The path to the downloaded package.
+            version (str): The version of the test server.
+            build (int): The build number of the test server.
+        """
+        with open(location / self.__version_filename, "w") as f:
+            f.write(self.version)
 
 
 assert __name__ != "__main__", "This module is not meant to be run directly"

@@ -34,6 +34,7 @@ if __name__ == "__main__":
 
 from environment.aws.common.io import pushd
 from environment.aws.common.output import header
+from environment.aws.es_setup.setup_edge_servers import main as es_main
 from environment.aws.lb_setup.setup_load_balancers import main as lb_main
 from environment.aws.logslurp_setup.setup_logslurp import main as logslurp_main
 from environment.aws.server_setup.setup_server import main as server_main
@@ -72,6 +73,7 @@ def topology_has_aws_resources(topology: TopologyConfig) -> bool:
     """
     return (
         topology.total_sgw_count > 0
+        or topology.total_es_count > 0
         or topology.total_cbs_count > 0
         or topology.total_lb_count > 0
         or topology.wants_logslurp
@@ -108,6 +110,7 @@ def terraform_apply(public_key_name: str | None, topology: TopologyConfig) -> No
             )
 
         sgw_count = topology.total_sgw_count
+        es_count = topology.total_es_count
         cbs_count = topology.total_cbs_count
         lb_count = topology.total_lb_count
         wants_logslurp = str(topology.wants_logslurp).lower()
@@ -118,6 +121,7 @@ def terraform_apply(public_key_name: str | None, topology: TopologyConfig) -> No
             f"-var=key_name={public_key_name}",
             f"-var=server_count={cbs_count}",
             f"-var=sgw_count={sgw_count}",
+            f"-var=es_count={es_count}",
             f"-var=lb_count={lb_count}",
             f"-var=logslurp={wants_logslurp}",
             "-auto-approve",
@@ -153,6 +157,7 @@ def write_config(
         config_json = cast(dict, json.load(fin))
         config_json.pop("couchbase-servers", None)
         config_json.pop("sync-gateways", None)
+        config_json.pop("edge-servers", None)
         config_json.pop("test-servers", None)
         config_json.pop("load-balancers", None)
         config_json.pop("logslurp", None)
@@ -172,6 +177,13 @@ def write_config(
 
             config_json["sync-gateways"] = sgw_instances
 
+        if len(topology.edge_servers) > 0:
+            es_instances = []
+            for es in topology.edge_servers:
+                es_instances.append({"hostname": es.hostname, "tls": True})
+
+            config_json["edge-servers"] = es_instances
+
         if topology.logslurp is not None:
             config_json["logslurp"] = f"{topology.logslurp}:8180"
 
@@ -182,7 +194,8 @@ def write_config(
                 test_servers.append(
                     {
                         "url": f"http://{ts.ip_address}:{port}",
-                        "dataset_version": ts.dataset_version,
+                        # TODO: Convert all test servers to URLs to this is not needed
+                        "dataset_version": "3.2",
                     }
                 )
 
@@ -203,6 +216,7 @@ class BackendSteps(Flag):
     TERRAFORM_APPLY = auto()
     CBS_PROVISION = auto()
     SGW_PROVISION = auto()
+    ES_PROVISION = auto()
     LB_PROVISION = auto()
     LS_PROVISION = auto()
     TS_RUN = auto()
@@ -210,6 +224,7 @@ class BackendSteps(Flag):
         TERRAFORM_APPLY
         | CBS_PROVISION
         | SGW_PROVISION
+        | ES_PROVISION
         | LB_PROVISION
         | LS_PROVISION
         | TS_RUN
@@ -265,6 +280,11 @@ def main(
         sgw_main(topology, private_key)
     else:
         click.secho("Skipping Sync Gateway provisioning...", fg="yellow")
+
+    if steps & BackendSteps.ES_PROVISION:
+        es_main(topology, private_key)
+    else:
+        click.secho("Skipping Edge Server provisioning...", fg="yellow")
 
     if steps & BackendSteps.LB_PROVISION:
         lb_main(topology, private_key)
@@ -331,6 +351,13 @@ def main(
     envvar="TDK_NO_SGW_PROVISION",
 )
 @click.option(
+    "--no-es-provision",
+    type=bool,
+    is_flag=True,
+    help="Skip Edge Server provisioning step",
+    envvar="TDK_NO_ES_PROVISION",
+)
+@click.option(
     "--no-lb-provision",
     type=bool,
     is_flag=True,
@@ -366,6 +393,7 @@ def cli_entry(
     no_terraform_apply: bool,
     no_cbs_provision: bool,
     no_sgw_provision: bool,
+    no_es_provision: bool,
     no_lb_provision: bool,
     no_ls_provision: bool,
     no_ts_run: bool,
@@ -377,6 +405,8 @@ def cli_entry(
         steps &= ~BackendSteps.CBS_PROVISION
     if no_sgw_provision:
         steps &= ~BackendSteps.SGW_PROVISION
+    if no_es_provision:
+        steps &= ~BackendSteps.ES_PROVISION
     if no_lb_provision:
         steps &= ~BackendSteps.LB_PROVISION
     if no_ls_provision:

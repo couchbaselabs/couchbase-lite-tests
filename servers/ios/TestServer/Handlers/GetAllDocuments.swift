@@ -14,7 +14,7 @@ extension Handlers {
             throw TestServerError.badRequest("Request body does not match the 'Collections' scheme.")
         }
         
-        let dbManager = req.application.databaseManager
+        let dbManager = req.databaseManager
         return try getCollectionsDocuments(dbManager: dbManager,
                                            database: collections.database,
                                            collections: collections.collections)

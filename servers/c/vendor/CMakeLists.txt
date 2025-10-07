@@ -78,6 +78,13 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
         GIT_TAG v11.4.5
 )
+
+# For FileDownloader on Linux Platform
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(USE_TLS ON CACHE BOOL "Enable TLS support")
+    set(USE_OPEN_SSL ON CACHE BOOL "Use OpenSSL for TLS")
+endif()
+
 message(STATUS "Fetching IXWebSocket...")
 FetchContent_MakeAvailable(ixwebsocket)
 

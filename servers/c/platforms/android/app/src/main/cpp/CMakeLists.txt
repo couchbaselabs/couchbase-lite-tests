@@ -65,6 +65,7 @@ set(SHARED_SRC
         ${SHARED_SRC_DIR}/log/RemoteLogger.cpp
         ${SHARED_SRC_DIR}/support/Android.cpp
         ${SHARED_SRC_DIR}/support/Device.cpp
+        ${SHARED_SRC_DIR}/support/FileDownloader.cpp
         ${SHARED_SRC_DIR}/support/Error.cpp
         ${SHARED_SRC_DIR}/support/Files.cpp
         ${SHARED_SRC_DIR}/support/StringUtil.cpp
@@ -73,6 +74,7 @@ set(SHARED_SRC
 
 set(LIB_SRC
         ${SHARED_SRC}
+        JNIUtil.cpp
         testserver.cpp)
 
 # Creates and names a library, sets it as either STATIC
@@ -88,6 +90,7 @@ endif()
 
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE NEVER)
 find_package(CouchbaseLite ${CBL_VERSION} REQUIRED PATHS ${PROJECT_SOURCE_DIR}/lib/libcblite-${CBL_VERSION})
+
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
 add_subdirectory(vendor)
@@ -105,6 +108,7 @@ target_link_libraries(testserver
 
 target_include_directories(
         testserver PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
         ${SHARED_SRC_DIR}
         ${SHARED_SRC_DIR}/cbl
         ${SHARED_SRC_DIR}/dispatcher

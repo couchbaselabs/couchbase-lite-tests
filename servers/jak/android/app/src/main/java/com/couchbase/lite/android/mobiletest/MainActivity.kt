@@ -18,7 +18,6 @@ package com.couchbase.lite.android.mobiletest
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import com.couchbase.lite.android.mobiletest.databinding.ActivityMainBinding
-import com.couchbase.lite.mobiletest.TestApp
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 

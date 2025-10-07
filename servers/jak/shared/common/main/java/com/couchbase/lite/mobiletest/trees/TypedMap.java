@@ -24,16 +24,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.couchbase.lite.mobiletest.errors.ClientError;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
+import com.couchbase.lite.mobiletest.services.Log;
 
 
 public class TypedMap extends TypedCollection {
     @NonNull
     private final Map<String, Object> data;
 
+    @SuppressWarnings("MemberName")
+    @NonNull
+    private static final String TAG = "TYPMAP";
+
     public TypedMap() { this(new HashMap<>()); }
 
     @SuppressWarnings("unchecked")
+    @SuppressFBWarnings({"EI_EXPOSE_REP2"})
     public TypedMap(@NonNull Map<?, ?> data) { this.data = (Map<String, Object>) data; }
 
     @Nullable
@@ -52,7 +59,8 @@ public class TypedMap extends TypedCollection {
     public void validate(@NonNull Set<String> expected) {
         final Set<String> keys = getKeys();
         keys.removeAll(expected);
-        if (!keys.isEmpty()) { throw new ClientError("Unexpected keys: " + String.join(",", keys)); }
+
+        if (!keys.isEmpty()) { Log.p(TAG, "Unexpected keys: " + String.join(",", keys)); }
     }
 
     @Nullable

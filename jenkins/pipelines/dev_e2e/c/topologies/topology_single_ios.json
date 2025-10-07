@@ -4,8 +4,8 @@
         {
             "platform": "c_ios",
             "cbl_version": "{{version}}",
-            "dataset_version": "{{dataset_version}}",
-            "location": "00008110-000A48A63E10401E"
+            "location": "00008110-000A48A63E10401E",
+            "download": true
         }
     ],
     "include": "../../../../../environment/aws/topology_setup/default_topology.json"

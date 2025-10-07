@@ -21,7 +21,9 @@ import android.util.Base64
 import com.couchbase.lite.CouchbaseLite
 import com.couchbase.lite.CouchbaseLiteException
 import com.couchbase.lite.KeyStoreUtils
+import com.couchbase.lite.KeyUsage
 import com.couchbase.lite.TLSIdentity
+import com.couchbase.lite.android.mobiletest.services.MultipeerReplicatorService
 import com.couchbase.lite.internal.core.CBLVersion
 import com.couchbase.lite.mobiletest.TestApp
 import java.io.IOException
@@ -30,9 +32,13 @@ import java.security.NoSuchAlgorithmException
 import java.security.UnrecoverableEntryException
 import java.security.cert.CertificateException
 import java.util.*
+import java.util.concurrent.atomic.AtomicReference
 
 
 class AndroidTestApp(private val context: Context) : TestApp("Android") {
+    private val multipeerReplSvc = AtomicReference<MultipeerReplicatorService>()
+
+
     override fun initCBL() {
         CouchbaseLite.init(context, true)
     }
@@ -67,7 +73,7 @@ class AndroidTestApp(private val context: Context) : TestApp("Android") {
     @Throws(CouchbaseLiteException::class)
     override fun getCreateIdentity(): TLSIdentity {
         return TLSIdentity.createIdentity(
-            true,
+            setOf(KeyUsage.CLIENT_AUTH, KeyUsage.SERVER_AUTH),
             x509Attributes,
             expirationTime,
             UUID.randomUUID().toString()
@@ -116,5 +122,18 @@ class AndroidTestApp(private val context: Context) : TestApp("Android") {
             )
         }
         return TLSIdentity.getIdentity("ClientCertsSelfsigned")!!
+    }
+
+
+    fun getMultipeerReplSvc(): MultipeerReplicatorService {
+        val mgr = multipeerReplSvc.get()
+        if (mgr == null) {
+            multipeerReplSvc.compareAndSet(null, MultipeerReplicatorService())
+        }
+        return multipeerReplSvc.get()
+    }
+
+    fun clearMultipeerReplSvc(): MultipeerReplicatorService? {
+        return multipeerReplSvc.getAndSet(null)
     }
 }

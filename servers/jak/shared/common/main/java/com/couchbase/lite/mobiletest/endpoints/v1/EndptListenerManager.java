@@ -23,6 +23,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.URLEndpointListener;
@@ -37,6 +39,7 @@ import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 
+@SuppressFBWarnings("EI_EXPOSE_REP2")
 public class EndptListenerManager {
     private static final String TAG = "LSTNR_MGR_V1";
 

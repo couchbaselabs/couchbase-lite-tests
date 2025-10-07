@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import com.couchbase.lite.Document;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
@@ -33,6 +34,9 @@ public class GetDocument {
     private static final String KEY_DOCUMENTS = "document";
     private static final String KEY_COLLECTION = "collection";
     private static final String KEY_DOC_ID = "id";
+    private static final String KEY_META_DOC_ID = "_id";
+    private static final String KEY_META_REV_HISTORY = "_revs";
+
 
     private static final Set<String> LEGAL_GET_DOC_KEYS;
     static {
@@ -65,14 +69,20 @@ public class GetDocument {
 
         final TypedMap docSpec = req.getMap(KEY_DOCUMENTS);
         if (docSpec == null) { throw new ClientError("No document specified for getDocument"); }
-        req.validate(LEGAL_DOC_SPEC_KEYS);
+        docSpec.validate(LEGAL_DOC_SPEC_KEYS);
 
-        final String collectionName = req.getString(KEY_COLLECTION);
+        final String collectionName = docSpec.getString(KEY_COLLECTION);
         if (collectionName == null) { throw new ClientError("No collection specified for getDocument"); }
 
-        final String docId = req.getString(KEY_DOC_ID);
+        final String docId = docSpec.getString(KEY_DOC_ID);
         if (docId == null) { throw new ClientError("No document id specified for getDocument"); }
 
-        return dbSvc.getDocument(ctxt, dbName, collectionName, docId);
+        final Document doc = dbSvc.getDocument(ctxt, dbName, collectionName, docId);
+
+        final Map<String, Object> ret = doc.toMap();
+        ret.put(KEY_META_DOC_ID, doc.getId());
+        ret.put(KEY_META_REV_HISTORY, dbSvc.getRevisionHistory(doc));
+
+        return ret;
     }
 }

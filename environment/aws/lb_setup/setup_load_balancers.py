@@ -17,9 +17,11 @@ Functions:
 """
 
 from pathlib import Path
+from typing import Any
 
 import click
 import paramiko
+import yaml
 
 from environment.aws.common.docker import (
     check_aws_key_checking,
@@ -64,42 +66,49 @@ def remote_exec(
     click.echo()
 
 
-def create_nginx_config(upstreams: list[str]) -> None:
-    with open(SCRIPT_DIR / "nginx.conf", "w") as f:
-        f.write("events { }\n")
-        f.write("\n")
-        f.write("http {\n")
-        f.write("\tupstream admin {\n")
-        f.write(f"\t\tserver {upstreams[0]}:4985 max_fails=1 fail_timeout=10s;\n")
-        for upstream in upstreams[1:]:
-            f.write(f"\t\tserver {upstream}:4985 backup;\n")
+def _create_router(index: int, admin: bool) -> dict:
+    name = "admin" if admin else "public"
+    rule = (
+        "PathPrefix(`/`)"
+        if index == 0
+        else f"Header(`X-Backend`, `sg-{index}`) && PathPrefix(`/`)"
+    )
+    return {
+        "entryPoints": [name],
+        "rule": rule,
+        "priority": 10 * (index + 1),
+        "service": f"sgw-{name}-{index}",
+        "middlewares": ["limit-body", "retry-once"],
+    }
 
-        f.write("\t}\n")
-        f.write("\tupstream public {\n")
-        f.write(f"\t\tserver {upstreams[0]}:4984 max_fails=1 fail_timeout=10s;\n")
-        for upstream in upstreams[1:]:
-            f.write(f"\t\tserver {upstream}:4984 backup;\n")
 
-        f.write("\t}\n")
+def _create_service(index: int, admin: bool, server: str) -> dict:
+    return {
+        "loadBalancer": {
+            "passHostHeader": False,
+            "serversTransport": "sg-upstream",
+            "servers": [{"url": f"https://{server}:{4985 if admin else 4984}"}],
+        }
+    }
 
-        for port, upstream in [(4984, "public"), (4985, "admin")]:
-            f.write("\t server {\n")
-            f.write(f"\t\tlisten {port};\n")
-            f.write("\t\tclient_max_body_size 20m;\n")
-            f.write("\t\tlocation / {\n")
-            f.write("\t\t\tproxy_pass_header Accept;\n")
-            f.write("\t\t\tproxy_pass_header Server;\n")
-            f.write("\t\t\tproxy_http_version 1.1;\n")
-            f.write("\t\t\tkeepalive_requests 1000;\n")
-            f.write("\t\t\tkeepalive_timeout 360s;\n")
-            f.write("\t\t\tproxy_read_timeout 360s;\n")
-            f.write("\t\t\tproxy_set_header Upgrade $http_upgrade;\n")
-            f.write('\t\t\tproxy_set_header Connection "Upgrade";\n')
-            f.write(f"\t\t\tproxy_pass https://{upstream};\n")
-            f.write("\t\t}\n")
-            f.write("\t }\n")
 
-        f.write("}\n")
+def create_traefik_config(upstreams: list[str]) -> None:
+    config: Any = None
+    with open(SCRIPT_DIR / "http_config.yml.in") as fin:
+        config = yaml.load(fin, Loader=yaml.SafeLoader)
+        routers: dict = {}
+        services: dict = {}
+        for i, upstream in enumerate(upstreams):
+            routers[f"public-{i}"] = _create_router(i, False)
+            routers[f"admin-{i}"] = _create_router(i, True)
+            services[f"sgw-public-{i}"] = _create_service(i, False, upstream)
+            services[f"sgw-admin-{i}"] = _create_service(i, True, upstream)
+
+        config["http"]["routers"] = routers
+        config["http"]["services"] = services
+
+    with open(SCRIPT_DIR / "http_config.yml", "w") as fout:
+        yaml.dump(config, fout)
 
 
 def main(topology: TopologyConfig, private_key: str | None = None) -> None:
@@ -117,7 +126,7 @@ def main(topology: TopologyConfig, private_key: str | None = None) -> None:
     header("Setting up load balancers")
     check_aws_key_checking()
     for lb in topology.load_balancers:
-        create_nginx_config(lb.upstreams)
+        create_traefik_config(lb.upstreams)
         ec2_hostname = get_ec2_hostname(lb.hostname)
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -134,7 +143,12 @@ def main(topology: TopologyConfig, private_key: str | None = None) -> None:
         sftp_progress_bar(
             sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
         )
-        sftp_progress_bar(sftp, SCRIPT_DIR / "nginx.conf", "/home/ec2-user/nginx.conf")
+        sftp_progress_bar(
+            sftp, SCRIPT_DIR / "traefik.yml", "/home/ec2-user/traefik.yml"
+        )
+        sftp_progress_bar(
+            sftp, SCRIPT_DIR / "http_config.yml", "/home/ec2-user/http_config.yml"
+        )
         remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
         sftp.close()
         ssh.close()
@@ -145,9 +159,11 @@ def main(topology: TopologyConfig, private_key: str | None = None) -> None:
             "-p",
             "4985:4985",
             "-v",
-            "/home/ec2-user/nginx.conf:/etc/nginx/nginx.conf:ro",
+            "/home/ec2-user/traefik.yml:/etc/traefik/traefik.yml:ro",
+            "-v",
+            "/home/ec2-user/http_config.yml:/etc/traefik/http_config.yml:ro",
         ]
         context_name = "lb" if topology.tag == "" else f"lb-{topology.tag}"
         start_container(
-            "nginx", context_name, "nginx:1-alpine", ec2_hostname, docker_args
+            "traefik", context_name, "traefik:v3", ec2_hostname, docker_args
         )

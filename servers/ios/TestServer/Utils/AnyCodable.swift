@@ -17,6 +17,8 @@ struct AnyCodable: Codable {
         switch value {
         case let value as NSNull:
             self.value = value
+        case let value as NSNumber:
+            self.value = try AnyCodable.convertNumber(value)
         case let value as Bool:
             self.value = value
         case let value as Int:
@@ -34,6 +36,22 @@ struct AnyCodable: Codable {
             self.value = try value.properties.mapValues { try AnyCodable($0) }
         default:
             throw TestServerError(domain: .TESTSERVER, code: 500, message: "Internal error parsing value type: \(value)")
+        }
+    }
+    
+    private static func convertNumber(_ value: NSNumber) throws -> Any {
+        let type = CFNumberGetType(value)
+        switch type {
+        case .charType:
+            return value.boolValue
+        case .sInt8Type, .sInt16Type, .sInt32Type, .sInt64Type,
+             .shortType, .intType, .longType, .longLongType,
+             .cfIndexType, .nsIntegerType:
+            return value.intValue
+        case .floatType, .float32Type, .float64Type, .doubleType, .cgFloatType:
+            return value.doubleValue
+        default:
+            throw TestServerError(domain: .TESTSERVER, code: 500, message: "Unsupport Number type: \(type)")
         }
     }
 

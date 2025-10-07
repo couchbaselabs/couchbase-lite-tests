@@ -18,6 +18,7 @@ session.log
 http_log
 .terraform
 servers/downloaded
+.version
 
-# config files
+# TDK config files
 config.json

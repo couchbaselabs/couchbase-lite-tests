@@ -18,7 +18,7 @@ namespace ts {
         static constexpr unsigned short PORT = 8080;
 
         struct Context {
-            std::string databaseDir;
+            std::string filesDir;
             std::string assetsDir;
         };
 
@@ -38,8 +38,6 @@ namespace ts {
 
         SessionManager *sessionManager() const { return _sessionManager.get(); }
 
-        cbl::CBLManager *cblManager() const { return _cblManager.get(); }
-
         void start();
 
         void stop();
@@ -51,7 +49,6 @@ namespace ts {
 
         std::unique_ptr<ts::Dispatcher> _dispatcher;
         std::unique_ptr<ts::SessionManager> _sessionManager;
-        std::unique_ptr<ts::cbl::CBLManager> _cblManager;
 
         mg_context *_server{nullptr};
         std::string _uuid;

@@ -89,6 +89,7 @@ public class RemoteLogger extends Log.TestLogger {
 
 
     public RemoteLogger(@NonNull String url, @NonNull String sessionId, @NonNull String tag) {
+        super(LogLevel.DEBUG);
         this.url = url;
         this.sessionId = sessionId;
         this.tag = tag;
@@ -118,12 +119,12 @@ public class RemoteLogger extends Log.TestLogger {
     }
 
     @Override
-    public void log(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String msg) {
-        log(level, domain.toString(), msg, null);
+    protected void writeLog(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String message) {
+        writeLog(level, domain.toString(), message, null);
     }
 
     @Override
-    public void log(LogLevel level, String tag, String msg, Exception err) {
+    public void writeLog(LogLevel level, String tag, String msg, Exception err) {
         final WebSocket socket = webSocket.get();
         if (socket == null) {
             Log.p(TAG, "RemoteLogger is not connected");

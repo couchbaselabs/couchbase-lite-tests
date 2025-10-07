@@ -98,6 +98,27 @@ class SyncGatewayDefaults:
         self.__version.set_value(cast(str, sgw_defaults[self.__version_key]))
 
 
+class EdgeServerDefaults:
+    __es_key: Final[str] = "es"
+    __version_key: Final[str] = "version"
+    __default_version: Final[str] = "1.0.0"
+
+    @property
+    def version(self) -> DefaultProperty:
+        return self.__version
+
+    def __init__(self, parent: dict):
+        self.__version = DefaultProperty(self.__default_version)
+        if self.__es_key not in parent:
+            return
+
+        es_default = cast(dict, parent[self.__es_key])
+        if self.__version_key not in es_default:
+            return
+
+        self.__version.set_value(cast(str, es_default[self.__version_key]))
+
+
 class ConfigDefaults:
     __defaults_key: Final[str] = "defaults"
 
@@ -109,6 +130,10 @@ class ConfigDefaults:
     def SyncGateway(self) -> SyncGatewayDefaults:
         return self.__sgw_defaults
 
+    @property
+    def EdgeServer(self) -> EdgeServerDefaults:
+        return self.__es_default
+
     def __init__(self, parent: dict):
         defaults = {}
         if self.__defaults_key in parent:
@@ -116,6 +141,7 @@ class ConfigDefaults:
 
         self.__cbs_defaults = CouchbaseServerDefaults(defaults)
         self.__sgw_defaults = SyncGatewayDefaults(defaults)
+        self.__es_default = EdgeServerDefaults(defaults)
 
     def extend(self, other: "ConfigDefaults"):
         if other.CouchbaseServer.version.is_set:
@@ -133,6 +159,12 @@ class ConfigDefaults:
                 )
 
             self.SyncGateway.version.set_value(other.SyncGateway.version.value)
+
+        if other.EdgeServer.version.is_set:
+            if self.EdgeServer.version.is_set:
+                raise Exception(
+                    "Both main and included file are setting default ES version"
+                )
 
 
 class ClusterConfig:
@@ -215,6 +247,7 @@ class SyncGatewayInput:
 
     Attributes:
         cluster_index (int): The index of the cluster to which the Sync Gateway belongs.
+        version (str): The version of the Sync Gateway instance to install.
     """
 
     @property
@@ -264,6 +297,51 @@ class SyncGatewayConfig:
         self.__hostname = hostname
         self.__internal_hostname = internal_hostname
         self.__cluster_hostname = cluster_hostname
+
+
+class EdgeServerInput:
+    """
+    A class to parse and store input configuration for an Edge Server instance.
+
+    Attributes:
+        version (str): The version of the Edge Server instance to install.
+    """
+
+    @property
+    def version(self) -> str:
+        return self.__version
+
+    def __init__(self, version: str):
+        self.__version = version
+
+
+class EdgeServerConfig:
+    """
+    A class to store the configuration of an Edge Server instance.
+
+    Attributes:
+        version (str): The version of the Edge Server instance to install.
+        hostname (str): The hostname of the Edge Server instance.
+        internal_hostname (str): The EC2 internal hostname of the Edge Server instance.
+        cluster_hostname (str): The hostname of the cluster to which the Edge Server belongs.
+    """
+
+    @property
+    def version(self) -> str:
+        return self.__version
+
+    @property
+    def hostname(self) -> str:
+        return self.__hostname
+
+    @property
+    def internal_hostname(self) -> str:
+        return self.__internal_hostname
+
+    def __init__(self, version: str, hostname: str, internal_hostname: str):
+        self.__version = version
+        self.__hostname = hostname
+        self.__internal_hostname = internal_hostname
 
 
 class LoadBalancerInput:
@@ -336,6 +414,10 @@ class TestServerInput:
     def download(self) -> bool:
         return self.__download
 
+    @property
+    def ip_hint(self) -> str | None:
+        return self.__ip_hint
+
     def __init__(
         self,
         location: str,
@@ -343,12 +425,15 @@ class TestServerInput:
         dataset_version: str,
         platform: str,
         download: bool,
+        *,
+        ip_hint: str | None = None,
     ):
         self.__location = location
         self.__cbl_version = cbl_version
         self.__dataset_version = dataset_version
         self.__platform = platform
         self.__download = download
+        self.__ip_hint = ip_hint
 
 
 class TestServerConfig:
@@ -402,6 +487,7 @@ class TopologyConfig:
 
     __clusters_key: Final[str] = "clusters"
     __sync_gateways_key: Final[str] = "sync_gateways"
+    __edge_servers_key: Final[str] = "edge_servers"
     __cluster_key: Final[str] = "cluster"
     __test_servers_key: Final[str] = "test_servers"
     __load_balancers_key: Final[str] = "load_balancers"
@@ -420,9 +506,11 @@ class TopologyConfig:
 
         self.__defaults = ConfigDefaults({})
         self.__clusters: list[ClusterConfig] = []
+        self.__cluster_inputs: list[ClusterInput] = []
         self.__sync_gateways: list[SyncGatewayConfig] = []
         self.__sync_gateway_inputs: list[SyncGatewayInput] = []
-        self.__cluster_inputs: list[ClusterInput] = []
+        self.__edge_servers: list[EdgeServerConfig] = []
+        self.__edge_server_inputs: list[EdgeServerInput] = []
         self.__test_server_inputs: list[TestServerInput] = []
         self.__test_servers: list[TestServerConfig] = []
         self.__load_balancers: list[LoadBalancerConfig] = []
@@ -464,6 +552,16 @@ class TopologyConfig:
                         SyncGatewayInput(cluster_index, version)
                     )
 
+            if self.__edge_servers_key in config:
+                raw_entry = cast(list[dict], config[self.__edge_servers_key])
+                for raw_server in raw_entry:
+                    version = (
+                        cast(str, raw_server[self.__version_key])
+                        if self.__version_key in raw_server
+                        else str(self.__defaults.EdgeServer.version)
+                    )
+                    self.__edge_server_inputs.append(EdgeServerInput(version))
+
             if self.__test_servers_key in config:
                 raw_servers = cast(
                     list[dict[str, str]], config[self.__test_servers_key]
@@ -473,9 +571,10 @@ class TopologyConfig:
                         TestServerInput(
                             raw_server["location"],
                             raw_server["cbl_version"],
-                            raw_server["dataset_version"],
+                            raw_server.get("dataset_version", "3.2"),
                             raw_server["platform"],
                             cast(bool, raw_server.get("download", False)),
+                            ip_hint=raw_server.get("ip_hint"),
                         )
                     )
 
@@ -508,6 +607,7 @@ class TopologyConfig:
                 sub_config = TopologyConfig(include_file, self.__defaults)
                 self.__cluster_inputs.extend(sub_config.__cluster_inputs)
                 self.__sync_gateway_inputs.extend(sub_config.__sync_gateway_inputs)
+                self.__edge_server_inputs.extend(sub_config.__edge_server_inputs)
                 self.__load_balancer_inputs.extend(sub_config.__load_balancer_inputs)
                 self.__test_server_inputs.extend(sub_config.__test_server_inputs)
                 if self._wants_logslurp is None:
@@ -525,6 +625,10 @@ class TopologyConfig:
         return len(self.__sync_gateway_inputs)
 
     @property
+    def total_es_count(self) -> int:
+        return len(self.__edge_server_inputs)
+
+    @property
     def total_lb_count(self) -> int:
         return len(self.__load_balancer_inputs)
 
@@ -535,6 +639,10 @@ class TopologyConfig:
     @property
     def sync_gateways(self) -> list[SyncGatewayConfig]:
         return self.__sync_gateways
+
+    @property
+    def edge_servers(self) -> list[EdgeServerConfig]:
+        return self.__edge_servers
 
     @property
     def test_servers(self) -> list[TestServerConfig]:
@@ -611,6 +719,35 @@ class TopologyConfig:
         sgw_internal_ips = cast(list[str], json.loads(result.stdout))
         self.apply_sgw_hostnames(sgw_ips, sgw_internal_ips)
 
+        es_command = [
+            "terraform",
+            "output",
+            "-json",
+            "edge_server_instance_public_ips",
+        ]
+        result = subprocess.run(es_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(
+                f"Command '{' '.join(es_command)}' failed with exit status {result.returncode}: {result.stderr}"
+            )
+
+        es_ips = cast(list[str], json.loads(result.stdout))
+
+        es_command = [
+            "terraform",
+            "output",
+            "-json",
+            "edge_server_instance_private_ips",
+        ]
+        result = subprocess.run(es_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(
+                f"Command '{' '.join(es_command)}' failed with exit status {result.returncode}: {result.stderr}"
+            )
+
+        es_internal_ips = cast(list[str], json.loads(result.stdout))
+        self.apply_es_hostnames(es_ips, es_internal_ips)
+
         lb_command = [
             "terraform",
             "output",
@@ -642,15 +779,15 @@ class TopologyConfig:
         """
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
-                test_server_input.platform,
-                test_server_input.cbl_version,
-                test_server_input.dataset_version,
+                test_server_input.platform, test_server_input.cbl_version
             )
             bridge = test_server.create_bridge()
             bridge.validate(test_server_input.location)
             self.__test_servers.append(
                 TestServerConfig(
-                    bridge.get_ip(test_server_input.location),
+                    bridge.get_ip(
+                        test_server_input.location, fallback=test_server_input.ip_hint
+                    ),
                     test_server_input.cbl_version,
                     test_server_input.dataset_version,
                     test_server_input.platform,
@@ -663,9 +800,7 @@ class TopologyConfig:
         """
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
-                test_server_input.platform,
-                test_server_input.cbl_version,
-                test_server_input.dataset_version,
+                test_server_input.platform, test_server_input.cbl_version
             )
 
             if test_server_input.download:
@@ -678,11 +813,15 @@ class TopologyConfig:
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
             port = 5555 if test_server_input.platform.startswith("dotnet") else 8080
-            ip = bridge.get_ip(test_server_input.location)
+            ip = bridge.get_ip(
+                test_server_input.location, fallback=test_server_input.ip_hint
+            )
+
+            success = False
             for _ in range(0, 30):
                 try:
                     requests.get(f"http://{ip}:{port}")
-                    return
+                    success = True
                 except requests.exceptions.ConnectionError:
                     click.secho(
                         f"Failed to connect to test server at {ip}:{port}, retrying in 1s...",
@@ -691,9 +830,10 @@ class TopologyConfig:
                     sleep(1)
                     pass
 
-            raise RuntimeError(
-                f"Test server failed to start at {test_server_input.location}"
-            )
+            if not success:
+                raise RuntimeError(
+                    f"Test server failed to start at {test_server_input.location}"
+                )
 
     def stop_test_servers(self):
         """
@@ -702,11 +842,13 @@ class TopologyConfig:
         TestServer.initialize()
         for test_server_input in self.__test_server_inputs:
             test_server = TestServer.create(
-                test_server_input.platform,
-                test_server_input.cbl_version,
-                test_server_input.dataset_version,
+                test_server_input.platform, test_server_input.cbl_version
             )
-            bridge = test_server.create_bridge()
+
+            # This is a smell in that some platforms have a different
+            # bridge implementation based on built vs downloaded.  Pass
+            # in this information here as a hint
+            bridge = test_server.create_bridge(downloaded=test_server_input.download)
             bridge.validate(test_server_input.location)
             bridge.stop(test_server_input.location)
 
@@ -726,6 +868,22 @@ class TopologyConfig:
                 cluster.internal_hostnames[0],
             )
             self.__sync_gateways.append(sgw)
+
+    def apply_es_hostnames(self, hostnames: list[str], internal_hostnames: list[str]):
+        """
+        Apply the Edge Server hostnames to the configuration.
+
+        Args:
+            hostnames (List[str]): The list of Edge Server hostnames.
+            internal_hostnames (List[str]): The list of Edge Server internal hostnames.
+        """
+        for es_input in self.__edge_server_inputs:
+            es = EdgeServerConfig(
+                es_input.version,
+                hostnames.pop(0),
+                internal_hostnames.pop(0),
+            )
+            self.__edge_servers.append(es)
 
     def apply_server_hostnames(
         self, server_hostnames: list[str], server_internal_hostnames: list[str]
@@ -756,6 +914,9 @@ class TopologyConfig:
         Args:
             hostnames (List[str]): The list of load balancer hostnames.
         """
+        if len(hostnames) == 0:
+            return
+
         if len(self.__sync_gateways) == 0:
             raise Exception(
                 "apply_sgw_hostnames must be called prior to apply_lb_hostnames"
@@ -797,6 +958,15 @@ class TopologyConfig:
         if len(self.__sync_gateways) > 0:
             click.echo()
 
+        i = 1
+        for es in self.__edge_servers:
+            click.echo(
+                f"Edge Server {i} ({es.version}): {es.hostname} -> {es.internal_hostname}"
+            )
+            i += 1
+
+        if len(self.__edge_servers) > 0:
+            click.echo()
         i = 1
         for lb in self.__load_balancers:
             click.echo(f"Load Balancer {i}: {lb.hostname}")

@@ -6,6 +6,7 @@
 //
 
 import Vapor
+import CouchbaseLiteSwift
 
 extension ContentTypes {
     enum ReplicatorActivity : String, Codable {
@@ -15,10 +16,12 @@ extension ContentTypes {
         case IDLE = "IDLE"
         case BUSY = "BUSY"
     }
+    
     struct ReplicatorStatus : Content, CustomStringConvertible {
         struct Progress : Codable {
             let completed: Bool
         }
+        
         let activity: ReplicatorActivity
         let progress: Progress
         let documents: [DocumentReplication]?
@@ -36,5 +39,34 @@ extension ContentTypes {
             
             return result
         }
+    }
+}
+
+extension ContentTypes.ReplicatorActivity {
+    init(activityLevel: Replicator.ActivityLevel) {
+        switch activityLevel {
+        case .busy:
+            self = .BUSY
+        case .connecting:
+            self = .CONNECTING
+        case .idle:
+            self = .IDLE
+        case .offline:
+            self = .OFFLINE
+        case .stopped:
+            self = .STOPPED
+        @unknown default:
+            fatalError("Encountered unknown enum value from Replicator.status.activity")
+        }
+    }
+}
+
+extension ContentTypes.ReplicatorStatus {
+    init(status: Replicator.Status, docs: [ContentTypes.DocumentReplication]) {
+        self.activity = ContentTypes.ReplicatorActivity(activityLevel: status.activity)
+        self.progress = ContentTypes.ReplicatorStatus.Progress(
+            completed: status.progress.completed == status.progress.total)
+        self.documents = docs
+        self.error = status.error.map(TestServerError.cblError)
     }
 }

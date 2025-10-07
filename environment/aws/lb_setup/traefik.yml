@@ -1,0 +1,14 @@
+entryPoints:
+  public:
+    address: ":4984"
+  admin:
+    address: ":4985"
+
+providers:
+  file:
+    filename: "/etc/traefik/http_config.yml"
+
+log:
+  level: INFO
+
+accessLog: {}

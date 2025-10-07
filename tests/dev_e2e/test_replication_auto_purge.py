@@ -1307,6 +1307,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             Update doc in CBL:
                 * Update `post_1` with channels = ["fake"]
         """)
+        repl.clear_document_updates()
         async with db.batch_updater() as b:
             b.upsert_document(
                 "_default.posts",

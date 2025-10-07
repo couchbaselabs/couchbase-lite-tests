@@ -37,7 +37,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.couchbase.lite.TLSIdentity;
+import com.couchbase.lite.mobiletest.endpoints.v1.Session;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
@@ -47,16 +50,16 @@ import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
-@SuppressWarnings("resource")
+@SuppressFBWarnings({"EI_EXPOSE_REP", "EI_EXPOSE_REP2"})
 public abstract class TestApp {
-    public static final String HEADER_REQEST = "CBLTest-Request-ID".toLowerCase(Locale.getDefault());
-    public static final String HEADER_CLIENT = "CBLTest-Client-ID".toLowerCase(Locale.getDefault());
-    public static final String HEADER_SERVER = "CBLTest-Server-ID".toLowerCase(Locale.getDefault());
+    public static final String HEADER_REQEST = "CBLTest-Request-ID".toLowerCase(Locale.US);
+    public static final String HEADER_CLIENT = "CBLTest-Client-ID".toLowerCase(Locale.US);
+    public static final String HEADER_SERVER = "CBLTest-Server-ID".toLowerCase(Locale.US);
 
-    public static final String HEADER_CONTENT_TYPE = "Content-Type".toLowerCase(Locale.getDefault());
+    public static final String HEADER_CONTENT_TYPE = "Content-Type".toLowerCase(Locale.US);
     public static final String CONTENT_TYPE_JSON = "application/json";
 
-    public static final String HEADER_PROTOCOL_VERSION = "CBLTest-API-Version".toLowerCase(Locale.getDefault());
+    public static final String HEADER_PROTOCOL_VERSION = "CBLTest-API-Version".toLowerCase(Locale.US);
     public static final int LATEST_SUPPORTED_PROTOCOL_VERSION = 1;
     public static final Set<Integer> KNOWN_VERSIONS
         = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(LATEST_SUPPORTED_PROTOCOL_VERSION)));
@@ -92,7 +95,7 @@ public abstract class TestApp {
     private final AtomicReference<ListenerService> listenerSvc = new AtomicReference<>();
 
     @Nullable
-    private TestContext session;
+    private Session session;
 
     protected final String platform;
 
@@ -142,24 +145,15 @@ public abstract class TestApp {
         return certsList;
     }
 
+    public final void newSession(@NonNull Session session) { this.session = session; }
+
     @Nullable
-    public final TestContext getSessionUnchecked() { return session; }
+    public final Session getSession() { return session; }
 
     @NonNull
-    public final TestContext getSession(@NonNull String client) {
-        final TestContext ctxt = session;
-        if ((ctxt == null) || !ctxt.getClient().equals(client)) {
-            throw new ClientError("Attempt to access a test context for an unknown client");
-        }
-        return ctxt;
-    }
-
-    @NonNull
-    public final TestContext newSession(@NonNull String client, @Nullable String datasetVersion) {
-        final TestContext ctxt = session;
-        session = new TestContext(client, datasetVersion);
-        if (ctxt != null) { ctxt.close(); }
-        return session;
+    public final TestContext getTestContext(@NonNull String client) {
+        if (session == null) { throw new ClientError("Attempt to get a test context witn no session"); }
+        return session.getVerifiedContext(client);
     }
 
     @NonNull

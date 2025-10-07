@@ -25,6 +25,11 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
         yield
         return
 
+    if len(cblpytest.test_servers) == 0:
+        cbl_info("No test servers available, skipping greenboard upload")
+        yield
+        return
+
     uploader = GreenboardUploader(
         cblpytest.config.greenboard_url,
         cblpytest.config.greenboard_username,
@@ -40,17 +45,17 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     yield
 
     test_server_info = await cblpytest.test_servers[0].get_info()
-    sgw_version = await cblpytest.sync_gateways[0].get_version()
+    sgw_version: str = "n/a"
+    if len(cblpytest.sync_gateways) > 0:
+        sgw_version_parts = await cblpytest.sync_gateways[0].get_version()
+        sgw_version = f"{sgw_version_parts.version}-{sgw_version_parts.build_number}"
     os_name = (
         test_server_info.device["systemName"]
         if "systemName" in test_server_info.device
         else ""
     )
     uploader.upload(
-        test_server_info.cbl,
-        os_name,
-        test_server_info.library_version,
-        f"{sgw_version.version}-{sgw_version.build_number}",
+        test_server_info.cbl, os_name, test_server_info.library_version, sgw_version
     )
     pytestconfig.pluginmanager.unregister(uploader)
 

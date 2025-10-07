@@ -1,25 +1,21 @@
 #!/bin/bash -e
 
 function usage() {
-    echo "Usage: $0 <edition: enterprise | community>  <cbl-version> <cbl-build-num> <dataset-version>"
+    echo "Usage: $0 <edition: enterprise | community>  <cbl-version> <cbl-build-num>"
     exit 1
 }
 
-if [ "$#" -lt 4 ]; then
+if [ "$#" -lt 3 ]; then
     usage
 fi
 
 EDITION=${1}
 VERSION=${2}
 BLD_NUM=${3}
-DATASET_VERSION=${4}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/../build"
 LIB_DIR="${SCRIPT_DIR}/../lib"
-
-# Prepare Environment:
-"${SCRIPT_DIR}"/prepare_env.sh ${DATASET_VERSION}
 
 # Download CBL:
 "${SCRIPT_DIR}"/download_cbl.sh macos ${EDITION} ${VERSION} ${BLD_NUM}

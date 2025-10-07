@@ -14,7 +14,7 @@ Functions:
         Build the Java test server.
     compress_package(self) -> str:
         Compress the Java test server package.
-    create_bridge(self) -> PlatformBridge:
+    create_bridge(self, **kwargs) -> PlatformBridge:
         Create a bridge for the Java test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
@@ -38,11 +38,7 @@ import requests
 
 from environment.aws.common.io import download_progress_bar, unzip_directory
 from environment.aws.common.output import header
-from environment.aws.topology_setup.test_server import (
-    TEST_SERVER_DIR,
-    TestServer,
-    copy_dataset,
-)
+from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer
 
 from .android_bridge import AndroidBridge
 from .platform_bridge import PlatformBridge
@@ -119,7 +115,7 @@ class JarBridge(JavaBridge):
     def uninstall(self, location: str) -> None:
         pass
 
-    def get_ip(self, location):
+    def _get_ip(self, location) -> str | None:
         if location != "localhost":
             raise ValueError("JarBridge only supports running on localhost")
 
@@ -162,11 +158,10 @@ class JarBridge(JavaBridge):
 
 
 class JettyBridge(JavaBridge):
-    def __init__(self, cbl_version: str, dataset_version: str):
+    def __init__(self, cbl_version: str):
         super().__init__()
 
         self.__cbl_version = cbl_version
-        self.__dataset_version = dataset_version
         self.__gradle_path = JAK_TEST_SERVER_DIR / "webservice" / "gradlew"
         if platform.system() == "Windows":
             self.__gradle_path = self.__gradle_path.with_suffix(".bat")
@@ -180,7 +175,7 @@ class JettyBridge(JavaBridge):
     def uninstall(self, location: str) -> None:
         pass
 
-    def get_ip(self, location):
+    def _get_ip(self, location) -> str | None:
         if location != "localhost":
             raise ValueError("JettyBridge only supports running on localhost")
 
@@ -200,7 +195,7 @@ class JettyBridge(JavaBridge):
             str(self.__gradle_path),
             "jettyStart",
             f"-PcblVersion={self.__cbl_version}",
-            f"-PdatasetVersion={self.__dataset_version}",
+            "-PdatasetVersion=3.2",
         ]
         if platform.system() != "Windows":
             args.insert(0, "nohup")
@@ -228,7 +223,7 @@ class JettyBridge(JavaBridge):
             str(self.__gradle_path),
             "appStop",
             f"-PcblVersion={self.__cbl_version}",
-            f"-PdatasetVersion={self.__dataset_version}",
+            "-PdatasetVersion=3.2",
         ]
         subprocess.run(
             args, cwd=self.__gradle_path.parent, check=check_result, capture_output=True
@@ -248,25 +243,14 @@ class JAKTestServer(TestServer):
     def test_server_path(self) -> str:
         pass
 
-    def __init__(self, version: str, dataset_version: str, gradle_target: str = "jar"):
-        super().__init__(version, dataset_version)
+    def __init__(self, version: str, gradle_target: str = "jar"):
+        super().__init__(version)
         self.__gradle_target = gradle_target
-
-    def _copy_dataset(self) -> None:
-        # The original script this was ported from copied all versions
-        # regardless of what was being built.  I opted to not do this
-        # and instead only copy the one that is going to be built
-        # so that way there is no need to keep a manual list of versions
-        # here.
-        dest_dir = JAK_TEST_SERVER_DIR / "assets" / self.dataset_version
-        dest_dir.mkdir(0o755, parents=True, exist_ok=True)
-        copy_dataset(dest_dir, self.dataset_version)
 
     def build(self) -> None:
         """
         Build the JAK test server.
         """
-        self._copy_dataset()
         gradle_path = JAK_TEST_SERVER_DIR / self.test_server_path / "gradlew"
         if platform.system() == "Windows":
             gradle_path = gradle_path.with_suffix(".bat")
@@ -275,7 +259,7 @@ class JAKTestServer(TestServer):
             str(gradle_path.resolve()),
             self.__gradle_target,
             f"-PcblVersion={self.version}",
-            f"-PdatasetVersion={self.dataset_version}",
+            "-PdatasetVersion=3.2",
         ]
         if platform.system() == "Windows":
             args.append("--no-daemon")
@@ -292,12 +276,16 @@ class JAKTestServer_Android(JAKTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version, "assembleRelease")
+    def __init__(self, version: str):
+        super().__init__(version, "assembleRelease")
 
     @property
     def test_server_path(self) -> str:
         return "android"
+
+    @property
+    def product(self) -> str:
+        return "couchbase-lite-android"
 
     @property
     def platform(self) -> str:
@@ -318,17 +306,23 @@ class JAKTestServer_Android(JAKTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-android/{version_parts[0]}/{version_parts[1]}/testserver_android_{self.dataset_version}.apk"
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
-    def create_bridge(self) -> PlatformBridge:
+    def create_bridge(self, **kwargs) -> PlatformBridge:
         """
-        Create a bridge for the Java test server to be able to install, run, etc.
+        Create a bridge for the Android test server to be able to install, run, etc.
 
         Returns:
             PlatformBridge: The platform bridge.
         """
         path = (
-            JAK_TEST_SERVER_DIR
+            TEST_SERVER_DIR
+            / "downloaded"
+            / self.platform
+            / self.version
+            / "testserver_android.apk"
+            if self._downloaded
+            else JAK_TEST_SERVER_DIR
             / self.test_server_path
             / "app"
             / "build"
@@ -346,7 +340,7 @@ class JAKTestServer_Android(JAKTestServer):
 
     def compress_package(self) -> str:
         """
-        Compress the Java test server package.
+        Compress the Android test server package.
 
         Returns:
             str: The path to the compressed package.
@@ -362,15 +356,13 @@ class JAKTestServer_Android(JAKTestServer):
             / "release"
             / "app-release.apk"
         )
-        zip_path = (
-            apk_path.parents[5] / f"testserver_android_{self.dataset_version}.apk"
-        )
+        zip_path = apk_path.parents[5] / "testserver_android.apk"
         shutil.copy(apk_path, zip_path)
         return str(zip_path)
 
     def uncompress_package(self, path: Path) -> None:
         """
-        Uncompress the Java test server package.
+        Uncompress the Android test server package.
 
         Args:
             path (Path): The path to the compressed package.
@@ -380,26 +372,24 @@ class JAKTestServer_Android(JAKTestServer):
         )
 
 
-@TestServer.register("jak_desktop")
-class JAKTestServer_Desktop(JAKTestServer):
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+class JAKTestServer_NonAndroid(JAKTestServer):
+    def __init__(self, version: str, jar_name: str):
+        super().__init__(version)
+        self.__jar_name = jar_name
         with open(JAK_TEST_SERVER_DIR / "version.txt") as f:
-            self.__server_version = f.read().strip()
-
-    @property
-    def test_server_path(self) -> str:
-        return "desktop"
+            self._server_version = f.read().strip()
 
     @property
     def platform(self) -> str:
-        """
-        Get the platform name.
+        return f"jak_{self.__jar_name.lower()}"
 
-        Returns:
-            str: The platform name.
-        """
-        return "jak_desktop"
+    @property
+    def product(self) -> str:
+        return "couchbase-lite-java"
+
+    @property
+    def test_server_path(self) -> str:
+        return self.__jar_name.lower()
 
     @property
     def latestbuilds_path(self) -> str:
@@ -410,53 +400,29 @@ class JAKTestServer_Desktop(JAKTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return f"couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
-
-    def create_bridge(self):
-        jar_path = (
-            str(
-                TEST_SERVER_DIR
-                / "downloaded"
-                / self.platform
-                / self.version
-                / f"CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
-            )
-            if self._downloaded
-            else str(
-                JAK_TEST_SERVER_DIR
-                / "desktop"
-                / "app"
-                / "build"
-                / "libs"
-                / f"CBLTestServer-Java-Desktop-{self.__server_version}_{self.version}.jar"
-            )
-        )
-        return JarBridge(jar_path, self.version)
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/CBLTestServer-Java-{self.__jar_name}.jar"
 
     def compress_package(self):
         """
-        Compress the C test server package.
+        Compress the Java test server package.
 
         Returns:
             str: The path to the compressed package.
         """
-        header(f"Compressing C test server for {self.platform}")
+        header(f"Compressing test server for {self.platform}")
 
         jar_path = (
             JAK_TEST_SERVER_DIR
-            / "desktop"
+            / self.test_server_path
             / "app"
             / "build"
             / "libs"
-            / f"CBLTestServer-Java-Desktop-{self.__server_version}_{self.version}.jar"
+            / f"CBLTestServer-Java-{self.__jar_name}-{self._server_version}_{self.version}.jar"
         )
 
         # The server version is not going to be known when downloading from latestbuilds,
         # and the CBL version will be built into the path on latestbuilds, so remove both
-        copy_path = (
-            jar_path.parents[5]
-            / f"CBLTestServer-Java-Desktop_{self.dataset_version}.jar"
-        )
+        copy_path = jar_path.parents[5] / f"CBLTestServer-Java-{self.__jar_name}.jar"
         shutil.copy(jar_path, copy_path)
         return str(copy_path)
 
@@ -468,49 +434,53 @@ class JAKTestServer_Desktop(JAKTestServer):
             path (Path): The path to the compressed package.
         """
         click.secho(
-            "No uncompressing needed for JAK desktop server package", fg="yellow"
+            f"No uncompressing needed for {self.__jar_name} server package", fg="yellow"
         )
+
+
+@TestServer.register("jak_desktop")
+class JAKTestServer_Desktop(JAKTestServer_NonAndroid):
+    def __init__(self, version: str):
+        super().__init__(version, "Desktop")
+
+    def create_bridge(self, **kwargs):
+        jar_path = (
+            str(
+                TEST_SERVER_DIR
+                / "downloaded"
+                / self.platform
+                / self.version
+                / "CBLTestServer-Java-Desktop.jar"
+            )
+            if self._downloaded
+            else str(
+                JAK_TEST_SERVER_DIR
+                / "desktop"
+                / "app"
+                / "build"
+                / "libs"
+                / f"CBLTestServer-Java-Desktop-{self._server_version}_{self.version}.jar"
+            )
+        )
+        return JarBridge(jar_path, self.version)
 
 
 @TestServer.register("jak_webservice")
-class JAKTestServer_WebService(JAKTestServer):
-    def __init__(self, version: str, dataset_version: str):
-        super().__init__(version, dataset_version)
+class JAKTestServer_WebService(JAKTestServer_NonAndroid):
+    def __init__(self, version: str):
+        super().__init__(version, "WebService")
 
-    @property
-    def test_server_path(self) -> str:
-        return "webservice"
+    def create_bridge(self, **kwargs):
+        if not self._downloaded and not kwargs.get("downloaded", False):
+            return JettyBridge(self.version)
 
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "jak_webservice"
-
-    @property
-    def latestbuilds_path(self) -> str:
-        raise NotImplementedError(
-            "Please implement the latestbuilds path for webservice"
+        return JarBridge(
+            str(
+                TEST_SERVER_DIR
+                / "downloaded"
+                / self.platform
+                / self.version
+                / "CBLTestServer-Java-WebService.jar"
+            ),
+            self.version,
         )
-
-    def create_bridge(self):
-        return JettyBridge(self.version, self.dataset_version)
-
-    def compress_package(self):
-        raise NotImplementedError(
-            "Please implement the compress logic for a built server"
-        )
-
-    def uncompress_package(self, path: Path) -> None:
-        """
-        Uncompress the C test server package.
-
-        Args:
-            path (Path): The path to the compressed package.
-        """
-        unzip_directory(path, path.parent)
-        path.unlink()
