@@ -8,7 +8,15 @@ from json import loads
 
 def start_environment():
     print("Bringing up docker compose...")
-    subprocess.run(["docker", "compose", "up", "-d"])
+    subprocess.run(["docker", "compose", "build"])
+    subprocess.run(
+        [
+            "docker",
+            "compose",
+            "up",
+            "-d",
+        ]
+    )
     print()
 
     sg_count = 0

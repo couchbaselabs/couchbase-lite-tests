@@ -3,7 +3,7 @@ services:
     build:
       context: ./cbs
       args:
-        - COUCHBASE_VERSION=${COUCHBASE_VERSION:-7.6.4}
+        - COUCHBASE_VERSION=${COUCHBASE_VERSION:-7.6.7}
     ports:
       - "8091:8091"
       - "8092:8092"
@@ -21,7 +21,8 @@ services:
     build:
       context: ./sg
       args:
-        - SG_DEB=${SG_DEB:-https://packages.couchbase.com/releases/couchbase-sync-gateway/3.2.0/couchbase-sync-gateway-enterprise_3.2.0_<ARCH>.deb}
+        - SG_DEB=${SG_DEB:-https://latestbuilds.service.couchbase.com/builds/latestbuilds/sync_gateway/4.0.0/242/couchbase-sync-gateway-enterprise_4.0.0-242_<ARCH>.deb}
+        #- SG_DEB=${SG_DEB:-https://packages.couchbase.com/releases/couchbase-sync-gateway/4.0.0/couchbase-sync-gateway-enterprise_4.0.0_<ARCH>.deb}
     environment:
       SSL: ${SSL:-false}
     ports:
