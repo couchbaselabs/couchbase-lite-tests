@@ -37,7 +37,7 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 
 @SuppressFBWarnings({"EI_EXPOSE_REP", "EI_EXPOSE_REP2"})
 public class Session {
-    private static final String DEFAULT_DATASET_VERSION = "3.2";
+    private static final String DEFAULT_DATASET_VERSION = "4.0";
 
     private static final String TAG = "RESET";
 

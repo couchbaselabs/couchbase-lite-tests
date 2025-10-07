@@ -42,6 +42,7 @@ import com.couchbase.lite.Collection;
 import com.couchbase.lite.CollectionConfiguration;
 import com.couchbase.lite.Conflict;
 import com.couchbase.lite.ConflictResolver;
+import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.DocumentReplication;
@@ -306,17 +307,25 @@ public class ReplicatorManager extends BaseReplicatorManager {
         if (dbName == null) { throw new ClientError("Replicator configuration doesn't specify a database"); }
 
         final TypedList collections = config.getList(KEY_COLLECTIONS);
-        if (collections == null || collections.isEmpty()) {
+        if (collections == null) {
             throw new ClientError("Replicator configuration doesn't specify a list of collections");
         }
 
         final Database db = dbSvc.getOpenDb(ctxt, dbName);
 
-        final ReplicatorConfiguration replConfig = new ReplicatorConfiguration(
-                addCollections(
-                        db,
-                        collections,
-                        ctxt), endpoint);
+        final ReplicatorConfiguration replConfig;
+        if (collections.isEmpty()) {
+            try {
+                replConfig = new ReplicatorConfiguration(
+                        CollectionConfiguration.fromCollections(Set.of(db.getDefaultCollection())),
+                        endpoint
+                );
+            } catch (CouchbaseLiteException e) {
+                throw new ClientError("No collection found");
+            }
+        } else {
+            replConfig = new ReplicatorConfiguration(addCollections(db, collections, ctxt), endpoint);
+        }
 
         final String replType = config.getString(KEY_TYPE);
         if (replType != null) {

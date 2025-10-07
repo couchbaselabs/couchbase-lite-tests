@@ -127,7 +127,6 @@ public class RemoteLogger extends Log.TestLogger {
     public void writeLog(LogLevel level, String tag, String msg, Exception err) {
         final WebSocket socket = webSocket.get();
         if (socket == null) {
-            Log.p(TAG, "RemoteLogger is not connected");
             return;
         }
 
