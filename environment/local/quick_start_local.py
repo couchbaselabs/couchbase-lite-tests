@@ -72,7 +72,7 @@ def write_config() -> None:
         "api-version": 1,
     }
     with pathlib.Path("config.json").open("w") as f:
-        json.dump(config, f, indent=2)
+        json.dump(config, f, indent=4)
 
 
 def start_testserver(server_type: TestServerType) -> None:
@@ -101,9 +101,9 @@ def build_testserver(
         [
             "/bin/bash",
             "-c",
-            f"./build_macos.sh {edition} {version} {build_number} {dataset_version}",
+            f"./scripts/build_macos.sh {edition} {version} {build_number} {dataset_version}",
         ],
-        cwd=pathlib.Path(__file__).parent / "servers" / "c" / "scripts",
+        cwd=pathlib.Path(__file__).parent / "servers" / "c",
         check=True,
     )
 

@@ -31,5 +31,5 @@ ninja install
 cp "${LIB_DIR}"/libcblite/lib/libcblite*.dylib out/bin/
 
 # Copy assets folder
-cp -R assets out/bin
+cp -R ${SCRIPT_DIR}/../assets out/bin
 popd > /dev/null
