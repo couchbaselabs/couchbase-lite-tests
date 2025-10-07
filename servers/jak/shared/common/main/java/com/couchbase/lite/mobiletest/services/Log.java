@@ -60,8 +60,8 @@ public final class Log {
         @NonNull String tag,
         @NonNull String msg,
         @Nullable Exception err) {
-        TestLogger logger = LOGGER.get();
-        if(logger != null) {
+        final TestLogger logger = LOGGER.get();
+        if (logger != null) {
             logger.writeLog(level, tag, msg, err);
         }
     }
