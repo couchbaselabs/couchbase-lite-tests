@@ -10,7 +10,7 @@ import os
 import CouchbaseLiteSwift
 
 public protocol LoggerProtocol {
-    func log(level: LogLevel, domain: String, message: String)
+    func writeLog(level: LogLevel, domain: String, message: String)
     func close()
 }
 
@@ -22,7 +22,8 @@ public class Log {
     private init () { }
     
     public static func initialize() {
-        Database.log.custom = CBLLogger(level: .verbose)
+        let logSink = CustomLogger()
+        LogSinks.custom = CustomLogSink(level: .verbose, logSink: logSink)
     }
         
     public static func useDefaultLogger() {
@@ -41,37 +42,36 @@ public class Log {
     
     public static func log(level: LogLevel, message: String) {
         sLogQueue.async {
-            sLogger.log(level: level, domain: "TS", message: message)
+            sLogger.writeLog(level: level, domain: "TS", message: message)
         }
     }
     
     public static func logToConsole(level: LogLevel,  message: String) {
-        sConsoleLogger.log(level: level, domain: "TS", message: message)
+        sConsoleLogger.writeLog(level: level, domain: "TS", message: message)
     }
     
-    fileprivate static func log(level: LogLevel, domain: LogDomain, message: String) {
+    fileprivate static func writeLog(level: LogLevel, domain: LogDomain, message: String) {
         sLogQueue.async {
-            sLogger.log(level: level, domain: domain.name, message: message)
+            sLogger.writeLog(level: level, domain: domain.name, message: message)
         }
     }
 }
 
-private class CBLLogger : CouchbaseLiteSwift.Logger {
-    let level: LogLevel
+private class CustomLogger : LogSinkProtocol {
+    var lines: [String] = []
+    private let queue = DispatchQueue(label: "CustomLogger.lines.queue")
     
-    init(level: LogLevel) {
-        self.level = level
-    }
-    
-    func log(level: CouchbaseLiteSwift.LogLevel, domain: LogDomain, message: String) {
-        Log.log(level: level, domain: domain, message: message)
+    func writeLog(level: LogLevel, domain: LogDomain, message: String) {
+        queue.async {
+            self.lines.append(message)
+        }
     }
 }
 
 private class ConsoleLogger: LoggerProtocol {
     let logger = os.Logger()
     
-    func log(level: LogLevel, domain: String, message: String) {
+    func writeLog(level: LogLevel, domain: String, message: String) {
         logger.log(level: level.osLogType, "[\(domain)] \(message)")
     }
 
@@ -134,7 +134,7 @@ public class RemoteLogger: LoggerProtocol {
         }
     }
     
-    public func log(level: LogLevel, domain: String, message: String) {
+    public func writeLog(level: LogLevel, domain: String, message: String) {
         lock.lock()
         defer { lock.unlock() }
         
