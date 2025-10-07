@@ -6,8 +6,8 @@ project = "Couchbase Lite Python Test Client"
 copyright = "2023, Couchbase"
 author = "Couchbase"
 
-release = "0.2.3"
-version = "0.2"
+release = "1.2.0"
+version = "1.2"
 
 # -- General configuration
 
@@ -29,13 +29,13 @@ intersphinx_disabled_domains = ["std"]
 templates_path = ["_templates"]
 
 autoapi_dirs = ["../../src/cbltest"]
-autoapi_add_toctree_entry = True
+autoapi_ignore = ["*/plugins/*"]
 autodoc_inherit_docstrings = True
 html_theme = "sphinx_rtd_theme"
 
 
 def skip_private(app, what, name, obj, skip, options):
-    return name.split(".")[-1].startswith("_")
+    return skip or name.split(".")[-1].startswith("_")
 
 
 def setup(sphinx):
