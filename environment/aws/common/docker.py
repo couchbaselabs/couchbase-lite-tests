@@ -121,13 +121,20 @@ def start_container(
     env = os.environ.copy()
     env["DOCKER_CONTEXT"] = context_name
 
-    container_check = subprocess.run(
-        ["docker", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"],
-        check=True,
-        capture_output=True,
-        text=True,
-        env=env,
-    )
+    try:  
+        container_check = subprocess.run(  
+            ["docker", "--log-level", "debug", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"],  
+            check=True,  
+            capture_output=True,  
+            text=True,  
+            env=env,  
+        )  
+    except subprocess.CalledProcessError as e:  
+        click.secho(f"Docker command failed!", fg="red")  
+        click.secho(f"Return code: {e.returncode}", fg="red")  
+        click.secho(f"Stderr: {e.stderr}", fg="red")  
+        click.secho(f"Stdout: {e.stdout}", fg="yellow")  
+        raise
 
     if container_check.stdout.strip() != "":
         if container_check.stdout.startswith("Up"):
