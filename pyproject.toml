@@ -21,3 +21,10 @@ members = ["client"]
 
 [tool.uv.sources]
 cbltest = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "click>=8.3.0",
+    "pyyaml>=6.0.3",
+    "tqdm>=4.67.1",
+]
