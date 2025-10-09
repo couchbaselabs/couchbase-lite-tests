@@ -134,7 +134,6 @@ def start_container(
         click.secho(f"Return code: {e.returncode}", fg="red")  
         click.secho(f"Stderr: {e.stderr}", fg="red")  
         click.secho(f"Stdout: {e.stdout}", fg="yellow")  
-        raise
 
     if container_check.stdout.strip() != "":
         if container_check.stdout.startswith("Up"):
