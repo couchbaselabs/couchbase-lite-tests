@@ -69,6 +69,7 @@ int Dispatcher::handlePOSTStartReplicator(Request &request, Session *session) {
     params.enableDocumemntListener = GetValue<bool>(config, "enableDocumentListener", false);
     params.enableAutoPurge = GetValue<bool>(config, "enableAutoPurge", false);
     params.pinnedServerCert = GetOptValue<string>(config, "pinnedServerCert");
+    params.headers = GetOptValue<unordered_map<string, string>>(config, "headers");
 
     vector<ReplicationCollection> collections;
     for (auto &colObject: GetValue<vector<json>>(config, "collections")) {

@@ -102,7 +102,7 @@ namespace ts::cbl {
         // Release Listener:
         {
             lock_guard <mutex> lock(_mutex);
-            for (auto listener : _listeners) {
+            for (const auto& listener : _listeners) {
                 CBLURLEndpointListener_Release(listener.second);
             }
             _listeners.clear();
@@ -439,6 +439,16 @@ namespace ts::cbl {
                                               params.pinnedServerCert->size()};
         }
 
+        FLMutableDict headers = nullptr;
+        if (params.headers) {
+            headers = FLMutableDict_New();
+            for (const auto& [k, v] : params.headers.value()) {
+                FLMutableDict_SetString(headers, FLS(k), FLS(v));
+            }
+            config.headers = headers;
+        }
+        DEFER { FLMutableDict_Release(headers); };
+
         // Some stubs for encrypting and decrypting
         config.documentPropertyEncryptor = xor_encryptor;
         config.documentPropertyDecryptor = xor_decryptor;
@@ -526,7 +536,7 @@ namespace ts::cbl {
 
     /// URLEndpointListener
 
-    string CBLManager::startListener(const string &database, vector<std::string>collNames, int port) {
+    string CBLManager::startListener(const string &database, const vector<std::string>&collNames, int port) {
         lock_guard <mutex> lock(_mutex);
 
         CBLError error{};
