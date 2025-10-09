@@ -64,7 +64,6 @@ pipeline {
                         echo "=== Run OSX Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                whoami
                                 jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                             """
                         }
@@ -91,15 +90,11 @@ pipeline {
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'windows_desktop'
+                        TDK_NO_LS_PROVISION = 'true'
                     }
                     steps {
                         echo "=== Run Windows Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            pwsh """  
-                                Write-Host "Current user: $env:USERNAME"  
-                                Write-Host "User profile: $env:USERPROFILE"  
-                                whoami  
-                            """
                             pwsh """
                                 jenkins\\pipelines\\dev_e2e\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
                             """
@@ -187,6 +182,7 @@ pipeline {
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'windows_webservice'
+                        TDK_NO_LS_PROVISION = 'true'
                     }
                     steps {
                         echo "=== Run Windows Web Service Tests"
