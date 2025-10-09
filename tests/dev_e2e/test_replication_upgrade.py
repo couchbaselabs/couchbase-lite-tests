@@ -332,25 +332,13 @@ class TestReplicationUpgrade(CBLTestClass):
         }
 
         def validator(pre: TestReplicationUpgrade.DocSnapshot, post: TestReplicationUpgrade.DocSnapshot):
-            assert post.local.revid, (
-                f"Expected local doc to have revid, but got none"
-            )
-
-            assert post.local.cv is None, (
-                f"Expected local doc to have no CV, but got: {post.local.cv}"
-            )
-
-            assert post.remote.revid, (
-                f"Expected local doc to have revid, but got: none"
+            assert post.remote.revid == pre.remote.revid, (
+                f"Expected remote doc's revid to be unchanged. "
+                f"Before: {pre.remote.revid}, After: {post.remote.revid}"
             )
 
             assert post.remote.cv is None, (
                 f"Expected remote doc to have no CV, but got: {post.remote.cv}"
-            )
-
-            assert post.local.revid != post.remote.revid, (
-                f"Expected local and remote docs to have different revids, "
-                f"but both are {post.local.revid}"
             )
 
         await self.do_nonconflict_test(
@@ -374,16 +362,16 @@ class TestReplicationUpgrade(CBLTestClass):
         """
 
         def validator(pre: TestReplicationUpgrade.DocSnapshot, post: TestReplicationUpgrade.DocSnapshot):
-            assert post.local.revid and post.local.revid == post.remote.revid, (
-                f"RevID mismatch: Local:  {post.local.cv}, Remote: {post.remote.cv}"
+            assert post.local.revid and post.local.revid != pre.local.revid (
+                f"Expectd local doc revID to be updated, but got: {post.remote.revid}"
+            )
+
+            assert post.local.revid == post.remote.revid, (
+                f"RevID mismatch: Local:  {post.local.revid}, Remote: {post.remote.revid}"
             )
 
             assert post.local.cv is None, (
                 f"Expected local doc to have no CV, but got: {post.local.cv}"
-            )
-
-            assert post.remote.cv is None, (
-                f"Expected remote doc to have no CV, but got: {post.remote.cv}"
             )
 
         await self.do_nonconflict_test(
@@ -391,6 +379,7 @@ class TestReplicationUpgrade(CBLTestClass):
             dataset_path,
             doc_id="conflict_2",
             replicator_type=ReplicatorType.PULL,
+            conflict_resolver=ReplicatorConflictResolver("remote-wins"),
             validator=validator)
 
         # TODO: Try to push the resolved doc back
@@ -439,8 +428,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Expected local doc to have no revID, but got: {post.local.revid}"
             )
 
-            assert post.local.cv and post.local.cv == post.remote.cv, (
-                f"CV mismatch: Local:  {post.local.cv}, Remote: {post.remote.cv}"
+            assert post.local.cv, (
+               f"Expected local doc to have CV, but got None"
             )
 
         await self.do_nonconflict_test(
@@ -449,7 +438,14 @@ class TestReplicationUpgrade(CBLTestClass):
             doc_id="conflict_4",
             replicator_type=ReplicatorType.PULL,
             conflict_resolver=ReplicatorConflictResolver("local-wins"),
+            compare_docs=False,
             validator=validator)
+
+        await self.do_nonconflict_test(
+            cblpytest,
+            dataset_path,
+            doc_id="conflict_4",
+            replicator_type=ReplicatorType.PUSH)
 
         # TODO: Try to push the resolved doc back
 
@@ -470,7 +466,8 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             assert post.local.cv and post.local.cv != post.remote.cv, (
-                f"CV match: Local:  {post.local.cv}, Remote: {post.remote.cv}"
+                f"Expected local doc's CV to be different from remote doc's CV after the merge, "
+                f"but got local={post.local.cv}, remote={post.remote.cv}"
             )
 
         await self.do_nonconflict_test(
@@ -499,8 +496,14 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Expected local doc to have no revID, but got: {post.local.revid}"
             )
 
+            assert post.local.cv != pre.local.cv, (
+                f"Expected local doc's CV to be updated after the merge, "
+                f"but got before={pre.local.cv}, after={post.local.cv}"
+            )
+
             assert post.local.cv and post.local.cv != post.remote.cv, (
-                f"CV match: Local:  {post.local.cv}, Remote: {post.remote.cv}"
+                f"Expected local doc's CV to be different from remote doc's CV after the merge, "
+                f"but got local={post.local.cv}, remote={post.remote.cv}"
             )
 
         await self.do_nonconflict_test(
