@@ -95,8 +95,12 @@ pipeline {
                     steps {
                         echo "=== Run Windows Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
+                            pwsh """  
+                                Write-Host "Current user: $env:USERNAME"  
+                                Write-Host "User profile: $env:USERPROFILE"  
+                                whoami  
+                            """
                             pwsh """
-                                whoami
                                 jenkins\\pipelines\\dev_e2e\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
                             """
                         }
