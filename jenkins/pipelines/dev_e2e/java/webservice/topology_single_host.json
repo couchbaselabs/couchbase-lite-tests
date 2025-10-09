@@ -1,5 +1,6 @@
 {
     "$schema": "../../../../../environment/aws/topology_setup/topology_schema.json",
+    "logslurp": false,
     "test_servers": [
         {
             "platform": "jak_webservice",
