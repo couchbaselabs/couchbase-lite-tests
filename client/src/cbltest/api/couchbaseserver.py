@@ -85,7 +85,7 @@ class CouchbaseServer:
                 ):
                     try:
                         if name != "_default":
-                            c.create_collection(CollectionSpec(name, scope))
+                            c.create_collection(scope_name=scope, collection_name=name)
                     except CollectionAlreadyExistsException:
                         pass
 

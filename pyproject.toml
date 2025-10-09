@@ -1,11 +1,23 @@
+[project]
+name = "couchbase-lite-tests"
+version = "0.1.0"
+requires-python = "==3.10.*"  # match jenkins
+dependencies = ["cbltest"]
+
 [tool.ruff]
 lint.extend-select = ["I"]
 lint.ignore = ["E402"]
 
 [tool.mypy]
 check_untyped_defs = true
-exclude = "conftest.py" # Exclude conftest.py, since these are duplicated across several test files
+exclude = "conftest.py"   # Exclude conftest.py, since these are duplicated across several test files
 
 [[tool.mypy.overrides]]
 module = "couchbase.*"
 ignore_missing_imports = true
+
+[tool.uv.workspace]
+members = ["client"]
+
+[tool.uv.sources]
+cbltest = { workspace = true }
