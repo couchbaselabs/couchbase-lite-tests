@@ -121,13 +121,13 @@ def start_container(
     env = os.environ.copy()
     env["DOCKER_CONTEXT"] = context_name
 
-    container_check = subprocess.run(  
-        ["docker", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"],  
-        check=True,  
-        capture_output=True,  
-        text=True,  
-        env=env,  
-    ) 
+    container_check = subprocess.run(
+        ["docker", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
 
     if container_check.stdout.strip() != "":
         if container_check.stdout.startswith("Up"):
