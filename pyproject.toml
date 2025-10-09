@@ -23,8 +23,8 @@ members = ["client"]
 cbltest = { workspace = true }
 
 [dependency-groups]
-dev = [
-    "click>=8.3.0",
-    "pyyaml>=6.0.3",
-    "tqdm>=4.67.1",
-]
+dev = ["click>=8.3.0", "pyyaml>=6.0.3", "tqdm>=4.67.1"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
