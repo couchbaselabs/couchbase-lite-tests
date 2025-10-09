@@ -320,7 +320,8 @@ public class ReplicatorManager extends BaseReplicatorManager {
             try {
                 replConfig = new ReplicatorConfiguration(
                         CollectionConfiguration.fromCollections(Set.of(db.getDefaultCollection())),
-                        endpoint);
+                        endpoint
+                );
             } catch (CouchbaseLiteException e) {
                 throw new ClientError("No collection found");
             }
@@ -357,7 +358,6 @@ public class ReplicatorManager extends BaseReplicatorManager {
         final TypedMap headers = config.getMap(KEY_HEADERS);
 
         if (headers != null) {
-            android.util.Log.d("Aniket", "Header not null");
             final Map<String, String> headerMap = new HashMap<>();
             for (String key : headers.getKeys()) {
                 final String value = headers.getString(key);
