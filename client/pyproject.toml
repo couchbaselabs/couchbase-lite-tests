@@ -98,3 +98,7 @@ include = [
 packages = [
     "src/cbltest"
 ]
+
+[tool.pyright]
+venv = ".venv"
+venvPath = "../."
