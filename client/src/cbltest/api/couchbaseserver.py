@@ -20,7 +20,6 @@ from couchbase.exceptions import (
     ScopeAlreadyExistsException,
 )
 from couchbase.management.buckets import CreateBucketSettings
-from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import CreatePrimaryQueryIndexOptions
 from couchbase.options import ClusterOptions
 from opentelemetry.trace import get_tracer
