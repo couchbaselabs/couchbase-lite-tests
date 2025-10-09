@@ -64,6 +64,7 @@ pipeline {
                         echo "=== Run OSX Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
+                                whoami
                                 jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ~/.ssh/jborden.pem
                             """
                         }
