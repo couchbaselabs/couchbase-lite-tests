@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 from opentelemetry.trace import get_tracer
 
@@ -62,20 +62,24 @@ def compare_doc_results(
     local: list[AllDocumentsEntry],
     remote: list[AllDocumentsResponseRow],
     mode: ReplicatorType,
+    docIDs: set[str] | None = None,
+    skipCompareRevs: bool = False
 ) -> DocsCompareResult:
     """
     Checks for consistency between a list of local documents and a list of remote documents, accounting
     for the mode of replication that was run.  For PUSH_AND_PULL, the document count must match exactly,
     along with the contents.  For PUSH, the local list is consulted and the remote list is checked,
     and vice-versa for PULL (to account for other pre-existing documents that have not been synced
-    due to the non bi-directional mode)
+    due to the non bi-directional mode). If `docIDs` is provided, only those documents are compared.
 
     :param local: The list of documents from the local side (Couchbase Lite)
     :param remote: The list of documents from the remote side (Sync Gateway)
     :param mode: The mode of replication that was run.
+    :param docIDs: Optional set of document IDs to restrict the comparison to.
     """
     with _test_function_tracer.start_as_current_span("compare_doc_results"):
-        if mode == ReplicatorType.PUSH_AND_PULL and len(local) != len(remote):
+        # No filtering: for full sync, counts must match exactly
+        if not docIDs and mode == ReplicatorType.PUSH_AND_PULL and len(local) != len(remote) :
             return DocsCompareResult(
                 False,
                 f"Local count {len(local)} did not match remote count {len(remote)}",
@@ -85,10 +89,21 @@ def compare_doc_results(
         remote_dict: dict[str, list[str | None]] = {}
 
         for local_entry in local:
+            if docIDs and local_entry.id not in docIDs:
+                continue
             local_dict[local_entry.id] = local_entry.rev
 
         for remote_entry in remote:
+            if docIDs and remote_entry.id not in docIDs:
+                continue
             remote_dict[remote_entry.id] = [remote_entry.revid, remote_entry.cv]
+
+        # With filtering: for full sync, filtered counts should match
+        if docIDs and mode == ReplicatorType.PUSH_AND_PULL and len(local_dict) != len(remote_dict):
+            return DocsCompareResult(
+                False,
+                f"Filtered local count {len(local_dict)} did not match filtered remote count {len(remote_dict)}",
+            )
 
         source: dict[str, Any]
         dest: dict[str, Any]
@@ -103,23 +118,24 @@ def compare_doc_results(
             source_name = "remote"
             dest_name = "local"
 
-        for id in source:
-            if id not in dest:
+        for doc_id in source:
+            if doc_id not in dest:
                 return DocsCompareResult(
-                    False, f"Doc '{id}' present in {source_name} but not {dest_name}"
+                    False, f"Doc '{doc_id}' present in {source_name} but not {dest_name}"
                 )
 
-            if not _compare_revisions(local_dict[id], remote_dict[id]):
+            if not skipCompareRevs and not _compare_revisions(local_dict[doc_id], remote_dict[doc_id]):
                 return DocsCompareResult(
                     False,
-                    f"Doc '{id}' mismatched revid ({source_name}: {source[id]}, {dest_name}: {dest[id]})",
+                    f"Doc '{doc_id}' mismatched revid ({source_name}: {source[doc_id]}, {dest_name}: {dest[doc_id]})",
                 )
 
         return DocsCompareResult(True)
 
 
 def compare_doc_results_p2p(
-    local: list[AllDocumentsEntry], remote: list[AllDocumentsEntry]
+    local: list[AllDocumentsEntry],
+    remote: list[AllDocumentsEntry]
 ) -> DocsCompareResult:
     local_dict: dict[str, str] = {entry.id: entry.rev for entry in local}
     remote_dict: dict[str, str] = {entry.id: entry.rev for entry in remote}
@@ -145,6 +161,8 @@ async def compare_local_and_remote(
     mode: ReplicatorType,
     bucket: str,
     collections: list[str],
+    docIDs: set[str] | None = None,
+    skipCompareRevs: bool = False,
 ) -> None:
     """
     Checks the specified collections for consistency between local and remote, using the
@@ -161,6 +179,6 @@ async def compare_local_and_remote(
             )
             sg_all_docs = await remote.get_all_documents(bucket, split[0], split[1])
             compare_result = compare_doc_results(
-                lite_all_docs[collection], sg_all_docs.rows, mode
+                lite_all_docs[collection], sg_all_docs.rows, mode, docIDs, skipCompareRevs
             )
             assert compare_result.success, f"{compare_result.message} ({collection})"

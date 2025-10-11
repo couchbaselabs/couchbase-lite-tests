@@ -1,6 +1,9 @@
 # macOS:
 .DS_Store
 
+# Any temp files
+.tmp
+
 # python
 __pycache__
 venv

@@ -317,7 +317,6 @@ class CouchbaseServer:
                             "hostname": target.__hostname,
                             "name": target.__hostname,
                             "demandEncryption": 0,
-                            "mobile": "active",
                         },
                     )
                     resp.raise_for_status()
@@ -351,6 +350,7 @@ class CouchbaseServer:
                             "toBucket": bucket_name,
                             "replicationType": "continuous",
                             "compressionLevel": "Auto",
+                            "mobile": "active",
                         },
                     )
                     resp.raise_for_status()
