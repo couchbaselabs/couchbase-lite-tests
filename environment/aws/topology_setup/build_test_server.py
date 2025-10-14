@@ -97,11 +97,11 @@ def main() -> None:
         click.secho("Upload not requested, skipping", fg="yellow")
         exit(0)
 
-    if upload_exists(server):
-        click.secho(
-            "Server already exists on latestbuilds, skipping upload", fg="yellow"
-        )
-        exit(0)
+    #if upload_exists(server):
+    #    click.secho(
+    #        "Server already exists on latestbuilds, skipping upload", fg="yellow"
+    #    )
+    #    exit(0)
 
     if "LATESTBUILDS_PASSWORD" not in os.environ:
         click.secho("LATESTBUILDS_PASSWORD env var is not set", fg="red")
