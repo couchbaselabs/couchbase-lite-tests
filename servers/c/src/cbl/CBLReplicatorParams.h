@@ -8,6 +8,7 @@
 
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace ts::cbl {
@@ -57,6 +58,7 @@ namespace ts::cbl {
         bool enableDocumemntListener{false};
         bool enableAutoPurge{true};
         std::optional<std::string> pinnedServerCert;
+        std::optional<std::unordered_map<std::string, std::string>> headers;
     };
 
     struct ReplicationCollection {
