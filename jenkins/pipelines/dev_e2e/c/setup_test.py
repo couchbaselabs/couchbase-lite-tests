@@ -36,7 +36,7 @@ def cli_entry(
         cbl_version,
         sgw_version,
         SCRIPT_DIR / "topologies" / f"topology_single_{platform}.json",
-        SCRIPT_DIR / "config.c.json",
+        SCRIPT_DIR / "config.json",
         f"c_{platform}",
         private_key,
     )
