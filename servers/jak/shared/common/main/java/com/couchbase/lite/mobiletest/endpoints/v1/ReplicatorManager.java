@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -44,10 +45,13 @@ import com.couchbase.lite.Conflict;
 import com.couchbase.lite.ConflictResolver;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
+import com.couchbase.lite.Dictionary;
 import com.couchbase.lite.Document;
 import com.couchbase.lite.DocumentReplication;
 import com.couchbase.lite.MutableArray;
+import com.couchbase.lite.MutableDictionary;
 import com.couchbase.lite.MutableDocument;
+import com.couchbase.lite.PeerInfo;
 import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.ReplicatorConfiguration;
@@ -55,6 +59,7 @@ import com.couchbase.lite.ReplicatorStatus;
 import com.couchbase.lite.ReplicatorType;
 import com.couchbase.lite.SessionAuthenticator;
 import com.couchbase.lite.URLEndpoint;
+import com.couchbase.lite.android.mobiletest.endpoints.v1.MultipeerReplicatorManager;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
@@ -167,6 +172,58 @@ public class ReplicatorManager extends BaseReplicatorManager {
         }
     }
 
+    private static class MergeDictResolver implements ConfigurableConflictResolver {
+        private static final String KEY_PROPERTY = "property";
+
+        private static final Set<String> MERGE_DICT_RESOLVER_KEYS = Set.of(KEY_PROPERTY);
+
+        private String docProp;
+
+        @Override
+        public void configure(@Nullable TypedMap config) {
+            if (config == null) { throw new ClientError("Merge resolver requires configuration"); }
+
+            config.validate(MERGE_DICT_RESOLVER_KEYS);
+
+            final String prop = config.getString(KEY_PROPERTY);
+            if (prop == null) { throw new ClientError("Merge resolver requires a property name"); }
+
+            docProp = prop;
+        }
+
+        @Nullable
+        @Override
+        public Document resolve(@NonNull Conflict conflict) {
+            final Document localDoc = conflict.getLocalDocument();
+            final Document remoteDoc = conflict.getRemoteDocument();
+            if ((localDoc == null) || (remoteDoc == null)) { return null; }
+
+            final MutableDocument doc = remoteDoc.toMutable();
+
+            final Dictionary localDict = localDoc.getDictionary(docProp);
+            final Dictionary remoteDict = remoteDoc.getDictionary(docProp);
+            if(localDict == null || remoteDict == null) {
+                return doc.setString(docProp, "Both values are not dictionary");
+            }
+
+            final MutableDictionary mergedDict = new MutableDictionary();
+            for(String key : localDict) {
+                mergedDict.setValue(docProp, localDict.getValue(key));
+            }
+
+            for(String key : remoteDict) {
+                final Object remoteValue = remoteDict.getValue(key);
+                if(mergedDict.contains(key) && !Objects.equals(remoteValue, mergedDict.getValue(key))) {
+                    return doc.setString(key, String.format("Conflicting values found at key named %s", key));
+                }
+
+                mergedDict.setValue(docProp, remoteValue);
+            }
+
+            return doc.setDictionary(docProp, mergedDict);
+        }
+    }
+
     private static final Set<String> LEGAL_CREATE_KEYS;
     static {
         final Set<String> l = new HashSet<>();
@@ -221,15 +278,13 @@ public class ReplicatorManager extends BaseReplicatorManager {
         LEGAL_SESSION_AUTH_KEYS = Collections.unmodifiableSet(l);
     }
 
-    private static final Map<String, Supplier<ConfigurableConflictResolver>> CONFLICT_RESOLVER_FACTORIES;
-    static {
-        final Map<String, Supplier<ConfigurableConflictResolver>> m = new HashMap<>();
-        m.put("local-wins", LocalWinsResolver::new);
-        m.put("remote-wins", RemoteWinsResolver::new);
-        m.put("delete", DeleteResolver::new);
-        m.put("merge", MergeResolver::new);
-        CONFLICT_RESOLVER_FACTORIES = Collections.unmodifiableMap(m);
-    }
+    private static final Map<String, Supplier<ConfigurableConflictResolver>> CONFLICT_RESOLVER_FACTORIES = Map.of(
+            "local-wins", LocalWinsResolver::new,
+            "remote-wins", RemoteWinsResolver::new,
+            "delete", DeleteResolver::new,
+            "merge", MergeResolver::new,
+            "merge-dict", MergeDictResolver::new
+    );
 
     @NonNull
     private final ReplicatorService replSvc;
