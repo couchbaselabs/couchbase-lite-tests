@@ -145,6 +145,7 @@ async def compare_local_and_remote(
     mode: ReplicatorType,
     bucket: str,
     collections: list[str],
+    doc_ids: list[str] | None = None,
 ) -> None:
     """
     Checks the specified collections for consistency between local and remote, using the
@@ -160,7 +161,15 @@ async def compare_local_and_remote(
                 f"Invalid collection name in compare_local_and_remote: {collection}"
             )
             sg_all_docs = await remote.get_all_documents(bucket, split[0], split[1])
+
+            lite_docs = lite_all_docs[collection]
+            sg_docs = sg_all_docs.rows
+
+            if doc_ids is not None:
+                lite_docs = [entry for entry in lite_docs if entry.id in doc_ids]
+                sg_docs = [entry for entry in sg_docs if entry.id in doc_ids]
+
             compare_result = compare_doc_results(
-                lite_all_docs[collection], sg_all_docs.rows, mode
+                lite_docs, sg_docs, mode
             )
             assert compare_result.success, f"{compare_result.message} ({collection})"

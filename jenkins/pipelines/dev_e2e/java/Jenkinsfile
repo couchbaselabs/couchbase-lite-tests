@@ -90,6 +90,7 @@ pipeline {
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'windows_desktop'
+                        TDK_NO_LS_PROVISION = 'true'
                     }
                     steps {
                         echo "=== Run Windows Desktop Tests"
@@ -181,6 +182,7 @@ pipeline {
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'windows_webservice'
+                        TDK_NO_LS_PROVISION = 'true'
                     }
                     steps {
                         echo "=== Run Windows Web Service Tests"

@@ -1,0 +1,27 @@
+{
+  "config": {
+    "bucket": "upgrade",
+    "scopes": {
+      "_default": {
+        "collections": {
+          "_default": {
+            "sync": "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
+          }
+        }
+      }
+    },
+    "num_index_replicas": 0
+  },
+  "users": {
+    "user1": {
+      "password": "pass",
+      "collection_access": {
+        "_default": {
+          "_default": {
+            "admin_channels": ["*"]
+          }
+        }
+      }
+    }
+  }
+}
