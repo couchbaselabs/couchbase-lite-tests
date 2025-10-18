@@ -11,12 +11,18 @@ class _HttpLogWriter:
     __fname_prefix: str
     __folder_name: str
 
+    @property
+    def num(self) -> int:
+        """Gets the number of this log writer"""
+        return self.__num
+
     def __init__(self, num: int):
         test_name = CBLPyTestGlobal.running_test_name
         if test_name.startswith("test_"):
             test_name = test_name[5:]
 
         mod_num = num % 100
+        self.__num = num
         self.__fname_prefix = f"{mod_num:02d}_{test_name}"
         self.__folder_name = f"{(num // 100) * 100:08d}"
 

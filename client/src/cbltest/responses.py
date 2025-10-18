@@ -42,6 +42,11 @@ class TestServerResponse(JSONSerializable):
         """Gets the error sent by the remote server, if any"""
         return self.__error
 
+    @property
+    def status_code(self) -> int:
+        """Gets the HTTP status code of the response"""
+        return self.__status_code
+
     def __init__(
         self,
         status_code: int,
