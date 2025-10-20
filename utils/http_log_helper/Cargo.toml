@@ -1,0 +1,13 @@
+[package]
+edition = "2024"
+name = "http_log_helper"
+version = "0.1.0"
+authors = ["Couchbase, Inc."]
+description = "A tool for inspecting http_log folder contents"
+license = "Apache-2.0"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+indicatif = "0.17.11"
+tabled = "0.20.0"
+walkdir = "2"
