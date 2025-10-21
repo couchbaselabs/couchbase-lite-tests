@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from json import dumps
+from re import match
 from typing import Any, Final, cast
 
 from opentelemetry.trace import get_tracer
@@ -294,6 +295,36 @@ class GetDocumentResult:
     def body(self) -> dict[str, Any]:
         """Gets the body of the document"""
         return self.__body
+
+    @property
+    def revid(self) -> str | None:
+        """
+        If the current version looks like a rev-tree style 'N-xxxx', return it,
+        otherwise return None.
+        """
+        current = self.__current_version()
+        # rev-tree is assumed to be number-dash-anything
+        return current if match(r"^\d+-", current) else None
+
+    @property
+    def cv(self) -> str | None:
+        """
+        If the current version looks like a version-vector (contains '@'),
+        return it, otherwise return None.
+        """
+        current = self.__current_version()
+        return current if "@" in current else None
+
+    def __current_version(self) -> str:
+        """
+        Returns the first (current) version string.
+        Handles both rev-tree and version-vector formats.
+        """
+        # Replace semicolons with commas, then split
+        parts = [
+            p.strip() for p in self.__revs.replace(";", ",").split(",") if p.strip()
+        ]
+        return parts[0] if parts else ""
 
     def __init__(self, raw: dict[str, Any]) -> None:
         assert self.__id_key in raw and self.__revs_key in raw, (

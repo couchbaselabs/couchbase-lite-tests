@@ -195,7 +195,7 @@ def write_config(
                     {
                         "url": f"http://{ts.ip_address}:{port}",
                         # TODO: Convert all test servers to URLs to this is not needed
-                        "dataset_version": "3.2",
+                        "dataset_version": ts.dataset_version,
                     }
                 )
 
