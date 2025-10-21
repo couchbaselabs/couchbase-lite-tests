@@ -169,7 +169,5 @@ async def compare_local_and_remote(
                 lite_docs = [entry for entry in lite_docs if entry.id in doc_ids]
                 sg_docs = [entry for entry in sg_docs if entry.id in doc_ids]
 
-            compare_result = compare_doc_results(
-                lite_docs, sg_docs, mode
-            )
+            compare_result = compare_doc_results(lite_docs, sg_docs, mode)
             assert compare_result.success, f"{compare_result.message} ({collection})"

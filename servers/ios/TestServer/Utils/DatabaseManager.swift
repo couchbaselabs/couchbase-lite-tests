@@ -141,7 +141,37 @@ class DatabaseManager {
             throw TestServerError.badRequest("Endpoint URL is not a valid URL.")
         }
         
-        var replConfig = ReplicatorConfiguration(target: URLEndpoint(url: endpointURL))
+        var replConfig: ReplicatorConfiguration
+        var collectionsConfig: [CollectionConfiguration] = []
+        if config.collections.count > 0 {
+            for configColl in config.collections {
+                let _ = try configColl.names.map({ collName in
+                    guard let collection = try collection(collName, inDB: database)
+                    else {
+                        Log.log(level: .error, message: "Failed to start Replicator, Collection '\(collName)' does not exist in \(config.database).")
+                        throw TestServerError.badRequest("Collection '\(collName)' does not exist in \(config.database).")
+                    }
+                    var collConfig = CollectionConfiguration(collection: collection)
+                    collConfig.channels = configColl.channels
+                    collConfig.documentIDs = configColl.documentIDs
+                    if let pullFilter = configColl.pullFilter {
+                        collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter).toReplicationFilter()
+                    }
+                    if let pushFilter = configColl.pushFilter {
+                        collConfig.pushFilter = try DatabaseManager.getCBLReplicationFilter(from: pushFilter).toReplicationFilter()
+                    }
+                    if let resolver = configColl.conflictResolver {
+                        collConfig.conflictResolver = try DatabaseManager.getCBLReplicationConflictResolver(from: resolver)
+                    }
+                    collectionsConfig.append(collConfig)
+                    return collConfig
+                })
+            }
+            replConfig = ReplicatorConfiguration(collections: collectionsConfig, target: URLEndpoint(url: endpointURL))
+        } else {
+            let defaultColConfig = CollectionConfiguration(collection: try database.defaultCollection())
+            replConfig = ReplicatorConfiguration(collections: [defaultColConfig], target: URLEndpoint(url: endpointURL))
+        }
         
         switch(config.replicatorType) {
         case .push:
@@ -160,40 +190,25 @@ class DatabaseManager {
             replConfig.authenticator = try DatabaseManager.getCBLAuthenticator(from: auth)
         }
         
+        if let headersString = config.headers {
+            // Decode as [String: String] as per CBL type
+            if let data = headersString.data(using: .utf8) {
+                do {
+                    let decoded = try JSONDecoder().decode([String: String].self, from: data)
+                    replConfig.headers = decoded
+                } catch {
+                    throw TestServerError.badRequest("Invalid headers. Must be a JSON object with string key-value pairs with single quotes." )
+                }
+            } else {
+                replConfig.headers = nil
+            }
+        }
+        
         if let pinnedCert = config.pinnedServerCert {
             guard let cert = CertUtil.certificate(from: pinnedCert) else {
                 throw TestServerError.badRequest("Pinned server cert has invalid format.")
             }
             replConfig.pinnedServerCertificate = cert
-        }
-        
-        if config.collections.count > 0 {
-            for configColl in config.collections {
-                let collections = try configColl.names.map({ collName in
-                    guard let collection = try collection(collName, inDB: database)
-                    else {
-                        Log.log(level: .error, message: "Failed to start Replicator, Collection '\(collName)' does not exist in \(config.database).")
-                        throw TestServerError.badRequest("Collection '\(collName)' does not exist in \(config.database).")
-                    }
-                    return collection
-                })
-                
-                var collConfig = CollectionConfiguration()
-                collConfig.channels = configColl.channels
-                collConfig.documentIDs = configColl.documentIDs
-                if let pullFilter = configColl.pullFilter {
-                    collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter).toReplicationFilter()
-                }
-                if let pushFilter = configColl.pushFilter {
-                    collConfig.pushFilter = try DatabaseManager.getCBLReplicationFilter(from: pushFilter).toReplicationFilter()
-                }
-                if let resolver = configColl.conflictResolver {
-                    collConfig.conflictResolver = try DatabaseManager.getCBLReplicationConflictResolver(from: resolver)
-                }
-                replConfig.addCollections(collections, config: collConfig)
-            }
-        } else {
-            replConfig.addCollection(try database.defaultCollection())
         }
         
         let replicatorID = UUID()

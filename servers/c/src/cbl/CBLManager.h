@@ -83,7 +83,7 @@ namespace ts::cbl {
 
         /// Listener
 
-        std::string startListener(const std::string &database, std::vector<std::string>collections, int port);
+        std::string startListener(const std::string &database, const std::vector<std::string>&collections, int port);
 
         CBLURLEndpointListener *listener(const std::string &id);
 

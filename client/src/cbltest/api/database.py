@@ -321,18 +321,10 @@ class GetDocumentResult:
         Handles both rev-tree and version-vector formats.
         """
         # Replace semicolons with commas, then split
-        parts = [p.strip() for p in self.__revs.replace(";", ",").split(",") if p.strip()]
+        parts = [
+            p.strip() for p in self.__revs.replace(";", ",").split(",") if p.strip()
+        ]
         return parts[0] if parts else ""
-
-    def __init__(self, raw: dict[str, Any]) -> None:
-        assert self.__id_key in raw and self.__revs_key in raw, (
-            "Malformed raw dict in GetDocumentResult"
-        )
-        self.__id = raw[self.__id_key]
-        self.__revs = raw[self.__revs_key]
-        raw.pop(self.__id_key)
-        raw.pop(self.__revs_key)
-        self.__body = raw
 
     def __init__(self, raw: dict[str, Any]) -> None:
         assert self.__id_key in raw and self.__revs_key in raw, (
