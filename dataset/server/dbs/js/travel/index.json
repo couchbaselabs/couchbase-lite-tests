@@ -1,0 +1,8 @@
+{
+    "name": "travel",
+    "collections": [
+        "travel.airlines",
+        "travel.hotels",
+        "travel.routes"
+    ]
+}
