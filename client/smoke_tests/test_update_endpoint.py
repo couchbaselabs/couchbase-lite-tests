@@ -1,15 +1,14 @@
 import pytest
 from cbltest import CBLPyTest
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
 from cbltest.api.error import CblTestServerBadResponseError
-from cbltest.globals import CBLPyTestGlobal
+from cbltest.responses import ServerVariant
 
 
-class TestUpdateDatabase:
+class TestUpdateDatabase(CBLTestClass):
     def setup_method(self, method) -> None:
-        # If writing a new test do not forget this step or the test server
-        # will not be informed about the currently running test
-        CBLPyTestGlobal.running_test_name = method.__name__
+        super().setup_method(method)
 
         self.db: Database | None = None
 
@@ -42,6 +41,14 @@ class TestUpdateDatabase:
         ],
     )
     async def test_bad_updates(self, cblpytest: CBLPyTest, attempt: str) -> None:
+        self.mark_test_step(f"Testing bad update with path: {attempt}")
+
+        # JS can accept negative numbers in paths to count from the end
+        if "-1" in attempt:
+            await self.skip_if_not_platform(
+                cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS
+            )
+
         if self.db is None:
             self.db = (
                 await cblpytest.test_servers[0].create_and_reset_db(
@@ -89,6 +96,13 @@ class TestUpdateDatabase:
         ],
     )
     async def test_good_updates(self, cblpytest: CBLPyTest, attempt: str) -> None:
+        # The JS test server doesn't support escapes
+        if "\\" in attempt:
+            await self.skip_if_not_platform(
+                cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS
+            )
+
+        self.mark_test_step(f"Testing good update with path: {attempt}")
         if self.db is None:
             self.db = (
                 await cblpytest.test_servers[0].create_and_reset_db(

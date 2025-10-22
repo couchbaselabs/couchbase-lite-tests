@@ -15,6 +15,8 @@ class ServerVariant(Flag):
     DOTNET = auto()
     IOS = auto()
     JVM = auto()
+    JS = auto()
+    ALL = ANDROID | C | DOTNET | IOS | JVM | JS
 
     def __str__(self) -> str:
         return "|".join(
@@ -117,6 +119,8 @@ class GetRootResponse(TestServerResponse):
             elif self.__cbl == "couchbase-lite-swift":
                 # Treat the new Swift-based test server variant as iOS for compatibility.
                 return ServerVariant.IOS
+            elif self.__cbl == "couchbase-lite-js":
+                return ServerVariant.JS
             else:
                 raise ValueError(f"Unknown test server variant: {self.__cbl}")
 
