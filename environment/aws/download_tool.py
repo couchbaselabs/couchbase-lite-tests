@@ -38,15 +38,12 @@ _LINUX: Final[str] = "linux"
 TMP_LOCATION: Final[Path] = SCRIPT_DIR / ".tmp"
 
 
+# CLI entry point
 @click.command()
 @click.argument("name", type=click.Choice([a.value for a in ToolName]), required=True)
 @click.argument("version", type=str, required=True)
 def main(name: str, version: str):
-    header(f"Downloading {name} v{version}")
-    TMP_LOCATION.mkdir(parents=True, exist_ok=True)
-    choice = ToolName(name)
-    if choice == ToolName.BackupManager:
-        download_cbbackupmgr(version)
+    download_tool(ToolName(name), version)
 
 
 def _get_os() -> str:
@@ -84,6 +81,16 @@ def _extract(location: Path) -> None:
         unzip_directory(location, location.parent)
     else:
         untar_directory(location, location.parent)
+
+
+# Entry for other scripts to call
+def download_tool(name: ToolName, version: str):
+    header(f"Downloading {name.value} v{version}")
+    TMP_LOCATION.mkdir(parents=True, exist_ok=True)
+    if name == ToolName.BackupManager:
+        download_cbbackupmgr(version)
+    else:
+        raise RuntimeError(f"Unsupported tool: {name.value}")
 
 
 def download_cbbackupmgr(version: str):
@@ -126,7 +133,7 @@ def download_cbbackupmgr(version: str):
         )
 
     # Choose the first match
-    src_path = matches[0]
+    src_path = next(match for match in matches if match.is_file())
     shutil.copy2(src_path, location)
     shutil.rmtree(TMP_LOCATION)
 
