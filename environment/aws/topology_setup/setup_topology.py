@@ -59,7 +59,7 @@ class DefaultProperty:
 class CouchbaseServerDefaults:
     __cbs_key: Final[str] = "cbs"
     __version_key: Final[str] = "version"
-    __default_version: Final[str] = "7.6.4"
+    __default_version: Final[str] = "7.6.7"
 
     @property
     def version(self) -> DefaultProperty:
@@ -80,7 +80,7 @@ class CouchbaseServerDefaults:
 class SyncGatewayDefaults:
     __sgw_key: Final[str] = "sgw"
     __version_key: Final[str] = "version"
-    __default_version: Final[str] = "3.2.2"
+    __default_version: Final[str] = "4.0.0"
 
     @property
     def version(self) -> DefaultProperty:
@@ -571,7 +571,7 @@ class TopologyConfig:
                         TestServerInput(
                             raw_server["location"],
                             raw_server["cbl_version"],
-                            raw_server.get("dataset_version", "3.2"),
+                            raw_server.get("dataset_version", "4.0"),
                             raw_server["platform"],
                             cast(bool, raw_server.get("download", False)),
                             ip_hint=raw_server.get("ip_hint"),
