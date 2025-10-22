@@ -18,7 +18,7 @@ from typing import Any, cast
 import click
 import requests
 
-from environment.aws.download_tool import main as download_tool, ToolName
+from environment.aws.download_tool import download_tool, ToolName
 from environment.aws.start_backend import script_entry as start_backend
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
@@ -159,7 +159,7 @@ def setup_test_multi(
         with open(topology_file_out, "w") as fout:
             json.dump(topology, fout, indent=4)
 
-    download_tool.callback(ToolName.BackupManager.value, couchbase_server_version)
+    download_tool(ToolName.BackupManager, couchbase_server_version)
     
     topology_obj = TopologyConfig(str(topology_file_out))
     start_backend(
@@ -169,7 +169,7 @@ def setup_test_multi(
         private_key=private_key,
         tdk_config_out=str(config_file_out),
     )
-    
+
 
 def setup_test(
     cbl_version: str,
