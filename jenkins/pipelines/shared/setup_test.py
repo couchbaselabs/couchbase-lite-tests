@@ -18,6 +18,7 @@ from typing import Any, cast
 import click
 import requests
 
+from environment.aws.download_tool import main as download_tool, ToolName
 from environment.aws.start_backend import script_entry as start_backend
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
@@ -114,6 +115,8 @@ def setup_test_multi(
         f"Output file {config_file_out} already exists and is not writeable."
     )
 
+    couchbase_server_version = resolved_version("couchbase-server", couchbase_version)
+
     with open(topology_file_in) as fin:
         topology = cast(dict[str, Any], json.load(fin))
         topology["$schema"] = "topology_schema.json"
@@ -140,7 +143,7 @@ def setup_test_multi(
 
         topology["defaults"] = {
             "cbs": {
-                "version": resolved_version("couchbase-server", couchbase_version),
+                "version": couchbase_server_version
             },
             "sgw": {
                 "version": resolved_version("sync-gateway", sgw_version),
@@ -156,6 +159,8 @@ def setup_test_multi(
         with open(topology_file_out, "w") as fout:
             json.dump(topology, fout, indent=4)
 
+    download_tool.callback(ToolName.BackupManager.value, couchbase_server_version)
+    
     topology_obj = TopologyConfig(str(topology_file_out))
     start_backend(
         topology_obj,
@@ -164,7 +169,7 @@ def setup_test_multi(
         private_key=private_key,
         tdk_config_out=str(config_file_out),
     )
-
+    
 
 def setup_test(
     cbl_version: str,
