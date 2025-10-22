@@ -79,9 +79,9 @@ class RequestFactory:
         self.__version = available_api_version(config.api_version)
         self.__server_infos: list[tuple[str, TransportType]] = []
         self.__session = ClientSession()
+        ws_urls: list[str] = []
         for ts in config.test_servers:
             transport = cast(str, ts.get("transport", TransportType.HTTP.value)).lower()
-            ws_urls: list[str] = []
             next_url = cast(str, ts.get("url"))
             if transport == TransportType.HTTP.value:
                 self.__server_infos.append((next_url, TransportType.HTTP))
