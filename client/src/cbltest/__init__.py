@@ -70,6 +70,7 @@ class CBLPyTest:
         test_server_only: bool = False,
     ):
         ret_val = CBLPyTest(config_path, log_level, extra_props_path, test_server_only)
+        await ret_val.request_factory.start()
         cbl_log_init(str(ret_val.request_factory.uuid), ret_val.config.logslurp_url)
 
         ts_index = 0

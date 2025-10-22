@@ -1,0 +1,31 @@
+{
+  "name": "@couchbase/test-server",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/couchbaselabs/couchbase-lite-tests.git"
+  },
+  "displayName": "Couchbase Lite Test Server for JavaScript",
+  "type": "module",
+  "version": "1.2.2",
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest --run",
+    "test:browser": "vitest --run --browser",
+    "test:watch": "vitest --watch",
+    "lint": "eslint src",
+    "lint:fix": "eslint --fix src"
+  },
+  "dependencies": {
+    "@couchbase/lite-js": "^1.0.0-3"
+  },
+  "devDependencies": {
+    "@stylistic/eslint-plugin": "^4.4.1",
+    "@types/node": "^22.17.0",
+    "@vitest/browser": "^3.2.4",
+    "playwright": "^1.54.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.39.0",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  }
+}

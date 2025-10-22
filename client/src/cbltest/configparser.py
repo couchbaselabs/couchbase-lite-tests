@@ -1,3 +1,4 @@
+from enum import Enum
 from json import dumps, load
 from pathlib import Path
 from typing import Final
@@ -116,6 +117,11 @@ class CouchbaseServerInfo:
         self.__admin_password: str = _get_str_or_default(
             data, self.__admin_password_key, "password"
         )
+
+
+class TransportType(Enum):
+    HTTP = "http"
+    WS = "ws"
 
 
 class ParsedConfig:

@@ -1,0 +1,150 @@
+{"_id":"airline_1","callsign":"MILE-AIR","icao":"MLA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"Q5","name":"40-Mile Air","oid":10}
+{"_id":"airline_10","callsign":"ALLEGHENY","icao":"ALO","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"Allegheny Commuter Airlines","oid":287}
+{"_id":"airline_100","callsign":null,"icao":"HA1","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"H1","name":"Hankook Air US","oid":16735}
+{"_id":"airline_101","callsign":"FLYSTAR","icao":"AEU","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"5W","name":"Astraeus","oid":112}
+{"_id":"airline_102","callsign":"SWALLOW","icao":"WOW","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":null,"name":"Air Southwest","oid":492}
+{"_id":"airline_103","callsign":"AYLINE","icao":"AUR","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"GR","name":"Aurigny Air Services","oid":508}
+{"_id":"airline_104","callsign":"RED DRAGON","icao":"AWW","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"6G","name":"Air Wales","oid":565}
+{"_id":"airline_105","callsign":"FLIGHTVUE","icao":"VUE","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":null,"name":"AD Aviation","oid":665}
+{"_id":"airline_106","callsign":"FOYLE","icao":"UPA","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"GS","name":"Air Foyle","oid":690}
+{"_id":"airline_107","callsign":"SPEEDBIRD","icao":"BAW","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"BA","name":"British Airways","oid":1355}
+{"_id":"airline_108","callsign":"BRINTEL","icao":"BIH","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"BS","name":"British International Helicopters","oid":1411}
+{"_id":"airline_109","callsign":"MIDLAND","icao":"BMA","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"BD","name":"bmi","oid":1437}
+{"_id":"airline_11","callsign":"AIR SUNSHINE","icao":"RSI","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"Air Sunshine","oid":295}
+{"_id":"airline_110","callsign":"BABY","icao":"BMI","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"WW","name":"bmibaby","oid":1441}
+{"_id":"airline_111","callsign":null,"icao":"BMR","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":null,"name":"British Midland Regional","oid":1445}
+{"_id":"airline_112","callsign":"BEE MED","icao":"LAJ","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"KJ","name":"British Mediterranean Airways","oid":1543}
+{"_id":"airline_113","callsign":"FLYER","icao":"CFE","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"CJ","name":"BA CityFlyer","oid":1795}
+{"_id":"airline_114","callsign":"CREST","icao":"CAN","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":null,"name":"Crest Aviation","oid":1923}
+{"_id":"airline_115","callsign":"EASTFLIGHT","icao":"EZE","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"T3","name":"Eastern Airways","oid":2117}
+{"_id":"airline_116","callsign":"EXPO","icao":"XLA","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"JN","name":"Excel Airways","oid":2264}
+{"_id":"airline_117","callsign":"HELI EXCEL","icao":"XEL","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":null,"name":"Excel Charter","oid":2265}
+{"_id":"airline_118","callsign":"EASY","icao":"EZY","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"U2","name":"easyJet","oid":2297}
+{"_id":"airline_119","callsign":"JETSET","icao":"FCA","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"DP","name":"First Choice Airways","oid":2357}
+{"_id":"airline_12","callsign":"AMTRAN","icao":"AMT","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"ATA Airlines","oid":315}
+{"_id":"airline_120","callsign":"FLIGHTLINE","icao":"FLT","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"B5","name":"Flightline","oid":2395}
+{"_id":"airline_121","callsign":"JERSEY","icao":"BEE","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"BE","name":"Flybe","oid":2421}
+{"_id":"airline_122","callsign":"GLOBESPAN","icao":"GSM","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"B4","name":"Flyglobespan","oid":2425}
+{"_id":"airline_123","callsign":"GEEBEE AIRWAYS","icao":"GBL","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"GT","name":"GB Airways","oid":2486}
+{"_id":"airline_124","callsign":"HIWAY","icao":"HWY","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":null,"name":"Highland Airways","oid":2761}
+{"_id":"airline_125","callsign":"CHANNEX","icao":"EXS","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"LS","name":"Jet2.com","oid":3026}
+{"_id":"airline_126","callsign":"MONARCH","icao":"MON","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"ZB","name":"Monarch Airlines","oid":3532}
+{"_id":"airline_127","callsign":"KESTREL","icao":"MYT","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":"VZ","name":"MyTravel Airways","oid":3568}
+{"_id":"airline_128","callsign":"COUNTY","icao":"NCF","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":null,"name":"Norfolk County Flight College","oid":3684}
+{"_id":"airline_129","callsign":"KINLOSS","icao":"KIN","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":null,"name":"Kinloss Flying Training Unit","oid":4113}
+{"_id":"airline_13","callsign":"BIG A","icao":"APW","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"JW","name":"Arrow Air","oid":397}
+{"_id":"airline_130","callsign":"SUCKLING","icao":"SAY","channels":["United Kingdom"],"scope":"travel","collection":"airlines","country":"United Kingdom","iata":null,"name":"ScotAirways","oid":4323}
+{"_id":"airline_131","callsign":"AIGLE AZUR","icao":"AAF","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"ZI","name":"Aigle Azur","oid":21}
+{"_id":"airline_132","callsign":"AIRFRANS","icao":"AFR","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"AF","name":"Air France","oid":137}
+{"_id":"airline_133","callsign":"AIRCALIN","icao":"ACI","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"SB","name":"Air Caledonie International","oid":139}
+{"_id":"airline_134","callsign":"TAHITI AIRLINES","icao":"THT","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"TN","name":"Air Tahiti Nui","oid":225}
+{"_id":"airline_135","callsign":null,"icao":"SPM","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"PJ","name":"Air Saint Pierre","oid":477}
+{"_id":"airline_136","callsign":"MEDITERRANEE","icao":"BIE","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"DR","name":"Air Mediterranee","oid":547}
+{"_id":"airline_137","callsign":"AIR MOOREA","icao":"TAH","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":null,"name":"Air Moorea","oid":551}
+{"_id":"airline_138","callsign":"FRENCH WEST","icao":"FWI","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"TX","name":"Air CaraÃ¯bes","oid":567}
+{"_id":"airline_139","callsign":"REUNION","icao":"REU","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"UU","name":"Air Austral","oid":1191}
+{"_id":"airline_14","callsign":"ACEY","icao":"ASQ","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"EV","name":"Atlantic Southeast Airlines","oid":452}
+{"_id":"airline_140","callsign":"AIRLINAIR","icao":"RLA","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"A5","name":"Airlinair","oid":1203}
+{"_id":"airline_141","callsign":"BRITAIR","icao":"BZH","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"DB","name":"Brit Air","oid":1523}
+{"_id":"airline_142","callsign":"CORSAIR","icao":"CRL","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"SS","name":"Corsairfly","oid":1908}
+{"_id":"airline_143","callsign":"CORSICA","icao":"CCM","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"XK","name":"Corse-Mediterranee","oid":1909}
+{"_id":"airline_144","callsign":"HELIFRANCE","icao":"HFR","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"8H","name":"Heli France","oid":2704}
+{"_id":"airline_145","callsign":"HEX AIRLINE","icao":"HER","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"UD","name":"Hex'Air","oid":2757}
+{"_id":"airline_146","callsign":"REGIONAL EUROPE","icao":"RAE","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"YS","name":"RÃ©gional","oid":4299}
+{"_id":"airline_147","callsign":"TWINJET","icao":"TJT","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"T7","name":"Twin Jet","oid":4965}
+{"_id":"airline_148","callsign":"STARWAY","icao":"SEU","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"SE","name":"XL Airways France","oid":5479}
+{"_id":"airline_149","callsign":"FRENCH SUN","icao":"TVF","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"TO","name":"Transavia France","oid":8745}
+{"_id":"airline_15","callsign":"EAGLE FLIGHT","icao":"EGF","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"MQ","name":"American Eagle Airlines","oid":659}
+{"_id":"airline_150","callsign":"T&","icao":"T&O","channels":["France"],"scope":"travel","collection":"airlines","country":"France","iata":"&T","name":"Tom\\'s & co airliners","oid":13947}
+{"_id":"airline_16","callsign":"CYCLONE","icao":"CYD","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"ZA","name":"Access Air","oid":792}
+{"_id":"airline_17","callsign":"AIR FLORIDA","icao":"FLZ","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"QH","name":"Air Florida","oid":882}
+{"_id":"airline_18","callsign":"GIANT","icao":"GTI","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"5Y","name":"Atlas Air","oid":928}
+{"_id":"airline_19","callsign":"CITRUS","icao":"TRS","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"FL","name":"AirTran Airways","oid":1316}
+{"_id":"airline_2","callsign":"ALOHA","icao":"AAH","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"AQ","name":"Aloha Airlines","oid":22}
+{"_id":"airline_20","callsign":"BEMIDJI","icao":"BMJ","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"CH","name":"Bemidji Airlines","oid":1442}
+{"_id":"airline_21","callsign":"BERING AIR","icao":"BRG","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"8E","name":"Bering Air","oid":1472}
+{"_id":"airline_22","callsign":"CAIR","icao":"KAP","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"9K","name":"Cape Air","oid":1629}
+{"_id":"airline_23","callsign":"CHAUTAUQUA","icao":"CHQ","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"RP","name":"Chautauqua Airlines","oid":1739}
+{"_id":"airline_24","callsign":"COLGAN","icao":"CJC","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"9L","name":"Colgan Air","oid":1821}
+{"_id":"airline_25","callsign":"COMAIR","icao":"COM","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"OH","name":"Comair","oid":1828}
+{"_id":"airline_26","callsign":"COMMUTAIR","icao":"UCA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"C5","name":"CommutAir","oid":1843}
+{"_id":"airline_27","callsign":"Compass Rose","icao":"CPZ","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"CP","name":"Compass Airlines","oid":1860}
+{"_id":"airline_28","callsign":"CONTINENTAL","icao":"COA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"CO","name":"Continental Airlines","oid":1881}
+{"_id":"airline_29","callsign":"AIR MIKE","icao":"CMI","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"CS","name":"Continental Micronesia","oid":1884}
+{"_id":"airline_3","callsign":"AMERICAN","icao":"AAL","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"AA","name":"American Airlines","oid":24}
+{"_id":"airline_30","callsign":"CROWN AIRWAYS","icao":"CRO","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"Crown Airways","oid":1931}
+{"_id":"airline_31","callsign":"DELTA","icao":"DAL","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"DL","name":"Delta Air Lines","oid":2009}
+{"_id":"airline_32","callsign":"EVERGREEN","icao":"EIA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"EZ","name":"Evergreen International Airlines","oid":2261}
+{"_id":"airline_33","callsign":"LONGHORN","icao":"LHN","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"EO","name":"Express One International","oid":2293}
+{"_id":"airline_34","callsign":"JET LINK","icao":"BTA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"XE","name":"ExpressJet","oid":2295}
+{"_id":"airline_35","callsign":"FLO WEST","icao":"FWL","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"RF","name":"Florida West International Airways","oid":2404}
+{"_id":"airline_36","callsign":"FREEDOM","icao":"FRE","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"FP","name":"Freedom Air","oid":2454}
+{"_id":"airline_37","callsign":"FREEDOM AIR","icao":"FRL","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"Freedom Airlines","oid":2456}
+{"_id":"airline_38","callsign":"FRONTIER FLIGHT","icao":"FFT","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"F9","name":"Frontier Airlines","oid":2468}
+{"_id":"airline_39","callsign":"FRONTIER-AIR","icao":"FTA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"2F","name":"Frontier Flying Service","oid":2470}
+{"_id":"airline_4","callsign":"ALLEGIANT","icao":"AAY","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"G4","name":"Allegiant Air","oid":35}
+{"_id":"airline_40","callsign":"GATEWAY","icao":"GJS","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"G7","name":"GoJet Airlines","oid":2577}
+{"_id":"airline_41","callsign":"LAKES AIR","icao":"GLA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"ZK","name":"Great Lakes Airlines","oid":2607}
+{"_id":"airline_42","callsign":"GULF FLIGHT","icao":"GFT","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"Gulfstream International Airlines","oid":2645}
+{"_id":"airline_43","callsign":"HAGELAND","icao":"HAG","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"H6","name":"Hageland Aviation Services","oid":2657}
+{"_id":"airline_44","callsign":"HAWAIIAN","icao":"HAL","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"HA","name":"Hawaiian Airlines","oid":2688}
+{"_id":"airline_45","callsign":"HORIZON AIR","icao":"QXE","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"QX","name":"Horizon Air","oid":2778}
+{"_id":"airline_46","callsign":"INDIGO BLUE","icao":"IBU","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"I9","name":"Indigo","oid":2855}
+{"_id":"airline_47","callsign":"JETBLUE","icao":"JBU","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"B6","name":"JetBlue Airways","oid":3029}
+{"_id":"airline_48","callsign":"KENMORE","icao":"KEN","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"M5","name":"Kenmore Air","oid":3123}
+{"_id":"airline_49","callsign":"AIR SHUTTLE","icao":"ASH","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"YV","name":"Mesa Airlines","oid":3466}
+{"_id":"airline_5","callsign":"ACE AIR","icao":"AER","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"KO","name":"Alaska Central Express","oid":109}
+{"_id":"airline_50","callsign":"MESABA","icao":"MES","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"XJ","name":"Mesaba Airlines","oid":3467}
+{"_id":"airline_51","callsign":"MIDWAY","icao":"MDW","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"JI","name":"Midway Airlines","oid":3494}
+{"_id":"airline_52","callsign":null,"icao":"MEP","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"YX","name":"Midwest Airlines","oid":3497}
+{"_id":"airline_53","callsign":"EXECJET","icao":"EJA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"1I","name":"NetJets","oid":3641}
+{"_id":"airline_54","callsign":"NEW ENGLAND","icao":"NEA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"EJ","name":"New England Airlines","oid":3644}
+{"_id":"airline_55","callsign":"NORTHWEST","icao":"NWA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"NW","name":"Northwest Airlines","oid":3731}
+{"_id":"airline_56","callsign":"OMNI-EXPRESS","icao":"OAE","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"OY","name":"Omni Air International","oid":3781}
+{"_id":"airline_57","callsign":"PACIFIC ISLE","icao":"PSA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"Pacific Island Aviation","oid":3860}
+{"_id":"airline_58","callsign":"TSUNAMI","icao":"NMI","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"LW","name":"Pacific Wings","oid":3865}
+{"_id":"airline_59","callsign":"PENINSULA","icao":"PEN","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"KS","name":"Peninsula Airways","oid":3935}
+{"_id":"airline_6","callsign":"NIGHT CARGO","icao":"SNC","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"2Q","name":"Air Cargo Carriers","oid":149}
+{"_id":"airline_60","callsign":"PIEDMONT","icao":"PDT","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"PI","name":"Piedmont Airlines (1948-1989)","oid":3969}
+{"_id":"airline_61","callsign":"FLAGSHIP","icao":"FLG","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"9E","name":"Pinnacle Airlines","oid":3976}
+{"_id":"airline_62","callsign":"DISTRICT","icao":"PDC","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"BK","name":"Potomac Air","oid":4026}
+{"_id":"airline_63","callsign":"BRICKYARD","icao":"RPA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"RW","name":"Republic Airlines","oid":4187}
+{"_id":"airline_64","callsign":"RYAN AIR","icao":"RYA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"Ryan Air Services","oid":4294}
+{"_id":"airline_65","callsign":"RYAN INTERNATIONAL","icao":"RYN","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"RD","name":"Ryan International Airlines","oid":4295}
+{"_id":"airline_66","callsign":"SEABORNE","icao":"SBS","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"BB","name":"Seaborne Airlines","oid":4335}
+{"_id":"airline_67","callsign":"SCENIC","icao":"SCE","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"Scenic Airlines","oid":4342}
+{"_id":"airline_68","callsign":"SUN COUNTRY","icao":"SCX","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"SY","name":"Sun Country Airlines","oid":4356}
+{"_id":"airline_69","callsign":"SOUTHEAST AIR","icao":"SEA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"Southeast Air","oid":4370}
+{"_id":"airline_7","callsign":"AIRLIFT","icao":"AIR","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"Airlift International","oid":210}
+{"_id":"airline_70","callsign":"SKAGWAY AIR","icao":"SGY","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"N5","name":"Skagway Air Service","oid":4411}
+{"_id":"airline_71","callsign":"SOUTHWEST","icao":"SWA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"WN","name":"Southwest Airlines","oid":4547}
+{"_id":"airline_72","callsign":"SKYWAY-EX","icao":"SYX","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"AL","name":"Skywalk Airlines","oid":4589}
+{"_id":"airline_73","callsign":"SPIRIT WINGS","icao":"NKS","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"NK","name":"Spirit Airlines","oid":4687}
+{"_id":"airline_74","callsign":"SKYWEST","icao":"SKW","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"OO","name":"SkyWest","oid":4738}
+{"_id":"airline_75","callsign":"SOUTHERN EXPRESS","icao":"SOU","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"Southern Airways","oid":4804}
+{"_id":"airline_76","callsign":"SOUTH PACIFIC","icao":"SPI","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"South Pacific Island Airways","oid":4816}
+{"_id":"airline_77","callsign":"MERCURY","icao":"TCF","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"S5","name":"Shuttle America","oid":4822}
+{"_id":"airline_78","callsign":"WATERSKI","icao":"LOF","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"AX","name":"Trans States Airlines","oid":5160}
+{"_id":"airline_79","callsign":"GETAWAY","icao":"GWY","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"U5","name":"USA3000 Airlines","oid":5207}
+{"_id":"airline_8","callsign":"CACTUS","icao":"AWE","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"HP","name":"America West Airlines","oid":281}
+{"_id":"airline_80","callsign":"UNITED","icao":"UAL","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"UA","name":"United Airlines","oid":5209}
+{"_id":"airline_81","callsign":"U S AIR","icao":"USA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"US","name":"US Airways","oid":5265}
+{"_id":"airline_82","callsign":"US-HELI","icao":"USH","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"US Helicopter","oid":5268}
+{"_id":"airline_83","callsign":"AIR CHIEF","icao":"AIO","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"United States Air Force","oid":5279}
+{"_id":"airline_84","callsign":"REDWOOD","icao":"VRD","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"VX","name":"Virgin America","oid":5331}
+{"_id":"airline_85","callsign":"WESTERN","icao":"WAL","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"WA","name":"Western Airlines","oid":5424}
+{"_id":"airline_86","callsign":"WORLD","icao":"WOA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"WO","name":"World Airways","oid":5465}
+{"_id":"airline_87","callsign":null,"icao":"MKU","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"WP","name":"Island Air (WP)","oid":8809}
+{"_id":"airline_88","callsign":"Epic","icao":"4AA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"FA","name":"Epic Holiday","oid":9833}
+{"_id":"airline_89","callsign":"TXW","icao":"TXW","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"TQ","name":"Texas Wings","oid":10123}
+{"_id":"airline_9","callsign":"AIR WISCONSIN","icao":"AWI","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"ZW","name":"Air Wisconsin","oid":282}
+{"_id":"airline_90","callsign":"atifly","icao":"A1F","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"A1","name":"Atifly","oid":10226}
+{"_id":"airline_91","callsign":"LOCAIR","icao":"LOC","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"ZQ","name":"Locair","oid":10748}
+{"_id":"airline_92","callsign":"SASQUATCH","icao":"SQH","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"K5","name":"SeaPort Airlines","oid":10765}
+{"_id":"airline_93","callsign":null,"icao":"--+","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"-+","name":"U.S. Air","oid":13391}
+{"_id":"airline_94","callsign":null,"icao":"PQW","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"WQ","name":"PanAm World Airways","oid":13633}
+{"_id":"airline_95","callsign":"AIRMAX","icao":"XBM","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":null,"name":"CBM America","oid":15887}
+{"_id":"airline_96","callsign":"Stallion","icao":"BSA","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"BZ","name":"Black Stallion Airways","oid":15975}
+{"_id":"airline_97","callsign":null,"icao":"TP6","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"T6","name":"Trans Pas Air","oid":16264}
+{"_id":"airline_98","callsign":"USKY","icao":"ES2","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"E1","name":"Usa Sky Cargo","oid":16702}
+{"_id":"airline_99","callsign":"ERAH","icao":"ERR","channels":["United States"],"scope":"travel","collection":"airlines","country":"United States","iata":"7H","name":"Era Alaska","oid":16726}

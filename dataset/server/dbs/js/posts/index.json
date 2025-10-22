@@ -1,0 +1,7 @@
+{
+    "name": "posts",
+    "collections": [
+        "_default",
+        "posts"
+    ]
+}
