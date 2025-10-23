@@ -29,8 +29,7 @@ from cbltest.logging import cbl_info
 class TestReplicationUpgrade(CBLTestClass):
     @staticmethod
     def tools_path() -> Path:
-        script_path = os.path.abspath(os.path.dirname(__file__))
-        return Path(script_path, "..", ".tools")
+        return Path(__file__).resolve().parent.parent / ".tools"
 
     async def setup_env(self, cblpytest: CBLPyTest, dataset_path: Path) -> Database:
         dataset_ver = cblpytest.config.dataset_version_at(0)
