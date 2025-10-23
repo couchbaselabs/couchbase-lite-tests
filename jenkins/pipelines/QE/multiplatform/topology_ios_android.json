@@ -5,97 +5,113 @@
             "platform": "swift_ios",
             "cbl_version": "{{ios_version}}",
             "location": "00008110-000E544201D1401E",
-            "ip_hint": "172.16.150.155"
+            "ip_hint": "172.16.150.155",
+            "download": true
         },
         {
             "platform": "swift_ios",
             "cbl_version": "{{ios_version}}",
             "location": "34fc12796a401aa57405c12c06c5b51491f9a68d",
-            "ip_hint": "172.16.150.157"
+            "ip_hint": "172.16.150.157",
+            "download": true
         },
         {
             "platform": "swift_ios",
             "cbl_version": "{{ios_version}}",
             "location": "00008132-000C15A20E7A801C",
-            "ip_hint": "172.16.150.151"
+            "ip_hint": "172.16.150.151",
+            "download": true
         },
         {
             "platform": "swift_ios",
             "cbl_version": "{{ios_version}}",
             "location": "0223a6ffabd4a4fded71f32351b498e04e2dacfe",
-            "ip_hint": "172.16.150.156"
+            "ip_hint": "172.16.150.156",
+            "download": true
         },
         {
             "platform": "swift_ios",
             "cbl_version": "{{ios_version}}",
             "location": "23ee833a5d402a3c05ca7e1e366fd50dedd0c1e5",
-            "ip_hint": "172.16.150.153"
+            "ip_hint": "172.16.150.153",
+            "download": true
         },
         {
             "platform": "swift_ios",
             "cbl_version": "{{ios_version}}",
             "location": "b5e82968a65bbaf925bd8a1cb65dc0da0b538b6a",
-            "ip_hint": "172.16.150.154"
+            "ip_hint": "172.16.150.154",
+            "download": true
         },
         {
             "platform": "swift_ios",
             "cbl_version": "{{ios_version}}",
             "location": "00008122-001108DC2EB9801C",
-            "ip_hint": "172.16.150.152"
+            "ip_hint": "172.16.150.152",
+            "download": true
         },
         {
             "platform": "swift_ios",
             "cbl_version": "{{ios_version}}",
             "location": "00008140-0006458A0C22801C",
-            "ip_hint": "172.16.150.158"
+            "ip_hint": "172.16.150.158",
+            "download": true
         },
         {
             "platform": "jak_android",
             "cbl_version": "{{jak_android}}",
             "location": "56141JEBF18456",
-            "ip_hint": "172.16.150.165"
+            "ip_hint": "172.16.150.165",
+            "download": true
         },
         {
             "platform": "jak_android",
             "cbl_version": "{{jak_android}}",
             "location": "45291VDJH01660",
-            "ip_hint": "172.16.150.159"
+            "ip_hint": "172.16.150.159",
+            "download": true
         },
         {
             "platform": "jak_android",
             "cbl_version": "{{jak_android}}",
             "location": "51131XEKB7DBF1",
-            "ip_hint": "172.16.150.163"
+            "ip_hint": "172.16.150.163",
+            "download": true
         },
         {
             "platform": "jak_android",
             "cbl_version": "{{jak_android}}",
             "location": "35101FDH20004D",
-            "ip_hint": "172.16.150.164"
+            "ip_hint": "172.16.150.164",
+            "download": true
         },
         {
             "platform": "jak_android",
             "cbl_version": "{{jak_android}}",
             "location": "RZCWC0DAYLW",
-            "ip_hint": "172.16.150.160"
+            "ip_hint": "172.16.150.160",
+            "download": true
         },
         {
             "platform": "jak_android",
             "cbl_version": "{{jak_android}}",
             "location": "RZCY60E6SCF",
-            "ip_hint": "172.16.150.166"
+            "ip_hint": "172.16.150.166",
+            "download": true
         },
         {
             "platform": "jak_android",
             "cbl_version": "{{jak_android}}",
             "location": "RZCT31DWZEV",
-            "ip_hint": "172.16.150.161"
+            "ip_hint": "172.16.150.161",
+            "download": true
         },
         {
             "platform": "jak_android",
             "cbl_version": "{{jak_android}}",
             "location": "R58M87C818K",
-            "ip_hint": "172.16.150.163"
+            "ip_hint": "172.16.150.163",
+            "download": true
         }
     ],
     "logslurp": true
