@@ -34,7 +34,6 @@ fileprivate func document(dbManager: DatabaseManager, id: String, collection: St
     
     var dict = doc.toDictionary()
     dict["_id"] = doc.id
-    dict["_revid"] = doc.revisionID
     dict["_revs"] = doc._getRevisionHistory()
     
     let result = try dict.mapValues { try AnyCodable($0) }
