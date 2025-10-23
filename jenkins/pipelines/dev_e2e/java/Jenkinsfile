@@ -89,6 +89,7 @@ pipeline {
                         lock("mob-e2e-win-01")
                     }
                     environment {
+                        TDK_NO_LS_PROVISION = 'true'
                         TS_ARTIFACTS_DIR = 'windows_desktop'
                     }
                     steps {
@@ -180,6 +181,7 @@ pipeline {
                         lock("mob-e2e-win-01")
                     }
                     environment {
+                        TDK_NO_LS_PROVISION = 'true'
                         TS_ARTIFACTS_DIR = 'windows_webservice'
                     }
                     steps {
