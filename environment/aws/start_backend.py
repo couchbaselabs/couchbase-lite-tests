@@ -190,7 +190,13 @@ def write_config(
         if len(topology.test_servers) > 0:
             test_servers = []
             for ts in topology.test_servers:
-                port = 5555 if ts.platform.startswith("dotnet") else 8080
+                port = (
+                    5555
+                    if ts.platform.startswith("dotnet")
+                    else 5173
+                    if ts.platform == "js"
+                    else 8080
+                )
                 test_servers.append(
                     {
                         "url": f"http://{ts.ip_address}:{port}",

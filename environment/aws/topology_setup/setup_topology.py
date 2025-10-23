@@ -812,7 +812,13 @@ class TopologyConfig:
             bridge.validate(test_server_input.location)
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
-            port = 5555 if test_server_input.platform.startswith("dotnet") else 8080
+            port = (
+                5555
+                if test_server_input.platform.startswith("dotnet")
+                else 5173
+                if test_server_input.platform == "js"
+                else 8080
+            )
             ip = bridge.get_ip(
                 test_server_input.location, fallback=test_server_input.ip_hint
             )

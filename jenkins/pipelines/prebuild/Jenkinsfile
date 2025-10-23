@@ -6,7 +6,7 @@ pipeline {
     parameters {
         choice(
             name: 'TS_PLATFORM',
-            choices: ['dotnet_windows', 'dotnet_macos', 'dotnet_ios', 'dotnet_android', 'jak_android', 'jak_desktop', 'jak_webservice', 'swift_ios', 'c_ios', 'c_android', 'c_linux_x86_64', 'c_macos', 'c_windows'],
+            choices: ['dotnet_windows', 'dotnet_macos', 'dotnet_ios', 'dotnet_android', 'jak_android', 'jak_desktop', 'jak_webservice', 'swift_ios', 'c_ios', 'c_android', 'c_linux_x86_64', 'c_macos', 'c_windows', 'js'],
             description: 'The test server platform to build'
         )
         string(
