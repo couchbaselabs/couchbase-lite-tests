@@ -18,7 +18,7 @@ from typing import Any, cast
 import click
 import requests
 
-from environment.aws.download_tool import download_tool, ToolName
+from environment.aws.download_tool import ToolName, download_tool
 from environment.aws.start_backend import script_entry as start_backend
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
@@ -142,9 +142,7 @@ def setup_test_multi(
                     topology["include"] = str(new_include)
 
         topology["defaults"] = {
-            "cbs": {
-                "version": couchbase_server_version
-            },
+            "cbs": {"version": couchbase_server_version},
             "sgw": {
                 "version": resolved_version("sync-gateway", sgw_version),
             },
@@ -160,7 +158,7 @@ def setup_test_multi(
             json.dump(topology, fout, indent=4)
 
     download_tool(ToolName.BackupManager, couchbase_server_version)
-    
+
     topology_obj = TopologyConfig(str(topology_file_out))
     start_backend(
         topology_obj,
