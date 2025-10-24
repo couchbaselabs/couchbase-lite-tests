@@ -208,7 +208,7 @@ export interface VerifyDocumentsResponse {
     description?: string,
     actual?: cbl.JSONValue,
     expected?: cbl.JSONValue,
-    document?: cbl.JSONObject,
+    document?: cbl.CBLDocument | cbl.JSONObject,     // Document will stringify to an object
 }
 
 

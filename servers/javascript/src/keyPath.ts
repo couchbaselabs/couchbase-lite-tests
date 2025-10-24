@@ -13,6 +13,8 @@
 import type { CBLDictionary, CBLValue } from "@couchbase/lite-js";
 import { HTTPError } from "./httpError";
 
+type KeyPathComponents = Array<string | number>;
+
 /** JSONPath implementation that supports both "." properties and "[]" array indexes,
  *  and can both read and write object properties. */
 export class KeyPath {
@@ -46,8 +48,19 @@ export class KeyPath {
         this.str = str;
     }
 
-    public readonly components = new Array<string | number>();
+    readonly components: KeyPathComponents = [];
+
     readonly str: string;
+
+    /** Utility to create a KeyPath string from an array of path components. */
+    static componentsToString(path: KeyPathComponents): string {
+        if (path.length === 0) {
+            return ".";
+        } else {
+            return path.flatMap( item => (typeof item === 'string') ? [".", item] : `[${item}]`)
+                .join("");
+        }
+    }
 
     /** Returns the value at this path in `root`, else `undefined`. */
     read(root: CBLValue): CBLValue | undefined {
@@ -140,7 +153,15 @@ export class KeyPathCache {
         return path;
     }
 
+    static path(str: string): KeyPath {
+        if (!this.#sharedInstance)
+            this.#sharedInstance = new KeyPathCache();
+        return this.#sharedInstance.path(str);
+    }
+
     #paths = new Map<string,KeyPath>();
+
+    static #sharedInstance?: KeyPathCache;
 }
 
 

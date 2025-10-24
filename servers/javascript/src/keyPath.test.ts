@@ -35,6 +35,13 @@ describe("KeyPath", () => {
         }
     });
 
+    test("componentsToString", () => {
+        expect(KeyPath.componentsToString([])).toBe(".");
+        expect(KeyPath.componentsToString(["foo"])).toBe(".foo");
+        expect(KeyPath.componentsToString(["foo", 12])).toBe(".foo[12]");
+        expect(KeyPath.componentsToString([12, "foo"])).toBe("[12].foo");
+    });
+
     test("Path reading", () => {
         const object = {
             arr: [1, 2, 3, [4, 5]],

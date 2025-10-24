@@ -15,6 +15,7 @@
 import { KeyPathCache } from "./keyPath";
 import { LogSlurpSender } from "./logSlurpSender";
 import { check, HTTPError } from "./httpError";
+import { Snapshot } from "./snapshot";
 import type { TestRequest } from "./testServer";
 import * as tdk from "./tdkSchema";
 import * as cbl from "@couchbase/lite-js";
@@ -146,7 +147,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                         if (update.updatedProperties) {
                             for (const props of update.updatedProperties) {
                                 for (const pathStr of Object.getOwnPropertyNames(props)) {
-                                    if (!this.#keyPaths.path(pathStr).write(doc, props[pathStr]))
+                                    if (!KeyPathCache.path(pathStr).write(doc, props[pathStr]))
                                         throw new HTTPError(400, `Invalid path ${pathStr} in doc ${update.documentID}`);
                                 }
                             }
@@ -154,7 +155,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                         if (update.removedProperties) {
                             for (const props of update.removedProperties) {
                                 for (const pathStr of props) {
-                                    if (!this.#keyPaths.path(pathStr).write(doc, undefined))
+                                    if (!KeyPathCache.path(pathStr).write(doc, undefined))
                                         throw new HTTPError(400, `Invalid path ${pathStr} in doc ${update.documentID}`);
                                 }
                             }
@@ -274,20 +275,41 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
 
 
     //////// PERFORM MAINTENANCE:
-    async [tdk.PerformMaintenanceCommand] (_rq: tdk.PerformMaintenanceRequest): Promise<void> {
-        throw new HTTPError(501);   // TODO
+    async [tdk.PerformMaintenanceCommand] (rq: tdk.PerformMaintenanceRequest): Promise<void> {
+        const db = this.#getDatabase(rq.database);
+        switch (rq.maintenanceType) {
+            case 'compact':
+                await db.performMaintenance('compact');
+                break;
+            default:
+                throw new HTTPError(501, "Unimplemented maintenance type");
+        }
     }
 
 
     //////// SNAPSHOT DOCUMENTS:
-    async [tdk.SnapshotDocumentsCommand] (_rq: tdk.SnapshotDocumentsRequest): Promise<tdk.SnapshotDocumentsResponse> {
-        throw new HTTPError(501);   // TODO
+    async [tdk.SnapshotDocumentsCommand] (rq: tdk.SnapshotDocumentsRequest): Promise<tdk.SnapshotDocumentsResponse> {
+        const db = this.#getDatabase(rq.database);
+        const snap = new Snapshot(db);
+        for (const d of rq.documents)
+            await snap.record(d.collection, d.id);
+        const snapID = `snap-${++this.#snapshotCounter}`;
+        this.#snapshots.set(snapID, snap);
+        return {id: snapID};
     }
 
 
     //////// VERIFY DOCUMENTS:
-    async [tdk.VerifyDocumentsCommand] (_rq: tdk.VerifyDocumentsRequest): Promise<tdk.VerifyDocumentsResponse> {
-        throw new HTTPError(501);   // TODO
+    async [tdk.VerifyDocumentsCommand] (rq: tdk.VerifyDocumentsRequest): Promise<tdk.VerifyDocumentsResponse> {
+        const db = this.#getDatabase(rq.database);
+        const snap = this.#snapshots.get(rq.snapshot);
+        if (snap === undefined)
+            throw new HTTPError(404, `No such snapshot ${rq.snapshot}`);
+        if (snap.db !== db)
+            throw new HTTPError(400, `Snapshot is of a different database, ${db.name}`);
+        this.#snapshots.delete(rq.snapshot);
+
+        return await snap.verify(rq.changes);
     }
 
 
@@ -409,9 +431,10 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
 
     readonly #databases     = new Map<string,cbl.Database>();
     readonly #replicators   = new Map<string,ReplicatorInfo>();
-    readonly #keyPaths      = new KeyPathCache();
+    readonly #snapshots     = new Map<string,Snapshot>();
     readonly #logger        = logtape.getLogger("TDK");
     #idCounter              = 0;
+    #snapshotCounter        = 0;
     #sessionID?             : string;
     #logSender?             : LogSlurpSender;
 }
