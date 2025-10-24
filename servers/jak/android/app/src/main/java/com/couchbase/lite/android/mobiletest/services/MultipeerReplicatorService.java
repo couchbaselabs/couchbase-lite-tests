@@ -85,7 +85,7 @@ public class MultipeerReplicatorService {
                 throw new ServerError("Null status map");
             }
 
-            myStatusMap.put(status.getPeerId(), status);
+            myStatusMap.put(status.getPeer(), status);
         }));
 
         ctxt.addMultipeerRepl(replId, repl);
