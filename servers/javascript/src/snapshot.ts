@@ -10,7 +10,7 @@
 // the file licenses/APL2.txt.
 //
 
-import { HTTPError } from "./httpError";
+import { HTTPError, normalizeCollectionID } from "./utils";
 import { KeyPath, KeyPathCache } from "./keyPath";
 import type * as tdk from "./tdkSchema";
 import type * as cbl from "@couchbase/lite-js";
@@ -22,7 +22,7 @@ export class Snapshot {
 
     /** Adds a (possibly nonexistent) document to the snapshot. */
     async record(collection: string, id: cbl.DocID) {
-        const doc = await this.db.getCollection(collection).getDocument(id);
+        const doc = await this.#getCollection(collection).getDocument(id);
         this.#documents.set(collection, id, doc ?? null);
     }
 
@@ -42,14 +42,14 @@ export class Snapshot {
                 let expected: cbl.CBLDocument | undefined;
                 // Update the old document with the changes listed in the DatabaseUpdateItem:
                 if (oldDoc) {
-                    expected = update ? this.applyUpdate(oldDoc, update) : oldDoc;
+                    expected = update ? this.#applyUpdate(oldDoc, update) : oldDoc;
                 } else {
-                    oldDoc = this.db.getCollection(collection).createDocument(id);
-                    expected = this.applyUpdate(oldDoc, update!!);
+                    oldDoc = this.#getCollection(collection).createDocument(id);
+                    expected = this.#applyUpdate(oldDoc, update!!);
                 }
                 // Compare the updated oldDoc against the database's current document:
-                const newDoc = await this.db.getCollection(collection).getDocument(id);
-                const result = this.compareDocs(expected, newDoc, update?.type);
+                const newDoc = await this.#getCollection(collection).getDocument(id);
+                const result = this.#compareDocs(expected, newDoc, update?.type);
                 if (result !== undefined) {
                     // On failure, return the result:
                     result.result = false;
@@ -63,9 +63,8 @@ export class Snapshot {
     }
 
 
-    /** Applies the changes described in a `DatabaseUpdateItem` to a `CBLDocument`.
-     *  @internal (exposed for testing) */
-    applyUpdate(doc: cbl.CBLDocument, update: tdk.DatabaseUpdateItem)
+    /** Applies the changes described in a `DatabaseUpdateItem` to a `CBLDocument`. */
+    #applyUpdate(doc: cbl.CBLDocument, update: tdk.DatabaseUpdateItem)
         : cbl.CBLDocument | undefined
     {
         if (update.type !== 'UPDATE')
@@ -96,11 +95,10 @@ export class Snapshot {
 
 
     /** Compares the expected and actual bodies of a document.
-     *  @returns `undefined` if they're equal, or a response describing the mismatch.
-     *  @internal (exposed for testing) */
-    compareDocs(expected: cbl.CBLDocument | undefined,
-                actual: cbl.CBLDocument | undefined,
-                updateType: string | undefined) : tdk.VerifyDocumentsResponse | undefined {
+     *  @returns `undefined` if they're equal, or a response describing the mismatch. */
+    #compareDocs(expected: cbl.CBLDocument | undefined,
+                 actual: cbl.CBLDocument | undefined,
+                 updateType: string | undefined) : tdk.VerifyDocumentsResponse | undefined {
         let response: tdk.VerifyDocumentsResponse | undefined = undefined;
         let path = new Array<string|number>();
 
@@ -182,6 +180,11 @@ export class Snapshot {
         }
 
         return response;
+    }
+
+
+    #getCollection(name: string): cbl.Collection {
+        return this.db.getCollection(normalizeCollectionID(name));
     }
 
 

@@ -14,7 +14,7 @@
 
 import { KeyPathCache } from "./keyPath";
 import { LogSlurpSender } from "./logSlurpSender";
-import { check, HTTPError } from "./httpError";
+import { check, HTTPError, normalizeCollectionID } from "./utils";
 import { Snapshot } from "./snapshot";
 import type { TestRequest } from "./testServer";
 import * as tdk from "./tdkSchema";
@@ -109,7 +109,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         const response: tdk.GetAllDocumentsResponse = {};
         for (const collName of rq.collections) {
             if (collName in db.collections) {
-                const coll = db.getCollection(collName);
+                const coll = db.getCollection(normalizeCollectionID(collName));
                 const docs = new Array<{id:cbl.DocID, rev:cbl.RevID}>();
                 response[collName] = docs;
                 await coll.eachDocument( doc => {
@@ -374,7 +374,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         let totalDocs = 0, totalBlobs = 0;
         for (const collID of config.collections) {
             this.#logger.debug `- Loading docs in collection ${collID}...`;
-            const collection = db.getCollection(collID);
+            const collection = db.getCollection(normalizeCollectionID(collID));
             const docs: cbl.CBLDocument[] = [];
             const jsonl = await fetchRelative(`${collID}.jsonl`);
             for (const line of jsonl.trim().split('\n')) {
@@ -464,12 +464,6 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     #snapshotCounter        = 0;
     #sessionID?             : string;
     #logSender?             : LogSlurpSender;
-}
-
-
-/** Strips the default scope name from an incoming collection ID. */
-function normalizeCollectionID(id: string): string {
-    return id.startsWith("_default.") ? id.substring(9) : id;
 }
 
 /** Adds the default scope name, if necessary, to an outgoing collection ID. */

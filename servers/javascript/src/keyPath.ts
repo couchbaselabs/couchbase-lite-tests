@@ -11,7 +11,7 @@
 //
 
 import type { CBLDictionary, CBLValue } from "@couchbase/lite-js";
-import { HTTPError } from "./httpError";
+import { HTTPError } from "./utils";
 
 type KeyPathComponents = Array<string | number>;
 
