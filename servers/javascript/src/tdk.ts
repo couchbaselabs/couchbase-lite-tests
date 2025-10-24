@@ -168,6 +168,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                                 updatePath(pathStr, blob);
                             }
                         }
+                        await coll.save(doc);
                         break;
                     }
                     case 'DELETE':
