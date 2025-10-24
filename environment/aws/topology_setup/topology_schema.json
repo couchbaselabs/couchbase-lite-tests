@@ -128,7 +128,8 @@
                             "c_linux_x86_64",
                             "c_ios",
                             "c_android",
-                            "swift_ios"
+                            "swift_ios",
+                            "js"
                         ]
                     },
                     "download": {

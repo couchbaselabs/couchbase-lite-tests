@@ -47,7 +47,8 @@ export interface GetInfoResponse {
 export const ResetCommand = "/reset";
 
 export interface ResetRequest extends TestRequest {
-    databases: null | Record<string, {collections: string[]} | {dataset: string}>;
+    databases: null | Record<string, {collections: string[] | undefined} | {dataset: string}>;
+    test: string | undefined;
 }
 
 
@@ -249,9 +250,9 @@ export interface LogRequest extends TestRequest {
 
 //-------- Loading datasets:
 
-
 /** Base URL for our JSON datasets. */
-export const kDatasetBaseURL = "/tdk_datasets/";
+export const kDatasetBaseURL = "https://raw.githubusercontent.com/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/dbs/js/";
+export const kBlobBaseURL = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/blobs/js/";
 
 /** Schema of `index.json` */
 export interface DatasetIndex {

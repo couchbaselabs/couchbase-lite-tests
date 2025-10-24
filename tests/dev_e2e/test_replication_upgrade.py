@@ -1,6 +1,6 @@
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import pytest
 from cbltest import CBLPyTest, CouchbaseServer

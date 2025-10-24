@@ -321,7 +321,7 @@ class TestServer(ABC):
             bool: True if the package is downloaded, False otherwise.
         """
         if (location / self.__version_filename).exists():
-            with open(location / self.__version_filename, "r") as f:
+            with open(location / self.__version_filename) as f:
                 saved_version = f.read().strip()
                 return saved_version == self.version
 

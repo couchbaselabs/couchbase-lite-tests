@@ -20,6 +20,7 @@ import os
 import tarfile
 import zipfile
 from contextlib import contextmanager
+from fnmatch import fnmatch
 from pathlib import Path
 
 import click
@@ -73,7 +74,7 @@ def sftp_progress_bar(
         sftp.put(local_path, remote_path, callback=callback)
 
 
-def zip_directory(input: Path, output: Path) -> None:
+def zip_directory(input: Path, output: Path, excludes: list[str] | None = None) -> None:
     """
     Zip the contents of a directory.
 
@@ -87,12 +88,44 @@ def zip_directory(input: Path, output: Path) -> None:
     if not input.exists():
         raise RuntimeError(f"{input} does not exist...")
 
+    excludes = excludes or []
+
+    def is_excluded(rel_path: Path, is_dir: bool) -> bool:
+        rel_posix = rel_path.as_posix()
+        # For directories also test pattern with trailing slash variants
+        for pat in excludes:
+            # Expand simple directory name patterns (e.g. '__pycache__')
+            if is_dir and not any(ch in pat for ch in "*?[]") and "/" not in pat:
+                if rel_posix == pat:
+                    return True
+            # Direct match
+            if fnmatch(rel_posix, pat):
+                return True
+            # Allow directory patterns written without trailing /** by user
+            if is_dir and (
+                fnmatch(rel_posix + "/", pat) or fnmatch(rel_posix + "/.", pat)
+            ):
+                return True
+        return False
+
     click.echo("Zipping...")
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for root, _, files in os.walk(input):
-            for file in tqdm(files, desc="Zipping"):
-                file_path = Path(root) / file
-                zipf.write(file_path, file_path.relative_to(input))
+        for root, dirs, files in os.walk(input):
+            root_path = Path(root)
+            pruned_dirs = []
+            for d in dirs:
+                rel_dir = (root_path / d).relative_to(input)
+                if is_excluded(rel_dir, is_dir=True):
+                    continue
+                pruned_dirs.append(d)
+            dirs[:] = pruned_dirs
+
+            for file in files:
+                rel_file = (root_path / file).relative_to(input)
+                if is_excluded(rel_file, is_dir=False):
+                    continue
+                file_path = root_path / file
+                zipf.write(file_path, rel_file)
 
     click.echo("Done")
 

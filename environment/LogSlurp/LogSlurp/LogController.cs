@@ -9,7 +9,9 @@ namespace LogSlurp
     public sealed class LogController : ControllerBase
     {
         private const string LogIDHeader = "CBL-Log-ID";
+        private const string LogIDParam = "cbl_log_id";
         private const string LogTagHeader = "CBL-Log-Tag";
+        private const string LogTagParam = "cbl_log_tag";
 
         private static readonly Dictionary<string, SerializedStreamWriter> FileLoggers = new();
 
@@ -23,8 +25,9 @@ namespace LogSlurp
                     return;
                 }
 
-                var tag = HttpContext.Request.Headers[LogTagHeader].FirstOrDefault();
-                if (tag == null || tag == String.Empty) {
+                var tag = HttpContext.Request.Headers[LogTagHeader].FirstOrDefault()
+                    ?? HttpContext.Request.Query[LogTagParam].FirstOrDefault();
+                if (String.IsNullOrEmpty(tag)) {
                     tag = "{0} ";
                 } else {
                     tag += ": {0} ";
@@ -46,7 +49,7 @@ namespace LogSlurp
                 HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
                 foreach(var state in ModelState) {
                     foreach(var err in state.Value.Errors) {
-                        await HttpContext.Response.WriteAsync(err.ErrorMessage ?? "<unknown>");
+                        await HttpContext.Response.WriteAsync(err.ErrorMessage);
                     }
                 }
                 return;
@@ -89,10 +92,11 @@ namespace LogSlurp
         [HttpGet]
         public async Task<ActionResult> RetrieveLog()
         {
-            var id = HttpContext.Request.Headers[LogIDHeader].FirstOrDefault();
-            if (id == null || id == String.Empty) {
+            var id = HttpContext.Request.Headers[LogIDHeader].FirstOrDefault()
+                ?? HttpContext.Request.Query[LogIDParam];
+            if (String.IsNullOrEmpty(id)) {
                 HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await HttpContext.Response.WriteAsync($"Missing header '{LogIDHeader}'");
+                await HttpContext.Response.WriteAsync($"Missing header '{LogIDHeader}' or query parameter '{LogIDParam}'");
                 return BadRequest();
             }
 
@@ -110,20 +114,21 @@ namespace LogSlurp
 
         private async Task<string?> GetLogID()
         {
-            var id = HttpContext.Request.Headers[LogIDHeader].FirstOrDefault();
-            if (id == null || id == String.Empty) {
+            var id = HttpContext.Request.Headers[LogIDHeader].FirstOrDefault()
+                ?? HttpContext.Request.Query[LogIDParam];
+            if (String.IsNullOrEmpty(id)) {
                 HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await HttpContext.Response.WriteAsync($"Missing header '{LogIDHeader}'");
+                await HttpContext.Response.WriteAsync($"Missing header '{LogIDHeader}' or query parameter '{LogIDParam}'");
                 return null;
             }
 
-            if (!FileLoggers.ContainsKey(id)) {
-                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await HttpContext.Response.WriteAsync($"Unknown Log ID '{id}'");
-                return null;
+            if (FileLoggers.ContainsKey(id)) {
+                return id;
             }
-
-            return id;
+            
+            HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await HttpContext.Response.WriteAsync($"Unknown Log ID '{id}'");
+            return null;
         }
 
         private static async Task ReadLogs(WebSocket ws, string id, string prologueFormat)
