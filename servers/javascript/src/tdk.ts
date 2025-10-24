@@ -142,26 +142,31 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                 const coll = db.getCollection(normalizeCollectionID(update.collection));
                 const doc = await coll.getDocument(update.documentID);
                 if (!doc) throw new HTTPError(404, `No document "${update.documentID}"`);
+
+                const updatePath = (pathStr: string, value: cbl.CBLValue | undefined): void => {
+                    if (!KeyPathCache.path(pathStr).write(doc, value))
+                        throw new HTTPError(400, `Invalid path ${pathStr} in doc ${update.documentID}`);
+                };
+
                 switch (update.type) {
                     case 'UPDATE': {
                         if (update.updatedProperties) {
                             for (const props of update.updatedProperties) {
-                                for (const pathStr of Object.getOwnPropertyNames(props)) {
-                                    if (!KeyPathCache.path(pathStr).write(doc, props[pathStr]))
-                                        throw new HTTPError(400, `Invalid path ${pathStr} in doc ${update.documentID}`);
-                                }
+                                for (const pathStr of Object.getOwnPropertyNames(props))
+                                    updatePath(pathStr, props[pathStr]);
                             }
                         }
                         if (update.removedProperties) {
                             for (const props of update.removedProperties) {
-                                for (const pathStr of props) {
-                                    if (!KeyPathCache.path(pathStr).write(doc, undefined))
-                                        throw new HTTPError(400, `Invalid path ${pathStr} in doc ${update.documentID}`);
-                                }
+                                for (const pathStr of props)
+                                    updatePath(pathStr, undefined);
                             }
                         }
                         if (update.updatedBlobs) {
-                            throw new HTTPError(501, "updatedBlobs is not implemented yet"); //TODO
+                            for (const pathStr of Object.getOwnPropertyNames(update.updatedBlobs)) {
+                                const blob = await this.#downloadBlob(update.updatedBlobs[pathStr]);
+                                updatePath(pathStr, blob);
+                            }
                         }
                         break;
                     }
@@ -190,12 +195,19 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                 throw new HTTPError(501, "Unimplemented replication feature(s)");
             const collCfg: cbl.ReplicatorCollectionConfig = { };
             if (rq.config.replicatorType !== 'pull') {
+                if (colls.pushFilter) throw new HTTPError(501, "Push filter is not supported");
                 collCfg.push = {
                     continuous: rq.config.continuous,
                     //filter: colls.pushFilter                  //TODO
                 };
             }
             if (rq.config.replicatorType !== 'push') {
+                if (colls.pullFilter)
+                    throw new HTTPError(501, "Pull filter is not supported");
+                if (colls.documentIDs)
+                    throw new HTTPError(501, "List of docIDs is not supported");
+                if (colls.conflictResolver)
+                    throw new HTTPError(501, "Conflict resolver is not supported");
                 collCfg.pull = {
                     continuous: rq.config.continuous,
                     channels:   colls.channels,
@@ -401,7 +413,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                 obj = obj as cbl.CBLDictionary;
                 if (obj["@type"] === "blob" && typeof obj.digest === "string") {
                     ++totalBlobs;
-                    return await this.#downloadBlob(obj as unknown as cbl.Bloblike, datasetURL);
+                    return await this.#downloadDataSetBlob(obj as unknown as cbl.Bloblike, datasetURL);
                 }
                 for (const key of Object.getOwnPropertyNames(obj)) {
                     const blob = await _installBlobs(obj[key]);  // recurse
@@ -416,16 +428,31 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     }
 
 
-    async #downloadBlob(blobMeta: cbl.Bloblike, datasetURL: string): Promise<cbl.NewBlob> {
+    async #downloadDataSetBlob(blobMeta: cbl.Bloblike, datasetURL: string): Promise<cbl.NewBlob> {
         check(blobMeta.digest.startsWith("sha1-"), "Unexpected prefix in blob digest");
         const digest = blobMeta.digest.substring(5).replaceAll('/', '_');
         const blobURL = `${datasetURL}Attachments/${digest}.blob`;
         this.#logger.info `  - downloading blob ${blobMeta.digest}`;
+        const contents = await this.#downloadBlobContents(blobURL);
+        return new cbl.NewBlob(contents, blobMeta.content_type);
+    }
+
+
+    async #downloadBlob(blobURL: string): Promise<cbl.NewBlob> {
+        if (blobURL.endsWith(".zip"))
+            throw new HTTPError(501, "Unzipping blobs is not supported");
+        const contents = await this.#downloadBlobContents(blobURL);
+        const type = blobURL.endsWith(".jpg") ? "image/jpeg" : "application/octet-stream";
+        return new cbl.NewBlob(contents, type);
+    }
+
+
+    async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
         const response = await fetch(blobURL);
         if (response.status !== 200)
             throw new HTTPError(502, `Unable to load blob from <${blobURL}>: ${response.status} ${response.statusText}`);
         const data = await response.arrayBuffer();
-        return new cbl.NewBlob(new Uint8Array(data), blobMeta.content_type);
+        return new Uint8Array(data);
     }
 
 
