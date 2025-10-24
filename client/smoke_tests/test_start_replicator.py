@@ -32,6 +32,7 @@ class TestStartReplicator:
         db = dbs[0]
 
         repl = Replicator(db, "ws://foo:4984/db")
+        repl.add_default_collection()
         await repl.start()
         status = await repl.wait_for(ReplicatorActivityLevel.STOPPED)
         assert (
