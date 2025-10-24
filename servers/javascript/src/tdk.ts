@@ -297,17 +297,19 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
 
     #getDatabase(name: string): cbl.Database {
         const db = this.#databases.get(name);
-        if (!db) throw new HTTPError(404, `No open database "${name}"`);
+        if (!db) throw new HTTPError(400, `No open database "${name}"`);
         return db;
     }
 
 
-    async #createDatabase(name: string, collections: readonly string[]): Promise<cbl.Database> {
+    async #createDatabase(name: string, collections: readonly string[] | undefined): Promise<cbl.Database> {
         check(!this.#databases.has(name), `There is already an open database named ${name}`);
         let colls: Record<string,cbl.CollectionConfig> = {};
-        for (const coll of collections)
-            colls[coll] = {};
-        this.#logger.info `Reset: Creating database ${name} with ${collections.length} collection(s)`;
+        if (collections) {
+            for (const coll of collections)
+                colls[coll] = {};
+        }
+        this.#logger.info `Reset: Creating database ${name} with ${collections?.length ?? 0} collection(s)`;
         const db = await cbl.Database.open({name: name, version: 1, collections: colls});
         this.#databases.set(name, db);
         return db;
