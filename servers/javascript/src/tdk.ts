@@ -66,6 +66,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         if (rq.logging) {
             this.#logger.info `Connecting to LogSlurp at ${rq.logging.url} with id=${rq.id}, tag=${rq.logging.tag}`;
             this.#logSender = new LogSlurpSender(rq.logging.url, rq.id, rq.logging.tag);
+            await this.#logSender.waitForConnected(5000);
         }
     }
 
@@ -94,6 +95,9 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                 else
                     await this.#createDatabase(name, what.collections);
             }
+        }
+        if (rq.test) {
+            this.#logger.info(`>>>>>>>>>> ${rq.test}`);
         }
     }
 

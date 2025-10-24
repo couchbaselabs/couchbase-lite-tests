@@ -48,6 +48,7 @@ export const ResetCommand = "/reset";
 
 export interface ResetRequest extends TestRequest {
     databases: null | Record<string, {collections: string[] | undefined} | {dataset: string}>;
+    test: string | undefined;
 }
 
 

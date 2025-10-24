@@ -31,7 +31,7 @@ class _RequestHttpTransport(RequestTransport):
     async def send(
         self, request: TestServerRequest, message_no: int
     ) -> TestServerResponse:
-        cbl_trace(f"Sending {self} to {self.__url}")
+        cbl_trace(f"Sending {request} to {self.__url}")
         headers = {}
         headers["Accept"] = "application/json"
         if request.version > 0:
@@ -125,7 +125,7 @@ class _RequestWebSocketTransport(RequestTransport):
         data["ts_id"] = message_no
         data["ts_command"] = f"/{request.http_name}"
 
-        cbl_trace(f"Sending {self} to {self.__url}")
+        cbl_trace(f"Sending {request} to {self.__url}")
         if request.version > 0:
             data["ts_clientID"] = request.uuid
             data["ts_apiVersion"] = request.version
