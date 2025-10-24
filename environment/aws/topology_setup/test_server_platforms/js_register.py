@@ -78,9 +78,23 @@ class JavascriptBridge(PlatformBridge):
             location (str): The location of the Javascript (e.g., "localhost").
         """
         proc_name = "bun.exe" if platform.system() == "Windows" else "bun"
+        node_name = "node.exe" if platform.system() == "Windows" else "node"
         header("Stopping test server")
         for proc in psutil.process_iter():
             if proc.name() == proc_name:
+                try:
+                    # For some reason terminating bun leaves this child behind
+                    node_process = next(
+                        p for p in proc.children(True) if p.name() == node_name
+                    )
+                    node_process.terminate()
+                    click.secho(
+                        f"Stopped node child PID {node_process.pid}", fg="green"
+                    )
+                except StopIteration:
+                    click.secho("No child node process found...", fg="yellow")
+                    pass
+
                 proc.terminate()
                 click.secho(f"Stopped PID {proc.pid}", fg="green")
                 return
