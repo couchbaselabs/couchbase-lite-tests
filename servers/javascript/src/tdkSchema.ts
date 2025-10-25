@@ -91,7 +91,7 @@ export interface DatabaseUpdateItem {
     documentID: cbl.DocID,
     updatedProperties?: cbl.JSONObject[],
     removedProperties?: string[],
-    updatedBlobs?: Record<string,string>,
+    updatedBlobs?: Record<string,string>,                   // KeyPath -> blob URL
 }
 
 
@@ -172,7 +172,7 @@ export interface DocumentReplication {
     collection: string,
     documentID: cbl.DocID,
     isPush?: boolean,
-    flags?: Array<'deleted'>;   //TODO: other flags?
+    flags?: Array<'deleted' | 'accessRemoved'>;
     error?: ErrorInfo
 }
 
@@ -208,7 +208,7 @@ export interface VerifyDocumentsResponse {
     description?: string,
     actual?: cbl.JSONValue,
     expected?: cbl.JSONValue,
-    document?: cbl.JSONObject,
+    document?: cbl.CBLDocument | cbl.JSONObject,     // Document will stringify to an object
 }
 
 

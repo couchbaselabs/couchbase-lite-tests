@@ -19,7 +19,15 @@ export class HTTPError extends Error {
     }
 }
 
+
+/** Simple assertion that throws an HTTPError with status 400 on failure. */
 export function check(cond: boolean, message: string): asserts cond {
     if (!cond)
         throw new HTTPError(400, message);
+}
+
+
+/** Strips the default scope name from an incoming collection ID. */
+export function normalizeCollectionID(id: string): string {
+    return id.startsWith("_default.") ? id.substring(9) : id;
 }
