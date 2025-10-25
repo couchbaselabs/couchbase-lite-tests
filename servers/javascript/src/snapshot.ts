@@ -32,8 +32,12 @@ export class Snapshot {
     async verify(changes: readonly tdk.DatabaseUpdateItem[]): Promise<tdk.VerifyDocumentsResponse> {
         // Index the updates in a map for quick lookup:
         const updates = new DocumentMap<tdk.DatabaseUpdateItem>();
-        for (const u of changes)
+        for (const u of changes){
+            if (!this.#documents.get(u.collection, u.documentID)) {
+                throw new HTTPError(400, `Update for unknown document ${u.documentID} in collection ${u.collection}`);
+            }
             updates.set(u.collection, u.documentID, u);
+        }
 
         // Now check each document in the snapshot:
         for (let [collection, id, oldDoc] of this.#documents) {
@@ -54,8 +58,19 @@ export class Snapshot {
                     // On failure, return the result:
                     result.result = false;
                     result.description = `Document ${id} in collection ${collection} ${result.description}`;
-                    result.document = newDoc;
+                    if (update?.type === "UPDATE") {
+                        result.document = newDoc;
+                    }
                     return result;
+                }
+            } else {
+                // The doc should NOT exist; verify that:
+                const foundDoc = await this.#getCollection(collection).getDocument(id);
+                if (foundDoc) {
+                    return {
+                        result: false,
+                        description: `Document ${id} in collection ${collection} should not exist`
+                    };
                 }
             }
         }

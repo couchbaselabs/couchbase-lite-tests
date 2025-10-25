@@ -140,8 +140,11 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         await db.inTransaction("rw", db.collectionNames, async () => {
             for (const update of rq.updates) {
                 const coll = db.getCollection(normalizeCollectionID(update.collection));
-                const doc = await coll.getDocument(update.documentID);
-                if (!doc) throw new HTTPError(404, `No document "${update.documentID}"`);
+                let doc = await coll.getDocument(update.documentID);
+                if (!doc) {
+                    doc = coll.createDocument(update.documentID);
+                    await coll.save(doc);
+                }
 
                 const updatePath = (pathStr: string, value: cbl.CBLValue | undefined): void => {
                     if (!KeyPathCache.path(pathStr).write(doc, value))
@@ -158,8 +161,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                         }
                         if (update.removedProperties) {
                             for (const props of update.removedProperties) {
-                                for (const pathStr of props)
-                                    updatePath(pathStr, undefined);
+                                updatePath(props, undefined);
                             }
                         }
                         if (update.updatedBlobs) {
