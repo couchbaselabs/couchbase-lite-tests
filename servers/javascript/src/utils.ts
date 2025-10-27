@@ -10,6 +10,9 @@
 // the file licenses/APL2.txt.
 //
 
+import type { CBLDictionary, CBLValue, JSONObject, JSONValue } from "@couchbase/lite-js";
+import { Blob } from "@couchbase/lite-js";
+
 
 /** Test functions can throw this to report an HTTP error status. */
 export class HTTPError extends Error {
@@ -30,4 +33,14 @@ export function check(cond: boolean, message: string): asserts cond {
 /** Strips the default scope name from an incoming collection ID. */
 export function normalizeCollectionID(id: string): string {
     return id.startsWith("_default.") ? id.substring(9) : id;
+}
+
+
+export function isObject(val: JSONValue | undefined) : val is JSONObject {
+    return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+
+
+export function isDict(val: CBLValue | undefined) : val is CBLDictionary {
+    return typeof val === "object" && val !== null && !Array.isArray(val) && !(val instanceof Blob);
 }

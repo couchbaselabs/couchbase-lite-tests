@@ -20,6 +20,7 @@ import type { TestRequest } from "./testServer";
 import * as tdk from "./tdkSchema";
 import * as cbl from "@couchbase/lite-js";
 import * as logtape from "@logtape/logtape";
+import { TDKConflictResolvers } from "./conflictResolvers";
 
 
 interface ReplicatorInfo {
@@ -203,7 +204,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             };
         }
         for (const colls of rq.config.collections) {
-            if (colls.documentIDs || colls.pushFilter || colls.pullFilter || colls.conflictResolver)
+            if (colls.documentIDs || colls.pushFilter || colls.pullFilter)
                 throw new HTTPError(501, "Unimplemented replication feature(s)");
             const collCfg: cbl.ReplicatorCollectionConfig = { };
             if (rq.config.replicatorType !== 'pull') {
@@ -214,19 +215,16 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                 };
             }
             if (rq.config.replicatorType !== 'push') {
-                if (colls.pullFilter)
-                    throw new HTTPError(501, "Pull filter is not supported");
-                if (colls.documentIDs)
-                    throw new HTTPError(501, "List of docIDs is not supported");
-                if (colls.conflictResolver)
-                    throw new HTTPError(501, "Conflict resolver is not supported");
                 collCfg.pull = {
                     continuous: rq.config.continuous,
                     channels:   colls.channels,
-                    //documentIDs: colls.documentIDs,           //FIXME
-                    //filter: colls.pullFilter,                 //TODO
-                    //conflictResolver: colls.conflictResolver, //TODO
                 };
+                if (colls.conflictResolver) {
+                    const name = colls.conflictResolver.name;
+                    const resolverFn = TDKConflictResolvers[name]?.(colls.conflictResolver);
+                    check(resolverFn !== undefined, `Unknown conflict resolver "${name}"`);
+                    collCfg.pull.conflictResolver = resolverFn;
+                }
             }
             for (const collName of colls.names)
                 config.collections[collName] = collCfg;

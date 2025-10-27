@@ -10,8 +10,8 @@
 // the file licenses/APL2.txt.
 //
 
-import type { CBLDictionary, CBLValue } from "@couchbase/lite-js";
-import { HTTPError } from "./utils";
+import type { CBLValue } from "@couchbase/lite-js";
+import { HTTPError, isDict } from "./utils";
 
 type KeyPathComponents = Array<string | number>;
 
@@ -67,7 +67,7 @@ export class KeyPath {
         let cur : CBLValue | undefined = root;
         for (const c of this.components) {
             if (typeof c === 'string')
-                cur = isDictionary(cur) ? cur[c] : undefined;
+                cur = isDict(cur) ? cur[c] : undefined;
             else
                 cur = Array.isArray(cur) ? cur[c] : undefined;
             if (cur === undefined)
@@ -94,7 +94,7 @@ export class KeyPath {
         for (let i = 0; i <= last; ++i) {
             const c = this.components[i];
             if (typeof c === 'string') {
-                if (!isDictionary(cur))
+                if (!isDict(cur))
                     return false; // type mismatch
                 if (i === last) {
                     if (value !== undefined)
@@ -162,9 +162,4 @@ export class KeyPathCache {
     #paths = new Map<string,KeyPath>();
 
     static #sharedInstance?: KeyPathCache;
-}
-
-
-function isDictionary(val: CBLValue | undefined) : val is CBLDictionary {
-    return typeof val === "object" && val !== null && !Array.isArray(val) && !(val instanceof Blob);
 }

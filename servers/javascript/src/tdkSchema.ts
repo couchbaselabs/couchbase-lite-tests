@@ -128,7 +128,7 @@ export interface Filter {
 }
 
 export interface ReplicatorAuthenticator {
-    type: string,
+    type: 'BASIC' | 'SESSION',
 }
 
 export interface ReplicatorBasicAuthenticator extends ReplicatorAuthenticator {
