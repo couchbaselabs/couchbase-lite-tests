@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.11)
 cmake_policy(VERSION 3.11)
 cmake_policy(SET CMP0077 NEW)
 
+option(CBL_FROM_SOURCE "Build against couchbase-lite-c source in this repo" OFF)
+
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
 set(CMAKE_OSX_ARCHITECTURES x86_64 arm64)
 
@@ -12,13 +14,32 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/out)
 
 add_subdirectory(vendor)
 
-get_directory_property(civetweb_SOURCE_DIR DIRECTORY vendor DEFINITION civetweb_SOURCE_DIR)
-
-if(NOT DEFINED CBL_VERSION)
-    message(FATAL_ERROR "Please pass -DCBL_VERSION to indicate which version of Couchbase Lite you will use")
+if(CBL_FROM_SOURCE)
+    message(STATUS "BUILD_WITH_CBL_C_SRC=ON -> Building with couchbase-lite-c from source")
+    # Add couchbase-lite-c subdirectory
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/couchbase-lite-c/CMakeLists.txt")
+        set(BUILD_ENTERPRISE ON CACHE INTERNAL "Enterprise build enabled when using source" FORCE)
+        add_subdirectory(couchbase-lite-c)
+    else()
+        message(FATAL_ERROR
+                "BUILD_WITH_CBL_C_SRC=ON but couchbase-lite-c source directory not found at "
+                "${CMAKE_CURRENT_SOURCE_DIR}/couchbase-lite-c")
+    endif()
+else()
+    if(NOT DEFINED CBL_VERSION)
+        message(FATAL_ERROR "Please pass -DCBL_VERSION to indicate which version of Couchbase Lite you will use")
+    endif()
+    find_package(
+            CouchbaseLite
+            REQUIRED
+            VERSION EXACT ${CBL_VERSION}
+            PATHS lib/libcblite-${CBL_VERSION} lib/libcblite
+            NO_DEFAULT_PATH
+    )
+    set(CBL_FROM_SOURCE OFF)
 endif()
 
-find_package(CouchbaseLite REQUIRED VERSION EXACT ${CBL_VERSION} PATHS lib/libcblite-${CBL_VERSION} lib/libcblite NO_DEFAULT_PATH)
+get_directory_property(civetweb_SOURCE_DIR DIRECTORY vendor DEFINITION civetweb_SOURCE_DIR)
 
 if(APPLE)
     set(CMAKE_INSTALL_RPATH "@loader_path")
@@ -110,6 +131,15 @@ target_include_directories(
         ${civetweb_SOURCE_DIR}/include
 )
 
+
+# If building from CBL's source, also include generated public headers
+if(CBL_FROM_SOURCE)
+    target_include_directories(
+            testserver PRIVATE
+            ${CMAKE_BINARY_DIR}/couchbase-lite-c/generated_headers/public
+    )
+endif()
+
 target_compile_definitions(
         testserver PRIVATE
         -DJSON_USE_IMPLICIT_CONVERSIONS=0
@@ -137,10 +167,13 @@ install(
         RUNTIME DESTINATION bin
 )
 
-get_target_property(CBLITE_DLL_LOCATION cblite IMPORTED_LOCATION_MINSIZEREL)
-get_filename_component(CBLITE_PARENT_DIR "${CBLITE_DLL_LOCATION}" DIRECTORY)
-file(GLOB CBLITE_FILES "${CBLITE_PARENT_DIR}/*cblite*")
-install(
-        FILES ${CBLITE_FILES}
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-)
+# Install CBL runtime artifacts when using prebuilt package
+if(NOT CBL_FROM_SOURCE)
+    get_target_property(CBLITE_DLL_LOCATION cblite IMPORTED_LOCATION_MINSIZEREL)
+    get_filename_component(CBLITE_PARENT_DIR "${CBLITE_DLL_LOCATION}" DIRECTORY)
+    file(GLOB CBLITE_FILES "${CBLITE_PARENT_DIR}/*cblite*")
+    install(
+            FILES ${CBLITE_FILES}
+            DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+    )
+endif()

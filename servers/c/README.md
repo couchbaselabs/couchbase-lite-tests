@@ -26,13 +26,13 @@
 3. Build and Run
 
    From this directory (`servers/c`), use the platform build script in the `scripts` directory to build and assemble the built artifacts.
-   The build script requires CBL edition, version, and build number. When specifying the build number = 0, the script 
+   The build script requires CBL version and build number. When specifying the build number = 0, the script 
    will download the public release CBL binary. The built artifacts will be located at `build/out/bin` directory.
 
 ### macOS
 
 ```
-./scripts/build_macos.sh enterprise 4.0.0 8
+./scripts/build_macos.sh 4.0.0 43
 cd build/out/bin
 ./testserver
 ```
@@ -40,7 +40,7 @@ cd build/out/bin
 ### linux
 
 ```
-./scripts/build_linux.sh enterprise 4.0.0 8
+./scripts/build_linux.sh 4.0.0 43
 cd build/out/bin
 ./testserver
 ```
@@ -48,7 +48,7 @@ cd build/out/bin
 ### iOS
 
 ```
-./scripts/build_ios.sh all enterprise 4.0.0 8
+./scripts/build_ios.sh all 4.0.0 43
 SHARED_DIR="../../jenkins/pipelines/shared"
 "${SHARED_DIR}/ios_app.sh" start "$("${SHARED_DIR}/ios_device.sh")" build/out/bin/TestServer.app
 ```
@@ -59,7 +59,7 @@ Android and Windows instruction are in progress.
 
 ### Tools
 
-* VSCode with C++/CMake plugin or Jetbrains CLion
+* Jetbrains CLion or VSCode with C++/CMake plugin
 
 ### Download Couchbase Lite
 
@@ -81,15 +81,19 @@ The next step is to download CBL library.
 
 #### CMake for macOS, Linux, and Windows
 
-Open the project from this directory which has the CMakeLists.txt file using VSCode with C++/CMake plugin or CLion.
+Open the project from this directory which has the CMakeLists.txt file using CLion (Recommended) or VSCode with C++/CMake plugin.
 
 #### CLion
 
 1. Open the c test server directory with CLion.
 
-2. CLion will load the CMake Project and create `cmake-build-debug` directory for building.
+2. When configurating CMake, add `DCBL_VERSION=<CBL Version>` option with the CBL version you are using. 
+    If using CLion, add the option to Settings > Build, Execution, Deploymenet > CMake > CMake Options
 
-3. If you switch the dataset and CBL version, ensure to clean `cmake-build-debug` the directory either by removing the directory or find an option to clean it from the CLion.
+3. CLion will load the CMake Project and create `cmake-build-debug` directory for building.
+
+4. If you switch CBL version, ensure to clean `cmake-build-debug` the directory either by removing the directory 
+    or find an option to clean it from the CLion.
 
 #### iOS
 
@@ -103,29 +107,31 @@ Go to `platforms/android` directory and open `settings.gradle` using Android Stu
 
 This is for debugging purposes with CBL-C and LiteCore.
 
-1. Clone couchbase-lite-c named cblite at c test server directory.
+1. Clone couchbase-lite-C as couchbase-lite-c at c test server directory.
 
 ```
-git clone https://github.com/couchbase/couchbase-lite-C.git cblite
-git checkout <your branch>
-cd cblite && git submodule update --init --recursive
+git clone --recurse-submodules https://github.com/couchbase/couchbase-lite-C.git couchbase-lite-c
 ```
 
-2. Update CMakeLists.txt as follows:
+2. Clone couchbase-lite-c-ee at c test server directory.
 
 ```
- add_subdirectory(vendor)
-+add_subdirectory(cblite)
- 
--find_package(CouchbaseLite REQUIRED VERSION 3.2.1 PATHS lib/libcblite)
-+#find_package(CouchbaseLite REQUIRED VERSION 3.2.1 PATHS lib/libcblite)
- 
- if(APPLE)
-     set(CMAKE_INSTALL_RPATH "@loader_path")
-@@ -92,6 +94,7 @@ target_include_directories(
-         src/support/ext
-         src/support/ws
-         ${civetweb_SOURCE_DIR}/include
-+       ${CMAKE_BINARY_DIR}/cblite/generated_headers/public
- )
+git clone --recurse-submodules https://github.com/couchbase/couchbase-lite-c-ee.git
+```
+
+3. Create symlink for LiteCore EE
+
+```
+pushd couchbase-lite-c/vendor
+ln -s ../../couchbase-lite-c-ee/couchbase-lite-core-EE couchbase-lite-core-EE
+popd
+```
+
+4. When configurating CMake, add `-DCBL_FROM_SOURCE=ON`.
+    If using CLion, add the option to Settings > Build, Execution, Deploymenet > CMake > CMake Options
+
+```
+mkdir build & cd build
+cmake -DCBL_FROM_SOURCE=ON  ..
+make
 ```
