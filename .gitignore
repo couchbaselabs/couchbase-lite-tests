@@ -19,3 +19,6 @@ http_log
 .terraform
 servers/downloaded
 .version
+
+# Temp files
+.tmp
