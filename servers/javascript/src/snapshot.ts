@@ -32,7 +32,7 @@ export class Snapshot {
     async verify(changes: readonly tdk.DatabaseUpdateItem[]): Promise<tdk.VerifyDocumentsResponse> {
         // Index the updates in a map for quick lookup:
         const updates = new DocumentMap<tdk.DatabaseUpdateItem>();
-        for (const u of changes){
+        for (const u of changes) {
             if (!this.#documents.get(u.collection, u.documentID)) {
                 throw new HTTPError(400, `Update for unknown document ${u.documentID} in collection ${u.collection}`);
             }
@@ -88,7 +88,7 @@ export class Snapshot {
             for (const updates of update.updatedProperties) {
                 for (const key of Object.getOwnPropertyNames(updates)) {
                     if (!KeyPathCache.path(key).write(doc, updates[key])) {
-                        //???
+                        throw new HTTPError(400, `Type mismatch traversing path ${key}`);
                     }
                 }
             }
@@ -96,7 +96,7 @@ export class Snapshot {
         if (update.removedProperties !== undefined) {
             for (const key of update.removedProperties) {
                 if (!KeyPathCache.path(key).write(doc, undefined)) {
-                    //???
+                    throw new HTTPError(400, `Type mismatch traversing path ${key}`);
                 }
             }
         }
