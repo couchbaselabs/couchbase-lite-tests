@@ -1214,7 +1214,6 @@ components:
           $ref: '#/components/schemas/ReplicationFilter'
         conflictResolver:
           description: One of the predefined conflict resolvers to use during replication
-          type: string
           $ref: '#/components/schemas/ConflictResolver'
     ReplicationFilter:
       description: |-
