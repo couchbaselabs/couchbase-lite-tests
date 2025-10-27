@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 function usage() {
-    echo "Usage: $0 <edition: enterprise | community> <cbl-version> <cbl-build-num>"
+    echo "Usage: $0 <cbl-version> <cbl-build-num>"
     exit 1
 }
 
@@ -24,13 +24,13 @@ BUILD_DIR="${SCRIPT_DIR}/../build"
 LIB_DIR="${SCRIPT_DIR}/../lib"
 
 # Download CBL:
-"${SCRIPT_DIR}"/download_cbl.sh linux ${EDITION} ${VERSION} ${BLD_NUM}
+"${SCRIPT_DIR}"/download_cbl.sh linux "enterprise" ${VERSION} ${BLD_NUM}
 
 # Build
 rm -rf "${BUILD_DIR}"
 mkdir -p $BUILD_DIR
 pushd $BUILD_DIR > /dev/null
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCBL_VERSION=${VERSION} -DCMAKE_BUILD_TYPE=Release ..
 make -j8 install
 
 # Copy libcblite to
