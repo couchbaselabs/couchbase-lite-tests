@@ -193,6 +193,15 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             url:         rq.config.endpoint,
             collections: {},
         };
+        if (rq.config.authenticator) {
+            if (rq.config.authenticator.type !== 'BASIC')
+                throw new HTTPError(501, "Only Basic auth is supported");
+            const basicAuth = rq.config.authenticator as tdk.ReplicatorBasicAuthenticator;
+            config.credentials = {
+                username: basicAuth.username,
+                password: basicAuth.password
+            };
+        }
         for (const colls of rq.config.collections) {
             if (colls.documentIDs || colls.pushFilter || colls.pullFilter || colls.conflictResolver)
                 throw new HTTPError(501, "Unimplemented replication feature(s)");
