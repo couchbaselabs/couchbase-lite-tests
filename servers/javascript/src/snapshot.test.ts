@@ -112,15 +112,7 @@ describe("Snapshot", () => {
         }], noBlobLoader);
         expect(response).toEqual({
             "result": false,
-            "description": "Document nose in collection red was not deleted",
-            "document": {
-                "name": "Santa",
-                "reindeer": [
-                    "Dasher",
-                    "Prancer",
-                    "etc.",
-                ],
-            },
+            "description": "Document nose in collection red was not deleted"
         });
     });
 

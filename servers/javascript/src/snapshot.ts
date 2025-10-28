@@ -37,7 +37,7 @@ export class Snapshot {
         // Index the updates in a map for quick lookup:
         const updates = new DocumentMap<tdk.DatabaseUpdateItem>();
         for (const u of changes) {
-            if (!this.#documents.get(u.collection, u.documentID)) {
+            if (!this.#documents.get(u.collection, u.documentID) === undefined) {
                 throw new HTTPError(400, `Update for unknown document ${u.documentID} in collection ${u.collection}`);
             }
             updates.set(u.collection, u.documentID, u);
@@ -216,7 +216,7 @@ export class Snapshot {
 
 /** A mapping from a collection ID and DocID to a type T. */
 class DocumentMap<T> {
-    set(collection: string, id: cbl.DocID, value: T) {
+    set(collection: string, id: cbl.DocID, value: T | null) {
         let coll = this.#map.get(collection);
         if (coll === undefined) {
             coll = new Map<cbl.DocID, T>();
@@ -225,18 +225,18 @@ class DocumentMap<T> {
         coll.set(id, value);
     }
 
-    get(collection: string, id: cbl.DocID): T | undefined {
+    get(collection: string, id: cbl.DocID): T | null | undefined {
         return this.#map.get(collection)?.get(id);
     }
 
-    *[Symbol.iterator](): Generator<[string, cbl.DocID, T]> {
+    *[Symbol.iterator](): Generator<[string, cbl.DocID, T | null]> {
         for (const [collection, docs] of this.#map) {
             for (const [id, doc] of docs)
                 yield [collection, id, doc];
         }
     }
 
-    #map = new Map<string, Map<cbl.DocID, T>>();
+    #map = new Map<string, Map<cbl.DocID, T | null>>();
 }
 
 
