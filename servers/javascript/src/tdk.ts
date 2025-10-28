@@ -32,6 +32,16 @@ interface ReplicatorInfo {
 }
 
 
+/** Parameter type of Collection.updateMultiple.
+ *  TODO: Replace with `cbl.MultipleUpdates` once that's exported from CBL. */
+interface CollectionUpdates {
+    save?       : cbl.CBLDocument[],
+    delete?     : cbl.CBLDocument[],
+    bestEffort? : boolean,
+    onConflict? : cbl.ConflictHandler,
+}
+
+
 export const APIVersion = 1;
 
 
@@ -139,51 +149,61 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     //////// UPDATE DATABASE:
     async [tdk.UpdateDatabaseCommand] (rq: tdk.UpdateDatabaseRequest): Promise<void> {
         const db = this.#getDatabase(rq.database);
-        await db.inTransaction("rw", db.collectionNames, async () => {
-            for (const update of rq.updates) {
-                const coll = db.getCollection(normalizeCollectionID(update.collection));
-                let doc = await coll.getDocument(update.documentID);
-                if (!doc) {
-                    doc = coll.createDocument(update.documentID);
-                    await coll.save(doc);
-                }
+        const dbUpdates = new Map<cbl.Collection, CollectionUpdates>();
 
-                const updatePath = (pathStr: string, value: cbl.CBLValue | undefined): void => {
-                    if (!KeyPathCache.path(pathStr).write(doc, value))
-                        throw new HTTPError(400, `Invalid path ${pathStr} in doc ${update.documentID}`);
-                };
-
-                switch (update.type) {
-                    case 'UPDATE': {
-                        if (update.updatedProperties) {
-                            for (const props of update.updatedProperties) {
-                                for (const pathStr of Object.getOwnPropertyNames(props))
-                                    updatePath(pathStr, props[pathStr]);
-                            }
-                        }
-                        if (update.removedProperties) {
-                            for (const props of update.removedProperties) {
-                                updatePath(props, undefined);
-                            }
-                        }
-                        if (update.updatedBlobs) {
-                            for (const pathStr of Object.getOwnPropertyNames(update.updatedBlobs)) {
-                                const blob = await this.#downloadBlob(update.updatedBlobs[pathStr]);
-                                updatePath(pathStr, blob);
-                            }
-                        }
-                        await coll.save(doc);
-                        break;
-                    }
-                    case 'DELETE':
-                        await coll.delete(doc);
-                        break;
-                    case 'PURGE':
-                        await coll.purge(doc);
-                        break;
-                }
+        // Wrapping this loop in a transaction won't work, because the async call to downloadBlob
+        // is illegal: the only async calls you can make in a transaction are calls to that DB.
+        // Instead, we collect the docs to update/delete and then do a batch update at the end.
+        for (const update of rq.updates) {
+            const coll = db.getCollection(normalizeCollectionID(update.collection));
+            let collUpdates = dbUpdates.get(coll);
+            if (!collUpdates) {
+                collUpdates = {save: [], delete: []};
+                dbUpdates.set(coll, collUpdates);
             }
-        });
+
+            const doc = (await coll.getDocument(update.documentID)) ??
+                        coll.createDocument(update.documentID);
+
+            function updatePath(pathStr: string, value: cbl.CBLValue | undefined): void {
+                if (!KeyPathCache.path(pathStr).write(doc, value))
+                    throw new HTTPError(400, `Invalid path ${pathStr} in doc ${update.documentID}`);
+            };
+
+            switch (update.type) {
+                case 'UPDATE': {
+                    if (update.updatedProperties) {
+                        for (const props of update.updatedProperties) {
+                            for (const pathStr of Object.getOwnPropertyNames(props))
+                                updatePath(pathStr, props[pathStr]);
+                        }
+                    }
+                    if (update.removedProperties) {
+                        for (const props of update.removedProperties) {
+                            updatePath(props, undefined);
+                        }
+                    }
+                    if (update.updatedBlobs) {
+                        for (const pathStr of Object.getOwnPropertyNames(update.updatedBlobs)) {
+                            const blob = await this.#downloadBlob(update.updatedBlobs[pathStr]);
+                            updatePath(pathStr, blob);
+                        }
+                    }
+                    collUpdates.save!.push(doc);
+                    break;
+                }
+                case 'DELETE':
+                    collUpdates.delete!.push(doc);
+                    break;
+                case 'PURGE':
+                    await coll.purge(doc);  // Collection.updateMultiple doesn't do purges
+                    break;
+            }
+        }
+
+        // Now update the database:
+        for (const collection of dbUpdates.keys())
+            await collection.updateMultiple(dbUpdates.get(collection)!);
     }
 
 
