@@ -68,6 +68,8 @@ class TestReplicationXdcr(CBLTestClass):
     async def test_push_and_pull_with_xdcr(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
+        self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
+
         if len(cblpytest.load_balancers) < 1:
             pytest.skip("No load balancer available for XDCR test.")
 
@@ -215,6 +217,8 @@ class TestReplicationXdcr(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_fail_over(self, cblpytest: CBLPyTest, dataset_path: Path):
+        self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
+
         if len(cblpytest.load_balancers) < 1:
             pytest.skip("No load balancer available for XDCR test.")
 
