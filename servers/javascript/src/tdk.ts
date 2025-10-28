@@ -21,6 +21,7 @@ import * as tdk from "./tdkSchema";
 import * as cbl from "@couchbase/lite-js";
 import * as logtape from "@logtape/logtape";
 import { TDKConflictResolvers } from "./conflictResolvers";
+import { CreateFilter } from "./filters";
 
 
 interface ReplicatorInfo {
@@ -204,20 +205,20 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             };
         }
         for (const colls of rq.config.collections) {
-            if (colls.documentIDs || colls.pushFilter || colls.pullFilter)
+            if (colls.documentIDs)
                 throw new HTTPError(501, "Unimplemented replication feature(s)");
             const collCfg: cbl.ReplicatorCollectionConfig = { };
             if (rq.config.replicatorType !== 'pull') {
-                if (colls.pushFilter) throw new HTTPError(501, "Push filter is not supported");
                 collCfg.push = {
                     continuous: rq.config.continuous,
-                    //filter: colls.pushFilter                  //TODO
+                    filter:     CreateFilter(colls.pushFilter),
                 };
             }
             if (rq.config.replicatorType !== 'push') {
                 collCfg.pull = {
                     continuous: rq.config.continuous,
                     channels:   colls.channels,
+                    filter:     CreateFilter(colls.pushFilter),
                 };
                 if (colls.conflictResolver) {
                     const name = colls.conflictResolver.name;
