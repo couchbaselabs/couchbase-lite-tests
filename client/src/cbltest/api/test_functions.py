@@ -139,6 +139,30 @@ def compare_doc_results_p2p(
     return DocsCompareResult(True)
 
 
+def compare_doc_ids(
+    local: list[AllDocumentsEntry],
+    remote: list[AllDocumentsResponseRow],
+) -> DocsCompareResult:
+    local_ids = {e.id for e in local}
+    remote_ids = {e.id for e in remote}
+
+    missing_on_remote = local_ids - remote_ids
+    if missing_on_remote:
+        missing_id = next(iter(missing_on_remote))
+        return DocsCompareResult(
+            False, f"Doc '{missing_id}' present locally but missing on remote"
+        )
+
+    missing_on_local = remote_ids - local_ids
+    if missing_on_local:
+        missing_id = next(iter(missing_on_local))
+        return DocsCompareResult(
+            False, f"Doc '{missing_id}' present on remote but missing locally"
+        )
+
+    return DocsCompareResult(True)
+
+
 async def compare_local_and_remote(
     local: Database,
     remote: SyncGateway,

@@ -4,9 +4,7 @@
     "scopes": {
       "_default": {
         "collections": {
-          "_default": {
-            "sync": "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
-          }
+          "_default": { }
         }
       }
     },
