@@ -248,7 +248,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                 }
             }
             for (const collName of colls.names)
-                config.collections[collName] = collCfg;
+                config.collections[normalizeCollectionID(collName)] = collCfg;
         }
 
         const repl = new cbl.Replicator(config);
