@@ -459,9 +459,10 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
 
 
     async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
-        const response = await fetch(blobURL);
+        const absURL = new URL(blobURL, tdk.kBlobBaseURL);
+        const response = await fetch(absURL);
         if (response.status !== 200)
-            throw new HTTPError(502, `Unable to load blob from <${blobURL}>: ${response.status} ${response.statusText}`);
+            throw new HTTPError(502, `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`);
         const data = await response.arrayBuffer();
         return new Uint8Array(data);
     }
