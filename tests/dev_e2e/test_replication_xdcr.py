@@ -20,6 +20,7 @@ from cbltest.utils import assert_not_null
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(2)
 @pytest.mark.min_couchbase_servers(2)
+@pytest.mark.min_loadbalancer(1)
 class TestReplicationXdcr(CBLTestClass):
     async def setup_xdcr_clusters(
         self,
@@ -69,9 +70,6 @@ class TestReplicationXdcr(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
-
-        if len(cblpytest.load_balancers) < 1:
-            pytest.skip("No load balancer available for XDCR test.")
 
         self.mark_test_step("Prepare clusters and start XDCR.")
         await self.setup_xdcr_clusters(cblpytest, dataset_path, "names")
@@ -218,9 +216,6 @@ class TestReplicationXdcr(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_fail_over(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
-
-        if len(cblpytest.load_balancers) < 1:
-            pytest.skip("No load balancer available for XDCR test.")
 
         self.mark_test_step("Prepare clusters and start XDCR.")
         await self.setup_xdcr_clusters(cblpytest, dataset_path, "names")
