@@ -16,6 +16,9 @@ import type * as tdk from "./tdkSchema";
 import type * as cbl from "@couchbase/lite-js";
 
 
+export type BlobLoader = (blobURL: string) => Promise<cbl.NewBlob>;
+
+
 /** Creates and verifies TDK database snapshots. */
 export class Snapshot {
     constructor(readonly db: cbl.Database) { }
@@ -29,7 +32,8 @@ export class Snapshot {
 
     /** Verifies the current database against the snapshot and a list of updates.
      *  @warning  This can only be called once, as it mutates the stored state. */
-    async verify(changes: readonly tdk.DatabaseUpdateItem[]): Promise<tdk.VerifyDocumentsResponse> {
+    async verify(changes: readonly tdk.DatabaseUpdateItem[],
+                 blobLoader: BlobLoader): Promise<tdk.VerifyDocumentsResponse> {
         // Index the updates in a map for quick lookup:
         const updates = new DocumentMap<tdk.DatabaseUpdateItem>();
         for (const u of changes) {
@@ -46,10 +50,13 @@ export class Snapshot {
                 let expected: cbl.CBLDocument | undefined;
                 // Update the old document with the changes listed in the DatabaseUpdateItem:
                 if (oldDoc) {
-                    expected = update ? this.#applyUpdate(oldDoc, update) : oldDoc;
+                    if (update)
+                        expected = await this.#applyUpdate(oldDoc, update, blobLoader);
+                    else
+                        expected = oldDoc;
                 } else {
                     oldDoc = this.#getCollection(collection).createDocument(id);
-                    expected = this.#applyUpdate(oldDoc, update!!);
+                    expected = await this.#applyUpdate(oldDoc, update!!, blobLoader);
                 }
                 // Compare the updated oldDoc against the database's current document:
                 const newDoc = await this.#getCollection(collection).getDocument(id);
@@ -79,31 +86,31 @@ export class Snapshot {
 
 
     /** Applies the changes described in a `DatabaseUpdateItem` to a `CBLDocument`. */
-    #applyUpdate(doc: cbl.CBLDocument, update: tdk.DatabaseUpdateItem)
-        : cbl.CBLDocument | undefined
+    async #applyUpdate(doc: cbl.CBLDocument,
+                       update: tdk.DatabaseUpdateItem,
+                       blobLoader: BlobLoader) : Promise<cbl.CBLDocument | undefined>
     {
         if (update.type !== 'UPDATE')
             return undefined;
+
+        const patch = (key: string, value: cbl.CBLValue | undefined) => {
+            if (!KeyPathCache.path(key).write(doc, value))
+                throw new HTTPError(400, `Type mismatch traversing path ${key}`);
+        };
+
         if (update.updatedProperties !== undefined) {
             for (const updates of update.updatedProperties) {
-                for (const key of Object.getOwnPropertyNames(updates)) {
-                    if (!KeyPathCache.path(key).write(doc, updates[key])) {
-                        throw new HTTPError(400, `Type mismatch traversing path ${key}`);
-                    }
-                }
+                for (const key of Object.getOwnPropertyNames(updates))
+                    patch(key,  updates[key]);
             }
         }
         if (update.removedProperties !== undefined) {
-            for (const key of update.removedProperties) {
-                if (!KeyPathCache.path(key).write(doc, undefined)) {
-                    throw new HTTPError(400, `Type mismatch traversing path ${key}`);
-                }
-            }
+            for (const key of update.removedProperties)
+                patch(key,  undefined);
         }
         if (update.updatedBlobs !== undefined) {
-            for (const _key of Object.getOwnPropertyNames(update.updatedBlobs)) {
-                throw new HTTPError(501, `updatedBlobs is not supported yet`);
-            }
+            for (const key of Object.getOwnPropertyNames(update.updatedBlobs))
+                patch(key, await blobLoader(update.updatedBlobs[key]));
         }
         return doc;
     }

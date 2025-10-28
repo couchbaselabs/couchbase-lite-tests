@@ -332,7 +332,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             throw new HTTPError(400, `Snapshot is of a different database, ${db.name}`);
         this.#snapshots.delete(rq.snapshot);
 
-        return await snap.verify(rq.changes);
+        return await snap.verify(rq.changes, this.#downloadBlob.bind(this));
     }
 
 

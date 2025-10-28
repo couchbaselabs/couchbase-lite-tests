@@ -4,6 +4,8 @@ import * as cbl from "@couchbase/lite-js";
 import { beforeEach, test, describe, expect, afterEach } from "vitest";
 
 
+/* eslint-disable @typescript-eslint/require-await */
+
 cbl.Database.useIndexedDB(indexedDB, IDBKeyRange);
 
 
@@ -24,6 +26,11 @@ afterEach( async() => {
 });
 
 
+async function noBlobLoader(_url: string): Promise<cbl.NewBlob> {
+    throw Error("Should not be called");
+}
+
+
 describe("Snapshot", () => {
 
     test("doc wasn't created", async () => {
@@ -34,7 +41,7 @@ describe("Snapshot", () => {
             type: 'UPDATE',
             collection: "red",
             documentID: cbl.DocID("nose"),
-        }]);
+        }], noBlobLoader);
         expect(response).toMatchInlineSnapshot(`
           {
             "description": "Document nose in collection red was not found",
@@ -62,7 +69,7 @@ describe("Snapshot", () => {
                 name: "Santa",
                 reindeer: ["Dasher", "Prancer", "etc."],
             }],
-        }]);
+        }], noBlobLoader);
         expect(response).toEqual({result: true});
     });
 
@@ -83,7 +90,7 @@ describe("Snapshot", () => {
             collection: "red",
             documentID: cbl.DocID("nose"),
             type: 'DELETE',
-        }]);
+        }], noBlobLoader);
         expect(response).toEqual({result: true});
     });
 
@@ -102,7 +109,7 @@ describe("Snapshot", () => {
             collection: "red",
             documentID: cbl.DocID("nose"),
             type: 'DELETE',
-        }]);
+        }], noBlobLoader);
         expect(response).toEqual({
             "result": false,
             "description": "Document nose in collection red was not deleted",
@@ -135,7 +142,7 @@ describe("Snapshot", () => {
                 name: "Santa",
                 reindeer: ["Dasher", "Prancer", "etc."],
             }],
-        }]);
+        }], noBlobLoader);
 
         expect(response).toEqual({
             "result": false,
@@ -165,6 +172,7 @@ describe("Snapshot", () => {
         await snapshot.record("red", cbl.DocID("nose"));
 
         (nose.reindeer as string[])[2] = "Rudolph";
+        await red.save(nose);
 
         const response = await snapshot.verify([{
             collection: "red",
@@ -173,22 +181,41 @@ describe("Snapshot", () => {
             updatedProperties: [{
                 "reindeer[2]": "Rudolph",
             }],
-        }]);
+        }], noBlobLoader);
 
-        expect(response).toEqual({
-            "result": false,
-            "description": "Document nose in collection red had unexpected properties at .reindeer[2]",
-            "expected": "Rudolph",
-            "actual": "etc.",
-            "document": {
-                "name": "Santa",
-                "reindeer": [
-                    "Dasher",
-                    "Prancer",
-                    "etc.",
-                ],
-            },
+        expect(response).toEqual({"result": true});
+    });
+
+
+    test("doc added a blob", async () => {
+        const nose = red.createDocument(cbl.DocID("nose"), {
+            name: "Santa",
+            reindeer: ["Dasher", "Prancer", "etc."],
         });
+        await red.save(nose);
+
+        const snapshot = new Snapshot(db);
+        await snapshot.record("red", cbl.DocID("nose"));
+
+        const hohoho = new TextEncoder().encode("Ho ho ho!");
+        nose.hohoho = new cbl.NewBlob(hohoho, "text/plain");
+        await red.save(nose);
+
+        const blobLoader = async (url: string): Promise<cbl.NewBlob> => {
+            expect(url).toBe("x/y/hohoho.txt");
+            return new cbl.NewBlob(hohoho, "text/plain");
+        };
+
+        const response = await snapshot.verify([{
+            collection: "red",
+            documentID: cbl.DocID("nose"),
+            type: 'UPDATE',
+            updatedBlobs: {
+                "hohoho": "x/y/hohoho.txt",
+            },
+        }], blobLoader);
+
+        expect(response).toEqual({"result": true});
     });
 
 
@@ -210,7 +237,7 @@ describe("Snapshot", () => {
             updatedProperties: [{
                 "reindeer[2]": "Rudolph",
             }],
-        }]);
+        }], noBlobLoader);
 
         expect(response).toEqual({
             "result": false,
