@@ -1,8 +1,6 @@
-from pathlib import Path
-from typing import Dict, List, Optional, cast
+from typing import Dict, List, Optional
 
 from .api.edgeserver import EdgeServer
-from .api.httpclient import HTTPClient
 from .requests import RequestFactory
 from .logging import LogLevel, cbl_setLogLevel, cbl_log_init
 from .extrapropsparser import _parse_extra_props

@@ -43,7 +43,7 @@ class CouchbaseServer:
                       if it doesn't already exist, unless it is the default scope
         :param names: The names of the collections to create
         """
-        with self.__tracer.start_as_current_span("Create Scope", attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket}) as current_span:
+        with self.__tracer.start_as_current_span("Create Scope", attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket}):
             bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, Bucket, bucket)
             c = bucket_obj.collections()
             try:

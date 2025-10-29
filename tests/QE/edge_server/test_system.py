@@ -6,7 +6,6 @@ import pytest
 import time
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.error import CblEdgeServerBadResponseError, CblSyncGatewayBadResponseError
 from cbltest.api.httpclient import ClientFactory
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
@@ -24,7 +23,6 @@ class TestSystem(CBLTestClass):
         # Calculate end time for 30 minutes from now
         end_time = datetime.now() + timedelta(minutes=360)
 
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -282,7 +280,6 @@ class TestSystem(CBLTestClass):
         # Calculate end time for 30 minutes from now
         end_time = datetime.now() + timedelta(minutes=360)
 
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -572,7 +569,6 @@ class TestSystem(CBLTestClass):
         # Calculate end time for 30 minutes from now
         end_time = datetime.now() + timedelta(minutes=360)
 
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -898,7 +894,6 @@ class TestSystem(CBLTestClass):
         # Calculate end time for 30 minutes from now
         end_time = datetime.now() + timedelta(minutes=360)
 
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 

@@ -149,7 +149,7 @@ class TestEdgeServerChaos(CBLTestClass):
         sgw_docs = await sgw.get_all_documents("travel", scope="travel", collection="hotels")
 
         assert len(edge1_docs.rows) == len(sgw_docs.rows) == len(edge2_docs.rows) == docgen.size, \
-            f"Collection {collection} count mismatch in len(edge1_docs.rows): {len(edge1_docs.rows)} ,  len(sgw_docs.rows): {len(sgw_docs.rows)}, len(edge2_docs.rows):  {len(edge2_docs.rows)} and {docgen.size}"
+            f"Collection hotels count mismatch in len(edge1_docs.rows): {len(edge1_docs.rows)} ,  len(sgw_docs.rows): {len(sgw_docs.rows)}, len(edge2_docs.rows):  {len(edge2_docs.rows)} and {docgen.size}"
 
     async def perform_operation(self,client, optype, docs_dict,docgen,db_name,scope,collection,revmap):
         """Perform async CRUD operation based on random optype"""
@@ -211,7 +211,7 @@ class TestEdgeServerChaos(CBLTestClass):
         docgen=JSONGenerator(seed=10,size=10000)
         docs_list=docgen.generate_all_documents()
         bulk_ops = [BulkDocOperation(doc, optype="create") for doc in docs_list]
-        resp = await edge_server.bulk_doc_op(
+        await edge_server.bulk_doc_op(
             bulk_ops,db_name="db")
         self.mark_test_step("Verify document inserted")
         try:

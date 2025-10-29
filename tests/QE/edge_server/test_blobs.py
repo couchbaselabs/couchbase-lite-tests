@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.error import CblEdgeServerBadResponseError
 from cbltest.api.syncgateway import PutDatabasePayload
 
@@ -17,7 +16,6 @@ class TestBlobs(CBLTestClass):
     async def test_blobs_create_delete(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Starting Blobs CRUD test with Server, Sync Gateway, Edge Server and 1 client")
 
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -154,8 +152,6 @@ class TestBlobs(CBLTestClass):
     async def test_empty_blob(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Starting test to add empty blob to a document in Edge Server")
 
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
-        server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
         sg_db_name = "db-1"
@@ -216,8 +212,6 @@ class TestBlobs(CBLTestClass):
     async def test_blob_update(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Starting test to update blob in a document in Edge Server")
 
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
-        server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
         sg_db_name = "db-1"
@@ -317,7 +311,7 @@ class TestBlobs(CBLTestClass):
         attachment_name = "missing_blob.png"
 
         try:
-            blob = await edge_server.get_sub_document(doc_id, attachment_name, es_db_name)
+            await edge_server.get_sub_document(doc_id, attachment_name, es_db_name)
         except CblEdgeServerBadResponseError:
             assert CblEdgeServerBadResponseError, "Able to retrieve nonexistent blob from document."
 
@@ -435,7 +429,7 @@ class TestBlobs(CBLTestClass):
             image_data = img_file.read()
 
         try:
-            response = await edge_server.put_sub_document(doc_id, "1-abcdef", attachment_name, es_db_name, value=image_data)
+            await edge_server.put_sub_document(doc_id, "1-abcdef", attachment_name, es_db_name, value=image_data)
         except CblEdgeServerBadResponseError:
             assert CblEdgeServerBadResponseError, "Able to add blob to nonexistent document."
 
@@ -553,10 +547,10 @@ class TestBlobs(CBLTestClass):
 
         try:
             response = await edge_server.put_sub_document(doc_id, rev_id, attachment_name, es_db_name, value=image_data)
-        except CblEdgeServerBadResponseError:
+        except CblEdgeServerBadResponseError as e:
             assert CblEdgeServerBadResponseError, "Able to add blob exceeding max size to document."
 
-        assert "413" in str(e), f"Expected HTTP 413 status code in error message but got '{str(e)}'"
+            assert "413" in str(e), f"Expected HTTP 413 status code in error message but got '{str(e)}'"
 
         logger.info("Blob exceeding max size addition test passed.")
         self.mark_test_step("Blob exceeding max size addition test passed.")
@@ -566,7 +560,6 @@ class TestBlobs(CBLTestClass):
     async def test_blob_special_characters(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Starting test to add blob with special characters to a document in Edge Server")
 
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
