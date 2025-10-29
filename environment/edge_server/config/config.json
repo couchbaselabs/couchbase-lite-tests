@@ -13,7 +13,7 @@
     },
     "replications": [
         {
-            "source": "ws://172.23.96.111:4984/db-1",
+            "source": "ws://172.23.96.195:4984/db-1",
             "target": "db",
             "bidirectional": true,
             "continuous": true,
