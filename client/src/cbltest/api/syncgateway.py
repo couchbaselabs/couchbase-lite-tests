@@ -1335,7 +1335,7 @@ class SyncGateway:
 
             return RemoteDocument(cast_resp)
 
-    async def update_document(self, db_name: str, doc_id: str, document: dict, rev: str, 
+    async def update_document(self, db_name: str, doc_id: str, document: dict, rev: str,
                           scope: str = "_default", collection: str = "_default") -> RemoteDocument:
         """
         Updates a document in Sync Gateway.
