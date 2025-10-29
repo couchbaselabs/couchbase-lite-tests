@@ -1,6 +1,5 @@
 import json
 import requests
-import subprocess
 import sys
 import time
 from bs4 import BeautifulSoup
