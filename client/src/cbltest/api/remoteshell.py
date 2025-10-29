@@ -1,11 +1,7 @@
-import asyncio
-from typing import Dict, List, Optional, Any
+from typing import List, Optional
 import asyncssh
-import logging
-import signal
 import subprocess
 from cbltest.version import VERSION
-from gevent.testing.travis import command
 from opentelemetry.trace import get_tracer
 
 
@@ -38,7 +34,7 @@ class RemoteShellConnection:
             command = "systemctl stop couchbase-edge-server"
             await self.ssh_client.run(command, check=True)
             return await self.is_edge_server_running()
-        except Exception as e:
+        except Exception:
             return False
 
     async def start_edge_server(self) -> bool:
@@ -46,7 +42,7 @@ class RemoteShellConnection:
             command = " systemctl start couchbase-edge-server"
             await self.ssh_client.run(command, check=True)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     async def take_offline(self) -> bool:
@@ -54,7 +50,7 @@ class RemoteShellConnection:
             command = "sudo iptables -A OUTPUT -d 172.23.96.195 -j REJECT"
             await self.ssh_client.run(command, check=True)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     async def bring_online(self) -> bool:
@@ -62,7 +58,7 @@ class RemoteShellConnection:
             command = "sudo iptables -D OUTPUT -d 172.23.96.195 -j REJECT"
             await self.ssh_client.run(command, check=True)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     async def reset_db_uuid(self, db_name: str) -> bool:
@@ -72,7 +68,7 @@ class RemoteShellConnection:
             if result.stderr.strip():
                 return False
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     async def check_log(self, search_string: str, log_file: str) -> List[str]:
@@ -81,7 +77,7 @@ class RemoteShellConnection:
             result = await self.ssh_client.run(command, check=True)
             matching_lines = result.stdout.strip().splitlines()
             return matching_lines
-        except Exception as e:
+        except Exception:
             return []
 
 
@@ -102,7 +98,7 @@ class RemoteShellConnection:
             await self.ssh_client.run(f" chmod 644 {dest_path}")
             await self.ssh_client.run( f" chown -R couchbase:couchbase {dest_path}")
             return True
-        except Exception as e:
+        except Exception:
             return False
     async def add_user(self,name,password, role):
         try:
@@ -130,7 +126,7 @@ class RemoteShellConnection:
             await self.move_file(local_database_path,"/opt/couchbase-edge-server/database/db.cblite2.zip")
         cmd_check_unzip = "command -v unzip ||  apt-get update &&  apt-get install -y unzip"
         await self.ssh_client.run( cmd_check_unzip,check=True)
-        await self.ssh_client.run( f"unzip -o /opt/couchbase-edge-server/database/db.cblite2.zip -d /opt/couchbase-edge-server/database",check=True)
+        await self.ssh_client.run( "unzip -o /opt/couchbase-edge-server/database/db.cblite2.zip -d /opt/couchbase-edge-server/database",check=True)
         await self.ssh_client.run("chown -R couchbase:couchbase /opt/couchbase-edge-server/database")
 
     async def close(self):
@@ -144,7 +140,7 @@ class RemoteShellConnection:
             command=" systemctl stop sync_gateway"
             await self.ssh_client.run(command, check=True)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     async def start_sgw(self, config_file: str) -> bool:
@@ -152,6 +148,6 @@ class RemoteShellConnection:
             command="systemctl restart sync_gateway"
             await self.ssh_client.run(command, check=True)
             return True
-        except Exception as e:
+        except Exception:
             return False
 

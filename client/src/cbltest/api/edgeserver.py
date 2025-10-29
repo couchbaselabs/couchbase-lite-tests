@@ -1,32 +1,19 @@
-import ssl
 import uuid
-from abc import ABC, abstractmethod
 import json
-from json import dumps, loads
-from operator import truediv
-from pathlib import Path
-from symbol import raise_stmt
+from json import dumps
 from typing import Dict, List, Tuple, cast, Any, Optional
 from urllib.parse import urljoin
 import pyjson5 as json5
-import os
-from aiohttp import ClientSession, BasicAuth, TCPConnector
-from couchbase.pycbc_core import result
+from aiohttp import ClientSession, BasicAuth
 from opentelemetry.trace import get_tracer
-from setuptools.command.setopt import config_file
 from varname import nameof
-import random
 from cbltest.api.error import CblEdgeServerBadResponseError
 from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_warning, cbl_info
-from cbltest.logging import cbl_error, cbl_trace
 from cbltest.version import VERSION
-from cbltest.utils import assert_not_null
-from cbltest.api.syncgateway import AllDocumentsResponseRow, AllDocumentsResponse, DocumentUpdateEntry, RemoteDocument, CouchbaseVersion
-from deprecated import deprecated
+from cbltest.api.syncgateway import AllDocumentsResponse, RemoteDocument, CouchbaseVersion
 import urllib.parse
 from cbltest.api.error import CblTestError
 from cbltest.api.remoteshell import RemoteShellConnection
@@ -159,10 +146,10 @@ class EdgeServer:
                             data: Optional[Dict] = None, params: Optional[Dict[str, str]] = None) -> str:
         curl_command = f"curl -X {method.upper()} "
         if self.__mtls:
-            curl_command+=f"--cert /opt/clientcert --key /opt/clientkey"
-            curl_command += f" --cacert /opt/rootcert "
+            curl_command+="--cert /opt/clientcert --key /opt/clientkey"
+            curl_command += " --cacert /opt/rootcert "
         elif self.__secure:
-            curl_command+=f" --cacert /opt/certfile_tls "
+            curl_command+=" --cacert /opt/certfile_tls "
         if self.__auth:
             curl_command+=f" -u {self.__auth_name}:{self.__auth_password} "
         if '?' in path:
@@ -191,7 +178,7 @@ class EdgeServer:
         if session is None:
             session = self.__session
 
-        with self.__tracer.start_as_current_span(f"send_request",
+        with self.__tracer.start_as_current_span("send_request",
                                                  attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()

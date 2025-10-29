@@ -1,17 +1,12 @@
 import asyncio
 import time
 
-import requests
-from couchbase.pycbc_core import exception
-from future.backports.http.client import responses
-import concurrent.futures
 import json
 from typing import Dict, List, Optional
-from cbltest.api.syncgateway import AllDocumentsResponseRow, AllDocumentsResponse, DocumentUpdateEntry, RemoteDocument, CouchbaseVersion
+from cbltest.api.syncgateway import AllDocumentsResponse, RemoteDocument
 from cbltest.api.edgeserver import EdgeServer,BulkDocOperation
 from cbltest.api.remoteshell import RemoteShellConnection
 from cbltest.api.error import CblEdgeServerBadResponseError
-from gevent.testing.travis import command
 
 
 class HTTPClient:

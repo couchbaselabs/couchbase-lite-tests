@@ -1,26 +1,9 @@
-import json
-from datetime import timedelta
-from http.client import responses
 from pathlib import Path
-from random import randint
-from typing import List
-import random
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
-from cbltest.api.edgeserver import EdgeServer
-from cbltest.api.error_types import ErrorDomain
-from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry, ReplicatorActivityLevel, \
-    WaitForDocumentEventEntry
-from cbltest.api.replicator_types import ReplicatorBasicAuthenticator, ReplicatorDocumentFlags
-from cbltest.api.syncgateway import DocumentUpdateEntry
-from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.utils import assert_not_null
 import os
-from cbltest.api.edgeserver import EdgeServer, BulkDocOperation, EdgeServerVersion
-from cbltest.api.httpclient import HTTPClient,ClientFactory
-from conftest import cblpytest
+from cbltest.api.httpclient import HTTPClient
 from deepdiff import DeepDiff
 
 class TestQueryEdgeServer(CBLTestClass):

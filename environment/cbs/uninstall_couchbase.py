@@ -1,5 +1,4 @@
 import json
-import subprocess
 import sys
 from optparse import OptionParser
 import paramiko

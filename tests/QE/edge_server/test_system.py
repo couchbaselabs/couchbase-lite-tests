@@ -1,8 +1,6 @@
 from datetime import timedelta, datetime
 from pathlib import Path
-from random import randint
 from typing import List
-import asyncio
 import random
 import pytest
 import time
@@ -10,20 +8,10 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.error import CblEdgeServerBadResponseError, CblSyncGatewayBadResponseError
-from cbltest.api.edgeserver import EdgeServer, BulkDocOperation
-from cbltest.api.httpclient import HTTPClient, ClientFactory
-from cbltest.api.error_types import ErrorDomain
-from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry, ReplicatorActivityLevel, \
-    WaitForDocumentEventEntry
-from cbltest.api.replicator_types import ReplicatorBasicAuthenticator, ReplicatorDocumentFlags
-from cbltest.api.couchbaseserver import CouchbaseServer
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
-from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.utils import assert_not_null
+from cbltest.api.httpclient import ClientFactory
+from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 
-from conftest import cblpytest
 
-from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 import logging
 
 logger = logging.getLogger(__name__)
@@ -190,7 +178,7 @@ class TestSystem(CBLTestClass):
                     try:
                         document = await edge_server.get_document(es_db_name, doc_id)
                         print(document)
-                    except CblEdgeServerBadResponseError as e:
+                    except CblEdgeServerBadResponseError:
                         assert CblEdgeServerBadResponseError, f"Document {doc_id} not deleted from Edge Server"
 
                     logger.info(f"Document {doc_id} deleted from Edge Server")
@@ -201,7 +189,7 @@ class TestSystem(CBLTestClass):
                         
                     try:
                         document = await sync_gateway.get_document(sg_db_name, doc_id)
-                    except CblSyncGatewayBadResponseError as e:
+                    except CblSyncGatewayBadResponseError:
                         assert CblSyncGatewayBadResponseError, f"Document {doc_id} not deleted from Sync Gateway"
 
                     logger.info(f"Document {doc_id} deleted from Sync Gateway")
@@ -277,7 +265,7 @@ class TestSystem(CBLTestClass):
                     try:
                         document = await edge_server.get_document(es_db_name, doc_id)
                         print(document)
-                    except CblEdgeServerBadResponseError as e:
+                    except CblEdgeServerBadResponseError:
                         assert CblEdgeServerBadResponseError, f"Document {doc_id} not deleted from Edge Server"
 
                     logger.info(f"Document {doc_id} deleted from Edge Server")
@@ -481,7 +469,7 @@ class TestSystem(CBLTestClass):
                         try:
                             document = await edge_server.get_document(es_db_name, doc_id)
                             print(document)
-                        except CblEdgeServerBadResponseError as e:
+                        except CblEdgeServerBadResponseError:
                             assert CblEdgeServerBadResponseError, f"Document {doc_id} not deleted from Edge Server"
 
                         logger.info(f"Document {doc_id} deleted from Edge Server")
@@ -492,7 +480,7 @@ class TestSystem(CBLTestClass):
                         
                         try:
                             document = await sync_gateway.get_document(sg_db_name, doc_id)
-                        except CblSyncGatewayBadResponseError as e:
+                        except CblSyncGatewayBadResponseError:
                             assert CblSyncGatewayBadResponseError, f"Document {doc_id} not deleted from Sync Gateway"
 
                         logger.info(f"Document {doc_id} deleted from Sync Gateway")
@@ -567,7 +555,7 @@ class TestSystem(CBLTestClass):
                         try:
                             document = await edge_server.get_document(es_db_name, doc_id)
                             print(document)
-                        except CblEdgeServerBadResponseError as e:
+                        except CblEdgeServerBadResponseError:
                             assert CblEdgeServerBadResponseError, f"Document {doc_id} not deleted from Edge Server"
 
                         logger.info(f"Document {doc_id} deleted from Edge Server")
@@ -728,7 +716,7 @@ class TestSystem(CBLTestClass):
 
                 if "update" in operations:
                     # Update on sync gateway and validate on edge server
-                    logger.info(f"Updating last 5 documents via Sync Gateway")
+                    logger.info("Updating last 5 documents via Sync Gateway")
                     updated_doc = {
                         "channels": ["public"],
                         "timestamp": datetime.utcnow().isoformat(),
@@ -755,7 +743,7 @@ class TestSystem(CBLTestClass):
                         assert document.id == i, f"Document ID mismatch: {document.id}"
                         assert document.revid is not None, "Revision ID (_rev) missing in the document"
 
-                    logger.info(f"Documents fetched successfully from edge server")
+                    logger.info("Documents fetched successfully from edge server")
 
                     # Storing the revision ID
                     rev_id = document.revid
@@ -787,7 +775,7 @@ class TestSystem(CBLTestClass):
                     try:
                         document = await edge_server.get_document(es_db_name, doc_id)
                         print(document)
-                    except CblEdgeServerBadResponseError as e:
+                    except CblEdgeServerBadResponseError:
                         assert CblEdgeServerBadResponseError, f"Document {doc_id} not deleted from Edge Server"
 
                     logger.info(f"Document {doc_id} deleted from Edge Server")
@@ -796,7 +784,7 @@ class TestSystem(CBLTestClass):
                     
                     try:
                         document = await sync_gateway.get_document(sg_db_name, doc_id)
-                    except CblSyncGatewayBadResponseError as e:
+                    except CblSyncGatewayBadResponseError:
                         assert CblSyncGatewayBadResponseError, f"Document {doc_id} not deleted from Sync Gateway"
 
                     logger.info(f"Document {doc_id} deleted from Sync Gateway")
@@ -892,7 +880,7 @@ class TestSystem(CBLTestClass):
                     try:
                         document = await edge_server.get_document(es_db_name, doc_id)
                         print(document)
-                    except CblEdgeServerBadResponseError as e:
+                    except CblEdgeServerBadResponseError:
                         assert CblEdgeServerBadResponseError, f"Document {doc_id} not deleted from Edge Server"
 
                     logger.info(f"Document {doc_id} deleted from Edge Server")
@@ -1081,7 +1069,7 @@ class TestSystem(CBLTestClass):
 
                 if "update" in operations:
                     # Update on sync gateway and validate on edge server
-                    logger.info(f"Updating last 5 documents via Sync Gateway")
+                    logger.info("Updating last 5 documents via Sync Gateway")
                     updated_doc = {
                         "id": doc_id,
                         "channels": ["public"],
@@ -1110,7 +1098,7 @@ class TestSystem(CBLTestClass):
                             assert document.id == i, f"Document ID mismatch: {document.id}"
                             assert document.revid is not None, "Revision ID (_rev) missing in the document"
 
-                        logger.info(f"Documents fetched successfully from edge server")
+                        logger.info("Documents fetched successfully from edge server")
 
                     # Storing the revision ID
                     rev_id = response.revid
@@ -1142,7 +1130,7 @@ class TestSystem(CBLTestClass):
                         
                         try:
                             document = await sync_gateway.get_document(sg_db_name, doc_id)
-                        except CblSyncGatewayBadResponseError as e:
+                        except CblSyncGatewayBadResponseError:
                             assert CblSyncGatewayBadResponseError, f"Document {doc_id} not deleted from Sync Gateway"
 
                         logger.info(f"Document {doc_id} deleted from Sync Gateway")
@@ -1230,7 +1218,7 @@ class TestSystem(CBLTestClass):
                         try:
                             document = await edge_server.get_document(es_db_name, doc_id)
                             print(document)
-                        except CblEdgeServerBadResponseError as e:
+                        except CblEdgeServerBadResponseError:
                             assert CblEdgeServerBadResponseError, f"Document {doc_id} not deleted from Edge Server"
 
                         logger.info(f"Document {doc_id} deleted from Edge Server")

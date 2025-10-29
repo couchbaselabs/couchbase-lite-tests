@@ -1,27 +1,14 @@
 from datetime import timedelta, datetime
 from pathlib import Path
-from random import randint
-from typing import List
-import random
 import pytest
 import time
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.error import CblEdgeServerBadResponseError, CblSyncGatewayBadResponseError
-from cbltest.api.edgeserver import EdgeServer, BulkDocOperation
-from cbltest.api.error_types import ErrorDomain
-from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry, ReplicatorActivityLevel, \
-    WaitForDocumentEventEntry
-from cbltest.api.replicator_types import ReplicatorBasicAuthenticator, ReplicatorDocumentFlags
-from cbltest.api.couchbaseserver import CouchbaseServer
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
-from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.utils import assert_not_null
+from cbltest.api.syncgateway import PutDatabasePayload
 
-from conftest import cblpytest
 
-from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 import logging
 
 logger = logging.getLogger(__name__)
@@ -116,7 +103,7 @@ class TestEndtoEnd(CBLTestClass):
             logger.info(f"Starting Sync Gateway cycle for {doc_id}")
             
             # Step 1: Create Document via Sync Gateway
-            self.mark_test_step(f"Checking documents created at Sync Gateway get synced down to Edge Server")
+            self.mark_test_step("Checking documents created at Sync Gateway get synced down to Edge Server")
             logger.info(f"Step 1: Creating document {doc_id} via Sync Gateway.")
             doc = {
                 "id": doc_id,
@@ -147,7 +134,7 @@ class TestEndtoEnd(CBLTestClass):
             # print(rev_id)
 
             # Step 3: Update Document via Edge Server
-            self.mark_test_step(f"Checking documents updated Edge Server get synced up to Sync Gateway")
+            self.mark_test_step("Checking documents updated Edge Server get synced up to Sync Gateway")
             logger.info(f"Step 3: Updating document by adding a 'changed' sub document in {doc_id} via Edge Server.")
 
             updated_doc = {
@@ -177,7 +164,7 @@ class TestEndtoEnd(CBLTestClass):
             rev_id = response.revid
             
             # Step 5: Delete Document via Sync Gateway
-            self.mark_test_step(f"Checking documents deleted at Sync Gateway get synced down to Edge Server")
+            self.mark_test_step("Checking documents deleted at Sync Gateway get synced down to Edge Server")
             logger.info(f"Step 5: Deleting document {doc_id} via Sync Gateway.")
             response = await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
             assert response is None, f"Failed to delete document {doc_id} via Sync Gateway."
@@ -193,7 +180,7 @@ class TestEndtoEnd(CBLTestClass):
             try:
                 document = await edge_server.get_document(es_db_name, doc_id)
                 print(document)
-            except CblEdgeServerBadResponseError as e:
+            except CblEdgeServerBadResponseError:
                 assert CblEdgeServerBadResponseError, f"Document {doc_id} not deleted from Edge Server."
 
             logger.info(f"Document {doc_id} deleted from Edge Server.")
@@ -204,7 +191,7 @@ class TestEndtoEnd(CBLTestClass):
             logger.info(f"Starting Edge Server cycle for {doc_id}")
             
             # Step 7: Create Document via Edge Server
-            self.mark_test_step(f"Checking documents created at Edge Server get synced up to Sync Gateway")
+            self.mark_test_step("Checking documents created at Edge Server get synced up to Sync Gateway")
             logger.info(f"Step 7: Creating document {doc_id} via Edge Server.")
             doc = {
                 "id": doc_id,
@@ -233,7 +220,7 @@ class TestEndtoEnd(CBLTestClass):
             rev_id = response.revid
 
             # Step 9: Update Document via Sync Gateway
-            self.mark_test_step(f"Checking documents updated at Sync Gateway get synced down to Edge Server")
+            self.mark_test_step("Checking documents updated at Sync Gateway get synced down to Edge Server")
             logger.info(f"Step 9: Updating document {doc_id} via Sync Gateway.")
             updated_doc = {
                 "id": doc_id,
@@ -265,7 +252,7 @@ class TestEndtoEnd(CBLTestClass):
             # print(rev_id)
             
             # Step 11: Delete Document via Edge Server
-            self.mark_test_step(f"Checking documents deleted at Edge Server get synced up to Sync Gateway")
+            self.mark_test_step("Checking documents deleted at Edge Server get synced up to Sync Gateway")
             logger.info(f"Step 11: Deleting document {doc_id} via Edge Server.")
 
             response = await edge_server.delete_document(doc_id, rev_id, es_db_name)
@@ -282,7 +269,7 @@ class TestEndtoEnd(CBLTestClass):
             
             try:
                 document = await sync_gateway.get_document(sg_db_name, doc_id)
-            except CblSyncGatewayBadResponseError as e:
+            except CblSyncGatewayBadResponseError:
                 assert CblSyncGatewayBadResponseError, f"Document {doc_id} not deleted from Sync Gateway."
 
             logger.info(f"Document {doc_id} deleted from Sync Gateway.")
