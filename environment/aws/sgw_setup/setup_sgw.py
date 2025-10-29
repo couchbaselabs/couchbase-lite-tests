@@ -270,11 +270,19 @@ def setup_server(
             fail_on_error=False,
         )
     else:
-        sftp_progress_bar(
-            sftp,
-            SCRIPT_DIR / sgw_info.local_filename,
-            f"/tmp/{sgw_info.local_filename}",
-        )
+        existing_remote = sftp.stat(f"/tmp/{sgw_info.local_filename}")
+        existing_local = os.stat(SCRIPT_DIR / sgw_info.local_filename)
+        if existing_remote.st_size == existing_local.st_size:
+            click.secho(
+                f"File {sgw_info.local_filename} already exists on remote, skipping upload.",
+                fg="green",
+            )
+        else:
+            sftp_progress_bar(
+                sftp,
+                SCRIPT_DIR / sgw_info.local_filename,
+                f"/tmp/{sgw_info.local_filename}",
+            )
 
     sftp_progress_bar(sftp, SCRIPT_DIR / "start-sgw.sh", "/home/ec2-user/start-sgw.sh")
     sftp_progress_bar(
