@@ -1,55 +1,61 @@
 #!/bin/bash -e
 
-# This is the script for generating a self-sign certificate and key
-# The final output includes
-#  - sg_cert.pem // Server cert for SG config
-#  - sg_key.pem  // Server private key for SG config
-#  - cert.pem    // Cert in PEM format for pinning in CBL replicator
-#  - cert.per    // Cert in DER format for pinning in CBL replicator
+DOMAIN="compute-1.amazonaws.com"
+WILDCARD="*.compute-1.amazonaws.com"
+CREATE_CA=0
+CA_KEY="ca_key.pem"
+CA_CERT="../../../dataset/sg/ca_cert.pem"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-function usage 
-{
-  echo "Usage: ${0} -o <Output Directory>"
-}
+pushd "${SCRIPT_DIR}" > /dev/null
 
-while [[ $# -gt 0 ]]
-do
-  key=${1}
-  case $key in
-      -o)
-      OUTPUT_DIR=${2}
-      shift
-      ;;
-      *)
-      usage
-      exit 3
-      ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --create-ca)
+      CREATE_CA=1; shift ;;
+    *)
+      echo "Unknown option: $1" ;;
   esac
-  shift
 done
 
-if [ -z "$OUTPUT_DIR" ]
-then
-  usage
-  exit 4
+# Create OpenSSL config with SAN + wildcard
+cat > internal-openssl.cnf <<'EOF'
+[ req ]
+default_bits       = 4096
+prompt             = no
+default_md         = sha256
+req_extensions     = req_ext
+distinguished_name = dn
+
+[ dn ]
+CN = compute-1.amazonaws.com
+
+[ req_ext ]
+subjectAltName = @alt_names
+
+[ alt_names ]
+DNS.1 = compute-1.amazonaws.com
+DNS.2 = *.compute-1.amazonaws.com
+EOF
+
+if [[ $CREATE_CA -eq 1 ]]; then
+  echo "Creating new Private CA..."
+  # Private CA
+  openssl genrsa -out $CA_KEY 4096
+  openssl req -x509 -new -nodes -key $CA_KEY -sha256 -days 730 \
+    -subj "/CN=Internal Test CA/O=Couchbase/C=US" -out ../../../dataset/certs/$CA_CERT
+else
+  echo "Using existing Private CA..."
 fi
 
-rm -rf ${OUTPUT_DIR}
-mkdir -p ${OUTPUT_DIR}
-pushd ${OUTPUT_DIR} > /dev/null
+# Server key + CSR
+openssl genrsa -out sg_key.pem 4096
+openssl req -new -key sg_key.pem -out server.csr -config internal-openssl.cnf
 
-openssl genrsa -out server.key 2048
-openssl req -new -sha256 -key server.key -out server.csr -subj "/CN=localhost"
-openssl x509 -req -sha256 -days 3650 -in server.csr -signkey server.key -out server.pem
-openssl x509 -in server.pem -out server.cer -outform DER 
+# Sign leaf cert
+openssl x509 -req -in server.csr -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial \
+  -out sg_cert.pem -days 365 -sha256 -extensions req_ext -extfile internal-openssl.cnf
 
-cp server.pem sg_cert.pem
-cp server.key sg_key.pem
-cp server.pem cert.pem
-cp server.cer cert.cer
-
-rm -rf server.*
-
-echo "Created sg_cert.pem (SG Config), sg_key.pem (SG Config), and cert.pem/cer (For pinning) ..."
-
-popd > /dev/null
+# Full chain
+cat sg_cert.pem ca_cert.pem > sg_fullchain.pem
+rm internal-openssl.cnf server.csr

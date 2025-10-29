@@ -14,11 +14,15 @@
 
 import { KeyPathCache } from "./keyPath";
 import { LogSlurpSender } from "./logSlurpSender";
-import { check, HTTPError } from "./httpError";
+import { check, HTTPError, normalizeCollectionID } from "./utils";
+import { Snapshot } from "./snapshot";
 import type { TestRequest } from "./testServer";
 import * as tdk from "./tdkSchema";
 import * as cbl from "@couchbase/lite-js";
 import * as logtape from "@logtape/logtape";
+import { TDKConflictResolvers } from "./conflictResolvers";
+import { CreatePushFilter, CreatePullFilter } from "./filters";
+import path from "path";
 
 
 interface ReplicatorInfo {
@@ -26,6 +30,16 @@ interface ReplicatorInfo {
     documents?  : tdk.DocumentReplication[],
     finished    : boolean,
     error?      : Error,
+}
+
+
+/** Parameter type of Collection.updateMultiple.
+ *  TODO: Replace with `cbl.MultipleUpdates` once that's exported from CBL. */
+interface CollectionUpdates {
+    save?       : cbl.CBLDocument[],
+    delete?     : cbl.CBLDocument[],
+    bestEffort? : boolean,
+    onConflict? : cbl.ConflictHandler,
 }
 
 
@@ -108,7 +122,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         const response: tdk.GetAllDocumentsResponse = {};
         for (const collName of rq.collections) {
             if (collName in db.collections) {
-                const coll = db.getCollection(collName);
+                const coll = db.getCollection(normalizeCollectionID(collName));
                 const docs = new Array<{id:cbl.DocID, rev:cbl.RevID}>();
                 response[collName] = docs;
                 await coll.eachDocument( doc => {
@@ -136,43 +150,61 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     //////// UPDATE DATABASE:
     async [tdk.UpdateDatabaseCommand] (rq: tdk.UpdateDatabaseRequest): Promise<void> {
         const db = this.#getDatabase(rq.database);
-        await db.inTransaction("rw", db.collectionNames, async () => {
-            for (const update of rq.updates) {
-                const coll = db.getCollection(normalizeCollectionID(update.collection));
-                const doc = await coll.getDocument(update.documentID);
-                if (!doc) throw new HTTPError(404, `No document "${update.documentID}"`);
-                switch (update.type) {
-                    case 'UPDATE': {
-                        if (update.updatedProperties) {
-                            for (const props of update.updatedProperties) {
-                                for (const pathStr of Object.getOwnPropertyNames(props)) {
-                                    if (!this.#keyPaths.path(pathStr).write(doc, props[pathStr]))
-                                        throw new HTTPError(400, `Invalid path ${pathStr} in doc ${update.documentID}`);
-                                }
-                            }
-                        }
-                        if (update.removedProperties) {
-                            for (const props of update.removedProperties) {
-                                for (const pathStr of props) {
-                                    if (!this.#keyPaths.path(pathStr).write(doc, undefined))
-                                        throw new HTTPError(400, `Invalid path ${pathStr} in doc ${update.documentID}`);
-                                }
-                            }
-                        }
-                        if (update.updatedBlobs) {
-                            throw new HTTPError(501, "updatedBlobs is not implemented yet"); //TODO
-                        }
-                        break;
-                    }
-                    case 'DELETE':
-                        await coll.delete(doc);
-                        break;
-                    case 'PURGE':
-                        await coll.purge(doc);
-                        break;
-                }
+        const dbUpdates = new Map<cbl.Collection, CollectionUpdates>();
+
+        // Wrapping this loop in a transaction won't work, because the async call to downloadBlob
+        // is illegal: the only async calls you can make in a transaction are calls to that DB.
+        // Instead, we collect the docs to update/delete and then do a batch update at the end.
+        for (const update of rq.updates) {
+            const coll = db.getCollection(normalizeCollectionID(update.collection));
+            let collUpdates = dbUpdates.get(coll);
+            if (!collUpdates) {
+                collUpdates = {save: [], delete: []};
+                dbUpdates.set(coll, collUpdates);
             }
-        });
+
+            const doc = (await coll.getDocument(update.documentID)) ??
+                        coll.createDocument(update.documentID);
+
+            function updatePath(pathStr: string, value: cbl.CBLValue | undefined): void {
+                if (!KeyPathCache.path(pathStr).write(doc, value))
+                    throw new HTTPError(400, `Invalid path ${pathStr} in doc ${update.documentID}`);
+            };
+
+            switch (update.type) {
+                case 'UPDATE': {
+                    if (update.updatedProperties) {
+                        for (const props of update.updatedProperties) {
+                            for (const pathStr of Object.getOwnPropertyNames(props))
+                                updatePath(pathStr, props[pathStr]);
+                        }
+                    }
+                    if (update.removedProperties) {
+                        for (const props of update.removedProperties) {
+                            updatePath(props, undefined);
+                        }
+                    }
+                    if (update.updatedBlobs) {
+                        for (const pathStr of Object.getOwnPropertyNames(update.updatedBlobs)) {
+                            const blob = await this.#downloadBlob(update.updatedBlobs[pathStr]);
+                            updatePath(pathStr, blob);
+                        }
+                    }
+                    collUpdates.save!.push(doc);
+                    break;
+                }
+                case 'DELETE':
+                    collUpdates.delete!.push(doc);
+                    break;
+                case 'PURGE':
+                    await coll.purge(doc);  // Collection.updateMultiple doesn't do purges
+                    break;
+            }
+        }
+
+        // Now update the database:
+        for (const collection of dbUpdates.keys())
+            await collection.updateMultiple(dbUpdates.get(collection)!);
     }
 
 
@@ -184,27 +216,40 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             url:         rq.config.endpoint,
             collections: {},
         };
+        if (rq.config.authenticator) {
+            if (rq.config.authenticator.type !== 'BASIC')
+                throw new HTTPError(501, "Only Basic auth is supported");
+            const basicAuth = rq.config.authenticator as tdk.ReplicatorBasicAuthenticator;
+            config.credentials = {
+                username: basicAuth.username,
+                password: basicAuth.password
+            };
+        }
         for (const colls of rq.config.collections) {
-            if (colls.documentIDs || colls.pushFilter || colls.pullFilter || colls.conflictResolver)
+            if (colls.documentIDs)
                 throw new HTTPError(501, "Unimplemented replication feature(s)");
             const collCfg: cbl.ReplicatorCollectionConfig = { };
             if (rq.config.replicatorType !== 'pull') {
                 collCfg.push = {
                     continuous: rq.config.continuous,
-                    //filter: colls.pushFilter                  //TODO
+                    filter:     CreatePushFilter(colls.pushFilter),
                 };
             }
             if (rq.config.replicatorType !== 'push') {
                 collCfg.pull = {
                     continuous: rq.config.continuous,
                     channels:   colls.channels,
-                    //documentIDs: colls.documentIDs,           //FIXME
-                    //filter: colls.pullFilter,                 //TODO
-                    //conflictResolver: colls.conflictResolver, //TODO
+                    filter:     CreatePullFilter(colls.pullFilter),
                 };
+                if (colls.conflictResolver) {
+                    const name = colls.conflictResolver.name;
+                    const resolverFn = TDKConflictResolvers[name]?.(colls.conflictResolver);
+                    check(resolverFn !== undefined, `Unknown conflict resolver "${name}"`);
+                    collCfg.pull.conflictResolver = resolverFn;
+                }
             }
             for (const collName of colls.names)
-                config.collections[collName] = collCfg;
+                config.collections[normalizeCollectionID(collName)] = collCfg;
         }
 
         const repl = new cbl.Replicator(config);
@@ -274,20 +319,41 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
 
 
     //////// PERFORM MAINTENANCE:
-    async [tdk.PerformMaintenanceCommand] (_rq: tdk.PerformMaintenanceRequest): Promise<void> {
-        throw new HTTPError(501);   // TODO
+    async [tdk.PerformMaintenanceCommand] (rq: tdk.PerformMaintenanceRequest): Promise<void> {
+        const db = this.#getDatabase(rq.database);
+        switch (rq.maintenanceType) {
+            case 'compact':
+                await db.performMaintenance('compact');
+                break;
+            default:
+                throw new HTTPError(501, "Unimplemented maintenance type");
+        }
     }
 
 
     //////// SNAPSHOT DOCUMENTS:
-    async [tdk.SnapshotDocumentsCommand] (_rq: tdk.SnapshotDocumentsRequest): Promise<tdk.SnapshotDocumentsResponse> {
-        throw new HTTPError(501);   // TODO
+    async [tdk.SnapshotDocumentsCommand] (rq: tdk.SnapshotDocumentsRequest): Promise<tdk.SnapshotDocumentsResponse> {
+        const db = this.#getDatabase(rq.database);
+        const snap = new Snapshot(db);
+        for (const d of rq.documents)
+            await snap.record(d.collection, d.id);
+        const snapID = `snap-${++this.#snapshotCounter}`;
+        this.#snapshots.set(snapID, snap);
+        return {id: snapID};
     }
 
 
     //////// VERIFY DOCUMENTS:
-    async [tdk.VerifyDocumentsCommand] (_rq: tdk.VerifyDocumentsRequest): Promise<tdk.VerifyDocumentsResponse> {
-        throw new HTTPError(501);   // TODO
+    async [tdk.VerifyDocumentsCommand] (rq: tdk.VerifyDocumentsRequest): Promise<tdk.VerifyDocumentsResponse> {
+        const db = this.#getDatabase(rq.database);
+        const snap = this.#snapshots.get(rq.snapshot);
+        if (snap === undefined)
+            throw new HTTPError(404, `No such snapshot ${rq.snapshot}`);
+        if (snap.db !== db)
+            throw new HTTPError(400, `Snapshot is of a different database, ${db.name}`);
+        this.#snapshots.delete(rq.snapshot);
+
+        return await snap.verify(rq.changes, this.#downloadBlob.bind(this));
     }
 
 
@@ -340,7 +406,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         let totalDocs = 0, totalBlobs = 0;
         for (const collID of config.collections) {
             this.#logger.debug `- Loading docs in collection ${collID}...`;
-            const collection = db.getCollection(collID);
+            const collection = db.getCollection(normalizeCollectionID(collID));
             const docs: cbl.CBLDocument[] = [];
             const jsonl = await fetchRelative(`${collID}.jsonl`);
             for (const line of jsonl.trim().split('\n')) {
@@ -379,7 +445,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                 obj = obj as cbl.CBLDictionary;
                 if (obj["@type"] === "blob" && typeof obj.digest === "string") {
                     ++totalBlobs;
-                    return await this.#downloadBlob(obj as unknown as cbl.Bloblike, datasetURL);
+                    return await this.#downloadDataSetBlob(obj as unknown as cbl.Bloblike, datasetURL);
                 }
                 for (const key of Object.getOwnPropertyNames(obj)) {
                     const blob = await _installBlobs(obj[key]);  // recurse
@@ -394,32 +460,49 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     }
 
 
-    async #downloadBlob(blobMeta: cbl.Bloblike, datasetURL: string): Promise<cbl.NewBlob> {
+    async #downloadDataSetBlob(blobMeta: cbl.Bloblike, datasetURL: string): Promise<cbl.NewBlob> {
         check(blobMeta.digest.startsWith("sha1-"), "Unexpected prefix in blob digest");
         const digest = blobMeta.digest.substring(5).replaceAll('/', '_');
         const blobURL = `${datasetURL}Attachments/${digest}.blob`;
         this.#logger.info `  - downloading blob ${blobMeta.digest}`;
-        const response = await fetch(blobURL);
-        if (response.status !== 200)
-            throw new HTTPError(502, `Unable to load blob from <${blobURL}>: ${response.status} ${response.statusText}`);
+        const contents = await this.#downloadBlobContents(blobURL);
+        return new cbl.NewBlob(contents, blobMeta.content_type);
+    }
+
+
+    async #downloadBlob(blobURL: string): Promise<cbl.NewBlob> {
+        if (blobURL.endsWith(".zip"))
+            throw new HTTPError(501, "Unzipping blobs is not supported");
+        const contents = await this.#downloadBlobContents(blobURL);
+        const type = blobURL.endsWith(".jpg") ? "image/jpeg" : "application/octet-stream";
+        return new cbl.NewBlob(contents, type);
+    }
+
+
+    async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
+        const absURL = new URL(blobURL, tdk.kBlobBaseURL);
+        const response = await fetch(absURL);
+        if (response.status !== 200){
+            let ret_code = 502
+            if (response.status === 404) {
+                ret_code = 400
+            }
+
+            throw new HTTPError(ret_code, `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`);
+        }
         const data = await response.arrayBuffer();
-        return new cbl.NewBlob(new Uint8Array(data), blobMeta.content_type);
+        return new Uint8Array(data);
     }
 
 
     readonly #databases     = new Map<string,cbl.Database>();
     readonly #replicators   = new Map<string,ReplicatorInfo>();
-    readonly #keyPaths      = new KeyPathCache();
+    readonly #snapshots     = new Map<string,Snapshot>();
     readonly #logger        = logtape.getLogger("TDK");
     #idCounter              = 0;
+    #snapshotCounter        = 0;
     #sessionID?             : string;
     #logSender?             : LogSlurpSender;
-}
-
-
-/** Strips the default scope name from an incoming collection ID. */
-function normalizeCollectionID(id: string): string {
-    return id.startsWith("_default.") ? id.substring(9) : id;
 }
 
 /** Adds the default scope name, if necessary, to an outgoing collection ID. */

@@ -54,29 +54,6 @@ def check_aws_key_checking() -> None:
         )
 
 
-def get_ec2_hostname(hostname: str) -> str:
-    """
-    Convert an IP address to an EC2 hostname.
-
-    Args:
-        hostname (str): The IP address.
-
-    Returns:
-        str: The EC2 hostname.
-
-    Raises:
-        ValueError: If the hostname is not an IP address.
-    """
-    if hostname.startswith("ec2-"):
-        return hostname
-
-    components = hostname.split(".")
-    if len(components) != 4:
-        raise ValueError(f"Invalid hostname {hostname}")
-
-    return f"ec2-{hostname.replace('.', '-')}.compute-1.amazonaws.com"
-
-
 def start_container(
     name: str,
     context_name: str,
