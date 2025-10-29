@@ -1,11 +1,9 @@
 import json
 import optparse
-import os
 import subprocess
 import sys
 import time
 import paramiko
-from distutils.command.build import build
 
 def fix_hostname(ip):
     """Ensure the remote machine has the correct hostname entry in /etc/hosts."""
@@ -117,7 +115,7 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build, crea
         print("Setting up database directory...")
         run_remote_command(edge_server_ip, "sudo mkdir -p /opt/couchbase-edge-server/database")
         run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/database")
-        run_remote_command(edge_server_ip, f"sudo chown -R couchbase:couchbase /opt/couchbase-edge-server/database")
+        run_remote_command(edge_server_ip, "sudo chown -R couchbase:couchbase /opt/couchbase-edge-server/database")
         print(f"Copying database file to {data_file_path}...")
         cmd_check_sshpass = "command -v sshpass || sudo apt-get update && sudo apt-get install -y sshpass"
         run_remote_command(edge_server_ip, cmd_check_sshpass)
@@ -133,7 +131,7 @@ def install_edge_server(edge_server_ip, edge_server_config, version, build, crea
         run_remote_command(edge_server_ip, "sudo mkdir -p /opt/couchbase-edge-server/users")
         run_remote_command(edge_server_ip, "sudo chmod 755 -R /opt/couchbase-edge-server/users")
         run_remote_command(edge_server_ip, "sudo chown -R couchbase:couchbase /opt/couchbase-edge-server/users")
-        command = f"/opt/couchbase-edge-server/bin/couchbase-edge-server --add-user /opt/couchbase-edge-server/users/users.json  admin_user --create --role admin --password password"
+        command = "/opt/couchbase-edge-server/bin/couchbase-edge-server --add-user /opt/couchbase-edge-server/users/users.json  admin_user --create --role admin --password password"
         run_remote_command(edge_server_ip, command)
     
     run_remote_command(edge_server_ip, f"sudo chmod 644 {config_file_path}")

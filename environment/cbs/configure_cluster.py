@@ -1,6 +1,4 @@
 import json
-import subprocess
-import os
 import optparse
 import sys
 import paramiko

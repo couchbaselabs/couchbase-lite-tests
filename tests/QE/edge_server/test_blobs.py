@@ -1,27 +1,13 @@
-from datetime import timedelta, datetime
+from datetime import datetime
 from pathlib import Path
-from random import randint
-from typing import List
-import random
 import pytest
-import time
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
-from cbltest.api.error import CblEdgeServerBadResponseError, CblSyncGatewayBadResponseError
-from cbltest.api.edgeserver import EdgeServer, BulkDocOperation
-from cbltest.api.error_types import ErrorDomain
-from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry, ReplicatorActivityLevel, \
-    WaitForDocumentEventEntry
-from cbltest.api.replicator_types import ReplicatorBasicAuthenticator, ReplicatorDocumentFlags
-from cbltest.api.couchbaseserver import CouchbaseServer
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
-from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.utils import assert_not_null
+from cbltest.api.error import CblEdgeServerBadResponseError
+from cbltest.api.syncgateway import PutDatabasePayload
 
-from conftest import cblpytest
 
-from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 import logging
 
 logger = logging.getLogger(__name__)
@@ -332,7 +318,7 @@ class TestBlobs(CBLTestClass):
 
         try:
             blob = await edge_server.get_sub_document(doc_id, attachment_name, es_db_name)
-        except CblEdgeServerBadResponseError as e:
+        except CblEdgeServerBadResponseError:
             assert CblEdgeServerBadResponseError, "Able to retrieve nonexistent blob from document."
 
         logger.info("Nonexistent blob retrieval test passed.")
@@ -371,7 +357,7 @@ class TestBlobs(CBLTestClass):
 
         try:
             response = await edge_server.delete_sub_document(doc_id, rev_id, attachment_name, es_db_name)
-        except CblEdgeServerBadResponseError as e:
+        except CblEdgeServerBadResponseError:
             assert CblEdgeServerBadResponseError, "Able to delete nonexistent blob from document."
 
         logger.info("Nonexistent blob deletion test passed.")
@@ -424,7 +410,7 @@ class TestBlobs(CBLTestClass):
 
         try:
             response = await edge_server.put_sub_document(doc_id, "incorrect rev", attachment_name, es_db_name, value=updated_data)
-        except CblEdgeServerBadResponseError as e:
+        except CblEdgeServerBadResponseError:
             assert CblEdgeServerBadResponseError, "Able to update blob with incorrect revision in document."
 
         logger.info("Incorrect revision blob update test passed.")
@@ -450,7 +436,7 @@ class TestBlobs(CBLTestClass):
 
         try:
             response = await edge_server.put_sub_document(doc_id, "1-abcdef", attachment_name, es_db_name, value=image_data)
-        except CblEdgeServerBadResponseError as e:
+        except CblEdgeServerBadResponseError:
             assert CblEdgeServerBadResponseError, "Able to add blob to nonexistent document."
 
         logger.info("Nonexistent document blob addition test passed.")
@@ -567,7 +553,7 @@ class TestBlobs(CBLTestClass):
 
         try:
             response = await edge_server.put_sub_document(doc_id, rev_id, attachment_name, es_db_name, value=image_data)
-        except CblEdgeServerBadResponseError as e:
+        except CblEdgeServerBadResponseError:
             assert CblEdgeServerBadResponseError, "Able to add blob exceeding max size to document."
 
         assert "413" in str(e), f"Expected HTTP 413 status code in error message but got '{str(e)}'"

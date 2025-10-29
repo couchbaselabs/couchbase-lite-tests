@@ -7,10 +7,6 @@ from cbltest.api.database import Database
 from cbltest.api.replicator_types import ReplicatorType
 from cbltest.api.syncgateway import SyncGateway, AllDocumentsResponseRow
 from cbltest.version import VERSION
-import os
-import signal
-import subprocess
-import paramiko
 
 def _compare_revisions(cbl_rev: str, sg_rev: List[Optional[str]]):
     """

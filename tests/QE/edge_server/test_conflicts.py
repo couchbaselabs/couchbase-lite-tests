@@ -1,27 +1,13 @@
-from datetime import timedelta, datetime
+from datetime import datetime
 from pathlib import Path
-from random import randint
-from typing import List
-import random
 import pytest
 import time
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
-from cbltest.api.error import CblEdgeServerBadResponseError, CblSyncGatewayBadResponseError
-from cbltest.api.edgeserver import EdgeServer, BulkDocOperation
-from cbltest.api.error_types import ErrorDomain
-from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry, ReplicatorActivityLevel, \
-    WaitForDocumentEventEntry
-from cbltest.api.replicator_types import ReplicatorBasicAuthenticator, ReplicatorDocumentFlags
-from cbltest.api.couchbaseserver import CouchbaseServer
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
-from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.utils import assert_not_null
+from cbltest.api.syncgateway import PutDatabasePayload
 
-from conftest import cblpytest
 
-from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 import logging
 
 logger = logging.getLogger(__name__)
