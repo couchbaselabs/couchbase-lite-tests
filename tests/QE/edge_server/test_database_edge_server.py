@@ -22,7 +22,7 @@ class TestDatabase(CBLTestClass):
         assert len(dbs) == 1
     #     test write permission
         resp=await edge_server.add_document_auto_id({"test":"success"},db_name=dbs[0])
-        assert resp.get("ok")==True, f"insert doc failed with resp {resp}"
+        assert resp.get("ok"), f"insert doc failed with resp {resp}"
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_server_incorrect_db_config(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:

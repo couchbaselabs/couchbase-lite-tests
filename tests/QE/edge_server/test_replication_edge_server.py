@@ -79,7 +79,7 @@ class TestEdgeServerSync(CBLTestClass):
         }
 
         # Update via Edge HTTP client
-        update_resp = await client.put_document_with_id(
+        await client.put_document_with_id(
             update_doc,
             "airline_10000",
             "travel",
@@ -164,7 +164,7 @@ class TestEdgeServerSync(CBLTestClass):
         }
 
         # Update via Edge HTTP client
-        update_resp = await client.put_document_with_id(
+        await client.put_document_with_id(
             update_doc,
             "airline_10000",
             "travel",

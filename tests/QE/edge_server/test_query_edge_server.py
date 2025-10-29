@@ -28,7 +28,7 @@ class TestQueryEdgeServer(CBLTestClass):
         )
         self.mark_test_step(f"Query results: {response}")
         assert "name_144" in response.values()
-        assert len(results["results"]) >= 1
+        assert len(response["results"]) >= 1
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_adhoc_queries(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:

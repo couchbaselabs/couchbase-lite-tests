@@ -1,5 +1,3 @@
-from json import dumps
-
 from .api.couchbaseserver import CouchbaseServer
 from .api.edgeserver import EdgeServer
 from .api.httpclient import HTTPClient
@@ -16,6 +14,7 @@ from .configparser import (
 from .extrapropsparser import _parse_extra_props
 from .globals import CBLPyTestGlobal
 from .logging import LogLevel, cbl_log_init, cbl_setLogLevel
+from json import dumps
 from .requests import RequestFactory
 
 

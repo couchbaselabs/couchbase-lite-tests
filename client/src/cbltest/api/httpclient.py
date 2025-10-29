@@ -55,7 +55,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Delete document had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Delete document from edge server had error '{response}'")
 
     async def get_document(self, db_name: str, doc_id: str, scope: str = "", collection: str = "",revid:str=None):
@@ -67,7 +67,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Get document had error '{response_dict['reason']}'")
             return RemoteDocument(response_dict)
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Get document from edge server had error '{response}'")
 
     async def get_all_dbs(self):
@@ -87,7 +87,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Get active tasks had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Get active tasks from edge server had error '{response}'")
 
     async def get_db_info(self, db_name: str, scope: str = "", collection: str = ""):
@@ -98,7 +98,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Get database had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Get database info from edge server had error '{response}'")
 
     async def start_replication(self, source: str, target: str, user: str, password: str, bidirectional: bool,
@@ -118,7 +118,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Start replication had error '{response_dict['reason']}'")
             return response_dict.get("session_id")
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Start replication with edge server had error '{response}'")
 
     async def replication_status(self, replicator_id: str):
@@ -129,7 +129,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Adhoc query had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Get replication status from edge server had error '{response}'")
 
     async def all_replication_status(self):
@@ -140,7 +140,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Adhoc query had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500,
                                                 f"Get all replication statuses from edge server had error '{response}'")
 
@@ -152,7 +152,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Stop replication had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Stop replication had error '{response}'")
 
     async def changes_feed(self, db_name: str, scope: str = "", collection: str = "", since: Optional[int] = 0,
@@ -171,7 +171,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Changes feed had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Changes feed had error '{response}'")
 
     async def named_query(self, db_name: str, scope: str = "", collection: str = "", name: str = None,
@@ -183,7 +183,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Named query had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Named query had error '{response}'")
 
     async def adhoc_query(self, db_name: str, scope: str = "", collection: str = "", query: str = None,
@@ -195,7 +195,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Adhoc query had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Adhoc query had error '{response}'")
     
     async def add_document_auto_id(self, document: dict, db_name: str, scope: str = "", collection: str = ""):
@@ -206,7 +206,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Add document with auto ID had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Add document with auto ID had error '{response}'")
 
     async def put_document_with_id(self, document: dict, doc_id: str, db_name: str, scope: str = "", collection: str = "",rev:str=None) -> dict:
@@ -218,7 +218,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Add document with ID had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Add document with ID had error '{response}'")
 
     async def delete_sub_document(self, doc_id: str, revid: str, key: str, db_name: str, scope: str = "", collection: str = "") -> dict:
@@ -230,7 +230,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Delete sub-document had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Delete sub-document had error '{response}'")
 
     async def put_sub_document(self, doc_id: str, revid: str, key: str, db_name: str, scope: str = "", collection: str = "", value=None) -> dict:
@@ -242,7 +242,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Put sub-document had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Put sub-document had error '{response}'")
 
     async def get_sub_document(self, doc_id: str, key: str, db_name: str, scope: str = "", collection: str = ""):
@@ -254,7 +254,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Get sub-document had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Get sub-document had error '{response}'")
 
     async def bulk_doc_op(self, docs: List[BulkDocOperation], db_name: str, scope: str = "", collection: str = "", new_edits: bool = True):
@@ -266,7 +266,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"Bulk documents operation had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"Bulk documents operation had error '{response}'")
 
     async def blip_sync(self, db_name: str, scope: str = "", collection: str = ""):
@@ -278,7 +278,7 @@ class HTTPClient:
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(500, f"BLIP sync had error '{response_dict['reason']}'")
             return response_dict
-        except:
+        except Exception:
             raise CblEdgeServerBadResponseError(500, f"BLIP sync had error '{response}'")
     async def disconnect(self):
         self.remote_shell.close()

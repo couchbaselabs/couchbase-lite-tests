@@ -4,7 +4,6 @@ import pytest
 import time
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.syncgateway import PutDatabasePayload
 
 
@@ -17,7 +16,6 @@ class TestConflicts(CBLTestClass):
     async def test_conflicts(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Starting E2E test with Server, Sync Gateway, Edge Server and 1 client")
 
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 

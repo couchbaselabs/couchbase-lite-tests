@@ -153,7 +153,7 @@ def reserve_node(doc_id, job_name, counter=0):
     try:
         cb_coll.replace(doc_id, doc, cas=curr_cas)
         return True
-    except CouchbaseException as err:
+    except Exception as err:
         result = cb_coll.get(doc_id)
         doc = result.value
         if doc["state"] != "booked" and counter < 5:
