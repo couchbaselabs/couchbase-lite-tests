@@ -54,6 +54,6 @@ pushd "${QE_TESTS_DIR}" > /dev/null
 create_venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl
+pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m sgw
 deactivate
 popd > /dev/null

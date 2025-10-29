@@ -18,6 +18,7 @@ from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.responses import ServerVariant
 
 
+@pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)

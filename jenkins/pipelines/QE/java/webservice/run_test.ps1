@@ -22,7 +22,7 @@ python $PSScriptRoot\setup_test.py @python_args
 Push-Location $QE_TESTS_DIR
 try {
     uv pip install -r requirements.txt
-    pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
+    pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json -m cbl
     $saved_exit = $LASTEXITCODE
     deactivate
 } finally {

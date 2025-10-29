@@ -60,5 +60,5 @@ pushd $QE_TESTS_DIR
 create_venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json
+pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl
 deactivate
