@@ -146,18 +146,6 @@ class TestBlobs(CBLTestClass):
 
         logger.info("Blob validated successfully on Sync Gateway.")
 
-        rev_id = document.rev_id
-
-        # # Update attachment in Edge Server
-        # self.mark_test_step("Updating the blob in the document in Edge Server.")
-        # logger.info(f"Updating the blob in document {doc_id} in Edge Server.")
-
-        # # Read new image as binary data
-        # with open("../resources/images/test2.png", "rb") as img_file:
-        #     new_image_data = img_file.read()
-
-        
-
         self.mark_test_step("Deleting the blob from the document in Edge Server.")
         logger.info(f"Deleting the blob from document {doc_id} in Edge Server.")
         response = await edge_server.delete_sub_document(doc_id, rev_id, attachment_name, es_db_name)
@@ -715,24 +703,3 @@ class TestBlobs(CBLTestClass):
         logger.info("Blob with special characters validated successfully on Sync Gateway.")
 
         self.mark_test_step("Blob with special characters addition test passed.")
-
-
-
-
-
-        
-
-        
-
-
-
-
-
-
-
-
-
-
-
-    
-
