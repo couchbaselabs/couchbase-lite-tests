@@ -228,10 +228,8 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step("Verify version vectors exist for SDK documents")
         for doc_id in sample_sdk_docs:
             doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-            print(doc)
             assert doc is not None, f"Document {doc_id} not found"
             if doc.cv is not None:
-                print(doc.cv)
                 assert "@" in doc.cv, (
                     f"Document {doc_id} should have valid version vector format. Got: {doc.cv}"
                 )
