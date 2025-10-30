@@ -1,9 +1,11 @@
+import asyncio
 from pathlib import Path
 from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 
 
@@ -23,6 +25,9 @@ class TestXattrs(CBLTestClass):
         bucket_name = "data-bucket"
 
         self.mark_test_step("Create bucket and default collection")
+        cbs.drop_bucket(
+            bucket_name
+        )  # in case the bucket already exists, due to a previous failed test
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
@@ -33,7 +38,16 @@ class TestXattrs(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        await sg.put_database(sg_db, db_payload)
+        try:
+            await sg.put_database(sg_db, db_payload)
+        except CblSyncGatewayBadResponseError as e:
+            if (
+                e.code == 412
+            ):  # in case the database already exists, delete it and try again
+                await sg.delete_database(sg_db)
+                await sg.put_database(sg_db, db_payload)
+            else:
+                raise
 
         self.mark_test_step("Create user 'vipul' with access to SG and SDK channels")
         await sg.add_user(
@@ -83,6 +97,12 @@ class TestXattrs(CBLTestClass):
             f"Expected {num_docs} SG docs, but found {sg_created_count}"
         )
 
+        self.mark_test_step("Store original version vectors for SG docs")
+        original_vv: dict[str, str | None] = {}
+        for row in sg_all_docs.rows:
+            if row.id.startswith("sg_"):
+                original_vv[row.id] = row.cv
+
         self.mark_test_step("Stop Sync Gateway")
         await sg.delete_database(sg_db)
 
@@ -119,6 +139,17 @@ class TestXattrs(CBLTestClass):
             collection_access={
                 "_default": {"_default": {"admin_channels": ["SG", "SDK", "*"]}}
             },
+        )
+
+        self.mark_test_step("Wait for Sync Gateway to import SDK documents")
+        for _ in range(10):
+            sg_check = await sg.get_all_documents(sg_db, "_default", "_default")
+            imported_count = len(sg_check.rows)
+            if imported_count == num_docs * 2:
+                break
+            await asyncio.sleep(2)
+        assert imported_count == num_docs * 2, (
+            f"Document import verification failed. Expected {num_docs * 2}, got {imported_count} after 10 attempts"
         )
 
         self.mark_test_step("Verify all docs are accessible via Sync Gateway")
@@ -181,6 +212,29 @@ class TestXattrs(CBLTestClass):
             assert doc.revid and doc.revid.startswith("1-"), (
                 f"Document {doc_id} has incorrect revision: {doc.revid}"
             )
+
+        self.mark_test_step("Verify version vectors for updated SG documents")
+        for doc_id in sample_sg_docs:
+            doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
+            assert doc is not None, f"Document {doc_id} not found"
+            if doc.cv is not None:
+                original_cv = original_vv.get(doc_id)
+                if original_cv is not None:
+                    assert doc.cv != original_cv, (
+                        f"Document {doc_id} should have different version vector after SDK update. "
+                        f"Original: {original_cv}, Current: {doc.cv}"
+                    )
+
+        self.mark_test_step("Verify version vectors exist for SDK documents")
+        for doc_id in sample_sdk_docs:
+            doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
+            print(doc)
+            assert doc is not None, f"Document {doc_id} not found"
+            if doc.cv is not None:
+                print(doc.cv)
+                assert "@" in doc.cv, (
+                    f"Document {doc_id} should have valid version vector format. Got: {doc.cv}"
+                )
 
         await sg.delete_database(sg_db)
         cbs.drop_bucket(bucket_name)
