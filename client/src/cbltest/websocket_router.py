@@ -64,7 +64,7 @@ class WebSocketRouter:
 
     def get_websocket_for_write(self, url: str) -> web.WebSocketResponse:
         if not self.is_known_ws_url(url):
-            raise IndexError("No WebSocket connection for the given URL")
+            raise IndexError(f"No WebSocket connection for the given URL ({url})")
 
         return self.__connections[url]
 
@@ -83,9 +83,10 @@ class WebSocketRouter:
         else:
             remote_ip = request.remote or "unknown"
 
-        if remote_ip == "127.0.0.1":
+        if remote_ip == "127.0.0.1" or remote_ip == "::1":
             remote_ip = "localhost"
 
+        cbl_info(f"WebSocket connection established from {remote_ip}")
         self.__connections[f"http://{remote_ip}:5173"] = ws
         self.__conn_sem.release()
 
