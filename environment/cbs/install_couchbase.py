@@ -9,16 +9,16 @@ import paramiko
 LATESTBUILDS_BASE_URL = "http://latestbuilds.service.couchbase.com/builds"
 
 RELEASES = {
-    'spock': '5.0.0',
-    'vulcan': '5.5.6',
-    'alice': '6.0.4',
-    'mad-hatter': '6.5.0',
-    'cheshire-cat': '7.0.0',
-    'neo': '7.1.0',
-    'elixir': '7.2.0',
-    'trinity': '7.6.0',
-    'cypher': '7.7.0',
-    'morpheus': '8.0.0'
+    "spock": "5.0.0",
+    "vulcan": "5.5.6",
+    "alice": "6.0.4",
+    "mad-hatter": "6.5.0",
+    "cheshire-cat": "7.0.0",
+    "neo": "7.1.0",
+    "elixir": "7.2.0",
+    "trinity": "7.6.0",
+    "cypher": "7.7.0",
+    "morpheus": "8.0.0",
 }
 
 DEFAULT_VERSION = "7.6.6"
@@ -29,26 +29,26 @@ DEFAULT_BUILD = "6126"
 def get_codename(version):
     # Define the versions and corresponding codenames in sorted order
     version_mappings = [
-        ('5.0', 'spock'),
-        ('5.5', 'vulcan'),
-        ('6.0', 'alice'),
-        ('6.5', 'mad-hatter'),
-        ('7.0', 'cheshire-cat'),
-        ('7.1', 'neo'),
-        ('7.2', 'elixir'),
-        ('7.6', 'trinity'),
-        ('7.7', 'cypher'),
-        ('8.0', 'morpheus'),
-        ('8.1', 'magma-preview')
+        ("5.0", "spock"),
+        ("5.5", "vulcan"),
+        ("6.0", "alice"),
+        ("6.5", "mad-hatter"),
+        ("7.0", "cheshire-cat"),
+        ("7.1", "neo"),
+        ("7.2", "elixir"),
+        ("7.6", "trinity"),
+        ("7.7", "cypher"),
+        ("8.0", "morpheus"),
+        ("8.1", "magma-preview"),
     ]
-    
+
     # Convert the version string to a tuple (major, minor) for easy comparison
-    major_minor_version = tuple(map(int, version.split('.')[:2]))
+    major_minor_version = tuple(map(int, version.split(".")[:2]))
 
     # Loop through the mappings and find where the version lies
     for i in range(len(version_mappings) - 1):
-        lower_version = tuple(map(int, version_mappings[i][0].split('.')))
-        upper_version = tuple(map(int, version_mappings[i + 1][0].split('.')))
+        lower_version = tuple(map(int, version_mappings[i][0].split(".")))
+        upper_version = tuple(map(int, version_mappings[i + 1][0].split(".")))
 
         # Check if the version is within the range
         if lower_version <= major_minor_version < upper_version:
@@ -64,11 +64,11 @@ def get_download_url(version=None, build=None):
     if not version and not build:
         version = DEFAULT_VERSION
         build = DEFAULT_BUILD
-    
+
     codename = get_codename(version)
     if codename is None:
         raise Exception(f"Unknown version: {version}")
-    
+
     print(f"Using codename {codename} for version {version}")
 
     if build:
@@ -76,32 +76,37 @@ def get_download_url(version=None, build=None):
         return f"{LATESTBUILDS_BASE_URL}/latestbuilds/couchbase-server/{codename}/{build}/couchbase-server-enterprise_{version}-{build}-linux_amd64.deb"
     else:
         # If build is not specified, fetch the latest build
-        latest_url = f"{LATESTBUILDS_BASE_URL}/latestbuilds/couchbase-server/{codename}/"
+        latest_url = (
+            f"{LATESTBUILDS_BASE_URL}/latestbuilds/couchbase-server/{codename}/"
+        )
         print(f"Fetching latest builds from {latest_url}")
-        
+
         try:
             response = requests.get(latest_url)
             response.raise_for_status()  # Raise an exception for bad HTTP responses
-            
+
             # Use BeautifulSoup to parse the HTML
-            soup = BeautifulSoup(response.text, 'html.parser')
+            soup = BeautifulSoup(response.text, "html.parser")
             build_number = None
 
             # Search for links that contain 'build/' and extract the build number
-            for link in soup.find_all('a', href=True):
-                if 'build/' in link['href']:
-                    build_number = link['href'].split('build/')[1].split('/')[0]
+            for link in soup.find_all("a", href=True):
+                if "build/" in link["href"]:
+                    build_number = link["href"].split("build/")[1].split("/")[0]
                     break
-            
+
             if build_number:
                 print(f"Latest build number: {build_number}")
                 return get_download_url(version, build_number)
             else:
-                raise Exception("Failed to extract build number from the latest builds page.")
-        
+                raise Exception(
+                    "Failed to extract build number from the latest builds page."
+                )
+
         except requests.exceptions.RequestException as e:
             print(f"Error fetching the latest build page: {e}")
             raise
+
 
 def fix_hostname(ip):
     """Ensure the remote machine has the correct hostname entry in /etc/hosts."""
@@ -137,7 +142,7 @@ def run_remote_command(ip, command, password="couchbase"):
             else:
                 print(f"Error executing command on {ip}: {error}")
                 sys.exit(1)
-        
+
         # print(output)
         return output
 
@@ -153,9 +158,11 @@ def install_couchbase_server(version, build, ips):
             fix_hostname(ip)
             download_url = get_download_url(version, build)
             print(f"Download URL: {download_url}")
-            
+
             # Commands to run on remote machine
-            download_command = f"wget -q {download_url} -O /tmp/couchbase-server.deb  && echo 'Done'"
+            download_command = (
+                f"wget -q {download_url} -O /tmp/couchbase-server.deb  && echo 'Done'"
+            )
             fix_dependencies = "sudo apt-get install -f"
             install_command = "sudo dpkg -i /tmp/couchbase-server.deb"
             # check_process_command = "ps aux | grep couchbase"
@@ -186,26 +193,44 @@ def install_couchbase_server(version, build, ips):
                 print(f"Couchbase successfully installed and running on {ip}")
             else:
                 print(f"Failed to access Couchbase UI on {ip}.")
-            
+
         except Exception as e:
             print(f"Error on {ip}: {e}")
 
 
 # Parse command line arguments using optparse
 def parse_args():
-    parser = OptionParser(usage="usage: python install_couchbase.py --config <config_file> [options]")
-    parser.add_option("-c", "--config", dest="config", help="Path to the JSON config file", metavar="FILE")
-    parser.add_option("-v", "--version", dest="version", default=DEFAULT_VERSION,
-                      help="Couchbase version to install (e.g., 7.6.2)")
-    parser.add_option("-b", "--build", dest="build", default=DEFAULT_BUILD,
-                      help="Build number (optional). If not provided, the latest build will be used.")
+    parser = OptionParser(
+        usage="usage: python install_couchbase.py --config <config_file> [options]"
+    )
+    parser.add_option(
+        "-c",
+        "--config",
+        dest="config",
+        help="Path to the JSON config file",
+        metavar="FILE",
+    )
+    parser.add_option(
+        "-v",
+        "--version",
+        dest="version",
+        default=DEFAULT_VERSION,
+        help="Couchbase version to install (e.g., 7.6.2)",
+    )
+    parser.add_option(
+        "-b",
+        "--build",
+        dest="build",
+        default=DEFAULT_BUILD,
+        help="Build number (optional). If not provided, the latest build will be used.",
+    )
     (options, args) = parser.parse_args()
     return options
 
 
 # Load IPs from configuration file
 def load_ips_from_config(config_path):
-    with open(config_path, 'r') as file:
+    with open(config_path, "r") as file:
         config = json.load(file)
     return [server["hostname"] for server in config.get("couchbase-servers", [])]
 
@@ -215,12 +240,13 @@ def main():
 
     # Load IPs from config file
     ips = load_ips_from_config(options.config)
-    
+
     # Install Couchbase Server
     if options.version:
         install_couchbase_server(options.version, options.build, ips)
     else:
         install_couchbase_server("7.6.2", "3721", ips)
+
 
 if __name__ == "__main__":
     main()

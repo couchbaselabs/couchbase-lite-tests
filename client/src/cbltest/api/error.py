@@ -53,9 +53,11 @@ class CblSyncGatewayBadResponseError(Exception):
 
 class CblEdgeServerBadResponseError(Exception):
     """A bad HTTP code was returned from Edge Server"""
+
     @property
     def code(self) -> int:
         return self.__code
+
     def __init__(self, code: int, *args):
         self.__code = code
         super().__init__(args)

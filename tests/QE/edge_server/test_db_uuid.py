@@ -10,10 +10,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class TestDbUUID(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_db_uuid_cli(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step("Starting test to check the database UUID reset functionality")
+        self.mark_test_step(
+            "Starting test to check the database UUID reset functionality"
+        )
 
         es_db_name = "db"
         edge_server = cblpytest.edge_servers[0]
@@ -38,10 +41,13 @@ class TestDbUUID(CBLTestClass):
 
         logger.info("Database UUID reset through CLI test passed.")
 
-
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_db_uuid_config(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step("Starting test to check the database UUID reset functionality")
+    async def test_db_uuid_config(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
+        self.mark_test_step(
+            "Starting test to check the database UUID reset functionality"
+        )
 
         es_db_name = "db"
         edge_server = cblpytest.edge_servers[0]
@@ -56,7 +62,9 @@ class TestDbUUID(CBLTestClass):
 
         file_path = os.path.abspath(os.path.dirname(__file__))
         file_path = str(Path(file_path, ".."))
-        config_path =f"{file_path}/environment/edge_server/config/config_reset_uuid.json"
+        config_path = (
+            f"{file_path}/environment/edge_server/config/config_reset_uuid.json"
+        )
         with open(config_path, "r") as file:
             config = json.load(file)
 
@@ -67,7 +75,9 @@ class TestDbUUID(CBLTestClass):
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
 
-        await edge_server.set_config(config_path, "/opt/couchbase-edge-server/etc/config.json")
+        await edge_server.set_config(
+            config_path, "/opt/couchbase-edge-server/etc/config.json"
+        )
 
         self.mark_test_step("Get the UUID after reset")
         response = await edge_server.get_db_info(es_db_name)
