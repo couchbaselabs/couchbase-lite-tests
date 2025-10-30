@@ -270,9 +270,12 @@ def setup_server(
             fail_on_error=False,
         )
     else:
-        existing_remote = sftp.stat(f"/tmp/{sgw_info.local_filename}")
+        try:
+            existing_remote = sftp.stat(f"/tmp/{sgw_info.local_filename}")
+        except IOError:
+            existing_remote = None  # File doesn't exist on remote
         existing_local = os.stat(SCRIPT_DIR / sgw_info.local_filename)
-        if existing_remote.st_size == existing_local.st_size:
+        if existing_remote and existing_remote.st_size == existing_local.st_size:
             click.secho(
                 f"File {sgw_info.local_filename} already exists on remote, skipping upload.",
                 fg="green",
