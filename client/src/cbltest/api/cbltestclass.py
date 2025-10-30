@@ -4,6 +4,7 @@ import pytest
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
+from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.testserver import TestServer
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.logging import cbl_info, cbl_warning
@@ -62,3 +63,18 @@ class CBLTestClass(ABC):
         if version not in spec:
             self.__skipped = True
             pytest.skip(f"CBL {version_str} not {constraint}")
+
+    async def skip_if_sgw_not(self, sg: "SyncGateway", constraint: str):
+        """
+        Skips the test if the SGW version does not match the specified comparison operation and value.
+
+        :param sg: The SyncGateway instance to check version for.
+        :param constraint: A string representing the comparison operation and version, e.g., ">= 4.0.0".
+        """
+        sgw_version_obj = await sg.get_version()
+        version_str = sgw_version_obj.version
+        version = Version(version_str)
+        spec = SpecifierSet(constraint)
+        if version not in spec:
+            self.__skipped = True
+            pytest.skip(f"SGW {version_str} not {constraint}")

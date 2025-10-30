@@ -7,6 +7,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from packaging.version import Version
 
 
 @pytest.mark.sgw
@@ -97,11 +98,15 @@ class TestXattrs(CBLTestClass):
             f"Expected {num_docs} SG docs, but found {sg_created_count}"
         )
 
-        self.mark_test_step("Store original version vectors for SG docs")
-        original_vv: dict[str, str | None] = {}
-        for row in sg_all_docs.rows:
-            if row.id.startswith("sg_"):
-                original_vv[row.id] = row.cv
+        sgw_version_obj = await sg.get_version()
+        sgw_version = Version(sgw_version_obj.version)
+        supports_version_vectors = sgw_version >= Version("4.0.0")
+        if supports_version_vectors:
+            self.mark_test_step("Store original version vectors for SG docs (optional)")
+            original_vv: dict[str, str | None] = {}
+            for row in sg_all_docs.rows:
+                if row.id.startswith("sg_"):
+                    original_vv[row.id] = row.cv
 
         self.mark_test_step("Stop Sync Gateway")
         await sg.delete_database(sg_db)
@@ -213,26 +218,31 @@ class TestXattrs(CBLTestClass):
                 f"Document {doc_id} has incorrect revision: {doc.revid}"
             )
 
-        self.mark_test_step("Verify version vectors for updated SG documents")
-        for doc_id in sample_sg_docs:
-            doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-            assert doc is not None, f"Document {doc_id} not found"
-            if doc.cv is not None:
-                original_cv = original_vv.get(doc_id)
-                if original_cv is not None:
-                    assert doc.cv != original_cv, (
-                        f"Document {doc_id} should have different version vector after SDK update. "
-                        f"Original: {original_cv}, Current: {doc.cv}"
-                    )
+        if supports_version_vectors:
+            self.mark_test_step(
+                "Verify version vectors for updated SG documents (optional)"
+            )
+            for doc_id in sample_sg_docs:
+                doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
+                assert doc is not None, f"Document {doc_id} not found"
+                if doc.cv is not None:
+                    original_cv = original_vv.get(doc_id)
+                    if original_cv is not None:
+                        assert doc.cv != original_cv, (
+                            f"Document {doc_id} should have different version vector after SDK update. "
+                            f"Original: {original_cv}, Current: {doc.cv}"
+                        )
 
-        self.mark_test_step("Verify version vectors exist for SDK documents")
-        for doc_id in sample_sdk_docs:
-            doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-            assert doc is not None, f"Document {doc_id} not found"
-            if doc.cv is not None:
-                assert "@" in doc.cv, (
-                    f"Document {doc_id} should have valid version vector format. Got: {doc.cv}"
-                )
+            self.mark_test_step(
+                "Verify version vectors exist for SDK documents (optional)"
+            )
+            for doc_id in sample_sdk_docs:
+                doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
+                assert doc is not None, f"Document {doc_id} not found"
+                if doc.cv is not None:
+                    assert "@" in doc.cv, (
+                        f"Document {doc_id} should have valid version vector format. Got: {doc.cv}"
+                    )
 
         await sg.delete_database(sg_db)
         cbs.drop_bucket(bucket_name)
