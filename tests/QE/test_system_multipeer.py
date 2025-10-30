@@ -21,6 +21,7 @@ from cbltest.api.test_functions import compare_doc_results_p2p, compare_local_an
 from cbltest.responses import ServerVariant
 
 
+@pytest.mark.cbl
 @pytest.mark.min_test_servers(2)
 class TestSystemMultipeer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")

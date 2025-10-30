@@ -24,7 +24,7 @@ if($LASTEXITCODE -ne 0) {
 
 Push-Location $QE_TESTS_DIR
 pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json
+pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl
 $saved_exit = $LASTEXITCODE
 deactivate
 Pop-Location

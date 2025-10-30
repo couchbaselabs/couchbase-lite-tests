@@ -71,6 +71,6 @@ create_venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 adb shell input keyevent KEYCODE_WAKEUP
-pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
+pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json -m cbl
 deactivate
 popd > /dev/null

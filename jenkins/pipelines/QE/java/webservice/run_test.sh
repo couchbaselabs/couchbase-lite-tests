@@ -38,5 +38,5 @@ fi
 
 pushd $QE_TESTS_DIR
 uv pip install -r requirements.txt
-pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
+pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json -m cbl
 deactivate
