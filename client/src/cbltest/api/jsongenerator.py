@@ -3,7 +3,7 @@ import sys
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 
 
 class JSONGenerator:
@@ -49,7 +49,7 @@ class JSONGenerator:
         return doc
 
     def batch_process(
-        self, process_fn: callable, items: List[Any], batch_size: int = 1000
+        self, process_fn: Callable, items: List[Any], batch_size: int = 1000
     ) -> List[Any]:
         """Generic batch processing function with threading"""
         results = []

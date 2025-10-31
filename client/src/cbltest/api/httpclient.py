@@ -108,7 +108,7 @@ class HTTPClient:
         doc_id: str,
         scope: str = "",
         collection: str = "",
-        revid: str = None,
+        revid: Optional[str] = None,
     ):
         curl = await self.edge_server.get_document(
             db_name, doc_id, scope, collection, curl=True, revid=revid
@@ -316,8 +316,8 @@ class HTTPClient:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        name: str = None,
-        params: Dict = None,
+        name: Optional[str] = None,
+        params: Optional[Dict] = None,
     ):
         curl_command = await self.edge_server.named_query(
             db_name, scope, collection, name, params, curl=True
@@ -340,8 +340,8 @@ class HTTPClient:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        query: str = None,
-        params: Dict = None,
+        query: Optional[str] = None,
+        params: Optional[Dict] = None,
     ):
         curl_command = await self.edge_server.adhoc_query(
             db_name, scope, collection, query, params, curl=True
@@ -386,7 +386,7 @@ class HTTPClient:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        rev: str = None,
+        rev: Optional[str] = None,
     ) -> dict:
         curl_command = await self.edge_server.put_document_with_id(
             document, doc_id, db_name, scope, collection, curl=True, rev=rev
@@ -571,7 +571,7 @@ class ClientFactory:
         self.user = user
         self.password = password
         self.client_counter = 1
-        self.clients = {}  # client_id -> HTTPClient
+        self.clients: dict[str, HTTPClient] = {}  # client_id -> HTTPClient
         self.lock = (
             asyncio.Lock()
         )  # Lock to manage client creation and respawning concurrently
