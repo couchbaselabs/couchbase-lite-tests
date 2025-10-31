@@ -1477,14 +1477,14 @@ def scan_logs_for_untagged_sensitive_data(
         with self.__tracer.start_as_current_span("kill sync gateway"):
             await self.__ssh_client.connect()
             resp = await self.__ssh_client.kill_sgw()
-            await self.__ssh_client.disconnect()
+            await self.__ssh_client.close()
             return resp
 
     async def start_server(self):
         with self.__tracer.start_as_current_span("start sync gateway"):
             await self.__ssh_client.connect()
             resp = await self.__ssh_client.start_sgw()
-            await self.__ssh_client.disconnect()
+            await self.__ssh_client.close()
             return resp
 
     async def close(self) -> None:
