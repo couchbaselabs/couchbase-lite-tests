@@ -52,7 +52,7 @@ class BulkDocOperation(JSONSerializable):
         if optype == "update":
             if _id is None:
                 optype = "create"
-                _id = uuid.uuid4()
+                _id = str(uuid.uuid4())
             if rev is None:
                 raise CblTestError("Update cannot be performed without rev id")
             body["_rev"] = rev
@@ -233,7 +233,7 @@ class EdgeServer:
             data = "" if payload is None else payload.serialize()
             if curl:
                 return self._build_curl_command(
-                    method, path, headers=headers, data=payload, params=params
+                    method, path, headers=headers, data=payload.to_json(), params=params
                 )
             writer = get_next_writer()
             writer.write_begin(
@@ -473,7 +473,7 @@ class EdgeServer:
             attributes={
                 "cbl.source.name": source,
                 "cbl.target.name": target,
-                "cbl.collection.name": collections,
+                "cbl.collection.name": collections or [],
             },
         ):
             payload: Dict[str, Any] = {
@@ -520,7 +520,7 @@ class EdgeServer:
                     500,
                     f"start replication with edge server had error '{cast_resp['reason']}'",
                 )
-            return cast_resp.session_id
+            return cast_resp.get("session_id")
 
     async def replication_status(self, replicator_id: str, curl: bool = False):
         with self.__tracer.start_as_current_span(
@@ -614,7 +614,7 @@ class EdgeServer:
                 "cbl.database.name": db_name,
                 "cbl.scope.name": scope,
                 "cbl.collection.name": collection,
-                "since": since,
+                "since": since or 0,
             },
         ):
             body = {
