@@ -11,7 +11,7 @@ from datetime import timedelta
 from optparse import OptionParser
 
 
-SERVER_IP = "172.23.104.162"
+SERVER_IP = "172.23.105.178"
 USERNAME = "Administrator"
 PASSWORD = "esabhcuoc"
 BUCKET_NAME = "QE-mobile-pool"

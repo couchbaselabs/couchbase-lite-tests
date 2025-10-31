@@ -143,7 +143,6 @@ def run_remote_command(ip, command, password="couchbase"):
                 print(f"Error executing command on {ip}: {error}")
                 sys.exit(1)
 
-        # print(output)
         return output
 
     except Exception as e:
@@ -171,16 +170,12 @@ def install_couchbase_server(version, build, ips):
             check_service_command = "curl -s http://localhost:8091"
 
             # Run commands on remote server
-            # if await ensure_sshpass(ip):
             run_remote_command(ip, download_command)
             run_remote_command(ip, fix_dependencies)
             run_remote_command(ip, install_command)
 
             # Check if Couchbase is running
             result = run_remote_command(ip, check_process_command)
-            # if result is None or "couchbase" not in result:
-            #     print(f"Couchbase not found as a process on {ip}, starting the service...")
-            #     run_remote_command(ip, start_service_command)
             if "active (running)" not in result:
                 print(f"Couchbase not running on {ip}")
                 run_remote_command(ip, start_service_command)
@@ -245,7 +240,7 @@ def main():
     if options.version:
         install_couchbase_server(options.version, options.build, ips)
     else:
-        install_couchbase_server("7.6.2", "3721", ips)
+        install_couchbase_server("7.6.6", "6126", ips)
 
 
 if __name__ == "__main__":

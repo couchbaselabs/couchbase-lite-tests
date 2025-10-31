@@ -47,7 +47,7 @@ class RemoteShellConnection:
 
     async def start_edge_server(self) -> bool:
         try:
-            command = " systemctl start couchbase-edge-server"
+            command = "systemctl start couchbase-edge-server"
             await self.ssh_client.run(command, check=True)
             return True
         except Exception:
@@ -167,7 +167,7 @@ class RemoteShellConnection:
 
     async def kill_sgw(self):
         try:
-            command = " systemctl stop sync_gateway"
+            command = "systemctl stop sync_gateway"
             await self.ssh_client.run(command, check=True)
             return True
         except Exception:

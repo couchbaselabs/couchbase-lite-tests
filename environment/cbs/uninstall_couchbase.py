@@ -27,12 +27,6 @@ def run_remote_command(ip, command):
         error = stderr.read().decode().strip()
         return output.strip(), error.strip()
 
-        # if error:
-        #     print(f"Error executing command on {ip}: {error}")
-        #     # sys.exit(1)
-
-        # return output
-
     except Exception as e:
         print(f"Error connecting to {ip}: {str(e)}")
         sys.exit(1)

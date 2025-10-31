@@ -69,7 +69,8 @@ class TestAuthentication(CBLTestClass):
         await client.connect()
         active_tasks = await client.get_active_tasks()
         self.mark_test_step(f"Active Tasks: {active_tasks}")
-        #     testing invalid auth
+
+        # testing invalid auth
         self.mark_test_step("testing invalid auth")
         await edge_server_new.set_auth(name=invalid_auth[0], password=invalid_auth[1])
         try:

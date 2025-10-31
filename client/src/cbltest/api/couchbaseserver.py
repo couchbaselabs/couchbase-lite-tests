@@ -200,7 +200,6 @@ class CouchbaseServer:
                 bucket = self.__cluster.bucket(bucket_name)
                 collection = bucket.default_collection()
 
-                # Insert the document into the bucket
                 collection.insert(document_id, document_data)
                 span.set_attribute("couchbase.bucket", bucket_name)
                 span.set_attribute("couchbase.document_id", document_id)

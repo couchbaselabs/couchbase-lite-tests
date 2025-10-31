@@ -14,7 +14,7 @@ import json
 
 
 class TestEdgeServerChaos(CBLTestClass):
-    # set up : changes -> ES3 <- ES2 <<-Es1 <-Sgw
+    # set up : changes -> ES3 <- ES2 <<- ES1 <- SGW
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_server_offline_sync_and_recovery(
         self, cblpytest, dataset_path
