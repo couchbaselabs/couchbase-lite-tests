@@ -174,7 +174,7 @@ class RemoteShellConnection:
         except Exception:
             return False
 
-    async def start_sgw(self, config_file: str) -> bool:
+    async def start_sgw(self) -> bool:
         try:
             command = "systemctl restart sync_gateway"
             await self.ssh_client.run(command, check=True)
