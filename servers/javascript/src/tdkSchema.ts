@@ -162,7 +162,7 @@ export interface GetReplicatorStatusRequest extends TestRequest {
 }
 
 export interface GetReplicatorStatusResponse {
-    activity    : string,
+    activity    : string, // "STOPPED" | "OFFLINE" | "CONNECTING" | "IDLE" | "BUSY",
     progress    : {completed: boolean},
     documents?  : DocumentReplication[],
     error?      : ErrorInfo,
