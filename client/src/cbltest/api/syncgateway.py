@@ -175,6 +175,61 @@ class AllDocumentsResponse:
             )
 
 
+class ChangesResponseEntry:
+    """
+    A class representing a single entry in a changes feed response from Sync Gateway
+    """
+
+    @property
+    def seq(self) -> int:
+        """Gets the sequence number"""
+        return self.__seq
+
+    @property
+    def id(self) -> str:
+        """Gets the document ID"""
+        return self.__id
+
+    @property
+    def revisions(self) -> list[str]:
+        """Gets the list of revisions for this change"""
+        return self.__revisions
+
+    @property
+    def deleted(self) -> bool:
+        """Gets whether this document was deleted"""
+        return self.__deleted
+
+    def __init__(self, entry: dict) -> None:
+        self.__seq = entry.get("seq", 0)
+        self.__id = cast(str, entry["id"])
+        self.__deleted = entry.get("deleted", False)
+        changes = cast(list[dict], entry.get("changes", []))
+        self.__revisions = [cast(str, c["rev"]) for c in changes]
+
+
+class ChangesResponse:
+    """
+    A class representing a changes feed response from Sync Gateway
+    """
+
+    @property
+    def results(self) -> list[ChangesResponseEntry]:
+        """Gets the list of changes"""
+        return self.__results
+
+    @property
+    def last_seq(self) -> str:
+        """Gets the last sequence number"""
+        return self.__last_seq
+
+    def __init__(self, input: dict) -> None:
+        self.__results: list[ChangesResponseEntry] = []
+        for entry in cast(list[dict], input.get("results", [])):
+            self.__results.append(ChangesResponseEntry(entry))
+        self.__last_seq = cast(str, input.get("last_seq", "0"))
+
+
 class DocumentUpdateEntry(JSONSerializable):
     """
     A class that represents an update to a document.
@@ -491,7 +546,7 @@ class SyncGateway:
         with self.__tracer.start_as_current_span(
             "delete_database", attributes={"cbl.database.name": db_name}
         ):
-            await self._send_request("delete", f"/{db_name}/")
+            await self._send_request("delete", f"/{db_name}")
 
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
@@ -688,10 +743,40 @@ class SyncGateway:
             },
         ):
             resp = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/_all_docs?show_cv=true"
+                "get", f"/{db_name}.{scope}.{collection}/_all_docs"
             )
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
+
+    async def get_changes(
+        self,
+        db_name: str,
+        scope: str = "_default",
+        collection: str = "_default",
+        version_type: str = "rev",
+    ) -> ChangesResponse:
+        """
+        Gets the changes feed from Sync Gateway, including deleted documents
+
+        :param db_name: The name of the Sync Gateway database to query
+        :param scope: The scope to use when querying Sync Gateway
+        :param collection: The collection to use when querying Sync Gateway
+        :param version_type: The version type to use ('rev' for revision IDs, 'cv' for version vectors in SGW 4.0+)
+        """
+        with self.__tracer.start_as_current_span(
+            "get_changes",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+            },
+        ):
+            query_params = f"version_type={version_type}"
+            resp = await self._send_request(
+                "get", f"/{db_name}.{scope}.{collection}/_changes?{query_params}"
+            )
+            assert isinstance(resp, dict)
+            return ChangesResponse(cast(dict, resp))
 
     @deprecated("Only should be used until 4.0 SGW gets close to GA")
     async def _rewrite_rev_ids(
@@ -925,7 +1010,7 @@ class SyncGateway:
             },
         ):
             response = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/{doc_id}?show_cv=true"
+                "get", f"/{db_name}.{scope}.{collection}/{doc_id}"
             )
             if not isinstance(response, dict):
                 raise ValueError(

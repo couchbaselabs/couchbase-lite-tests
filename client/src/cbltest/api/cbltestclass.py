@@ -64,7 +64,7 @@ class CBLTestClass(ABC):
             self.__skipped = True
             pytest.skip(f"CBL {version_str} not {constraint}")
 
-    async def skip_if_sgw_not(self, sg: "SyncGateway", constraint: str):
+    async def skip_if_sgw_not(self, sg: SyncGateway, constraint: str):
         """
         Skips the test if the SGW version does not match the specified comparison operation and value.
 
