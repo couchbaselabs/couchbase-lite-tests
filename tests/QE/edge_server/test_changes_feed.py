@@ -5,7 +5,6 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import PutDatabasePayload
 
-
 import logging
 
 logger = logging.getLogger(__name__)

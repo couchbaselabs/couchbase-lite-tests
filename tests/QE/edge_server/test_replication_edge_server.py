@@ -107,8 +107,6 @@ class TestEdgeServerSync(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         self.mark_test_step("test_edge_to_edge_replication")
-        # cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
-        # await cloud.configure_dataset(dataset_path, "travel")
 
         # Get infrastructure components
         edge_server1 = cblpytest.edge_servers[0]

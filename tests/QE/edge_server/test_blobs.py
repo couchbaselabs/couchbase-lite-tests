@@ -667,18 +667,6 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Multiple blobs addition test passed.")
         logger.info("Multiple blobs addition test passed.")
 
-        # try:
-        #     response = await edge_server.put_sub_document(doc_id, rev_id, attachment_name, es_db_name, value=image_data)
-        # except CblEdgeServerBadResponseError as e:
-        #     assert CblEdgeServerBadResponseError, "Able to add multiple blobs to the same document."
-
-        # assert response is not None, "Failed to add attachment to document."
-
-        # assert "409" in str(e), f"Expected HTTP 409 status code in error message but got '{str(e)}'"
-
-        # logger.info("Multiple blobs addition test passed.")
-        # self.mark_test_step("Multiple blobs addition test passed.")
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_exceeding_maxsize(
         self, cblpytest: CBLPyTest, dataset_path: Path

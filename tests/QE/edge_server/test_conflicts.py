@@ -156,11 +156,6 @@ class TestConflicts(CBLTestClass):
         await edge_server.go_online()
         logger.info("Edge Server is online")
 
-        # self.mark_test_step("Restarting Edge Server")
-        # await edge_server.kill_server()
-        # await edge_server.start_server()
-        # logger.info("Edge Server restarted")
-
         self.mark_test_step("Check that conflicts have resolved")
 
         # Wait for conflict resolution to complete

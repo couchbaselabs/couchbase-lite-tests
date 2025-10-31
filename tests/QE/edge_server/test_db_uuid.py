@@ -34,7 +34,6 @@ class TestDbUUID(CBLTestClass):
         response = await edge_server.get_db_info(es_db_name)
         reset_uuid = response["db_uuid"]
         logger.info(f"Reset UUID: {reset_uuid}")
-        # print(response)
 
         self.mark_test_step("Check if the UUID is different after reset")
         assert initial_uuid != reset_uuid, "UUID should be different after reset"

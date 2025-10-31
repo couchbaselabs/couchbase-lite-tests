@@ -102,7 +102,6 @@ class EdgeServer:
         self.__auth = is_auth
         ws_scheme = "wss://" if secure else "ws://"
         self.__replication_url = f"{ws_scheme}{url}:{port}"
-        # if not session:
         self.scheme = "https://" if secure else "http://"
         if self.__anonymous_auth:
             self.__session: ClientSession = self._create_session(
@@ -115,8 +114,6 @@ class EdgeServer:
                 port,
                 BasicAuth(self.__auth_name, self.__auth_password, "ascii"),
             )
-        # else:
-        #     self.__session = session
 
     @property
     def hostname(self) -> str:
@@ -205,7 +202,6 @@ class EdgeServer:
         if params:
             curl_command += f" {' '.join([f'--{k}={v}' for k, v in params.items()])}"
 
-        print(curl_command)
         return curl_command
 
     async def _send_request(

@@ -28,7 +28,7 @@ class TestSystem(CBLTestClass):
             "Starting system test with Server, Sync Gateway, Edge Server and 1 client"
         )
 
-        # Calculate end time for 30 minutes from now
+        # Calculate end time for 6 hours from now
         end_time = datetime.now() + timedelta(minutes=360)
 
         server = cblpytest.couchbase_servers[0]
@@ -118,7 +118,7 @@ class TestSystem(CBLTestClass):
 
         doc_counter = 11  # Initialize the document counter
 
-        # Run until 30 minutes have passed
+        # Run until 6 hours have passed
         while datetime.now() < end_time:
             doc_id = f"doc_{doc_counter}"
 
@@ -360,7 +360,7 @@ class TestSystem(CBLTestClass):
             "Starting system test with Server, Sync Gateway, Edge Server and 1 client with intermittent connectivity with Edge Server"
         )
 
-        # Calculate end time for 30 minutes from now
+        # Calculate end time for 6 hours from now
         end_time = datetime.now() + timedelta(minutes=360)
 
         server = cblpytest.couchbase_servers[0]
@@ -453,7 +453,7 @@ class TestSystem(CBLTestClass):
 
         doc_counter = 11  # Initialize the document counter
 
-        # Run until 30 minutes have passed
+        # Run until 6 hours have passed
         while datetime.now() < end_time:
             if datetime.now() > end:
                 self.mark_test_step("Edge server is back online")
@@ -743,7 +743,7 @@ class TestSystem(CBLTestClass):
             "Starting system test with Server, Sync Gateway, Edge Server and HTTP clients"
         )
 
-        # Calculate end time for 30 minutes from now
+        # Calculate end time for 6 hours from now
         end_time = datetime.now() + timedelta(minutes=360)
 
         server = cblpytest.couchbase_servers[0]
@@ -864,7 +864,7 @@ class TestSystem(CBLTestClass):
 
         doc_counter = 11  # Initialize the document counter
 
-        # Run until 30 minutes have passed
+        # Run until 6 hours have passed
         while datetime.now() < end_time:
             doc_id = f"doc_{doc_counter}"
             if len(last_three_docs) < 3:
@@ -1177,7 +1177,7 @@ class TestSystem(CBLTestClass):
             doc_counter += 1
 
         await factory.disconnect()
-        logger.info("Test completed after 30 minutes.")
+        logger.info("Test completed after 6 hours.")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_multiple_clients_chaos(
@@ -1187,7 +1187,7 @@ class TestSystem(CBLTestClass):
             "Starting system test with Server, Sync Gateway, Edge Server and HTTP clients with intermittent connectivity with Edge Server"
         )
 
-        # Calculate end time for 30 minutes from now
+        # Calculate end time for 6 hours from now
         end_time = datetime.now() + timedelta(minutes=360)
 
         server = cblpytest.couchbase_servers[0]
@@ -1310,7 +1310,7 @@ class TestSystem(CBLTestClass):
 
         doc_counter = 11  # Initialize the document counter
 
-        # Run until 30 minutes have passed
+        # Run until 6 hours have passed
         while datetime.now() < end_time:
             if datetime.now() > end:
                 self.mark_test_step("Edge server is back online")
@@ -1652,4 +1652,4 @@ class TestSystem(CBLTestClass):
             doc_counter += 1
 
         await factory.disconnect()
-        logger.info("Test completed after 30 minutes.")
+        logger.info("Test completed after 6 hours.")
