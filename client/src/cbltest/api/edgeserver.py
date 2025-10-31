@@ -186,7 +186,7 @@ class EdgeServer:
         if self.__auth:
             curl_command += f" -u {self.__auth_name}:{self.__auth_password} "
         if "?" in path:
-            path = path.replace("?", "\?")
+            path = path.replace("?", r"\?")
 
         curl_command += f"{self.scheme}{self.__hostname}:{self.__port}{path} "
         if headers:
@@ -198,7 +198,7 @@ class EdgeServer:
             else:
                 json_data = json.dumps(data)
             json_data = json_data.replace('"', '\\"')
-            json_data = json_data.replace("$", "\$")
+            json_data = json_data.replace("$", r"\$")
             curl_command += f' -d "{json_data}"'
         if params:
             curl_command += f" {' '.join([f'--{k}={v}' for k, v in params.items()])}"
