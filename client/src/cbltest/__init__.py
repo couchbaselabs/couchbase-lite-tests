@@ -1,11 +1,18 @@
 from json import dumps
+from sys import version_info
+from typing import List, Optional
+
+from varname import nameof
 
 from .api.couchbaseserver import CouchbaseServer
+from .api.edgeserver import EdgeServer
 from .api.syncgateway import SyncGateway
 from .api.testserver import TestServer
 from .assertions import _assert_not_null
 from .configparser import (
     CouchbaseServerInfo,
+    EdgeServerInfo,
+    HTTPClientInfo,
     ParsedConfig,
     SyncGatewayInfo,
     TestServerInfo,
@@ -15,6 +22,9 @@ from .extrapropsparser import _parse_extra_props
 from .globals import CBLPyTestGlobal
 from .logging import LogLevel, cbl_log_init, cbl_setLogLevel
 from .requests import RequestFactory
+
+if version_info < (3, 9):
+    raise RuntimeError("Python must be at least v3.9!")
 
 
 class CBLPyTest:
@@ -59,6 +69,14 @@ class CBLPyTest:
         return self.__couchbase_servers
 
     @property
+    def edge_servers(self) -> List[EdgeServer]:
+        return self.__edge_servers
+
+    @property
+    def http_clients(self) -> List[str]:
+        return self.__http_clients
+
+    @property
     def load_balancers(self) -> list[str]:
         """Gets the list of Load Balancers available"""
         return self.__config.load_balancers
@@ -67,7 +85,7 @@ class CBLPyTest:
     async def create(
         config_path: str,
         log_level: LogLevel = LogLevel.VERBOSE,
-        extra_props_path: str | None = None,
+        extra_props_path: Optional[str] = None,
         test_server_only: bool = False,
     ):
         ret_val = CBLPyTest(config_path, log_level, extra_props_path, test_server_only)
@@ -81,7 +99,6 @@ class CBLPyTest:
         for ts in ret_val.test_servers:
             await ts.new_session(
                 str(ret_val.request_factory.uuid),
-                ret_val.config.dataset_version_at(ts_index),
                 ret_val.config.logslurp_url,
                 f"test-server[{ts_index}]",
             )
@@ -93,10 +110,10 @@ class CBLPyTest:
         self,
         config_path: str,
         log_level: LogLevel = LogLevel.VERBOSE,
-        extra_props_path: str | None = None,
+        extra_props_path: Optional[str] = None,
         test_server_only: bool = False,
     ):
-        _assert_not_null(config_path, "config_path")
+        _assert_not_null(config_path, nameof(config_path))
         self.__config = _parse_config(config_path)
         self.__log_level = LogLevel(log_level)
         cbl_setLogLevel(self.__log_level)
@@ -140,6 +157,18 @@ class CBLPyTest:
                         cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password
                     )
                 )
+
+        self.__edge_servers: List[EdgeServer] = []
+        if not test_server_only:
+            for es in self.__config.edge_servers:
+                es_info = EdgeServerInfo(es)
+                self.__edge_servers.append(EdgeServer(es_info.hostname))
+
+        self.__http_clients: List[str] = []
+        if not test_server_only:
+            for http in self.__config.http_clients:
+                h_info = HTTPClientInfo(http)
+                self.__http_clients.append(h_info.hostname)
 
     async def close(self) -> None:
         """

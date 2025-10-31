@@ -15,6 +15,7 @@ from couchbase.exceptions import (
     BucketAlreadyExistsException,
     BucketDoesNotExistException,
     CollectionAlreadyExistsException,
+    DocumentExistsException,
     DocumentNotFoundException,
     QueryIndexAlreadyExistsException,
     ScopeAlreadyExistsException,
@@ -256,6 +257,37 @@ class CouchbaseServer:
                 pass
 
             return list(dict(result) for result in query_obj.execute())
+
+    def add_document(
+        self, bucket_name: str, document_id: str, document_data: dict
+    ) -> None:
+        """
+        Adds a document to the specified bucket in the Couchbase cluster.
+
+        :param bucket_name: The name of the bucket where the document will be added
+        :param document_id: The unique ID of the document
+        :param document_data: The content of the document as a dictionary
+        :raises DocumentExistsException: If a document with the same ID already exists
+        """
+        with self.__tracer.start_as_current_span("add_document") as span:
+            try:
+                bucket = self.__cluster.bucket(bucket_name)
+                collection = bucket.default_collection()
+
+                collection.insert(document_id, document_data)
+                span.set_attribute("couchbase.bucket", bucket_name)
+                span.set_attribute("couchbase.document_id", document_id)
+
+                print(
+                    f"Document '{document_id}' successfully added to bucket '{bucket_name}'."
+                )
+            except DocumentExistsException:
+                print(
+                    f"Document with ID '{document_id}' already exists in bucket '{bucket_name}'."
+                )
+            except Exception as e:
+                print(f"An error occurred while adding document '{document_id}': {e}")
+                raise
 
     def upsert_document(
         self,

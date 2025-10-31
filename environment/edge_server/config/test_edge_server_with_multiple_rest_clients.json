@@ -1,0 +1,26 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
+    "interface": "0.0.0.0:59840",
+    "enable_anonymous_users": true,
+    "databases": {
+        "db":
+        {
+            "path": "/opt/couchbase-edge-server/database/db.cblite2",
+            "create": true,
+            "enable_adhoc_queries": true,
+            "enable_client_writes": true,
+            "enable_client_sync": true
+        }
+    },
+
+    "logging": {
+        "console": false,
+        "file": {
+            "dir": "/tmp/EdgeServerLog",
+            "format": "text"
+        },
+        "domains": {
+            "Listener": "info"
+        }
+    }
+}

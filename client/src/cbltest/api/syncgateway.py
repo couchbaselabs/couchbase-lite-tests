@@ -2,13 +2,14 @@ import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Optional, cast
 from urllib.parse import urljoin
 
 import requests
 from aiohttp import BasicAuth, ClientSession, TCPConnector
 from deprecated import deprecated
 from opentelemetry.trace import get_tracer
+from varname import nameof
 
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
@@ -54,6 +55,8 @@ WCKJ0c94mrl9GwwBmcSIKJBvd6u7uAta2fREJeE=
 -----END CERTIFICATE-----
 """
 
+from cbltest.api.remoteshell import RemoteShellConnection
+
 
 class _CollectionMap(JSONSerializable):
     @property
@@ -89,7 +92,7 @@ class PutDatabasePayload(JSONSerializable):
         return self.__bucket
 
     def __init__(self, dataset_or_config: dict):
-        _assert_not_null(dataset_or_config, "dataset_or_config")
+        _assert_not_null(dataset_or_config, nameof(dataset_or_config))
         assert isinstance(dataset_or_config, dict), (
             "Invalid dataset_or_config passed to PutDatabasePayload"
         )
@@ -175,7 +178,9 @@ class AllDocumentsResponseRow:
         """Gets the either revid or cv, whichever is populated (at least one must be)"""
         return cast(str, self.__revid if self.__revid is not None else self.__cv)
 
-    def __init__(self, key: str, id: str, revid: str | None, cv: str | None) -> None:
+    def __init__(
+        self, key: str, id: str, revid: Optional[str], cv: Optional[str]
+    ) -> None:
         self.__key = key
         self.__id = id
         self.__revid = revid
@@ -192,12 +197,22 @@ class AllDocumentsResponse:
         """Gets the entries of the response"""
         return self.__rows
 
+    @property
+    def input(self):
+        return self.__input
+
+    @property
+    def revmap(self):
+        return self.__revmap
+
     def __len__(self) -> int:
         return self.__len
 
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
         self.__rows: list[AllDocumentsResponseRow] = []
+        self.__input = input
+        self.__revmap = dict()
         for row in cast(list[dict], input["rows"]):
             rev = cast(dict, row["value"])
             self.__rows.append(
@@ -208,6 +223,7 @@ class AllDocumentsResponse:
                     cast(str, rev["cv"]) if "cv" in rev else None,
                 )
             )
+            self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
 
 
 class DocumentUpdateEntry(JSONSerializable):
@@ -371,12 +387,13 @@ class SyncGateway:
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__admin_port: int = admin_port
+        self.__ssh_client: RemoteShellConnection = RemoteShellConnection(host=url)
         self.__admin_session: ClientSession = self._create_session(
             secure, scheme, url, admin_port, BasicAuth(username, password, "ascii")
         )
 
     def _create_session(
-        self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None
+        self, secure: bool, scheme: str, url: str, port: int, auth: Optional[BasicAuth]
     ) -> ClientSession:
         if secure:
             ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
@@ -394,9 +411,9 @@ class SyncGateway:
         self,
         method: str,
         path: str,
-        payload: JSONSerializable | None = None,
-        params: dict[str, str] | None = None,
-        session: ClientSession | None = None,
+        payload: Optional[JSONSerializable] = None,
+        params: Optional[dict[str, str]] = None,
+        session: Optional[ClientSession] = None,
     ) -> Any:
         if session is None:
             session = self.__admin_session
@@ -460,7 +477,7 @@ class SyncGateway:
 
         :param db_name: The DB to replicate with
         """
-        _assert_not_null(db_name, "db_name")
+        _assert_not_null(db_name, nameof(db_name))
         sgw_address = urljoin(self.__replication_url, db_name)
         if not load_balancer:
             return sgw_address
@@ -941,7 +958,7 @@ class SyncGateway:
         doc_id: str,
         scope: str = "_default",
         collection: str = "_default",
-    ) -> RemoteDocument | None:
+    ) -> Optional[RemoteDocument]:
         """
         Gets a document from Sync Gateway
 
@@ -977,6 +994,132 @@ class SyncGateway:
                 )
 
             return RemoteDocument(cast_resp)
+
+    async def create_document(
+        self,
+        db_name: str,
+        doc_id: str,
+        document: dict,
+        scope: str = "_default",
+        collection: str = "_default",
+    ):
+        """
+        Creates a document in Sync Gateway
+
+        :param db_name: The name of the DB endpoint where the document should be created
+        :param doc_id: The document ID to create
+        :param document: The document data to be created (as a dictionary)
+        :param scope: The scope where the document should be created (default '_default')
+        :param collection: The collection where the document should be created (default '_default')
+        :return: The response from the Sync Gateway (or None if document creation fails)
+        """
+        with self.__tracer.start_as_current_span(
+            "create_document",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            document["_id"] = doc_id  # Ensure document has _id before sending
+            response = await self._send_request(
+                "PUT",
+                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                payload=JSONDictionary(document),
+            )
+
+            # Check for response structure
+            if not response or "error" in response:
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to create document {doc_id}"
+                )
+
+            # Convert response to match expected format
+            cast_resp = cast(dict, response)
+
+            # Ensure RemoteDocument fields exist
+            if "id" in cast_resp:
+                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
+            if "rev" in cast_resp:
+                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
+            if "cv" in cast_resp:
+                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
+
+            return RemoteDocument(cast_resp)
+
+    async def update_document(
+        self,
+        db_name: str,
+        doc_id: str,
+        document: dict,
+        rev: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> RemoteDocument:
+        """
+        Updates a document in Sync Gateway.
+
+        :param db_name: The name of the DB endpoint where the document exists
+        :param doc_id: The document ID to update
+        :param document: The updated document data (as a dictionary)
+        :param rev: The current revision ID of the document
+        :param scope: The scope where the document exists (default '_default')
+        :param collection: The collection where the document exists (default '_default')
+        :return: The updated document as a RemoteDocument object
+        """
+        with self.__tracer.start_as_current_span(
+            "update_document",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            document["_id"] = doc_id
+            document["_rev"] = rev
+
+            params = {"new_edits": "true", "rev": rev}
+
+            response = await self._send_request(
+                "PUT",
+                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                payload=JSONDictionary(document),
+                params=params,
+            )
+
+            if not response or "error" in response:
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to update document {doc_id} with rev {rev}"
+                )
+
+            # Convert response to match expected format
+            cast_resp = cast(dict, response)
+
+            # Ensure RemoteDocument fields exist
+            if "id" in cast_resp:
+                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
+            if "rev" in cast_resp:
+                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
+            if "cv" in cast_resp:
+                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
+
+            return RemoteDocument(cast_resp)
+
+    async def kill_server(self):
+        with self.__tracer.start_as_current_span("kill sync gateway"):
+            await self.__ssh_client.connect()
+            resp = await self.__ssh_client.kill_sgw()
+            await self.__ssh_client.close()
+            return resp
+
+    async def start_server(self):
+        with self.__tracer.start_as_current_span("start sync gateway"):
+            await self.__ssh_client.connect()
+            resp = await self.__ssh_client.start_sgw()
+            await self.__ssh_client.close()
+            return resp
 
     async def close(self) -> None:
         """
