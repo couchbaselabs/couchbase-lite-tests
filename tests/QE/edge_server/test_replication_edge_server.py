@@ -1,11 +1,12 @@
+import json
+import os
 from pathlib import Path
+
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
-import os
 from cbltest.api.httpclient import HTTPClient
-import json
 
 
 class TestEdgeServerSync(CBLTestClass):

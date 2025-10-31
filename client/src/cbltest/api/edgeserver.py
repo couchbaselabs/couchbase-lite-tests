@@ -1,26 +1,27 @@
-import uuid
 import json
+import urllib.parse
+import uuid
 from json import dumps
-from typing import Dict, List, Tuple, cast, Any, Optional
+from typing import Any, Dict, List, Optional, Tuple, cast
 from urllib.parse import urljoin
+
 import pyjson5 as json5
-from aiohttp import ClientSession, BasicAuth
+from aiohttp import BasicAuth, ClientSession
 from opentelemetry.trace import get_tracer
 from varname import nameof
-from cbltest.api.error import CblEdgeServerBadResponseError
-from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
+
+from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
+from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
+from cbltest.api.remoteshell import RemoteShellConnection
+from cbltest.api.syncgateway import (
+    AllDocumentsResponse,
+    CouchbaseVersion,
+    RemoteDocument,
+)
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.version import VERSION
-from cbltest.api.syncgateway import (
-    AllDocumentsResponse,
-    RemoteDocument,
-    CouchbaseVersion,
-)
-import urllib.parse
-from cbltest.api.error import CblTestError
-from cbltest.api.remoteshell import RemoteShellConnection
 
 
 class EdgeServerVersion(CouchbaseVersion):

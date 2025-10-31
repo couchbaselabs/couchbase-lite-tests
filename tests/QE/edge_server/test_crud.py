@@ -1,8 +1,8 @@
 from pathlib import Path
+
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-
 from cbltest.api.edgeserver import BulkDocOperation
 from cbltest.api.httpclient import ClientFactory
 

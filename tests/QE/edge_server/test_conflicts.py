@@ -1,13 +1,12 @@
+import logging
+import time
 from datetime import datetime
 from pathlib import Path
+
 import pytest
-import time
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import PutDatabasePayload
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 

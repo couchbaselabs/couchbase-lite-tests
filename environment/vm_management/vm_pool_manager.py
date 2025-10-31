@@ -1,15 +1,15 @@
 import logging
-import paramiko
 import subprocess
 import sys
 import time
-import couchbase.subdocument as SD
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
-from couchbase.options import ClusterTimeoutOptions, ClusterOptions
 from datetime import timedelta
 from optparse import OptionParser
 
+import couchbase.subdocument as SD
+import paramiko
+from couchbase.auth import PasswordAuthenticator
+from couchbase.cluster import Cluster
+from couchbase.options import ClusterOptions, ClusterTimeoutOptions
 
 SERVER_IP = "172.23.105.178"
 USERNAME = "Administrator"

@@ -1,9 +1,9 @@
-import uuid
-import time
 import random
 import sys
+import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 
 class JSONGenerator:

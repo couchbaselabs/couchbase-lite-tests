@@ -6,6 +6,8 @@ from .api.testserver import TestServer
 from .assertions import _assert_not_null
 from .configparser import (
     CouchbaseServerInfo,
+    EdgeServerInfo,
+    HTTPClientInfo,
     ParsedConfig,
     SyncGatewayInfo,
     TestServerInfo,
@@ -28,12 +30,12 @@ class CBLPyTest:
     def config(self) -> ParsedConfig:
         """Gets the config as parsed from the provided JSON file path"""
         return self.__config
-    
+
     @property
     def log_level(self) -> LogLevel:
         """Gets the log level provided"""
         return self.__log_level
-    
+
     @property
     def extra_props(self) -> dict[str, str]:
         """Gets the extra properties provided as parsed from the provided JSON file path"""

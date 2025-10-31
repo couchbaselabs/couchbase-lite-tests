@@ -1,10 +1,11 @@
 import json
-import requests
 import sys
 import time
-from bs4 import BeautifulSoup
 from optparse import OptionParser
+
 import paramiko
+import requests
+from bs4 import BeautifulSoup
 
 LATESTBUILDS_BASE_URL = "http://latestbuilds.service.couchbase.com/builds"
 

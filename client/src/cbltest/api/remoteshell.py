@@ -1,9 +1,10 @@
-from typing import List, Optional
-import asyncssh
 import subprocess
-from cbltest.version import VERSION
+from typing import List, Optional
+
+import asyncssh
 from opentelemetry.trace import get_tracer
 
+from cbltest.version import VERSION
 
 _remote_shell_tracer = get_tracer("remote_shell", VERSION)
 

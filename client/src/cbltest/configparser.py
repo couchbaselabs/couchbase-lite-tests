@@ -191,7 +191,7 @@ class ParsedConfig:
         return self.__edge_servers
 
     @property
-    def http_clients(self) -> List[dict]:
+    def http_clients(self) -> list[dict]:
         return self.__http_clients
 
     @property
