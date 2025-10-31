@@ -104,7 +104,7 @@ class WebSocketRouter:
                             cbl_error(
                                 f"Unknown or invalid device ID received: {device}"
                             )
-                            ws.close(message=b"Unknown or invalid device ID")
+                            await ws.close(message=b"Unknown or invalid device ID")
             elif msg.type == web.WSMsgType.ERROR:
                 cbl_error(
                     f"WebSocket connection closed with exception {ws.exception()}"
