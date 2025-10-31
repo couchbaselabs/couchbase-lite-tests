@@ -201,10 +201,10 @@ class TestXattrs(CBLTestClass):
             self.mark_test_step(
                 "Verify version vectors for updated SG documents (optional)"
             )
-            for doc in sg_check.rows:
-                assert doc.cv != original_vv.get(doc.id), (
-                    f"Document {doc.id} should have different version vector after SDK update. "
-                    f"Original: {original_vv.get(doc.id)}, Current: {doc.cv}"
+            for row in sg_check.rows:
+                assert row.cv is not None and row.cv != original_vv.get(row.id), (
+                    f"Document {row.id} should have different version vector after SDK update. "
+                    f"Original: {original_vv.get(row.id)}, Current: {row.cv}"
                 )
 
         await sg.delete_database(sg_db)
@@ -310,8 +310,8 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step("Get all docs via SDK and verify count")
         sdk_visible_count = 0
         for doc_id in all_doc_ids:
-            doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
-            if doc is not None:
+            sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
+            if sdk_doc is not None:
                 sdk_visible_count += 1
         assert sdk_visible_count == num_docs * 2, (
             f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
@@ -323,10 +323,10 @@ class TestXattrs(CBLTestClass):
         remaining_docs = all_doc_ids[num_docs:]
 
         for doc_id in docs_to_delete:
-            doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-            if doc and doc.revid:
+            sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
+            if sg_doc is not None and sg_doc.revid is not None:
                 await sg.delete_document(
-                    doc_id, doc.revid, sg_db, "_default", "_default"
+                    doc_id, sg_doc.revid, sg_db, "_default", "_default"
                 )
 
         self.mark_test_step(
@@ -348,8 +348,8 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step("Verify non-deleted docs still accessible")
         for doc_id in remaining_docs:
-            doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-            assert doc is not None, (
+            sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
+            assert sg_doc is not None, (
                 f"Non-deleted doc {doc_id} should still be accessible"
             )
 
@@ -362,7 +362,10 @@ class TestXattrs(CBLTestClass):
             )
             for entry in changes.results:
                 if entry.id in docs_to_delete and entry.deleted:
-                    assert entry.cv != all_doc_version_vectors.get(entry.id), (
+                    assert (
+                        entry.cv is not None
+                        and entry.cv != all_doc_version_vectors.get(entry.id)
+                    ), (
                         f"Deleted doc {entry.id} should have a different version vector, got {entry.cv}"
                     )
 

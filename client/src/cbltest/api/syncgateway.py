@@ -195,6 +195,10 @@ class ChangesResponseEntry:
         """Gets the list of revisions for this change"""
         return self.__revisions
 
+    def cv(self) -> str | None:
+        """Gets the version vector for this change"""
+        return self.__cv
+
     @property
     def deleted(self) -> bool:
         """Gets whether this document was deleted"""
@@ -206,6 +210,7 @@ class ChangesResponseEntry:
         self.__deleted = entry.get("deleted", False)
         changes = cast(list[dict], entry.get("changes", []))
         self.__revisions = [cast(str, c["rev"]) for c in changes]
+        self.__cv = cast(str, entry.get("cv"))
 
 
 class ChangesResponse:
