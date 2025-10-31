@@ -12,6 +12,7 @@ from .configparser import (
     _parse_config,
 )
 from .extrapropsparser import _parse_extra_props
+from .globals import CBLPyTestGlobal
 from .logging import LogLevel, cbl_log_init, cbl_setLogLevel
 from .requests import RequestFactory
 
@@ -33,7 +34,7 @@ class CBLPyTest:
         return self.__log_level
 
     @property
-    def extra_props(self) -> dict[str, str] | None:
+    def extra_props(self) -> dict[str, str]:
         """Gets the extra properties provided as parsed from the provided JSON file path"""
         return self.__extra_props
 
@@ -70,6 +71,9 @@ class CBLPyTest:
         test_server_only: bool = False,
     ):
         ret_val = CBLPyTest(config_path, log_level, extra_props_path, test_server_only)
+        if not ret_val.extra_props.get("auto_start_tdk_page", True):
+            CBLPyTestGlobal.auto_start_tdk_page = False
+
         await ret_val.request_factory.start()
         cbl_log_init(str(ret_val.request_factory.uuid), ret_val.config.logslurp_url)
 
@@ -96,7 +100,7 @@ class CBLPyTest:
         self.__config = _parse_config(config_path)
         self.__log_level = LogLevel(log_level)
         cbl_setLogLevel(self.__log_level)
-        self.__extra_props = None
+        self.__extra_props = {}
         if extra_props_path is not None:
             self.__extra_props = _parse_extra_props(extra_props_path)
 

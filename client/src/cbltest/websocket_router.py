@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 import netifaces
 from aiohttp import web
 
+from cbltest.globals import CBLPyTestGlobal
 from cbltest.logging import cbl_error, cbl_info
 
 
@@ -37,8 +38,12 @@ class WebSocketRouter:
                 "device": "foo",
             }
             query = urlencode(params)
-            webbrowser.open_new_tab(f"{url}/tdk.html?{query}")
-            await wait_for(self.__conn_sem.acquire(), timeout=10)
+            timeout = 30
+            if CBLPyTestGlobal.auto_start_tdk_page:
+                webbrowser.open_new_tab(f"{url}/tdk.html?{query}")
+                timeout = 10
+
+            await wait_for(self.__conn_sem.acquire(), timeout=timeout)
             cbl_info(f"Connected to test server at {url}!")
 
     async def stop(self) -> None:
@@ -72,7 +77,9 @@ class WebSocketRouter:
         return url in self.__connections
 
     async def _websocket_handler(self, request: web.Request) -> web.WebSocketResponse:
-        ws = web.WebSocketResponse()
+        ws = web.WebSocketResponse(
+            protocols=request.headers.getall("Sec-WebSocket-Protocol", [])
+        )
         await ws.prepare(request)
 
         peer = (

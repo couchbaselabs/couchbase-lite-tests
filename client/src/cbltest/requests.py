@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 from enum import Enum
 from importlib import import_module
 from pathlib import Path
@@ -160,7 +161,7 @@ class RequestFactory:
             raise
         except Exception as e:
             cbl_error(f"Failed to send {r} to {server_info[0]} ({str(e)})")
-            writer.write_error(str(e))
+            writer.write_error(traceback.format_exc())
             raise
 
         writer.write_end(str(ret_val), ret_val.serialize())
