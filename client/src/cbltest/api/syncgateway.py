@@ -2,13 +2,14 @@ import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Optional, cast
 from urllib.parse import urljoin
 
 import requests
 from aiohttp import BasicAuth, ClientSession, TCPConnector
 from deprecated import deprecated
 from opentelemetry.trace import get_tracer
+from varname import nameof
 
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
@@ -411,7 +412,7 @@ class SyncGateway:
         method: str,
         path: str,
         payload: Optional[JSONSerializable] = None,
-        params: Optional[Dict[str, str]] = None,
+        params: Optional[dict[str, str]] = None,
         session: Optional[ClientSession] = None,
     ) -> Any:
         if session is None:
@@ -1119,7 +1120,7 @@ class SyncGateway:
             resp = await self.__ssh_client.start_sgw()
             await self.__ssh_client.disconnect()
             return resp
-            
+
     async def close(self) -> None:
         """
         Closes the Sync Gateway session

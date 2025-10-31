@@ -1,12 +1,12 @@
 import asyncio
-import time
-
 import json
+import time
 from typing import Dict, List, Optional
-from cbltest.api.syncgateway import AllDocumentsResponse, RemoteDocument
-from cbltest.api.edgeserver import EdgeServer, BulkDocOperation
-from cbltest.api.remoteshell import RemoteShellConnection
+
+from cbltest.api.edgeserver import BulkDocOperation, EdgeServer
 from cbltest.api.error import CblEdgeServerBadResponseError
+from cbltest.api.remoteshell import RemoteShellConnection
+from cbltest.api.syncgateway import AllDocumentsResponse, RemoteDocument
 
 
 class HTTPClient:

@@ -1,16 +1,17 @@
+import json
+import os
+import random
 import time
 import uuid
 from pathlib import Path
 from typing import List
-import random
+
 import pytest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
-import os
 from cbltest.api.edgeserver import BulkDocOperation
+from cbltest.api.httpclient import ClientFactory, HTTPClient
 from cbltest.api.jsongenerator import JSONGenerator
-from cbltest.api.httpclient import HTTPClient, ClientFactory
-import json
 
 
 class TestEdgeServerChaos(CBLTestClass):

@@ -1,5 +1,5 @@
-import json
 import argparse
+import json
 
 # Load the Edge Server configuration file used
 parser = argparse.ArgumentParser(

@@ -15,21 +15,21 @@ from couchbase.exceptions import (
     BucketAlreadyExistsException,
     BucketDoesNotExistException,
     CollectionAlreadyExistsException,
+    DocumentExistsException,
     DocumentNotFoundException,
     QueryIndexAlreadyExistsException,
     ScopeAlreadyExistsException,
-    DocumentExistsException,
 )
 from couchbase.management.buckets import CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import CreatePrimaryQueryIndexOptions
 from couchbase.options import ClusterOptions
 from opentelemetry.trace import get_tracer
+
 from cbltest.api.error import CblTestError
 from cbltest.logging import cbl_warning
 from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
-
 
 
 class CouchbaseServer:
@@ -288,7 +288,7 @@ class CouchbaseServer:
             except Exception as e:
                 print(f"An error occurred while adding document '{document_id}': {e}")
                 raise
-            
+
     def upsert_document(
         self,
         bucket: str,

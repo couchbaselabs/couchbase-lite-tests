@@ -1,12 +1,11 @@
-from pathlib import Path
-import pytest
-import os
 import json
+import logging
+import os
+from pathlib import Path
+
+import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 

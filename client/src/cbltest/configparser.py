@@ -158,7 +158,7 @@ class HTTPClientInfo:
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
 
-        
+
 class TransportType(Enum):
     HTTP = "http"
     WS = "ws"
@@ -194,11 +194,11 @@ class ParsedConfig:
         return self.__couchbase_servers
 
     @property
-    def edge_servers(self) -> List[dict]:
+    def edge_servers(self) -> list[dict]:
         return self.__edge_servers
 
     @property
-    def http_clients(self) -> List[dict]:
+    def http_clients(self) -> list[dict]:
         return self.__http_clients
 
     @property

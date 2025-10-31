@@ -1,6 +1,6 @@
+import argparse
 import json
 import os
-import argparse
 
 # Define the path to your resources and the expected config output location
 POOL_JSON_PATH = "resources/pool.json"

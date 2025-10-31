@@ -1,7 +1,9 @@
-from datetime import timedelta, datetime
-from pathlib import Path
-import pytest
+import logging
 import time
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import (
@@ -9,9 +11,6 @@ from cbltest.api.error import (
     CblSyncGatewayBadResponseError,
 )
 from cbltest.api.syncgateway import PutDatabasePayload
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 

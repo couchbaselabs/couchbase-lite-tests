@@ -1,9 +1,11 @@
-from datetime import timedelta, datetime
+import logging
+import random
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List
-import random
+
 import pytest
-import time
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import (
@@ -12,9 +14,6 @@ from cbltest.api.error import (
 )
 from cbltest.api.httpclient import ClientFactory
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 
