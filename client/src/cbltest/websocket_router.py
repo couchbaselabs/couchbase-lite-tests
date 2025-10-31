@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 import netifaces
 from aiohttp import web
 
+from cbltest.globals import CBLPyTestGlobal
 from cbltest.logging import cbl_error, cbl_info
 
 
@@ -28,17 +29,22 @@ class WebSocketRouter:
         site = web.TCPSite(self.__runner, port=10000)
         await site.start()
 
+        ws_index = 0
         for url in self.__server_urls:
             local_ip = self._lookup_ip(url)
             cbl_info(f"Connecting to test server at {url}...")
             params = {
                 "tdkURL": f"ws://{local_ip}:10000",
                 "autostart": "true",
-                "device": "foo",
+                "device": f"ws{ws_index}",
             }
             query = urlencode(params)
-            webbrowser.open_new_tab(f"{url}/tdk.html?{query}")
-            await wait_for(self.__conn_sem.acquire(), timeout=10)
+            timeout = 30
+            if CBLPyTestGlobal.auto_start_tdk_page:
+                webbrowser.open_new_tab(f"{url}/tdk.html?{query}")
+                timeout = 10
+
+            await wait_for(self.__conn_sem.acquire(), timeout=timeout)
             cbl_info(f"Connected to test server at {url}!")
 
     async def stop(self) -> None:
@@ -72,23 +78,10 @@ class WebSocketRouter:
         return url in self.__connections
 
     async def _websocket_handler(self, request: web.Request) -> web.WebSocketResponse:
-        ws = web.WebSocketResponse()
-        await ws.prepare(request)
-
-        peer = (
-            request.transport.get_extra_info("peername") if request.transport else None
+        ws = web.WebSocketResponse(
+            protocols=request.headers.getall("Sec-WebSocket-Protocol", [])
         )
-        if peer is not None:
-            remote_ip = peer[0]
-        else:
-            remote_ip = request.remote or "unknown"
-
-        if remote_ip == "127.0.0.1" or remote_ip == "::1":
-            remote_ip = "localhost"
-
-        cbl_info(f"WebSocket connection established from {remote_ip}")
-        self.__connections[f"http://{remote_ip}:5173"] = ws
-        self.__conn_sem.release()
+        await ws.prepare(request)
 
         async for msg in ws:
             if self.__stopping:
@@ -100,6 +93,18 @@ class WebSocketRouter:
                 if ts_id is not None and ts_id in self.__pending:
                     future = self.__pending.pop(ts_id)
                     future.set_result(data)
+                else:
+                    device = data.get("device")
+                    if device is not None:
+                        try:
+                            url_index = int(device[2:])
+                            self.__connections[self.__server_urls[url_index]] = ws
+                            self.__conn_sem.release()
+                        except (ValueError, IndexError):
+                            cbl_error(
+                                f"Unknown or invalid device ID received: {device}"
+                            )
+                            await ws.close(message=b"Unknown or invalid device ID")
             elif msg.type == web.WSMsgType.ERROR:
                 cbl_error(
                     f"WebSocket connection closed with exception {ws.exception()}"
