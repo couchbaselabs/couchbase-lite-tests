@@ -233,7 +233,7 @@ class EdgeServer:
             data = "" if payload is None else payload.serialize()
             if curl:
                 return self._build_curl_command(
-                    method, path, headers=headers, data=payload.to_json(), params=params
+                    method, path, headers=headers, data=payload, params=params
                 )
             writer = get_next_writer()
             writer.write_begin(
