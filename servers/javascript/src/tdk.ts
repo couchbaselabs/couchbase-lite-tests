@@ -300,7 +300,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         info.documents = undefined;
 
         return {
-            activity:   status.status?.toUpperCase() ?? "STOPPED",
+            activity:   status.status?.toUpperCase() ?? "CONNECTING",
             progress:   { completed: (status.status === 'stopped') },
             documents:  documents,
             error:      this.#mkErrorInfo(info.error),
