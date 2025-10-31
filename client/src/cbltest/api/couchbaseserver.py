@@ -292,6 +292,43 @@ class CouchbaseServer:
                     f"Failed to insert document '{doc_id}' into {bucket}.{scope}.{collection}: {e}"
                 )
 
+    def get_document(
+        self,
+        bucket: str,
+        doc_id: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> dict | None:
+        """
+        Gets a document from the specified bucket.scope.collection.
+
+        :param bucket: The bucket name.
+        :param doc_id: The document ID.
+        :param scope: The scope name.
+        :param collection: The collection name.
+        :return: The document content as a dictionary, or None if not found.
+        """
+        with self.__tracer.start_as_current_span(
+            "get_document",
+            attributes={
+                "cbl.bucket.name": bucket,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            try:
+                bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
+                coll = bucket_obj.scope(scope).collection(collection)
+                result = coll.get(doc_id)
+                return result.content_as[dict] if result else None
+            except DocumentNotFoundException:
+                return None
+            except Exception as e:
+                raise CblTestError(
+                    f"Failed to get document '{doc_id}' from {bucket}.{scope}.{collection}: {e}"
+                )
+
     def start_xdcr(self, target: "CouchbaseServer", bucket_name: str) -> None:
         """
         Starts an XDCR replication from this cluster to the target cluster
