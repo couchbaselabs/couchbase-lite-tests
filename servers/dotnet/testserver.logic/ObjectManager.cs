@@ -1,8 +1,11 @@
 ﻿using Couchbase.Lite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Nito.AsyncEx;
 using System.IO.Compression;
+using System.Net;
 using System.Text.Json;
+using System.Xml.Linq;
 using TestServer.Handlers;
 using TestServer.Services;
 
@@ -10,23 +13,27 @@ namespace TestServer
 {
     public sealed class ObjectManager
     {
+        private const string GithubBaseUrl = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/";
+
         private readonly Dictionary<string, Database> _activeDatabases = new();
         private readonly Dictionary<string, IDisposable> _activeDisposables = new();
         private readonly HashSet<object> _keepAlives = new();
-        private readonly AutoReaderWriterLock _lock = new AutoReaderWriterLock();
-        private readonly IFileSystem _fileSystem = CBLTestServer.ServiceProvider.GetRequiredService<IFileSystem>();
+        private readonly AsyncReaderWriterLock _lock = new AsyncReaderWriterLock();
+        private readonly string _datasetVersion;
+        private readonly HttpClient _httpClient = new HttpClient();
 
         public readonly string FilesDirectory;
 
-        public ObjectManager(string filesDirectory)
+        public ObjectManager(string filesDirectory, string datasetVersion)
         {
             FilesDirectory = filesDirectory;
+            _datasetVersion = datasetVersion;
             Directory.CreateDirectory(FilesDirectory);
         }
 
         public void Reset()
         {
-            using var l = _lock.GetWriteLock();
+            using var l = _lock.WriterLock();
 
             foreach (var db in _activeDatabases) {
                 try {
@@ -52,7 +59,7 @@ namespace TestServer
         public async Task LoadDatabase(string? datasetName, IEnumerable<string> targetDbNames, IEnumerable<string>? collections = null)
         {
             IEnumerable<string> targetsToCreate = default!;
-            using (var rl = _lock.GetReadLock()) {
+            using (var rl = _lock.ReaderLock()) {
                 targetsToCreate = targetDbNames.Where(x => !_activeDatabases.ContainsKey(x));
                 if (!targetsToCreate.Any()) {
                     return;
@@ -93,15 +100,12 @@ namespace TestServer
                 return;
             }
 
-            Stream asset;
-            try {
-                asset = await _fileSystem.OpenAppPackageFileAsync($"{datasetName}.cblite2.zip");
-            } catch (Exception ex) {
-                throw new ApplicationException($"Unable to open dataset '{datasetName}'", ex);
+            using var asset = await DownloadIfNecessary($"dbs/{_datasetVersion}/{datasetName}.cblite2.zip");
+            if(asset == null) {
+                throw new JsonException($"Request for nonexistent dataset '{datasetName}'");
             }
-
             var destinationZip = Path.Combine(FilesDirectory, $"{datasetName}.cblite2.zip");
-            using var wl = _lock.GetWriteLock();
+            using var wl = _lock.WriterLock();
             if (File.Exists(destinationZip)) {
                 File.Delete(destinationZip);
             }
@@ -122,16 +126,8 @@ namespace TestServer
 
         public async Task<Stream> LoadBlob(string name)
         {
-            Stream asset;
-            try {
-                asset = await _fileSystem.OpenAppPackageFileAsync($"blobs/{name}");
-            } catch (FileNotFoundException) {
-                throw new JsonException($"Request for nonexistent blob '{name}'");
-            } catch (Exception ex) {
-                throw new ApplicationException($"Unable to open blob '{name}'", ex);
-            }
-
-            return asset;
+            var retVal = await DownloadIfNecessary($"blobs/{name}").ConfigureAwait(false);
+            return retVal ?? throw new JsonException($"Request for nonexistent blob '{name}'");
         }
 
         public Database? GetDatabase(string name)
@@ -163,6 +159,39 @@ namespace TestServer
             }
 
             return castVal;
+        }
+
+        private async Task<Stream?> DownloadIfNecessary(string relativePath)
+        {
+            var downloadedPath = Path.Combine(FilesDirectory, "downloaded", relativePath);
+            if (File.Exists(downloadedPath)) {
+                return File.OpenRead(downloadedPath);
+            }
+
+            var directory = Path.GetDirectoryName(downloadedPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) {
+                Directory.CreateDirectory(directory);
+            }
+
+            Stream retVal;
+            try {
+                retVal = await _httpClient.GetStreamAsync($"{GithubBaseUrl}/{relativePath}");
+            } catch (HttpRequestException ex) {
+                if(ex.StatusCode == HttpStatusCode.NotFound) {
+                    return null;
+                }
+
+                throw;
+            } catch (Exception ex) {
+                throw new ApplicationException($"Unable to download item '{relativePath}'", ex);
+            }
+
+            using var wl = await _lock.WriterLockAsync();
+            using (var fout = File.Create(downloadedPath)) {
+                await retVal.CopyToAsync(fout).ConfigureAwait(false);
+            }
+
+            return File.OpenRead(downloadedPath);
         }
     }
 }

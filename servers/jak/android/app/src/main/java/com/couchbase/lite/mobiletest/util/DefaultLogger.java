@@ -24,19 +24,12 @@ import com.couchbase.lite.mobiletest.services.Log;
 
 public class DefaultLogger extends Log.TestLogger {
 
-    @Override
-    public void log(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String message) {
-        // these CBL messages have already been sent to the console
+    public DefaultLogger(@NonNull LogLevel level) {
+        super(level);
     }
 
     @Override
-    public void close() {
-        // no-op
-    }
-
-    // These are messages from the Test Server: log them to the console
-    @Override
-    public void log(LogLevel level, String tag, String msg, Exception err) {
+    public void writeLog(LogLevel level, String tag, String msg, Exception err) {
         switch (level) {
             case DEBUG:
                 android.util.Log.d(LOG_PREFIX + tag, msg, err);
@@ -54,5 +47,16 @@ public class DefaultLogger extends Log.TestLogger {
                 android.util.Log.e(LOG_PREFIX + tag, msg, err);
                 break;
         }
+    }
+
+    @Override
+    protected void writeLog(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String message) {
+        // these CBL messages have already been sent to the console
+        throw new RuntimeException("Unsupported, Do not call");
+    }
+
+    @Override
+    public void close() {
+        // no-op
     }
 }

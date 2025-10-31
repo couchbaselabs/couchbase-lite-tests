@@ -14,7 +14,7 @@ extension Handlers {
             throw TestServerError.badRequest("Request body does not match the 'GetDocument' scheme.")
         }
         
-        let dbManager = req.application.databaseManager
+        let dbManager = req.databaseManager
         let json = try document(dbManager: dbManager,
                                 id: getDoc.document.id,
                                 collection: getDoc.document.collection,
@@ -34,7 +34,8 @@ fileprivate func document(dbManager: DatabaseManager, id: String, collection: St
     
     var dict = doc.toDictionary()
     dict["_id"] = doc.id
-    dict["_revs"] = doc.revisionID // TODO : Change this to get rev history using 4.0 binary
+    dict["_revs"] = doc._getRevisionHistory()
+    
     let result = try dict.mapValues { try AnyCodable($0) }
     return result
 }

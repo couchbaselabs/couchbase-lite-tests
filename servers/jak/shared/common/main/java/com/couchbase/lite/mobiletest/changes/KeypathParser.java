@@ -64,7 +64,7 @@ public class KeypathParser {
         return parsedPath;
     }
 
-    @SuppressWarnings({"FallThrough", "PMD.MissingBreakInSwitch"})
+    @SuppressWarnings({"FallThrough", "PMD.MissingBreakInSwitch", "PMD.ImplicitSwitchFallThrough"})
     private void parseKeypath(@NonNull KeyPath parsedPath) {
         nextChar();
         switch (curCharClass) {

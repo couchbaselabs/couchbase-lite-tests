@@ -10,7 +10,7 @@ authors = [
 ]
 description = "A client for consuming the Couchbase Lite functional testing REST API"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {text ="Apache-2.0"}
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",
@@ -22,18 +22,71 @@ classifiers = [
     "Environment :: Console"
 ]
 dependencies = [
-    "aiohttp",
-    "opentelemetry-api",
-    "varname",
-    "couchbase",
-    "websocket-client",
-    "requests",
-    "typing_extensions; python_version < '3.10'"
+    "aiohappyeyeballs==2.4.4",
+    "aiohttp==3.11.11",
+    "aiosignal==1.3.2",
+    "async-timeout==5.0.1",
+    "attrs==24.3.0",
+    "bcrypt==4.2.1",
+    "certifi==2024.12.14",
+    "cffi==1.17.1",
+    "charset-normalizer==3.4.1",
+    "colorama==0.4.6",
+    "couchbase==4.3.4",
+    "cryptography==44.0.0",
+    "Deprecated==1.2.15",
+    "exceptiongroup==1.2.2",
+    "executing==2.1.0",
+    "frozenlist==1.5.0",
+    "googleapis-common-protos==1.66.0",
+    "grpcio==1.69.0",
+    "idna==3.10",
+    "importlib_metadata==8.5.0",
+    "iniconfig==2.0.0",
+    "multidict==6.1.0",
+    "netifaces==0.11.0",
+    "opentelemetry-api==1.29.0",
+    "opentelemetry-exporter-otlp-proto-common==1.29.0",
+    "opentelemetry-exporter-otlp-proto-grpc==1.29.0",
+    "opentelemetry-proto==1.29.0",
+    "opentelemetry-sdk==1.29.0",
+    "opentelemetry-semantic-conventions==0.50b0",
+    "packaging==24.2",
+    "paramiko==3.5.0",
+    "pluggy==1.5.0",
+    "propcache==0.2.1",
+    "protobuf==5.29.3",
+    "pycparser==2.22",
+    "PyNaCl==1.5.0",
+    "pytest==8.3.4",
+    "pytest-asyncio==0.25.2",
+    "requests==2.32.3",
+    "tomli==2.2.1",
+    "typing_extensions==4.12.2",
+    "urllib3==2.3.0",
+    "websocket-client==1.8.0",
+    "wrapt==1.17.2",
+    "yarl==1.18.3",
+    "zipp==3.21.0",
+]
+[project.optional-dependencies]
+dev = [
+    "mypy==1.15.0",
+    "types-Deprecated==1.2.15.20241117",
+    "types-requests==2.32.0.20241016",
+    "types-netifaces==0.11.0.20241025"
 ]
 
 [project.urls]
 "Homepage" = "https://github.com/couchbaselabs/couchbase-lite-tests"
 "Bug Tracker" = "https://github.com/couchbaselabs/couchbase-lite-tests/issues"
+
+[project.entry-points.pytest11]
+required_topology = "cbltest.plugins.required_topology"
+cbse_filter = "cbltest.plugins.cbse_filter"
+cblpytest_fixture = "cbltest.plugins.cblpytest_fixture"
+greenboard_fixture = "cbltest.plugins.greenboard_fixture"
+span_generation_fixture = "cbltest.plugins.span_generation_fixture"
 
 [tool.hatch.version]
 path = "src/cbltest/version.py"

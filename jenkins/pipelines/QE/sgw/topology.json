@@ -1,0 +1,5 @@
+{
+    "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
+    "test_servers": [],
+    "include": "../../../../environment/aws/topology_setup/default_topology.json"
+}

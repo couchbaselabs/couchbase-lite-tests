@@ -7,12 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		4009847F2D11F9F60029F26E /* blobs in Resources */ = {isa = PBXBuildFile; fileRef = 4009847E2D11F9F60029F26E /* blobs */; };
-		400984812D11FA0B0029F26E /* dbs in Resources */ = {isa = PBXBuildFile; fileRef = 400984802D11FA0B0029F26E /* dbs */; };
 		4029C4A02CB88E0300C34775 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4029C49F2CB88E0300C34775 /* SessionManager.swift */; };
 		404619D02CB9A761003835C7 /* NewSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619CF2CB9A761003835C7 /* NewSession.swift */; };
 		404619D22CB9A985003835C7 /* NewSessionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404619D12CB9A985003835C7 /* NewSessionHandler.swift */; };
 		4055CAA02CDC33A400EDD0CB /* IPAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4055CA9F2CDC33A400EDD0CB /* IPAddress.swift */; };
+		409F43F82DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F43F72DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift */; };
+		409F43FC2DEA373E00BB7851 /* StartMultipeerReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F43FB2DEA373E00BB7851 /* StartMultipeerReplicator.swift */; };
+		409F44002DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F43FF2DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift */; };
+		409F44022DEA823A00BB7851 /* StopMultipeerReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F44012DEA823A00BB7851 /* StopMultipeerReplicator.swift */; };
+		409F44172DEE187600BB7851 /* GetMultipeerReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F44162DEE187600BB7851 /* GetMultipeerReplicatorStatus.swift */; };
+		409F442C2DEE228300BB7851 /* MultipeerReplicatorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F442B2DEE228300BB7851 /* MultipeerReplicatorStatus.swift */; };
+		409F443D2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F443C2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift */; };
+		409F443F2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F443E2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift */; };
+		409F45302DFA7BC900BB7851 /* FileDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409F452F2DFA7BC900BB7851 /* FileDownloader.swift */; };
 		40AA34992CAF5D20004F4D08 /* StopReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34982CAF5D20004F4D08 /* StopReplicator.swift */; };
 		40AA349D2CAF6755004F4D08 /* CollectionSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */; };
 		40AA34A12CAF6BE4004F4D08 /* ReplicationConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AA34A02CAF6BE4004F4D08 /* ReplicationConflictResolver.swift */; };
@@ -75,6 +82,10 @@
 		40C7A5632CA4AF5C0053ADCB /* RunQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A5622CA4AF5C0053ADCB /* RunQuery.swift */; };
 		40C7A5652CA4AFB40053ADCB /* RunQueryConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A5642CA4AFB40053ADCB /* RunQueryConfiguration.swift */; };
 		40C7A5672CA4B15B0053ADCB /* QueryResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A5662CA4B15B0053ADCB /* QueryResults.swift */; };
+		AED567692E01BBBE00007993 /* StartListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED567682E01BBBE00007993 /* StartListener.swift */; };
+		AED5676B2E01BBD100007993 /* StopListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED5676A2E01BBD100007993 /* StopListener.swift */; };
+		AED5676D2E01BC1100007993 /* Listener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED5676C2E01BC1100007993 /* Listener.swift */; };
+		AED5676F2E01BC1D00007993 /* StartListenerRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED5676E2E01BC1D00007993 /* StartListenerRequest.swift */; };
 		EACC964D2AF3F8B500999C70 /* CBLVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EACC964C2AF3F8B500999C70 /* CBLVersion.swift */; };
 /* End PBXBuildFile section */
 
@@ -93,12 +104,19 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		4009847E2D11F9F60029F26E /* blobs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = blobs; path = ../../Assets/blobs; sourceTree = "<group>"; };
-		400984802D11FA0B0029F26E /* dbs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = dbs; path = ../../Assets/dbs; sourceTree = "<group>"; };
 		4029C49F2CB88E0300C34775 /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
 		404619CF2CB9A761003835C7 /* NewSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSession.swift; sourceTree = "<group>"; };
 		404619D12CB9A985003835C7 /* NewSessionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionHandler.swift; sourceTree = "<group>"; };
 		4055CA9F2CDC33A400EDD0CB /* IPAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPAddress.swift; sourceTree = "<group>"; };
+		409F43F72DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartMultipeerReplicatorRequest.swift; sourceTree = "<group>"; };
+		409F43FB2DEA373E00BB7851 /* StartMultipeerReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartMultipeerReplicator.swift; sourceTree = "<group>"; };
+		409F43FF2DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorConfiguration.swift; sourceTree = "<group>"; };
+		409F44012DEA823A00BB7851 /* StopMultipeerReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopMultipeerReplicator.swift; sourceTree = "<group>"; };
+		409F44162DEE187600BB7851 /* GetMultipeerReplicatorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetMultipeerReplicatorStatus.swift; sourceTree = "<group>"; };
+		409F442B2DEE228300BB7851 /* MultipeerReplicatorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorStatus.swift; sourceTree = "<group>"; };
+		409F443C2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorCAAuthenticator.swift; sourceTree = "<group>"; };
+		409F443E2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerReplicatorIdentity.swift; sourceTree = "<group>"; };
+		409F452F2DFA7BC900BB7851 /* FileDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDownloader.swift; sourceTree = "<group>"; };
 		40A219D62CDC3E790038204C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		40AA34982CAF5D20004F4D08 /* StopReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopReplicator.swift; sourceTree = "<group>"; };
 		40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionSpec.swift; sourceTree = "<group>"; };
@@ -160,6 +178,10 @@
 		40C7A5622CA4AF5C0053ADCB /* RunQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunQuery.swift; sourceTree = "<group>"; };
 		40C7A5642CA4AFB40053ADCB /* RunQueryConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunQueryConfiguration.swift; sourceTree = "<group>"; };
 		40C7A5662CA4B15B0053ADCB /* QueryResults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryResults.swift; sourceTree = "<group>"; };
+		AED567682E01BBBE00007993 /* StartListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartListener.swift; sourceTree = "<group>"; };
+		AED5676A2E01BBD100007993 /* StopListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopListener.swift; sourceTree = "<group>"; };
+		AED5676C2E01BC1100007993 /* Listener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Listener.swift; sourceTree = "<group>"; };
+		AED5676E2E01BC1D00007993 /* StartListenerRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartListenerRequest.swift; sourceTree = "<group>"; };
 		EACC964C2AF3F8B500999C70 /* CBLVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBLVersion.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -177,15 +199,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		4009844B2D11F3710029F26E /* Assets */ = {
-			isa = PBXGroup;
-			children = (
-				4009847E2D11F9F60029F26E /* blobs */,
-				400984802D11FA0B0029F26E /* dbs */,
-			);
-			path = Assets;
-			sourceTree = "<group>";
-		};
 		40BDA7452AF1BFCC008DB256 = {
 			isa = PBXGroup;
 			children = (
@@ -206,7 +219,6 @@
 		40BDA7502AF1BFCC008DB256 /* TestServer */ = {
 			isa = PBXGroup;
 			children = (
-				4009844B2D11F3710029F26E /* Assets */,
 				40BDA8C92AF20AAB008DB256 /* ContentTypes */,
 				40BDA7ED2AF1C13B008DB256 /* Handlers */,
 				40BDA7F82AF1C13B008DB256 /* Middleware */,
@@ -243,6 +255,7 @@
 			children = (
 				40BDA7F72AF1C13B008DB256 /* GetAllDocuments.swift */,
 				40AA34A42CAF94A4004F4D08 /* GetDocument.swift */,
+				409F44162DEE187600BB7851 /* GetMultipeerReplicatorStatus.swift */,
 				40BDA7F62AF1C13B008DB256 /* GetReplicatorStatus.swift */,
 				40BDA7F02AF1C13B008DB256 /* GetRootHandler.swift */,
 				40BDA7F32AF1C13B008DB256 /* Handler.swift */,
@@ -251,8 +264,12 @@
 				40BDA7EE2AF1C13B008DB256 /* ResetHandler.swift */,
 				40C7A5622CA4AF5C0053ADCB /* RunQuery.swift */,
 				40BDA7F42AF1C13B008DB256 /* SnapshotDocuments.swift */,
+				409F43FB2DEA373E00BB7851 /* StartMultipeerReplicator.swift */,
 				40BDA7EF2AF1C13B008DB256 /* StartReplicator.swift */,
+				409F44012DEA823A00BB7851 /* StopMultipeerReplicator.swift */,
 				40AA34982CAF5D20004F4D08 /* StopReplicator.swift */,
+				AED567682E01BBBE00007993 /* StartListener.swift */,
+				AED5676A2E01BBD100007993 /* StopListener.swift */,
 				40BDA7F22AF1C13B008DB256 /* UpdateDatabase.swift */,
 				40BDA7F12AF1C13B008DB256 /* VerifyDocuments.swift */,
 			);
@@ -274,6 +291,7 @@
 				40BDA80E2AF1C15C008DB256 /* AnyCodable.swift */,
 				40AA34B52CAFB28E004F4D08 /* CertUtil.swift */,
 				40AA349C2CAF6755004F4D08 /* CollectionSpec.swift */,
+				409F452F2DFA7BC900BB7851 /* FileDownloader.swift */,
 				40BDA7632AF1C0AF008DB256 /* DatabaseManager.swift */,
 				40BDA80B2AF1C15C008DB256 /* DocComparison.swift */,
 				40BDA8082AF1C15C008DB256 /* DocumentUpdater.swift */,
@@ -307,6 +325,10 @@
 				40BDA8D92AF20AAB008DB256 /* DocumentID.swift */,
 				40BDA8D22AF20AAB008DB256 /* DocumentReplication.swift */,
 				40AA34A62CAF9BC8004F4D08 /* GetDocumentRequest.swift */,
+				409F443C2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift */,
+				409F43FF2DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift */,
+				409F443E2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift */,
+				409F442B2DEE228300BB7851 /* MultipeerReplicatorStatus.swift */,
 				404619CF2CB9A761003835C7 /* NewSession.swift */,
 				40BDA8D32AF20AAB008DB256 /* PerformMaintenanceConfiguration.swift */,
 				40C7A5662CA4B15B0053ADCB /* QueryResults.swift */,
@@ -319,9 +341,12 @@
 				40BDA8CB2AF20AAB008DB256 /* ReplicatorStatus.swift */,
 				40BDA8D82AF20AAB008DB256 /* ResetConfiguration.swift */,
 				40C7A5642CA4AFB40053ADCB /* RunQueryConfiguration.swift */,
+				AED5676C2E01BC1100007993 /* Listener.swift */,
+				AED5676E2E01BC1D00007993 /* StartListenerRequest.swift */,
 				40BDA8DC2AF20AAB008DB256 /* ServerInfo.swift */,
 				40BDA8CF2AF20AAB008DB256 /* SnapshotID.swift */,
 				40BDA8CC2AF20AAB008DB256 /* SnapshotRequest.swift */,
+				409F43F72DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift */,
 				40BDA8CD2AF20AAB008DB256 /* StartReplicatorRequest.swift */,
 				40BDA8D72AF20AAB008DB256 /* TestServerError.swift */,
 				40BDA8DB2AF20AAB008DB256 /* UpdateRequest.swift */,
@@ -399,8 +424,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				400984812D11FA0B0029F26E /* dbs in Resources */,
-				4009847F2D11F9F60029F26E /* blobs in Resources */,
 				40BDA7592AF1BFCD008DB256 /* Preview Assets.xcassets in Resources */,
 				40BDA7562AF1BFCD008DB256 /* Assets.xcassets in Resources */,
 			);
@@ -444,14 +467,20 @@
 				40AA34A72CAF9BC8004F4D08 /* GetDocumentRequest.swift in Sources */,
 				40BDA8F32AF20AAB008DB256 /* ReplicatorAuthenticator.swift in Sources */,
 				40BDA8112AF1C15C008DB256 /* Snapshot.swift in Sources */,
+				AED567692E01BBBE00007993 /* StartListener.swift in Sources */,
 				40BDA8E22AF20AAB008DB256 /* SnapshotRequest.swift in Sources */,
 				40BDA8132AF1C15C008DB256 /* ReplicationFilterFactory.swift in Sources */,
 				40BDA8EC2AF20AAB008DB256 /* VerifyRequest.swift in Sources */,
 				40BDA8062AF1C13B008DB256 /* TestServerMiddleware.swift in Sources */,
+				409F43F82DEA348500BB7851 /* StartMultipeerReplicatorRequest.swift in Sources */,
+				409F443D2DF0EB3800BB7851 /* MultipeerReplicatorCAAuthenticator.swift in Sources */,
+				AED5676F2E01BC1D00007993 /* StartListenerRequest.swift in Sources */,
 				40BDA8F22AF20AAB008DB256 /* ServerInfo.swift in Sources */,
 				40BDA8F42AF20AAB008DB256 /* DatabaseUpdateItem.swift in Sources */,
 				40BDA8002AF1C13B008DB256 /* Handler.swift in Sources */,
+				409F44022DEA823A00BB7851 /* StopMultipeerReplicator.swift in Sources */,
 				40BDA7FC2AF1C13B008DB256 /* StartReplicator.swift in Sources */,
+				409F44172DEE187600BB7851 /* GetMultipeerReplicatorStatus.swift in Sources */,
 				40BDA7FE2AF1C13B008DB256 /* VerifyDocuments.swift in Sources */,
 				40BDA7FD2AF1C13B008DB256 /* GetRootHandler.swift in Sources */,
 				40BDA7FB2AF1C13B008DB256 /* ResetHandler.swift in Sources */,
@@ -461,6 +490,7 @@
 				40BDA8F52AF20AAB008DB256 /* ReplicationCollection.swift in Sources */,
 				40BDA8E02AF20AAB008DB256 /* VerifyResponse.swift in Sources */,
 				40BDA8E32AF20AAB008DB256 /* StartReplicatorRequest.swift in Sources */,
+				AED5676B2E01BBD100007993 /* StopListener.swift in Sources */,
 				40AA349D2CAF6755004F4D08 /* CollectionSpec.swift in Sources */,
 				404619D02CB9A761003835C7 /* NewSession.swift in Sources */,
 				40BDA8F02AF20AAB008DB256 /* Replicator.swift in Sources */,
@@ -468,6 +498,7 @@
 				40AA34A12CAF6BE4004F4D08 /* ReplicationConflictResolver.swift in Sources */,
 				40BDA8E72AF20AAB008DB256 /* CollectionDocuments.swift in Sources */,
 				40C7A5672CA4B15B0053ADCB /* QueryResults.swift in Sources */,
+				409F44002DEA561A00BB7851 /* MultipeerReplicatorConfiguration.swift in Sources */,
 				EACC964D2AF3F8B500999C70 /* CBLVersion.swift in Sources */,
 				40AA34992CAF5D20004F4D08 /* StopReplicator.swift in Sources */,
 				404619D22CB9A985003835C7 /* NewSessionHandler.swift in Sources */,
@@ -475,6 +506,7 @@
 				40BDA8022AF1C13B008DB256 /* PerformMaintenance.swift in Sources */,
 				40BDA8032AF1C13B008DB256 /* GetReplicatorStatus.swift in Sources */,
 				40BDA8012AF1C13B008DB256 /* SnapshotDocuments.swift in Sources */,
+				409F443F2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift in Sources */,
 				40BDA8E42AF20AAB008DB256 /* ContentTypes.swift in Sources */,
 				40BDA8152AF1C15C008DB256 /* AnyCodable.swift in Sources */,
 				40AA34A32CAF8C4C004F4D08 /* ReplicationConflictResolverFactory.swift in Sources */,
@@ -487,10 +519,14 @@
 				40BDA8052AF1C13B008DB256 /* TestServerErrorMiddleware.swift in Sources */,
 				40BDA8042AF1C13B008DB256 /* GetAllDocuments.swift in Sources */,
 				40BDA8F12AF20AAB008DB256 /* UpdateRequest.swift in Sources */,
+				409F45302DFA7BC900BB7851 /* FileDownloader.swift in Sources */,
 				40BDA8ED2AF20AAB008DB256 /* TestServerError.swift in Sources */,
+				AED5676D2E01BC1100007993 /* Listener.swift in Sources */,
 				40BDA8142AF1C15C008DB256 /* KeyPathParser.swift in Sources */,
+				409F43FC2DEA373E00BB7851 /* StartMultipeerReplicator.swift in Sources */,
 				40C7A5652CA4AFB40053ADCB /* RunQueryConfiguration.swift in Sources */,
 				40C7A5632CA4AF5C0053ADCB /* RunQuery.swift in Sources */,
+				409F442C2DEE228300BB7851 /* MultipeerReplicatorStatus.swift in Sources */,
 				4055CAA02CDC33A400EDD0CB /* IPAddress.swift in Sources */,
 				40BDA8EE2AF20AAB008DB256 /* ResetConfiguration.swift in Sources */,
 				40BDA8EB2AF20AAB008DB256 /* ReplicatorConfiguration.swift in Sources */,
@@ -641,7 +677,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -673,7 +709,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

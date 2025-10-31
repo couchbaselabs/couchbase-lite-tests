@@ -9,11 +9,15 @@ int Dispatcher::handlePOSTNewSession(Request &request, Session *session) {
     json body = request.jsonBody();
     CheckBody(body);
 
-    // Session:
+    // Session Parameters:
     auto id = GetValue<string>(body, "id");
+    auto datasetVersion = GetValue<string>(body, "dataset_version");
+
+    // Create Session:
     auto sessionManager = request.dispatcher()->sessionManager();
-    auto newSession = sessionManager->createSession(id);
-    Log::logToConsole(LogLevel::info, "Start new session with id : %s", id.c_str());
+    auto newSession = sessionManager->createSession(id, datasetVersion);
+    Log::logToConsole(LogLevel::info, "Start new session with id '%s' and dataset version '%s'",
+                      id.c_str(), datasetVersion.c_str());
 
     // Logging:
     auto logging = GetOptValue<json>(body, "logging");

@@ -59,12 +59,7 @@ internal static class SerilogExtensions
 
 internal record NewSessionLoggingInfo(string url, string tag);
 
-internal readonly record struct NewSessionBody
-{
-    public required string id { get; init; }
-
-    public NewSessionLoggingInfo? logging { get; init; }
-}
+internal readonly record struct NewSessionBody(string id, string dataset_version = "3.2", NewSessionLoggingInfo? logging = null);
 
 internal static partial class HandlerList
 {
@@ -77,7 +72,7 @@ internal static partial class HandlerList
             return Task.CompletedTask;
         }
 
-        Session.Create(CBLTestServer.ServiceProvider, newSessionBody.id);
+        Session.Create(CBLTestServer.ServiceProvider, newSessionBody.id, newSessionBody.dataset_version);
 
         if(newSessionBody.logging == null) {
             response.WriteEmptyBody(version);

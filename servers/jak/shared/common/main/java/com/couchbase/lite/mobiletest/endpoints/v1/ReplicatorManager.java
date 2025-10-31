@@ -26,43 +26,42 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import com.couchbase.lite.BasicAuthenticator;
+import com.couchbase.lite.Collection;
 import com.couchbase.lite.CollectionConfiguration;
 import com.couchbase.lite.Conflict;
 import com.couchbase.lite.ConflictResolver;
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
+import com.couchbase.lite.Dictionary;
 import com.couchbase.lite.Document;
-import com.couchbase.lite.DocumentFlag;
 import com.couchbase.lite.DocumentReplication;
 import com.couchbase.lite.MutableArray;
+import com.couchbase.lite.MutableDictionary;
 import com.couchbase.lite.MutableDocument;
-import com.couchbase.lite.ReplicatedDocument;
+import com.couchbase.lite.PeerInfo;
 import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.ReplicatorConfiguration;
-import com.couchbase.lite.ReplicatorProgress;
 import com.couchbase.lite.ReplicatorStatus;
 import com.couchbase.lite.ReplicatorType;
 import com.couchbase.lite.SessionAuthenticator;
 import com.couchbase.lite.URLEndpoint;
+import com.couchbase.lite.android.mobiletest.endpoints.v1.MultipeerReplicatorManager;
 import com.couchbase.lite.mobiletest.TestContext;
-import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
-import com.couchbase.lite.mobiletest.json.ErrorBuilder;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
@@ -70,91 +69,10 @@ import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.trees.TypedMap;
 
 
-@SuppressWarnings("PMD.ExcessiveImports")
-interface ConfigurableConflictResolver extends ConflictResolver {
-    void configure(@Nullable TypedMap config);
-}
-
-class LocalWinsResolver implements ConfigurableConflictResolver {
-    @Override
-    public void configure(@Nullable TypedMap config) {
-        // no configuration needed
-    }
-
-    @Nullable
-    @Override
-    public Document resolve(@NonNull Conflict conflict) { return conflict.getLocalDocument(); }
-}
-
-class RemoteWinsResolver implements ConfigurableConflictResolver {
-    @Override
-    public void configure(@Nullable TypedMap config) {
-        // no configuration needed
-    }
-
-    @Nullable
-    @Override
-    public Document resolve(@NonNull Conflict conflict) { return conflict.getRemoteDocument(); }
-}
-
-class DeleteResolver implements ConfigurableConflictResolver {
-    @Override
-    public void configure(@Nullable TypedMap config) {
-        // no configuration needed
-    }
-
-    @Nullable
-    @Override
-    public Document resolve(@NonNull Conflict conflict) { return null; }
-}
-
-class MergeResolver implements ConfigurableConflictResolver {
-    private static final String KEY_PROPERTY = "property";
-
-    private static final Set<String> MERGE_RESOLVER_KEYS;
-    static {
-        final Set<String> l = new HashSet<>();
-        l.add(KEY_PROPERTY);
-        MERGE_RESOLVER_KEYS = Collections.unmodifiableSet(l);
-    }
-
-
-    private String docProp;
-
-    @Override
-    public void configure(@Nullable TypedMap config) {
-        if (config == null) { throw new ClientError("Merge resolver requires configuration"); }
-
-        config.validate(MERGE_RESOLVER_KEYS);
-
-        final String prop = config.getString(KEY_PROPERTY);
-        if (prop == null) { throw new ClientError("Merge resolver requires a property name"); }
-
-        docProp = prop;
-    }
-
-    @Nullable
-    @Override
-    public Document resolve(@NonNull Conflict conflict) {
-        final Document localDoc = conflict.getLocalDocument();
-        final Document remoteDoc = conflict.getRemoteDocument();
-        if ((localDoc == null) || (remoteDoc == null)) { return null; }
-
-        final MutableArray mergedVal = new MutableArray();
-        mergedVal.addValue(localDoc.getValue(docProp));
-        mergedVal.addValue(remoteDoc.getValue(docProp));
-
-        final MutableDocument mergedDoc = localDoc.toMutable();
-        mergedDoc.setValue(docProp, mergedVal);
-
-        return mergedDoc;
-    }
-}
-
-public class ReplicatorManager {
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CyclomaticComplexity"})
+@SuppressFBWarnings("EI_EXPOSE_REP2")
+public class ReplicatorManager extends BaseReplicatorManager {
     private static final String TAG = "REPL_MGR_V1";
-
-    private static final String KEY_REPL_ID = "id";
 
     // Create replicator
     private static final String KEY_RESET = "reset";
@@ -168,38 +86,143 @@ public class ReplicatorManager {
     private static final String TYPE_PULL = "pull";
     private static final String KEY_IS_CONTINUOUS = "continuous";
     private static final String KEY_ENABLE_DOC_LISTENER = "enableDocumentListener";
-    private static final String KEY_AUTHENTICATOR = "authenticator";
-    private static final String KEY_AUTH_TYPE = "type";
-    private static final String AUTH_TYPE_BASIC = "basic";
-    private static final String KEY_BASIC_AUTH_USER = "username";
-    private static final String KEY_BASIC_AUTH_PASSWORD = "password";
-    private static final String AUTH_TYPE_SESSION = "session";
     private static final String KEY_SESSION_AUTH_ID = "sessionID";
     private static final String KEY_SESSION_AUTH_COOKIE = "cookieName";
-    private static final String KEY_NAMES = "names";
-    private static final String KEY_CHANNELS = "channels";
-    private static final String KEY_DOCUMENT_IDS = "documentIDs";
-    private static final String KEY_PUSH_FILTER = "pushFilter";
-    private static final String KEY_PULL_FILTER = "pullFilter";
-    private static final String KEY_CONFLICT_RESOLVER = "conflictResolver";
-    private static final String KEY_NAME = "name";
-    private static final String KEY_PARAMS = "params";
-    private static final String FILTER_DELETED = "deletedDocumentsOnly";
-    private static final String FILTER_DOC_ID = "documentIDs";
-    private static final String KEY_DOC_IDS = "documentIDs";
+    private static final String KEY_HEADERS = "headers";
     private static final String KEY_ENABLE_AUTOPURGE = "enableAutoPurge";
     private static final String KEY_PINNED_CERT = "pinnedServerCert";
 
-    // Replicator status
-    private static final String KEY_REPL_ACTIVITY = "activity";
-    private static final String KEY_REPL_PROGRESS = "progress";
-    private static final String KEY_REPL_DOCS = "documents";
-    private static final String KEY_REPL_DOCS_COMPLETE = "completed";
-    private static final String KEY_REPL_COLLECTION = "collection";
-    private static final String KEY_REPL_DOC_ID = "documentID";
-    private static final String KEY_REPL_PUSH = "isPush";
-    private static final String KEY_REPL_FLAGS = "flags";
-    private static final String KEY_REPL_ERROR = "error";
+    private interface ConfigurableConflictResolver extends ConflictResolver {
+        void configure(@Nullable TypedMap config);
+    }
+
+    private static class LocalWinsResolver implements ConfigurableConflictResolver {
+        @Override
+        public void configure(@Nullable TypedMap config) {
+            // no configuration needed
+        }
+
+        @Nullable
+        @Override
+        public Document resolve(@NonNull Conflict conflict) { return conflict.getLocalDocument(); }
+    }
+
+    private static class RemoteWinsResolver implements ConfigurableConflictResolver {
+        @Override
+        public void configure(@Nullable TypedMap config) {
+            // no configuration needed
+        }
+
+        @Nullable
+        @Override
+        public Document resolve(@NonNull Conflict conflict) { return conflict.getRemoteDocument(); }
+    }
+
+    private static class DeleteResolver implements ConfigurableConflictResolver {
+        @Override
+        public void configure(@Nullable TypedMap config) {
+            // no configuration needed
+        }
+
+        @Nullable
+        @Override
+        public Document resolve(@NonNull Conflict conflict) { return null; }
+    }
+
+    private static class MergeResolver implements ConfigurableConflictResolver {
+        private static final String KEY_PROPERTY = "property";
+
+        private static final Set<String> MERGE_RESOLVER_KEYS;
+        static {
+            final Set<String> l = new HashSet<>();
+            l.add(KEY_PROPERTY);
+            MERGE_RESOLVER_KEYS = Collections.unmodifiableSet(l);
+        }
+
+
+        private String docProp;
+
+        @Override
+        public void configure(@Nullable TypedMap config) {
+            if (config == null) { throw new ClientError("Merge resolver requires configuration"); }
+
+            config.validate(MERGE_RESOLVER_KEYS);
+
+            final String prop = config.getString(KEY_PROPERTY);
+            if (prop == null) { throw new ClientError("Merge resolver requires a property name"); }
+
+            docProp = prop;
+        }
+
+        @Nullable
+        @Override
+        public Document resolve(@NonNull Conflict conflict) {
+            final Document localDoc = conflict.getLocalDocument();
+            final Document remoteDoc = conflict.getRemoteDocument();
+            if ((localDoc == null) || (remoteDoc == null)) { return null; }
+
+            final MutableArray mergedVal = new MutableArray();
+            mergedVal.addValue(localDoc.getValue(docProp));
+            mergedVal.addValue(remoteDoc.getValue(docProp));
+
+            final MutableDocument mergedDoc = localDoc.toMutable();
+            mergedDoc.setValue(docProp, mergedVal);
+
+            return mergedDoc;
+        }
+    }
+
+    private static class MergeDictResolver implements ConfigurableConflictResolver {
+        private static final String KEY_PROPERTY = "property";
+
+        private static final Set<String> MERGE_DICT_RESOLVER_KEYS = Set.of(KEY_PROPERTY);
+
+        private String docProp;
+
+        @Override
+        public void configure(@Nullable TypedMap config) {
+            if (config == null) { throw new ClientError("Merge resolver requires configuration"); }
+
+            config.validate(MERGE_DICT_RESOLVER_KEYS);
+
+            final String prop = config.getString(KEY_PROPERTY);
+            if (prop == null) { throw new ClientError("Merge resolver requires a property name"); }
+
+            docProp = prop;
+        }
+
+        @Nullable
+        @Override
+        public Document resolve(@NonNull Conflict conflict) {
+            final Document localDoc = conflict.getLocalDocument();
+            final Document remoteDoc = conflict.getRemoteDocument();
+            if ((localDoc == null) || (remoteDoc == null)) { return null; }
+
+            final MutableDocument doc = remoteDoc.toMutable();
+
+            final Dictionary localDict = localDoc.getDictionary(docProp);
+            final Dictionary remoteDict = remoteDoc.getDictionary(docProp);
+            if(localDict == null || remoteDict == null) {
+                return doc.setString(docProp, "Both values are not dictionary");
+            }
+
+            final MutableDictionary mergedDict = new MutableDictionary();
+            for(String key : localDict) {
+                mergedDict.setValue(docProp, localDict.getValue(key));
+            }
+
+            for(String key : remoteDict) {
+                final Object remoteValue = remoteDict.getValue(key);
+                if(mergedDict.contains(key) && !Objects.equals(remoteValue, mergedDict.getValue(key))) {
+                    return doc.setString(key, String.format("Conflicting values found at key named %s", key));
+                }
+
+                mergedDict.setValue(docProp, remoteValue);
+            }
+
+            return doc.setDictionary(docProp, mergedDict);
+        }
+    }
 
     private static final Set<String> LEGAL_CREATE_KEYS;
     static {
@@ -219,6 +242,7 @@ public class ReplicatorManager {
         l.add(KEY_IS_CONTINUOUS);
         l.add(KEY_AUTHENTICATOR);
         l.add(KEY_ENABLE_DOC_LISTENER);
+        l.add(KEY_HEADERS);
         l.add(KEY_ENABLE_AUTOPURGE);
         l.add(KEY_PINNED_CERT);
         LEGAL_CONFIG_KEYS = Collections.unmodifiableSet(l);
@@ -235,7 +259,6 @@ public class ReplicatorManager {
         l.add(KEY_CONFLICT_RESOLVER);
         LEGAL_COLLECTION_KEYS = Collections.unmodifiableSet(l);
     }
-
 
     private static final Set<String> LEGAL_BASIC_AUTH_KEYS;
     static {
@@ -255,38 +278,19 @@ public class ReplicatorManager {
         LEGAL_SESSION_AUTH_KEYS = Collections.unmodifiableSet(l);
     }
 
-    private static final EnumMap<DocumentFlag, String> DOC_FLAGS;
-    static {
-        final EnumMap<DocumentFlag, String> m = new EnumMap<>(DocumentFlag.class);
-        m.put(DocumentFlag.DELETED, "DELETED");
-        m.put(DocumentFlag.ACCESS_REMOVED, "ACCESSREMOVED");
-        DOC_FLAGS = m;
-    }
+    private static final Map<String, Supplier<ConfigurableConflictResolver>> CONFLICT_RESOLVER_FACTORIES = Map.of(
+            "local-wins", LocalWinsResolver::new,
+            "remote-wins", RemoteWinsResolver::new,
+            "delete", DeleteResolver::new,
+            "merge", MergeResolver::new,
+            "merge-dict", MergeDictResolver::new
+    );
 
-    private static final Set<String> LEGAL_REPL_ID_KEYS;
-    static {
-        final Set<String> l = new HashSet<>();
-        l.add(KEY_REPL_ID);
-        LEGAL_REPL_ID_KEYS = Collections.unmodifiableSet(l);
-    }
-
-    private static final Map<String, Supplier<ConfigurableConflictResolver>> CONFLICT_RESOLVER_FACTORIES;
-    static {
-        final Map<String, Supplier<ConfigurableConflictResolver>> m = new HashMap<>();
-        m.put("local-wins", LocalWinsResolver::new);
-        m.put("remote-wins", RemoteWinsResolver::new);
-        m.put("delete", DeleteResolver::new);
-        m.put("merge", MergeResolver::new);
-        CONFLICT_RESOLVER_FACTORIES = Collections.unmodifiableMap(m);
-    }
-
-    @NonNull
-    private final DatabaseService dbSvc;
     @NonNull
     private final ReplicatorService replSvc;
 
     public ReplicatorManager(@NonNull DatabaseService dbSvc, @NonNull ReplicatorService replSvc) {
-        this.dbSvc = dbSvc;
+        super(dbSvc);
         this.replSvc = replSvc;
     }
 
@@ -328,25 +332,8 @@ public class ReplicatorManager {
         final ReplicatorStatus replStatus = replSvc.getReplStatus(ctxt, replId);
         Log.p(TAG, "Replicator status: " + replStatus);
 
-        final Map<String, Object> resp = new HashMap<>();
-
-        resp.put(KEY_REPL_ACTIVITY, replStatus.getActivityLevel().toString());
-
-        final CouchbaseLiteException err = replStatus.getError();
-        if (err != null) { resp.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err)).build()); }
-
-        final Map<String, Object> progress = new HashMap<>();
-        final ReplicatorProgress replProgress = replStatus.getProgress();
-        progress.put(KEY_REPL_DOCS_COMPLETE, replProgress.getCompleted() >= replProgress.getTotal());
-        resp.put(KEY_REPL_PROGRESS, progress);
-
         final List<DocumentReplication> docs = replSvc.getReplicatedDocs(ctxt, replId);
-        if (docs != null) {
-            final List<Map<String, Object>> docRepls = getReplicatedDocs(docs);
-            if (!docRepls.isEmpty()) { resp.put(KEY_REPL_DOCS, docRepls); }
-        }
-
-        return resp;
+        return parseReplStatus(replStatus, docs);
     }
 
     @NonNull
@@ -359,32 +346,6 @@ public class ReplicatorManager {
         replSvc.stopRepl(ctxt, replId);
 
         return Collections.emptyMap();
-    }
-
-    @NonNull
-    private List<Map<String, Object>> getReplicatedDocs(@NonNull List<DocumentReplication> replicatedDocs) {
-        final List<Map<String, Object>> docRepls = new ArrayList<>();
-        for (DocumentReplication replicatedDoc: replicatedDocs) {
-            for (ReplicatedDocument replDoc: replicatedDoc.getDocuments()) {
-                final Map<String, Object> docRepl = new HashMap<>();
-
-                docRepl.put(KEY_REPL_COLLECTION, replDoc.getCollectionScope() + "." + replDoc.getCollectionName());
-
-                docRepl.put(KEY_REPL_DOC_ID, replDoc.getID());
-
-                docRepl.put(KEY_REPL_PUSH, replicatedDoc.isPush());
-
-                final List<String> flagList = new ArrayList<>();
-                for (DocumentFlag flag: replDoc.getFlags()) { flagList.add(DOC_FLAGS.get(flag)); }
-                docRepl.put(KEY_REPL_FLAGS, flagList);
-
-                final CouchbaseLiteException err = replDoc.getError();
-                if (err != null) { docRepl.put(KEY_REPL_ERROR, new ErrorBuilder(new CblApiFailure(err)).build()); }
-
-                docRepls.add(docRepl);
-            }
-        }
-        return docRepls;
     }
 
     @SuppressWarnings({"deprecation", "PMD.NPathComplexity"})
@@ -410,10 +371,17 @@ public class ReplicatorManager {
         final Database db = dbSvc.getOpenDb(ctxt, dbName);
 
         final ReplicatorConfiguration replConfig;
-        if (collections.isEmpty()) { replConfig = new ReplicatorConfiguration(db, endpoint); }
-        else {
-            replConfig = new ReplicatorConfiguration(endpoint);
-            addCollections(db, collections, replConfig, ctxt);
+        if (collections.isEmpty()) {
+            try {
+                replConfig = new ReplicatorConfiguration(
+                        CollectionConfiguration.fromCollections(Set.of(db.getDefaultCollection())),
+                        endpoint
+                );
+            } catch (CouchbaseLiteException e) {
+                throw new ClientError("No collection found");
+            }
+        } else {
+            replConfig = new ReplicatorConfiguration(addCollections(db, collections, ctxt), endpoint);
         }
 
         final String replType = config.getString(KEY_TYPE);
@@ -442,6 +410,19 @@ public class ReplicatorManager {
         final String pinnedCert = config.getString(KEY_PINNED_CERT);
         if (pinnedCert != null) { replConfig.setPinnedServerX509Certificate(str2X509Cert(pinnedCert)); }
 
+        final TypedMap headers = config.getMap(KEY_HEADERS);
+
+        if (headers != null) {
+            final Map<String, String> headerMap = new HashMap<>();
+            for (String key : headers.getKeys()) {
+                final String value = headers.getString(key);
+                if (value != null) {
+                    headerMap.put(key, value);
+                }
+            }
+            replConfig.setHeaders(headerMap);
+        }
+
         final TypedMap authenticator = config.getMap(KEY_AUTHENTICATOR);
         if (authenticator != null) {
             final String authType = authenticator.getString(KEY_AUTH_TYPE);
@@ -455,7 +436,7 @@ public class ReplicatorManager {
                     replConfig.setAuthenticator(buildSessionAuthenticator(authenticator));
                     break;
                 default:
-                    throw new ClientError("Unrecognized authenticator type: " + replType);
+                    throw new ClientError("Unrecognized authenticator type: " + authType);
             }
         }
 
@@ -463,12 +444,14 @@ public class ReplicatorManager {
         return replConfig;
     }
 
-    private void addCollections(
+    @SuppressWarnings("checkstyle:FinalLocalVariable")
+    @NonNull
+    private Set<CollectionConfiguration> addCollections(
         @NonNull Database db,
         @NonNull TypedList spec,
-        @NonNull ReplicatorConfiguration replConfig,
         @NonNull TestContext ctxt
     ) {
+        Set<CollectionConfiguration> collectionConfigurations = new HashSet<>();
         for (int i = 0; i < spec.size(); i++) {
             final TypedMap replCollection = spec.getMap(i);
             if (replCollection == null) { throw new ClientError("Replication collection spec is null: " + i); }
@@ -476,16 +459,17 @@ public class ReplicatorManager {
 
             final TypedList collectionNames = replCollection.getList(KEY_NAMES);
             if (collectionNames == null) { throw new ClientError("no collections specified"); }
-
-            replConfig.addCollections(
-                dbSvc.getCollections(ctxt, db, collectionNames),
-                buildCollectionConfig(replCollection));
+            Set<Collection> collections = dbSvc.getCollections(ctxt, db, collectionNames);
+            for (Collection collection : collections) {
+                collectionConfigurations.add(buildCollectionConfig(replCollection, collection));
+            }
         }
+        return collectionConfigurations;
     }
 
     @NonNull
-    private CollectionConfiguration buildCollectionConfig(@NonNull TypedMap spec) {
-        final CollectionConfiguration collectionConfig = new CollectionConfiguration();
+    private CollectionConfiguration buildCollectionConfig(@NonNull TypedMap spec, @NonNull Collection collection) {
+        final CollectionConfiguration collectionConfig = new CollectionConfiguration(collection);
 
         final List<String> channels = getList(spec.getList(KEY_CHANNELS));
         if (channels != null) { collectionConfig.setChannels(channels); }
@@ -503,6 +487,57 @@ public class ReplicatorManager {
         if (conflictResolver != null) { collectionConfig.setConflictResolver(buildConflictResolver(conflictResolver)); }
 
         return collectionConfig;
+    }
+
+    @NonNull
+    private ReplicationFilter buildReplicatorFilter(@NonNull TypedMap spec) {
+        final String name = spec.getString(KEY_NAME);
+        if (name == null) { throw new ClientError("Filter doesn't specify a name"); }
+        switch (name) {
+            case FILTER_DOC_ID:
+                return buildDocIdFilter(spec.getMap(KEY_PARAMS));
+            case FILTER_DELETED:
+                return replSvc.getDeletedDocFilter();
+            default:
+                throw new ClientError("Unrecognized filter name: " + name);
+        }
+    }
+
+    @NonNull
+    private ReplicationFilter buildDocIdFilter(@Nullable TypedMap spec) {
+        if (spec == null) { throw new ClientError("DocId filter specifies no doc ids"); }
+
+        final TypedMap documentIds = spec.getMap(KEY_DOC_IDS);
+        if (documentIds == null) { throw new ClientError("DocId filter specifies no doc ids"); }
+
+        final Set<String> permitted = new HashSet<>();
+
+        final Set<String> collections = documentIds.getKeys();
+        for (String collection: collections) {
+            final TypedList collectionDocs = documentIds.getList(collection);
+            if (collectionDocs == null) {
+                throw new ClientError("DocId filter: no doc ids specified for collection " + collection);
+            }
+            final int n = collectionDocs.size();
+            for (int i = 0; i < n; i++) { permitted.add(collection + "." + collectionDocs.getString(i)); }
+        }
+
+        return replSvc.getDocIdFilter(permitted);
+    }
+
+    @NonNull
+    private ConflictResolver buildConflictResolver(@NonNull TypedMap spec) {
+        final String name = spec.getString(KEY_NAME);
+        if (name == null) { throw new ClientError("No name specified for the conflict resolver"); }
+
+        final Supplier<ConfigurableConflictResolver> resolverFactory
+            = CONFLICT_RESOLVER_FACTORIES.get(name.toLowerCase(Locale.US).trim());
+        if (resolverFactory == null) { throw new ClientError("Unrecognized conflict resolver: " + name); }
+
+        final ConfigurableConflictResolver resolver = resolverFactory.get();
+        resolver.configure(spec.getMap(KEY_PARAMS));
+
+        return resolver;
     }
 
     @NonNull
@@ -527,69 +562,6 @@ public class ReplicatorManager {
             throw new ClientError("Session authenticator doesn't specify a session id");
         }
         return new SessionAuthenticator(session, spec.getString(KEY_SESSION_AUTH_COOKIE));
-    }
-
-    @Nullable
-    private List<String> getList(@Nullable TypedList spec) {
-        if (spec == null) { return null; }
-        final int n = spec.size();
-        final List<String> list = new ArrayList<>(n);
-        for (int i = 0; i < n; i++) {
-            final String item = spec.getString(i);
-            if (item != null) { list.add(item); }
-        }
-        return list;
-    }
-
-    @NonNull
-    private ReplicationFilter buildReplicatorFilter(@NonNull TypedMap spec) {
-        final String name = spec.getString(KEY_NAME);
-        if (name == null) { throw new ClientError("Filter doesn't specify a name"); }
-        switch (name) {
-            case FILTER_DOC_ID:
-                return buildDocIdFilter(spec.getMap(KEY_PARAMS));
-            case FILTER_DELETED:
-                return replSvc.getDeletedDocFilter();
-            default:
-                throw new ClientError("Unrecognized filter name: " + name);
-        }
-    }
-
-    @NonNull
-    private ConflictResolver buildConflictResolver(@NonNull TypedMap spec) {
-        final String name = spec.getString(KEY_NAME);
-        if (name == null) { throw new ClientError("No name specified for the conflict resolver"); }
-
-        final Supplier<ConfigurableConflictResolver> resolverFactory
-            = CONFLICT_RESOLVER_FACTORIES.get(name.toLowerCase(Locale.US).trim());
-        if (resolverFactory == null) { throw new ClientError("Unrecognized conflict resolver: " + name); }
-
-        final ConfigurableConflictResolver resolver = resolverFactory.get();
-        resolver.configure(spec.getMap(KEY_PARAMS));
-
-        return resolver;
-    }
-
-    @NonNull
-    private ReplicationFilter buildDocIdFilter(@Nullable TypedMap spec) {
-        if (spec == null) { throw new ClientError("DocId filter specifies no doc ids"); }
-
-        final TypedMap documentIds = spec.getMap(KEY_DOC_IDS);
-        if (documentIds == null) { throw new ClientError("DocId filter specifies no doc ids"); }
-
-        final Set<String> permitted = new HashSet<>();
-
-        final Set<String> collections = documentIds.getKeys();
-        for (String collection: collections) {
-            final TypedList collectionDocs = documentIds.getList(collection);
-            if (collectionDocs == null) {
-                throw new ClientError("DocId filter: no doc ids specified for collection " + collection);
-            }
-            final int n = collectionDocs.size();
-            for (int i = 0; i < n; i++) { permitted.add(collection + "." + collectionDocs.getString(i)); }
-        }
-
-        return replSvc.getDocIdFilter(permitted);
     }
 
     @NonNull

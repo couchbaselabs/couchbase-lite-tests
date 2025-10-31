@@ -1,0 +1,176 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "type": "object",
+    "default": {
+        "clusters": [
+            {
+                "server_count": 1
+            }
+        ],
+        "sync_gateways": [
+            {
+                "cluster": 1
+            }
+        ],
+        "logslurp": true
+    },
+    "additionalProperties": false,
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "$comment": "Allows config files to declare they conform to this schema. Otherwise ignored."
+        },
+        "defaults": {
+            "type": "object",
+            "properties": {
+                "cbs": {
+                    "type": "object",
+                    "properties": {
+                        "version": {
+                            "type": "string",
+                            "default": "7.6.4"
+                        }
+                    }
+                },
+                "sgw": {
+                    "type": "object",
+                    "properties": {
+                        "version": {
+                            "type": "string",
+                            "default": "3.2.2"
+                        }
+                    }
+                },
+                "es": {
+                    "type": "object",
+                    "properties": {
+                        "version": {
+                            "type": "string",
+                            "default": "1.0.0"
+                        }
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "clusters": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "server_count": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "version": {
+                        "type": "string",
+                        "$comment": "The default here is 7.6.4 but can be changed with the schema defaults.cbs.version"
+                    }
+                },
+                "required": ["server_count"],
+                "additionalProperties": false
+            }
+        },
+        "sync_gateways": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "cluster": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "version": {
+                        "type": "string",
+                        "$comment": "The default here is 3.2.2 but can be changed with the schema defaults.sgw.version"
+                    }
+                },
+                "required": ["cluster"],
+                "additionalProperties": false
+            }
+        },
+        "edge_servers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "$comment": "The default here is 1.0.0 but can be changed with the schema defaults.es.version"
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
+        "test_servers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string"
+                    },
+                    "cbl_version": {
+                        "type": "string"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "enum": [
+                            "dotnet_windows",
+                            "dotnet_macos",
+                            "dotnet_ios",
+                            "dotnet_android",
+                            "jak_webservice",
+                            "jak_desktop",
+                            "jak_android",
+                            "c_windows",
+                            "c_macos",
+                            "c_linux_x86_64",
+                            "c_ios",
+                            "c_android",
+                            "swift_ios",
+                            "js"
+                        ]
+                    },
+                    "download": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "ip_hint": {
+                        "type": "string",
+                        "default": ""
+                    }
+                },
+                "required": ["location", "cbl_version", "platform"],
+                "additionalProperties": false
+            }
+        },
+        "load_balancers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "sync_gateways": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "minItems": 1
+                    }
+                },
+                "required": ["sync_gateways"],
+                "additionalProperties": false
+            }
+        },
+        "logslurp": {
+            "type": "boolean"
+        },
+        "include": {
+            "type": "string"
+        },
+        "tag": {
+            "type": "string"
+        }
+    }
+}

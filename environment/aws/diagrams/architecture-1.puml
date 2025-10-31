@@ -1,0 +1,29 @@
+@startuml architecture-1
+
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam node {
+    BackgroundColor #E0E0E0
+    BorderColor Black
+    FontName "Courier New"
+}
+skinparam component {
+    BackgroundColor #FFFFFF
+    BorderColor Black
+    FontName "Courier New"
+}
+skinparam defaultTextAlignment center
+
+node "Control Machine" as Control {
+    component "Orchestrator"
+    component "TDK"
+}
+
+' Bottom layer: Mobile Device
+node "Mobile Device\n(USB-connected)" as Mobile {
+    
+}
+
+Control -> Mobile
+
+@enduml

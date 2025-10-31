@@ -24,9 +24,7 @@ import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.context.GlobalContext
 import org.koin.dsl.module
 
-
 class TestServerApp : Application() {
-
     @Suppress("USELESS_CAST")
     override fun onCreate() {
         super.onCreate()

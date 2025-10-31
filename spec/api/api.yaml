@@ -14,7 +14,7 @@ info:
   description: |-
     This is a REST API specification for Couchbase Lite Test Server.
 
-    The APIs except GET '/' requires the following request headers:
+    The APIs except GET [/](#operation/getInfo) requires the following request headers:
     * CBLTest-API-Version (integer)
     * CBLTest-Client-ID (UUID)
 
@@ -26,10 +26,11 @@ info:
     * Any enum values in the spec are case insensitive.
 
     KeyPath:
-    * The /updateDatabase and /verifyDocuments API are using the JSON's keypath to
+    * The [/updateDatabase](#operation/updateDatabase) and [/verifyDocuments](#operation/verifyDocuments) API are using the JSON's keypath to
       refer to a specific path in the document's properties tree.
     * The keypath structure can be described as follows:
 
+      ```
       keypath  ::= ( [ DOLLAR DOT ] <property> | <index> ) <path>
       path     ::= (DOT <property> | <index>)* EOP
       index    ::= OBRACKET DIGIT+ CBRACKET
@@ -42,11 +43,34 @@ info:
       DIGIT    ::=  '0' |'1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
       ANY      ::= (! (DOT | OBRACKET | CBRACKET | EOP) ) | ESCAPE
       ESCAPE   ::= '\' (! EOP )
+      ```
 
     Changes
-    1.0.0(09/27/2024)
+    2.0.1 (07/10/2025)
+    * Add Merge-Dict Conflict Resolver
+
+    2.0.0 (06/13/2025)
+    * This is a breaking change: CBLTest-API-Version is now "2"
+    * deprecate dataset_version
+    * In ResetConfiguration, change the value for the "dataset" key to a url.
+
+    1.2.1 (06/04/2025)
+    * Add authenticator property to [/startMultipeerReplicator](#operation/startMultipeerReplicator)
+
+    1.2.0 (04/09/2025)
+    * Add [/startMultipeerReplicator](#operation/startMultipeerReplicator),
+    * Add [/stopMultipeerReplicator](#operation/stopMultipeerReplicator) endpoint
+    * Add [/getMultipeerReplicatorStatus](#operation/getMultipeerReplicatorStatus) endpoint
+
+    1.1.1 (04/26/2025)
+    * Modify newSession to accept dataset_version to set the version of the dataset to be downloaded
+
+    1.1.0 (03/05/2025)
+    * Add [/startListener](#operation/startListener) and [/stopListener](#operation/stopListener) endpoint
+
+    1.0.0 (09/27/2024)
     * Replace setupLogging endpoint with expanded newSession endpoint
-    * Add /log endpoint
+    * Add [/log](#operation/log) endpoint
 
     0.5.2 (09/25/2024)
     * Split getDocument into database and document key to more closely match other API
@@ -118,7 +142,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 1.0.0
+  version: 1.2.1
 tags:
   - name: API
     description: The API endpoints of the test server
@@ -267,69 +291,70 @@ paths:
         how documents are updated, deleted or purged. For updating a document, the changes to the document are specified
         in 'updatedProperties' and 'removedProperties'.
 
-        updatedProperties:
+        - **updatedProperties**:
 
-        An array of objects. Each object contains one or more keys that are key paths into the document to be updated with the
-        values associated with the keys. The objects in the array are evaluated in their natural order.
+          An array of objects. Each object contains one or more keys that are key paths into the document to be updated with the
+          values associated with the keys. The objects in the array are evaluated in their natural order.
 
-        The keypath identifies a unique location in the document's property tree starting from the root that follows
-        dictionary properties and array elements. The keypath looks like "foo.bar[1].baz". The keypath structure can be found
-        in the description at the beginning of this specification.
+          The keypath identifies a unique location in the document's property tree starting from the root that follows
+          dictionary properties and array elements. The keypath looks like "foo.bar[1].baz". The keypath structure can be found
+          in the description at the beginning of this specification.
 
-        The value at the location specified by the keypath is replaced with the value associated with the keypath, in the object
-        regardless of its type. When a path in the keypath refers to a non-existent property, the key is added and
-        its value set as a dictionary or an array depending on the type of the path.
+          The value at the location specified by the keypath is replaced with the value associated with the keypath, in the object
+          regardless of its type. When a path in the keypath refers to a non-existent property, the key is added and
+          its value set as a dictionary or an array depending on the type of the path.
 
-        When a path in the keypath includes an array index that is out of bounds (the array is smaller than the specified index), the array
-        is padded with nulls until it is exactly large enough to make the specified index legal.
+           When a path in the keypath includes an array index that is out of bounds (the array is smaller than the specified index), the array
+           is padded with nulls until it is exactly large enough to make the specified index legal.
 
-        When a path (dictionary or array) in the keypath doesn't match the actual value type, the error will be returned.
+           When a path (dictionary or array) in the keypath doesn't match the actual value type, the error will be returned.
 
-        Examples,
+           Examples :
 
-        Document:
-        {
-          "name", {"first": "John", "last": "Doe"},
-          "addresses": [{"city": "San Francisco"}, {"city": "Palo Alto"}]
-        }
+          ```
+             Document:
+             {
+               "name", {"first": "John", "last": "Doe"},
+               "addresses": [{"city": "San Francisco"}, {"city": "Palo Alto"}]
+             }
 
-        Updates:
+             Updates:
 
-        name.last = "Tiger" -> {"name", {"first": "John", "last": "Tiger"}, ...}
-        name.middle = "Sky" -> {"name", {"first": "John", "middle": "sky", "last": "Tiger"}, ...}
-        name = "John Doe" -> {"name", "John Doe"}
+             name.last = "Tiger" -> {"name", {"first": "John", "last": "Tiger"}, ...}
+             name.middle = "Sky" -> {"name", {"first": "John", "middle": "sky", "last": "Tiger"}, ...}
+             name = "John Doe" -> {"name", "John Doe"}
 
-        name.first.value = "John" ->  Error as the value of "first" is not the dictionary
+             name.first.value = "John" ->  Error as the value of "first" is not the dictionary
+             addresses[0].city = "Santa Clara" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}], ...}
+             addresses[4].city = "San Mateo" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}, null, {"city": "San Mateo"}], ...}
+             phones[1] = "650-123-4567" -> {"phones": [null, "650-123-4567"]}
+          ```
+        - **removedProperties**:
 
-        addresses[0].city = "Santa Clara" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}], ...}
-        addresses[4].city = "San Mateo" -> {"addresses": [{"city": "Santa Clara"}, {"city": "Palo Alto"}, null, {"city": "San Mateo"}], ...}
-        phones[1] = "650-123-4567" -> {"phones": [null, "650-123-4567"]}
+          An array of the key paths which refer to ditionary keys or array elements to be removed. If a keypath refer to a non-existent
+          property or array element, the remove for the keypath will be no-ops. When removing multiple items in an array, the order of the array indexes
+          should be from high to low to avoid index mutation during the removal.
 
-        removedProperties:
+        - **updatedBlobs**:
 
-        An array of the key paths which refer to ditionary keys or array elements to be removed. If a keypath refer to a non-existent
-        property or array element, the remove for the keypath will be no-ops. When removing multiple items in an array, the order of the array indexes
-        should be from high to low to avoid index mutation during the removal.
+          A dictionary whose keys are the key paths into the document to be updated with the blob objects and values are
+          the urls from which to retrieve the blobs to be put at the key path location.
 
-        updatedBlobs:
+          The logic to update blobs is similar to the logic when updating properties. The value at the location specified
+          by the keypath is replaced with the blob object regardless of the value's type. When a path in the keypath
+          refers to a non-existent property, the key is added and its value set as a dictionary or an array depending on
+          the type of the path. When a path in the keypath includes an array index that is out of bounds, the array
+          is padded with nulls until it is exactly large enough to make the specified index legal.
 
-        A dictionary whose keys are the key paths into the document to be updated with the blob objects and values are
-        the blob file names listed in the blob dataset.
+          The blob object is created from the content of the blob file to which the blob url refers: the value associated
+          with the keypath in the request.  If the name of the file retrieved from the url ends with the extension ".zip"
+          the file is unzipped, first, to recover the blob.   If the blob file name refers to non-existing blob file,
+          a 400 request error will be returned.
 
-        The logic to update blobs is similar to the logic when updating properties. The value at the location specified
-        by the keypath is replaced with the blob object in the object regardless of its type. When a path in the keypath
-        refers to a non-existent property, the key is added and  its value set as a dictionary or an array depending on
-        the type of the path. When a path in the keypath includes an array index that is out of bounds, the array
-        is padded with nulls until it is exactly large enough to make the specified index legal.
-
-        The blob object is created from the content of the blob file refered by the blob file name, the dictionary value
-        associated with each key path. If the blob file name refers to non-existing blob file, 400 request error will
-        be returned.
-
-        The content_type of the blob used when creating a blob object can be detected from the blob file name's extension
-        as the following rules:
-          * "image/jpeg" for the .jpg
-          * "application/octet-stream" for others
+          The content_type of the blob used when creating a blob object can be detected from the blob file name's extension
+          (after it is unzipped, if necessary) according to the following rules:
+            * "image/jpeg" for the .jpg
+            * "application/octet-stream" for others
 
       operationId: updateDatabase
       requestBody:
@@ -634,7 +659,7 @@ paths:
                     description: |-
                       The actual document body of the document that has unexpected properties.
                     type: object
-                    additionalProperties: { }
+                    additionalProperties: {}
                     example: {'name': 'John Doe', 'address': {'city': 'Santa Clara', 'state': 'CA'}}
         '400':
           $ref: '#/components/responses/Error'
@@ -738,6 +763,196 @@ paths:
           $ref: '#/components/responses/Error'
         '500':
           $ref: '#/components/responses/Error'
+  /startListener:
+    post:
+      tags:
+        - API
+      summary: Starts a P2P listener
+      description: |-
+        Starts a P2P listener so that the device can act as the passive side of a P2P replication.
+      operationId: startListener
+      requestBody:
+        description: |-
+          The request object containing the collections to share and, optionally, the port to listen on.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['database', 'collections']
+              properties:
+                database:
+                  type: string
+                  example: 'db1'
+                collections:
+                  type: array
+                  items:
+                    type: string
+                    example: 'store.cloths'
+                port:
+                  type: integer
+                  example: 12345
+        required: true
+      responses:
+        '200':
+          description: |-
+            Success
+
+            The response body is an object containing the ID of the listener, and the port
+            it is listening on.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartListenerResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /stopListener:
+    post:
+      tags:
+        - API
+      summary: Stops a P2P listener
+      description: |-
+        Stops a previously started P2P listener.
+      operationId: stopListener
+      requestBody:
+        description: |-
+          The request object containing the listener to stop.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['id']
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  example: '123e4567-e89b-12d3-a456-426614174000'
+        required: true
+      responses:
+        '200':
+          description: |-
+            Success
+        '400':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /startMultipeerReplicator:
+    post:
+      tags:
+        - API
+      summary: Starts a Multipeer replicator
+      description: |-
+        Starts a multipeer replicator to create a mesh of connected clients.
+      operationId: startMultipeerReplicator
+      requestBody:
+        description: |-
+          The request object containing the collections to share and the peer group ID.  Optionally,
+          it can contain an authenticator as well.  The default (null) behavior is accept all connections.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['peerGroupID', 'database', 'collections', 'identity']
+              properties:
+                peerGroupID:
+                  type: string
+                  example: 'com.couchbase.testing'
+                database:
+                  type: string
+                  example: 'db1'
+                collections:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ReplicationCollection"
+                identity:
+                  $ref: '#/components/schemas/MultipeerReplicatorIdentity'
+                authenticator:
+                  $ref: '#/components/schemas/MultipeerReplicatorCAAuthenticator'
+        required: true
+      responses:
+        '200':
+          description: |-
+            Success
+
+            The response body is an object containing the ID of the listener, and the port
+            it is listening on.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Replicator'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /stopMultipeerReplicator:
+    post:
+      tags:
+        - API
+      summary: Stops a Multipeer replicator
+      description: |-
+        Stops a previously started Multipeer Replicator.
+      operationId: stopMultipeerReplicator
+      requestBody:
+        description: |-
+          The request object containing the replicator to stop.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['id']
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  example: '123e4567-e89b-12d3-a456-426614174000'
+        required: true
+      responses:
+        '200':
+          description: |-
+            Success
+        '400':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /getMultipeerReplicatorStatus:
+    post:
+      tags:
+        - API
+      summary: Gets the status of a multipeer replicator
+      description: |-
+        Gets the status of a multipeer replicator
+      operationId: getMultipeerReplicatorStatus
+      requestBody:
+        description: |-
+          The request object containing the replicator to query.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['id']
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  example: '123e4567-e89b-12d3-a456-426614174000'
+        required: true
+      responses:
+        '200':
+          description: |-
+            Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultipeerReplicatorStatus'
+        '400':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
 components:
   schemas:
     Collections:
@@ -759,13 +974,15 @@ components:
       type: object
       additionalProperties:
         type: string
-      example: { 'catalog.cloths': [{'id': 'c1', 'rev': '800@Bob'}, {'id': 'c2', 'rev': '1-9ef'}],
-                 'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1010@Alice}]}
+      example: {
+        'catalog.cloths': [{'id': 'c1', 'rev': '800@Bob'}, {'id': 'c2', 'rev': '1-9ef'}],
+        'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1010@Alice'}]
+      }
     Document:
       description: |-
         Contains document's properties and the metadata.
       type: object
-      additionalProperties: { }
+      additionalProperties: {}
       example: {'_id': 'doc1', '_revs': '17f4ed7b51a50000@MlAW1NbbT8KcTRO8oPnpgw, 17f4ed7b42a70000@ScJAVJf3TdOUanAcByIcXg', 'foo': 'bar'}
     DocumentID:
       type: object
@@ -822,24 +1039,24 @@ components:
           type: array
           items:
             type: object
-            additionalProperties: { }
+            additionalProperties: {}
             example:
               [
-                {'people[47].address': {'street': 'Oak St. ', 'city': 'Auburn'} },
-                {'people[3].address': {'street': 'Elm St. ', 'city': 'Sibley'} }
+                {'people[47].address': {'street': 'Oak St. ', 'city': 'Auburn'}},
+                {'people[3].address': {'street': 'Elm St. ', 'city': 'Sibley'}}
               ]
         removedProperties:
           description: An array of the key paths which refer to ditionary keys or array elements to be removed.
           type: array
           items:
             type: string
-            example: [ 'people[22].address', 'people[3]' ]
+            example: ['people[22].address', 'people[3]']
         updatedBlobs:
           description: A dictionary whose keys are the key paths into the document to be updated with the
-            blob objects and values are the blob keys in the dataset.
+            blob objects and values are the urls from which to obtain the blob files.
           type: object
-          additionalProperties: { }
-          example: { 'photo.thumbnail': 's1.jpg' }
+          additionalProperties: {}
+          example: {'photo.thumbnail': 'https://media.githubusercontent.com/media/blob/s1.jpg'}
     Error:
       type: object
       required: ['domain', 'code']
@@ -997,7 +1214,6 @@ components:
           $ref: '#/components/schemas/ReplicationFilter'
         conflictResolver:
           description: One of the predefined conflict resolvers to use during replication
-          type: string
           $ref: '#/components/schemas/ConflictResolver'
     ReplicationFilter:
       description: |-
@@ -1015,8 +1231,8 @@ components:
           example: 'documentIDs'
         params:
           type: object
-          additionalProperties: { }
-          example: { 'documentIDs': ['doc1', 'doc2'] }
+          additionalProperties: {}
+          example: {'documentIDs': ['doc1', 'doc2']}
     ConflictResolver:
       description: |-
         The conflict resolver to set for this collection of the replication.  Each resolver is predefined
@@ -1031,8 +1247,8 @@ components:
           example: 'merge'
         params:
           type: object
-          additionalProperties: { }
-          example: { 'property': 'region'}
+          additionalProperties: {}
+          example: {'property': 'region'}
     ReplicatorStatus:
       type: object
       required: ['activity', 'progress']
@@ -1057,6 +1273,53 @@ components:
             $ref: '#/components/schemas/DocumentReplication'
         error:
           $ref: '#/components/schemas/Error'
+    MultipeerReplicatorStatus:
+      type: object
+      required: ['replicators']
+      properties:
+        replicators:
+          type: array
+          items:
+            type: object
+            required: ['peerID', 'status']
+            properties:
+              peerID:
+                type: string
+                example: '1234567890abcdef'
+              status:
+                $ref: '#/components/schemas/ReplicatorStatus'
+    MultipeerReplicatorIdentity:
+      description: |-
+        MultipeerReplicatorIdentity is used to specify a TLS certificate and key particular
+        for a multipeer replciator so that it can identify itself.
+      type: object
+      required: ['encoding', 'data']
+      properties:
+        encoding:
+          type: string
+          enum: ['PKCS12']
+          description: The type of data contained in the data field.
+        data:
+          type: string
+          format: byte
+          description: Base-64 encoded data of the format specified in encoding
+        password:
+          type: string
+          example: 'pass'
+          description: The password if the data is password protected
+    MultipeerReplicatorCAAuthenticator:
+      description: |-
+        MultipeerReplicatorCAAuthenticator is used to authenticate the replicator using a CA certificate.
+        The certificate is expected to be in PEM format, and any accepted client must have a certificate
+        signed by the CA certificate.
+      type: object
+      required: ['type', 'certificate']
+      properties:
+        'type':
+          type: string
+          enum: ['CA-CERT']
+        certificate:
+          type: string
     ResetConfiguration:
       description: |-
         ResetConfiguration describes how the databases will be setup after the reset.
@@ -1068,9 +1331,9 @@ components:
             * Null or an empty dictionary for creating an empty database.
             * A dictionary contains a single key named "collections", with a list of the collection names
               as its value, for creating a database with those collections.
-            * A dictionary contains a single key named contains a key named "dataset",
-              with a dataset name as its value, for creating a database from the specified dataset
-              which is a prebuilt database. '
+            * A dictionary that contains the single key "dataset",
+              whose value is the url for a dataset.  A dataset is a file named <dbname>.cblite2.zip
+              which when unzipped is the prebuilt database named <dbname>.
       type: object
       properties:
         test:
@@ -1097,10 +1360,13 @@ components:
                     example: ["_default.employees", "_default.departments"]
               - properties:
                   dataset:
-                    description: 'Dataset name. Cannot be used together with collections.'
+                    description: 'Dataset url. Cannot be used together with collections.'
                     type: string
-                    example: "travel"
-          example: {'db1': {}, 'db2': {'collections': ["_default.employees"]}, 'db3': {'dataset': "travel"}}
+                    example: "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/4.0/travel.cblite2.zip"
+          example: {
+            'db1': {},
+            'db2': {'collections': ["_default.employees"]},
+            'db3': {'dataset': "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/4.0/travel.cblite2.zip"}}
     ServerInfo:
       type: object
       required: ['version', 'apiVersion', 'cbl', 'device']
@@ -1161,6 +1427,19 @@ components:
         results:
           description: 'The JSON serialized results of the query run'
           type: object
+    StartListenerResponse:
+      type: object
+      required: ['id', 'port']
+      properties:
+        id:
+          description: 'The ID of the listener'
+          type: string
+          format: uuid
+          example: '123e4567-e89b-12d3-a456-426614174000'
+        port:
+          description: 'The port the listener is listening on'
+          type: integer
+          example: 12345
   responses:
     Error:
       description: |-

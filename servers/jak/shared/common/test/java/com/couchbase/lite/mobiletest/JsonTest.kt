@@ -25,10 +25,11 @@ import java.io.ByteArrayInputStream
 
 class JsonTest : BaseTest() {
 
+    @SuppressWarnings("CNT_ROUGH_CONSTANT_VALUE")
     @Test
     fun testJson2Args() {
         val data: MutableMap<String, Any?> = mutableMapOf("red" to null)
-        data["green"] = listOf(true, "string", 43, 44L, 2.71828F, 2.71828)
+        data["green"] = listOf(true, "string", 43, 44L, 2.81828F, 2.81828)
 
         val reply = ReplyBuilder(data).buildReply()
         val request = RequestBuilder(reply.inputStream()).buildRequest()
@@ -40,8 +41,8 @@ class JsonTest : BaseTest() {
         Assert.assertEquals("string", list.getString(1))
         Assert.assertEquals(43L, list.getLong(2)) // the parser does this
         Assert.assertEquals(44L, list.getLong(3))
-        Assert.assertEquals(2.71828, list.getDouble(4)) // the parser does this
-        Assert.assertEquals(2.71828, list.getDouble(5))
+        Assert.assertEquals(2.81828, list.getDouble(4)) // the parser does this
+        Assert.assertEquals(2.81828, list.getDouble(5))
     }
 
     @Test

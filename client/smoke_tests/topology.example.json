@@ -1,0 +1,10 @@
+{
+    "$schema": "../../environment/aws/topology_setup/topology_schema.json",
+    "test_servers": [
+        {
+            "platform": "dotnet_ios",
+            "cbl_version": "<replace-me>",
+            "location": "<replace-me>"
+        }
+    ]
+}

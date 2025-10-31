@@ -35,8 +35,10 @@ android {
         }
 
         externalNativeBuild {
+            var cbl_version = project.properties["cblVersion"];
             cmake {
                 cppFlags ''
+                arguments "-DCBL_VERSION=${cbl_version}"
             }
         }
     }

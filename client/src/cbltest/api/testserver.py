@@ -1,12 +1,18 @@
-from typing import List, cast, Optional
+from typing import cast
+from urllib.parse import urljoin
 
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.database import Database
+from cbltest.assertions import _assert_not_null
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.responses import GetRootResponse
-from cbltest.v1.requests import PostResetRequestBody, PostNewSessionRequestBody, PostLogRequestBody
+from cbltest.v1.requests import (
+    PostLogRequestBody,
+    PostNewSessionRequestBody,
+    PostResetRequestBody,
+)
 from cbltest.version import VERSION
 
 
@@ -21,23 +27,37 @@ class TestServer:
         return self.__url
 
     def __init__(self, request_factory: RequestFactory, index: int, url: str):
-        assert request_factory.version == 1, "This version of the CBLTest API requires request API v1"
+        assert request_factory.version == 1, (
+            "This version of the CBLTest API requires request API v1"
+        )
         self.__index = index
         self.__url = url
         self.__request_factory = request_factory
         self.__tracer = get_tracer(__name__, VERSION)
+        self.__info: GetRootResponse | None = None
 
     async def get_info(self) -> GetRootResponse:
         """
-        Retrieves the information about the running test server
+        Retrieves the information about the running test server.
+        This is cached after the first call.
         """
-        with self.__tracer.start_as_current_span("get_info"):
-            request = self.__request_factory.create_request(TestServerRequestType.ROOT)
-            resp = await self.__request_factory.send_request(self.__index, request)
-            return cast(GetRootResponse, resp)
+        if self.__info is None:
+            with self.__tracer.start_as_current_span("get_info"):
+                request = self.__request_factory.create_request(
+                    TestServerRequestType.ROOT
+                )
+                resp = await self.__request_factory.send_request(self.__index, request)
+                ret_val = cast(GetRootResponse, resp)
+                self.__info = ret_val
 
-    async def create_and_reset_db(self, db_names: List[str], dataset: Optional[str] = None, 
-                                  collections: Optional[List[str]] = None) -> List[Database]:
+        return self.__info
+
+    async def create_and_reset_db(
+        self,
+        db_names: list[str],
+        dataset: str | None = None,
+        collections: list[str] | None = None,
+    ) -> list[Database]:
         """
         Creates and returns a set of Databases based on the given dataset
 
@@ -48,9 +68,10 @@ class TestServer:
         :param collections: The name of the collections to add after creating the database.  Cannot
                             be combined with dataset.
         """
-        assert collections is None or dataset is None, \
+        assert collections is None or dataset is None, (
             "dataset and collections cannot both be specified"
-            
+        )
+
         with self.__tracer.start_as_current_span("create_and_reset_db"):
             payload = PostResetRequestBody(CBLPyTestGlobal.running_test_name)
             if dataset is not None:
@@ -58,15 +79,19 @@ class TestServer:
             else:
                 payload.add_empty(db_names, collections)
 
-            request = self.__request_factory.create_request(TestServerRequestType.RESET, payload)
+            request = self.__request_factory.create_request(
+                TestServerRequestType.RESET, payload
+            )
             await self.__request_factory.send_request(self.__index, request)
-            ret_val: List[Database] = []
+            ret_val: list[Database] = []
             for db_name in db_names:
                 ret_val.append(Database(self.__request_factory, self.__index, db_name))
 
             return ret_val
-        
-    async def new_session(self, id: str, url: Optional[str], tag: Optional[str]):
+
+    async def new_session(
+        self, id: str, dataset_version: str, url: str | None, tag: str | None
+    ):
         """
         Instructs this test server to log to the given LogSlurp instance
 
@@ -75,8 +100,10 @@ class TestServer:
         :param tag: The tag to use for this test server
         """
         with self.__tracer.start_as_current_span("new_session"):
-            payload = PostNewSessionRequestBody(id, url, tag)
-            request = self.__request_factory.create_request(TestServerRequestType.NEW_SESSION, payload)
+            payload = PostNewSessionRequestBody(id, dataset_version, url, tag)
+            request = self.__request_factory.create_request(
+                TestServerRequestType.NEW_SESSION, payload
+            )
             await self.__request_factory.send_request(self.__index, request)
 
     async def cleanup(self) -> None:
@@ -84,15 +111,29 @@ class TestServer:
         Resets the test server
         """
         with self.__tracer.start_as_current_span("create_and_reset_db"):
-            request = self.__request_factory.create_request(TestServerRequestType.RESET, PostResetRequestBody())
+            request = self.__request_factory.create_request(
+                TestServerRequestType.RESET, PostResetRequestBody()
+            )
             await self.__request_factory.send_request(self.__index, request)
 
     async def log(self, msg: str) -> None:
         """
         Sends a message to be logged on the server side.  Useful for debugging.
         """
-        
+
         # I'll exclude this from telemetry since it's not really related to any testing
         payload = PostLogRequestBody(msg)
-        request = self.__request_factory.create_request(TestServerRequestType.LOG, payload)
+        request = self.__request_factory.create_request(
+            TestServerRequestType.LOG, payload
+        )
         await self.__request_factory.send_request(self.__index, request)
+
+    def replication_url(self, db_name: str, port: int):
+        """
+        Returns the URL of the replication endpoint for this test server
+        """
+        ws_scheme = "ws://"  # For now not using secure
+
+        _assert_not_null(db_name, "db_name")
+        replication_url = f"{ws_scheme}{self.url}:{port}"
+        return urljoin(replication_url, db_name)

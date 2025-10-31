@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from enum import Enum, Flag, auto
-from typing import Any, Dict, Final, List, cast, Optional
-
-from varname import nameof
+from typing import Any, Final, cast
 
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.assertions import _assert_not_empty
@@ -23,19 +21,19 @@ class ReplicatorFilter(JSONSerializable):
         """Gets the name of the filter"""
         return self.__name
 
-    def __init__(self, name: str, parameters: Optional[dict] = None):
+    def __init__(self, name: str, parameters: dict | None = None):
         self.__name = name
         self.parameters = parameters
         """The parameters to be applied to the filter"""
 
     def to_json(self) -> Any:
-        ret_val: Dict[str, Any] = {"name": self.name}
+        ret_val: dict[str, Any] = {"name": self.name}
         if self.parameters is not None:
             ret_val["params"] = self.parameters
 
         return ret_val
-    
-    
+
+
 class ReplicatorConflictResolver(JSONSerializable):
     """
     A class representing a conflict resolver to use on a replication.
@@ -46,13 +44,13 @@ class ReplicatorConflictResolver(JSONSerializable):
         """Gets the name of the resolver"""
         return self.__name
 
-    def __init__(self, name: str, parameters: Optional[dict] = None):
+    def __init__(self, name: str, parameters: dict | None = None):
         self.__name = name
         self.parameters = parameters
         """The parameters to be applied to the resolver"""
 
     def to_json(self) -> Any:
-        ret_val: Dict[str, Any] = {"name": self.name}
+        ret_val: dict[str, Any] = {"name": self.name}
         if self.parameters is not None:
             ret_val["params"] = self.parameters
 
@@ -61,18 +59,23 @@ class ReplicatorConflictResolver(JSONSerializable):
 
 class ReplicatorCollectionEntry(JSONSerializable):
     @property
-    def names(self) -> List[str]:
+    def names(self) -> list[str]:
         """Gets the name of the collection that the options will be applied to"""
         return self.__names
 
-    def __init__(self, names: Optional[List[str]] = None, channels: Optional[List[str]] = None,
-                 document_ids: Optional[List[str]] = None,
-                 push_filter: Optional[ReplicatorFilter] = None, pull_filter: Optional[ReplicatorFilter] = None,
-                 conflict_resolver: Optional[ReplicatorConflictResolver] = None):
+    def __init__(
+        self,
+        names: list[str] | None = None,
+        channels: list[str] | None = None,
+        document_ids: list[str] | None = None,
+        push_filter: ReplicatorFilter | None = None,
+        pull_filter: ReplicatorFilter | None = None,
+        conflict_resolver: ReplicatorConflictResolver | None = None,
+    ):
         if names is None:
             self.__names = ["_default"]
         else:
-            _assert_not_empty(names, nameof(names))
+            _assert_not_empty(names, "names")
             self.__names = names
 
         self.channels = channels
@@ -91,9 +94,7 @@ class ReplicatorCollectionEntry(JSONSerializable):
         """The name of the one of the predefined conflict resolvers to use in this replication"""
 
     def to_json(self) -> Any:
-        ret_val: dict[str, Any] = {
-            "names": self.__names
-        }
+        ret_val: dict[str, Any] = {"names": self.__names}
 
         if self.channels is not None:
             ret_val["channels"] = self.channels
@@ -169,7 +170,7 @@ class ReplicatorBasicAuthenticator(ReplicatorAuthenticator):
         return {
             "type": self.type,
             "username": self.__username,
-            "password": self.__password
+            "password": self.__password,
         }
 
 
@@ -186,7 +187,9 @@ class ReplicatorSessionAuthenticator(ReplicatorAuthenticator):
         """Gets the cookie name that will be used for auth"""
         return self.__cookie_name
 
-    def __init__(self, session_id: str, cookie_name: str = "SyncGatewaySession") -> None:
+    def __init__(
+        self, session_id: str, cookie_name: str = "SyncGatewaySession"
+    ) -> None:
         super().__init__("SESSION")
         self.__session_id = session_id
         self.__cookie_name = cookie_name
@@ -195,7 +198,7 @@ class ReplicatorSessionAuthenticator(ReplicatorAuthenticator):
         return {
             "type": self.type,
             "sessionID": self.__session_id,
-            "cookieName": self.__cookie_name
+            "cookieName": self.__cookie_name,
         }
 
 
@@ -233,10 +236,13 @@ class ReplicatorProgress:
         return self.__completed
 
     def __init__(self, body: dict) -> None:
-        assert isinstance(body, dict), "Invalid replicator progress value received (not an object)"
+        assert isinstance(body, dict), (
+            "Invalid replicator progress value received (not an object)"
+        )
         self.__completed = cast(bool, body.get(self.__completed_key))
-        assert isinstance(self.__completed,
-                          bool), "Invalid replicator progress value received ('completed' not a boolean)"
+        assert isinstance(self.__completed, bool), (
+            "Invalid replicator progress value received ('completed' not a boolean)"
+        )
 
 
 class ReplicatorDocumentFlags(Flag):
@@ -256,7 +262,9 @@ class ReplicatorDocumentFlags(Flag):
 
         :param input: The string representing the flag (e.g. DELETED), case-insensitive
         """
-        assert isinstance(input, str), f"Non-string input to ReplicatorDocumentFlags {input}"
+        assert isinstance(input, str), (
+            f"Non-string input to ReplicatorDocumentFlags {input}"
+        )
         upper = input.upper()
         if upper == "NONE":
             return ReplicatorDocumentFlags.NONE
@@ -270,7 +278,7 @@ class ReplicatorDocumentFlags(Flag):
         raise ValueError(f"Unrecognized input ReplicatorDocumentFlags {input}")
 
     @classmethod
-    def parse_all(cls, input: List[str]) -> ReplicatorDocumentFlags:
+    def parse_all(cls, input: list[str]) -> ReplicatorDocumentFlags:
         """
         Parses and ORs a list of string words representing flags
 
@@ -334,19 +342,27 @@ class ReplicatorDocumentEntry:
         return self.__flags
 
     @property
-    def error(self) -> Optional[ErrorResponseBody]:
+    def error(self) -> ErrorResponseBody | None:
         """Gets the error that prevented the document from being replicated, if any"""
         return self.__error
 
     def __init__(self, body: dict) -> None:
-        assert isinstance(body, dict), "Invalid replicator document received (not an object)"
+        assert isinstance(body, dict), (
+            "Invalid replicator document received (not an object)"
+        )
         self.__collection = _get_typed_required(body, self.__collection_key, str)
-        assert self.__collection is not None, "Null collection on replicator document received"
+        assert self.__collection is not None, (
+            "Null collection on replicator document received"
+        )
         self.__document_id = _get_typed_required(body, self.__document_id_key, str)
         assert self.__document_id is not None, "Null ID on replicator document received"
         self.__is_push = _get_typed_required(body, self.__is_push_key, bool)
-        self.__flags = ReplicatorDocumentFlags.parse_all(_get_typed_required(body, self.__flags_key, List[str]))
-        self.__error: Optional[ErrorResponseBody] = ErrorResponseBody.create(cast(dict, body.get(self.__error_key)))
+        self.__flags = ReplicatorDocumentFlags.parse_all(
+            _get_typed_required(body, self.__flags_key, list[str])
+        )
+        self.__error: ErrorResponseBody | None = ErrorResponseBody.create(
+            cast(dict, body.get(self.__error_key))
+        )
 
 
 class WaitForDocumentEventEntry:
@@ -372,14 +388,23 @@ class WaitForDocumentEventEntry:
         return self.__direction
 
     @property
-    def flags(self) -> Optional[ReplicatorDocumentFlags]:
+    def flags(self) -> ReplicatorDocumentFlags | None:
         """Gets the flags of the event to wait for.  Events that otherwise match
         (e.g. have the same document ID) will be ignored"""
         return self.__flags
 
-    def __init__(self, collection: str, id: str, direction: ReplicatorType, flags: Optional[ReplicatorDocumentFlags],
-                 err_domain: Optional[str] = None, err_code: Optional[int] = None):
-        assert isinstance(collection, str), "WaitForDocumentEventEntry: collection not a string"
+    def __init__(
+        self,
+        collection: str,
+        id: str,
+        direction: ReplicatorType,
+        flags: ReplicatorDocumentFlags | None,
+        err_domain: str | None = None,
+        err_code: int | None = None,
+    ):
+        assert isinstance(collection, str), (
+            "WaitForDocumentEventEntry: collection not a string"
+        )
         assert isinstance(id, str), "WaitForDocumentEventEntry: id not a string"
         self.__collection = collection
         self.__id = id
@@ -396,15 +421,20 @@ class WaitForDocumentEventEntry:
             return False
         other = cast(WaitForDocumentEventEntry, obj)
 
-        return (self.__collection == other.__collection and self.__id == other.__id) and (
-                self.__err_domain == other.__err_domain) and (
-                self.__err_code == other.__err_code) and (
-                self.__direction == other.__direction or
-                self.__direction == ReplicatorType.PUSH_AND_PULL or
-                other.__direction == ReplicatorType.PUSH_AND_PULL) and (
-                self.__flags == other.__flags or
-                self.__flags is None or
-                other.__flags is None
+        return (
+            (self.__collection == other.__collection and self.__id == other.__id)
+            and (self.__err_domain == other.__err_domain)
+            and (self.__err_code == other.__err_code)
+            and (
+                self.__direction == other.__direction
+                or self.__direction == ReplicatorType.PUSH_AND_PULL
+                or other.__direction == ReplicatorType.PUSH_AND_PULL
+            )
+            and (
+                self.__flags == other.__flags
+                or self.__flags is None
+                or other.__flags is None
+            )
         )
 
     def __str__(self) -> str:
@@ -427,12 +457,16 @@ class ReplicatorStatus:
         return self.__activity
 
     @property
-    def error(self) -> Optional[ErrorResponseBody]:
+    def error(self) -> ErrorResponseBody | None:
         """Gets the error for the Replicator, if any"""
         return self.__error
 
-    def __init__(self, progress: ReplicatorProgress, activity: ReplicatorActivityLevel,
-                 error: Optional[ErrorResponseBody]):
+    def __init__(
+        self,
+        progress: ReplicatorProgress,
+        activity: ReplicatorActivityLevel,
+        error: ErrorResponseBody | None,
+    ):
         self.__progress = progress
         self.__activity = activity
         self.__error = error

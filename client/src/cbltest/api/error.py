@@ -21,10 +21,14 @@ class CblTestServerBadResponseError(Exception):
         """Gets the body of the response that had the bad status"""
         return self.__response
 
-    def __init__(self, code: int, response: TestServerResponse, *args):
+    def __init__(self, code: int, response: TestServerResponse, message: str):
         self.__code = code
         self.__response = response
-        super().__init__(args)
+        self.__message = message
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        return self.__message
 
 
 class CblTimeoutError(Exception):

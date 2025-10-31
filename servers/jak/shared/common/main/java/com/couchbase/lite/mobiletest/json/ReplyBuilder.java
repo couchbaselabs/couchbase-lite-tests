@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.squareup.moshi.JsonWriter;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import okio.Buffer;
 
 import com.couchbase.lite.Blob;
@@ -36,6 +37,7 @@ public class ReplyBuilder {
 
     private final Map<String, Object> reply;
 
+    @SuppressFBWarnings("EI_EXPOSE_REP2")
     public ReplyBuilder(@Nullable Map<String, Object> reply) { this.reply = reply; }
 
     @NonNull

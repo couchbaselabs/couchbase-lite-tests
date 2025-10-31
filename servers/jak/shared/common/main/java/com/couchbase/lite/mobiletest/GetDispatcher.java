@@ -41,6 +41,8 @@ public final class GetDispatcher extends BaseDispatcher<GetDispatcher.Endpoint> 
 
         // build the endpoint table
         addEndpoint(1, "/", app::getSystemInfo);
+
+        PlatformDispatcher.addGetEndpoints(this, app);
     }
 
     // This method returns a Reply.  Be sure to close it!

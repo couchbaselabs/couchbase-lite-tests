@@ -1,0 +1,63 @@
+pipeline {
+    agent none
+    parameters {
+        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
+        string(name: 'CBL_VERSION', defaultValue: '1.0.0', description: 'Couchbase Lite Version')
+        string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
+        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD}-${CBL_EDITION} (#${currentBuild.number})"
+                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
+                }
+            }
+        }
+        stage('Prebuild Server') {
+            steps {
+                script {
+                    build job: 'prebuild-test-server',
+                    parameters: [
+                        string(name: 'TS_PLATFORM', value: 'js'),
+                        string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                        string(name: 'CBL_BUILD', value: params.CBL_BUILD)
+                    ],
+                    wait: true,
+                    propagate: true
+                }
+            }
+        }
+        stage('Run Test') {
+            agent { label 'mob-e2e-mac-01' }
+            options {
+                lock("mob-e2e-mac-01")
+            }
+            steps {
+                // Unlock keychain:
+                timeout(time: 60, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/dev_e2e/javascript/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                }
+            }
+            post { 
+                always { 
+                    echo "Teardown JavaScript Test"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh 'jenkins/pipelines/dev_e2e/javascript/teardown.sh'
+                    }
+                    archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "pasin@couchbase.com";
+        }
+    }
+}

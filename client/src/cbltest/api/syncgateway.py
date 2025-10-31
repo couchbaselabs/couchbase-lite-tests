@@ -2,23 +2,57 @@ import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
 from pathlib import Path
-from typing import Dict, List, Tuple, cast, Any, Optional
+from typing import Any, cast
 from urllib.parse import urljoin
 
-from aiohttp import ClientSession, BasicAuth, TCPConnector
+import requests
+from aiohttp import BasicAuth, ClientSession, TCPConnector
+from deprecated import deprecated
 from opentelemetry.trace import get_tracer
-from varname import nameof
 
 from cbltest.api.error import CblSyncGatewayBadResponseError
-from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
+from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_warning, cbl_info
-from cbltest.version import VERSION
+from cbltest.logging import cbl_info, cbl_warning
 from cbltest.utils import assert_not_null
+from cbltest.version import VERSION
 
-from deprecated import deprecated
+# This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
+# So if that file ever changes, change this too.
+_SGW_CA_CERT: str = """-----BEGIN CERTIFICATE-----
+MIIFWTCCA0GgAwIBAgIUBdrc0OhquX8RnXtZ6AiOY+57C18wDQYJKoZIhvcNAQEL
+BQAwPDEZMBcGA1UEAwwQSW50ZXJuYWwgVGVzdCBDQTESMBAGA1UECgwJQ291Y2hi
+YXNlMQswCQYDVQQGEwJVUzAeFw0yNTEwMjkwMTAzMDBaFw0yNzEwMjkwMTAzMDBa
+MDwxGTAXBgNVBAMMEEludGVybmFsIFRlc3QgQ0ExEjAQBgNVBAoMCUNvdWNoYmFz
+ZTELMAkGA1UEBhMCVVMwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCl
+vMLIQDFfEcttEUSzBKkzoRSSLJ3Z/73xmJxBenCtZ9HasLhF3iJxwyQK09nD7sLv
+RRwLeRfY8QObr/F/qJAa1cQtVA/5UxIiKsjDk+TrUibg4p6NFSgKUEg+08D0tRHG
+CF3CF/3qcM/10A+Pg2K1COaAtPrYjslOv8DoDBzwOBxibaheDZmtBdPEeHghDXZr
+DWYDe2770XGzKYqINCEDxNdyDUBdiNSzuX2h/YeZi6vGTtpAt3Iti2SIerRrCiah
+UOlykQoqiDVh4JPXts79Xhszw0oDK6YWHEBBfXmYDUdYAyF97XC6hZc+6HxiCVTB
+887mkyLCuKMGfB3dabyCqJ31fXm7gmufOs8voCfi/sKjLgcdZQUY4Gw345oYI3Yw
+O41ig/uR04KW2xASba38vXt0fEl9/50+AO3xAy9oaY36nLSnBwTV72VbvTlvevGf
+zSHbVIbtzcuovpudghYizmIqMEFguc8VsGgmwZb8mkypzB80SOoED3nJRziIK1ym
+e+NuO0DIG6xMPUhputNhwqaeYXuSmcUH5YcmLN//ewMIjzxoH33H1cwcADHFioR/
+YfIraSgVZCUhrN9aJlXdDOzDuhbVpXYJMbh5PfAiNLHPCXmo685Utf3ID+nFW1wd
+WOIyuE3aJ5KVtG8hjlgKARV7eEqtxHjIl41QtsxalwIDAQABo1MwUTAdBgNVHQ4E
+FgQUs2WdMu1wh9pJ5dPN80yN1NPAkSswHwYDVR0jBBgwFoAUs2WdMu1wh9pJ5dPN
+80yN1NPAkSswDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAgEAhiYP
+a9dvAv/33u9vBKzUo045RRrfEpv80DSZQb4ttyulrIfbaLFHxaDcf2+S+mywAgoW
+tf9SAwWO41qU7sfIBnFdCh982nP1dD707GDAZIe8ZNpl/Vu3hWY3TRQAp9ufA51w
+wxn0m2tOS18UXpv5BNX1kVaLlAiOzRzmP1ghx08v9yd8eBgnjJ89D2m1U+qFS1Xk
+egiyw66HHc3bG+eo523/l4RDqTx6KkhYnD3Bz89IxMaeK7CuynCY3VyVWPeIUfBr
+clkDBqZa4o7fD3xV6Wiu/NHZsWJx3wog1wwelvlsyOVM+mfd4IOsPGVCCdDGtpoq
+sT+f9mPDXXHKuDER8a7HiCgGK8rAQtCm/P5UFp2HUEIru/psWCXc3vh9HYVX9W79
+TwS+AVAlkeVogs1ugqAXOuGmstnevj6XzA8PszCKDSIV+t1PJSSOtypUyN4gbGGx
+sk1s9bwqy7bw2cMh3tt7HromGOoLnPxnsbQCs5HsqNdiEsPABWnI6m7epm0tFjCe
+gHDyw1LdmZlZ3R7DT+CwfyhxL6hktfs8h7goR1vkmS2q0Alxmw9faKVVpDyWnsZC
+qv6PMC0fI7jhvrr2Uf2Hhw9SQlBFwZ7LjjLqjuuJkclM4VooDElsLbPjSUbA+c5h
+WCKJ0c94mrl9GwwBmcSIKJBvd6u7uAta2fREJeE=
+-----END CERTIFICATE-----
+"""
 
 from cbltest.api.remoteshell import RemoteShellConnection
 
@@ -29,13 +63,13 @@ class _CollectionMap(JSONSerializable):
         return self.__scope_name
 
     @property
-    def collections(self) -> List[str]:
+    def collections(self) -> list[str]:
         return list(self.__collections.keys())
 
     def __init__(self, scope_name: str) -> None:
-        _assert_not_null(scope_name, nameof(scope_name))
+        _assert_not_null(scope_name, "scope_name")
         self.__scope_name = scope_name
-        self.__collections: Dict[str, dict] = {}
+        self.__collections: dict[str, dict] = {}
 
     def add_collection(self, collection_name: str, payload: dict) -> None:
         if collection_name in self.__collections:
@@ -68,7 +102,7 @@ class PutDatabasePayload(JSONSerializable):
         self.__bucket = _get_typed_required(self.__config, "bucket", str)
         """The bucket name in the backing Couchbase Server"""
 
-        self.__scopes: Dict[str, _CollectionMap] = {}
+        self.__scopes: dict[str, _CollectionMap] = {}
         scopes = _get_typed_required(self.__config, "scopes", dict)
         for scope in scopes:
             scope_dict = _get_typed_required(scopes, scope, dict)
@@ -77,11 +111,11 @@ class PutDatabasePayload(JSONSerializable):
                 collection_dict = _get_typed_required(collections, collection, dict)
                 self._add_collection(collection_dict, scope, collection)
 
-    def scopes(self) -> List[str]:
+    def scopes(self) -> list[str]:
         """Gets all the scopes contained in the payload"""
         return list(self.__scopes.keys())
 
-    def collections(self, scope: str) -> List[str]:
+    def collections(self, scope: str) -> list[str]:
         """
         Gets a list of collections specified for the given scope
 
@@ -104,7 +138,7 @@ class PutDatabasePayload(JSONSerializable):
         :param scope_name: The name of the scope in which the collection resides
         :param collection_name: The name of the collection to retrieve data from
         """
-        _assert_not_null(scope_name, nameof(scope_name))
+        _assert_not_null(scope_name, "scope_name")
         col_map = self.__scopes.get(scope_name, _CollectionMap(collection_name))
         self.__scopes[scope_name] = col_map
         col_map.add_collection(collection_name, payload)
@@ -129,12 +163,12 @@ class AllDocumentsResponseRow:
         return self.__id
 
     @property
-    def revid(self) -> Optional[str]:
+    def revid(self) -> str | None:
         """Gets the revision ID of the row"""
         return self.__revid
 
     @property
-    def cv(self) -> Optional[str]:
+    def cv(self) -> str | None:
         """Gets the current version for the row"""
         return self.__cv
 
@@ -158,7 +192,7 @@ class AllDocumentsResponse:
     """
 
     @property
-    def rows(self) -> List[AllDocumentsResponseRow]:
+    def rows(self) -> list[AllDocumentsResponseRow]:
         """Gets the entries of the response"""
         return self.__rows
 
@@ -175,11 +209,11 @@ class AllDocumentsResponse:
 
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
-        self.__rows: List[AllDocumentsResponseRow] = []
+        self.__rows: list[AllDocumentsResponseRow] = []
         self.__input = input
         self.__revmap = dict()
-        for row in cast(List[Dict], input["rows"]):
-            rev = cast(Dict, row["value"])
+        for row in cast(list[dict], input["rows"]):
+            rev = cast(dict, row["value"])
             self.__rows.append(
                 AllDocumentsResponseRow(
                     row["key"],
@@ -207,7 +241,7 @@ class DocumentUpdateEntry(JSONSerializable):
 
     @property
     @deprecated("Only should be used until 4.0 SGW gets close to GA")
-    def rev(self) -> Optional[str]:
+    def rev(self) -> str | None:
         """
         Gets the rev ID of the entry (NOTE: Will go away after 4.0 SGW gets close to GA)
         """
@@ -216,7 +250,7 @@ class DocumentUpdateEntry(JSONSerializable):
 
         return cast(str, self.__body["_rev"])
 
-    def __init__(self, id: str, revid: Optional[str], body: dict):
+    def __init__(self, id: str, revid: str | None, body: dict):
         self.__body = body.copy()
         self.__body["_id"] = id
         if revid:
@@ -244,12 +278,12 @@ class RemoteDocument(JSONSerializable):
         return self.__id
 
     @property
-    def revid(self) -> Optional[str]:
+    def revid(self) -> str | None:
         """Gets the revision ID of the document"""
         return self.__rev
 
     @property
-    def cv(self) -> Optional[str]:
+    def cv(self) -> str | None:
         """Gets the CV of the document"""
         return self.__cv
 
@@ -306,7 +340,7 @@ class CouchbaseVersion(ABC):
         return self.__build_number
 
     @abstractmethod
-    def parse(self, input: str) -> Tuple[str, int]:
+    def parse(self, input: str) -> tuple[str, int]:
         pass
 
     def __init__(self, input: str):
@@ -321,7 +355,7 @@ class SyncGatewayVersion(CouchbaseVersion):
     A class for parsing Sync Gateway Version
     """
 
-    def parse(self, input: str) -> Tuple[str, int]:
+    def parse(self, input: str) -> tuple[str, int]:
         first_lparen = input.find("(")
         first_semicol = input.find(";")
         if first_lparen == -1 or first_semicol == -1:
@@ -361,7 +395,7 @@ class SyncGateway:
         self, secure: bool, scheme: str, url: str, port: int, auth: Optional[BasicAuth]
     ) -> ClientSession:
         if secure:
-            ssl_context = ssl.create_default_context(cadata=self.tls_cert())
+            ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
             ssl_context.check_hostname = False
             return ClientSession(
@@ -407,7 +441,6 @@ class SyncGateway:
                 f"Sync Gateway [{self.__admin_url}] <- {method.upper()} {path} {resp.status}",
                 data,
             )
-
             if not resp.ok:
                 raise CblSyncGatewayBadResponseError(
                     resp.status, f"{method} {path} returned {resp.status}"
@@ -428,7 +461,7 @@ class SyncGateway:
             assert "/" in raw_version
             return SyncGatewayVersion(raw_version.split("/")[1])
 
-    def tls_cert(self) -> Optional[str]:
+    def tls_cert(self) -> str | None:
         if not self.__secure:
             cbl_warning(
                 "Sync Gateway instance not using TLS, returning empty tls_cert..."
@@ -437,14 +470,37 @@ class SyncGateway:
 
         return ssl.get_server_certificate((self.__hostname, self.__admin_port))
 
-    def replication_url(self, db_name: str):
+    def replication_url(self, db_name: str, load_balancer: str | None = None) -> str:
         """
         Gets the replicator URL (e.g. ws://xxx) for a given db
 
         :param db_name: The DB to replicate with
         """
         _assert_not_null(db_name, nameof(db_name))
-        return urljoin(self.__replication_url, db_name)
+        sgw_address = urljoin(self.__replication_url, db_name)
+        if not load_balancer:
+            return sgw_address
+
+        return sgw_address.replace("wss", "ws").replace(self.__hostname, load_balancer)
+
+    async def bytes_transferred(self, dataset_name: str) -> tuple[int, int]:
+        """
+        Gets the bytes transferred for a given dataset
+
+        :param dataset_name: The name of the dataset to get the bytes transferred for
+        """
+        resp = requests.get(
+            urljoin(self.__admin_url, "_expvar"),
+            verify=False,
+            auth=("admin", "password"),
+        )
+        resp.raise_for_status()
+        expvars = resp.json()
+
+        db_stats = expvars["syncgateway"]["per_db"][dataset_name]["database"]
+        doc_reads_bytes = db_stats["doc_reads_bytes_blip"]
+        doc_writes_bytes = db_stats["doc_writes_bytes_blip"]
+        return doc_reads_bytes, doc_writes_bytes
 
     async def _put_database(
         self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0
@@ -455,7 +511,7 @@ class SyncGateway:
             try:
                 await self._send_request("put", f"/{db_name}/", payload)
             except CblSyncGatewayBadResponseError as e:
-                if e.code == 500 and retry_count < 10:
+                if e.code == 500 and retry_count < 3:
                     cbl_warning(
                         f"Sync gateway returned 500 from PUT database call, retrying ({retry_count + 1})..."
                     )
@@ -488,7 +544,7 @@ class SyncGateway:
         ):
             await self._send_request("delete", f"/{db_name}/")
 
-    def create_collection_access_dict(self, input: Dict[str, List[str]]) -> dict:
+    def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
         Creates a collection access dictionary in the format that Sync Gateway expects,
         given an input dictionary keyed by collection with a list of channels
@@ -521,7 +577,7 @@ class SyncGateway:
                 )
 
             if spec[0] not in ret_val:
-                scope_dict: Dict[str, dict] = {}
+                scope_dict: dict[str, dict] = {}
                 ret_val[spec[0]] = scope_dict
             else:
                 scope_dict = ret_val[spec[0]]
@@ -531,10 +587,15 @@ class SyncGateway:
         return ret_val
 
     async def add_user(
-        self, db_name: str, name: str, password: str, collection_access: dict
+        self,
+        db_name: str,
+        name: str,
+        password: str | None = None,
+        collection_access: dict | None = None,
+        admin_roles: list[str] | None = None,
     ) -> None:
         """
-        Adds the specified user to a Sync Gateway database with the specified channel access
+        Adds or updates the specified user to a Sync Gateway database with the specified channel access
 
         :param db_name: The name of the Database to add the user to
         :param name: The username to add
@@ -542,15 +603,23 @@ class SyncGateway:
         :param collection_access: The collections that the user will have access to.  This needs to
             be formatted in the way Sync Gateway expects it, so if you are unsure use
             :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
+        :param admin_roles: The admin roles
         """
         with self.__tracer.start_as_current_span(
             "add_user", attributes={"cbl.user.name": name}
         ):
-            body = {
+            body: dict[str, Any] = {
                 "name": name,
-                "password": password,
-                "collection_access": collection_access,
             }
+
+            if password is not None:
+                body["password"] = password
+
+            if collection_access is not None:
+                body["collection_access"] = collection_access
+
+            if admin_roles is not None:
+                body["admin_roles"] = admin_roles
 
             await self._send_request(
                 "put", f"/{db_name}/_user/{name}", JSONDictionary(body)
@@ -580,17 +649,11 @@ class SyncGateway:
         with self.__tracer.start_as_current_span(
             "add_role", attributes={"cbl.role.name": role}
         ):
-            body = {"name": role, "collection_access": collection_access}
+            body = {"collection_access": collection_access}
 
-            try:
-                await self._send_request(
-                    "post", f"/{db_name}/_role/", JSONDictionary(body)
-                )
-            except CblSyncGatewayBadResponseError as e:
-                if e.code == 409:
-                    pass
-                else:
-                    raise
+            await self._send_request(
+                "put", f"/{db_name}/_role/{role}", JSONDictionary(body)
+            )
 
     def _analyze_dataset_response(self, response: list) -> None:
         assert isinstance(response, list), "Invalid bulk docs response (not a list)"
@@ -622,8 +685,8 @@ class SyncGateway:
         ):
             last_scope: str = ""
             last_coll: str = ""
-            collected: List[dict] = []
-            with open(path, "r", encoding="utf8") as fin:
+            collected: list[dict] = []
+            with open(path, encoding="utf8") as fin:
                 json_line = fin.readline()
                 while json_line:
                     json = cast(dict, loads(json_line))
@@ -685,7 +748,7 @@ class SyncGateway:
     async def _rewrite_rev_ids(
         self,
         db_name: str,
-        updates: List[DocumentUpdateEntry],
+        updates: list[DocumentUpdateEntry],
         scope: str,
         collection: str,
     ) -> None:
@@ -722,7 +785,7 @@ class SyncGateway:
     async def update_documents(
         self,
         db_name: str,
-        updates: List[DocumentUpdateEntry],
+        updates: list[DocumentUpdateEntry],
         scope: str = "_default",
         collection: str = "_default",
     ) -> None:
@@ -746,6 +809,61 @@ class SyncGateway:
 
             body = {"docs": list(u.to_json() for u in updates)}
 
+            await self._send_request(
+                "post",
+                f"/{db_name}.{scope}.{collection}/_bulk_docs",
+                JSONDictionary(body),
+            )
+
+    async def upsert_documents(
+        self,
+        db_name: str,
+        updates: list[DocumentUpdateEntry],
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> None:
+        """
+        Upserts a list of documents on Sync Gateway.
+        Its different from update_documents in that it will not overwrite the doc body in case the
+            doc already exists.
+        It will preserve the existing body fields and only add / update whatever is being passed,
+            like the behaviour shown by the function batch_upsert used in CBL updates.
+
+        :param db_name: The name of the DB endpoint to upsert
+        :param updates: A list of upserts to perform
+        :param scope: The scope that the upserts will be applied to (default '_default')
+        :param collection: The collection that the upserts will be applied to (default '_default')
+        """
+        with self.__tracer.start_as_current_span(
+            "update_documents",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+            },
+        ):
+            merged_updates = []
+            for update in updates:
+                try:
+                    current_doc = await self.get_document(
+                        db_name, update.id, scope, collection
+                    )
+                    if current_doc is not None:
+                        current_body = dict(current_doc.body)
+                        current_body.update(update.to_json())
+                        current_body["_id"] = update.id
+                        if update.rev:
+                            current_body["_rev"] = update.rev
+                    else:
+                        current_body = update.to_json()
+                except Exception:
+                    current_body = update.to_json()
+                merged_updates.append(
+                    DocumentUpdateEntry(update.id, update.rev, current_body)
+                )
+
+            await self._rewrite_rev_ids(db_name, merged_updates, scope, collection)
+            body = {"docs": list(u.to_json() for u in merged_updates)}
             await self._send_request(
                 "post",
                 f"/{db_name}.{scope}.{collection}/_bulk_docs",
@@ -1001,3 +1119,70 @@ class SyncGateway:
             resp = await self.__ssh_client.start_sgw()
             await self.__ssh_client.disconnect()
             return resp
+            
+    async def close(self) -> None:
+        """
+        Closes the Sync Gateway session
+        """
+        if not self.__admin_session.closed:
+            await self.__admin_session.close()
+
+    async def get_database_config(self, db_name: str) -> dict[str, Any]:
+        """
+        Gets the configuration for a specific database from the admin API.
+
+        Args:
+            db_name: The name of the database to get configuration for
+
+        Returns:
+            Dictionary containing the database configuration
+        """
+        _assert_not_null(db_name, "db_name")
+        with self.__tracer.start_as_current_span(
+            "get_database_config", attributes={"cbl.database.name": db_name}
+        ):
+            return await self._send_request("GET", f"/{db_name}/_config")
+
+    async def get_document_revision_public(
+        self,
+        db_name: str,
+        doc_id: str,
+        revision: str,
+        auth: BasicAuth,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> dict[str, Any]:
+        """
+        Gets a specific revision of a document using the public API with user authentication.
+
+        Args:
+            db_name: The name of the database
+            doc_id: The document ID
+            revision: The specific revision to retrieve
+            auth: User authentication credentials
+            scope: The scope name (defaults to "_default")
+            collection: The collection name (defaults to "_default")
+
+        Returns:
+            Dictionary containing the document at the specified revision
+
+        Raises:
+            CblSyncGatewayBadResponseError: If the document or revision is not found
+        """
+        _assert_not_null(db_name, "db_name")
+        _assert_not_null(doc_id, "doc_id")
+        _assert_not_null(revision, "revision")
+        _assert_not_null(auth, "auth")
+
+        path = (
+            f"/{db_name}/{scope}.{collection}/{doc_id}"
+            if scope != "_default" or collection != "_default"
+            else f"/{db_name}/{doc_id}"
+        )
+        params = {"rev": revision}
+
+        scheme = "https://" if self.__secure else "http://"
+        async with self._create_session(
+            self.__secure, scheme, self.__hostname, 4984, auth
+        ) as session:
+            return await self._send_request("GET", path, params=params, session=session)

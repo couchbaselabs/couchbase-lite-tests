@@ -14,7 +14,7 @@ extension Handlers {
             throw TestServerError.badRequest("Request body does not match the 'RunQueryConfiguration' scheme.")
         }
         
-        let dbManager = req.application.databaseManager
+        let dbManager = req.databaseManager
         return try _runQuery(dbManager: dbManager, database: config.database, query: config.query)
     }
 }

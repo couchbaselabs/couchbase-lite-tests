@@ -39,7 +39,7 @@ public class Logger {
 
     /* log a message from the client */
     @NonNull
-    public Map<String, Object> log(@NonNull TestContext ctxt, @NonNull TypedMap req) {
+    public Map<String, Object> log(@NonNull TestContext ignore, @NonNull TypedMap req) {
         req.validate(LEGAL_LOG_KEYS);
 
         final String msg = req.getString(KEY_MESSAGE);

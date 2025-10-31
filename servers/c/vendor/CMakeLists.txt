@@ -25,7 +25,7 @@ include(FetchContent)
 FetchContent_Declare(
         civetweb
         GIT_REPOSITORY https://github.com/couchbasedeps/civetweb
-        GIT_TAG cbl_c_testserver
+        GIT_TAG v1.16-couchbase
         GIT_SHALLOW TRUE
 )
 
@@ -46,46 +46,52 @@ set(BUILD_SHARED_LIBS OFF) # Ugh how many times do I have to tell you?!
 message(STATUS "Fetching civetweb...")
 FetchContent_MakeAvailable(civetweb)
 
-FetchContent_Declare(
-        json
-        GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent
-        GIT_TAG v3.9.1
-        GIT_SHALLOW TRUE
-)
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_MakeAvailable(json)
 message(STATUS "Fetching json...")
 FetchContent_MakeAvailable(json)
+
+if(MSVC)
+    FetchContent_Declare(
+            zlib
+            GIT_REPOSITORY https://github.com/couchbasedeps/zlib
+            GIT_TAG v1.3.1
+            GIT_SHALLOW TRUE
+    )
+
+    message(STATUS "Fetching zlib...")
+    FetchContent_MakeAvailable(zlib)
+
+    if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+        set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/Debug/zlibstaticd.lib)
+    else()
+        set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/${CMAKE_BUILD_TYPE}/zlibstatic.lib)
+    endif()
+    
+    set(ZLIB_INCLUDE_DIR ${zlib_SOURCE_DIR})
+    list(APPEND ZLIB_INCLUDE_DIR ${zlib_BINARY_DIR})
+    target_include_directories(zlibstatic PRIVATE ${ZLIB_INCLUDE_DIR})
+endif()
 
 FetchContent_Declare(
         ixwebsocket
         GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
         GIT_TAG v11.4.5
 )
+
+# For FileDownloader on Linux Platform
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(USE_TLS ON CACHE BOOL "Enable TLS support")
+    set(USE_OPEN_SSL ON CACHE BOOL "Use OpenSSL for TLS")
+endif()
+
 message(STATUS "Fetching IXWebSocket...")
 FetchContent_MakeAvailable(ixwebsocket)
-
-if(MSVC)
-    FetchContent_Declare(
-            zlib
-            GIT_REPOSITORY https://github.com/couchbasedeps/zlib
-            GIT_TAG master
-            GIT_SHALLOW TRUE
-    )
-
-    message(STATUS "Fetching zlib...")
-    FetchContent_MakeAvailable(zlib)
-    if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-        set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/Debug/zlibstaticd.lib)
-    else()
-        set(ZLIB_LIBRARY ${zlib_BINARY_DIR}/${CMAKE_BUILD_TYPE}/zlibstatic.lib)
-    endif()
-    set(ZLIB_INCLUDE_DIR ${zlib_SOURCE_DIR})
-    target_include_directories(zlibstatic PRIVATE ${zlib_BINARY_DIR})
-endif()
 
 FetchContent_Declare(
         libzip
         GIT_REPOSITORY https://github.com/nih-at/libzip
-        GIT_TAG v1.7.3
+        GIT_TAG v1.11.3
         GIT_SHALLOW TRUE
 )
 
@@ -97,6 +103,7 @@ option(ENABLE_BZIP2 "" OFF)
 option(ENABLE_LZMA "" OFF)
 option(ENABLE_WINDOWS_CRYPTO "" OFF)
 option(ENABLE_OPENSSL "" OFF)
+option(ENABLE_ZSTD "" OFF)
 message(STATUS "Fetching libzip...")
 FetchContent_MakeAvailable(libzip)
 target_include_directories(zip PRIVATE ${zlib_BINARY_DIR})

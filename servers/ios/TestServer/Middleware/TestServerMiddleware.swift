@@ -28,23 +28,24 @@ class TestServerMiddleware : AsyncMiddleware {
     func respond(to request: Vapor.Request, chainingTo next: Vapor.AsyncResponder) async throws -> Vapor.Response {
         Log.log(level: .debug, message: "Received request: \(request.description)")
         
-        let isGetRoot = request.route?.description == "GET /"
-        
-        let version = isGetRoot ? 0 : try getAndVerifyVersion(request.headers)
-        
+        var version = 0;
         var session: Session
         do {
+            let isGetRoot = request.route?.description == "GET /"
+            if !isGetRoot {
+                version = try getAndVerifyVersion(request.headers)
+            }
             if isGetRoot || request.route?.description == "POST /newSession" {
                 session = createNewTempSession()
             } else {
                 session = try getSession(clientID: getClientID(request.headers))
             }
             request.storage[SessionKey.self] = session
-        } catch(let error as TestServerError) {
-            // This middleware sits before the error middleware,
-            // so we have to create this error ourselves
+        } catch {
+            // This middleware sits before the error middleware, so we have to create this error ourselves
             Log.log(level: .error, message: "Request failed with error: \(error)")
-            let response = ErrorResponseFactory.CreateErrorResponse(request, error)
+            let err = TestServerError.fromError(error)
+            let response = ErrorResponseFactory.CreateErrorResponse(request, err)
             return withResponseHeaders(response, version: version)
         }
         
@@ -57,7 +58,7 @@ class TestServerMiddleware : AsyncMiddleware {
         return responseWithHeaders
     }
     
-    func withResponseHeaders(_ response: Response, version: Int) -> Response {
+    private func withResponseHeaders(_ response: Response, version: Int) -> Response {
         let resolvedVersion = version != 0 ? version : TestServer.maxAPIVersion
         response.headers.add(name: kHeaderKeyServerID, value: TestServer.serverID.uuidString)
         response.headers.add(name: kHeaderKeyAPIVersion, value: "\(resolvedVersion)")
@@ -93,5 +94,21 @@ class TestServerMiddleware : AsyncMiddleware {
     
     private func getSession(clientID: String) throws -> Session {
         return try application.sessionManager.getSession(id: clientID)
+    }
+}
+
+extension Vapor.Request {
+    var session : Session {
+        guard let s = self.storage.get(SessionKey.self) else {
+            fatalError("No session found in request")
+        }
+        return s
+    }
+    
+    var databaseManager : DatabaseManager {
+        guard let manager = self.session.databaseManager else {
+            fatalError("Get database manager from temp session is not supported")
+        }
+        return manager
     }
 }

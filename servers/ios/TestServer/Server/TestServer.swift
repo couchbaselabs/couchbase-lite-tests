@@ -12,6 +12,7 @@ class TestServer : ObservableObject {
     var app : Vapor.Application
     
     public static let maxAPIVersion = 1
+    
     public static let serverID = UUID()
     
     init(port: Int) {
@@ -20,11 +21,10 @@ class TestServer : ObservableObject {
             try LoggingSystem.bootstrap(from: &env)
             Log.initialize()
             
-            let databaseManager = DatabaseManager()
-            let sessionManager = SessionManager(databaseManager: databaseManager)
+            let urls = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+            let sessionManager = try SessionManager(filesDirectory: urls[0])
             
             app = Application(env)
-            app.storage[DatabaseManagerKey.self] = databaseManager
             app.storage[SessionManagerKey.self] = sessionManager
             configure(port: port)
         } catch {
@@ -54,7 +54,7 @@ class TestServer : ObservableObject {
         setupRoutes()
     }
     
-    /// Implement API v1.0.0
+    /// Implement API v1.2.1 + Merge-Dict Conflict Resolver defined in 2.0.1.
     private func setupRoutes() {
         app.get("", use: Handlers.getRoot)
         app.post("newSession", use: Handlers.newSession)
@@ -66,15 +66,16 @@ class TestServer : ObservableObject {
         app.post("verifyDocuments", use: Handlers.verifyDocuments)
         app.post("startReplicator", use: Handlers.startReplicator)
         app.post("getReplicatorStatus", use: Handlers.getReplicatorStatus)
+        app.post("startMultipeerReplicator", use: Handlers.startMultipeerReplicator)
+        app.post("stopMultipeerReplicator", use: Handlers.stopMultipeerReplicator)
         app.post("performMaintenance", use: Handlers.performMaintenance)
+        app.post("getMultipeerReplicatorStatus", use: Handlers.getMultipperReplicatorStatus)
         app.post("runQuery", use: Handlers.runQuery)
+        app.post("startListener", use: Handlers.startListener)
+        app.post("stopListener", use: Handlers.stopListener)
         
         Log.log(level: .debug, message: "Server configured with the following routes: \n\(app.routes.description)")
     }
-}
-
-private struct DatabaseManagerKey: StorageKey {
-    typealias Value = DatabaseManager
 }
 
 private struct SessionManagerKey: StorageKey {
@@ -82,10 +83,6 @@ private struct SessionManagerKey: StorageKey {
 }
 
 extension Vapor.Application {
-    var databaseManager : DatabaseManager {
-        self.storage.get(DatabaseManagerKey.self)!
-    }
-    
     var sessionManager : SessionManager {
         return self.storage.get(SessionManagerKey.self)!
     }

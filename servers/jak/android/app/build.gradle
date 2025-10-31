@@ -22,14 +22,12 @@ plugins {
 
 ext {
     SERVER_VERSION = file("${ROOT_DIR}/version.txt").text.trim()
-    SERVER_BUILD  = "${getBuildId()}"
+    SERVER_BUILD = "${getBuildId()}"
 
     SPOTBUGS_VERSION = '4.7.3'
 
     SHARED_DIR = "${ROOT_DIR}/shared"
     ETC_DIR = "${ROOT_DIR}/etc"
-    ASSETS_ROOT = "${ROOT_DIR}/../../dataset/server"
-    BLOB_ASSETS_DIR = "${ASSETS_ROOT}/blobs"
 
     REPORTS_DIR = "${buildDir}/reports"
 
@@ -37,16 +35,14 @@ ext {
 }
 
 def COUCHBASE_LITE_VERSION = project.hasProperty("cblVersion") ? cblVersion : ""
-if (!(COUCHBASE_LITE_VERSION =~ /^\d{1,2}\.\d{1,2}\.\d{1,2}-/)) { throw new InvalidUserDataException ("!!! Bad Couchbase version: ${COUCHBASE_LITE_VERSION}") }
+if (!(COUCHBASE_LITE_VERSION =~ /^\d{1,2}\.\d{1,2}\.\d{1,2}([ab.]\d)?-/)) {
+    throw new InvalidUserDataException("!!! Bad Couchbase version: ${COUCHBASE_LITE_VERSION}")
+}
 
 // If it is a snapshot, it is in maven local
 def USE_LOCAL_MAVEN = COUCHBASE_LITE_VERSION.endsWith("SNAPSHOT")
 
-def DATASET_VERSION = project.hasProperty("datasetVersion") ? datasetVersion : ""
-if (!(DATASET_VERSION =~ /^\d{1,2}\.\d{1,2}/)) { throw new InvalidUserDataException ("!!! Bad dataset version: ${DATASET_VERSION}") }
-def DB_ASSETS_DIR = "${ASSETS_ROOT}/dbs/${DATASET_VERSION}"
-
-println "Building test server ${SERVER_VERSION}@${SERVER_BUILD} for CBL Android ${COUCHBASE_LITE_VERSION} with ${DATASET_VERSION} data"
+println "Building test server ${SERVER_VERSION}@${SERVER_BUILD} for CBL Android ${COUCHBASE_LITE_VERSION}"
 
 android {
     namespace "com.couchbase.lite.android.mobiletest"
@@ -54,11 +50,11 @@ android {
     compileSdk COMPILE_SDK_VERSION
 
     compileOptions {
-        targetCompatibility 1.8
-        sourceCompatibility 1.8
+        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_11
     }
 
-    kotlinOptions { jvmTarget = '1.8' }
+    kotlinOptions { jvmTarget = '11' }
 
     buildFeatures {
         buildConfig = true
@@ -106,8 +102,6 @@ android {
                 "${SHARED_DIR}/server/main/java"
             ]
             assets.srcDirs = [
-                DB_ASSETS_DIR,
-                BLOB_ASSETS_DIR,
                 "${SHARED_DIR}/assets"
             ]
         }
@@ -128,17 +122,19 @@ android {
 repositories {
     if (USE_LOCAL_MAVEN) { mavenLocal() }
     else {
-        maven { url 'https://proget.sc.couchbase.com/maven2/internalmaven' }
+        maven {
+            url 'https://proget.sc.couchbase.com/maven2/internalmaven'
+            content { 
+                includeGroupByRegex "com\\.couchbase\\.lite.*"
+                includeGroupByRegex "org\\.nanohttpd.*"
+            }
+        }
     }
-
-    // Home of NanoHTTP
-    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
 
     google()
     mavenCentral()
 }
 
-configurations.all { resolutionStrategy.cacheChangingModulesFor 1, 'seconds' }
 dependencies {
     compileOnly "com.github.spotbugs:spotbugs-annotations:${SPOTBUGS_VERSION}"
 
@@ -146,9 +142,9 @@ dependencies {
     implementation "io.insert-koin:koin-core:3.3.3"
     implementation "io.insert-koin:koin-android:3.3.3"
 
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    implementation 'androidx.databinding:databinding-runtime:8.5.2'
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'androidx.databinding:databinding-runtime:8.10.1'
 
     implementation 'com.squareup.moshi:moshi:1.14.0'
 
@@ -156,7 +152,7 @@ dependencies {
 
     implementation 'org.nanohttpd:nanohttpd:2.3.2-SNAPSHOT'
 
-    implementation ("com.couchbase.lite:couchbase-lite-android-ee-ktx:${COUCHBASE_LITE_VERSION}") { changing = true }
+    implementation "com.couchbase.lite:couchbase-lite-android-ee-ktx:${COUCHBASE_LITE_VERSION}"
 
     testImplementation 'junit:junit:4.13.2'
 
@@ -205,7 +201,7 @@ task checkstyle(type: Checkstyle) {
 
 /////// PMD
 pmd {
-    toolVersion '6.26.0'
+    toolVersion '6.55.0'
     ruleSets = []
 }
 task pmd(type: Pmd) {
@@ -289,7 +285,7 @@ def getVersionCode(version) {
 def getBuildId() {
     def hostname = "rogue"
     try { hostname = "hostname".execute().text.trim() }
-    catch (Exception ignore) { }
+    catch (Exception ignore) {}
 
     return "${getCommit().substring(0, 10)} on ${hostname}"
 }
@@ -297,7 +293,7 @@ def getBuildId() {
 def getCommit() {
     def commit = "unofficial"
     try { commit = "git rev-parse HEAD".execute().text.trim() }
-    catch (Exception ignore) { }
+    catch (Exception ignore) {}
     return commit
 }
 

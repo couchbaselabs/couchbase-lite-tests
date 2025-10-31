@@ -1,14 +1,39 @@
+from enum import Enum
+from json import dumps, load
 from pathlib import Path
-from json import load, dumps
-from typing import Final, List, cast, Optional
+from typing import Final
 
 from .jsonhelper import (
-    _assert_contains_string_list,
-    _get_int_or_default,
     _assert_string_entry,
-    _get_str_or_default,
     _get_bool_or_default,
+    _get_int_or_default,
+    _get_str_or_default,
+    _get_typed,
+    _get_typed_nonnull,
 )
+
+
+class TestServerInfo:
+    """The parsed Test Server information from the config file"""
+
+    ___url_key: Final[str] = "url"
+    __dataset_version_key: Final[str] = "dataset_version"
+
+    @property
+    def url(self) -> str:
+        """Gets the URL of the test server instance"""
+        return self.__url
+
+    @property
+    def dataset_version(self) -> str:
+        """Gets the dataset version of the test server instance"""
+        return self.__dataset_version
+
+    def __init__(self, data: dict):
+        self.__url: str = _assert_string_entry(data, self.___url_key)
+        self.__dataset_version: str = _assert_string_entry(
+            data, self.__dataset_version_key
+        )
 
 
 class SyncGatewayInfo:
@@ -133,6 +158,11 @@ class HTTPClientInfo:
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
 
+        
+class TransportType(Enum):
+    HTTP = "http"
+    WS = "ws"
+
 
 class ParsedConfig:
     """The parsed result of the JSON config file provided to the SDK"""
@@ -142,22 +172,24 @@ class ParsedConfig:
     __cbs_key: Final[str] = "couchbase-servers"
     __es_key: Final[str] = "edge-servers"
     __http_client_key: Final[str] = "http-clients"
+    __lb_key: Final[str] = "load-balancers"
     __greenboard_key: Final[str] = "greenboard"
     __api_version_key: Final[str] = "api-version"
     __logslurp_key: Final[str] = "logslurp"
+    __dataset_version_key: Final[str] = "dataset_version"
 
     @property
-    def test_servers(self) -> List[str]:
+    def test_servers(self) -> list[dict]:
         """The list of test servers that can be interacted with"""
         return self.__test_servers
 
     @property
-    def sync_gateways(self) -> List[dict]:
+    def sync_gateways(self) -> list[dict]:
         """The list of sync gateways that can be interacted with"""
         return self.__sync_gateways
 
     @property
-    def couchbase_servers(self) -> List[dict]:
+    def couchbase_servers(self) -> list[dict]:
         """The list of couchbase servers that can be interacted with"""
         return self.__couchbase_servers
 
@@ -170,7 +202,12 @@ class ParsedConfig:
         return self.__http_clients
 
     @property
-    def greenboard_url(self) -> Optional[str]:
+    def load_balancers(self) -> list[str]:
+        """The list of load balancers that can be interacted with"""
+        return self.__load_balancers
+
+    @property
+    def greenboard_url(self) -> str | None:
         """The optional URL to greenboard for uploading results"""
         if self.__greenboard is None:
             return None
@@ -178,7 +215,7 @@ class ParsedConfig:
         return self.__greenboard["hostname"]
 
     @property
-    def greenboard_username(self) -> Optional[str]:
+    def greenboard_username(self) -> str | None:
         """The optional URL to greenboard for uploading results"""
         if self.__greenboard is None:
             return None
@@ -186,7 +223,7 @@ class ParsedConfig:
         return self.__greenboard["username"]
 
     @property
-    def greenboard_password(self) -> Optional[str]:
+    def greenboard_password(self) -> str | None:
         """The optional URL to greenboard for uploading results"""
         if self.__greenboard is None:
             return None
@@ -199,21 +236,27 @@ class ParsedConfig:
         return self.__api_version
 
     @property
-    def logslurp_url(self) -> Optional[str]:
+    def logslurp_url(self) -> str | None:
         """The URL of the optional logslurp server to send and collect logs"""
         return self.__logslurp_url
 
-    def __init__(self, json: dict):
-        self.__test_servers = _assert_contains_string_list(json, self.__test_server_key)
-        if self.__sgw_key not in json:
-            raise ValueError(f"Missing key in configuration '{self.__sgw_key}'")
+    def dataset_version_at(self, i: int) -> str:
+        """The dataset version of the test server instance"""
+        return self.__test_servers[i][self.__dataset_version_key]
 
-        self.__sync_gateways = json[self.__sgw_key]
-        self.__couchbase_servers = json[self.__cbs_key]
+    def __init__(self, json: dict):
+        self.__test_servers = _get_typed_nonnull(
+            json, self.__test_server_key, list[dict], []
+        )
+        self.__sync_gateways = _get_typed_nonnull(json, self.__sgw_key, list[dict], [])
+        self.__couchbase_servers = _get_typed_nonnull(
+            json, self.__cbs_key, list[dict], []
+        )
         self.__edge_servers = json[self.__es_key]
         self.__http_clients = json[self.__http_client_key]
+        self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, list[str], [])
         self.__api_version = _get_int_or_default(json, self.__api_version_key, 1)
-        self.__greenboard = cast(dict, json.get(self.__greenboard_key))
+        self.__greenboard = _get_typed(json, self.__greenboard_key, dict[str, str])
         if self.__greenboard is not None and (
             "hostname" not in self.__greenboard
             or "username" not in self.__greenboard
@@ -223,9 +266,7 @@ class ParsedConfig:
                 "Malformed greenboard entry, must have hostname username and password"
             )
 
-        self.__logslurp_url: Optional[str] = None
-        if self.__logslurp_key in json:
-            self.__logslurp_url = cast(str, json[self.__logslurp_key])
+        self.__logslurp_url = _get_typed(json, self.__logslurp_key, str)
 
     def __str__(self) -> str:
         ret_val = (
@@ -246,6 +287,12 @@ class ParsedConfig:
             + "\n"
             + "HTTP Clients: "
             + dumps(self.__http_clients)
+            + "Load Balancers: "
+            + dumps(self.__load_balancers)
+            + "\n"
+            + "Logslurp URL: "
+            + (self.__logslurp_url if self.__logslurp_url is not None else "")
+            + "\n"
             + "Greenboard: "
             + (self.__greenboard["url"] if self.__greenboard is not None else "")
         )

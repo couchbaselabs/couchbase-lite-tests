@@ -16,7 +16,7 @@ extension Handlers {
             throw TestServerError.badRequest("Request body is not a valid Update request.")
         }
 
-        let dbManager = req.application.databaseManager
+        let dbManager = req.databaseManager
         
         for update in updateRequest.updates {
             switch(update.type) {

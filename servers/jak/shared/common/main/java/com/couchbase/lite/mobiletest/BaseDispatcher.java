@@ -21,6 +21,8 @@ import androidx.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.couchbase.lite.mobiletest.services.Log;
 
 
@@ -33,6 +35,7 @@ public class BaseDispatcher<T> {
     @NonNull
     protected final TestApp app;
 
+    @SuppressFBWarnings("EI_EXPOSE_REP2")
     public BaseDispatcher(@NonNull TestApp app) { this.app = app; }
 
     @Nullable

@@ -62,7 +62,7 @@ public class TestServerApp implements Daemon {
      *
      * @param args Arguments from prunsrv command line
      **/
-    @SuppressWarnings("PMD.MissingBreakInSwitch")
+    @SuppressWarnings("PMD.ImplicitSwitchFallThrough")
     public static void windowsService(String[] args) {
         switch (args[0].trim().toLowerCase(Locale.getDefault())) {
             case "":

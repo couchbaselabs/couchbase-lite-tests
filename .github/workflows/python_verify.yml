@@ -1,24 +1,51 @@
 name: Validate Python Files
-
 on:
   push:
     branches:
       - main
+    paths:
+      - 'client/smoke_tests/**/*.py'
+      - 'client/src/**/*.py'
+      - 'environment/**/*.py'
+      - 'tests/**/*.py'
+      - 'jenkins/pipelines/**/*.py'
+      - '**/pyproject.toml'
+      - '**/pytest.ini'
+      - '.github/workflows/*py*'
   pull_request:
     branches:
       - "**"
+    paths:
+      - 'client/smoke_tests/**/*.py'
+      - 'client/src/**/*.py'
+      - 'environment/**/*.py'
+      - 'tests/**/*.py'
+      - 'jenkins/pipelines/**/*.py'
+      - '.github/workflows/*py*'
 
 jobs:
   mypy:
     strategy:
       fail-fast: false
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v2
-
-    - name: mypy validation
-      working-directory: ${{github.workspace}}
-      shell: bash
-      run: .github/workflows/verify_python.sh
-      
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+      - name: mypy validation
+        working-directory: ${{github.workspace}}
+        shell: bash
+        run: .github/workflows/verify_python.sh
+  python-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: 'format --check'
+  python-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v3

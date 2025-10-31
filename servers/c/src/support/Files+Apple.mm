@@ -1,5 +1,7 @@
 #import "Files.h"
 #import <Foundation/Foundation.h>
+#include <filesystem>
+#include <mach-o/dyld.h>
 #include <sys/stat.h>
 
 #pragma clang diagnostic push
@@ -7,7 +9,18 @@
 
 using namespace std;
 
+
 namespace ts::support {
+    std::string getExecutablePath() {
+        char path[1024];
+        uint32_t size = sizeof(path);
+        if (_NSGetExecutablePath(path, &size) == 0) {
+            return std::string(path);
+        } else {
+            throw std::runtime_error("Buffer too small for executable path");
+        }
+    }
+
     string files::filesDir(const std::string &subdir, bool create) {
         NSString *tempDir = NSTemporaryDirectory();
         if (!subdir.empty()) {
@@ -34,7 +47,8 @@ namespace ts::support {
             CFStringGetCString(path, pathBuf, sizeof(pathBuf), kCFStringEncodingUTF8);
             return pathBuf;
         } else {
-            return "assets";
+            auto current = filesystem::path(getExecutablePath()).parent_path() / ".." / "assets";
+            return current.string();
         }
     }
 }

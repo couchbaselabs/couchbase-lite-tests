@@ -19,6 +19,7 @@ import androidx.annotation.NonNull;
 
 import java.io.InputStream;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import okio.Buffer;
 
 import com.couchbase.lite.mobiletest.errors.ServerError;
@@ -28,6 +29,7 @@ public class Reply implements AutoCloseable {
     @NonNull
     private final Buffer content;
 
+    @SuppressFBWarnings("EI_EXPOSE_REP2")
     public Reply(@NonNull Buffer content) { this.content = content; }
 
     @NonNull

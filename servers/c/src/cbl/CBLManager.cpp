@@ -5,6 +5,7 @@
 #include "Defer.h"
 #include "Define.h"
 #include "Error.h"
+#include "FileDownloader.h"
 #include "Precondition.h"
 #include "StringUtil.h"
 #include "ZipUtil.h"
@@ -15,24 +16,48 @@
 #include <utility>
 
 using namespace std;
-using namespace filesystem;
-
 using namespace ts::support;
 using namespace ts::support::precond;
 using namespace ts::support::error;
 
-#define DB_FILE_EXT ".cblite2"
-#define DB_FILE_ZIP_EXT ".cblite2.zip"
-#define DB_FILE_ZIP_EXTRACTED_DIR "extracted"
-#define ASSET_DBS_DIR "dbs"
-#define ASSET_BLOBS_DIR "blobs"
+namespace fs = std::filesystem;
+
+#define DATASET_BASE_URL "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/"
+#define DATASET_DOWNLOAD_DIR "download"
+#define DATASET_EXTRACTED_DIR "extracted"
 
 namespace ts::cbl {
-    /// Constructor
+    static FLSliceResult xor_cipher(FLSlice input) {
+        FLSliceResult result = FLSliceResult_New(input.size);
+        for (int i = 0; i < input.size; ++i) {
+            ((uint8_t*)(result.buf))[i] = ((uint8_t*)input.buf)[i] ^ 'K';
+        }
+        return result;
+    }
 
-    CBLManager::CBLManager(const string &databaseDir, const string &assetDir) {
+    static FLSliceResult xor_encryptor(void* context, FLString scope, FLString collection, 
+        FLString docID, FLDict props, FLString path, FLSlice input, FLStringResult* algorithm, 
+        FLStringResult* keyID, CBLError* error) {
+        *algorithm = FLSlice_Copy(FLSTR("XOR-K"));
+        return xor_cipher(input);
+    }
+
+    static FLSliceResult xor_decryptor(void* context, FLString scope, FLString collection, 
+        FLString documentID, FLDict properties, FLString keyPath, FLSlice input, FLString algorithm, 
+        FLString keyID, CBLError* error) {
+        return xor_cipher(input);
+    }
+
+    /// Constructor & Destructor
+
+    CBLManager::CBLManager(const string &databaseDir, const string &assetDir, const std::string& datasetVersion) {
         _databaseDir = databaseDir;
         _assetDir = assetDir;
+        _datasetVersion = datasetVersion;
+    }
+
+    CBLManager::~CBLManager() {
+        reset();
     }
 
     /// Database
@@ -73,6 +98,15 @@ namespace ts::cbl {
             }
             _contextMaps.clear();
         }
+
+        // Release Listener:
+        {
+            lock_guard <mutex> lock(_mutex);
+            for (const auto& listener : _listeners) {
+                CBLURLEndpointListener_Release(listener.second);
+            }
+            _listeners.clear();
+        }
     }
 
     void CBLManager::createDatabaseWithDataset(const string &dbName, const string &datasetName) {
@@ -82,19 +116,23 @@ namespace ts::cbl {
         }
 
         string fromDbPath;
-        auto dbAssetPath = path(_assetDir).append(ASSET_DBS_DIR);
-        auto zipFilePath = path(dbAssetPath).append(datasetName + DB_FILE_ZIP_EXT);
-        if (filesystem::exists(zipFilePath)) {
-            if (auto it = _extDatasetPaths.find(datasetName); it != _extDatasetPaths.end()) {
-                fromDbPath = it->second;
-            } else {
-                auto extDirPath = path(_databaseDir).append(DB_FILE_ZIP_EXTRACTED_DIR);
-                zip::extractZip(zipFilePath.string(), extDirPath.string());
-                fromDbPath = extDirPath.append(datasetName + DB_FILE_EXT).string();
-                _extDatasetPaths[datasetName] = fromDbPath;
-            }
+        if (auto it = _extDatasetPaths.find(datasetName); it != _extDatasetPaths.end()) {
+            fromDbPath = it->second;
         } else {
-            fromDbPath = dbAssetPath.append(datasetName + DB_FILE_EXT).string();
+            auto relativeZipPath = fs::path("dbs") / _datasetVersion / (datasetName + ".cblite2.zip");
+            auto datasetZipFile = downloadDatasetFileIfNecessary(relativeZipPath.string());
+
+            if (!fs::exists(datasetZipFile)) {
+                throw std::logic_error("Dataset not found: " + datasetZipFile);
+            }
+
+            fs::path extDirPath = fs::path(_databaseDir) / DATASET_EXTRACTED_DIR;
+            zip::extractZip(datasetZipFile, extDirPath.string());
+
+            fs::path extractedDbPath = extDirPath / (datasetName + ".cblite2");
+            fromDbPath = extractedDbPath.string();
+
+            _extDatasetPaths[datasetName] = fromDbPath;
         }
 
         CBLError error{};
@@ -108,12 +146,11 @@ namespace ts::cbl {
         }
 
         // Copy:
-        if (!fromDbPath.empty()) {
-            if (!CBL_CopyDatabase(FLS(fromDbPath), FLS(dbName), &config, &error)) {
-                throw CBLException(error);
-            }
+        if (!CBL_CopyDatabase(FLS(fromDbPath), FLS(dbName), &config, &error)) {
+            throw CBLException(error);
         }
 
+        // Open:
         CBLDatabase *db = CBLDatabase_Open(FLS(dbName), &config, &error);
         if (!db) {
             throw CBLException(error);
@@ -191,6 +228,24 @@ namespace ts::cbl {
         return doc;
     }
 
+    /// Dataset
+
+    string CBLManager::downloadDatasetFileIfNecessary(const string &relativePath) {
+        auto datasetPath = fs::path(_databaseDir).append(DATASET_DOWNLOAD_DIR).append(relativePath);
+        if (fs::exists(datasetPath)) {
+            return datasetPath.string();
+        }
+
+        auto datasetDir = datasetPath.parent_path();
+        if (!fs::exists(datasetDir)) {
+            fs::create_directories(datasetDir);
+        }
+
+        auto datasetURL = string(DATASET_BASE_URL) + relativePath;
+        FileDownloader::download(datasetURL, datasetPath.string());
+        return datasetPath.string();
+    }
+
     /// Blob
 
     bool CBLManager::blobExists(const CBLDatabase *db, FLDict blobDict) {
@@ -211,8 +266,8 @@ namespace ts::cbl {
     }
 
     CBLBlob *CBLManager::blob(const string &name, CBLDatabase *db) {
-        auto blobPath = path(_assetDir).append(ASSET_BLOBS_DIR).append(name);
-        ifstream ifs(blobPath.string(), ios::in | ios::binary);
+        auto blobPath = downloadDatasetFileIfNecessary("blobs/" + name);
+        ifstream ifs(blobPath, ios::in | ios::binary);
         if (!ifs.is_open()) {
             throw logic_error("Blob '" + name + "' not found in dataset");
         }
@@ -351,8 +406,7 @@ namespace ts::cbl {
         checkCBLError(error);
 
         if (params.authenticator) {
-            auth = CBLAuth_CreatePassword(FLS(params.authenticator->username),
-                                          FLS(params.authenticator->password));
+            auth = params.authenticator->toCBLAuth();
         }
 
         CBLReplicatorConfiguration config{};
@@ -362,8 +416,19 @@ namespace ts::cbl {
             config.collections = replCols.data();
             config.collectionCount = replCols.size();
         } else {
-            config.database = db;
+            // For backward compatibility with the tests that don't specify any collections
+            // to use the default collection:
+            auto col = CBLDatabase_DefaultCollection(db, &error);
+            checkCBLError(error);
+
+            CBLReplicationCollection replCol{};
+            replCol.collection = col;
+            replCols.push_back(replCol);
+
+            config.collections = replCols.data();
+            config.collectionCount = replCols.size();
         }
+
         config.replicatorType = params.replicatorType;
         config.continuous = params.continuous;
         config.authenticator = auth;
@@ -373,6 +438,20 @@ namespace ts::cbl {
             config.pinnedServerCertificate = {params.pinnedServerCert->data(),
                                               params.pinnedServerCert->size()};
         }
+
+        FLMutableDict headers = nullptr;
+        if (params.headers) {
+            headers = FLMutableDict_New();
+            for (const auto& [k, v] : params.headers.value()) {
+                FLMutableDict_SetString(headers, FLS(k), FLS(v));
+            }
+            config.headers = headers;
+        }
+        DEFER { FLMutableDict_Release(headers); };
+
+        // Some stubs for encrypting and decrypting
+        config.documentPropertyEncryptor = xor_encryptor;
+        config.documentPropertyDecryptor = xor_decryptor;
 
         CBLReplicator *repl = CBLReplicator_Create(&config, &error);
         checkCBLError(error);
@@ -453,6 +532,63 @@ namespace ts::cbl {
             return result;
         }
         return nullopt;
+    }
+
+    /// URLEndpointListener
+
+    string CBLManager::startListener(const string &database, const vector<std::string>&collNames, int port) {
+        lock_guard <mutex> lock(_mutex);
+
+        CBLError error{};
+
+        auto db = databaseUnlocked(database);
+
+        vector<CBLCollection*> collections;
+        DEFER {
+                  for (auto &collection: collections) {
+                      CBLCollection_Release(collection);
+                  }
+              };
+
+        for (auto &collName: collNames) {
+            auto spec = CollectionSpec(collName);
+            auto collection = CBLDatabase_Collection(db, FLS(spec.name()), FLS(spec.scope()), &error);
+            checkCBLError(error);
+            checkNotNull(collection, "Collection " + spec.fullName() + " Not Found");
+            collections.push_back(collection);
+        }
+
+        CBLURLEndpointListenerConfiguration config{};
+        config.collections = collections.data();
+        config.collectionCount = collections.size();
+        config.port = port;
+
+        auto listener = CBLURLEndpointListener_Create(&config, &error);
+        if (!listener) {
+            throw CBLException(error);
+        }
+
+        if (!CBLURLEndpointListener_Start(listener, &error)) {
+            throw CBLException(error);
+        }
+
+        string id = "@urlendpointlistener::" + to_string(++_listenerID);
+        _listeners[id] = listener;
+        return id;
+    }
+
+    CBLURLEndpointListener *CBLManager::listener(const std::string &id) {
+        lock_guard <mutex> lock(_mutex);
+        auto it = _listeners.find(id);
+        return it != _listeners.end() ? it->second : nullptr;
+    }
+
+    void CBLManager::stopListener(const std::string &id) {
+        lock_guard <mutex> lock(_mutex);
+        auto it = _listeners.find(id);
+        if (it != _listeners.end()) {
+            CBLURLEndpointListener_Stop(it->second);
+        }
     }
 
     /// Snapshot

@@ -4,6 +4,7 @@
 # python
 __pycache__
 venv
+.venv*
 .mypy_cache
 .pytest_cache
 
@@ -15,3 +16,9 @@ venv
 testserver.log
 session.log
 http_log
+.terraform
+servers/downloaded
+.version
+
+# Temp files
+.tmp

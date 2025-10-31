@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Couchbase Lite for JavaScript Test “Server”</title>
+    </head>
+    <body>
+        <h1>Couchbase Lite for JavaScript Test “Server”</h1>
+
+        <table>
+            <tr>
+                <td><label>Test Device ID:</label></td>
+                <td><input id="deviceID"></td>
+            </tr>
+            <tr>
+                <td><label>Connect To URL:</label></td>
+                <td><input id="url" value="ws://"></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td>
+                    <button id="start">Start</button>
+                    <input id="autostart" type="checkbox" /><label>automatically</label>
+                </td>
+            </tr>
+        </table>
+
+        <div id="info" style="display: none">
+            <h3 id="status">Connecting...</h3>
+            <em>(Logs will appear in the browser JavaScript console.)</em>
+        </div>
+
+        <script type="module" defer>
+            import { TDKImpl } from "/src/tdk.ts";
+            import { TestServer, StateNames } from "/src/testServer.ts";
+
+            const deviceField = document.getElementById("deviceID");
+            const urlField = document.getElementById("url");
+            const startButton = document.getElementById("start");
+            const autostartBox = document.getElementById("autostart");
+            const infoText = document.getElementById("info");
+            let Server;
+
+            let savedDeviceID = GetParam("device");
+            if (savedDeviceID)
+                deviceField.value = savedDeviceID;
+
+            let savedURL = GetParam("tdkURL");
+            if (savedURL)
+                urlField.value = savedURL;
+
+            const autostartStr = GetParam("autostart");
+            const autostart = autostartStr !== undefined && autostartStr !== "false";
+            autostartBox.checked = autostart;
+            autostartBox.onchange = () => {
+                document.cookie = `autostart=${autostartBox.checked}`;
+            };
+
+            startButton.onclick = Start;
+            if (autostart)
+                Start();
+
+            function GetParam(name) {
+                const urlQueryParams = new URLSearchParams(document.location.search);
+                let val = urlQueryParams.get(name);
+                if (val)
+                    return val;
+                name += "=";
+                val = document.cookie.split(";").find(c => c.trim().startsWith(name));
+                if (val)
+                    return val.trim().substring(name.length);
+                return undefined;
+            }
+
+            async function Start() {
+                // Make sure to start with no databases:
+                for (const info of await indexedDB.databases()) {
+                    if (info.name)
+                        indexedDB.deleteDatabase(info.name);
+                }
+
+                const url = urlField.value;
+                const deviceID = deviceField.value;
+                if (!url || !deviceID) {
+                    if (!autostart)
+                        alert("Please fill in the device ID and server URL.");
+                    return;
+                }
+                document.cookie = `device=${deviceID}`;
+                document.cookie = `tdkURL=${url}`;
+                document.cookie = `autostart=${autostartBox.checked}`;
+
+                Server = new TestServer(deviceID);
+                await Server.logToConsole();
+                Server.delegate = new TDKImpl();
+
+                Server.onStateChange = (state) => {
+                    document.getElementById("status").innerText = "Status: " + (Server.error ?? StateNames[state]);
+                };
+
+                Server.connect(url);
+                startButton.disabled = true;
+                infoText.style.display = "block";
+            }
+        </script>
+    </body>
+</html>

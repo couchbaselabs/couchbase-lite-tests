@@ -1,0 +1,9 @@
+{
+    "name": "todo",
+    "collections": [
+        "_default",
+        "lists",
+        "tasks",
+        "users"
+    ]
+}

@@ -1,17 +1,25 @@
 from typing import Dict, List, Optional
+from json import dumps
+from sys import version_info
+
+from varname import nameof
 
 from .api.edgeserver import EdgeServer
-from .requests import RequestFactory
-from .logging import LogLevel, cbl_setLogLevel, cbl_log_init
-from .extrapropsparser import _parse_extra_props
+from .api.couchbaseserver import CouchbaseServer
+from .api.syncgateway import SyncGateway
+from .api.testserver import TestServer
+from .assertions import _assert_not_null
 from .configparser import (
     CouchbaseServerInfo,
     ParsedConfig,
     SyncGatewayInfo,
-    _parse_config,
+    TestServerInfo,
     EdgeServerInfo,
     HTTPClientInfo,
+    _parse_config,
 )
+from .extrapropsparser import _parse_extra_props
+from .configparser import CouchbaseServerInfo, ParsedConfig, SyncGatewayInfo, _parse_config
 from .assertions import _assert_not_null
 from .api.testserver import TestServer
 from .api.syncgateway import SyncGateway
@@ -22,7 +30,6 @@ from json import dumps
 
 if version_info < (3, 9):
     raise RuntimeError("Python must be at least v3.9!")
-
 
 class CBLPyTest:
     """
@@ -41,7 +48,7 @@ class CBLPyTest:
         return self.__log_level
 
     @property
-    def extra_props(self) -> Optional[Dict[str, str]]:
+    def extra_props(self) -> dict[str, str] | None:
         """Gets the extra properties provided as parsed from the provided JSON file path"""
         return self.__extra_props
 
@@ -51,15 +58,18 @@ class CBLPyTest:
         return self.__request_factory
 
     @property
-    def test_servers(self) -> List[TestServer]:
+    def test_servers(self) -> list[TestServer]:
+        """Gets the list of Test Servers available"""
         return self.__test_servers
 
     @property
-    def sync_gateways(self) -> List[SyncGateway]:
+    def sync_gateways(self) -> list[SyncGateway]:
+        """Gets the list of Sync Gateways available"""
         return self.__sync_gateways
 
     @property
-    def couchbase_servers(self) -> List[CouchbaseServer]:
+    def couchbase_servers(self) -> list[CouchbaseServer]:
+        """Gets the list of Couchbase Servers available"""
         return self.__couchbase_servers
 
     @property
@@ -70,6 +80,11 @@ class CBLPyTest:
     def http_clients(self) -> List[str]:
         return self.__http_clients
 
+    @property
+    def load_balancers(self) -> list[str]:
+        """Gets the list of Load Balancers available"""
+        return self.__config.load_balancers
+
     @staticmethod
     async def create(
         config_path: str,
@@ -78,6 +93,7 @@ class CBLPyTest:
         test_server_only: bool = False,
     ):
         ret_val = CBLPyTest(config_path, log_level, extra_props_path, test_server_only)
+        await ret_val.request_factory.start()
         cbl_log_init(str(ret_val.request_factory.uuid), ret_val.config.logslurp_url)
 
         ts_index = 0
@@ -107,13 +123,16 @@ class CBLPyTest:
             self.__extra_props = _parse_extra_props(extra_props_path)
 
         self.__request_factory = RequestFactory(self.__config)
-        self.__test_servers: List[TestServer] = []
+        self.__test_servers: list[TestServer] = []
         index = 0
-        for url in self.__config.test_servers:
-            self.__test_servers.append(TestServer(self.__request_factory, index, url))
+        for ts in self.__config.test_servers:
+            ts_info = TestServerInfo(ts)
+            self.__test_servers.append(
+                TestServer(self.__request_factory, index, ts_info.url)
+            )
             index += 1
 
-        self.__sync_gateways: List[SyncGateway] = []
+        self.__sync_gateways: list[SyncGateway] = []
         index = 0
         if not test_server_only:
             for sg in self.__config.sync_gateways:
@@ -130,7 +149,7 @@ class CBLPyTest:
                 )
                 index += 1
 
-        self.__couchbase_servers: List[CouchbaseServer] = []
+        self.__couchbase_servers: list[CouchbaseServer] = []
         if not test_server_only:
             for cbs in self.__config.couchbase_servers:
                 cbs_info = CouchbaseServerInfo(cbs)
@@ -145,11 +164,20 @@ class CBLPyTest:
             for es in self.__config.edge_servers:
                 es_info = EdgeServerInfo(es)
                 self.__edge_servers.append(EdgeServer(es_info.hostname))
+
         self.__http_clients: List[str] = []
         if not test_server_only:
             for http in self.__config.http_clients:
                 h_info = HTTPClientInfo(http)
                 self.__http_clients.append(h_info.hostname)
+
+    async def close(self) -> None:
+        """
+        Closes all the test servers and sync gateways
+        """
+        await self.request_factory.close()
+        for sg in self.__sync_gateways:
+            await sg.close()
 
     def __str__(self) -> str:
         ret_val = (

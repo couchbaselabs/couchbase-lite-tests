@@ -22,6 +22,8 @@ import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Map;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.couchbase.lite.mobiletest.errors.TestError;
 
 
@@ -33,6 +35,7 @@ public class ErrorBuilder {
 
     private final TestError error;
 
+    @SuppressFBWarnings("EI_EXPOSE_REP2")
     public ErrorBuilder(@NonNull TestError error) { this.error = error; }
 
     @NonNull

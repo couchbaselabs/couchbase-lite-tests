@@ -1,0 +1,18 @@
+http:
+  serversTransports:
+    sg-upstream:
+      insecureSkipVerify: true
+      maxIdleConnsPerHost: 1000
+      forwardingTimeouts:
+        dialTimeout: 30s
+        responseHeaderTimeout: 360s
+        idleConnTimeout: 360s
+
+  middlewares:
+    limit-body:
+      buffering:
+        maxRequestBodyBytes: 20971520
+    retry-once:
+      retry:
+        attempts: 2
+        initialInterval: 100ms

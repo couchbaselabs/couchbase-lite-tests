@@ -21,7 +21,13 @@ struct DocumentUpdater {
         
         let mutableDoc = doc?.toMutable() ?? MutableDocument(id: item.documentID)
         
-        try update(doc: mutableDoc, updatedProperties: item.updatedProperties, removedProperties: item.removedProperties, updatedBlobs: item.updatedBlobs)
+        try update(
+            dbManager: dbManager,
+            doc: mutableDoc,
+            updatedProperties: item.updatedProperties,
+            removedProperties: item.removedProperties,
+            updatedBlobs: item.updatedBlobs)
+        
         do {
             try collection.save(document: mutableDoc)
         } catch(let error as NSError) {
@@ -30,7 +36,7 @@ struct DocumentUpdater {
     }
     
     // This function does not save the updated doc, the caller must do that if desired
-    public static func update(doc: MutableDocument, updatedProperties: Array<Dictionary<String, AnyCodable>>?, removedProperties: Array<String>?, updatedBlobs: Dictionary<String, String>?) throws {
+    public static func update(dbManager:DatabaseManager, doc: MutableDocument, updatedProperties: Array<Dictionary<String, AnyCodable>>?, removedProperties: Array<String>?, updatedBlobs: Dictionary<String, String>?) throws {
         Log.log(level: .debug, message: "Processing update for document '\(doc.id)'")
         
         if let removedProperties = removedProperties {
@@ -69,7 +75,7 @@ struct DocumentUpdater {
                 var parser = KeyPathParser(input: keyPath)
                 let components = try parser.parse()
                 let parentProperty = try getParentProperty(mutableDoc: doc, keyPathComponents: components)
-                let blob = try createBlob(filename: filename)
+                let blob = try dbManager.loadBlob(filename: filename)
                 
                 Log.log(level: .debug, message: "Updating property of document '\(doc.id)' at keypath '\(keyPath)' with blob '\(filename)'")
                 updateProperty(parentProperty: parentProperty, propertyKey: components.last!, blob: blob)
@@ -163,37 +169,6 @@ struct DocumentUpdater {
         
         Log.log(level: .debug, message: "Navigated KeyPath of document '\(mutableDoc.id)' to reach parent property")
         return current
-    }
-    
-    private static func createBlob(filename: String) throws -> Blob {
-        let filenameComponents = filename.components(separatedBy: ".")
-        
-        guard filenameComponents.count == 2
-        else {
-            Log.log(level: .error, message: "Invalid filename given for blob")
-            throw TestServerError.badRequest("Invalid blob filename '\(filename)'.")
-        }
-        
-        let fileExtension = filenameComponents.last!
-        let res = ("blobs" as NSString).appendingPathComponent(filenameComponents.first!)
-        guard let blobURL = Bundle.main.url(forResource: res, withExtension: fileExtension)
-        else {
-            Log.log(level: .error, message: "No blob found at given filename")
-            throw TestServerError.badRequest("Blob '\(filename)' not found.")
-        }
-        
-        let contentType: String = {
-            switch fileExtension {
-            case "jpeg", "jpg": return "image/jpeg"
-            default: return "application/octet-stream"
-            }
-        }()
-        
-        do {
-            return try Blob(contentType: contentType, fileURL: blobURL)
-        } catch(let error as NSError) {
-            throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
-        }
     }
     
     private static func updateProperty(parentProperty: MutableObjectProtocol, propertyKey: KeyPathComponent, value: AnyCodable) {

@@ -1,0 +1,125 @@
+pipeline {
+    agent none
+    options {
+        skipDefaultCheckout()
+    }
+    parameters {
+        choice(
+            name: 'TS_PLATFORM',
+            choices: ['dotnet_windows', 'dotnet_macos', 'dotnet_ios', 'dotnet_android', 'jak_android', 'jak_desktop', 'jak_webservice', 'swift_ios', 'c_ios', 'c_android', 'c_linux_x86_64', 'c_macos', 'c_windows', 'js'],
+            description: 'The test server platform to build'
+        )
+        string(
+            name: 'CBL_VERSION',
+            description: 'The version of CBL to use'
+        )
+        string(
+            name: 'CBL_BUILD',
+            description: 'The build of CBL to use'
+        )
+    }
+
+    stages {
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    if (!params.TS_PLATFORM || !params.CBL_VERSION) {
+                        error("One or more required parameters are not set. Please set TS_PLATFORM, CBL_VERSION, CBL_BUILD.")
+                    }
+                    if(!params.CBL_BUILD) {
+                        currentBuild.displayName = "${params.TS_PLATFORM} ${params.CBL_VERSION}"
+                    } else {
+                        currentBuild.displayName = "${params.TS_PLATFORM} ${params.CBL_VERSION}-${params.CBL_BUILD}"
+                    }
+                }
+            }
+        }
+        stage("Determine Branch") {
+            steps {
+                script {
+                    def match = (params.CBL_VERSION =~ /^(\d+)\.(\d+)/)[0]
+                    if (!match) {
+                        error "CBL_VERSION format is invalid: ${params.CBL_VERSION}"
+                    }
+
+                    def majorMinor = "${match[1]}.${match[2]}"
+                    env.BUILD_BRANCH = "release/${majorMinor}"
+
+                    // Check if e.g. release/3.2 exists in the repo
+                    def apiUrl = "https://api.github.com/repos/couchbaselabs/couchbase-lite-tests/branches/${env.BUILD_BRANCH}"
+                    def response = httpRequest(
+                        url: apiUrl,
+                        validResponseCodes: '200,404'
+                    )
+
+                    if (response.status != 200) {
+                        env.BUILD_BRANCH = 'main'
+                    }
+
+                    echo "Build will come from branch ${env.BUILD_BRANCH}"
+                }
+            }
+        }
+        stage('Build') {
+            agent {
+                label getNodeForPlatform(params.TS_PLATFORM)
+            }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
+            }
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${env.BUILD_BRANCH}"]],
+                    userRemoteConfigs: [[url: 'https://github.com/couchbaselabs/couchbase-lite-tests']]
+                ])
+                script {
+                    def fullVersion
+                    if (!params.CBL_BUILD) {
+                        fullVersion = "${params.CBL_VERSION}"
+                    } else {
+                        fullVersion = "${params.CBL_VERSION}-${params.CBL_BUILD}"
+                    }
+
+                    withEnv(["FULL_CBL_VERSION=${fullVersion}"]) {
+                        if (params.TS_PLATFORM.contains("ios")) {
+                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        }
+
+                        if (params.TS_PLATFORM.contains("windows")) {
+                            pwsh """
+                                python -m venv venv
+                                .\\venv\\Scripts\\activate
+                                pip install uv
+                                uv pip install -r environment/aws/requirements.txt
+                                python environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
+                                deactivate
+                            """
+                        } else {
+                            sh """#!/bin/bash -e
+
+                                source jenkins/pipelines/shared/config.sh
+                                create_venv venv
+                                source venv/bin/activate
+                                pip install uv
+                                uv pip install -r "environment/aws/requirements.txt"
+                                python "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci
+                                deactivate
+                            """
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+def getNodeForPlatform(platform) {
+    if (platform.contains("windows")) {
+        return 'mob-e2e-win-01'
+    } else if (platform.contains("linux")) {
+        return 'mob-e2e-deb-02'
+    } else {
+        return 'mob-e2e-mac-01'
+    }
+}
