@@ -41,7 +41,11 @@ class EdgeServerVersion(CouchbaseVersion):
 class BulkDocOperation(JSONSerializable):
     # optype should be  "create", "update" or "delete". by default it is create
     def __init__(
-        self, body: dict, _id: str = None, rev: str = None, optype: str = "create"
+        self,
+        body: dict,
+        _id: Optional[str] = None,
+        rev: Optional[str] = None,
+        optype: str = "create",
     ):
         if _id is None:
             _id = body.get("_id")
@@ -77,7 +81,11 @@ class EdgeServer:
     """
 
     def __init__(
-        self, url: str, username: str = None, password: str = None, config_file=None
+        self,
+        url: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        config_file=None,
     ):
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
@@ -104,12 +112,11 @@ class EdgeServer:
         ws_scheme = "wss://" if secure else "ws://"
         self.__replication_url = f"{ws_scheme}{url}:{port}"
         self.scheme = "https://" if secure else "http://"
+        self.__session: ClientSession
         if self.__anonymous_auth:
-            self.__session: ClientSession = self._create_session(
-                self.scheme, url, port, None
-            )
+            self.__session = self._create_session(self.scheme, url, port, None)
         else:
-            self.__session: ClientSession = self._create_session(
+            self.__session = self._create_session(
                 self.scheme,
                 url,
                 port,
@@ -347,7 +354,7 @@ class EdgeServer:
         scope: str = "",
         collection: str = "",
         curl: bool = False,
-        revid: str = None,
+        revid: Optional[str] = None,
     ):
         with self.__tracer.start_as_current_span(
             "get_document",
@@ -649,8 +656,8 @@ class EdgeServer:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        name: str = None,
-        params: Dict = None,
+        name: Optional[str] = None,
+        params: Optional[Dict] = None,
         curl: bool = False,
     ):
         with self.__tracer.start_as_current_span(
@@ -691,8 +698,8 @@ class EdgeServer:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        query: str = None,
-        params: Dict = None,
+        query: Optional[str] = None,
+        params: Optional[Dict] = None,
         curl: bool = False,
     ):
         with self.__tracer.start_as_current_span(
@@ -770,7 +777,7 @@ class EdgeServer:
         scope: str = "",
         collection: str = "",
         curl: bool = False,
-        rev: str = None,
+        rev: Optional[str] = None,
     ) -> dict:
         with self.__tracer.start_as_current_span(
             "add document with ID",
