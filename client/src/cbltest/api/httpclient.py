@@ -606,7 +606,11 @@ class ClientFactory:
         except Exception as e:
             print(e)
 
-    async def make_request(self, client: HTTPClient, method: str, *args, **kwargs):
+    async def make_request(
+        self, client: Optional[HTTPClient], method: str, *args, **kwargs
+    ):
+        if client is None:
+            raise ValueError("Client is None")
         try:
             if hasattr(client, method):
                 method_to_call = getattr(client, method)
