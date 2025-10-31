@@ -10,7 +10,7 @@
 // the file licenses/APL2.txt.
 //
 
-import { check } from "./httpError";
+import { check } from "./utils";
 
 
 /** States of WebSocketClient. (Same as the all-caps constants in `WebSocket`.) */

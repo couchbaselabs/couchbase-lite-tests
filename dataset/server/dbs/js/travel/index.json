@@ -2,7 +2,9 @@
     "name": "travel",
     "collections": [
         "travel.airlines",
+        "travel.airports",
         "travel.hotels",
+        "travel.landmarks",
         "travel.routes"
     ]
 }

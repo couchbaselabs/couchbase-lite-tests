@@ -14,11 +14,13 @@ class TestRunQuery:
         db = await cblpytest.test_servers[0].create_and_reset_db(
             ["db1"], dataset="names"
         )
-        results = await db[0].run_query("select meta().id from _ LIMIT 5")
+        results = await db[0].run_query(
+            "select meta().id from _ ORDER BY meta().id LIMIT 5"
+        )
         assert results is not None, "The query should return a result"
         assert len(results) == 5, "The query should return five results"
         i = 1
-        for r in results:
+        expected = ["name_1", "name_10", "name_100", "name_11", "name_12"]
+        for i, r in enumerate(results):
             assert "id" in r, "The result should have an ID column"
-            assert r["id"] == f"name_{i}", f"The result ID should be name_{i}"
-            i += 1
+            assert r["id"] == expected[i], f"The result ID should be {expected[i]}"

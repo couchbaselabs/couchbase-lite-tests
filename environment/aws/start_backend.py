@@ -197,13 +197,16 @@ def write_config(
                     if ts.platform == "js"
                     else 8080
                 )
-                test_servers.append(
-                    {
-                        "url": f"http://{ts.ip_address}:{port}",
-                        # TODO: Convert all test servers to URLs to this is not needed
-                        "dataset_version": "4.0",
-                    }
-                )
+                ts_definition = {
+                    "url": f"http://{ts.ip_address}:{port}",
+                    # TODO: Convert all test servers to URLs to this is not needed
+                    "dataset_version": "4.0",
+                }
+
+                if ts.platform == "js":
+                    ts_definition["transport"] = "ws"
+
+                test_servers.append(ts_definition)
 
             config_json["test-servers"] = test_servers
 

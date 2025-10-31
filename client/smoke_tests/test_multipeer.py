@@ -2,19 +2,20 @@ import asyncio
 
 import pytest
 from cbltest import CBLPyTest
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.multipeer_replicator import MultipeerReplicator
 from cbltest.api.replicator_types import ReplicatorCollectionEntry
-from cbltest.globals import CBLPyTestGlobal
+from cbltest.responses import ServerVariant
 
 
-class TestMultipeerReplicator:
-    def setup_method(self, method):
-        # If writing a new test do not forget this step or the test server
-        # will not be informed about the currently running test
-        CBLPyTestGlobal.running_test_name = method.__name__
-
+class TestMultipeerReplicator(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_start_stop_multipeer(self, cblpytest: CBLPyTest) -> None:
+        await self.skip_if_not_platform(
+            cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS
+        )
+        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 3.3.0")
+
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
         multipeer = MultipeerReplicator(

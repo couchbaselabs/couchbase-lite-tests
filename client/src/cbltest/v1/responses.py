@@ -98,6 +98,11 @@ class PostGetAllDocumentsResponse(TestServerResponse):
         super().__init__(status_code, uuid, 1, body, "getAllDocuments")
         self.__payload: dict[str, list[PostGetAllDocumentsEntry]] = {}
         for k in body:
+            key = cast(str, k)
+            if key.startswith("ts_"):
+                # Ignore any websocket metadata fields
+                continue
+
             v = body[k]
             self.__payload[k] = []
             for entry in v:

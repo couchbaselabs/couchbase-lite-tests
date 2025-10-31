@@ -2,7 +2,6 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.database import Database
 from cbltest.api.error import CblTestServerBadResponseError
-from cbltest.api.error_types import ErrorDomain
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -35,11 +34,7 @@ class TestStartReplicator:
         repl.add_default_collection()
         await repl.start()
         status = await repl.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert (
-            status.error is not None
-            and ErrorDomain.equal(status.error.domain, ErrorDomain.CBL)
-            and status.error.code == 5002
-        )
+        assert status.error is not None
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(

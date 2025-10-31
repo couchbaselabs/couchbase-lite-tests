@@ -11,6 +11,17 @@
     "https": {
       "tls_cert_path": "cert/sg_cert.pem",
       "tls_key_path": "cert/sg_key.pem"
+    },
+    "cors": {
+      "origin": [
+        "http://localhost:5173"
+      ],
+      "login_origin": [
+        "http://localhost:5173"
+      ],
+      "headers": [
+        "Authorization"
+      ]
     }
   },
   "logging": {

@@ -26,6 +26,7 @@ from typing import Final, cast
 import click
 import requests
 
+from environment.aws.common.io import get_ec2_hostname
 from environment.aws.common.output import header
 from environment.aws.topology_setup.test_server import TestServer
 
@@ -869,7 +870,7 @@ class TopologyConfig:
             cluster = self.__clusters[sgw_input.cluster_index]
             sgw = SyncGatewayConfig(
                 sgw_input.version,
-                hostnames.pop(0),
+                get_ec2_hostname(hostnames.pop(0)),
                 internal_hostnames.pop(0),
                 cluster.internal_hostnames[0],
             )

@@ -25,10 +25,9 @@ import yaml
 
 from environment.aws.common.docker import (
     check_aws_key_checking,
-    get_ec2_hostname,
     start_container,
 )
-from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
+from environment.aws.common.io import LIGHT_GRAY, get_ec2_hostname, sftp_progress_bar
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
