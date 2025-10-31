@@ -36,7 +36,7 @@ export class LogSlurpSender extends WebSocketClient implements Disposable {
         return new Promise<void>((resolve, reject) => {
             const prev = this.onStateChange;
             let done = false;
-            let timer: any;
+            let timer: number | NodeJS.Timeout | undefined;
             const finish = (fn: () => void) => {
                 if (done) return;
                 done = true;

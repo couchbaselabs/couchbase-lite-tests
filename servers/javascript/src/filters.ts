@@ -14,7 +14,7 @@ function _documentIDs(spec: tdk.Filter, rev: cbl.RemoteRevisionInfo | cbl.Revisi
     const documentIDs = spec.params?.documentIDs;
     check(Array.isArray(documentIDs), "invalid documentIDs in filter");
     const docSet = new Set(documentIDs);
-    return docSet.has(rev.id);
+    return docSet.has(rev.id as string);
 }
 
 function _deletedDocumentsOnly(rev: cbl.RemoteRevisionInfo | cbl.RevisionInfo) : boolean {

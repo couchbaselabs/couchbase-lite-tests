@@ -13,7 +13,7 @@
 /* eslint-disable camelcase */
 
 import { WebSocketClient } from "./webSocketClient";
-import { check, HTTPError } from "./utils";
+import { check } from "./utils";
 import * as logtape from "@logtape/logtape";
 import * as cbl from "@couchbase/lite-js";
 

@@ -22,7 +22,6 @@ import * as cbl from "@couchbase/lite-js";
 import * as logtape from "@logtape/logtape";
 import { TDKConflictResolvers } from "./conflictResolvers";
 import { CreatePushFilter, CreatePullFilter } from "./filters";
-import path from "path";
 
 
 interface ReplicatorInfo {
@@ -482,13 +481,13 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
         const absURL = new URL(blobURL, tdk.kBlobBaseURL);
         const response = await fetch(absURL);
-        if (response.status !== 200){
-            let ret_code = 502
+        if (response.status !== 200) {
+            let status = 502;
             if (response.status === 404) {
-                ret_code = 400
+                status = 400;
             }
 
-            throw new HTTPError(ret_code, `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`);
+            throw new HTTPError(status, `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`);
         }
         const data = await response.arrayBuffer();
         return new Uint8Array(data);
