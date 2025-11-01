@@ -449,6 +449,7 @@ class TestReplicationFilter(CBLTestClass):
             authenticator=ReplicatorBasicAuthenticator("user2", "pass"),
             pinned_server_cert=sgw.tls_cert(),
         )
+        replicator.add_default_collection()
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -493,6 +494,7 @@ class TestReplicationFilter(CBLTestClass):
             authenticator=ReplicatorBasicAuthenticator("user2", "pass"),
             pinned_server_cert=sgw.tls_cert(),
         )
+        replicator.add_default_collection()
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
