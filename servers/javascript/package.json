@@ -8,7 +8,7 @@
   "type": "module",
   "version": "1.2.2",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --force",
     "test": "vitest --run",
     "test:browser": "vitest --run --browser",
     "test:watch": "vitest --watch",
@@ -16,7 +16,7 @@
     "lint:fix": "eslint --fix src"
   },
   "dependencies": {
-    "@couchbase/lite-js": "^1.0.0-8"
+    "@couchbase/lite-js": "^1.0.0-13"
   },
   "devDependencies": {
     "@eslint/js": "^9.38.0",

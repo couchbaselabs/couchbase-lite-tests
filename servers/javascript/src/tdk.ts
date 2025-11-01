@@ -22,7 +22,6 @@ import * as cbl from "@couchbase/lite-js";
 import * as logtape from "@logtape/logtape";
 import { TDKConflictResolvers } from "./conflictResolvers";
 import { CreatePushFilter, CreatePullFilter } from "./filters";
-import path from "path";
 
 
 interface ReplicatorInfo {
@@ -120,11 +119,12 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     async [tdk.GetAllDocumentsCommand] (rq: tdk.GetAllDocumentsRequest): Promise<tdk.GetAllDocumentsResponse> {
         const db = this.#getDatabase(rq.database);
         const response: tdk.GetAllDocumentsResponse = {};
-        for (const collName of rq.collections) {
+        for (const inputColl of rq.collections) {
+            const collName = normalizeCollectionID(inputColl);
             if (collName in db.collections) {
-                const coll = db.getCollection(normalizeCollectionID(collName));
+                const coll = db.getCollection(collName);
                 const docs = new Array<{id:cbl.DocID, rev:cbl.RevID}>();
-                response[collName] = docs;
+                response[inputColl] = docs;
                 await coll.eachDocument( doc => {
                     const m = cbl.meta(doc);
                     docs.push({id: m.id, rev: m.revisionID!});
@@ -361,7 +361,12 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
 
 
     #mkErrorInfo(error: Error | undefined): tdk.ErrorInfo | undefined {
-        return error ? {domain: "CBL-JS", code: -1, message: error.message} : undefined;
+        let code = -1
+        if (error instanceof cbl.ReplicatorError) {
+            code = (error as cbl.ReplicatorError).code ?? -1;
+        }
+
+        return error ? {domain: "CBL-JS", code: code, message: error.message} : undefined;
     }
 
 
