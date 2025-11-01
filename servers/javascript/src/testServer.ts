@@ -13,7 +13,7 @@
 /* eslint-disable camelcase */
 
 import { WebSocketClient } from "./webSocketClient";
-import { check, HTTPError } from "./utils";
+import { check } from "./utils";
 import * as logtape from "@logtape/logtape";
 import * as cbl from "@couchbase/lite-js";
 
@@ -207,13 +207,14 @@ export class TestServer extends WebSocketClient {
 
     private sendResponse(request: TestRequest, result?: object | void, error?: Error) {
         if (error)
-            this.logger.warn `Sending response #${request.ts_id} with error: ${error.message}`;
+            this.logger.warn `Sending response #${request.ts_id} with error: ${error}`;
         else
             this.logger.info `Sending response #${request.ts_id}`;
         const response: TestResponse = {ts_id: request.ts_id, ts_serverID: this.serverID, ts_apiVersion: this.apiVersion, ...result};
         if (error) {
-            const code = (error instanceof HTTPError) ? error.code : -1;
-            response.ts_error = {domain: error.name, code: code, message: error.message};
+            let domain = ('domain' in error && typeof error.domain === 'string') ? error.domain : error.name;
+            const code = ('code' in error && typeof error.code === 'number') ? error.code : -1;
+            response.ts_error = {domain, code, message: error.message};
         }
         this.send(JSON.stringify(response));
     }
