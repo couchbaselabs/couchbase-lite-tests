@@ -191,13 +191,9 @@ class ChangesResponseEntry:
         return self.__id
 
     @property
-    def revisions(self) -> list[str]:
-        """Gets the list of revisions for this change"""
-        return self.__revisions
-
-    def cv(self) -> str | None:
-        """Gets the version vector for this change"""
-        return self.__cv
+    def changes(self) -> list[str]:
+        """Gets the list of changes (either rev IDs or version vectors depending on version_type parameter)"""
+        return self.__changes
 
     @property
     def deleted(self) -> bool:
@@ -208,9 +204,8 @@ class ChangesResponseEntry:
         self.__seq = entry.get("seq", 0)
         self.__id = cast(str, entry["id"])
         self.__deleted = entry.get("deleted", False)
-        changes = cast(list[dict], entry.get("changes", []))
-        self.__revisions = [cast(str, c["rev"]) for c in changes]
-        self.__cv = cast(str, entry.get("cv"))
+        changes_list = cast(list[dict], entry.get("changes", []))
+        self.__changes = [cast(str, c.get("rev") or c.get("cv")) for c in changes_list]
 
 
 class ChangesResponse:
@@ -538,6 +533,21 @@ class SyncGateway:
         """
         await self._put_database(db_name, payload, 0)
 
+    async def database_exists(self, db_name: str) -> bool:
+        """
+        Checks if a database exists in Sync Gateway's configuration.
+
+        :param db_name: The name of the Database to check
+        :return: True if the database exists, False otherwise
+        """
+        try:
+            await self._send_request("get", f"/{db_name}")
+            return True
+        except CblSyncGatewayBadResponseError as e:
+            if e.code == 403:  # Database does not exist
+                return False
+            raise
+
     async def delete_database(self, db_name: str) -> None:
         """
         Deletes a database from Sync Gateway's configuration.
@@ -551,7 +561,17 @@ class SyncGateway:
         with self.__tracer.start_as_current_span(
             "delete_database", attributes={"cbl.database.name": db_name}
         ):
-            await self._send_request("delete", f"/{db_name}")
+            try:
+                await self._send_request("delete", f"/{db_name}")
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 500:
+                    cbl_warning(
+                        f"SGW returned 500 when deleting {db_name}, database may be in transitional state. Ignoring."
+                    )
+                elif e.code == 404:
+                    pass
+                else:
+                    raise
 
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """

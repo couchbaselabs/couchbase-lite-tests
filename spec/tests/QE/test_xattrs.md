@@ -8,16 +8,12 @@ Test that documents written by Sync Gateway can be updated via SDK and successfu
 2. Configure Sync Gateway database endpoint
 3. Create user 'vipul' with access to SG and SDK channels
 4. Bulk create 1000 docs via Sync Gateway
-5. Verify all SG docs were created successfully and store revisions
+5. Verify all SG docs were created successfully and store revisions, versions
 6. Stop Sync Gateway
-7. Update 1000 SG docs via SDK
+7. Update all SG docs via SDK
 8. Write 1000 new docs via SDK
 9. Restart Sync Gateway (recreate database endpoint)
-10. Wait for Sync Gateway to import all documents
-11. Verify SG doc revisions changed after SDK update
-12. Verify SDK doc count is correct
-13. Verify document contents for all documents
-14. Verify version vectors for updated SG documents (optional)
+10. Verify revisions, versions and contents of all documents
 
 ## test_purge
 

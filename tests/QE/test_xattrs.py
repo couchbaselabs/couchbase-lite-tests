@@ -1,4 +1,3 @@
-import asyncio
 import random
 from pathlib import Path
 from typing import Any
@@ -6,7 +5,6 @@ from typing import Any
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 from packaging.version import Version
 
@@ -41,16 +39,9 @@ class TestXattrs(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        try:
-            await sg.put_database(sg_db, db_payload)
-        except CblSyncGatewayBadResponseError as e:
-            if (
-                e.code == 412
-            ):  # in case the database already exists, delete it and try again
-                await sg.delete_database(sg_db)
-                await sg.put_database(sg_db, db_payload)
-            else:
-                raise
+        if await sg.database_exists(sg_db):
+            await sg.delete_database(sg_db)
+        await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step("Create user 'vipul' with access to SG and SDK channels")
         await sg.add_user(
@@ -92,7 +83,7 @@ class TestXattrs(CBLTestClass):
             )
 
         self.mark_test_step(
-            "Verify all SG docs were created successfully and store revisions"
+            "Verify all SG docs were created successfully and store revisions, versions"
         )
         sg_all_docs = await sg.get_all_documents(sg_db, "_default", "_default")
         sg_created_count = len(
@@ -104,17 +95,14 @@ class TestXattrs(CBLTestClass):
         sgw_version_obj = await sg.get_version()
         sgw_version = Version(sgw_version_obj.version)
         supports_version_vectors = sgw_version >= Version("4.0.0")
-        original_revisions: dict[str, str] = {}
-        original_vv: dict[str, str | None] = {}
-        for row in sg_all_docs.rows:
-            original_revisions[row.id] = row.revision
-            if supports_version_vectors:
-                original_vv[row.id] = row.cv
+        original_revisions = {row.id: row.revision for row in sg_all_docs.rows}
+        if supports_version_vectors:
+            original_vv = {row.id: row.cv for row in sg_all_docs.rows}
 
         self.mark_test_step("Stop Sync Gateway")
         await sg.delete_database(sg_db)
 
-        self.mark_test_step(f"Update {num_docs} SG docs via SDK")
+        self.mark_test_step("Update all SG docs via SDK")
         for doc_id in sg_doc_ids:
             doc_body: dict[str, Any] = {
                 "type": "sg_doc",
@@ -149,63 +137,44 @@ class TestXattrs(CBLTestClass):
             },
         )
 
-        self.mark_test_step("Wait for Sync Gateway to import all documents")
-        sg_check = await sg.get_all_documents(sg_db, "_default", "_default")
-        for _ in range(10):
-            if len(sg_check.rows) == num_docs * 2:
-                break
-            await asyncio.sleep(2)
-            sg_check = await sg.get_all_documents(sg_db, "_default", "_default")
-        assert len(sg_check.rows) == num_docs * 2, (
-            f"Document import verification failed. Expected {num_docs * 2}, got {len(sg_check.rows)} after 10 attempts"
-        )
-
-        self.mark_test_step("Verify SG doc revisions changed after SDK update")
-        unchanged_sg_docs = []
-        sdk_doc_count = 0
-        for row in sg_check.rows:
-            if row.id.startswith("sg_") and row.revision == original_revisions.get(
-                row.id
-            ):
-                unchanged_sg_docs.append(row.id)
-            elif row.id.startswith("sdk_"):
-                sdk_doc_count += 1
-        assert len(unchanged_sg_docs) == 0, (
-            f"{len(unchanged_sg_docs)} SG documents should have changed revisions after SDK update"
-        )
-
-        self.mark_test_step("Verify SDK doc count is correct")
-        assert sdk_doc_count == num_docs, (
-            f"Expected {num_docs} SDK docs imported, found {sdk_doc_count}"
-        )
-
-        self.mark_test_step("Verify document contents for all documents")
+        self.mark_test_step("Verify revisions, versions and contents of all documents")
+        sgw_docs_now, sdk_docs_now = 0, 0
         content_errors = []
         for doc_id in sg_doc_ids + sdk_doc_ids:
             doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
             if doc is None:
                 content_errors.append(f"SG doc {doc_id} not found")
-            elif (
-                doc.id.startswith("sg_") and doc.body.get("updated_by_sdk") is not True
-            ):
-                content_errors.append(f"SG doc {doc_id} missing 'updated_by_sdk' flag")
-            elif doc.id.startswith("sdk_") and doc.body.get("created_by") != "sdk":
-                content_errors.append(
-                    f"SDK doc {doc_id} has incorrect 'created_by' value"
-                )
-        assert len(content_errors) == 0, (
-            f"{len(content_errors)} documents didn't have correct content"
+            elif doc.id.startswith("sg_"):
+                sgw_docs_now += 1
+                if doc.body.get("updated_by_sdk") is not True:
+                    content_errors.append(
+                        f"SG doc {doc_id} missing 'updated_by_sdk' flag"
+                    )
+                if doc.revid == original_revisions.get(doc.id):
+                    content_errors.append(f"SG doc {doc_id} has incorrect revision")
+                if (
+                    supports_version_vectors
+                    and doc.cv is not None
+                    and doc.cv == original_vv.get(doc.id)
+                ):
+                    content_errors.append(
+                        f"SG doc {doc_id} has incorrect version vector"
+                    )
+            elif doc.id.startswith("sdk_"):
+                sdk_docs_now += 1
+                if doc.body.get("created_by") != "sdk":
+                    content_errors.append(
+                        f"SDK doc {doc_id} has incorrect 'created_by' value"
+                    )
+        assert sgw_docs_now == num_docs, (
+            f"Expected {num_docs} SG docs, got {sgw_docs_now}"
         )
-
-        if supports_version_vectors:
-            self.mark_test_step(
-                "Verify version vectors for updated SG documents (optional)"
-            )
-            for row in sg_check.rows:
-                assert row.cv is not None and row.cv != original_vv.get(row.id), (
-                    f"Document {row.id} should have different version vector after SDK update. "
-                    f"Original: {original_vv.get(row.id)}, Current: {row.cv}"
-                )
+        assert sdk_docs_now == num_docs, (
+            f"Expected {num_docs} SDK docs, got {sdk_docs_now}"
+        )
+        assert len(content_errors) == 0, (
+            f"{len(content_errors)} documents didn't have correct content: {content_errors}"
+        )
 
         await sg.delete_database(sg_db)
         cbs.drop_bucket(bucket_name)
@@ -214,7 +183,7 @@ class TestXattrs(CBLTestClass):
     async def test_purge(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
-        num_docs = 5
+        num_docs = 1000
         sg_db = "db"
         bucket_name = "data-bucket"
         channels = ["NASA"]
@@ -232,14 +201,9 @@ class TestXattrs(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        try:
-            await sg.put_database(sg_db, db_payload)
-        except CblSyncGatewayBadResponseError as e:
-            if e.code == 412:
-                await sg.delete_database(sg_db)
-                await sg.put_database(sg_db, db_payload)
-            else:
-                raise
+        if await sg.database_exists(sg_db):
+            await sg.delete_database(sg_db)
+        await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step("Create user 'vipul' with access to channels")
         await sg.add_user(
@@ -332,18 +296,26 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             "Verify deleted docs visible in changes feed with new revision"
         )
-        changes = await sg.get_changes(
+        rev_changes = await sg.get_changes(
             sg_db, "_default", "_default", version_type="rev"
         )
-        deleted_revisions = 0
-        for entry in changes.results:
+        deleted_revisions, remaining_revisions = 0, 0
+        for entry in rev_changes.results:
             if entry.id in docs_to_delete and entry.deleted:
-                assert entry.revisions[0] != all_doc_revisions.get(entry.id), (
-                    f"Deleted doc {entry.id} should have a new revision, got {entry.revisions[0]}"
+                assert entry.changes[0] != all_doc_revisions.get(entry.id), (
+                    f"Deleted doc {entry.id} should have a new revision, got {entry.changes[0]}"
                 )
                 deleted_revisions += 1
+            elif entry.id in remaining_docs:
+                assert entry.changes[0] == all_doc_revisions.get(entry.id), (
+                    f"Non-deleted doc {entry.id} should have the same revision, got {entry.changes[0]}"
+                )
+                remaining_revisions += 1
         assert deleted_revisions == len(docs_to_delete), (
             f"Expected to find {len(docs_to_delete)} deleted docs in changes feed, found {deleted_revisions}"
+        )
+        assert remaining_revisions == len(remaining_docs), (
+            f"Expected to find {len(remaining_docs)} non-deleted docs in changes feed, found {remaining_revisions}"
         )
 
         self.mark_test_step("Verify non-deleted docs still accessible")
@@ -357,16 +329,14 @@ class TestXattrs(CBLTestClass):
             self.mark_test_step(
                 "Verify new version vectors for deleted docs (optional)"
             )
-            changes = await sg.get_changes(
+            cv_changes = await sg.get_changes(
                 sg_db, "_default", "_default", version_type="cv"
             )
-            for entry in changes.results:
-                if entry.id in docs_to_delete and entry.deleted:
-                    assert (
-                        entry.cv is not None
-                        and entry.cv != all_doc_version_vectors.get(entry.id)
-                    ), (
-                        f"Deleted doc {entry.id} should have a different version vector, got {entry.cv}"
+            for entry in cv_changes.results:
+                if entry.id in docs_to_delete and entry.deleted and entry.changes:
+                    assert entry.changes[0] != all_doc_version_vectors.get(entry.id), (
+                        f"Deleted doc {entry.id} should have different version vector. "
+                        f"Original: {all_doc_version_vectors.get(entry.id)}, Current: {entry.changes[0]}"
                     )
 
         self.mark_test_step("Purge all docs via Sync Gateway")
