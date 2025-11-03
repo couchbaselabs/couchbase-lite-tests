@@ -19,6 +19,41 @@ from cbltest.logging import cbl_info, cbl_warning
 from cbltest.utils import assert_not_null
 from cbltest.version import VERSION
 
+# This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
+# So if that file ever changes, change this too.
+_SGW_CA_CERT: str = """-----BEGIN CERTIFICATE-----
+MIIFWTCCA0GgAwIBAgIUBdrc0OhquX8RnXtZ6AiOY+57C18wDQYJKoZIhvcNAQEL
+BQAwPDEZMBcGA1UEAwwQSW50ZXJuYWwgVGVzdCBDQTESMBAGA1UECgwJQ291Y2hi
+YXNlMQswCQYDVQQGEwJVUzAeFw0yNTEwMjkwMTAzMDBaFw0yNzEwMjkwMTAzMDBa
+MDwxGTAXBgNVBAMMEEludGVybmFsIFRlc3QgQ0ExEjAQBgNVBAoMCUNvdWNoYmFz
+ZTELMAkGA1UEBhMCVVMwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCl
+vMLIQDFfEcttEUSzBKkzoRSSLJ3Z/73xmJxBenCtZ9HasLhF3iJxwyQK09nD7sLv
+RRwLeRfY8QObr/F/qJAa1cQtVA/5UxIiKsjDk+TrUibg4p6NFSgKUEg+08D0tRHG
+CF3CF/3qcM/10A+Pg2K1COaAtPrYjslOv8DoDBzwOBxibaheDZmtBdPEeHghDXZr
+DWYDe2770XGzKYqINCEDxNdyDUBdiNSzuX2h/YeZi6vGTtpAt3Iti2SIerRrCiah
+UOlykQoqiDVh4JPXts79Xhszw0oDK6YWHEBBfXmYDUdYAyF97XC6hZc+6HxiCVTB
+887mkyLCuKMGfB3dabyCqJ31fXm7gmufOs8voCfi/sKjLgcdZQUY4Gw345oYI3Yw
+O41ig/uR04KW2xASba38vXt0fEl9/50+AO3xAy9oaY36nLSnBwTV72VbvTlvevGf
+zSHbVIbtzcuovpudghYizmIqMEFguc8VsGgmwZb8mkypzB80SOoED3nJRziIK1ym
+e+NuO0DIG6xMPUhputNhwqaeYXuSmcUH5YcmLN//ewMIjzxoH33H1cwcADHFioR/
+YfIraSgVZCUhrN9aJlXdDOzDuhbVpXYJMbh5PfAiNLHPCXmo685Utf3ID+nFW1wd
+WOIyuE3aJ5KVtG8hjlgKARV7eEqtxHjIl41QtsxalwIDAQABo1MwUTAdBgNVHQ4E
+FgQUs2WdMu1wh9pJ5dPN80yN1NPAkSswHwYDVR0jBBgwFoAUs2WdMu1wh9pJ5dPN
+80yN1NPAkSswDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAgEAhiYP
+a9dvAv/33u9vBKzUo045RRrfEpv80DSZQb4ttyulrIfbaLFHxaDcf2+S+mywAgoW
+tf9SAwWO41qU7sfIBnFdCh982nP1dD707GDAZIe8ZNpl/Vu3hWY3TRQAp9ufA51w
+wxn0m2tOS18UXpv5BNX1kVaLlAiOzRzmP1ghx08v9yd8eBgnjJ89D2m1U+qFS1Xk
+egiyw66HHc3bG+eo523/l4RDqTx6KkhYnD3Bz89IxMaeK7CuynCY3VyVWPeIUfBr
+clkDBqZa4o7fD3xV6Wiu/NHZsWJx3wog1wwelvlsyOVM+mfd4IOsPGVCCdDGtpoq
+sT+f9mPDXXHKuDER8a7HiCgGK8rAQtCm/P5UFp2HUEIru/psWCXc3vh9HYVX9W79
+TwS+AVAlkeVogs1ugqAXOuGmstnevj6XzA8PszCKDSIV+t1PJSSOtypUyN4gbGGx
+sk1s9bwqy7bw2cMh3tt7HromGOoLnPxnsbQCs5HsqNdiEsPABWnI6m7epm0tFjCe
+gHDyw1LdmZlZ3R7DT+CwfyhxL6hktfs8h7goR1vkmS2q0Alxmw9faKVVpDyWnsZC
+qv6PMC0fI7jhvrr2Uf2Hhw9SQlBFwZ7LjjLqjuuJkclM4VooDElsLbPjSUbA+c5h
+WCKJ0c94mrl9GwwBmcSIKJBvd6u7uAta2fREJeE=
+-----END CERTIFICATE-----
+"""
+
 
 class _CollectionMap(JSONSerializable):
     @property
@@ -399,7 +434,7 @@ class SyncGateway:
         self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None
     ) -> ClientSession:
         if secure:
-            ssl_context = ssl.create_default_context(cadata=self.tls_cert())
+            ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
             ssl_context.check_hostname = False
             return ClientSession(

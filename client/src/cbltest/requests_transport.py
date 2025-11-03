@@ -85,7 +85,7 @@ class _RequestHttpTransport(RequestTransport):
         cbl_trace(f"Received {ret_val} from {self.__url}")
         if not resp.ok:
             raise CblTestServerBadResponseError(
-                resp.status, ret_val, f"{self} returned {resp.status}"
+                resp.status, ret_val, f"returned {resp.status}"
             )
 
         return ret_val
@@ -167,7 +167,7 @@ class _RequestWebSocketTransport(RequestTransport):
         cbl_trace(f"Received {ret_val} from {self.__url}")
         if ret_val.status_code != 200:
             raise CblTestServerBadResponseError(
-                ret_val.status_code, ret_val, f"{self} returned {ret_val.status_code}"
+                ret_val.status_code, ret_val, f"returned {ret_val.status_code}"
             )
 
         return ret_val

@@ -17,8 +17,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.utils import assert_not_null
-
-from tests.dev_e2e.test_replication_filter_data import uk_and_france_doc_ids
+from test_replication_filter_data import uk_and_france_doc_ids  # type: ignore
 
 
 @pytest.mark.min_test_servers(1)
@@ -450,6 +449,7 @@ class TestReplicationFilter(CBLTestClass):
             authenticator=ReplicatorBasicAuthenticator("user2", "pass"),
             pinned_server_cert=sgw.tls_cert(),
         )
+        replicator.add_default_collection()
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
@@ -494,6 +494,7 @@ class TestReplicationFilter(CBLTestClass):
             authenticator=ReplicatorBasicAuthenticator("user2", "pass"),
             pinned_server_cert=sgw.tls_cert(),
         )
+        replicator.add_default_collection()
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")

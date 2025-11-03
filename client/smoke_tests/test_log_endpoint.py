@@ -3,18 +3,17 @@ import time
 import pytest
 import requests
 from cbltest import CBLPyTest
-from cbltest.globals import CBLPyTestGlobal
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.logging import LogSlurpHandler, _cbl_log
+from cbltest.responses import ServerVariant
 
 
-class TestLogEndpoint:
-    def setup_method(self, method):
-        # If writing a new test do not forget this step or the test server
-        # will not be informed about the currently running test
-        CBLPyTestGlobal.running_test_name = method.__name__
-
+class TestLogEndpoint(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_log_message(self, cblpytest: CBLPyTest) -> None:
+        await self.skip_if_not_platform(
+            cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS
+        )
         if cblpytest.config.logslurp_url is None:
             pytest.skip(
                 "No LogSlurp server configured (required to check functionality)"
