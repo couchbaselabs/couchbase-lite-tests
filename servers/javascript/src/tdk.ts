@@ -264,7 +264,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                         collection: collectionIDWithScope(collection.name),
                         documentID: doc.docID,
                         isPush:     (direction === 'push'),
-                        flags:      (doc.deleted ? ["deleted"] : undefined),
+                        flags:      (doc.deleted ? ["deleted"] : []),
                         error:      this.#mkErrorInfo(doc.error),
                     });
                 }

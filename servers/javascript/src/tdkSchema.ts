@@ -171,8 +171,8 @@ export interface GetReplicatorStatusResponse {
 export interface DocumentReplication {
     collection  : string,
     documentID  : cbl.DocID,
+    flags       : Array<'deleted' | 'accessRemoved'>;
     isPush?     : boolean,
-    flags?      : Array<'deleted' | 'accessRemoved'>;
     error?      : ErrorInfo
 }
 
