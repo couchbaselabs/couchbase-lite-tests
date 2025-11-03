@@ -68,11 +68,11 @@ class CBLPyTest:
 
 
     @property
-    def edge_servers(self)-> List[EdgeServer]:
+    def edge_servers(self)-> list[EdgeServer]:
         return self.__edge_servers
 
     @property
-    def http_clients(self) -> List[str]:
+    def http_clients(self) -> list[str]:
         return self.__http_clients
 
     @staticmethod

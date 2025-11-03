@@ -8,7 +8,6 @@ from urllib.parse import urljoin
 import pyjson5 as json5
 from aiohttp import BasicAuth, ClientSession
 from opentelemetry.trace import get_tracer
-from varname import nameof
 
 from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
@@ -588,7 +587,7 @@ class EdgeServer:
                 )
 
     def replication_url(self, db_name: str):
-        _assert_not_null(db_name, nameof(db_name))
+        _assert_not_null(db_name, "db_name")
         return urljoin(self.__replication_url, db_name)
 
     async def changes_feed(
