@@ -178,7 +178,9 @@ class AllDocumentsResponseRow:
         """Gets the either revid or cv, whichever is populated (at least one must be)"""
         return cast(str, self.__revid if self.__revid is not None else self.__cv)
 
-    def __init__(self, key: str, id: str, revid: str | None, cv: str | None) -> None:
+    def __init__(
+        self, key: str, id: str, revid: str | None, cv: str | None
+    ) -> None:
         self.__key = key
         self.__id = id
         self.__revid = revid
@@ -1308,19 +1310,27 @@ class SyncGateway:
         :param collection: The collection where the document should be created (default '_default')
         :return: The response from the Sync Gateway (or None if document creation fails)
         """
-        with self.__tracer.start_as_current_span("create_document", attributes={
-            "cbl.database.name": db_name,
-            "cbl.scope.name": scope,
-            "cbl.collection.name": collection,
-            "cbl.document.id": doc_id
-        }):
+        with self.__tracer.start_as_current_span(
+            "create_document",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
             document["_id"] = doc_id  # Ensure document has _id before sending
-            response = await self._send_request("PUT", f"/{db_name}.{scope}.{collection}/{doc_id}",
-                                                payload=JSONDictionary(document))
+            response = await self._send_request(
+                "PUT",
+                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                payload=JSONDictionary(document),
+            )
 
             # Check for response structure
             if not response or "error" in response:
-                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}")
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to create document {doc_id}"
+                )
 
             # Convert response to match expected format
             cast_resp = cast(dict, response)
@@ -1335,8 +1345,15 @@ class SyncGateway:
 
             return RemoteDocument(cast_resp)
 
-    async def update_document(self, db_name: str, doc_id: str, document: dict, rev: str,
-                          scope: str = "_default", collection: str = "_default") -> RemoteDocument:
+    async def update_document(
+        self,
+        db_name: str,
+        doc_id: str,
+        document: dict,
+        rev: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> RemoteDocument:
         """
         Updates a document in Sync Gateway.
 
@@ -1348,23 +1365,31 @@ class SyncGateway:
         :param collection: The collection where the document exists (default '_default')
         :return: The updated document as a RemoteDocument object
         """
-        with self.__tracer.start_as_current_span("update_document", attributes={
-            "cbl.database.name": db_name,
-            "cbl.scope.name": scope,
-            "cbl.collection.name": collection,
-            "cbl.document.id": doc_id
-        }):
-
+        with self.__tracer.start_as_current_span(
+            "update_document",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
             document["_id"] = doc_id
             document["_rev"] = rev
 
             params = {"new_edits": "true", "rev": rev}
 
-            response = await self._send_request("PUT", f"/{db_name}.{scope}.{collection}/{doc_id}",
-                                                payload=JSONDictionary(document), params=params)
+            response = await self._send_request(
+                "PUT",
+                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                payload=JSONDictionary(document),
+                params=params,
+            )
 
             if not response or "error" in response:
-                raise CblSyncGatewayBadResponseError(500, f"Failed to update document {doc_id} with rev {rev}")
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to update document {doc_id} with rev {rev}"
+                )
 
             # Convert response to match expected format
             cast_resp = cast(dict, response)
