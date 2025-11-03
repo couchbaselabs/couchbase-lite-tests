@@ -178,9 +178,7 @@ class AllDocumentsResponseRow:
         """Gets the either revid or cv, whichever is populated (at least one must be)"""
         return cast(str, self.__revid if self.__revid is not None else self.__cv)
 
-    def __init__(
-        self, key: str, id: str, revid: str | None, cv: str | None
-    ) -> None:
+    def __init__(self, key: str, id: str, revid: str | None, cv: str | None) -> None:
         self.__key = key
         self.__id = id
         self.__revid = revid
