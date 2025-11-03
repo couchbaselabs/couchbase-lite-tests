@@ -75,11 +75,11 @@ def deploy_and_configure_cluster():
     couchbase_servers = get_couchbase_server_ips(
         options.cluster_config, "couchbase-servers"
     )
-    script_location = "/opt/configure-cluster.sh"
+    script_location = "/opt/configure-node.sh"
 
     for ip in couchbase_servers:
         # Step 1: Copy the setup script to the remote server
-        scp_to_remote(ip, "environment/cbs/configure-cluster.sh", script_location)
+        scp_to_remote(ip, "environment/cbs/configure-node.sh", script_location)
 
         # Step 2: Execute the setup script on the remote server
         execute_remote_command(ip, f"bash {script_location}")
