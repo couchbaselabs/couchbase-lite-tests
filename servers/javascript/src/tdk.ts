@@ -226,8 +226,6 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             };
         }
         for (const colls of rq.config.collections) {
-            if (colls.documentIDs)
-                throw new HTTPError(501, "Unimplemented replication feature(s)");
             const collCfg: cbl.ReplicatorCollectionConfig = { };
             if (rq.config.replicatorType !== 'pull') {
                 collCfg.push = {
@@ -248,6 +246,9 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                     collCfg.pull.conflictResolver = resolverFn;
                 }
             }
+            if (colls.documentIDs)
+                collCfg.documentIDs = colls.documentIDs;
+            
             for (const collName of colls.names)
                 config.collections[normalizeCollectionID(collName)] = collCfg;
         }
