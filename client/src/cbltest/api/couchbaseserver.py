@@ -292,6 +292,36 @@ class CouchbaseServer:
                     f"Failed to insert document '{doc_id}' into {bucket}.{scope}.{collection}: {e}"
                 )
 
+    def delete_document(
+        self,
+        bucket: str,
+        doc_id: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> None:
+        """
+        Deletes a document from the specified bucket.scope.collection.
+        """
+        with self.__tracer.start_as_current_span(
+            "delete_document",
+            attributes={
+                "cbl.bucket.name": bucket,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            try:
+                bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
+                coll = bucket_obj.scope(scope).collection(collection)
+                coll.remove(doc_id)
+            except DocumentNotFoundException:
+                pass
+            except Exception as e:
+                raise CblTestError(
+                    f"Failed to delete document '{doc_id}' from {bucket}.{scope}.{collection}: {e}"
+                )
+
     def get_document(
         self,
         bucket: str,

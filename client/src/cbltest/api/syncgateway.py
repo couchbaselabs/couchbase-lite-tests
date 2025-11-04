@@ -583,6 +583,27 @@ class SyncGateway:
                 return False
             raise
 
+    async def _delete_database(self, db_name: str, retry_count: int = 0) -> None:
+        with self.__tracer.start_as_current_span(
+            "delete_database", attributes={"cbl.database.name": db_name}
+        ) as current_span:
+            try:
+                await self._send_request("delete", f"/{db_name}")
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 500 and retry_count < 3:
+                    cbl_warning(
+                        f"Sync gateway returned 500 from DELETE database call, retrying ({retry_count + 1})..."
+                    )
+                    current_span.add_event("SGW returned 500, retry")
+                    import asyncio
+
+                    await asyncio.sleep(2)
+                    await self._delete_database(db_name, retry_count + 1)
+                elif e.code == 403:
+                    pass
+                else:
+                    raise
+
     async def delete_database(self, db_name: str) -> None:
         """
         Deletes a database from Sync Gateway's configuration.
@@ -593,20 +614,7 @@ class SyncGateway:
 
         :param db_name: The name of the Database to delete
         """
-        with self.__tracer.start_as_current_span(
-            "delete_database", attributes={"cbl.database.name": db_name}
-        ):
-            try:
-                await self._send_request("delete", f"/{db_name}")
-            except CblSyncGatewayBadResponseError as e:
-                if e.code == 500:
-                    cbl_warning(
-                        f"SGW returned 500 when deleting {db_name}, database may be in transitional state. Ignoring."
-                    )
-                elif e.code == 404:
-                    pass
-                else:
-                    raise
+        await self._delete_database(db_name, 0)
 
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """

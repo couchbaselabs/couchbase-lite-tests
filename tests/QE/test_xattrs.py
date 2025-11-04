@@ -372,3 +372,169 @@ class TestXattrs(CBLTestClass):
 
         await sg.delete_database(sg_db)
         cbs.drop_bucket(bucket_name)
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_sg_sdk_interop_unique_docs(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
+        sg = cblpytest.sync_gateways[0]
+        cbs = cblpytest.couchbase_servers[0]
+        num_docs = 10
+        num_updates = 10
+        sg_db = "db"
+        bucket_name = "data-bucket"
+
+        self.mark_test_step("Create bucket and default collection")
+        cbs.drop_bucket(bucket_name)
+        cbs.create_bucket(bucket_name)
+
+        self.mark_test_step("Configure Sync Gateway database endpoint")
+        db_config = {
+            "bucket": bucket_name,
+            "index": {"num_replicas": 0},
+            "scopes": {"_default": {"collections": {"_default": {}}}},
+        }
+        db_payload = PutDatabasePayload(db_config)
+        if await sg.database_exists(sg_db):
+            await sg.delete_database(sg_db)
+        await sg.put_database(sg_db, db_payload)
+
+        self.mark_test_step("Create user 'vipul' with access to SDK and SG channels")
+        await sg.add_user(
+            sg_db,
+            "vipul",
+            password="pass",
+            collection_access={
+                "_default": {"_default": {"admin_channels": ["sdk", "sg"]}}
+            },
+        )
+
+        self.mark_test_step(f"Bulk create {num_docs} docs via SDK")
+        sdk_doc_ids: list[str] = []
+        for i in range(num_docs):
+            doc_id = f"sdk_{i}"
+            sdk_doc_ids.append(doc_id)
+            doc_body = {"content": {"foo": "bar", "updates": 1}, "channels": ["sdk"]}
+            cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
+
+        self.mark_test_step(f"Bulk create {num_docs} docs via Sync Gateway")
+        sg_docs: list[DocumentUpdateEntry] = []
+        sg_doc_ids: list[str] = []
+        for i in range(num_docs):
+            doc_id = f"sg_{i}"
+            sg_doc_ids.append(doc_id)
+            sg_docs.append(
+                DocumentUpdateEntry(
+                    doc_id,
+                    None,
+                    body={"content": {"foo": "bar", "updates": 1}, "channels": ["sg"]},
+                )
+            )
+        await sg.update_documents(sg_db, sg_docs, "_default", "_default")
+        all_doc_ids = sdk_doc_ids + sg_doc_ids
+
+        self.mark_test_step("Verify SDK sees all docs")
+        sdk_visible_count = 0
+        for doc_id in all_doc_ids:
+            sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
+            if sdk_doc is not None:
+                sdk_visible_count += 1
+        assert sdk_visible_count == num_docs * 2, (
+            f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
+        )
+
+        self.mark_test_step("Verify SG sees all docs via _all_docs")
+        sg_check = await sg.get_all_documents(sg_db, "_default", "_default")
+        assert len(sg_check.rows) == num_docs * 2, (
+            f"Expected {num_docs * 2} docs via SG, got {len(sg_check.rows)}"
+        )
+
+        self.mark_test_step("Verify SG sees all docs via _changes")
+        changes = await sg.get_changes(sg_db, "_default", "_default", version_type="cv")
+        assert len(changes.results) == num_docs * 2, (
+            f"Expected {num_docs * 2} changes via SG, got {len(changes.results)}"
+        )
+
+        self.mark_test_step(f"Bulk update sdk docs {num_updates} times via SDK")
+        for _ in range(num_updates):
+            for doc_id in sdk_doc_ids:
+                sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
+                if sdk_doc is not None:
+                    sdk_doc["content"]["updates"] += 1
+                    cbs.upsert_document(
+                        bucket_name, doc_id, sdk_doc, "_default", "_default"
+                    )
+
+        self.mark_test_step("Verify SDK docs don't contain _sync metadata")
+        for doc_id in sdk_doc_ids[:5]:
+            sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
+            if sdk_doc is not None:
+                assert "_sync" not in sdk_doc, f"SDK doc {doc_id} contains _sync"
+
+        self.mark_test_step(f"Bulk update sg docs {num_updates} times via Sync Gateway")
+        for _ in range(num_updates):
+            sg_docs_to_update: list[DocumentUpdateEntry] = []
+            for doc_id in sg_doc_ids:
+                sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
+                if sg_doc is not None:
+                    updated_body = sg_doc.body.copy()
+                    updated_body["content"]["updates"] += 1
+                    sg_docs_to_update.append(
+                        DocumentUpdateEntry(doc_id, sg_doc.revid, updated_body)
+                    )
+            await sg.update_documents(sg_db, sg_docs_to_update, "_default", "_default")
+
+        self.mark_test_step("Verify SDK sees all doc updates")
+        for doc_id in all_doc_ids:
+            sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
+            if sdk_doc is not None:
+                assert sdk_doc["content"]["updates"] == num_updates + 1, (
+                    f"SDK doc {doc_id} should have {num_updates + 1} updates, got {sdk_doc['content']['updates']}"
+                )
+
+        self.mark_test_step("Verify SG sees all doc updates via _all_docs")
+        all_docs_updated = await sg.get_all_documents(sg_db, "_default", "_default")
+        for row in all_docs_updated.rows:
+            sg_doc = await sg.get_document(sg_db, row.id, "_default", "_default")
+            if sg_doc is not None:
+                assert sg_doc.body["content"]["updates"] == num_updates + 1, (
+                    f"SG doc {sg_doc.id} should have {num_updates + 1} updates, got {sg_doc.body['content']['updates']}"
+                )
+
+        self.mark_test_step("Verify SDK docs still don't contain _sync after updates")
+        for doc_id in sdk_doc_ids:
+            sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
+            assert sdk_doc is not None, f"SDK doc {doc_id} should not be None"
+            assert "_sync" not in sdk_doc, f"SDK doc {doc_id} should not contain _sync"
+
+        self.mark_test_step("Bulk delete sdk docs via SDK")
+        for doc_id in sdk_doc_ids:
+            cbs.delete_document(bucket_name, doc_id, "_default", "_default")
+
+        self.mark_test_step("Bulk delete sg docs via Sync Gateway")
+        for doc_id in sg_doc_ids:
+            sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
+            if sg_doc is not None and sg_doc.revid is not None:
+                await sg.delete_document(
+                    doc_id, sg_doc.revid, sg_db, "_default", "_default"
+                )
+
+        self.mark_test_step("Verify SDK sees all docs as deleted")
+        sdk_deleted_count = 0
+        for doc_id in all_doc_ids:
+            sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
+            if sdk_doc is None or len(sdk_doc) == 0:
+                sdk_deleted_count += 1
+        assert sdk_deleted_count == num_docs * 2, (
+            f"Expected {num_docs * 2} docs to be deleted via SDK, got {sdk_deleted_count}"
+        )
+
+        self.mark_test_step("Verify SG sees all docs as deleted via _changes")
+        changes_deleted = await sg.get_changes(sg_db, "_default", "_default")
+        sg_deleted_count = sum(1 for entry in changes_deleted.results if entry.deleted)
+        assert sg_deleted_count == num_docs * 2, (
+            f"Expected {num_docs * 2} docs to be deleted via SG, got {sg_deleted_count}"
+        )
+
+        await sg.delete_database(sg_db)
+        cbs.drop_bucket(bucket_name)

@@ -35,3 +35,26 @@ Test purging functionality with XATTR-based documents created via both Sync Gate
 14. Verify SG can't see any docs after purge
 15. Verify XATTRS are gone using changes feed
 16. Verify SDK can't see any docs after purge
+
+## test_sg_sdk_interop_unique_docs
+
+Test Sync Gateway and SDK interoperability with unique documents and multiple updates.
+
+1. Create bucket and default collection
+2. Configure Sync Gateway database endpoint
+3. Create user 'vipul' with access to sdk and sg channels
+4. Bulk create 10 docs via SDK
+5. Bulk create 10 docs via Sync Gateway
+6. Verify SDK sees all docs
+7. Verify SG sees all docs via _all_docs
+8. Verify SG sees all docs via _changes
+9. Bulk update sdk docs 10 times via SDK
+10. Verify SDK docs don't contain _sync metadata
+11. Bulk update sg docs 10 times via Sync Gateway
+12. Verify SDK sees all doc updates
+13. Verify SG sees all doc updates via _all_docs
+14. Verify SDK docs still don't contain _sync after updates
+15. Bulk delete sdk docs via SDK
+16. Bulk delete sg docs via Sync Gateway
+17. Verify SDK sees all docs as deleted
+18. Verify SG sees all docs as deleted via _changes
