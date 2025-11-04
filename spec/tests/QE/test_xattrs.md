@@ -58,3 +58,21 @@ Test Sync Gateway and SDK interoperability with unique documents and multiple up
 16. Bulk delete sg docs via Sync Gateway
 17. Verify SDK sees all docs as deleted
 18. Verify SG sees all docs as deleted via _changes
+
+## test_sg_sdk_interop_shared_docs
+
+Test concurrent updates and deletes from both Sync Gateway and SDK on shared documents.
+
+1. Create bucket and default collection
+2. Configure Sync Gateway database endpoint
+3. Create user 'vipul' with access to shared channel
+4. Bulk create 100 docs via SDK with tracking properties
+5. Bulk create 100 docs via SG with tracking properties
+6. Verify SDK sees all docs
+7. Verify SG sees all docs via _all_docs
+8. Verify SG sees all docs via _changes
+9. Perform concurrent updates (10 per doc) from SDK and SG
+10. Verify all documents have correct update counts
+11. Perform concurrent deletes from SDK and SG
+12. Verify all docs deleted from SDK side
+13. Verify all docs deleted from SG side via _changes
