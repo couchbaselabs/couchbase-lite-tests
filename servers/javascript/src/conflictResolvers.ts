@@ -1,7 +1,6 @@
 import type * as cbl from "@couchbase/lite-js";
 import type * as tdk from "./tdkSchema";
 import {check, isObject} from "./utils";
-import type {JSONObject} from "@couchbase/lite-js";
 
 
 // https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/conflict-resolvers.md
@@ -48,7 +47,7 @@ export const TDKConflictResolvers: Record<string,ResolverMaker> = {
         return async (_collection, local, remote) => {
             if (!local.deleted && !remote.deleted) {
                 const localDict = local.body[property], remoteDict = remote.body[property];
-                let merged: JSONObject;
+                let merged: cbl.JSONObject;
                 if (isObject(localDict) && isObject(remoteDict)) {
                     merged = localDict;
                     for (const key of Object.getOwnPropertyNames(remoteDict)) {
