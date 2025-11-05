@@ -10,8 +10,7 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorCollectionEntry,
 )
-
-from client.src.cbltest.api.test_functions import compare_doc_results_p2p
+from cbltest.api.test_functions import compare_doc_results_p2p
 
 
 @pytest.mark.cbl
