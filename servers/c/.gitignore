@@ -3,7 +3,9 @@ assets/dbs
 assets/blobs
 
 #lib
-lib/libcblite*
+libcblite*
+couchbase-lite-c
+couchbase-lite-c-ee
 
 #Build
 build

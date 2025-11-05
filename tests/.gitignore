@@ -1,10 +1,13 @@
 *_log
 *.log
 .idea
+
+#Downloads
+.tools
+
+#local config
 local-config.json
 android-config.json
 java-config.json
 c-config.json
-testserver.log
-session.log
 config.json
