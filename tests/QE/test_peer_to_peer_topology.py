@@ -9,6 +9,7 @@ from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorCollectionEntry,
+    ReplicatorType,
 )
 from cbltest.api.test_functions import compare_doc_results_p2p
 
@@ -23,6 +24,13 @@ class TestPeerToPeerTopology(CBLTestClass):
     ])
     @pytest.mark.asyncio(loop_scope="session")
     async def test_peer_to_peer_topology_mesh(self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type):
+        # Convert string to ReplicatorType enum
+        replicator_type_map = {
+            "push_pull": ReplicatorType.PUSH_AND_PULL,
+            "pull": ReplicatorType.PULL,
+            "push": ReplicatorType.PUSH,
+        }
+        replicator_type = replicator_type_map[replicator_type]
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
 
@@ -116,6 +124,13 @@ class TestPeerToPeerTopology(CBLTestClass):
     async def test_peer_to_peer_topology_loop(
         self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type
     ):
+        # Convert string to ReplicatorType enum
+        replicator_type_map = {
+            "push_pull": ReplicatorType.PUSH_AND_PULL,
+            "pull": ReplicatorType.PULL,
+            "push": ReplicatorType.PUSH,
+        }
+        replicator_type = replicator_type_map[replicator_type]
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
 
