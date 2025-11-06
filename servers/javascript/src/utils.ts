@@ -10,7 +10,7 @@
 // the file licenses/APL2.txt.
 //
 
-import type { CBLDictionary, CBLValue, JSONObject, JSONValue } from "@couchbase/lite-js";
+import type { CBLDictionary, CBLDocument, CBLValue, JSONObject, JSONValue } from "@couchbase/lite-js";
 import { Blob } from "@couchbase/lite-js";
 
 
@@ -43,4 +43,10 @@ export function isObject(val: JSONValue | undefined) : val is JSONObject {
 
 export function isDict(val: CBLValue | undefined) : val is CBLDictionary {
     return typeof val === "object" && val !== null && !Array.isArray(val) && !(val instanceof Blob);
+}
+
+
+/** Converts a CBLDocument to a regular JSON object (i.e. Blobs are replaced by their metadata.) */
+export function docToJSON(doc: CBLDocument): JSONObject {
+    return JSON.parse(JSON.stringify(doc)) as JSONObject;
 }

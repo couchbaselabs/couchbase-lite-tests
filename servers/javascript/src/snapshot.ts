@@ -10,7 +10,7 @@
 // the file licenses/APL2.txt.
 //
 
-import { HTTPError, normalizeCollectionID } from "./utils";
+import { docToJSON, HTTPError, normalizeCollectionID } from "./utils";
 import { KeyPath, KeyPathCache } from "./keyPath";
 import type * as tdk from "./tdkSchema";
 import type * as cbl from "@couchbase/lite-js";
@@ -237,10 +237,4 @@ class DocumentMap<T> {
     }
 
     #map = new Map<string, Map<cbl.DocID, T>>();
-}
-
-
-/** Converts a CBLDocument to a regular JSON object (i.e. Blobs are replaced by their metadata.) */
-function docToJSON(doc: cbl.CBLDocument): cbl.JSONObject {
-    return JSON.parse(JSON.stringify(doc)) as cbl.JSONObject;
 }

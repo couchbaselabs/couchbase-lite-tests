@@ -16,6 +16,7 @@ from cbltest.api.replicator import (
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.responses import ServerVariant
 from cbltest.utils import assert_not_null
 
 
@@ -28,6 +29,10 @@ class TestReplicationBlob(CBLTestClass):
     async def test_pull_non_blob_changes_with_delta_sync_and_compact(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
+        await self.skip_if_not_platform(
+            cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS
+        )
+
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled."
         )

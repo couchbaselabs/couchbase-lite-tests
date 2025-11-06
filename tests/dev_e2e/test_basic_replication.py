@@ -19,6 +19,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.responses import ServerVariant
 from cbltest.utils import assert_not_null
 
 
@@ -64,11 +65,14 @@ class TestBasicReplication(CBLTestClass):
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that the replicator's error is CBL/10404")
-        assert (
-            status.error is not None
-            and status.error.code == 10404
-            and ErrorDomain.equal(status.error.domain, ErrorDomain.CBL)
-        )
+        if (await cblpytest.test_servers[0].get_info()).variant == ServerVariant.JS:
+            assert status.error is not None and status.error.code == 404
+        else:
+            assert (
+                status.error is not None
+                and status.error.code == 10404
+                and ErrorDomain.equal(status.error.domain, ErrorDomain.CBL)
+            )
 
         await cblpytest.test_servers[0].cleanup()
 
