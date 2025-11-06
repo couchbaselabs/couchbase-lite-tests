@@ -34,8 +34,9 @@ class TestReplicationUpgrade(CBLTestClass):
         await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
 
         dataset_ver = cblpytest.config.dataset_version_at(0)
-        if dataset_ver != "4.0":
-            pytest.skip(f"Requires dataset v4.0 (current: {dataset_ver}).")
+        self.skip_if_not(
+            dataset_ver == "4.0", f"Requires dataset v4.0 (current: {dataset_ver})."
+        )
 
         # Delete SG database first to avoid reset error after backup is restored
         self.mark_test_step("Delete Sync Gateway 'upgrade' database if exists")

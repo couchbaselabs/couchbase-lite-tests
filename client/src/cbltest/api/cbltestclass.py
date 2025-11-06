@@ -38,6 +38,25 @@ class CBLTestClass(ABC):
 
             cbl_info(f"\t{stripped_line}")
 
+    def skip(self, reason: str):
+        """
+        Skips the test with the given reason.
+
+        :param reason: The reason for skipping the test.
+        """
+        self.__skipped = True
+        pytest.skip(reason)
+
+    def skip_if_not(self, condition: bool, reason: str):
+        """
+        Skips the test if the given condition is not met.
+
+        :param condition: A callable that returns a boolean indicating whether to skip the test.
+        :param reason: The reason for skipping the test.
+        """
+        if not condition:
+            self.skip(reason)
+
     async def skip_if_not_platform(
         self, server: TestServer, allow_platforms: ServerVariant
     ):
@@ -47,9 +66,10 @@ class CBLTestClass(ABC):
         :param platform: The platform to check against.
         """
         variant = (await server.get_info()).variant
-        if variant not in allow_platforms:
-            self.__skipped = True
-            pytest.skip(f"{variant} is not in the platforms {allow_platforms}")
+        self.skip_if_not(
+            variant in allow_platforms,
+            f"{variant} is not in the platforms {allow_platforms}",
+        )
 
     async def skip_if_cbl_not(self, server: TestServer, constraint: str):
         """
@@ -60,9 +80,7 @@ class CBLTestClass(ABC):
         version_str = (await server.get_info()).library_version.split("-")[0]
         version = Version(version_str)
         spec = SpecifierSet(constraint)
-        if version not in spec:
-            self.__skipped = True
-            pytest.skip(f"CBL {version_str} not {constraint}")
+        self.skip_if_not(version in spec, f"CBL {version_str} not {constraint}")
 
     async def skip_if_sgw_not(self, sg: SyncGateway, constraint: str):
         """
@@ -75,6 +93,4 @@ class CBLTestClass(ABC):
         version_str = sgw_version_obj.version
         version = Version(version_str)
         spec = SpecifierSet(constraint)
-        if version not in spec:
-            self.__skipped = True
-            pytest.skip(f"SGW {version_str} not {constraint}")
+        self.skip_if_not(version in spec, f"SGW {version_str} not {constraint}")
