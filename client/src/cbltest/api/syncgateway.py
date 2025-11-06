@@ -1,3 +1,4 @@
+import re
 import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
@@ -5,6 +6,7 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
+import paramiko
 import requests
 from aiohttp import BasicAuth, ClientSession, TCPConnector
 from deprecated import deprecated
@@ -1112,6 +1114,15 @@ class SyncGateway:
         assert revid == response_dict["_cv"] or revid == response_dict["_rev"]
         return cast(dict, response)["_rev"]
 
+    async def get_server_config(self) -> dict[str, Any]:
+        """
+        Gets the server-level configuration from the admin API.
+
+        Returns:
+            Dictionary containing the server configuration including logging settings
+        """
+        return await self._send_request("GET", "/_config")
+
     async def delete_document(
         self,
         doc_id: str,
@@ -1290,3 +1301,88 @@ class SyncGateway:
             self.__secure, scheme, self.__hostname, 4984, auth
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
+
+    def fetch_log_file(
+        self,
+        remote_log_path: str,
+        ssh_key_path: str,
+        ssh_username: str = "ec2-user",
+    ) -> str:
+        """
+        Fetches a log file from the remote Sync Gateway server via SSH
+
+        :param remote_log_path: Path to the log file on the remote server
+        :param ssh_key_path: Path to SSH private key for authentication
+        :param ssh_username: SSH username (default: ec2-user)
+        :return: Contents of the log file as a string
+        """
+        with self.__tracer.start_as_current_span(
+            "fetch_log_file",
+            attributes={
+                "remote.path": remote_log_path,
+                "ssh.username": ssh_username,
+            },
+        ):
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+            # Load private key
+            private_key = paramiko.Ed25519Key.from_private_key_file(ssh_key_path)
+
+            # Connect to the remote server
+            ssh.connect(
+                self.__hostname,
+                username=ssh_username,
+                pkey=private_key,
+            )
+
+            # Read the log file
+            sftp = ssh.open_sftp()
+            try:
+                with sftp.open(remote_log_path, "r") as remote_file:
+                    log_contents = remote_file.read().decode("utf-8")
+            finally:
+                sftp.close()
+                ssh.close()
+
+            return log_contents
+
+
+def scan_logs_for_untagged_sensitive_data(
+    log_content: str,
+    sensitive_patterns: list[str],
+) -> list[str]:
+    """
+    Scans log content for sensitive data that is NOT wrapped in <ud>...</ud> tags
+
+    :param log_content: The log file content as a string
+    :param sensitive_patterns: List of sensitive strings to look for (e.g., doc IDs, usernames)
+    :return: List of violations found (sensitive data without <ud> tags)
+    """
+    violations = []
+    for pattern in sensitive_patterns:
+        # Escape special regex characters in the pattern
+        escaped_pattern = re.escape(pattern)
+        for match in re.finditer(escaped_pattern, log_content):
+            start_pos = match.start()
+            end_pos = match.end()
+
+            # Check if this occurrence is within <ud>...</ud> tags
+            # Look backwards for <ud> and forwards for </ud>
+            before_text = log_content[max(0, start_pos - 100) : start_pos]
+            after_text = log_content[end_pos : min(len(log_content), end_pos + 100)]
+
+            # Check if there's an opening <ud> before and closing </ud> after
+            has_opening_tag = "<ud>" in before_text and before_text.rfind(
+                "<ud>"
+            ) > before_text.rfind("</ud>")
+            has_closing_tag = "</ud>" in after_text
+
+            if not (has_opening_tag and has_closing_tag):
+                context_start = max(0, start_pos - 50)
+                context_end = min(len(log_content), end_pos + 50)
+                context = log_content[context_start:context_end]
+                violations.append(
+                    f"Untagged '{pattern}' at position {start_pos}: ...{context}..."
+                )
+    return violations
