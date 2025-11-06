@@ -14,7 +14,7 @@
 
 import { KeyPathCache } from "./keyPath";
 import { LogSlurpSender } from "./logSlurpSender";
-import { check, HTTPError, normalizeCollectionID } from "./utils";
+import { check, docToJSON, HTTPError, normalizeCollectionID } from "./utils";
 import { Snapshot } from "./snapshot";
 import type { TestRequest } from "./testServer";
 import * as tdk from "./tdkSchema";
@@ -143,7 +143,8 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         const doc = await coll.getDocument(rq.document.id);
         if (!doc) throw new HTTPError(404, `No document "${rq.document.id}"`);
         const m = cbl.meta(doc);
-        return {_id: rq.document.id, _revs: m.revisionID!};
+        const jsonBody = docToJSON(doc);
+        return {_id: rq.document.id, _revs: m.revisionID!, ...jsonBody};
     }
 
 
@@ -169,7 +170,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             function updatePath(pathStr: string, value: cbl.CBLValue | undefined): void {
                 if (!KeyPathCache.path(pathStr).write(doc, value))
                     throw new HTTPError(400, `Invalid path ${pathStr} in doc ${update.documentID}`);
-            };
+            }
 
             switch (update.type) {
                 case 'UPDATE': {
@@ -261,11 +262,15 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                 if (info.documents === undefined)
                     info.documents = [];
                 for (const doc of documents) {
+                    const flags: ('deleted' | 'accessRemoved')[] = [];
+                    doc.deleted && flags.push('deleted');
+                    doc.lostAccess && flags.push('accessRemoved');
+
                     info.documents.push({
                         collection: collectionIDWithScope(collection.name),
                         documentID: doc.docID,
                         isPush:     (direction === 'push'),
-                        flags:      (doc.deleted ? ["deleted"] : []),
+                        flags:      flags,
                         error:      this.#mkErrorInfo(doc.error),
                     });
                 }
@@ -352,8 +357,6 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             throw new HTTPError(404, `No such snapshot ${rq.snapshot}`);
         if (snap.db !== db)
             throw new HTTPError(400, `Snapshot is of a different database, ${db.name}`);
-        this.#snapshots.delete(rq.snapshot);
-
         return await snap.verify(rq.changes, this.#downloadBlob.bind(this));
     }
 
@@ -362,9 +365,9 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
 
 
     #mkErrorInfo(error: Error | undefined): tdk.ErrorInfo | undefined {
-        let code = -1
+        let code = -1;
         if (error instanceof cbl.ReplicatorError) {
-            code = (error as cbl.ReplicatorError).code ?? -1;
+            code = error.code ?? -1;
         }
 
         return error ? {domain: "CBL-JS", code: code, message: error.message} : undefined;

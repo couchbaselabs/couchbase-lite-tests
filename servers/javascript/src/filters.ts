@@ -1,6 +1,6 @@
 import type * as cbl from "@couchbase/lite-js";
 import type * as tdk from "./tdkSchema";
-import { check } from "./utils";
+import {check, isObject} from "./utils";
 
 
 // https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/replication-filters.md
@@ -12,8 +12,15 @@ type PullFilterMaker = (spec: tdk.Filter) => PullReplicatorFilter;
 
 function _documentIDs(spec: tdk.Filter, rev: cbl.RemoteRevisionInfo | cbl.RevisionInfo) : boolean {
     const documentIDs = spec.params?.documentIDs;
-    check(Array.isArray(documentIDs), "invalid documentIDs in filter");
-    const docSet = new Set(documentIDs);
+    check(isObject(documentIDs), "documentIDs must be an object");
+    // Currently JS API doesn't provide information regarding the collection
+    // so validating that only one collection is allowed at least for now.
+    check(Object.keys(documentIDs).length === 1, "documentIDs have more than one collection");
+
+    const ids = Object.values(documentIDs)[0];
+    check(Array.isArray(ids), "documentIDs's value must be an array");
+
+    const docSet = new Set(ids);
     return docSet.has(rev.id as string);
 }
 
