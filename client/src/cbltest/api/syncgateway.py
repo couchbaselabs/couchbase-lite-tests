@@ -425,9 +425,72 @@ class SyncGateway:
         self.__tracer = get_tracer(__name__, VERSION)
         self.__secure: bool = secure
         self.__hostname: str = url
+        self.__port: int = port
         self.__admin_port: int = admin_port
         self.__admin_session: ClientSession = self._create_session(
             secure, scheme, url, admin_port, BasicAuth(username, password, "ascii")
+        )
+
+    @property
+    def hostname(self) -> str:
+        """Gets the hostname of the Sync Gateway instance"""
+        return self.__hostname
+
+    @property
+    def port(self) -> int:
+        """Gets the public port of the Sync Gateway instance"""
+        return self.__port
+
+    @property
+    def admin_port(self) -> int:
+        """Gets the admin port of the Sync Gateway instance"""
+        return self.__admin_port
+
+    @property
+    def secure(self) -> bool:
+        """Gets whether the Sync Gateway instance uses TLS"""
+        return self.__secure
+
+    @classmethod
+    async def create_user_client(
+        cls,
+        admin_sg: "SyncGateway",
+        db_name: str,
+        username: str,
+        password: str,
+        channels: list[str],
+    ) -> "SyncGateway":
+        """
+        Helper method to create a user with channel access and return a user-specific SG client.
+
+        This is a convenience method for tests that need to verify user-level access control.
+
+        :param admin_sg: The admin SyncGateway instance
+        :param db_name: The database name
+        :param username: The username to create
+        :param password: The password for the user
+        :param channels: List of channels the user should have access to
+        :return: A SyncGateway instance authenticated as the user for public API access
+        """
+        # Clean up user if exists from previous run
+        await admin_sg.delete_user(db_name, username)
+
+        # Create user with channel access
+        await admin_sg.add_user(
+            db_name,
+            username,
+            password=password,
+            collection_access={"_default": {"_default": {"admin_channels": channels}}},
+        )
+
+        # Return user-specific SG client for public API access
+        return cls(
+            admin_sg.hostname,
+            username,
+            password,
+            port=admin_sg.port,
+            admin_port=admin_sg.admin_port,
+            secure=admin_sg.secure,
         )
 
     def _create_session(
@@ -583,6 +646,27 @@ class SyncGateway:
                 return False
             raise
 
+    async def _delete_database(self, db_name: str, retry_count: int = 0) -> None:
+        with self.__tracer.start_as_current_span(
+            "delete_database", attributes={"cbl.database.name": db_name}
+        ) as current_span:
+            try:
+                await self._send_request("delete", f"/{db_name}")
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 500 and retry_count < 3:
+                    cbl_warning(
+                        f"Sync gateway returned 500 from DELETE database call, retrying ({retry_count + 1})..."
+                    )
+                    current_span.add_event("SGW returned 500, retry")
+                    import asyncio
+
+                    await asyncio.sleep(2)
+                    await self._delete_database(db_name, retry_count + 1)
+                elif e.code == 403:
+                    pass
+                else:
+                    raise
+
     async def delete_database(self, db_name: str) -> None:
         """
         Deletes a database from Sync Gateway's configuration.
@@ -593,20 +677,7 @@ class SyncGateway:
 
         :param db_name: The name of the Database to delete
         """
-        with self.__tracer.start_as_current_span(
-            "delete_database", attributes={"cbl.database.name": db_name}
-        ):
-            try:
-                await self._send_request("delete", f"/{db_name}")
-            except CblSyncGatewayBadResponseError as e:
-                if e.code == 500:
-                    cbl_warning(
-                        f"SGW returned 500 when deleting {db_name}, database may be in transitional state. Ignoring."
-                    )
-                elif e.code == 404:
-                    pass
-                else:
-                    raise
+        await self._delete_database(db_name, 0)
 
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
@@ -688,6 +759,25 @@ class SyncGateway:
             await self._send_request(
                 "put", f"/{db_name}/_user/{name}", JSONDictionary(body)
             )
+
+    async def delete_user(self, db_name: str, name: str) -> None:
+        """
+        Deletes a user from a Sync Gateway database
+
+        :param db_name: The name of the Database
+        :param name: The username to delete
+        """
+        with self.__tracer.start_as_current_span(
+            "delete_user", attributes={"cbl.user.name": name}
+        ):
+            try:
+                await self._send_request("delete", f"/{db_name}/_user/{name}")
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 404:
+                    # User doesn't exist, that's fine
+                    pass
+                else:
+                    raise
 
     async def add_role(self, db_name: str, role: str, collection_access: dict) -> None:
         """
@@ -785,7 +875,11 @@ class SyncGateway:
                 self._analyze_dataset_response(cast(list, resp))
 
     async def get_all_documents(
-        self, db_name: str, scope: str = "_default", collection: str = "_default"
+        self,
+        db_name: str,
+        scope: str = "_default",
+        collection: str = "_default",
+        use_public_api: bool = False,
     ) -> AllDocumentsResponse:
         """
         Gets all the documents in the given collection from Sync Gateway (id and revid)
@@ -793,6 +887,7 @@ class SyncGateway:
         :param db_name: The name of the Sync Gateway database to query
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
+        :param use_public_api: If True, uses public port (4984) with user auth instead of admin port (4985)
         """
         with self.__tracer.start_as_current_span(
             "get_all_documents",
@@ -802,9 +897,28 @@ class SyncGateway:
                 "cbl.collection.name": collection,
             },
         ):
-            resp = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/_all_docs"
-            )
+            if use_public_api:
+                # Use public port (4984) - required for regular user access
+                scheme = "https://" if self.__secure else "http://"
+                # Create session with user's credentials on public port
+                async with self._create_session(
+                    self.__secure,
+                    scheme,
+                    self.__hostname,
+                    4984,
+                    self.__admin_session.auth,
+                ) as session:
+                    resp = await self._send_request(
+                        "get",
+                        f"/{db_name}.{scope}.{collection}/_all_docs",
+                        session=session,
+                    )
+            else:
+                # Use admin port (4985) - default behavior
+                resp = await self._send_request(
+                    "get", f"/{db_name}.{scope}.{collection}/_all_docs"
+                )
+
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
 
@@ -814,6 +928,7 @@ class SyncGateway:
         scope: str = "_default",
         collection: str = "_default",
         version_type: str = "rev",
+        use_public_api: bool = False,
     ) -> ChangesResponse:
         """
         Gets the changes feed from Sync Gateway, including deleted documents
@@ -822,6 +937,7 @@ class SyncGateway:
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
         :param version_type: The version type to use ('rev' for revision IDs, 'cv' for version vectors in SGW 4.0+)
+        :param use_public_api: If True, uses public port (4984) with user auth instead of admin port (4985)
         """
         with self.__tracer.start_as_current_span(
             "get_changes",
@@ -832,9 +948,29 @@ class SyncGateway:
             },
         ):
             query_params = f"version_type={version_type}"
-            resp = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/_changes?{query_params}"
-            )
+
+            if use_public_api:
+                # Use public port (4984) - required for regular user access
+                scheme = "https://" if self.__secure else "http://"
+                # Create session with user's credentials on public port
+                async with self._create_session(
+                    self.__secure,
+                    scheme,
+                    self.__hostname,
+                    4984,
+                    self.__admin_session.auth,
+                ) as session:
+                    resp = await self._send_request(
+                        "get",
+                        f"/{db_name}.{scope}.{collection}/_changes?{query_params}",
+                        session=session,
+                    )
+            else:
+                # Use admin port (4985) - default behavior
+                resp = await self._send_request(
+                    "get", f"/{db_name}.{scope}.{collection}/_changes?{query_params}"
+                )
+
             assert isinstance(resp, dict)
             return ChangesResponse(cast(dict, resp))
 
