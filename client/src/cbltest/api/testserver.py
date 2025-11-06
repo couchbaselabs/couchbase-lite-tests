@@ -1,5 +1,5 @@
 from typing import cast
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from opentelemetry.trace import get_tracer
 
@@ -135,5 +135,15 @@ class TestServer:
         ws_scheme = "ws://"  # For now not using secure
 
         _assert_not_null(db_name, "db_name")
-        replication_url = f"{ws_scheme}{self.url}:{port}"
+
+        parsed = urlparse(self.url)
+        if parsed.hostname:
+            hostname = parsed.hostname
+        elif parsed.netloc:
+            # If no scheme, netloc might be host:port
+            hostname = parsed.netloc.split(":")[0]
+        else:
+            # Fallback: assume self.url is just a hostname
+            hostname = self.url.split("://")[-1].split(":")[0]
+        replication_url = f"{ws_scheme}{hostname}:{port}"
         return urljoin(replication_url, db_name)
