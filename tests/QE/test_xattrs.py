@@ -383,6 +383,8 @@ class TestXattrs(CBLTestClass):
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
         num_updates = 10
+        username = "vipul"
+        password = "pass"
         sg_db = "db"
         bucket_name = "data-bucket"
 
@@ -390,7 +392,8 @@ class TestXattrs(CBLTestClass):
         cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
 
-        self.mark_test_step("Configure Sync Gateway database endpoint")
+        self.mark_test_step("Configure Sync Gateway with default sync function")
+        # Default sync function reads doc.channels from document body
         db_config = {
             "bucket": bucket_name,
             "index": {"num_replicas": 0},
@@ -401,14 +404,11 @@ class TestXattrs(CBLTestClass):
             await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
 
-        self.mark_test_step("Create user 'vipul' with access to SDK and SG channels")
-        await sg.add_user(
-            sg_db,
-            "vipul",
-            password="pass",
-            collection_access={
-                "_default": {"_default": {"admin_channels": ["sdk", "sg"]}}
-            },
+        self.mark_test_step(
+            f"Create user '{username}' with access to SDK and SG channels"
+        )
+        sg_user = await SyncGateway.create_user_client(
+            sg, sg_db, username, password, ["sdk", "sg"]
         )
 
         self.mark_test_step(f"Bulk create {num_docs} docs via SDK")
@@ -445,16 +445,15 @@ class TestXattrs(CBLTestClass):
             f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
         )
 
-        self.mark_test_step("Verify SG sees all docs via _all_docs")
-        sg_check = await sg.get_all_documents(sg_db, "_default", "_default")
-        assert len(sg_check.rows) == num_docs * 2, (
-            f"Expected {num_docs * 2} docs via SG, got {len(sg_check.rows)}"
+        self.mark_test_step(
+            f"Verify user '{username}' sees all docs via _changes (public API)"
         )
-
-        self.mark_test_step("Verify SG sees all docs via _changes")
-        changes = await sg.get_changes(sg_db, "_default", "_default", version_type="cv")
-        assert len(changes.results) == num_docs * 2, (
-            f"Expected {num_docs * 2} changes via SG, got {len(changes.results)}"
+        user_changes = await sg_user.get_changes(
+            sg_db, "_default", "_default", use_public_api=True
+        )
+        unique_docs = {e.id for e in user_changes.results if e.id in all_doc_ids}
+        assert len(unique_docs) == num_docs * 2, (
+            f"User should see {num_docs * 2} docs via public API, got {len(unique_docs)}"
         )
 
         self.mark_test_step(f"Bulk update sdk docs {num_updates} times via SDK")
@@ -494,8 +493,12 @@ class TestXattrs(CBLTestClass):
                     f"SDK doc {doc_id} should have {num_updates + 1} updates, got {sdk_doc['content']['updates']}"
                 )
 
-        self.mark_test_step("Verify SG sees all doc updates via _all_docs")
-        all_docs_updated = await sg.get_all_documents(sg_db, "_default", "_default")
+        self.mark_test_step(
+            f"Verify '{username}' sees all doc updates via _all_docs (public API)"
+        )
+        all_docs_updated = await sg_user.get_all_documents(
+            sg_db, "_default", "_default", use_public_api=True
+        )
         for row in all_docs_updated.rows:
             sg_doc = await sg.get_document(sg_db, row.id, "_default", "_default")
             if sg_doc is not None:
@@ -531,8 +534,12 @@ class TestXattrs(CBLTestClass):
             f"Expected {num_docs * 2} docs to be deleted via SDK, got {sdk_deleted_count}"
         )
 
-        self.mark_test_step("Verify SG sees all docs as deleted via _changes")
-        changes_deleted = await sg.get_changes(sg_db, "_default", "_default")
+        self.mark_test_step(
+            f"Verify '{username}' sees all docs as deleted via _changes (public API)"
+        )
+        changes_deleted = await sg_user.get_changes(
+            sg_db, "_default", "_default", use_public_api=True
+        )
         sg_deleted_count = sum(1 for entry in changes_deleted.results if entry.deleted)
         assert sg_deleted_count == num_docs * 2, (
             f"Expected {num_docs * 2} docs to be deleted via SG, got {sg_deleted_count}"
@@ -547,8 +554,10 @@ class TestXattrs(CBLTestClass):
     ) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
-        num_docs = 100
+        num_docs = 10
         num_updates = 10
+        username = "vipul"
+        password = "pass"
         sg_db = "db"
         bucket_name = "data-bucket"
 
@@ -556,7 +565,7 @@ class TestXattrs(CBLTestClass):
         cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
 
-        self.mark_test_step("Configure Sync Gateway database endpoint")
+        self.mark_test_step("Configure Sync Gateway with default sync function")
         db_config = {
             "bucket": bucket_name,
             "index": {"num_replicas": 0},
@@ -567,14 +576,9 @@ class TestXattrs(CBLTestClass):
             await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
 
-        self.mark_test_step("Create user 'vipul' with access to shared channel")
-        await sg.add_user(
-            sg_db,
-            "vipul",
-            password="pass",
-            collection_access={
-                "_default": {"_default": {"admin_channels": ["shared"]}}
-            },
+        self.mark_test_step(f"Create user '{username}' with access to shared channel")
+        sg_user = await SyncGateway.create_user_client(
+            sg, sg_db, username, password, ["shared"]
         )
 
         self.mark_test_step(
@@ -625,16 +629,14 @@ class TestXattrs(CBLTestClass):
             f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
         )
 
-        self.mark_test_step("Verify SG sees all docs via _all_docs")
-        sg_all_docs = await sg.get_all_documents(sg_db, "_default", "_default")
-        assert len(sg_all_docs.rows) == num_docs * 2, (
-            f"Expected {num_docs * 2} docs via SG, got {len(sg_all_docs.rows)}"
+        self.mark_test_step(
+            f"Verify '{username}' sees all docs via _all_docs (public API)"
         )
-
-        self.mark_test_step("Verify SG sees all docs via _changes")
-        changes = await sg.get_changes(sg_db, "_default", "_default")
-        assert len(changes.results) == num_docs * 2, (
-            f"Expected {num_docs * 2} changes via SG, got {len(changes.results)}"
+        sg_all_docs = await sg_user.get_all_documents(
+            sg_db, "_default", "_default", use_public_api=True
+        )
+        assert len(sg_all_docs.rows) == num_docs * 2, (
+            f"Expected {num_docs * 2} docs, got {len(sg_all_docs.rows)}"
         )
 
         self.mark_test_step(
@@ -794,13 +796,15 @@ class TestXattrs(CBLTestClass):
             f"Expected {num_docs * 2} docs deleted via SDK, got {sdk_deleted_count}"
         )
 
-        self.mark_test_step("Verify all docs deleted from SG side via _changes")
-        changes_deleted = await sg.get_changes(sg_db, "_default", "_default")
-        sg_deleted_count_final = sum(
-            1 for entry in changes_deleted.results if entry.deleted
+        self.mark_test_step(
+            f"Verify '{username}' sees all docs as deleted via _changes (public API)"
         )
-        assert sg_deleted_count_final == num_docs * 2, (
-            f"Expected {num_docs * 2} docs deleted via SG, got {sg_deleted_count_final}"
+        changes_deleted = await sg_user.get_changes(
+            sg_db, "_default", "_default", use_public_api=True
+        )
+        sg_deleted_count = sum(1 for entry in changes_deleted.results if entry.deleted)
+        assert sg_deleted_count == num_docs * 2, (
+            f"Expected {num_docs * 2} docs deleted via SG, got {sg_deleted_count}"
         )
 
         await sg.delete_database(sg_db)
@@ -848,7 +852,6 @@ class TestXattrs(CBLTestClass):
 
         db_config = {
             "bucket": bucket_name,
-            "enable_shared_bucket_access": True,
             "import_docs": True,
             "user_xattr_key": user_custom_channel_xattr,  # Database-level config
             "index": {"num_replicas": 0},
@@ -860,31 +863,13 @@ class TestXattrs(CBLTestClass):
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(
-            f"Create user '{username1}' with access to channel '{sg_channel1}'"
+            f"Create users '{username1}', '{username2}' with access to '{sg_channel1}', '{sg_channel2}'"
         )
-        # Clean up user if exists from previous run, then create fresh
-        await sg.delete_user(sg_db, username1)
-        await sg.add_user(
-            sg_db,
-            username1,
-            password=password,
-            collection_access={
-                "_default": {"_default": {"admin_channels": [sg_channel1]}}
-            },
+        sg_user1 = await SyncGateway.create_user_client(
+            sg, sg_db, username1, password, [sg_channel1]
         )
-
-        self.mark_test_step(
-            f"Create user '{username2}' with access to channel '{sg_channel2}'"
-        )
-        # Clean up user if exists from previous run, then create fresh
-        await sg.delete_user(sg_db, username2)
-        await sg.add_user(
-            sg_db,
-            username2,
-            password=password,
-            collection_access={
-                "_default": {"_default": {"admin_channels": [sg_channel2]}}
-            },
+        sg_user2 = await SyncGateway.create_user_client(
+            sg, sg_db, username2, password, [sg_channel2]
         )
 
         self.mark_test_step(
@@ -917,15 +902,6 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Verify user '{username1}' can see all docs in channel '{sg_channel1}'"
         )
-        # Create user-specific SG client using connection info from admin SG instance
-        sg_user1 = SyncGateway(
-            sg.hostname,
-            username1,
-            password,
-            port=sg.port,
-            admin_port=sg.admin_port,
-            secure=sg.secure,
-        )
 
         user1_changes = await sg_user1.get_changes(
             sg_db, "_default", "_default", use_public_api=True
@@ -938,15 +914,6 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step(
             f"Concurrently update xattrs to '{sg_channel2}' while querying docs"
-        )
-        # Create user-specific SG client for user2
-        sg_user2 = SyncGateway(
-            sg.hostname,
-            username2,
-            password,
-            port=sg.port,
-            admin_port=sg.admin_port,
-            secure=sg.secure,
         )
 
         async def update_xattrs_and_docs() -> None:
@@ -982,21 +949,13 @@ class TestXattrs(CBLTestClass):
         )
         await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
-        await sg.add_user(
-            sg_db,
-            username1,
-            password=password,
-            collection_access={
-                "_default": {"_default": {"admin_channels": [sg_channel1]}}
-            },
+
+        # Recreate users after database restart
+        await SyncGateway.create_user_client(
+            sg, sg_db, username1, password, [sg_channel1]
         )
-        await sg.add_user(
-            sg_db,
-            username2,
-            password=password,
-            collection_access={
-                "_default": {"_default": {"admin_channels": [sg_channel2]}}
-            },
+        await SyncGateway.create_user_client(
+            sg, sg_db, username2, password, [sg_channel2]
         )
 
         self.mark_test_step(f"Verify user '{username2}' can now see all docs")

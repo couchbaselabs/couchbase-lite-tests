@@ -451,6 +451,48 @@ class SyncGateway:
         """Gets whether the Sync Gateway instance uses TLS"""
         return self.__secure
 
+    @classmethod
+    async def create_user_client(
+        cls,
+        admin_sg: "SyncGateway",
+        db_name: str,
+        username: str,
+        password: str,
+        channels: list[str],
+    ) -> "SyncGateway":
+        """
+        Helper method to create a user with channel access and return a user-specific SG client.
+
+        This is a convenience method for tests that need to verify user-level access control.
+
+        :param admin_sg: The admin SyncGateway instance
+        :param db_name: The database name
+        :param username: The username to create
+        :param password: The password for the user
+        :param channels: List of channels the user should have access to
+        :return: A SyncGateway instance authenticated as the user for public API access
+        """
+        # Clean up user if exists from previous run
+        await admin_sg.delete_user(db_name, username)
+
+        # Create user with channel access
+        await admin_sg.add_user(
+            db_name,
+            username,
+            password=password,
+            collection_access={"_default": {"_default": {"admin_channels": channels}}},
+        )
+
+        # Return user-specific SG client for public API access
+        return cls(
+            admin_sg.hostname,
+            username,
+            password,
+            port=admin_sg.port,
+            admin_port=admin_sg.admin_port,
+            secure=admin_sg.secure,
+        )
+
     def _create_session(
         self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None
     ) -> ClientSession:
@@ -833,7 +875,11 @@ class SyncGateway:
                 self._analyze_dataset_response(cast(list, resp))
 
     async def get_all_documents(
-        self, db_name: str, scope: str = "_default", collection: str = "_default"
+        self,
+        db_name: str,
+        scope: str = "_default",
+        collection: str = "_default",
+        use_public_api: bool = False,
     ) -> AllDocumentsResponse:
         """
         Gets all the documents in the given collection from Sync Gateway (id and revid)
@@ -841,6 +887,7 @@ class SyncGateway:
         :param db_name: The name of the Sync Gateway database to query
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
+        :param use_public_api: If True, uses public port (4984) with user auth instead of admin port (4985)
         """
         with self.__tracer.start_as_current_span(
             "get_all_documents",
@@ -850,9 +897,28 @@ class SyncGateway:
                 "cbl.collection.name": collection,
             },
         ):
-            resp = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/_all_docs"
-            )
+            if use_public_api:
+                # Use public port (4984) - required for regular user access
+                scheme = "https://" if self.__secure else "http://"
+                # Create session with user's credentials on public port
+                async with self._create_session(
+                    self.__secure,
+                    scheme,
+                    self.__hostname,
+                    4984,
+                    self.__admin_session.auth,
+                ) as session:
+                    resp = await self._send_request(
+                        "get",
+                        f"/{db_name}.{scope}.{collection}/_all_docs",
+                        session=session,
+                    )
+            else:
+                # Use admin port (4985) - default behavior
+                resp = await self._send_request(
+                    "get", f"/{db_name}.{scope}.{collection}/_all_docs"
+                )
+
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
 
