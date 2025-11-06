@@ -76,3 +76,20 @@ Test concurrent updates and deletes from both Sync Gateway and SDK on shared doc
 11. Perform concurrent deletes from SDK and SG
 12. Verify all docs deleted from SDK side
 13. Verify all docs deleted from SG side via _changes
+
+## test_sync_xattrs_update_concurrently
+
+Test concurrent xattr updates and xattr-based channel assignment.
+
+1. Create bucket and default collection
+2. Configure Sync Gateway with custom sync function using xattrs
+3. Create user 'vipul' with access to channel 'abc'
+4. Create user 'lupiv' with access to channel 'xyz'
+5. Create 20 docs via SDK with xattr 'channel1=abc'
+6. Wait for SG to import all docs (as admin)
+7. Verify user 'vipul' can see all docs in channel 'abc'
+8. Concurrently update xattrs to 'xyz' while querying docs
+9. Delete _sync xattrs to force complete re-processing
+10. Restart Sync Gateway to force re-import with updated xattrs
+11. Verify user 'lupiv' can now see all docs
+12. Verify user 'vipul' can no longer see any docs

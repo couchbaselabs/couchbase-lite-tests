@@ -697,6 +697,25 @@ class SyncGateway:
                 "put", f"/{db_name}/_user/{name}", JSONDictionary(body)
             )
 
+    async def delete_user(self, db_name: str, name: str) -> None:
+        """
+        Deletes a user from a Sync Gateway database
+
+        :param db_name: The name of the Database
+        :param name: The username to delete
+        """
+        with self.__tracer.start_as_current_span(
+            "delete_user", attributes={"cbl.user.name": name}
+        ):
+            try:
+                await self._send_request("delete", f"/{db_name}/_user/{name}")
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 404:
+                    # User doesn't exist, that's fine
+                    pass
+                else:
+                    raise
+
     async def add_role(self, db_name: str, role: str, collection_access: dict) -> None:
         """
         Adds the specified role to a Sync Gateway database with the specified collection access
@@ -822,6 +841,7 @@ class SyncGateway:
         scope: str = "_default",
         collection: str = "_default",
         version_type: str = "rev",
+        use_public_api: bool = False,
     ) -> ChangesResponse:
         """
         Gets the changes feed from Sync Gateway, including deleted documents
@@ -830,6 +850,7 @@ class SyncGateway:
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
         :param version_type: The version type to use ('rev' for revision IDs, 'cv' for version vectors in SGW 4.0+)
+        :param use_public_api: If True, uses public port (4984) with user auth instead of admin port (4985)
         """
         with self.__tracer.start_as_current_span(
             "get_changes",
@@ -840,9 +861,29 @@ class SyncGateway:
             },
         ):
             query_params = f"version_type={version_type}"
-            resp = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/_changes?{query_params}"
-            )
+
+            if use_public_api:
+                # Use public port (4984) - required for regular user access
+                scheme = "https://" if self.__secure else "http://"
+                # Create session with user's credentials on public port
+                async with self._create_session(
+                    self.__secure,
+                    scheme,
+                    self.__hostname,
+                    4984,
+                    self.__admin_session.auth,
+                ) as session:
+                    resp = await self._send_request(
+                        "get",
+                        f"/{db_name}.{scope}.{collection}/_changes?{query_params}",
+                        session=session,
+                    )
+            else:
+                # Use admin port (4985) - default behavior
+                resp = await self._send_request(
+                    "get", f"/{db_name}.{scope}.{collection}/_changes?{query_params}"
+                )
+
             assert isinstance(resp, dict)
             return ChangesResponse(cast(dict, resp))
 

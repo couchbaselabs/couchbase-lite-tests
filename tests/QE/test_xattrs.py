@@ -7,7 +7,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
 from packaging.version import Version
 
 
@@ -801,6 +801,226 @@ class TestXattrs(CBLTestClass):
         )
         assert sg_deleted_count_final == num_docs * 2, (
             f"Expected {num_docs * 2} docs deleted via SG, got {sg_deleted_count_final}"
+        )
+
+        await sg.delete_database(sg_db)
+        cbs.drop_bucket(bucket_name)
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_sync_xattrs_update_concurrently(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
+        sg = cblpytest.sync_gateways[0]
+        cbs = cblpytest.couchbase_servers[0]
+        num_docs = 20
+        sg_db = "db"
+        bucket_name = "data-bucket"
+        user_custom_channel_xattr = "channel1"
+        sg_channel1 = "abc"
+        sg_channel2 = "xyz"
+        username1 = "vipul"
+        username2 = "lupiv"
+        password = "password"
+
+        self.mark_test_step("Create bucket and default collection")
+        cbs.drop_bucket(bucket_name)
+        cbs.create_bucket(bucket_name)
+
+        self.mark_test_step(
+            "Configure Sync Gateway with custom sync function using xattrs"
+        )
+        if await sg.database_exists(sg_db):
+            await sg.delete_database(sg_db)
+
+        # Custom sync function that reads channel from user xattr via meta parameter
+        sync_function = f"""
+        function(doc, oldDoc, meta) {{
+            if (doc._deleted) {{
+                return;
+            }}
+            if (meta.xattrs.{user_custom_channel_xattr} === undefined) {{
+                channel("!");
+            }} else {{
+                channel(meta.xattrs.{user_custom_channel_xattr});
+            }}
+        }}
+        """
+
+        db_config = {
+            "bucket": bucket_name,
+            "enable_shared_bucket_access": True,
+            "import_docs": True,
+            "user_xattr_key": user_custom_channel_xattr,  # Database-level config
+            "index": {"num_replicas": 0},
+            "scopes": {
+                "_default": {"collections": {"_default": {"sync": sync_function}}}
+            },
+        }
+        db_payload = PutDatabasePayload(db_config)
+        await sg.put_database(sg_db, db_payload)
+
+        self.mark_test_step(
+            f"Create user '{username1}' with access to channel '{sg_channel1}'"
+        )
+        # Clean up user if exists from previous run, then create fresh
+        await sg.delete_user(sg_db, username1)
+        await sg.add_user(
+            sg_db,
+            username1,
+            password=password,
+            collection_access={
+                "_default": {"_default": {"admin_channels": [sg_channel1]}}
+            },
+        )
+
+        self.mark_test_step(
+            f"Create user '{username2}' with access to channel '{sg_channel2}'"
+        )
+        # Clean up user if exists from previous run, then create fresh
+        await sg.delete_user(sg_db, username2)
+        await sg.add_user(
+            sg_db,
+            username2,
+            password=password,
+            collection_access={
+                "_default": {"_default": {"admin_channels": [sg_channel2]}}
+            },
+        )
+
+        self.mark_test_step(
+            f"Create {num_docs} docs via SDK with xattr '{user_custom_channel_xattr}={sg_channel1}'"
+        )
+        sdk_doc_ids: list[str] = []
+        for i in range(num_docs):
+            doc_id = f"sdk_{i}"
+            sdk_doc_ids.append(doc_id)
+            doc_body = {
+                "type": "sdk_doc",
+                "index": i,
+            }
+            cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
+            cbs.upsert_document_xattr(
+                bucket_name,
+                doc_id,
+                user_custom_channel_xattr,
+                sg_channel1,
+                "_default",
+                "_default",
+            )
+
+        self.mark_test_step("Wait for SG to import all docs (as admin)")
+        sg_all_docs = await sg.get_all_documents(sg_db, "_default", "_default")
+        assert len(sg_all_docs.rows) >= num_docs, (
+            f"Expected at least {num_docs} docs to be imported, got {len(sg_all_docs.rows)}"
+        )
+
+        self.mark_test_step(
+            f"Verify user '{username1}' can see all docs in channel '{sg_channel1}'"
+        )
+        sg_hostname = cblpytest._CBLPyTest__config.sync_gateways[0]["hostname"]
+        sg_tls = cblpytest._CBLPyTest__config.sync_gateways[0].get("tls", False)
+        sg_user1 = SyncGateway(
+            sg_hostname,
+            username1,
+            password,
+            port=4984,
+            admin_port=4985,
+            secure=sg_tls,
+        )
+
+        user1_changes = await sg_user1.get_changes(
+            sg_db, "_default", "_default", use_public_api=True
+        )
+        unique_user1_docs = {e.id for e in user1_changes.results if e.id in sdk_doc_ids}
+        user1_doc_count = len(unique_user1_docs)
+        assert user1_doc_count == num_docs, (
+            f"User '{username1}' should see {num_docs} docs in channel '{sg_channel1}', got {user1_doc_count}"
+        )
+
+        self.mark_test_step(
+            f"Concurrently update xattrs to '{sg_channel2}' while querying docs"
+        )
+        sg_user2 = SyncGateway(
+            sg_hostname,
+            username2,
+            password,
+            port=4984,
+            admin_port=4985,
+            secure=sg_tls,
+        )
+
+        async def update_xattrs_and_docs() -> None:
+            """Update xattrs to change channel assignment, then trigger import"""
+            for doc_id in sdk_doc_ids:
+                cbs.upsert_document_xattr(
+                    bucket_name,
+                    doc_id,
+                    user_custom_channel_xattr,
+                    sg_channel2,
+                    "_default",
+                    "_default",
+                )
+
+        async def query_as_user2() -> None:
+            """Repeatedly query as user2 to trigger sync function processing"""
+            for _ in range(20):
+                await sg_user2.get_changes(
+                    sg_db, "_default", "_default", use_public_api=True
+                )
+                await asyncio.sleep(0.1)
+
+        await asyncio.gather(update_xattrs_and_docs(), query_as_user2())
+
+        self.mark_test_step("Delete _sync xattrs to force complete re-processing")
+        for doc_id in sdk_doc_ids:
+            cbs.delete_document_xattr(
+                bucket_name, doc_id, "_sync", "_default", "_default"
+            )
+
+        self.mark_test_step(
+            "Restart Sync Gateway to force re-import with updated xattrs"
+        )
+        await sg.delete_database(sg_db)
+        await sg.put_database(sg_db, db_payload)
+        await sg.add_user(
+            sg_db,
+            username1,
+            password=password,
+            collection_access={
+                "_default": {"_default": {"admin_channels": [sg_channel1]}}
+            },
+        )
+        await sg.add_user(
+            sg_db,
+            username2,
+            password=password,
+            collection_access={
+                "_default": {"_default": {"admin_channels": [sg_channel2]}}
+            },
+        )
+
+        self.mark_test_step(f"Verify user '{username2}' can now see all docs")
+        user2_changes = await sg_user2.get_changes(
+            sg_db, "_default", "_default", use_public_api=True
+        )
+        unique_user2_docs = {e.id for e in user2_changes.results if e.id in sdk_doc_ids}
+        user2_count = len(unique_user2_docs)
+        assert user2_count == num_docs, (
+            f"User '{username2}' should see {num_docs} docs after xattr change to channel '{sg_channel2}', "
+            f"got {user2_count}"
+        )
+
+        self.mark_test_step(f"Verify user '{username1}' can no longer see any docs")
+        user1_changes_after = await sg_user1.get_changes(
+            sg_db, "_default", "_default", use_public_api=True
+        )
+        unique_user1_after = {
+            e.id for e in user1_changes_after.results if e.id in sdk_doc_ids
+        }
+        user1_count_after = len(unique_user1_after)
+        assert user1_count_after == 0, (
+            f"User '{username1}' should see 0 docs after xattr change to channel '{sg_channel2}', "
+            f"got {user1_count_after}"
         )
 
         await sg.delete_database(sg_db)

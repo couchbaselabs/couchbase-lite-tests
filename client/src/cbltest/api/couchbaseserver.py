@@ -23,6 +23,7 @@ from couchbase.management.buckets import CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import CreatePrimaryQueryIndexOptions
 from couchbase.options import ClusterOptions
+from couchbase.subdocument import upsert
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblTestError
@@ -358,6 +359,84 @@ class CouchbaseServer:
                 raise CblTestError(
                     f"Failed to get document '{doc_id}' from {bucket}.{scope}.{collection}: {e}"
                 )
+
+    def upsert_document_xattr(
+        self,
+        bucket: str,
+        doc_id: str,
+        xattr_key: str,
+        xattr_value: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> None:
+        """
+        Upserts an xattr on a document using subdocument operations
+
+        :param bucket: The bucket containing the document
+        :param doc_id: The ID of the document to update
+        :param xattr_key: The xattr key to upsert
+        :param xattr_value: The value to set for the xattr
+        :param scope: The scope containing the document (default '_default')
+        :param collection: The collection containing the document (default '_default')
+        """
+        with self.__tracer.start_as_current_span(
+            "upsert_document_xattr",
+            attributes={
+                "cbl.bucket": bucket,
+                "cbl.scope": scope,
+                "cbl.collection": collection,
+                "cbl.document.id": doc_id,
+                "cbl.xattr.key": xattr_key,
+            },
+        ):
+            try:
+                col = self.__cluster.bucket(bucket).scope(scope).collection(collection)
+                col.mutate_in(
+                    doc_id,
+                    [upsert(xattr_key, xattr_value, xattr=True, create_parents=True)],
+                )
+            except Exception as e:
+                raise CblTestError(
+                    f"Failed to upsert xattr '{xattr_key}' on document '{doc_id}' in {bucket}.{scope}.{collection}: {e}"
+                )
+
+    def delete_document_xattr(
+        self,
+        bucket: str,
+        doc_id: str,
+        xattr_key: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> None:
+        """
+        Deletes an xattr from a document using subdocument operations
+
+        :param bucket: The bucket containing the document
+        :param doc_id: The ID of the document
+        :param xattr_key: The xattr key to delete
+        :param scope: The scope containing the document (default '_default')
+        :param collection: The collection containing the document (default '_default')
+        """
+        with self.__tracer.start_as_current_span(
+            "delete_document_xattr",
+            attributes={
+                "cbl.bucket": bucket,
+                "cbl.scope": scope,
+                "cbl.collection": collection,
+                "cbl.document.id": doc_id,
+                "cbl.xattr.key": xattr_key,
+            },
+        ):
+            try:
+                from couchbase.subdocument import remove
+
+                col = self.__cluster.bucket(bucket).scope(scope).collection(collection)
+                col.mutate_in(
+                    doc_id,
+                    [remove(xattr_key, xattr=True)],
+                )
+            except Exception:
+                pass
 
     def start_xdcr(self, target: "CouchbaseServer", bucket_name: str) -> None:
         """
