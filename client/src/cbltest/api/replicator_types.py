@@ -73,7 +73,7 @@ class ReplicatorCollectionEntry(JSONSerializable):
         conflict_resolver: ReplicatorConflictResolver | None = None,
     ):
         if names is None:
-            self.__names = ["_default"]
+            self.__names = ["_default._default"]
         else:
             _assert_not_empty(names, "names")
             self.__names = names

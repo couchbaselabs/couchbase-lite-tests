@@ -7,7 +7,6 @@ from urllib.parse import urljoin
 
 import requests
 from aiohttp import BasicAuth, ClientSession, TCPConnector
-from deprecated import deprecated
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblSyncGatewayBadResponseError
@@ -272,18 +271,16 @@ class DocumentUpdateEntry(JSONSerializable):
     """
 
     @property
-    @deprecated("Only should be used until 4.0 SGW gets close to GA")
     def id(self) -> str:
         """
-        Gets the ID of the entry (NOTE: Will go away after 4.0 SGW gets close to GA)
+        Gets the ID of the entry (NOTE: Will go away once SGW supports VV in REST)
         """
         return cast(str, self.__body["_id"])
 
     @property
-    @deprecated("Only should be used until 4.0 SGW gets close to GA")
     def rev(self) -> str | None:
         """
-        Gets the rev ID of the entry (NOTE: Will go away after 4.0 SGW gets close to GA)
+        Gets the rev ID of the entry (NOTE: Will go away once SGW supports VV in REST)
         """
         if "_rev" not in self.__body:
             return None
@@ -296,10 +293,9 @@ class DocumentUpdateEntry(JSONSerializable):
         if revid:
             self.__body["_rev"] = revid
 
-    @deprecated("Only should be used until 4.0 SGW gets close to GA")
     def swap_rev(self, revid: str) -> None:
         """
-        Changes the revid to the provided one (NOTE: Will go away after 4.0 SGW gets close to GA)
+        Changes the revid to the provided one (NOTE: Will go away once SGW supports VV in REST)
         """
         self.__body["_rev"] = revid
 
@@ -838,7 +834,6 @@ class SyncGateway:
             assert isinstance(resp, dict)
             return ChangesResponse(cast(dict, resp))
 
-    @deprecated("Only should be used until 4.0 SGW gets close to GA")
     async def _rewrite_rev_ids(
         self,
         db_name: str,
@@ -964,7 +959,6 @@ class SyncGateway:
                 JSONDictionary(body),
             )
 
-    @deprecated("Only should be used until 4.0 SGW gets close to GA")
     async def _replaced_revid(
         self, doc_id: str, revid: str, db_name: str, scope: str, collection: str
     ) -> str:
