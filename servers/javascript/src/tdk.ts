@@ -234,9 +234,11 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                     filter:     CreatePushFilter(colls.pushFilter),
                 };
             }
+
             if (rq.config.replicatorType !== 'push') {
                 collCfg.pull = {
                     continuous: rq.config.continuous,
+                    enableAutoPurge: rq.config.enableAutoPurge,
                     channels:   colls.channels,
                     filter:     CreatePullFilter(colls.pullFilter),
                 };
@@ -247,8 +249,12 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                     collCfg.pull.conflictResolver = resolverFn;
                 }
             }
+
             if (colls.documentIDs)
                 collCfg.documentIDs = colls.documentIDs;
+
+            if (rq.reset)
+                collCfg.resetCheckpoint = rq.reset;
             
             for (const collName of colls.names)
                 config.collections[normalizeCollectionID(collName)] = collCfg;
