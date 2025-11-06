@@ -917,15 +917,14 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Verify user '{username1}' can see all docs in channel '{sg_channel1}'"
         )
-        sg_hostname = cblpytest._CBLPyTest__config.sync_gateways[0]["hostname"]
-        sg_tls = cblpytest._CBLPyTest__config.sync_gateways[0].get("tls", False)
+        # Create user-specific SG client using connection info from admin SG instance
         sg_user1 = SyncGateway(
-            sg_hostname,
+            sg.hostname,
             username1,
             password,
-            port=4984,
-            admin_port=4985,
-            secure=sg_tls,
+            port=sg.port,
+            admin_port=sg.admin_port,
+            secure=sg.secure,
         )
 
         user1_changes = await sg_user1.get_changes(
@@ -940,13 +939,14 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Concurrently update xattrs to '{sg_channel2}' while querying docs"
         )
+        # Create user-specific SG client for user2
         sg_user2 = SyncGateway(
-            sg_hostname,
+            sg.hostname,
             username2,
             password,
-            port=4984,
-            admin_port=4985,
-            secure=sg_tls,
+            port=sg.port,
+            admin_port=sg.admin_port,
+            secure=sg.secure,
         )
 
         async def update_xattrs_and_docs() -> None:

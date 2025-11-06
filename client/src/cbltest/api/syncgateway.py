@@ -425,10 +425,31 @@ class SyncGateway:
         self.__tracer = get_tracer(__name__, VERSION)
         self.__secure: bool = secure
         self.__hostname: str = url
+        self.__port: int = port
         self.__admin_port: int = admin_port
         self.__admin_session: ClientSession = self._create_session(
             secure, scheme, url, admin_port, BasicAuth(username, password, "ascii")
         )
+
+    @property
+    def hostname(self) -> str:
+        """Gets the hostname of the Sync Gateway instance"""
+        return self.__hostname
+
+    @property
+    def port(self) -> int:
+        """Gets the public port of the Sync Gateway instance"""
+        return self.__port
+
+    @property
+    def admin_port(self) -> int:
+        """Gets the admin port of the Sync Gateway instance"""
+        return self.__admin_port
+
+    @property
+    def secure(self) -> bool:
+        """Gets whether the Sync Gateway instance uses TLS"""
+        return self.__secure
 
     def _create_session(
         self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None
