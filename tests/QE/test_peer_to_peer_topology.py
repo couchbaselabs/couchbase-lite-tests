@@ -24,8 +24,9 @@ class TestPeerToPeerTopology(CBLTestClass):
         (100, False, "push_pull")
     ])
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_peer_to_peer_topology_mesh(self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type):
-        # Convert string to ReplicatorType enum
+    async def test_peer_to_peer_topology_mesh(
+        self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type
+    ):
         replicator_type_map = {
             "push_pull": ReplicatorType.PUSH_AND_PULL,
             "pull": ReplicatorType.PULL,
@@ -47,12 +48,10 @@ class TestPeerToPeerTopology(CBLTestClass):
             target_peers = [i for i in range(3) if i != source_peer_idx]  # Other two peers
             
             self.mark_test_step(f"PHASE {phase}: Peer {phase} -> Peers {[p+1 for p in target_peers]}")
-            
-            # Add documents to source peer
+
             self.mark_test_step(f"Add {num_of_docs} documents to the database on peer {phase}")
             source_db = all_dbs[source_peer_idx]
 
-            # Batch documents in chunks of 10 to avoid payload size limits
             batch_size = 10
             for start in range(1, num_of_docs + 1, batch_size):
                 end = min(start + batch_size, num_of_docs + 1)
@@ -64,7 +63,6 @@ class TestPeerToPeerTopology(CBLTestClass):
                             [{"random": randint(1, 100000)}],
                         )
 
-            # Start listeners on target peers
             self.mark_test_step(f"Start listeners on peers {[p+1 for p in target_peers]}")
             listeners = []
             for target_idx in target_peers:
@@ -74,38 +72,39 @@ class TestPeerToPeerTopology(CBLTestClass):
                 await listener.start()
                 listeners.append((target_idx, listener))
 
-            # Setup replicators from source to targets
-            self.mark_test_step(f"Setup replicators from peer {phase} to peers {[p+1 for p in target_peers]}")
+            self.mark_test_step(
+                f"Setup replicators from peer {phase} to peers {[p + 1 for p in target_peers]}"
+            )
             replicators = []
             for target_idx, listener in listeners:
                 replicator = Replicator(
                     source_db,
-                    endpoint=cblpytest.test_servers[target_idx].replication_url("db1", listener.port),
+                    endpoint=cblpytest.test_servers[target_idx].replication_url(
+                        "db1", listener.port
+                    ),
                     replicator_type=replicator_type,
                     collections=[ReplicatorCollectionEntry(["_default._default"])],
                     continuous=continuous,
                 )
                 replicators.append((target_idx, replicator))
 
-            # Start replication
             self.mark_test_step(f"Start replication from peer {phase} to peers {[p+1 for p in target_peers]}")
             for _, replicator in replicators:
                 await replicator.start()
 
-            # Wait for replication to complete
             self.mark_test_step(f"Wait for replication from peer {phase} to complete")
-            target_activity = ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED
+            target_activity = (
+                ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED
+            )
             for target_idx, replicator in replicators:
-                # Use longer timeout for peer-to-peer replication
                 status = await replicator.wait_for(
                     target_activity, timeout=timedelta(seconds=300), interval=timedelta(seconds=1)
                 )
                 assert status.error is None, (
-                    f"Error waiting for replicator from peer {phase} to peer {target_idx+1}: "
+                    f"Error waiting for replicator from peer {phase} to peer {target_idx + 1}: "
                     f"({status.error.domain} / {status.error.code}) {status.error.message}"
                 )
 
-            # Verify documents are synced
             self.mark_test_step(f"Check that all device databases have the replicated documents after phase {phase}")
             all_docs_collection = [
                 db.get_all_documents("_default._default") for db in all_dbs
@@ -116,7 +115,6 @@ class TestPeerToPeerTopology(CBLTestClass):
                     all_docs_results[0]["_default._default"], all_docs["_default._default"]
                 ), f"All databases should have the same content after phase {phase}"
 
-            # Stop listeners
             self.mark_test_step(f"Stop listeners after phase {phase}")
             for _, listener in listeners:
                 await listener.stop()
@@ -134,7 +132,6 @@ class TestPeerToPeerTopology(CBLTestClass):
     async def test_peer_to_peer_topology_loop(
         self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type
     ):
-        # Convert string to ReplicatorType enum
         replicator_type_map = {
             "push_pull": ReplicatorType.PUSH_AND_PULL,
             "pull": ReplicatorType.PULL,
@@ -158,11 +155,9 @@ class TestPeerToPeerTopology(CBLTestClass):
 
             self.mark_test_step(f"PHASE {phase}: Peer {phase} -> Peer {target_peer_idx + 1}")
 
-            # Add documents to source peer
             self.mark_test_step(f"Add {num_of_docs} documents to the database on peer {phase}")
             source_db = all_dbs[source_peer_idx]
 
-            # Batch documents in chunks of 10 to avoid payload size limits
             batch_size = 10
             for start in range(1, num_of_docs + 1, batch_size):
                 end = min(start + batch_size, num_of_docs + 1)
@@ -174,14 +169,12 @@ class TestPeerToPeerTopology(CBLTestClass):
                             [{"random": randint(1, 100000)}],
                         )
 
-            # Start listener on target peer
             self.mark_test_step(f"Start listener on peer {target_peer_idx + 1}")
             listener = Listener(
                 all_dbs[target_peer_idx], ["_default._default"], 59840, disable_tls=True
             )
             await listener.start()
 
-            # Setup replicator from source to target
             self.mark_test_step(f"Setup replicator from peer {phase} to peer {target_peer_idx + 1}")
             replicator = Replicator(
                 source_db,
@@ -193,20 +186,17 @@ class TestPeerToPeerTopology(CBLTestClass):
                 continuous=continuous,
             )
 
-            # Start replication
             self.mark_test_step(
                 f"Start replication from peer {phase} to peer {target_peer_idx + 1}"
             )
             await replicator.start()
 
-            # Wait for replication to complete
             self.mark_test_step(
                 f"Wait for replication from peer {phase} to peer {target_peer_idx + 1} to complete"
             )
             target_activity = (
                 ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED
             )
-            # Use longer timeout for peer-to-peer replication
             status = await replicator.wait_for(
                 target_activity, timeout=timedelta(seconds=300), interval=timedelta(seconds=1)
             )
@@ -227,7 +217,6 @@ class TestPeerToPeerTopology(CBLTestClass):
                 f"Peer {phase} and peer {target_peer_idx + 1} should have the same content after phase {phase}"
             )
 
-            # Stop listener
             self.mark_test_step(f"Stop listener after phase {phase}")
             await listener.stop()
 
