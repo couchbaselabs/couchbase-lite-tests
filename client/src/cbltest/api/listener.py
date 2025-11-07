@@ -17,7 +17,11 @@ class Listener:
     """A class representing the passive side of a replication inside of a test server"""
 
     def __init__(
-        self, database: Database, collections: list[str], port: int | None = None
+        self,
+        database: Database,
+        collections: list[str],
+        port: int | None = None,
+        disable_tls: bool = False,
     ):
         self.database = database
         """The database that the listener will be serving"""
@@ -34,6 +38,9 @@ class Listener:
         value
         """
 
+        self.disable_tls = disable_tls
+        """If True, TLS will be disabled for the listener"""
+
         self.__original_port = port
         self.__index = database._index
         self.__request_factory = database._request_factory
@@ -48,7 +55,7 @@ class Listener:
         """Start listening for incoming connections"""
         with self.__tracer.start_as_current_span("start_listener"):
             payload = PostStartListenerRequestBody(
-                self.database.name, self.collections, self.port
+                self.database.name, self.collections, self.port, self.disable_tls
             )
             request = self.__request_factory.create_request(
                 TestServerRequestType.START_LISTENER, payload

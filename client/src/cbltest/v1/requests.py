@@ -707,11 +707,19 @@ class PostStartListenerRequestBody(TestServerRequestBody):
         """The desired port to listen on (if None, the OS will choose)"""
         return self.__port
 
-    def __init__(self, db: str, collections: list[str], port: int | None = None):
+    @property
+    def disableTLS(self) -> bool:
+        """If True, TLS will be disabled for the listener"""
+        return self.__disable_tls
+
+    def __init__(
+        self, db: str, collections: list[str], port: int | None = None, disable_tls: bool = False
+    ):
         super().__init__(1)
         self.__database = db
         self.__collections = collections
         self.__port = port
+        self.__disable_tls = disable_tls
 
     def to_json(self) -> Any:
         json: dict[str, Any] = {
@@ -721,6 +729,9 @@ class PostStartListenerRequestBody(TestServerRequestBody):
 
         if self.__port is not None:
             json["port"] = self.__port
+
+        if self.__disable_tls:
+            json["disableTLS"] = self.__disable_tls
 
         return json
 

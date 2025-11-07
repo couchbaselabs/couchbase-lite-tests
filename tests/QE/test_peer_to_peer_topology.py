@@ -64,7 +64,9 @@ class TestPeerToPeerTopology(CBLTestClass):
             self.mark_test_step(f"Start listeners on peers {[p+1 for p in target_peers]}")
             listeners = []
             for target_idx in target_peers:
-                listener = Listener(all_dbs[target_idx], ["_default._default"], 59840)
+                listener = Listener(
+                    all_dbs[target_idx], ["_default._default"], 59840, disable_tls=True
+                )
                 await listener.start()
                 listeners.append((target_idx, listener))
 
@@ -166,7 +168,9 @@ class TestPeerToPeerTopology(CBLTestClass):
 
             # Start listener on target peer
             self.mark_test_step(f"Start listener on peer {target_peer_idx + 1}")
-            listener = Listener(all_dbs[target_peer_idx], ["_default._default"], 59840)
+            listener = Listener(
+                all_dbs[target_peer_idx], ["_default._default"], 59840, disable_tls=True
+            )
             await listener.start()
 
             # Setup replicator from source to target
