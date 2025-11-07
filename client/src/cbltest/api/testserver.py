@@ -140,10 +140,8 @@ class TestServer:
         if parsed.hostname:
             hostname = parsed.hostname
         elif parsed.netloc:
-            # If no scheme, netloc might be host:port
             hostname = parsed.netloc.split(":")[0]
         else:
-            # Fallback: assume self.url is just a hostname
             hostname = self.url.split("://")[-1].split(":")[0]
         replication_url = f"{ws_scheme}{hostname}:{port}"
         return urljoin(replication_url, db_name)
