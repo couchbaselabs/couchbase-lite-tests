@@ -23,6 +23,8 @@ class TestXattrs(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 1000
+        username = "vipul"
+        password = "pass"
         sg_db = "db"
         bucket_name = "data-bucket"
 
@@ -45,14 +47,11 @@ class TestXattrs(CBLTestClass):
             await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
 
-        self.mark_test_step("Create user 'vipul' with access to SG and SDK channels")
-        await sg.add_user(
-            sg_db,
-            "vipul",
-            password="pass",
-            collection_access={
-                "_default": {"_default": {"admin_channels": ["SG", "SDK", "*"]}}
-            },
+        self.mark_test_step(
+            f"Create user {username} with access to SG and SDK channels"
+        )
+        sg_user = await sg.create_user_client(
+            sg, sg_db, username, password, ["SG", "SDK"]
         )
 
         self.mark_test_step(f"Bulk create {num_docs} docs via Sync Gateway")
@@ -87,7 +86,9 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             "Verify all SG docs were created successfully and store revisions, versions"
         )
-        sg_all_docs = await sg.get_all_documents(sg_db, "_default", "_default")
+        sg_all_docs = await sg_user.get_all_documents(
+            sg_db, "_default", "_default", use_public_api=True
+        )
         sg_created_count = len(
             [doc for doc in sg_all_docs.rows if doc.id.startswith("sg_")]
         )
@@ -130,13 +131,8 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step("Restart Sync Gateway (recreate database endpoint)")
         await sg.put_database(sg_db, db_payload)
-        await sg.add_user(
-            sg_db,
-            "seth",
-            password="pass",
-            collection_access={
-                "_default": {"_default": {"admin_channels": ["SG", "SDK", "*"]}}
-            },
+        sg_user = await sg.create_user_client(
+            sg, sg_db, username, password, ["SG", "SDK"]
         )
 
         self.mark_test_step("Verify revisions, versions and contents of all documents")
@@ -178,6 +174,7 @@ class TestXattrs(CBLTestClass):
             f"{len(content_errors)} documents didn't have correct content: {content_errors}"
         )
 
+        await sg_user.close()
         await sg.delete_database(sg_db)
         cbs.drop_bucket(bucket_name)
 
@@ -186,6 +183,8 @@ class TestXattrs(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 1000
+        username = "vipul"
+        password = "pass"
         sg_db = "db"
         bucket_name = "data-bucket"
         channels = ["NASA"]
@@ -207,13 +206,8 @@ class TestXattrs(CBLTestClass):
             await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
 
-        self.mark_test_step("Create user 'vipul' with access to channels")
-        await sg.add_user(
-            sg_db,
-            "vipul",
-            password="pass",
-            collection_access={"_default": {"_default": {"admin_channels": channels}}},
-        )
+        self.mark_test_step(f"Create user {username} with access to channels")
+        sg_user = await sg.create_user_client(sg, sg_db, username, password, channels)
 
         self.mark_test_step(f"Bulk create {num_docs} docs via Sync Gateway")
         sg_docs: list[DocumentUpdateEntry] = []
@@ -257,7 +251,9 @@ class TestXattrs(CBLTestClass):
         all_doc_ids = sg_doc_ids + sdk_doc_ids
 
         self.mark_test_step("Get all docs via Sync Gateway and save revisions")
-        sg_all_docs = await sg.get_all_documents(sg_db, "_default", "_default")
+        sg_all_docs = await sg_user.get_all_documents(
+            sg_db, "_default", "_default", use_public_api=True
+        )
         assert len(sg_all_docs.rows) == num_docs * 2, (
             f"Expected {num_docs * 2} docs via SG, got {len(sg_all_docs.rows)}"
         )
@@ -346,7 +342,9 @@ class TestXattrs(CBLTestClass):
             await sg.purge_document(doc_id, sg_db, "_default", "_default")
 
         self.mark_test_step("Verify SG can't see any docs after purge")
-        sg_docs_after_purge = await sg.get_all_documents(sg_db, "_default", "_default")
+        sg_docs_after_purge = await sg_user.get_all_documents(
+            sg_db, "_default", "_default", use_public_api=True
+        )
         assert len(sg_docs_after_purge.rows) == 0, (
             f"Expected 0 docs after purge, got {len(sg_docs_after_purge.rows)}"
         )
@@ -372,6 +370,7 @@ class TestXattrs(CBLTestClass):
             f"Expected 0 docs visible via SDK after purge, got {sdk_visible_after_purge}"
         )
 
+        await sg_user.close()
         await sg.delete_database(sg_db)
         cbs.drop_bucket(bucket_name)
 
@@ -407,7 +406,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Create user '{username}' with access to SDK and SG channels"
         )
-        sg_user = await SyncGateway.create_user_client(
+        sg_user = await sg.create_user_client(
             sg, sg_db, username, password, ["sdk", "sg"]
         )
 
@@ -545,6 +544,7 @@ class TestXattrs(CBLTestClass):
             f"Expected {num_docs * 2} docs to be deleted via SG, got {sg_deleted_count}"
         )
 
+        await sg_user.close()
         await sg.delete_database(sg_db)
         cbs.drop_bucket(bucket_name)
 
@@ -577,9 +577,7 @@ class TestXattrs(CBLTestClass):
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to shared channel")
-        sg_user = await SyncGateway.create_user_client(
-            sg, sg_db, username, password, ["shared"]
-        )
+        sg_user = await sg.create_user_client(sg, sg_db, username, password, ["shared"])
 
         self.mark_test_step(
             f"Bulk create {num_docs} docs via SDK with tracking properties"
@@ -807,6 +805,7 @@ class TestXattrs(CBLTestClass):
             f"Expected {num_docs * 2} docs deleted via SG, got {sg_deleted_count}"
         )
 
+        await sg_user.close()
         await sg.delete_database(sg_db)
         cbs.drop_bucket(bucket_name)
 
@@ -865,10 +864,10 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Create users '{username1}', '{username2}' with access to '{sg_channel1}', '{sg_channel2}'"
         )
-        sg_user1 = await SyncGateway.create_user_client(
+        sg_user1 = await sg.create_user_client(
             sg, sg_db, username1, password, [sg_channel1]
         )
-        sg_user2 = await SyncGateway.create_user_client(
+        sg_user2 = await sg.create_user_client(
             sg, sg_db, username2, password, [sg_channel2]
         )
 
@@ -982,5 +981,7 @@ class TestXattrs(CBLTestClass):
             f"got {user1_count_after}"
         )
 
+        await sg_user1.close()
+        await sg_user2.close()
         await sg.delete_database(sg_db)
         cbs.drop_bucket(bucket_name)

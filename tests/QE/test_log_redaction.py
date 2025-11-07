@@ -48,12 +48,7 @@ class TestLogRedaction(CBLTestClass):
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to channels")
-        await sg.add_user(
-            sg_db,
-            username,
-            password=password,
-            collection_access={"_default": {"_default": {"admin_channels": channels}}},
-        )
+        sg_user = await sg.create_user_client(sg, sg_db, username, password, channels)
 
         self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
         sg_docs: list[DocumentUpdateEntry] = []
@@ -74,20 +69,17 @@ class TestLogRedaction(CBLTestClass):
             )
         await sg.update_documents(sg_db, sg_docs, "_default", "_default")
 
-        self.mark_test_step("Verify docs were created")
-        all_docs = await sg.get_all_documents(sg_db, "_default", "_default")
+        self.mark_test_step("Verify docs were created (public API)")
+        all_docs = await sg_user.get_all_documents(
+            sg_db, "_default", "_default", use_public_api=True
+        )
         assert len(all_docs.rows) == num_docs, (
             f"Expected {num_docs} docs, got {len(all_docs.rows)}"
         )
 
         self.mark_test_step("Fetch and scan SG logs for redaction violations")
-        server_config = await sg.get_server_config()
-        log_dir = server_config.get("logging", {}).get(
-            "log_file_path", "/home/ec2-user/log"
-        )
-        remote_log_path = f"{log_dir}/sg_debug.log"
         try:
-            log_contents = sg.fetch_log_file(remote_log_path, ssh_key_path)
+            log_contents = await sg.fetch_log_file("debug", ssh_key_path)
         except Exception as e:
             raise Exception(f"Could not fetch log file: {e}")
         sensitive_patterns = sg_doc_ids + [username]
@@ -99,5 +91,6 @@ class TestLogRedaction(CBLTestClass):
             + "\n".join(violations[:10])
         )
 
+        await sg_user.close()
         await sg.delete_database(sg_db)
         cbs.drop_bucket(bucket_name)

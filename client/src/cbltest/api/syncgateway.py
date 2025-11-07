@@ -1114,15 +1114,6 @@ class SyncGateway:
         assert revid == response_dict["_cv"] or revid == response_dict["_rev"]
         return cast(dict, response)["_rev"]
 
-    async def get_server_config(self) -> dict[str, Any]:
-        """
-        Gets the server-level configuration from the admin API.
-
-        Returns:
-            Dictionary containing the server configuration including logging settings
-        """
-        return await self._send_request("GET", "/_config")
-
     async def delete_document(
         self,
         doc_id: str,
@@ -1302,23 +1293,31 @@ class SyncGateway:
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
-    def fetch_log_file(
+    async def fetch_log_file(
         self,
-        remote_log_path: str,
+        log_type: str,
         ssh_key_path: str,
         ssh_username: str = "ec2-user",
     ) -> str:
         """
         Fetches a log file from the remote Sync Gateway server via SSH
 
-        :param remote_log_path: Path to the log file on the remote server
+        :param log_type: The type of log to fetch (e.g., 'debug', 'info', 'error', 'warn')
         :param ssh_key_path: Path to SSH private key for authentication
         :param ssh_username: SSH username (default: ec2-user)
         :return: Contents of the log file as a string
         """
+        # Get log directory from SG configuration
+        server_config = await self._send_request("GET", "/_config")
+        log_dir = server_config.get("logging", {}).get(
+            "log_file_path", "/home/ec2-user/log"
+        )
+        remote_log_path = f"{log_dir}/sg_{log_type}.log"
+
         with self.__tracer.start_as_current_span(
             "fetch_log_file",
             attributes={
+                "log.type": log_type,
                 "remote.path": remote_log_path,
                 "ssh.username": ssh_username,
             },
