@@ -261,12 +261,14 @@ internal static partial class HandlerList
         public bool enableAutoPurge { get; init; }
 
         public string? pinnedServerCert { get; init; }
+        
+        public IReadOnlyDictionary<string, string?>? headers { get; init; }
 
         [JsonConstructor]
         public StartReplicatorConfig(string database, string endpoint,
             string replicatorType, bool continuous, IReadOnlyList<StartReplicatorCollection> collections,
             StartReplicatorAuthenticator? authenticator = null, bool enableDocumentListener = false,
-            bool enableAutoPurge = true, string? pinnedServerCert = null)
+            bool enableAutoPurge = true, string? pinnedServerCert = null, IReadOnlyDictionary<string, string?>? headers = null)
         {
             this.database = database;
             this.endpoint = endpoint;
@@ -277,6 +279,7 @@ internal static partial class HandlerList
             this.enableDocumentListener = enableDocumentListener;
             this.enableAutoPurge = enableAutoPurge;
             this.pinnedServerCert = pinnedServerCert;
+            this.headers = headers;
 
             if (replicatorType.ToLowerInvariant() == "pull") {
                 ReplicatorType = ReplicatorType.Pull;
@@ -360,7 +363,8 @@ internal static partial class HandlerList
             EnableAutoPurge = deserializedBody.config.enableAutoPurge,
             PinnedServerCertificate = deserializedBody.config.pinnedServerCert != null 
                 ? new(Encoding.ASCII.GetBytes(deserializedBody.config.pinnedServerCert)) 
-                : null
+                : null,
+            Headers = deserializedBody.config.headers?.ToImmutableDictionary() ?? ImmutableDictionary<string, string?>.Empty,
         };
 
         var (repl, id) = session.ObjectManager.RegisterObject(() => new Replicator(replConfig));

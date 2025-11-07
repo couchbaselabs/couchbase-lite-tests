@@ -459,6 +459,9 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
         self.pinnedServerCert: str | None = None
         """The PEM representation of the TLS certificate that the remote is using"""
 
+        self.headers: dict[str, str] | None = None
+        """The headers to include in the replication requests"""
+
     def to_json(self) -> Any:
         """Serializes the :class:`PostStartReplicatorRequestBody` to a JSON string"""
         raw = {
@@ -469,6 +472,7 @@ class PostStartReplicatorRequestBody(TestServerRequestBody):
             "enableDocumentListener": self.enableDocumentListener,
             "enableAutoPurge": self.enableAutoPurge,
             "pinnedServerCert": self.pinnedServerCert,
+            "headers": self.headers,
         }
 
         if self.collections is not None:
