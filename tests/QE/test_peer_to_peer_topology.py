@@ -51,14 +51,18 @@ class TestPeerToPeerTopology(CBLTestClass):
             # Add documents to source peer
             self.mark_test_step(f"Add {num_of_docs} documents to the database on peer {phase}")
             source_db = all_dbs[source_peer_idx]
-            
-            async with source_db.batch_updater() as b:
-                for i in range(1, num_of_docs + 1):
-                    b.upsert_document(
-                        "_default._default", 
-                        f"phase{phase}-peer{phase}-doc{i}", 
-                        [{"random": randint(1, 100000)}]
-                    )
+
+            # Batch documents in chunks of 10 to avoid payload size limits
+            batch_size = 10
+            for start in range(1, num_of_docs + 1, batch_size):
+                end = min(start + batch_size, num_of_docs + 1)
+                async with source_db.batch_updater() as b:
+                    for i in range(start, end):
+                        b.upsert_document(
+                            "_default._default",
+                            f"phase{phase}-peer{phase}-doc{i}",
+                            [{"random": randint(1, 100000)}],
+                        )
 
             # Start listeners on target peers
             self.mark_test_step(f"Start listeners on peers {[p+1 for p in target_peers]}")
@@ -158,13 +162,17 @@ class TestPeerToPeerTopology(CBLTestClass):
             self.mark_test_step(f"Add {num_of_docs} documents to the database on peer {phase}")
             source_db = all_dbs[source_peer_idx]
 
-            async with source_db.batch_updater() as b:
-                for i in range(1, num_of_docs + 1):
-                    b.upsert_document(
-                        "_default._default",
-                        f"phase{phase}-peer{phase}-doc{i}",
-                        [{"random": randint(1, 100000)}],
-                    )
+            # Batch documents in chunks of 10 to avoid payload size limits
+            batch_size = 10
+            for start in range(1, num_of_docs + 1, batch_size):
+                end = min(start + batch_size, num_of_docs + 1)
+                async with source_db.batch_updater() as b:
+                    for i in range(start, end):
+                        b.upsert_document(
+                            "_default._default",
+                            f"phase{phase}-peer{phase}-doc{i}",
+                            [{"random": randint(1, 100000)}],
+                        )
 
             # Start listener on target peer
             self.mark_test_step(f"Start listener on peer {target_peer_idx + 1}")
