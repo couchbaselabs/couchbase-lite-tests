@@ -86,10 +86,11 @@ class TestPeerToPeerTopology(CBLTestClass):
             )
             replicators = []
             for target_idx, listener in listeners:
+                listener_port = 59840 if listener.port is None else listener.port
                 replicator = Replicator(
                     source_db,
                     endpoint=cblpytest.test_servers[target_idx].replication_url(
-                        "db1", listener.port
+                        "db1", listener_port
                     ),
                     replicator_type=replicator_type,
                     collections=[ReplicatorCollectionEntry(["_default._default"])],
@@ -202,10 +203,11 @@ class TestPeerToPeerTopology(CBLTestClass):
             self.mark_test_step(
                 f"Setup replicator from peer {phase} to peer {target_peer_idx + 1}"
             )
+            listener_port = 59840 if listener.port is None else listener.port
             replicator = Replicator(
                 source_db,
                 endpoint=cblpytest.test_servers[target_peer_idx].replication_url(
-                    "db1", listener.port
+                    "db1", listener_port
                 ),
                 replicator_type=replicator_type,
                 collections=[ReplicatorCollectionEntry(["_default._default"])],
