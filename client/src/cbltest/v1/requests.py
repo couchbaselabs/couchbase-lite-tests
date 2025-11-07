@@ -713,7 +713,11 @@ class PostStartListenerRequestBody(TestServerRequestBody):
         return self.__disable_tls
 
     def __init__(
-        self, db: str, collections: list[str], port: int | None = None, disable_tls: bool = False
+        self,
+        db: str,
+        collections: list[str],
+        port: int | None = None,
+        disable_tls: bool = False,
     ):
         super().__init__(1)
         self.__database = db
