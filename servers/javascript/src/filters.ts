@@ -1,50 +1,48 @@
-import type * as cbl from "@couchbase/lite-js";
+import * as cbl from "@couchbase/lite-js";
+
 import type * as tdk from "./tdkSchema";
 import {check, isObject} from "./utils";
 
-
 // https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/replication-filters.md
 
-type PushReplicatorFilter = (rev: cbl.RevisionInfo) => boolean;
+type PushReplicatorFilter = (doc: cbl.CBLDocument, flags: cbl.DocumentFlags) => boolean;
 type PushFilterMaker = (spec: tdk.Filter) => PushReplicatorFilter;
-type PullReplicatorFilter = (rev: cbl.RemoteRevisionInfo) => boolean;
+type PullReplicatorFilter = (doc: cbl.CBLDocument, flags: cbl.DocumentFlags) => boolean;
 type PullFilterMaker = (spec: tdk.Filter) => PullReplicatorFilter;
 
-function _documentIDs(spec: tdk.Filter, rev: cbl.RemoteRevisionInfo | cbl.RevisionInfo) : boolean {
+function _documentIDs(spec: tdk.Filter, doc: cbl.CBLDocument, _flags: cbl.DocumentFlags) : boolean {
     const documentIDs = spec.params?.documentIDs;
     check(isObject(documentIDs), "documentIDs must be an object");
-    // Currently JS API doesn't provide information regarding the collection
-    // so validating that only one collection is allowed at least for now.
-    check(Object.keys(documentIDs).length === 1, "documentIDs have more than one collection");
 
-    const ids = Object.values(documentIDs)[0];
+    const meta = cbl.meta(doc);
+    const ids = documentIDs[meta.collection.name];
     check(Array.isArray(ids), "documentIDs's value must be an array");
 
     const docSet = new Set(ids);
-    return docSet.has(rev.id as string);
+    return docSet.has(meta.id);
 }
 
-function _deletedDocumentsOnly(rev: cbl.RemoteRevisionInfo | cbl.RevisionInfo) : boolean {
-    return !!rev.deleted;
+function _deletedDocumentsOnly(_doc: cbl.CBLDocument, flags: cbl.DocumentFlags) : boolean {
+    return (flags & cbl.DocumentFlags.deleted) !== 0;
 }
 
 export const TDKPushReplicationFilters: Record<string,PushFilterMaker> = {
     documentIDs: (spec) => {
-        return rev => _documentIDs(spec, rev);
+        return (doc, flags) => _documentIDs(spec, doc, flags);
     },
 
     deletedDocumentsOnly: (_spec) => {
-        return rev => _deletedDocumentsOnly(rev);
+        return (doc, flags) => _deletedDocumentsOnly(doc, flags);
     }
 };
 
 export const TDKPullReplicationFilters: Record<string,PullFilterMaker> = {
     documentIDs: (spec) => {
-        return rev => _documentIDs(spec, rev);
+        return (doc, flags) => _documentIDs(spec, doc, flags);
     },
 
     deletedDocumentsOnly: (_spec) => {
-        return rev => _deletedDocumentsOnly(rev);
+        return (doc, flags) => _deletedDocumentsOnly(doc, flags);
     }
 };
 
