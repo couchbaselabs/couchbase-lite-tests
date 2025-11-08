@@ -21,7 +21,7 @@ import * as tdk from "./tdkSchema";
 import * as cbl from "@couchbase/lite-js";
 import * as logtape from "@logtape/logtape";
 import { TDKConflictResolvers } from "./conflictResolvers";
-import { CreatePushFilter, CreatePullFilter } from "./filters";
+import { CreateFilter } from "./filters";
 
 
 interface ReplicatorInfo {
@@ -231,7 +231,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             if (rq.config.replicatorType !== 'pull') {
                 collCfg.push = {
                     continuous: rq.config.continuous,
-                    filter:     CreatePushFilter(colls.pushFilter),
+                    filter:     CreateFilter(colls.pushFilter),
                 };
             }
 
@@ -240,7 +240,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                     continuous: rq.config.continuous,
                     enableAutoPurge: rq.config.enableAutoPurge,
                     channels:   colls.channels,
-                    filter:     CreatePullFilter(colls.pullFilter),
+                    filter:     CreateFilter(colls.pullFilter),
                 };
                 if (colls.conflictResolver) {
                     const name = colls.conflictResolver.name;
