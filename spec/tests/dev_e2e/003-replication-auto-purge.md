@@ -182,7 +182,10 @@ Test that when the removed access documents are filtered, the removed access doc
    * credentials: user1/pass
 8. Check document replications:
    * `post_1` has access-removed flag set with no error.
-   * `post_2` has access-removed flag set with WebSocket/403 ("CBL, 10403) error.
+   * Note: JS doesn't notify document ended error notifications when documents 
+      are rejected by pull replication filters. The other platforms plan to align 
+      this behavior. So we are not checking the error from the filtered removed 
+      revision here. See CBL-7246 and CBL-7645 for more details. 
 9. Check local documents:
    * `post_1` was purged.
    * `post_2` still exists.

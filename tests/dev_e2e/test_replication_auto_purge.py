@@ -732,7 +732,10 @@ class TestReplicationAutoPurge(CBLTestClass):
         self.mark_test_step("""
             Check document replications
                * `post_1` has access-removed flag set with no error.
-               * `post_2` has access-removed flag set with WebSocket/403 ("CBL, 10403) error.
+               * Note: JS doesn't notify document ended error notifications when documents 
+                 are rejected by pull replication filters. The other platforms plan to align 
+                 this behavior. So we are not checking the error from the filtered removed 
+                 revision here. See CBL-7246 and CBL-7645 for more details. 
         """)
         await repl2.wait_for_all_doc_events(
             {
@@ -741,15 +744,7 @@ class TestReplicationAutoPurge(CBLTestClass):
                     "post_1",
                     ReplicatorType.PULL,
                     ReplicatorDocumentFlags.ACCESS_REMOVED,
-                ),
-                WaitForDocumentEventEntry(
-                    "_default.posts",
-                    "post_2",
-                    ReplicatorType.PULL,
-                    ReplicatorDocumentFlags.ACCESS_REMOVED,
-                    "CBL",
-                    10403,
-                ),
+                )
             }
         )
 
