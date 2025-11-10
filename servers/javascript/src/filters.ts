@@ -15,7 +15,11 @@ export const TDKReplicationFilters: Record<string,FilterMaker> = {
             check(isObject(documentIDs), "documentIDs must be an object");
 
             const meta = cbl.meta(doc);
-            const ids = documentIDs[meta.collection.name];
+            const collectionFullName = meta.collection.name.includes(".")
+                ? meta.collection.name
+                : `_default.${meta.collection.name}`;
+
+            const ids = documentIDs[collectionFullName];
             check(Array.isArray(ids), "documentIDs's value must be an array");
 
             const docSet = new Set(ids);
