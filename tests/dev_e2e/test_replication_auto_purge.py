@@ -17,6 +17,7 @@ from cbltest.api.replicator_types import (
     WaitForDocumentEventEntry,
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.responses import ServerVariant
 
 
 @pytest.mark.min_test_servers(1)
@@ -732,26 +733,42 @@ class TestReplicationAutoPurge(CBLTestClass):
         self.mark_test_step("""
             Check document replications
                * `post_1` has access-removed flag set with no error.
-               * `post_2` has access-removed flag set with WebSocket/403 ("CBL, 10403) error.
+               * `post_2` has access-removed flag set with WebSocket/403 ("CBL, 10403) error (except JS)
+            Note: 
+               * JS doesn't notify document ended notification when documents are rejected 
+                 by the pull replication filter. Maybe implemented in the future based on demands.
+                 See CBL-7246 for more details 
         """)
-        await repl2.wait_for_all_doc_events(
-            {
-                WaitForDocumentEventEntry(
-                    "_default.posts",
-                    "post_1",
-                    ReplicatorType.PULL,
-                    ReplicatorDocumentFlags.ACCESS_REMOVED,
-                ),
-                WaitForDocumentEventEntry(
-                    "_default.posts",
-                    "post_2",
-                    ReplicatorType.PULL,
-                    ReplicatorDocumentFlags.ACCESS_REMOVED,
-                    "CBL",
-                    10403,
-                ),
-            }
-        )
+        if (await cblpytest.test_servers[0].get_info()).variant != ServerVariant.JS:
+            await repl2.wait_for_all_doc_events(
+                {
+                    WaitForDocumentEventEntry(
+                        "_default.posts",
+                        "post_1",
+                        ReplicatorType.PULL,
+                        ReplicatorDocumentFlags.ACCESS_REMOVED,
+                    ),
+                    WaitForDocumentEventEntry(
+                        "_default.posts",
+                        "post_2",
+                        ReplicatorType.PULL,
+                        ReplicatorDocumentFlags.ACCESS_REMOVED,
+                        "CBL",
+                        10403,
+                    ),
+                }
+            )
+        else:
+            await repl2.wait_for_all_doc_events(
+                {
+                    WaitForDocumentEventEntry(
+                        "_default.posts",
+                        "post_1",
+                        ReplicatorType.PULL,
+                        ReplicatorDocumentFlags.ACCESS_REMOVED,
+                    )
+                }
+            )
 
         self.mark_test_step("""
             Check the local docs
