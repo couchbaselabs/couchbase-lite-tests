@@ -141,6 +141,7 @@ class Replicator:
             payload.pinnedServerCert = self.pinned_server_cert
             payload.reset = self.reset
             payload.collections = self.collections
+            payload.headers = self.headers
             req = self.__request_factory.create_request(
                 TestServerRequestType.START_REPLICATOR, payload
             )
