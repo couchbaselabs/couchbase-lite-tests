@@ -27,7 +27,31 @@ For more information on the specifics see the following sub README:
 - [Log Slurp Setup](./logslurp_setup/README.md)
 - [Topology Setup](./topology_setup/README.md)
 
-## Step 0: Prerequisites
+## Prerequisites (Don't worry, you will do this once and then forget)
+
+### AWS Credentials (One of the most annoying...)
+
+**Step 0-A: Getting access to the cb-mobile account**
+
+This has to happen through IT.  No one on the dev team or otherwise can do this.  You may (should) already have it as a member of the mobile team.  To confirm, go to the Couchbase Okta landing page and select AWS SSO from the panels.  If you are a member you will see "cb-mobile" under AWS Accounts.  Expand it and choose "Admin"
+
+**Step 0-B: Switch to us-east-1**
+
+This is so important that it needs its own step, since if you do anything without this you will end up re-doing it.  Switch your region to us-east-1.  That is, make sure that at the top left next to your username it shows "United States (N. Virginia)".  The static networking infrastructure for adding EC2 users is in this region, and tests will not work correctly in another.
+
+**Step 0-C: You need your own user**
+
+Once logged into AWS and switched to us-east-1, you need an IAM user.  Someone on the dev team can help you with that if you don't have one, but to confirm you need to navigate to the IAM > Users page (The search bar can very much help you navigate the gigantic AWS universe).  See if there is a user with your email address.  If not, get one created by asking your manager or one of the principals.
+
+**Step 0-D: The actual credentials**
+
+Click on your user in the users list, navigate to the Security Credentials tab, scroll down and select "Create Access Key".  Choose any option you like, it doesn't matter.  This is just where Amazon tries to tell you there are better ways to do this (that our IT policies have rendered impossible).  Choose next and copy your Key ID and Secret Access Key.  They will go into a file called `$HOME/.aws/credentials` as follows
+
+```
+[default]
+aws_access_key_id=<redacted>
+aws_secret_access_key=<redacted>
+```
 
 ### Public / Private Key Pair
 
@@ -36,9 +60,18 @@ One of the core principles of making this backend work is SSH key access.  This 
 1. The public key gets stored on Amazon servers for deployment to EC2 containers, and it has a user-selected name that you must remember (mine is jborden, for example)
 2. The private key gets stored by YOU.  Don't lose it or you will have to repeat this process.
 
+> [!NOTE]  
+> Use the ED25519 key type.  RSA keys will not work correctly.  This is a limitation I accidentally created and I could probably work around but I doubt it will give any sort of benefit.
+
 ### Python dependencies
 
-You need to make sure that the [python dependencies](./requirements.txt) are installed in whatever environment you are using
+You need to make sure that the [python dependencies](./requirements.txt) are installed in whatever environment you are using.  If you know nothing about python that means that when you use this orchestration you need to run `pip install -r requirements.txt` before trying to do anything, so that its dependencies are installed.  The most sane way to do this is to install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then run the following:
+
+```
+uv venv --python 3.10
+source .venv/bin/activate
+uv pip install -r requirements.txt
+```
 
 ### SSH configuration
 
@@ -57,20 +90,6 @@ Host *.amazonaws.com
     IdentityFile <path/to/key>
 ```
 
-### AWS Credentials
-
-You will need to set up your Amazon AWS credentials so that terraform can use them.  As a Couchbase Employee the easiest way to do this is to set them up as described on the AWS SSO page that can be accessed via the Okta landing page.  The easiest result (option 2 on the resulting page) looks something like the following added to `$HOME/.aws/credentials`
-
-```
-[<redacted>_Admin]
-aws_access_key_id=<redacted>
-aws_secret_access_key=<redacted>
-aws_session_token=<redacted>
-```
-
-> [!NOTE]  
-> Using this method the credentials will only last for a few hours.  If you want a longer session than that you will need to use your long term credentials and getting them is beyond the scope of this document.  You will need to become familiar with the [IAM Section](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html) of AWS for that.
-
 ### Git LFS
 
 As stated in the top level README of this repo, Git LFS must be installed so that the datasets and blobs are properly pulled for building test servers.  
@@ -81,11 +100,11 @@ The AWS instances are set up using [terraform](https://developer.hashicorp.com/t
 
 ### Xcode 16.0 or higher (iOS only)
 
-This is required because of a command usage that was introduced in this version of Xcode
+This is required because of a command usage that was introduced in this version of Xcode.  Your best bet is to simply install the latest version of Xcode.
 
 ### iPhone Private WiFi (iOS only)
 
-The "Private Wi-Fi Address" setting of the network that the nodes and devices are connected to *must* be set to `Off` for auto detection of iOS device IP addresses to work.
+The "Private Wi-Fi Address" setting of any iOS devices intended to be used *must* be set to `Off` for auto detection of iOS device IP addresses to work.
 
 ### libimobiledevice (iOS only)
 
@@ -95,7 +114,9 @@ You need to install this package from homebrew as it is a dependency for the iOS
 
 If you are working with devices that are iOS 16.x or lower you will need to install [XHarness](https://github.com/dotnet/xharness)
 
-## Step 1: Infrastructure
+## Infrastructure Deep Dive
+
+Skip to [Putting it all together](#putting-it-all-together) if you are just after how to run the orchestrator.  
 
 It's not enough to simply spin up virtual machines.  The creator (i.e. the person modifying the [config file](./main.tf)) is responsible for basically defining the entire virtual network that the machines are located in it, including any LAN subnets and external Internet access.  The tool being used here is [Terraform](https://developer.hashicorp.com/terraform/docs), and the [config file](./main.tf) defines what resources are created when the terraform command is run.  Here is a list of what is created or read in this config file:
 
@@ -107,11 +128,13 @@ It's not enough to simply spin up virtual machines.  The creator (i.e. the perso
 
 Creating and destroying these resources is as simple as running `terraform apply` and `terraform destroy` respectively.  You can add the following to avoid the console prompting you:  `-var=keyname=<keyname-from-step-0> -auto-approve`.  Other useful variables are `logslurp`, which is a bool indicating whether or not logslurp is needed, `sgw_count` which is the number of EC2 instances to create for SGW, and `server_count` which is the number of EC2 instances to create for Couchbase Server.  These default to `true`, `1`, and `1`.
 
-## Step 2: Deployment
+## Deployment
+
+Skip to [Putting it all together](#putting-it-all-together) if you are just after how to run the orchestrator.
 
 ### AWS
 
-Once the resources are in place, they need to have the appropriate software installed on them.  The scripts for doing so are in the `sgw_setup` (for Sync Gateway) and `server_setup` (for Couchbase Server) folders.  
+Once the resources are in place, they need to have the appropriate software installed on them.  For example, the scripts for doing so for Sync Gateway and Couchbase Server are in the `sgw_setup` (for Sync Gateway) and `server_setup` (for Couchbase Server) folders.  There are other folders that have "setup" in their name which address other things like LogSlurp, Edge Server, etc.
 
 The rough set of steps for Couchbase Server is as follows:
 
@@ -125,6 +148,11 @@ For Sync Gateway:
 - Upload SGW build and config files
 - Create needed home directory subdirectories for config / logs
 - Install and start SGW
+
+Various Others:
+
+- Install docker on EC2
+- Start a container of a given image via docker SSH context
 
 ### Test Server
 
