@@ -27,31 +27,14 @@ For more information on the specifics see the following sub README:
 - [Log Slurp Setup](./logslurp_setup/README.md)
 - [Topology Setup](./topology_setup/README.md)
 
-## Prerequisites (Don't worry, you will do this once and then forget)
+## Prerequisites
 
-### AWS Credentials (One of the most annoying...)
+### AWS SSO Configuration
 
-**Step 0-A: Getting access to the cb-mobile account**
+You need to configure the aws CLI to login with Okta.  You can do so by following the steps on the internal [wiki page](https://confluence.issues.couchbase.com/wiki/spaces/cbeng/pages/3243114500/AWS+access) on the topic.  Specifically for the TDK, pay attention to what you choose as the profile name.  You have two choices here:
 
-This has to happen through IT.  No one on the dev team or otherwise can do this.  You may (should) already have it as a member of the mobile team.  To confirm, go to the Couchbase Okta landing page and select AWS SSO from the panels.  If you are a member you will see "cb-mobile" under AWS Accounts.  Expand it and choose "Admin"
-
-**Step 0-B: Switch to us-east-1**
-
-This is so important that it needs its own step, since if you do anything without this you will end up re-doing it.  Switch your region to us-east-1.  That is, make sure that at the top left next to your username it shows "United States (N. Virginia)".  The static networking infrastructure for adding EC2 users is in this region, and tests will not work correctly in another.
-
-**Step 0-C: You need your own user**
-
-Once logged into AWS and switched to us-east-1, you need an IAM user.  Someone on the dev team can help you with that if you don't have one, but to confirm you need to navigate to the IAM > Users page (The search bar can very much help you navigate the gigantic AWS universe).  See if there is a user with your email address.  If not, get one created by asking your manager or one of the principals.
-
-**Step 0-D: The actual credentials**
-
-Click on your user in the users list, navigate to the Security Credentials tab, scroll down and select "Create Access Key".  Choose any option you like, it doesn't matter.  This is just where Amazon tries to tell you there are better ways to do this (that our IT policies have rendered impossible).  Choose next and copy your Key ID and Secret Access Key.  They will go into a file called `$HOME/.aws/credentials` as follows
-
-```
-[default]
-aws_access_key_id=<redacted>
-aws_secret_access_key=<redacted>
-```
+1. Choose "default" as the profile name, and then you are done (this will have an effect on any existing AWS config you have so be careful)
+2. Choose any other profile name, including the default provided one, and set it in the environment variable `AWS_PROFILE` before running the orchestrator
 
 ### Public / Private Key Pair
 
