@@ -294,7 +294,7 @@ class TestQueryConsistency(CBLTestClass):
              ON airports.icao = routes.destinationairport
             WHERE airports.country = "United States"
              AND routes.stops = 0
-            ORDER BY routes.destinationairport
+            ORDER BY routes.sourceairport
         """
 
         await self._test_join(cblpytest, query)
