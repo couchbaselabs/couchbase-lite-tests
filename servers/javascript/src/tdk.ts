@@ -396,6 +396,11 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         }
         this.#logger.info `Reset: Creating database ${name} with ${collections?.length ?? 0} collection(s)`;
         const db = await cbl.Database.open({name: name, version: 1, collections: colls});
+        if (import.meta.env.VITE_ENCRYPTED_DBS === 'true') {
+            this.#logger.info `- VITE_ENCRYPTED_DBS set, adding encryption to ${name}`;
+            await db.changeEncryptionKey("password");
+        }
+
         this.#databases.set(name, db);
         return db;
     }
