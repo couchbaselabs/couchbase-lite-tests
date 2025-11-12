@@ -15,32 +15,22 @@ This test verifies that NO document IDs or usernames appear in logs WITHOUT `<ud
 5. Verify docs were created (public API)
 6. Fetch and scan SG logs for redaction violations
 
-## test_redacted_files_via_command_line
+## test_sgcollect_redacted_files_and_contents
 
-Test that SGCollect properly marks sensitive data with redaction tags.
+Test SGCollect REST API for redacted files and log file contents (Combined test).
 
-This test verifies that when `redaction_level` is "partial", SGCollect creates a redacted zip file where sensitive data (usernames, doc IDs) is marked with `<ud>...</ud>` tags.
+This comprehensive test uses the `/_sgcollect_info` REST API to trigger SGCollect with partial redaction, then verifies:
+1. All expected log files are present in the zip
+2. Sensitive data is marked with `<ud>` tags in redacted files  
+3. sync_gateway.log contains correct system information (hostname)
 
 **Prerequisites**: Sync Gateway bootstrap.json must be configured with `redaction_level: "partial"` in the logging section.
-
-1. Create bucket and default collection
-2. Configure Sync Gateway with log redaction enabled
-3. Create user 'vipul' with access to ['log-redaction']
-4. Create 10 docs via Sync Gateway
-5. Verify docs were created via public API
-6. Run SGCollect to generate diagnostic zip
-7. Verify redacted zip marks sensitive data with <ud> tags
-
-## test_sgcollect_via_rest_api
-
-Test SGCollect REST API and verify all expected log files exist in generated zip.
-
-This test uses the `/_sgcollect_info` REST API endpoint (instead of command line) to trigger collection, and verifies that all expected log files are present in the resulting zip and contain correct system information.
 
 1. Create bucket and default collection
 2. Configure Sync Gateway
 3. Create user 'vipul' with access to ['logging']
 4. Create 10 docs via Sync Gateway
 5. Start SGCollect via REST API and wait for it to complete
-6. Verify all expected log files exist in SGCollect zip
-7. Verify content of sync_gateway.log
+6. Download and extract SGCollect redacted zip
+7. Verify redacted zip marks sensitive data with <ud> tags
+8. Verify content of sync_gateway.log
