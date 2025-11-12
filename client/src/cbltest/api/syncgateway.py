@@ -200,11 +200,6 @@ class DatabaseStatusResponse:
         return self.__state
 
     @property
-    def online(self) -> bool:
-        """Gets whether the database is online"""
-        return self.__state == "Online"
-
-    @property
     def update_seq(self) -> int:
         """Gets the update sequence number"""
         return self.__update_seq
