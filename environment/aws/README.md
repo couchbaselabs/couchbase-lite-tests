@@ -48,7 +48,7 @@ One of the core principles of making this backend work is SSH key access.  This 
 
 ### Python dependencies
 
-You need to make sure that the [python dependencies](./requirements.txt) are installed in whatever environment you are using.  If you know nothing about python that means that when you use this orchestration you need to run `pip install -r requirements.txt` before trying to do anything, so that its dependencies are installed.  The most sane way to do this is to install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then run the following:
+First of all you need to be using Python 3.10 or higher, but less than 3.13 (it might work but it's been known to cause issues sometimes).  You also need to make sure that the [python dependencies](./requirements.txt) are installed in whatever environment you are using.  If you know nothing about python that means that when you use this orchestration you need to run `pip install -r requirements.txt` before trying to do anything, so that its dependencies are installed.  The most sane way to do this is to install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then run the following:
 
 ```
 uv venv --python 3.10
