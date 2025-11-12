@@ -11,7 +11,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.edgeserver import BulkDocOperation
 from cbltest.api.httpclient import ClientFactory, HTTPClient
-from cbltest.api.jsongenerator import JSONGenerator
+from cbltest.api.json_generator import JSONGenerator
 
 
 class TestEdgeServerChaos(CBLTestClass):

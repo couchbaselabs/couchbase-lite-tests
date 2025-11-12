@@ -34,7 +34,7 @@ class TestBlobs(CBLTestClass):
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.add_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc["id"], doc)
         logger.info("2 documents created in Couchbase Server.")
 
         self.mark_test_step(
@@ -753,7 +753,7 @@ class TestBlobs(CBLTestClass):
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.add_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc["id"], doc)
         logger.info("2 documents created in Couchbase Server.")
 
         self.mark_test_step(

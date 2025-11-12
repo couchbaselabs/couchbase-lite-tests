@@ -33,7 +33,7 @@ class TestChangesFeed(CBLTestClass):
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.add_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc["id"], doc)
         logger.info("5 documents created in Couchbase Server.")
 
         self.mark_test_step(
