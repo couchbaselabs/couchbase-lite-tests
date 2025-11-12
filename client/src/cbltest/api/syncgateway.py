@@ -1,5 +1,4 @@
 import asyncio
-import re
 import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
@@ -183,6 +182,37 @@ class AllDocumentsResponseRow:
         self.__id = id
         self.__revid = revid
         self.__cv = cv
+
+
+class DatabaseStatusResponse:
+    """
+    A class representing a database status response from Sync Gateway
+    """
+
+    @property
+    def db_name(self) -> str:
+        """Gets the database name"""
+        return self.__db_name
+
+    @property
+    def state(self) -> str:
+        """Gets the database state ('Online', 'Offline', etc.)"""
+        return self.__state
+
+    @property
+    def online(self) -> bool:
+        """Gets whether the database is online"""
+        return self.__state == "Online"
+
+    @property
+    def update_seq(self) -> int:
+        """Gets the update sequence number"""
+        return self.__update_seq
+
+    def __init__(self, response: dict):
+        self.__db_name = response.get("db_name", "")
+        self.__state = response.get("state", "Unknown")
+        self.__update_seq = response.get("update_seq", 0)
 
 
 class AllDocumentsResponse:
@@ -631,20 +661,24 @@ class SyncGateway:
         """
         await self._put_database(db_name, payload, 0)
 
-    async def database_exists(self, db_name: str) -> bool:
+    async def get_database_status(self, db_name: str) -> DatabaseStatusResponse | None:
         """
-        Checks if a database exists in Sync Gateway's configuration.
+        Gets the status of a database including its online/offline state.
 
-        :param db_name: The name of the Database to check
-        :return: True if the database exists, False otherwise
+        :param db_name: The name of the Database
+        :return: DatabaseStatusResponse with state, sequences, etc. Returns None if database doesn't exist (404/403)
         """
-        try:
-            await self._send_request("get", f"/{db_name}")
-            return True
-        except CblSyncGatewayBadResponseError as e:
-            if e.code == 403:  # Database does not exist
-                return False
-            raise
+        with self.__tracer.start_as_current_span(
+            "get_database_status", attributes={"cbl.database.name": db_name}
+        ):
+            try:
+                resp = await self._send_request("get", f"/{db_name}/")
+                assert isinstance(resp, dict)
+                return DatabaseStatusResponse(cast(dict, resp))
+            except CblSyncGatewayBadResponseError as e:
+                if e.code in [403, 404]:  # Database doesn't exist
+                    return None
+                raise
 
     async def _delete_database(self, db_name: str, retry_count: int = 0) -> None:
         with self.__tracer.start_as_current_span(
@@ -658,8 +692,6 @@ class SyncGateway:
                         f"Sync gateway returned 500 from DELETE database call, retrying ({retry_count + 1})..."
                     )
                     current_span.add_event("SGW returned 500, retry")
-                    import asyncio
-
                     await asyncio.sleep(2)
                     await self._delete_database(db_name, retry_count + 1)
                 elif e.code == 403:
@@ -1318,20 +1350,7 @@ class SyncGateway:
                 "ssh.username": ssh_username,
             },
         ):
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-            # Load private key
-            private_key = paramiko.Ed25519Key.from_private_key_file(ssh_key_path)
-
-            # Connect to the remote server
-            ssh.connect(
-                self.__hostname,
-                username=ssh_username,
-                pkey=private_key,
-            )
-
-            # Read the log file
+            ssh = self._ssh_connect(ssh_key_path, ssh_username)
             sftp = ssh.open_sftp()
             try:
                 with sftp.open(remote_log_path, "r") as remote_file:
@@ -1341,89 +1360,6 @@ class SyncGateway:
                 ssh.close()
 
             return log_contents
-
-    async def run_sgcollect_info(
-        self,
-        ssh_key_path: str,
-        output_name: str = "sgcollect",
-        ssh_username: str = "ec2-user",
-    ) -> str:
-        """
-        Runs sgcollect_info on the remote SG server to create diagnostic zip
-
-        :param ssh_key_path: Path to SSH private key for authentication
-        :param output_name: Name for the output zip file (without extension)
-        :param ssh_username: SSH username (default: ec2-user)
-        :return: Full path to the generated zip file on remote server
-        """
-        with self.__tracer.start_as_current_span(
-            "run_sgcollect_info",
-            attributes={
-                "output.name": output_name,
-                "ssh.username": ssh_username,
-            },
-        ):
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            private_key = paramiko.Ed25519Key.from_private_key_file(ssh_key_path)
-            ssh.connect(
-                self.__hostname,
-                username=ssh_username,
-                pkey=private_key,
-            )
-
-            # Run sgcollect_info
-            output_dir = "/tmp/sgcollect_output"
-            ssh.exec_command(f"rm -rf {output_dir}")
-            stdin, stdout, stderr = ssh.exec_command(
-                "which sgcollect_info || find /opt/couchbase-sync-gateway -name sgcollect_info 2>/dev/null | head -1"
-            )
-            sgcollect_path = stdout.read().decode("utf-8").strip()
-            if not sgcollect_path:
-                ssh.close()
-                raise Exception(
-                    "sgcollect_info not found on remote server. Is Sync Gateway installed?"
-                )
-
-            server_config = await self._send_request("GET", "/_config")
-            redaction_level = server_config.get("logging", {}).get(
-                "redaction_level", "none"
-            )
-
-            scheme = "https" if self.__secure else "http"
-            sg_url = f"{scheme}://{self.__hostname}:{self.__admin_port}"
-            sgcollect_cmd = (
-                f"mkdir -p {output_dir} && cd {output_dir} && "
-                f"SG_PASSWORD=password {sgcollect_path} "
-                f"--sync-gateway-url={sg_url} "
-                f"--sync-gateway-username=admin "
-                f"--log-redaction-level={redaction_level} "
-                f"{output_name}.zip"
-            )
-            stdin, stdout, stderr = ssh.exec_command(sgcollect_cmd)
-            exit_status = stdout.channel.recv_exit_status()
-
-            stderr_output = stderr.read().decode("utf-8")
-            if exit_status != 0:
-                ssh.close()
-                raise Exception(
-                    f"sgcollect_info failed with exit code {exit_status}: {stderr_output}"
-                )
-
-            # Check for redacted zip file
-            stdin, stdout, stderr = ssh.exec_command(
-                f"test -f {output_dir}/{output_name}-redacted.zip && echo 'redacted' || echo 'none'"
-            )
-            has_redacted = stdout.read().decode("utf-8").strip() == "redacted"
-            ssh.close()
-
-            # Return appropriate path
-            if has_redacted:
-                return f"{output_dir}/{output_name}-redacted.zip"
-            else:
-                raise Exception(
-                    f"No zip files found in {output_dir} after sgcollect_info"
-                )
 
     async def start_sgcollect_via_api(
         self,
@@ -1556,27 +1492,6 @@ class SyncGateway:
             sftp.close()
             ssh.close()
 
-    async def wait_for_database_to_be_offline(self, db_name: str) -> None:
-        """
-        Waits for a database to be offline
-
-        :param db_name: Database name to wait for
-        """
-        max_attempts = 6
-        wait_time = 5
-        for _ in range(max_attempts):
-            try:
-                resp = await self._send_request("get", f"/{db_name}")
-                if resp.code == 403:
-                    return
-            except Exception as e:
-                if isinstance(e, CblSyncGatewayBadResponseError) and e.code == 403:
-                    return
-                await asyncio.sleep(wait_time)
-        raise Exception(
-            f"Database {db_name} did not go offline after {max_attempts * wait_time} seconds."
-        )
-
     async def scan_rest_endpoints(
         self,
         db_name: str,
@@ -1589,12 +1504,11 @@ class SyncGateway:
         :param db_name: Database name to test
         :param expected_online: True if DB should be online, False if offline
         :param num_docs: Number of docs (for testing doc operations)
-        :return: Tuple of (endpoints_tested, errors_503)
+        :return: Tuple of (endpoints_tested, errors_403) where errors_403 is count of 403/503 errors or connection failures
         """
         endpoints_tested = 0
         errors_403 = 0
 
-        # List of endpoints to test
         test_operations = [
             (
                 "GET /{db}/_all_docs",
@@ -1606,9 +1520,7 @@ class SyncGateway:
             ),
             (
                 "GET /{db}/{doc}",
-                lambda: self.get_document(
-                    db_name, f"{db_name}_doc_0", "_default", "_default"
-                ),
+                lambda: self.get_document(db_name, "doc_0", "_default", "_default"),
             ),
             (
                 "POST /{db}/_bulk_docs",
@@ -1626,104 +1538,15 @@ class SyncGateway:
                 endpoints_tested += 1
             except (CblSyncGatewayBadResponseError, JSONDecodeError) as e:
                 endpoints_tested += 1
-                if isinstance(e, CblSyncGatewayBadResponseError) and e.code == 403:
+                if isinstance(e, CblSyncGatewayBadResponseError) and e.code in [
+                    403,
+                    503,
+                ]:
                     errors_403 += 1
                 elif isinstance(e, JSONDecodeError):
                     errors_403 += 1
                 else:
                     raise e
             except Exception as e:
-                endpoints_tested += 1
                 raise e
         return (endpoints_tested, errors_403)
-
-
-def verify_sensitive_data_is_hashed(
-    log_content: str,
-    sensitive_patterns: list[str],
-) -> tuple[bool, list[str]]:
-    """
-    Verifies that sensitive data appears only in hashed form (not plaintext) in logs.
-
-    This checks that:
-    1. Sensitive data never appears as plaintext outside <ud> tags, for
-    2. When sensitive data reference exists, it's inside <ud> tags with a HASHED value (not original)
-
-    :param log_content: The log file content as a string
-    :param sensitive_patterns: List of sensitive strings to check (e.g., usernames, passwords)
-    :return: Tuple of (is_hashed, violations). is_hashed=True if no plaintext found.
-    """
-    violations = []
-
-    for pattern in sensitive_patterns:
-        # Look for ANY plaintext occurrences (inside or outside tags)
-        escaped_pattern = re.escape(pattern)
-        for match in re.finditer(escaped_pattern, log_content):
-            start_pos = match.start()
-            end_pos = match.end()
-
-            # Check if this plaintext is inside <ud> tags
-            before_text = log_content[max(0, start_pos - 100) : start_pos]
-            after_text = log_content[end_pos : min(len(log_content), end_pos + 100)]
-
-            has_opening_tag = "<ud>" in before_text and before_text.rfind(
-                "<ud>"
-            ) > before_text.rfind("</ud>")
-            has_closing_tag = "</ud>" in after_text
-
-            # If we find the ACTUAL plaintext value anywhere (even inside tags), it's NOT hashed!
-            # In properly redacted logs, we should NEVER see the original value, only hashes
-            context = log_content[
-                max(0, start_pos - 50) : min(len(log_content), end_pos + 50)
-            ]
-
-            if has_opening_tag and has_closing_tag:
-                violations.append(
-                    f"Found plaintext '{pattern}' INSIDE <ud> tags (should be hashed): ...{context}..."
-                )
-            else:
-                violations.append(
-                    f"Found plaintext '{pattern}' OUTSIDE <ud> tags: ...{context}..."
-                )
-
-    return (len(violations) == 0, violations)
-
-
-def scan_logs_for_untagged_sensitive_data(
-    log_content: str,
-    sensitive_patterns: list[str],
-) -> list[str]:
-    """
-    Scans log content for sensitive data that is NOT wrapped in <ud>...</ud> tags
-
-    :param log_content: The log file content as a string
-    :param sensitive_patterns: List of sensitive strings to look for (e.g., doc IDs, usernames)
-    :return: List of violations found (sensitive data without <ud> tags)
-    """
-    violations = []
-    for pattern in sensitive_patterns:
-        # Escape special regex characters in the pattern
-        escaped_pattern = re.escape(pattern)
-        for match in re.finditer(escaped_pattern, log_content):
-            start_pos = match.start()
-            end_pos = match.end()
-
-            # Check if this occurrence is within <ud>...</ud> tags
-            # Look backwards for <ud> and forwards for </ud>
-            before_text = log_content[max(0, start_pos - 100) : start_pos]
-            after_text = log_content[end_pos : min(len(log_content), end_pos + 100)]
-
-            # Check if there's an opening <ud> before and closing </ud> after
-            has_opening_tag = "<ud>" in before_text and before_text.rfind(
-                "<ud>"
-            ) > before_text.rfind("</ud>")
-            has_closing_tag = "</ud>" in after_text
-
-            if not (has_opening_tag and has_closing_tag):
-                context_start = max(0, start_pos - 50)
-                context_end = min(len(log_content), end_pos + 50)
-                context = log_content[context_start:context_end]
-                violations.append(
-                    f"Untagged '{pattern}' at position {start_pos}: ...{context}..."
-                )
-    return violations

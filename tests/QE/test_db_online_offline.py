@@ -8,7 +8,6 @@ from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 
 
 @pytest.mark.sgw
-@pytest.mark.min_test_servers(0)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestDbOnlineOffline(CBLTestClass):
@@ -36,7 +35,8 @@ class TestDbOnlineOffline(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        if await sg.database_exists(sg_db):
+        db_status = await sg.get_database_status(sg_db)
+        if db_status is not None:
             await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
 
@@ -48,7 +48,7 @@ class TestDbOnlineOffline(CBLTestClass):
         for i in range(num_docs):
             sg_docs.append(
                 DocumentUpdateEntry(
-                    f"{sg_db}_doc_{i}",
+                    f"doc_{i}",
                     None,
                     body={"type": "test_doc", "index": i, "channels": channels},
                 )
@@ -65,7 +65,9 @@ class TestDbOnlineOffline(CBLTestClass):
 
         self.mark_test_step("Delete bucket to sever connection")
         cbs.drop_bucket(bucket_name)
-        await sg.wait_for_database_to_be_offline(sg_db)
+        db_status = await sg.get_database_status(sg_db)
+        while db_status is not None and db_status.state == "Online":
+            db_status = await sg.get_database_status(sg_db)
 
         self.mark_test_step("Verify database is offline - REST endpoints return 403")
         endpoints_tested, errors_403 = await sg.scan_rest_endpoints(
@@ -104,7 +106,8 @@ class TestDbOnlineOffline(CBLTestClass):
                 "scopes": {"_default": {"collections": {"_default": {}}}},
             }
             db_payload = PutDatabasePayload(db_config)
-            if await sg.database_exists(db_name):
+            db_status = await sg.get_database_status(db_name)
+            if db_status is not None:
                 await sg.delete_database(db_name)
             await sg.put_database(db_name, db_payload)
             db_configs[i][4] = await sg.create_user_client(
@@ -116,7 +119,7 @@ class TestDbOnlineOffline(CBLTestClass):
             for j in range(num_docs):
                 sg_docs.append(
                     DocumentUpdateEntry(
-                        f"{db_name}_doc_{j}",
+                        f"doc_{j}",
                         None,
                         body={"db": db_name, "index": j, "channels": [channel]},
                     )
@@ -125,18 +128,21 @@ class TestDbOnlineOffline(CBLTestClass):
 
         self.mark_test_step("Verify all databases are online")
         for [db_name, _, _, _, _] in db_configs:
-            endpoints_tested, errors_403 = await sg.scan_rest_endpoints(
-                db_name, expected_online=True
-            )
-            assert errors_403 == 0, (
-                f"{db_name} should be online but got {errors_403} 403 errors"
+            status = await sg.get_database_status(db_name)
+            assert status is not None, f"{db_name} database doesn't exist"
+            assert status.state == "Online", (
+                f"{db_name} should be online, but state is: {status.state}"
             )
 
-        self.mark_test_step("Delete buckets for db1 and db3")
+        self.mark_test_step(
+            "Delete buckets for db1 and db3 and wait for databases to go offline"
+        )
         cbs.drop_bucket("data-bucket-1")
         cbs.drop_bucket("data-bucket-3")
-        await sg.wait_for_database_to_be_offline("db1")
-        await sg.wait_for_database_to_be_offline("db3")
+        for db_name in ["db1", "db3"]:
+            db_status = await sg.get_database_status(db_name)
+            while db_status is not None and db_status.state == "Online":
+                db_status = await sg.get_database_status(db_name)
 
         self.mark_test_step("Verify db2 and db4 remain online")
         for db_name in ["db2", "db4"]:
