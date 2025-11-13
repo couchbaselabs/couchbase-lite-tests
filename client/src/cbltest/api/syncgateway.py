@@ -1,4 +1,4 @@
-import re
+import asyncio
 import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
@@ -656,8 +656,6 @@ class SyncGateway:
                         f"Sync gateway returned 500 from DELETE database call, retrying ({retry_count + 1})..."
                     )
                     current_span.add_event("SGW returned 500, retry")
-                    import asyncio
-
                     await asyncio.sleep(2)
                     await self._delete_database(db_name, retry_count + 1)
                 elif e.code == 403:
@@ -1316,20 +1314,7 @@ class SyncGateway:
                 "ssh.username": ssh_username,
             },
         ):
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-            # Load private key
-            private_key = paramiko.Ed25519Key.from_private_key_file(ssh_key_path)
-
-            # Connect to the remote server
-            ssh.connect(
-                self.__hostname,
-                username=ssh_username,
-                pkey=private_key,
-            )
-
-            # Read the log file
+            ssh = self._ssh_connect(ssh_key_path, ssh_username)
             sftp = ssh.open_sftp()
             try:
                 with sftp.open(remote_log_path, "r") as remote_file:
@@ -1340,42 +1325,133 @@ class SyncGateway:
 
             return log_contents
 
+    async def start_sgcollect_via_api(
+        self,
+        redact_level: str | None = None,
+        redact_salt: str | None = None,
+        output_dir: str | None = None,
+    ) -> dict:
+        """
+        Starts SGCollect using the REST API endpoint
 
-def scan_logs_for_untagged_sensitive_data(
-    log_content: str,
-    sensitive_patterns: list[str],
-) -> list[str]:
-    """
-    Scans log content for sensitive data that is NOT wrapped in <ud>...</ud> tags
+        :param redact_level: Redaction level ('none', 'partial', 'full')
+        :param redact_salt: Custom salt for redaction hashing
+        :param output_dir: Output directory on the remote server
+        :return: Response dict with status
+        """
+        with self.__tracer.start_as_current_span(
+            "start_sgcollect_via_api",
+            attributes={
+                "redact.level": redact_level or "none",
+            },
+        ):
+            body: dict[str, Any] = {"upload": False}
 
-    :param log_content: The log file content as a string
-    :param sensitive_patterns: List of sensitive strings to look for (e.g., doc IDs, usernames)
-    :return: List of violations found (sensitive data without <ud> tags)
-    """
-    violations = []
-    for pattern in sensitive_patterns:
-        # Escape special regex characters in the pattern
-        escaped_pattern = re.escape(pattern)
-        for match in re.finditer(escaped_pattern, log_content):
-            start_pos = match.start()
-            end_pos = match.end()
+            if redact_level is not None:
+                body["redact_level"] = redact_level
+            if redact_salt is not None:
+                body["redact_salt"] = redact_salt
+            if output_dir is not None:
+                body["output_dir"] = output_dir
 
-            # Check if this occurrence is within <ud>...</ud> tags
-            # Look backwards for <ud> and forwards for </ud>
-            before_text = log_content[max(0, start_pos - 100) : start_pos]
-            after_text = log_content[end_pos : min(len(log_content), end_pos + 100)]
+            resp = await self._send_request(
+                "post",
+                "/_sgcollect_info",
+                JSONDictionary(body),
+            )
 
-            # Check if there's an opening <ud> before and closing </ud> after
-            has_opening_tag = "<ud>" in before_text and before_text.rfind(
-                "<ud>"
-            ) > before_text.rfind("</ud>")
-            has_closing_tag = "</ud>" in after_text
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
 
-            if not (has_opening_tag and has_closing_tag):
-                context_start = max(0, start_pos - 50)
-                context_end = min(len(log_content), end_pos + 50)
-                context = log_content[context_start:context_end]
-                violations.append(
-                    f"Untagged '{pattern}' at position {start_pos}: ...{context}..."
-                )
-    return violations
+    async def wait_for_sgcollect_to_complete(
+        self, max_attempts: int = 60, wait_time: int = 5
+    ) -> None:
+        """
+        Waits for SGCollect to complete
+
+        :param max_attempts: Maximum number of attempts to wait for SGCollect to complete
+        :param wait_time: Time to wait between attempts
+        """
+        for _ in range(max_attempts):
+            status_resp = await self.get_sgcollect_status()
+            if status_resp.get("status") in ["stopped", "completed"]:
+                return
+            await asyncio.sleep(wait_time)
+        raise Exception(
+            f"SGCollect did not complete after {max_attempts * wait_time} seconds.\n"
+            f"Status: {status_resp.get('status')}.\n"
+            f"Error: {status_resp.get('error')}"
+        )
+
+    async def get_sgcollect_status(self) -> dict:
+        """
+        Gets the current status of SGCollect operation
+
+        :return: Response dict with status ('stopped' or 'running')
+        """
+        with self.__tracer.start_as_current_span("get_sgcollect_status"):
+            resp = await self._send_request("get", "/_sgcollect_info")
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
+
+    def _ssh_connect(
+        self,
+        ssh_key_path: str,
+        ssh_username: str = "ec2-user",
+    ) -> paramiko.SSHClient:
+        """
+        Helper to create SSH connection to remote SG server
+
+        :param ssh_key_path: Path to SSH private key
+        :param ssh_username: SSH username (default: ec2-user)
+        :return: Connected SSH client (caller must close)
+        """
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        private_key = paramiko.Ed25519Key.from_private_key_file(ssh_key_path)
+        ssh.connect(self.__hostname, username=ssh_username, pkey=private_key)
+        return ssh
+
+    def ssh_exec_command(
+        self,
+        command: str,
+        ssh_key_path: str,
+        ssh_username: str = "ec2-user",
+    ) -> str:
+        """
+        Executes a command on remote SG server via SSH and returns stdout
+
+        :param command: Command to execute
+        :param ssh_key_path: Path to SSH private key
+        :param ssh_username: SSH username (default: ec2-user)
+        :return: Command stdout as string
+        """
+        ssh = self._ssh_connect(ssh_key_path, ssh_username)
+        try:
+            stdin, stdout, stderr = ssh.exec_command(command)
+            return stdout.read().decode("utf-8").strip()
+        finally:
+            ssh.close()
+
+    def download_file(
+        self,
+        remote_path: str,
+        local_path: str,
+        ssh_key_path: str,
+        ssh_username: str = "ec2-user",
+    ) -> None:
+        """
+        Downloads a file from the remote SG server via SSH
+
+        :param remote_path: Path to file on remote server
+        :param local_path: Path where file should be saved locally
+        :param ssh_key_path: Path to SSH private key for authentication
+        :param ssh_username: SSH username (default: ec2-user)
+        """
+        ssh = self._ssh_connect(ssh_key_path, ssh_username)
+        sftp = ssh.open_sftp()
+        try:
+            sftp.get(remote_path, local_path)
+        finally:
+            sftp.close()
+            ssh.close()
