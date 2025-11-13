@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
-import paramiko
 import requests
 from aiohttp import BasicAuth, ClientSession, TCPConnector
 from opentelemetry.trace import get_tracer
@@ -1315,46 +1314,6 @@ class SyncGateway:
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
-    async def fetch_log_file(
-        self,
-        log_type: str,
-        ssh_key_path: str,
-        ssh_username: str = "ec2-user",
-    ) -> str:
-        """
-        Fetches a log file from the remote Sync Gateway server via SSH
-
-        :param log_type: The type of log to fetch (e.g., 'debug', 'info', 'error', 'warn')
-        :param ssh_key_path: Path to SSH private key for authentication
-        :param ssh_username: SSH username (default: ec2-user)
-        :return: Contents of the log file as a string
-        """
-        # Get log directory from SG configuration
-        server_config = await self._send_request("GET", "/_config")
-        log_dir = server_config.get("logging", {}).get(
-            "log_file_path", "/home/ec2-user/log"
-        )
-        remote_log_path = f"{log_dir}/sg_{log_type}.log"
-
-        with self.__tracer.start_as_current_span(
-            "fetch_log_file",
-            attributes={
-                "log.type": log_type,
-                "remote.path": remote_log_path,
-                "ssh.username": ssh_username,
-            },
-        ):
-            ssh = self._ssh_connect(ssh_key_path, ssh_username)
-            sftp = ssh.open_sftp()
-            try:
-                with sftp.open(remote_log_path, "r") as remote_file:
-                    log_contents = remote_file.read().decode("utf-8")
-            finally:
-                sftp.close()
-                ssh.close()
-
-            return log_contents
-
     async def start_sgcollect_via_api(
         self,
         redact_level: str | None = None,
@@ -1423,65 +1382,3 @@ class SyncGateway:
             resp = await self._send_request("get", "/_sgcollect_info")
             assert isinstance(resp, dict)
             return cast(dict, resp)
-
-    def _ssh_connect(
-        self,
-        ssh_key_path: str,
-        ssh_username: str = "ec2-user",
-    ) -> paramiko.SSHClient:
-        """
-        Helper to create SSH connection to remote SG server
-
-        :param ssh_key_path: Path to SSH private key
-        :param ssh_username: SSH username (default: ec2-user)
-        :return: Connected SSH client (caller must close)
-        """
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        private_key = paramiko.Ed25519Key.from_private_key_file(ssh_key_path)
-        ssh.connect(self.__hostname, username=ssh_username, pkey=private_key)
-        return ssh
-
-    def ssh_exec_command(
-        self,
-        command: str,
-        ssh_key_path: str,
-        ssh_username: str = "ec2-user",
-    ) -> str:
-        """
-        Executes a command on remote SG server via SSH and returns stdout
-
-        :param command: Command to execute
-        :param ssh_key_path: Path to SSH private key
-        :param ssh_username: SSH username (default: ec2-user)
-        :return: Command stdout as string
-        """
-        ssh = self._ssh_connect(ssh_key_path, ssh_username)
-        try:
-            stdin, stdout, stderr = ssh.exec_command(command)
-            return stdout.read().decode("utf-8").strip()
-        finally:
-            ssh.close()
-
-    def download_file(
-        self,
-        remote_path: str,
-        local_path: str,
-        ssh_key_path: str,
-        ssh_username: str = "ec2-user",
-    ) -> None:
-        """
-        Downloads a file from the remote SG server via SSH
-
-        :param remote_path: Path to file on remote server
-        :param local_path: Path where file should be saved locally
-        :param ssh_key_path: Path to SSH private key for authentication
-        :param ssh_username: SSH username (default: ec2-user)
-        """
-        ssh = self._ssh_connect(ssh_key_path, ssh_username)
-        sftp = ssh.open_sftp()
-        try:
-            sftp.get(remote_path, local_path)
-        finally:
-            sftp.close()
-            ssh.close()
