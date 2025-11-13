@@ -222,6 +222,7 @@ class TestMultipeer(CBLTestClass):
 
         await asyncio.gather(*[multipeer.stop() for multipeer in multipeer_replicators])
 
+    @pytest.mark.min_test_servers(6)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_network_partition(self, cblpytest: CBLPyTest):
         for ts in cblpytest.test_servers:
@@ -508,6 +509,7 @@ class TestMultipeer(CBLTestClass):
 
         await asyncio.gather(*[replicator.stop() for replicator in all_replicators])
 
+    @pytest.mark.min_test_servers(6)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_dynamic_peer_addition_removal(self, cblpytest: CBLPyTest):
         for ts in cblpytest.test_servers:
