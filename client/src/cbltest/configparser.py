@@ -35,8 +35,6 @@ class TestServerInfo:
             data, self.__dataset_version_key
         )
 
-from .jsonhelper import _assert_contains_string_list, _get_int_or_default, _assert_string_entry, _get_str_or_default, _get_bool_or_default
-
 class SyncGatewayInfo:
     """The parsed Sync Gateway information from the config file"""
 

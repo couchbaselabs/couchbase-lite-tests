@@ -210,13 +210,16 @@ class AllDocumentsResponse:
         self.__rows: List[AllDocumentsResponseRow] = []
         self.__input=input
         self.__revmap=dict()
-        for row in cast(List[Dict], input["rows"]):
-            rev = cast(Dict, row["value"])
-            self.__rows.append(AllDocumentsResponseRow(
-                row["key"],
-                row["id"],
-                cast(str, rev["rev"]) if "rev" in rev else None,
-                cast(str, rev["cv"]) if "cv" in rev else None))
+        for row in cast(list[dict], input["rows"]):
+            rev = cast(dict, row["value"])
+            self.__rows.append(
+                AllDocumentsResponseRow(
+                    row["key"],
+                    row["id"],
+                    cast(str, rev["rev"]) if "rev" in rev else None,
+                    cast(str, rev["cv"]) if "cv" in rev else None,
+                )
+            )
             self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
 
 
