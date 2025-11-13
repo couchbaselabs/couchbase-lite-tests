@@ -2,7 +2,6 @@ import asyncio
 import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
-from json.decoder import JSONDecodeError
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
@@ -1486,62 +1485,3 @@ class SyncGateway:
         finally:
             sftp.close()
             ssh.close()
-
-    async def scan_rest_endpoints(
-        self,
-        db_name: str,
-        expected_online: bool,
-        num_docs: int = 10,
-    ) -> tuple[int, int]:
-        """
-        Scans multiple REST endpoints to verify database online/offline state.
-
-        :param db_name: Database name to test
-        :param expected_online: True if DB should be online, False if offline
-        :param num_docs: Number of docs (for testing doc operations)
-        :return: Tuple of (endpoints_tested, errors_403) where errors_403 is count of 403/503 errors or connection failures
-        """
-        endpoints_tested = 0
-        errors_403 = 0
-
-        test_operations = [
-            (
-                "GET /{db}/_all_docs",
-                lambda: self.get_all_documents(db_name, "_default", "_default"),
-            ),
-            (
-                "GET /{db}/_changes",
-                lambda: self.get_changes(db_name, "_default", "_default"),
-            ),
-            (
-                "GET /{db}/{doc}",
-                lambda: self.get_document(db_name, "doc_0", "_default", "_default"),
-            ),
-            (
-                "POST /{db}/_bulk_docs",
-                lambda: self.update_documents(
-                    db_name,
-                    [DocumentUpdateEntry("test_doc", None, {"foo": "bar"})],
-                    "_default",
-                    "_default",
-                ),
-            ),
-        ]
-        for endpoint_name, test_func in test_operations:
-            try:
-                await test_func()
-                endpoints_tested += 1
-            except (CblSyncGatewayBadResponseError, JSONDecodeError) as e:
-                endpoints_tested += 1
-                if isinstance(e, CblSyncGatewayBadResponseError) and e.code in [
-                    403,
-                    503,
-                ]:
-                    errors_403 += 1
-                elif isinstance(e, JSONDecodeError):
-                    errors_403 += 1
-                else:
-                    raise e
-            except Exception as e:
-                raise e
-        return (endpoints_tested, errors_403)

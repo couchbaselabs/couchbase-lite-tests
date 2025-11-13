@@ -1,16 +1,72 @@
+import asyncio
+from json.decoder import JSONDecodeError
 from pathlib import Path
 from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from cbltest.api.error import CblSyncGatewayBadResponseError
+from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
 
 
 @pytest.mark.sgw
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestDbOnlineOffline(CBLTestClass):
+    async def scan_rest_endpoints(
+        self,
+        sg: SyncGateway,
+        db_name: str,
+        expected_online: bool,
+        num_docs: int = 10,
+    ) -> tuple[int, int]:
+        """
+        Scans multiple REST endpoints to verify database online/offline state.
+        """
+        endpoints_tested = 0
+        errors_403 = 0
+
+        test_operations = [
+            (
+                "GET /{db}/_all_docs",
+                lambda: sg.get_all_documents(db_name, "_default", "_default"),
+            ),
+            (
+                "GET /{db}/_changes",
+                lambda: sg.get_changes(db_name, "_default", "_default"),
+            ),
+            (
+                "GET /{db}/{doc}",
+                lambda: sg.get_document(db_name, "doc_0", "_default", "_default"),
+            ),
+            (
+                "POST /{db}/_bulk_docs",
+                lambda: sg.update_documents(
+                    db_name,
+                    [DocumentUpdateEntry("test_doc", None, {"foo": "bar"})],
+                    "_default",
+                    "_default",
+                ),
+            ),
+        ]
+
+        for endpoint_name, test_func in test_operations:
+            try:
+                await test_func()
+                endpoints_tested += 1
+            except (CblSyncGatewayBadResponseError, JSONDecodeError) as e:
+                endpoints_tested += 1
+                if isinstance(e, CblSyncGatewayBadResponseError):
+                    if e.code in [403, 503]:
+                        errors_403 += 1
+                    elif e.code != 404:  # 404 is OK
+                        raise e
+                elif isinstance(e, JSONDecodeError):
+                    errors_403 += 1
+
+        return (endpoints_tested, errors_403)
+
     @pytest.mark.asyncio(loop_scope="session")
     async def test_db_offline_on_bucket_deletion(
         self, cblpytest: CBLPyTest, dataset_path: Path
@@ -56,8 +112,8 @@ class TestDbOnlineOffline(CBLTestClass):
         await sg.update_documents(sg_db, sg_docs, "_default", "_default")
 
         self.mark_test_step("Verify database is online - REST endpoints work")
-        endpoints_tested, errors_403 = await sg.scan_rest_endpoints(
-            sg_db, expected_online=True
+        endpoints_tested, errors_403 = await self.scan_rest_endpoints(
+            sg, sg_db, expected_online=True
         )
         assert errors_403 == 0, (
             f"DB is online but {errors_403}/{endpoints_tested} endpoints returned 403"
@@ -68,10 +124,11 @@ class TestDbOnlineOffline(CBLTestClass):
         db_status = await sg.get_database_status(sg_db)
         while db_status is not None and db_status.state == "Online":
             db_status = await sg.get_database_status(sg_db)
+            await asyncio.sleep(10)
 
         self.mark_test_step("Verify database is offline - REST endpoints return 403")
-        endpoints_tested, errors_403 = await sg.scan_rest_endpoints(
-            sg_db, expected_online=False
+        endpoints_tested, errors_403 = await self.scan_rest_endpoints(
+            sg, sg_db, expected_online=False
         )
         assert endpoints_tested > 0, "No endpoints were tested"
         assert errors_403 == endpoints_tested, (
@@ -143,11 +200,12 @@ class TestDbOnlineOffline(CBLTestClass):
             db_status = await sg.get_database_status(db_name)
             while db_status is not None and db_status.state == "Online":
                 db_status = await sg.get_database_status(db_name)
+                await asyncio.sleep(10)
 
         self.mark_test_step("Verify db2 and db4 remain online")
         for db_name in ["db2", "db4"]:
-            endpoints_tested, errors_403 = await sg.scan_rest_endpoints(
-                db_name, expected_online=True
+            endpoints_tested, errors_403 = await self.scan_rest_endpoints(
+                sg, db_name, expected_online=True
             )
             assert errors_403 == 0, (
                 f"{db_name} should be online but got {errors_403} 403 errors"
@@ -155,8 +213,8 @@ class TestDbOnlineOffline(CBLTestClass):
 
         self.mark_test_step("Verify db1 and db3 are offline (return 403)")
         for db_name in ["db1", "db3"]:
-            endpoints_tested, errors_403 = await sg.scan_rest_endpoints(
-                db_name, expected_online=False
+            endpoints_tested, errors_403 = await self.scan_rest_endpoints(
+                sg, db_name, expected_online=False
             )
             assert errors_403 == endpoints_tested, (
                 f"{db_name}: Expected all {endpoints_tested} endpoints to return 403, got {errors_403}"
