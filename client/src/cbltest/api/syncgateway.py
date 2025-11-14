@@ -20,6 +20,8 @@ from cbltest.logging import cbl_info, cbl_warning
 from cbltest.utils import assert_not_null
 from cbltest.version import VERSION
 
+from cbltest.api.remoteshell import RemoteShellConnection
+
 # This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
 # So if that file ever changes, change this too.
 _SGW_CA_CERT: str = """-----BEGIN CERTIFICATE-----
@@ -192,13 +194,22 @@ class AllDocumentsResponse:
     def rows(self) -> list[AllDocumentsResponseRow]:
         """Gets the entries of the response"""
         return self.__rows
+    @property
+    def input(self):
+        return self.__input
+    @property
+    def revmap(self):
+        return self.__revmap
 
     def __len__(self) -> int:
         return self.__len
 
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
-        self.__rows: list[AllDocumentsResponseRow] = []
+        self.__input = input
+        self.__rows: List[AllDocumentsResponseRow] = []
+        self.__input=input
+        self.__revmap=dict()
         for row in cast(list[dict], input["rows"]):
             rev = cast(dict, row["value"])
             self.__rows.append(
@@ -209,6 +220,7 @@ class AllDocumentsResponse:
                     cast(str, rev["cv"]) if "cv" in rev else None,
                 )
             )
+            self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
 
 
 class ChangesResponseEntry:
@@ -428,6 +440,7 @@ class SyncGateway:
         self.__admin_session: ClientSession = self._create_session(
             secure, scheme, url, admin_port, BasicAuth(username, password, "ascii")
         )
+        self.__ssh_client:RemoteShellConnection=RemoteShellConnection(host=url)
 
     @property
     def hostname(self) -> str:
@@ -1287,6 +1300,112 @@ class SyncGateway:
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
+    async def create_document(self, db_name: str, doc_id: str, document: dict, scope: str = "_default", collection: str = "_default"):
+        """
+        Creates a document in Sync Gateway
+
+        :param db_name: The name of the DB endpoint where the document should be created
+        :param doc_id: The document ID to create
+        :param document: The document data to be created (as a dictionary)
+        :param scope: The scope where the document should be created (default '_default')
+        :param collection: The collection where the document should be created (default '_default')
+        :return: The response from the Sync Gateway (or None if document creation fails)
+        """
+        with self.__tracer.start_as_current_span(
+            "create_document",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            document["_id"] = doc_id  # Ensure document has _id before sending
+            response = await self._send_request(
+                "PUT",
+                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                payload=JSONDictionary(document),
+            )
+
+            # Check for response structure
+            if not response or "error" in response:
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to create document {doc_id}"
+                )
+
+            # Convert response to match expected format
+            cast_resp = cast(dict, response)
+
+            # Ensure RemoteDocument fields exist
+            if "id" in cast_resp:
+                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
+            if "rev" in cast_resp:
+                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
+            if "cv" in cast_resp:
+                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
+
+            return RemoteDocument(cast_resp)
+
+    async def update_document(
+        self,
+        db_name: str,
+        doc_id: str,
+        document: dict,
+        rev: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> RemoteDocument:
+        """
+        Updates a document in Sync Gateway.
+
+        :param db_name: The name of the DB endpoint where the document exists
+        :param doc_id: The document ID to update
+        :param document: The updated document data (as a dictionary)
+        :param rev: The current revision ID of the document
+        :param scope: The scope where the document exists (default '_default')
+        :param collection: The collection where the document exists (default '_default')
+        :return: The updated document as a RemoteDocument object
+        """
+        with self.__tracer.start_as_current_span(
+            "update_document",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            document["_id"] = doc_id
+            document["_rev"] = rev
+
+            params = {"new_edits": "true", "rev": rev}
+
+            response = await self._send_request(
+                "PUT",
+                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                payload=JSONDictionary(document),
+                params=params,
+            )
+
+            if not response or "error" in response:
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to update document {doc_id} with rev {rev}"
+                )
+
+            # Convert response to match expected format
+            cast_resp = cast(dict, response)
+
+            # Ensure RemoteDocument fields exist
+            if "id" in cast_resp:
+                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
+            if "rev" in cast_resp:
+                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
+            if "cv" in cast_resp:
+                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
+
+            return RemoteDocument(cast_resp)
+
+
     async def fetch_log_file(
         self,
         log_type: str,
@@ -1379,3 +1498,84 @@ def scan_logs_for_untagged_sensitive_data(
                     f"Untagged '{pattern}' at position {start_pos}: ...{context}..."
                 )
     return violations
+
+    async def kill_server(self):
+        with self.__tracer.start_as_current_span("kill sync gateway"):
+            await self.__ssh_client.connect()
+            resp = await self.__ssh_client.kill_sgw()
+            await self.__ssh_client.close()
+            return resp
+
+    async def start_server(self):
+        with self.__tracer.start_as_current_span("start sync gateway"):
+            await self.__ssh_client.connect()
+            resp = await self.__ssh_client.start_sgw()
+            await self.__ssh_client.close()
+            return resp
+
+    async def close(self) -> None:
+        """
+        Closes the Sync Gateway session
+        """
+        if not self.__admin_session.closed:
+            await self.__admin_session.close()
+
+    async def get_database_config(self, db_name: str) -> dict[str, Any]:
+        """
+        Gets the configuration for a specific database from the admin API.
+
+        Args:
+            db_name: The name of the database to get configuration for
+
+        Returns:
+            Dictionary containing the database configuration
+        """
+        _assert_not_null(db_name, "db_name")
+        with self.__tracer.start_as_current_span(
+            "get_database_config", attributes={"cbl.database.name": db_name}
+        ):
+            return await self._send_request("GET", f"/{db_name}/_config")
+
+    async def get_document_revision_public(
+        self,
+        db_name: str,
+        doc_id: str,
+        revision: str,
+        auth: BasicAuth,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> dict[str, Any]:
+        """
+        Gets a specific revision of a document using the public API with user authentication.
+
+        Args:
+            db_name: The name of the database
+            doc_id: The document ID
+            revision: The specific revision to retrieve
+            auth: User authentication credentials
+            scope: The scope name (defaults to "_default")
+            collection: The collection name (defaults to "_default")
+
+        Returns:
+            Dictionary containing the document at the specified revision
+
+        Raises:
+            CblSyncGatewayBadResponseError: If the document or revision is not found
+        """
+        _assert_not_null(db_name, "db_name")
+        _assert_not_null(doc_id, "doc_id")
+        _assert_not_null(revision, "revision")
+        _assert_not_null(auth, "auth")
+
+        path = (
+            f"/{db_name}/{scope}.{collection}/{doc_id}"
+            if scope != "_default" or collection != "_default"
+            else f"/{db_name}/{doc_id}"
+        )
+        params = {"rev": revision}
+
+        scheme = "https://" if self.__secure else "http://"
+        async with self._create_session(
+            self.__secure, scheme, self.__hostname, 4984, auth
+        ) as session:
+            return await self._send_request("GET", path, params=params, session=session)
