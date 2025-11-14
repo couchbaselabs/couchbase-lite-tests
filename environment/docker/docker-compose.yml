@@ -32,7 +32,7 @@ services:
 
   cbl-test-logslurp:
     build:
-      context: ./LogSlurp
+      context: ../LogSlurp
       dockerfile: LogSlurp/Dockerfile
     ports:
       - "8180:8180"
