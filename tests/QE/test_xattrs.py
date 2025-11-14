@@ -12,7 +12,6 @@ from packaging.version import Version
 
 
 @pytest.mark.sgw
-@pytest.mark.min_test_servers(0)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestXattrs(CBLTestClass):
@@ -43,7 +42,8 @@ class TestXattrs(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        if await sg.database_exists(sg_db):
+        db_status = await sg.get_database_status(sg_db)
+        if db_status is not None:
             await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
 
@@ -202,7 +202,8 @@ class TestXattrs(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        if await sg.database_exists(sg_db):
+        db_status = await sg.get_database_status(sg_db)
+        if db_status is not None:
             await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
 
@@ -399,7 +400,8 @@ class TestXattrs(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        if await sg.database_exists(sg_db):
+        db_status = await sg.get_database_status(sg_db)
+        if db_status is not None:
             await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
 
@@ -572,7 +574,8 @@ class TestXattrs(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        if await sg.database_exists(sg_db):
+        db_status = await sg.get_database_status(sg_db)
+        if db_status is not None:
             await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
 
@@ -832,7 +835,8 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             "Configure Sync Gateway with custom sync function using xattrs"
         )
-        if await sg.database_exists(sg_db):
+        db_status = await sg.get_database_status(sg_db)
+        if db_status is not None:
             await sg.delete_database(sg_db)
 
         # Custom sync function that reads channel from user xattr via meta parameter
