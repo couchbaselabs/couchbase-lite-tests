@@ -4,7 +4,7 @@
 
 Test that database goes offline when its bucket is deleted.
 
-This test verifies that when the Couchbase Server bucket backing a Sync Gateway database is deleted, the database properly enters offline state and all REST API endpoints return 503 (Service Unavailable).
+This test verifies that when the Couchbase Server bucket backing a Sync Gateway database is deleted, the database properly enters offline state and all REST API endpoints return 403.
 
 1. Create bucket and default collection
 2. Configure Sync Gateway database endpoint
