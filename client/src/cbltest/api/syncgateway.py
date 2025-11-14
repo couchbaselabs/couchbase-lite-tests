@@ -1,4 +1,4 @@
-import re
+import asyncio
 import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
@@ -182,6 +182,32 @@ class AllDocumentsResponseRow:
         self.__id = id
         self.__revid = revid
         self.__cv = cv
+
+
+class DatabaseStatusResponse:
+    """
+    A class representing a database status response from Sync Gateway
+    """
+
+    @property
+    def db_name(self) -> str:
+        """Gets the database name"""
+        return self.__db_name
+
+    @property
+    def state(self) -> str:
+        """Gets the database state ('Online', 'Offline', etc.)"""
+        return self.__state
+
+    @property
+    def update_seq(self) -> int:
+        """Gets the update sequence number"""
+        return self.__update_seq
+
+    def __init__(self, response: dict):
+        self.__db_name = response.get("db_name", "")
+        self.__state = response.get("state", "Unknown")
+        self.__update_seq = response.get("update_seq", 0)
 
 
 class AllDocumentsResponse:
@@ -643,20 +669,24 @@ class SyncGateway:
         """
         await self._put_database(db_name, payload, 0)
 
-    async def database_exists(self, db_name: str) -> bool:
+    async def get_database_status(self, db_name: str) -> DatabaseStatusResponse | None:
         """
-        Checks if a database exists in Sync Gateway's configuration.
+        Gets the status of a database including its online/offline state.
 
-        :param db_name: The name of the Database to check
-        :return: True if the database exists, False otherwise
+        :param db_name: The name of the Database
+        :return: DatabaseStatusResponse with state, sequences, etc. Returns None if database doesn't exist (404/403)
         """
-        try:
-            await self._send_request("get", f"/{db_name}")
-            return True
-        except CblSyncGatewayBadResponseError as e:
-            if e.code == 403:  # Database does not exist
-                return False
-            raise
+        with self.__tracer.start_as_current_span(
+            "get_database_status", attributes={"cbl.database.name": db_name}
+        ):
+            try:
+                resp = await self._send_request("get", f"/{db_name}/")
+                assert isinstance(resp, dict)
+                return DatabaseStatusResponse(cast(dict, resp))
+            except CblSyncGatewayBadResponseError as e:
+                if e.code in [403, 404]:  # Database doesn't exist
+                    return None
+                raise
 
     async def _delete_database(self, db_name: str, retry_count: int = 0) -> None:
         with self.__tracer.start_as_current_span(
@@ -670,8 +700,6 @@ class SyncGateway:
                         f"Sync gateway returned 500 from DELETE database call, retrying ({retry_count + 1})..."
                     )
                     current_span.add_event("SGW returned 500, retry")
-                    import asyncio
-
                     await asyncio.sleep(2)
                     await self._delete_database(db_name, retry_count + 1)
                 elif e.code == 403:
