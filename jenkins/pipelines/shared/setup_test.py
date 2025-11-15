@@ -74,7 +74,7 @@ def setup_test_multi(
     topology_tag: str,
     private_key: str | None = None,
     couchbase_version: str = "7.6",
-    public_key_name: str = "jborden",
+    public_key_name: str = "mobile-e2e-jenkins",
     setup_dir: str = "dev_e2e",
 ) -> None:
     """
@@ -177,7 +177,7 @@ def setup_test(
     topology_tag: str,
     private_key: str | None = None,
     couchbase_version: str = "7.6",
-    public_key_name: str = "jborden",
+    public_key_name: str = "mobile-e2e-jenkins",
     setup_dir: str = "dev_e2e",
 ) -> None:
     """
