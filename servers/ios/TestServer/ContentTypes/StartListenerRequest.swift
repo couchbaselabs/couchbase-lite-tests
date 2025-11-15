@@ -12,12 +12,14 @@ extension ContentTypes {
         let database: String
         let collections: [String]
         let port: UInt16?
+        let disableTLS: Bool?
         
         public var description: String {
             var result: String = "Endpoint Listener Configuration:\n"
             result += "\tdatabase: \(database)\n"
             result += "\tcollection: \(collections.joined(separator: ", "))\n"
             result += "\tport: \(port ?? 0)\n"
+            result += "\tdisableTLS: \(disableTLS ?? false)\n"
             return result
         }
     }

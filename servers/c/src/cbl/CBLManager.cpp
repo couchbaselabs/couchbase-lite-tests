@@ -536,7 +536,7 @@ namespace ts::cbl {
 
     /// URLEndpointListener
 
-    string CBLManager::startListener(const string &database, const vector<std::string>&collNames, int port) {
+    string CBLManager::startListener(const string &database, const vector<std::string>&collNames, int port, bool disableTLS) {
         lock_guard <mutex> lock(_mutex);
 
         CBLError error{};
@@ -562,6 +562,7 @@ namespace ts::cbl {
         config.collections = collections.data();
         config.collectionCount = collections.size();
         config.port = port;
+        config.disableTLS = disableTLS;
 
         auto listener = CBLURLEndpointListener_Create(&config, &error);
         if (!listener) {

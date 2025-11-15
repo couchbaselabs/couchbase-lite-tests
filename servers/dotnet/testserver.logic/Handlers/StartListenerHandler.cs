@@ -16,6 +16,8 @@ internal static partial class HandlerList
         public required string[] collections { get; init; }
 
         public ushort port { get; init; }
+
+        public bool disableTLS { get; init; } = false;
     }
 
     [HttpHandler("startListener")]
@@ -48,7 +50,8 @@ internal static partial class HandlerList
 
         var listenerConfig = new URLEndpointListenerConfiguration(collectionObjects)
         {
-            Port = deserializedBody.port
+            Port = deserializedBody.port,
+            DisableTLS = deserializedBody.disableTLS
         };
         (var listener, var id) = session.ObjectManager.RegisterObject(() => new URLEndpointListener(listenerConfig));
         listener.Start();
