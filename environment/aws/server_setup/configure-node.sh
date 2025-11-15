@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 mkdir -p /home/ec2-user/logs
 
@@ -7,6 +7,7 @@ config_done() {
   touch ${CONFIG_DONE_FILE}
   echo "Couchbase Admin UI: http://localhost:8091" \
      "\nLogin credentials: Administrator / password"
+     sleep infinity
 }
 
 if [ -e ${CONFIG_DONE_FILE} ]; then
@@ -65,14 +66,14 @@ curl_check() {
 wait_for_uri 200 http://localhost:8091/ui/index.html
 echo "Couchbase Server up!"
 
-if [[ ! -z $1 ]]; then
+if [[ ! -z $E2E_PARENT_CLUSTER ]]; then
   my_ip=$(ifconfig | grep "inet 10" | awk '{print $2}')
-  echo "Adding node to cluster"
-  couchbase_cli_check server-add -c $1 -u Administrator -p password --server-add  $my_ip \
+  echo "Adding node to cluster $E2E_PARENT_CLUSTER"
+  couchbase_cli_check server-add -c $E2E_PARENT_CLUSTER -u Administrator -p password --server-add  $my_ip \
     --server-add-username Administrator --server-add-password password --services data,index,query
   echo
   echo "Rebalancing cluster"
-  couchbase_cli_check rebalance -c $1 -u Administrator -p password 
+  couchbase_cli_check rebalance -c $E2E_PARENT_CLUSTER -u Administrator -p password 
   echo
 else 
   echo "Set up the cluster"
