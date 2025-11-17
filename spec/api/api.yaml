@@ -773,7 +773,7 @@ paths:
       operationId: startListener
       requestBody:
         description: |-
-          The request object containing the collections to share and, optionally, the port to listen on.
+          The request object containing the collections to share and, optionally, the port to listen on and disableTLS flag.
         content:
           application/json:
             schema:
@@ -787,10 +787,13 @@ paths:
                   type: array
                   items:
                     type: string
-                    example: 'store.cloths'
+                  example: 'store.cloths'
                 port:
                   type: integer
                   example: 12345
+                disableTLS:
+                  type: boolean
+                  example: false
         required: true
       responses:
         '200':
