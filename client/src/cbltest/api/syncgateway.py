@@ -13,14 +13,13 @@ from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
+from cbltest.api.remoteshell import RemoteShellConnection
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_info, cbl_warning
 from cbltest.utils import assert_not_null
 from cbltest.version import VERSION
-
-from cbltest.api.remoteshell import RemoteShellConnection
 
 # This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
 # So if that file ever changes, change this too.
@@ -194,9 +193,11 @@ class AllDocumentsResponse:
     def rows(self) -> list[AllDocumentsResponseRow]:
         """Gets the entries of the response"""
         return self.__rows
+
     @property
     def input(self):
         return self.__input
+
     @property
     def revmap(self):
         return self.__revmap
@@ -207,9 +208,9 @@ class AllDocumentsResponse:
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
         self.__input = input
-        self.__rows: List[AllDocumentsResponseRow] = []
-        self.__input=input
-        self.__revmap=dict()
+        self.__rows: list[AllDocumentsResponseRow] = []
+        self.__input = input
+        self.__revmap = dict()
         for row in cast(list[dict], input["rows"]):
             rev = cast(dict, row["value"])
             self.__rows.append(
@@ -440,7 +441,7 @@ class SyncGateway:
         self.__admin_session: ClientSession = self._create_session(
             secure, scheme, url, admin_port, BasicAuth(username, password, "ascii")
         )
-        self.__ssh_client:RemoteShellConnection=RemoteShellConnection(host=url)
+        self.__ssh_client: RemoteShellConnection = RemoteShellConnection(host=url)
 
     @property
     def hostname(self) -> str:
@@ -1300,7 +1301,14 @@ class SyncGateway:
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
-    async def create_document(self, db_name: str, doc_id: str, document: dict, scope: str = "_default", collection: str = "_default"):
+    async def create_document(
+        self,
+        db_name: str,
+        doc_id: str,
+        document: dict,
+        scope: str = "_default",
+        collection: str = "_default",
+    ):
         """
         Creates a document in Sync Gateway
 
@@ -1404,7 +1412,6 @@ class SyncGateway:
                 cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
 
             return RemoteDocument(cast_resp)
-
 
     async def fetch_log_file(
         self,

@@ -7,6 +7,7 @@ from cbltest.api.replicator_types import ReplicatorType
 from cbltest.api.syncgateway import AllDocumentsResponseRow, SyncGateway
 from cbltest.version import VERSION
 
+
 def _compare_revisions(cbl_rev: str, sg_rev: list[str | None]):
     """
     A CBL revision and a SG revision are the same iff the cbl_rev
@@ -194,4 +195,3 @@ async def compare_local_and_remote(
 
             compare_result = compare_doc_results(lite_docs, sg_docs, mode)
             assert compare_result.success, f"{compare_result.message} ({collection})"
-

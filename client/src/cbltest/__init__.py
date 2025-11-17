@@ -1,6 +1,7 @@
+from json import dumps
+
 from .api.couchbaseserver import CouchbaseServer
 from .api.edgeserver import EdgeServer
-from .api.httpclient import HTTPClient
 from .api.syncgateway import SyncGateway
 from .api.testserver import TestServer
 from .assertions import _assert_not_null
@@ -16,7 +17,6 @@ from .configparser import (
 from .extrapropsparser import _parse_extra_props
 from .globals import CBLPyTestGlobal
 from .logging import LogLevel, cbl_log_init, cbl_setLogLevel
-from json import dumps
 from .requests import RequestFactory
 
 
@@ -66,9 +66,8 @@ class CBLPyTest:
         """Gets the list of Load Balancers available"""
         return self.__config.load_balancers
 
-
     @property
-    def edge_servers(self)-> list[EdgeServer]:
+    def edge_servers(self) -> list[EdgeServer]:
         return self.__edge_servers
 
     @property
@@ -156,13 +155,13 @@ class CBLPyTest:
         if not test_server_only:
             for es in self.__config.edge_servers:
                 es_info = EdgeServerInfo(es)
-                self.__edge_servers.append(
-                    EdgeServer(es_info.hostname))
+                self.__edge_servers.append(EdgeServer(es_info.hostname))
+                
         self.__http_clients: list[str] = []
         if not test_server_only:
             for http in self.__config.http_clients:
-                 h_info= HTTPClientInfo(http)
-                 self.__http_clients.append(h_info.hostname)
+                h_info = HTTPClientInfo(http)
+                self.__http_clients.append(h_info.hostname)
 
     async def close(self) -> None:
         """
@@ -171,7 +170,6 @@ class CBLPyTest:
         await self.request_factory.close()
         for sg in self.__sync_gateways:
             await sg.close()
-
 
     def __str__(self) -> str:
         ret_val = (
