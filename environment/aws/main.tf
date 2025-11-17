@@ -39,7 +39,7 @@ data "aws_security_group" "main" {
 # This is the machine(s) that will run Couchbase Server
 resource "aws_instance" "couchbaseserver" {
     count = var.server_count
-    ami = "ami-05576a079321f21f8"
+    ami = "ami-0cae6d6fe6048ca2c"
     instance_type = "m5.xlarge"
     key_name = var.key_name
 
@@ -55,13 +55,18 @@ resource "aws_instance" "couchbaseserver" {
     tags = {
         Name = "cbs"
         Type = "couchbaseserver"
+        ExpireAt = local.expire_at
+    }
+
+    lifecycle {
+      ignore_changes = [ tags["ExpireAt"] ]
     }
 }
 
 # And the machine(s) that will run Sync Gateway
 resource "aws_instance" "sync_gateway" {
     count = var.sgw_count
-    ami = "ami-05576a079321f21f8"
+    ami = "ami-0cae6d6fe6048ca2c"
     instance_type = "m5.xlarge"
     key_name = var.key_name
 
@@ -77,14 +82,19 @@ resource "aws_instance" "sync_gateway" {
     tags = {
         Name = "sg"
         Type = "syncgateway"
+        ExpireAt = local.expire_at
+    }
+
+    lifecycle {
+      ignore_changes = [ tags["ExpireAt"] ]
     }
 }
 
 # And the machine(s) that will run Edge Server
 resource "aws_instance" "edge_server" {
     count = var.es_count
-    ami = "ami-05576a079321f21f8"
-    instance_type = "m5.large"
+    ami = "ami-0cae6d6fe6048ca2c"
+    instance_type = "t3.micro"
     key_name = var.key_name
 
     subnet_id = data.aws_subnet.main.id
@@ -94,13 +104,18 @@ resource "aws_instance" "edge_server" {
     tags = {
         Name = "es"
         Type = "edgeserver"
+        ExpireAt = local.expire_at
+    }
+
+    lifecycle {
+      ignore_changes = [ tags["ExpireAt"] ]
     }
 }
 
 # And the machine(s) that will run load balancers
 resource "aws_instance" "load_balancer" {
     count = var.lb_count
-    ami = "ami-05576a079321f21f8"
+    ami = "ami-0cae6d6fe6048ca2c"
     instance_type = "m5.large"
     key_name = var.key_name
 
@@ -111,13 +126,18 @@ resource "aws_instance" "load_balancer" {
     tags = {
         Name = "lb"
         Type = "loadbalancer"
+        ExpireAt = local.expire_at
+    }
+
+    lifecycle {
+      ignore_changes = [ tags["ExpireAt"] ]
     }
 }
 
 # And the machine that will run LogSlurp
 resource "aws_instance" "log_slurp" {
     for_each = var.logslurp ? { "log_slurp": 1 } : {}
-    ami = "ami-05576a079321f21f8"
+    ami = "ami-0cae6d6fe6048ca2c"
     instance_type = "m5.large"
     key_name = var.key_name
 
@@ -128,7 +148,19 @@ resource "aws_instance" "log_slurp" {
     tags = {
         Name = "ls"
         Type = "logslurp"
+        ExpireAt = local.expire_at
     }
+
+    lifecycle {
+      ignore_changes = [ tags["ExpireAt"] ]
+    }
+}
+
+locals {
+  expire_at = formatdate(
+    "YYYY-MM-DD'T'hh:mm:ss'Z'",
+    timeadd(timestamp(), format("%dh", 3 * 24))
+  )
 }
 
 # This is a variable that needs to be specified and it specifies
