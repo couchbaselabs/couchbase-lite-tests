@@ -156,7 +156,7 @@ class CBLPyTest:
             for es in self.__config.edge_servers:
                 es_info = EdgeServerInfo(es)
                 self.__edge_servers.append(EdgeServer(es_info.hostname))
-                
+
         self.__http_clients: list[str] = []
         if not test_server_only:
             for http in self.__config.http_clients:
