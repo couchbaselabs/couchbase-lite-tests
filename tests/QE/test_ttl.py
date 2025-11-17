@@ -82,9 +82,11 @@ class TestTTL(CBLTestClass):
         )
 
         self.mark_test_step("Verify both documents exist initially")
-        doc_exp_3 = await sg.get_document(sg_db, "exp_3", "_default", "_default")
-        doc_exp_years = await sg.get_document(
-            sg_db, "exp_years", "_default", "_default"
+        doc_exp_3 = await sg_user.get_document(
+            sg_db, "exp_3", "_default", "_default", use_public_api=True
+        )
+        doc_exp_years = await sg_user.get_document(
+            sg_db, "exp_years", "_default", "_default", use_public_api=True
         )
         assert doc_exp_3 is not None, "exp_3 should exist"
         assert doc_exp_years is not None, "exp_years should exist"
@@ -94,7 +96,9 @@ class TestTTL(CBLTestClass):
 
         self.mark_test_step("Verify exp_3 document is expired (not accessible)")
         try:
-            expired_doc = await sg.get_document(sg_db, "exp_3", "_default", "_default")
+            expired_doc = await sg_user.get_document(
+                sg_db, "exp_3", "_default", "_default", use_public_api=True
+            )
             if expired_doc is not None:
                 pytest.fail("exp_3 should be expired/inaccessible")
         except CblSyncGatewayBadResponseError as e:
@@ -105,8 +109,8 @@ class TestTTL(CBLTestClass):
         assert sdk_doc is None, "exp_3 should be purged"
 
         self.mark_test_step("Verify exp_years document is still accessible")
-        doc_still_valid = await sg.get_document(
-            sg_db, "exp_years", "_default", "_default"
+        doc_still_valid = await sg_user.get_document(
+            sg_db, "exp_years", "_default", "_default", use_public_api=True
         )
         assert doc_still_valid is not None, "exp_years should still be accessible"
         assert doc_still_valid.id == "exp_years"

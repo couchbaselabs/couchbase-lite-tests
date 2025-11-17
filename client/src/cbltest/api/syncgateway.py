@@ -538,7 +538,27 @@ class SyncGateway:
         payload: JSONSerializable | None = None,
         params: dict[str, str] | None = None,
         session: ClientSession | None = None,
+        use_public_api: bool = False,
     ) -> Any:
+        if use_public_api and session is None:
+            # Use public port (4984) with current session's credentials
+            scheme = "https://" if self.__secure else "http://"
+            async with self._create_session(
+                self.__secure,
+                scheme,
+                self.__hostname,
+                4984,
+                self.__admin_session.auth,
+            ) as public_session:
+                return await self._send_request(
+                    method,
+                    path,
+                    payload,
+                    params,
+                    session=public_session,
+                    use_public_api=False,
+                )
+
         if session is None:
             session = self.__admin_session
 
@@ -922,27 +942,11 @@ class SyncGateway:
                 "cbl.collection.name": collection,
             },
         ):
-            if use_public_api:
-                # Use public port (4984) - required for regular user access
-                scheme = "https://" if self.__secure else "http://"
-                # Create session with user's credentials on public port
-                async with self._create_session(
-                    self.__secure,
-                    scheme,
-                    self.__hostname,
-                    4984,
-                    self.__admin_session.auth,
-                ) as session:
-                    resp = await self._send_request(
-                        "get",
-                        f"/{db_name}.{scope}.{collection}/_all_docs",
-                        session=session,
-                    )
-            else:
-                # Use admin port (4985) - default behavior
-                resp = await self._send_request(
-                    "get", f"/{db_name}.{scope}.{collection}/_all_docs"
-                )
+            resp = await self._send_request(
+                "get",
+                f"/{db_name}.{scope}.{collection}/_all_docs",
+                use_public_api=use_public_api,
+            )
 
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
@@ -973,28 +977,11 @@ class SyncGateway:
             },
         ):
             query_params = f"version_type={version_type}"
-
-            if use_public_api:
-                # Use public port (4984) - required for regular user access
-                scheme = "https://" if self.__secure else "http://"
-                # Create session with user's credentials on public port
-                async with self._create_session(
-                    self.__secure,
-                    scheme,
-                    self.__hostname,
-                    4984,
-                    self.__admin_session.auth,
-                ) as session:
-                    resp = await self._send_request(
-                        "get",
-                        f"/{db_name}.{scope}.{collection}/_changes?{query_params}",
-                        session=session,
-                    )
-            else:
-                # Use admin port (4985) - default behavior
-                resp = await self._send_request(
-                    "get", f"/{db_name}.{scope}.{collection}/_changes?{query_params}"
-                )
+            resp = await self._send_request(
+                "get",
+                f"/{db_name}.{scope}.{collection}/_changes?{query_params}",
+                use_public_api=use_public_api,
+            )
 
             assert isinstance(resp, dict)
             return ChangesResponse(cast(dict, resp))
@@ -1230,24 +1217,11 @@ class SyncGateway:
                 "cbl.document.id": doc_id,
             },
         ):
-            if use_public_api:
-                scheme = "https://" if self.__secure else "http://"
-                async with self._create_session(
-                    self.__secure,
-                    scheme,
-                    self.__hostname,
-                    self.__port,
-                    self.__admin_session.auth,
-                ) as session:
-                    response = await self._send_request(
-                        "get",
-                        f"/{db_name}.{scope}.{collection}/{doc_id}",
-                        session=session,
-                    )
-            else:
-                response = await self._send_request(
-                    "get", f"/{db_name}.{scope}.{collection}/{doc_id}"
-                )
+            response = await self._send_request(
+                "get",
+                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                use_public_api=use_public_api,
+            )
             if not isinstance(response, dict):
                 raise ValueError(
                     "Inappropriate response from sync gateway get /doc (not JSON)"
