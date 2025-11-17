@@ -1,0 +1,25 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
+    "test-servers": [],
+    "edge-servers": [
+        {
+            "hostname": "172.23.96.81"
+        }
+    ],
+    "sync-gateways": [
+        {
+            "hostname": "172.23.96.121"
+        }
+    ],
+    "couchbase-servers": [
+        {
+            "hostname": "172.23.96.166"
+        }
+    ],
+    "http-clients": [
+        {
+            "hostname": "172.23.96.59"
+        }
+    ],
+    "api-version": 1
+}

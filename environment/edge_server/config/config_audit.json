@@ -1,0 +1,39 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
+    "interface": "0.0.0.0:59840",
+    "enable_anonymous_users": true,
+    "databases": {
+        "db":
+        {
+            "path": "./db.cblite2",
+            "create": true,
+            "enable_adhoc_queries": true,
+            "enable_client_writes": true,
+            "enable_client_sync": true
+        }
+    },
+    "replications": [{
+	   "source":"ws://172.23.96.121:4984/db-1",
+       "target":"db",
+       "bidirectional": true,
+       "continuous": true,
+       "auth": {
+        "user":"sync_gateway",
+        "password": "password"
+       }
+     }
+    ],
+    "logging": {
+        "console": false,
+        "file": {
+            "dir": "/tmp/EdgeServerLog",
+            "format": "text"
+        },
+        "domains": {
+            "Listener": "info"
+        },
+        "audit": {
+            "file": "/tmp/EdgeServerAuditLog.txt"
+        }
+    }
+}

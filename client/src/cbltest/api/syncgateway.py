@@ -1,4 +1,4 @@
-import asyncio
+import re
 import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
@@ -6,12 +6,14 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
+import paramiko
 import requests
 from aiohttp import BasicAuth, ClientSession, TCPConnector
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
+from cbltest.api.remoteshell import RemoteShellConnection
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
@@ -182,32 +184,6 @@ class AllDocumentsResponseRow:
         self.__cv = cv
 
 
-class DatabaseStatusResponse:
-    """
-    A class representing a database status response from Sync Gateway
-    """
-
-    @property
-    def db_name(self) -> str:
-        """Gets the database name"""
-        return self.__db_name
-
-    @property
-    def state(self) -> str:
-        """Gets the database state ('Online', 'Offline', etc.)"""
-        return self.__state
-
-    @property
-    def update_seq(self) -> int:
-        """Gets the update sequence number"""
-        return self.__update_seq
-
-    def __init__(self, response: dict):
-        self.__db_name = response.get("db_name", "")
-        self.__state = response.get("state", "Unknown")
-        self.__update_seq = response.get("update_seq", 0)
-
-
 class AllDocumentsResponse:
     """
     A class representing an all_docs response from Sync Gateway
@@ -218,12 +194,23 @@ class AllDocumentsResponse:
         """Gets the entries of the response"""
         return self.__rows
 
+    @property
+    def input(self):
+        return self.__input
+
+    @property
+    def revmap(self):
+        return self.__revmap
+
     def __len__(self) -> int:
         return self.__len
 
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
+        self.__input = input
         self.__rows: list[AllDocumentsResponseRow] = []
+        self.__input = input
+        self.__revmap = dict()
         for row in cast(list[dict], input["rows"]):
             rev = cast(dict, row["value"])
             self.__rows.append(
@@ -234,6 +221,7 @@ class AllDocumentsResponse:
                     cast(str, rev["cv"]) if "cv" in rev else None,
                 )
             )
+            self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
 
 
 class ChangesResponseEntry:
@@ -453,6 +441,7 @@ class SyncGateway:
         self.__admin_session: ClientSession = self._create_session(
             secure, scheme, url, admin_port, BasicAuth(username, password, "ascii")
         )
+        self.__ssh_client: RemoteShellConnection = RemoteShellConnection(host=url)
 
     @property
     def hostname(self) -> str:
@@ -654,24 +643,20 @@ class SyncGateway:
         """
         await self._put_database(db_name, payload, 0)
 
-    async def get_database_status(self, db_name: str) -> DatabaseStatusResponse | None:
+    async def database_exists(self, db_name: str) -> bool:
         """
-        Gets the status of a database including its online/offline state.
+        Checks if a database exists in Sync Gateway's configuration.
 
-        :param db_name: The name of the Database
-        :return: DatabaseStatusResponse with state, sequences, etc. Returns None if database doesn't exist (404/403)
+        :param db_name: The name of the Database to check
+        :return: True if the database exists, False otherwise
         """
-        with self.__tracer.start_as_current_span(
-            "get_database_status", attributes={"cbl.database.name": db_name}
-        ):
-            try:
-                resp = await self._send_request("get", f"/{db_name}/")
-                assert isinstance(resp, dict)
-                return DatabaseStatusResponse(cast(dict, resp))
-            except CblSyncGatewayBadResponseError as e:
-                if e.code in [403, 404]:  # Database doesn't exist
-                    return None
-                raise
+        try:
+            await self._send_request("get", f"/{db_name}")
+            return True
+        except CblSyncGatewayBadResponseError as e:
+            if e.code == 403:  # Database does not exist
+                return False
+            raise
 
     async def _delete_database(self, db_name: str, retry_count: int = 0) -> None:
         with self.__tracer.start_as_current_span(
@@ -685,6 +670,8 @@ class SyncGateway:
                         f"Sync gateway returned 500 from DELETE database call, retrying ({retry_count + 1})..."
                     )
                     current_span.add_event("SGW returned 500, retry")
+                    import asyncio
+
                     await asyncio.sleep(2)
                     await self._delete_database(db_name, retry_count + 1)
                 elif e.code == 403:
@@ -1313,3 +1300,222 @@ class SyncGateway:
             self.__secure, scheme, self.__hostname, 4984, auth
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
+
+    async def create_document(
+        self,
+        db_name: str,
+        doc_id: str,
+        document: dict,
+        scope: str = "_default",
+        collection: str = "_default",
+    ):
+        """
+        Creates a document in Sync Gateway
+
+        :param db_name: The name of the DB endpoint where the document should be created
+        :param doc_id: The document ID to create
+        :param document: The document data to be created (as a dictionary)
+        :param scope: The scope where the document should be created (default '_default')
+        :param collection: The collection where the document should be created (default '_default')
+        :return: The response from the Sync Gateway (or None if document creation fails)
+        """
+        with self.__tracer.start_as_current_span(
+            "create_document",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            document["_id"] = doc_id  # Ensure document has _id before sending
+            response = await self._send_request(
+                "PUT",
+                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                payload=JSONDictionary(document),
+            )
+
+            # Check for response structure
+            if not response or "error" in response:
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to create document {doc_id}"
+                )
+
+            # Convert response to match expected format
+            cast_resp = cast(dict, response)
+
+            # Ensure RemoteDocument fields exist
+            if "id" in cast_resp:
+                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
+            if "rev" in cast_resp:
+                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
+            if "cv" in cast_resp:
+                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
+
+            return RemoteDocument(cast_resp)
+
+    async def update_document(
+        self,
+        db_name: str,
+        doc_id: str,
+        document: dict,
+        rev: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> RemoteDocument:
+        """
+        Updates a document in Sync Gateway.
+
+        :param db_name: The name of the DB endpoint where the document exists
+        :param doc_id: The document ID to update
+        :param document: The updated document data (as a dictionary)
+        :param rev: The current revision ID of the document
+        :param scope: The scope where the document exists (default '_default')
+        :param collection: The collection where the document exists (default '_default')
+        :return: The updated document as a RemoteDocument object
+        """
+        with self.__tracer.start_as_current_span(
+            "update_document",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            document["_id"] = doc_id
+            document["_rev"] = rev
+
+            params = {"new_edits": "true", "rev": rev}
+
+            response = await self._send_request(
+                "PUT",
+                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                payload=JSONDictionary(document),
+                params=params,
+            )
+
+            if not response or "error" in response:
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to update document {doc_id} with rev {rev}"
+                )
+
+            # Convert response to match expected format
+            cast_resp = cast(dict, response)
+
+            # Ensure RemoteDocument fields exist
+            if "id" in cast_resp:
+                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
+            if "rev" in cast_resp:
+                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
+            if "cv" in cast_resp:
+                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
+
+            return RemoteDocument(cast_resp)
+
+    async def fetch_log_file(
+        self,
+        log_type: str,
+        ssh_key_path: str,
+        ssh_username: str = "ec2-user",
+    ) -> str:
+        """
+        Fetches a log file from the remote Sync Gateway server via SSH
+
+        :param log_type: The type of log to fetch (e.g., 'debug', 'info', 'error', 'warn')
+        :param ssh_key_path: Path to SSH private key for authentication
+        :param ssh_username: SSH username (default: ec2-user)
+        :return: Contents of the log file as a string
+        """
+        # Get log directory from SG configuration
+        server_config = await self._send_request("GET", "/_config")
+        log_dir = server_config.get("logging", {}).get(
+            "log_file_path", "/home/ec2-user/log"
+        )
+        remote_log_path = f"{log_dir}/sg_{log_type}.log"
+
+        with self.__tracer.start_as_current_span(
+            "fetch_log_file",
+            attributes={
+                "log.type": log_type,
+                "remote.path": remote_log_path,
+                "ssh.username": ssh_username,
+            },
+        ):
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+            # Load private key
+            private_key = paramiko.Ed25519Key.from_private_key_file(ssh_key_path)
+
+            # Connect to the remote server
+            ssh.connect(
+                self.__hostname,
+                username=ssh_username,
+                pkey=private_key,
+            )
+
+            # Read the log file
+            sftp = ssh.open_sftp()
+            try:
+                with sftp.open(remote_log_path, "r") as remote_file:
+                    log_contents = remote_file.read().decode("utf-8")
+            finally:
+                sftp.close()
+                ssh.close()
+
+            return log_contents
+
+    async def kill_server(self):
+        with self.__tracer.start_as_current_span("kill sync gateway"):
+            await self.__ssh_client.connect()
+            resp = await self.__ssh_client.kill_sgw()
+            await self.__ssh_client.close()
+            return resp
+
+    async def start_server(self):
+        with self.__tracer.start_as_current_span("start sync gateway"):
+            await self.__ssh_client.connect()
+            resp = await self.__ssh_client.start_sgw()
+            await self.__ssh_client.close()
+            return resp
+
+
+def scan_logs_for_untagged_sensitive_data(
+    log_content: str,
+    sensitive_patterns: list[str],
+) -> list[str]:
+    """
+    Scans log content for sensitive data that is NOT wrapped in <ud>...</ud> tags
+
+    :param log_content: The log file content as a string
+    :param sensitive_patterns: List of sensitive strings to look for (e.g., doc IDs, usernames)
+    :return: List of violations found (sensitive data without <ud> tags)
+    """
+    violations = []
+    for pattern in sensitive_patterns:
+        # Escape special regex characters in the pattern
+        escaped_pattern = re.escape(pattern)
+        for match in re.finditer(escaped_pattern, log_content):
+            start_pos = match.start()
+            end_pos = match.end()
+
+            # Check if this occurrence is within <ud>...</ud> tags
+            # Look backwards for <ud> and forwards for </ud>
+            before_text = log_content[max(0, start_pos - 100) : start_pos]
+            after_text = log_content[end_pos : min(len(log_content), end_pos + 100)]
+
+            # Check if there's an opening <ud> before and closing </ud> after
+            has_opening_tag = "<ud>" in before_text and before_text.rfind(
+                "<ud>"
+            ) > before_text.rfind("</ud>")
+            has_closing_tag = "</ud>" in after_text
+
+            if not (has_opening_tag and has_closing_tag):
+                context_start = max(0, start_pos - 50)
+                context_end = min(len(log_content), end_pos + 50)
+                context = log_content[context_start:context_end]
+                violations.append(
+                    f"Untagged '{pattern}' at position {start_pos}: ...{context}..."
+                )
+    return violations
