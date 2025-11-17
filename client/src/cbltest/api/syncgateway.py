@@ -1466,6 +1466,20 @@ class SyncGateway:
 
             return log_contents
 
+    async def kill_server(self):
+        with self.__tracer.start_as_current_span("kill sync gateway"):
+            await self.__ssh_client.connect()
+            resp = await self.__ssh_client.kill_sgw()
+            await self.__ssh_client.close()
+            return resp
+
+    async def start_server(self):
+        with self.__tracer.start_as_current_span("start sync gateway"):
+            await self.__ssh_client.connect()
+            resp = await self.__ssh_client.start_sgw()
+            await self.__ssh_client.close()
+            return resp
+
 
 def scan_logs_for_untagged_sensitive_data(
     log_content: str,
@@ -1505,84 +1519,3 @@ def scan_logs_for_untagged_sensitive_data(
                     f"Untagged '{pattern}' at position {start_pos}: ...{context}..."
                 )
     return violations
-
-    async def kill_server(self):
-        with self.__tracer.start_as_current_span("kill sync gateway"):
-            await self.__ssh_client.connect()
-            resp = await self.__ssh_client.kill_sgw()
-            await self.__ssh_client.close()
-            return resp
-
-    async def start_server(self):
-        with self.__tracer.start_as_current_span("start sync gateway"):
-            await self.__ssh_client.connect()
-            resp = await self.__ssh_client.start_sgw()
-            await self.__ssh_client.close()
-            return resp
-
-    async def close(self) -> None:
-        """
-        Closes the Sync Gateway session
-        """
-        if not self.__admin_session.closed:
-            await self.__admin_session.close()
-
-    async def get_database_config(self, db_name: str) -> dict[str, Any]:
-        """
-        Gets the configuration for a specific database from the admin API.
-
-        Args:
-            db_name: The name of the database to get configuration for
-
-        Returns:
-            Dictionary containing the database configuration
-        """
-        _assert_not_null(db_name, "db_name")
-        with self.__tracer.start_as_current_span(
-            "get_database_config", attributes={"cbl.database.name": db_name}
-        ):
-            return await self._send_request("GET", f"/{db_name}/_config")
-
-    async def get_document_revision_public(
-        self,
-        db_name: str,
-        doc_id: str,
-        revision: str,
-        auth: BasicAuth,
-        scope: str = "_default",
-        collection: str = "_default",
-    ) -> dict[str, Any]:
-        """
-        Gets a specific revision of a document using the public API with user authentication.
-
-        Args:
-            db_name: The name of the database
-            doc_id: The document ID
-            revision: The specific revision to retrieve
-            auth: User authentication credentials
-            scope: The scope name (defaults to "_default")
-            collection: The collection name (defaults to "_default")
-
-        Returns:
-            Dictionary containing the document at the specified revision
-
-        Raises:
-            CblSyncGatewayBadResponseError: If the document or revision is not found
-        """
-        _assert_not_null(db_name, "db_name")
-        _assert_not_null(doc_id, "doc_id")
-        _assert_not_null(revision, "revision")
-        _assert_not_null(auth, "auth")
-
-        path = (
-            f"/{db_name}/{scope}.{collection}/{doc_id}"
-            if scope != "_default" or collection != "_default"
-            else f"/{db_name}/{doc_id}"
-        )
-        params = {"rev": revision}
-
-        scheme = "https://" if self.__secure else "http://"
-        async with self._create_session(
-            self.__secure, scheme, self.__hostname, 4984, auth
-        ) as session:
-            return await self._send_request("GET", path, params=params, session=session)
