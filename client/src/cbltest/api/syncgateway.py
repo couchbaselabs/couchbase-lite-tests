@@ -1210,6 +1210,7 @@ class SyncGateway:
         doc_id: str,
         scope: str = "_default",
         collection: str = "_default",
+        use_public_api: bool = False,
     ) -> RemoteDocument | None:
         """
         Gets a document from Sync Gateway
@@ -1218,6 +1219,7 @@ class SyncGateway:
         :param doc_id: The document ID to get
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
+        :param use_public_api: If True, uses public port (4984) - automatically set when using user client
         """
         with self.__tracer.start_as_current_span(
             "get_document",
@@ -1228,9 +1230,24 @@ class SyncGateway:
                 "cbl.document.id": doc_id,
             },
         ):
-            response = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/{doc_id}"
-            )
+            if use_public_api:
+                scheme = "https://" if self.__secure else "http://"
+                async with self._create_session(
+                    self.__secure,
+                    scheme,
+                    self.__hostname,
+                    self.__port,
+                    self.__admin_session.auth,
+                ) as session:
+                    response = await self._send_request(
+                        "get",
+                        f"/{db_name}.{scope}.{collection}/{doc_id}",
+                        session=session,
+                    )
+            else:
+                response = await self._send_request(
+                    "get", f"/{db_name}.{scope}.{collection}/{doc_id}"
+                )
             if not isinstance(response, dict):
                 raise ValueError(
                     "Inappropriate response from sync gateway get /doc (not JSON)"
