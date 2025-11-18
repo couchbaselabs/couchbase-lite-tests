@@ -21,7 +21,8 @@ from pathlib import Path
 import click
 import paramiko
 
-from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
+from environment.aws.common.docker import start_container
+from environment.aws.common.io import LIGHT_GRAY, get_ec2_hostname, sftp_progress_bar
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
@@ -63,6 +64,7 @@ def setup_node(
     hostname: str,
     pkey: paramiko.Ed25519Key | None,
     version: str,
+    tag: str,
     cluster: str | None = None,
 ) -> None:
     """
@@ -74,11 +76,6 @@ def setup_node(
         version (str): The version of Couchbase Server to install.
         cluster (Optional[str]): The cluster to join, if any.
     """
-    couchbase_filename = f"couchbase-server-enterprise-{version}-linux.x86_64.rpm"
-    couchbase_url = (
-        f"http://packages.couchbase.com/releases/{version}/{couchbase_filename}"
-    )
-
     header(f"Setting up server {hostname} with version {version}")
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -90,45 +87,42 @@ def setup_node(
     sftp_progress_bar(
         sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
     )
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "disable-thp.service", "/tmp/disable-thp.service"
-    )
     sftp.close()
 
     global current_ssh
     current_ssh = hostname
 
-    remote_exec(ssh, "sudo bash /tmp/configure-system.sh", "Setting up machine")
     remote_exec(
         ssh,
-        f"wget -nc -O /tmp/{couchbase_filename} {couchbase_url} 2>&1",
-        f"Downloading Couchbase Server {version}",
-        fail_on_error=False,
+        "chmod +x /tmp/configure-node.sh && bash /tmp/configure-system.sh",
+        "Setting up machine",
     )
-    remote_exec(
-        ssh,
-        "sudo rpm -e couchbase-server",
-        "Uninstalling Couchbase Server",
-        fail_on_error=False,
-    )
-    remote_exec(
-        ssh,
-        f"sudo rpm -i /tmp/{couchbase_filename}",
-        f"Installing Couchbase Server {version}",
-    )
-    remote_exec(
-        ssh, "sudo systemctl start couchbase-server", "Starting Couchbase Server"
-    )
-
-    # Some magic here that might be overlooked.  If we pass in a cluster
-    # address to the configure node script, it will join an existing cluster
-    # rather than using itself to create a new one
-    config_command = "bash /tmp/configure-node.sh"
-    if cluster is not None:
-        config_command += f" {cluster}"
-    remote_exec(ssh, config_command, "Setting up node")
-
     ssh.close()
+
+    ec2_hostname = get_ec2_hostname(hostname)
+    docker_args = [
+        "--network",
+        "host",
+        "-v",
+        "/tmp/configure-node.sh:/etc/service/couchbase-config/run",
+    ]
+
+    if cluster is not None:
+        docker_args.extend(
+            [
+                "-e",
+                f"E2E_PARENT_CLUSTER={cluster}",
+            ]
+        )
+    context_name = "cbs" if tag == "" else f"cbs-{tag}"
+    start_container(
+        "cbs-e2e",
+        context_name,
+        f"couchbase/server:enterprise-{version}",
+        ec2_hostname,
+        docker_args,
+        replace_existing=True,
+    )
 
 
 def setup_topology(pkey: paramiko.Ed25519Key | None, topology: TopologyConfig) -> None:
@@ -144,10 +138,19 @@ def setup_topology(pkey: paramiko.Ed25519Key | None, topology: TopologyConfig) -
         return
 
     for cluster_config in topology.clusters:
-        setup_node(cluster_config.public_hostnames[0], pkey, cluster_config.version)
+        setup_node(
+            cluster_config.public_hostnames[0],
+            pkey,
+            cluster_config.version,
+            topology.tag,
+        )
         for server in cluster_config.public_hostnames[1:]:
             setup_node(
-                server, pkey, cluster_config.version, cluster_config.public_hostnames[0]
+                server,
+                pkey,
+                cluster_config.version,
+                topology.tag,
+                cluster_config.internal_hostnames[0],
             )
 
 

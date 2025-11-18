@@ -61,6 +61,7 @@ def start_container(
     host: str,
     docker_args: list[str] | None = None,
     container_args: list[str] | None = None,
+    replace_existing: bool = False,
 ) -> None:
     context_result = subprocess.run(
         ["docker", "context", "ls", "--format", "{{.Name}}"],
@@ -108,17 +109,23 @@ def start_container(
 
     if container_check.stdout.strip() != "":
         if container_check.stdout.startswith("Up"):
-            click.echo(f"{name} already running, returning...")
-            return
+            if not replace_existing:
+                click.echo(f"{name} already running, returning...")
+                return
 
-        click.echo(f"Restarting existing {name} container...")
-        subprocess.run(["docker", "start", name], check=False, env=env)
-        return
+            click.echo(f"Stopping existing {name} container...")
+            subprocess.run(["docker", "stop", name], check=True, env=env)
+
+        if not replace_existing:
+            click.echo(f"Restarting existing {name} container...")
+            subprocess.run(["docker", "start", name], check=False, env=env)
+            return
 
     click.echo(f"Starting new {name} container...")
     args = [
         "docker",
         "run",
+        "--rm",
         "-d",
         "--name",
         name,

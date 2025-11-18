@@ -3,7 +3,7 @@
 set -x
 
 if ! command -v docker &> /dev/null; then
-  sudo yum install -y docker
+  sudo dnf install -y docker
   sudo systemctl start docker
 fi
 

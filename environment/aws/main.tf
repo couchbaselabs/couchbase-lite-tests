@@ -13,6 +13,9 @@ provider "aws" {
     region = "us-east-1"
 }
 
+# Who is running Terraform
+data "aws_caller_identity" "current" {}
+
 # Read the subnet in which to insert our EC2 instances.  
 # The mobile-e2e subnet exists in the mobile-e2e VPC and
 # has domain over the IP addresses 10.0.1.1 - 10.0.1.255
@@ -56,6 +59,7 @@ resource "aws_instance" "couchbaseserver" {
         Name = "cbs"
         Type = "couchbaseserver"
         ExpireAt = local.expire_at
+        CreatedBy = local.created_by
     }
 
     lifecycle {
@@ -83,6 +87,7 @@ resource "aws_instance" "sync_gateway" {
         Name = "sg"
         Type = "syncgateway"
         ExpireAt = local.expire_at
+        CreatedBy = local.created_by
     }
 
     lifecycle {
@@ -105,6 +110,7 @@ resource "aws_instance" "edge_server" {
         Name = "es"
         Type = "edgeserver"
         ExpireAt = local.expire_at
+        CreatedBy = local.created_by
     }
 
     lifecycle {
@@ -127,6 +133,7 @@ resource "aws_instance" "load_balancer" {
         Name = "lb"
         Type = "loadbalancer"
         ExpireAt = local.expire_at
+        CreatedBy = local.created_by
     }
 
     lifecycle {
@@ -157,6 +164,8 @@ resource "aws_instance" "log_slurp" {
 }
 
 locals {
+  arn_path_parts = split("/", data.aws_caller_identity.current.arn)
+  created_by     = local.arn_path_parts[length(local.arn_path_parts)-1]
   expire_at = formatdate(
     "YYYY-MM-DD'T'hh:mm:ss'Z'",
     timeadd(timestamp(), format("%dh", 3 * 24))
