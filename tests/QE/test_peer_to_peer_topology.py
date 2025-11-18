@@ -32,8 +32,6 @@ class TestPeerToPeerTopology(CBLTestClass):
             "push": ReplicatorType.PUSH,
         }
         replicator_type = replicator_type_map[replicator_type]
-        for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 2.8.0")
 
         self.mark_test_step(
             "Reset local database and load `empty` dataset on all devices"
@@ -157,8 +155,6 @@ class TestPeerToPeerTopology(CBLTestClass):
             "push": ReplicatorType.PUSH,
         }
         replicator_type = replicator_type_map[replicator_type]
-        for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 2.8.0")
 
         self.mark_test_step(
             "Reset local database and load `empty` dataset on all devices"
