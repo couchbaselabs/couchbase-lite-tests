@@ -16,7 +16,8 @@ extension Handlers {
         Log.log(level: .debug, message: "Starting Listener with config: \(listenerStartRq.description)")
         
         let dbManager = req.databaseManager
-        let id = try dbManager.startListener(dbName: listenerStartRq.database, collections: listenerStartRq.collections, port: listenerStartRq.port)
+        let disableTLS = listenerStartRq.disableTLS ?? false
+        let id = try dbManager.startListener(dbName: listenerStartRq.database, collections: listenerStartRq.collections, port: listenerStartRq.port, disableTLS: disableTLS)
         
         return ContentTypes.Listener(id: id, port: listenerStartRq.port)
     }

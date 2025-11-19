@@ -85,7 +85,7 @@ class DatabaseManager {
         }
     }
     
-    public func startListener(dbName: String, collections: [String], port: UInt16?) throws -> UUID {
+    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false) throws -> UUID {
         var collectionsArr: [Collection] = []
         
         guard let database = databases[dbName]
@@ -105,6 +105,7 @@ class DatabaseManager {
         
         var listenerConfig = URLEndpointListenerConfiguration(collections: collectionsArr)
         listenerConfig.port = port
+        listenerConfig.disableTLS = disableTLS
         
         let listener = URLEndpointListener(config: listenerConfig)
         

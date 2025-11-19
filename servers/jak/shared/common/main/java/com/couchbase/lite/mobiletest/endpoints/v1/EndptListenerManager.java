@@ -46,6 +46,7 @@ public class EndptListenerManager {
     private static final String KEY_DATABASE = "database";
     private static final String KEY_COLLECTIONS = "collections";
     private static final String KEY_PORT = "port";
+    private static final String KEY_DISABLE_TLS = "disableTLS";
     private static final String KEY_ID = "id";
 
     private static final Set<String> LEGAL_CREATE_KEYS;
@@ -54,6 +55,7 @@ public class EndptListenerManager {
         l.add(KEY_DATABASE);
         l.add(KEY_COLLECTIONS);
         l.add(KEY_PORT);
+        l.add(KEY_DISABLE_TLS);
         LEGAL_CREATE_KEYS = Collections.unmodifiableSet(l);
     }
 
@@ -95,6 +97,9 @@ public class EndptListenerManager {
 
         final Integer port = req.getInt(KEY_PORT);
         if (port != null) { listenerConfig.setPort(port); }
+
+        final Boolean disableTLS = req.getBoolean(KEY_DISABLE_TLS);
+        if (disableTLS != null) { listenerConfig.setDisableTLS(disableTLS); }
 
         final URLEndpointListener listener = new URLEndpointListener(listenerConfig);
         try { listener.start(); }
