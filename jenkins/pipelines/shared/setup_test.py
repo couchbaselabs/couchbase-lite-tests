@@ -72,9 +72,7 @@ def setup_test_multi(
     topology_file_in: Path,
     config_file_in: Path,
     topology_tag: str,
-    private_key: str | None = None,
     couchbase_version: str = "7.6",
-    public_key_name: str = "jborden",
     setup_dir: str = "dev_e2e",
 ) -> None:
     """
@@ -162,10 +160,8 @@ def setup_test_multi(
     topology_obj = TopologyConfig(str(topology_file_out))
     start_backend(
         topology_obj,
-        public_key_name,
         str(config_file_in),
-        private_key=private_key,
-        tdk_config_out=str(config_file_out),
+        str(config_file_out),
     )
 
 
@@ -175,9 +171,7 @@ def setup_test(
     topology_file_in: Path,
     config_file_in: Path,
     topology_tag: str,
-    private_key: str | None = None,
     couchbase_version: str = "7.6",
-    public_key_name: str = "jborden",
     setup_dir: str = "dev_e2e",
 ) -> None:
     """
@@ -197,9 +191,7 @@ def setup_test(
         topology_file_in,
         config_file_in,
         topology_tag,
-        private_key,
         couchbase_version,
-        public_key_name,
         setup_dir,
     )
 

@@ -9,7 +9,7 @@ Functions:
     get_ec2_hostname(hostname: str) -> str:
         Convert an IP address to an EC2 hostname.
 
-    main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
+    main(topology: TopologyConfig) -> None:
         Set up the LogSlurp service on an AWS EC2 instance.
 """
 

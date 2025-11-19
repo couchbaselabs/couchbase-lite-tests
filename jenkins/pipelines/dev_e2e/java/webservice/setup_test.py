@@ -20,14 +20,9 @@ from jenkins.pipelines.shared.setup_test import setup_test
 @click.command()
 @click.argument("cbl_version")
 @click.argument("sgw_version")
-@click.option(
-    "--private_key",
-    help="The private key to use for the SSH connection (if not default)",
-)
 def cli_entry(
     cbl_version: str,
     sgw_version: str,
-    private_key: str | None,
 ) -> None:
     setup_test(
         cbl_version,
@@ -35,7 +30,6 @@ def cli_entry(
         SCRIPT_DIR / "topology_single_host.json",
         SCRIPT_DIR / "config_java_webservice.json",
         "jak_webservice",
-        private_key,
     )
 
 

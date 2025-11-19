@@ -11,7 +11,7 @@ Functions:
     write_config(in_config_file: str, topology: TopologyConfig, output: IO[str]) -> None:
         Write the TDK configuration based on the provided topology.
 
-    main(topology: TopologyConfig, public_key_name: str, sgw_url: str, tdk_config_in: str, cbs_version: str = "7.6.4", private_key: Optional[str] = None, tdk_config_out: Optional[str] = None) -> None:
+    main(topology: TopologyConfig, public_key_name: str, sgw_url: str, tdk_config_in: str, cbs_version: str = "7.6.4", tdk_config_out: Optional[str] = None) -> None:
         Main function to set up the AWS environment and run the test servers.
 """
 

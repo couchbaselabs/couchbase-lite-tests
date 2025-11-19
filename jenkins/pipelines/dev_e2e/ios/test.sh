@@ -7,7 +7,6 @@ EDITION=${1}
 CBL_VERSION=${2}
 CBL_BLD_NUM=${3}
 SGW_VERSION=${4}
-private_key_path=${5}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
@@ -19,11 +18,7 @@ create_venv venv
 source venv/bin/activate
 trap stop_venv EXIT
 uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-if [ -n "$private_key_path" ]; then
-    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $SGW_VERSION --private_key $private_key_path
-else
-    python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $SGW_VERSION
-fi
+python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $SGW_VERSION
 
 # Run Tests :
 echo "Run tests..."

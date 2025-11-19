@@ -11,7 +11,6 @@ function usage() {
     echo "version: CBL version (e.g. 3.2.1-2)"
     echo "platform: The .NET platform to build (e.g. ios)"
     echo "sgw_version: Version of Sync Gateway to download and use"
-    echo "private_key_path: Path to the private key to use for SSH connections"
 }
 
 function prepare_dotnet() {
@@ -23,13 +22,9 @@ function prepare_dotnet() {
     fi
 }
 
-if [ $# -lt 3 ]; then
+if [ $# -ne 3 ]; then
     usage
     exit 1
-fi
-
-if [ $# -gt 3 ]; then
-    private_key_path=$4
 fi
 
 cbl_version=$1
@@ -43,11 +38,7 @@ create_venv venv
 source venv/bin/activate
 trap stop_venv EXIT
 uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-if [ -n "$private_key_path" ]; then
-    python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version --private_key $private_key_path
-else
-    python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
-fi
+python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
 
 pushd $DEV_E2E_TESTS_DIR
 uv pip install -r requirements.txt

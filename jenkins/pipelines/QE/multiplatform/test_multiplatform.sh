@@ -44,7 +44,6 @@ function usage() {
     echo "Usage: $0 \"platform1:version1[-build1] platform2:version2[-build2]...\" <sgw_version> [test_name] topology-file"
     echo ""
     echo "Supported platforms: android, ios, dotnet, c, java"
-    echo "Private key: ${HOME}/.ssh/jborden.pem (hardcoded)"
     echo ""
     echo "Examples:"
     echo "  # Auto-fetch latest builds with default test:"
@@ -80,7 +79,6 @@ fi
 
 PLATFORM_CONFIGS="$1"
 SG_VERSION="$2"
-PRIVATE_KEY_PATH="${HOME}/.ssh/jborden.pem"
 TEST_NAME="${3:-test_delta_sync.py::TestDeltaSync::test_delta_sync_replication}"
 TOPOLOGY_FILE="$SCRIPT_DIR/${4:-topology.json}"
 
@@ -95,11 +93,6 @@ if [ -z "$SG_VERSION" ]; then
     usage
 fi
 
-if [ ! -f "$PRIVATE_KEY_PATH" ]; then
-    echo "❌ Error: Private key file not found: $PRIVATE_KEY_PATH"
-    exit 1
-fi
-
 if [ ! -f "$TOPOLOGY_FILE" ]; then
     echo "❌ Error: Topology file not found: $TOPOLOGY_FILE"
     exit 1
@@ -109,7 +102,6 @@ echo "🚀 MULTIPLATFORM CBL TEST SETUP"
 echo "==============================="
 echo "📋 Platform configurations: $PLATFORM_CONFIGS"
 echo "🔄 SG version: $SG_VERSION"
-echo "🔑 Private key: $PRIVATE_KEY_PATH"
 echo "🧪 Test: $TEST_NAME"
 echo " Topology: $TOPOLOGY_FILE"
 
