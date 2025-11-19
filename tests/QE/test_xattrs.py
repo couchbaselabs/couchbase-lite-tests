@@ -86,9 +86,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             "Verify all SG docs were created successfully and store revisions, versions"
         )
-        sg_all_docs = await sg_user.get_all_documents(
-            sg_db, "_default", "_default", use_public_api=True
-        )
+        sg_all_docs = await sg_user.get_all_documents(sg_db)
         sg_created_count = len(
             [doc for doc in sg_all_docs.rows if doc.id.startswith("sg_")]
         )
@@ -252,9 +250,7 @@ class TestXattrs(CBLTestClass):
         all_doc_ids = sg_doc_ids + sdk_doc_ids
 
         self.mark_test_step("Get all docs via Sync Gateway and save revisions")
-        sg_all_docs = await sg_user.get_all_documents(
-            sg_db, "_default", "_default", use_public_api=True
-        )
+        sg_all_docs = await sg_user.get_all_documents(sg_db)
         assert len(sg_all_docs.rows) == num_docs * 2, (
             f"Expected {num_docs * 2} docs via SG, got {len(sg_all_docs.rows)}"
         )
@@ -343,9 +339,7 @@ class TestXattrs(CBLTestClass):
             await sg.purge_document(doc_id, sg_db, "_default", "_default")
 
         self.mark_test_step("Verify SG can't see any docs after purge")
-        sg_docs_after_purge = await sg_user.get_all_documents(
-            sg_db, "_default", "_default", use_public_api=True
-        )
+        sg_docs_after_purge = await sg_user.get_all_documents(sg_db)
         assert len(sg_docs_after_purge.rows) == 0, (
             f"Expected 0 docs after purge, got {len(sg_docs_after_purge.rows)}"
         )
@@ -449,9 +443,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Verify user '{username}' sees all docs via _changes (public API)"
         )
-        user_changes = await sg_user.get_changes(
-            sg_db, "_default", "_default", use_public_api=True
-        )
+        user_changes = await sg_user.get_changes(sg_db)
         unique_docs = {e.id for e in user_changes.results if e.id in all_doc_ids}
         assert len(unique_docs) == num_docs * 2, (
             f"User should see {num_docs * 2} docs via public API, got {len(unique_docs)}"
@@ -497,9 +489,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Verify '{username}' sees all doc updates via _all_docs (public API)"
         )
-        all_docs_updated = await sg_user.get_all_documents(
-            sg_db, "_default", "_default", use_public_api=True
-        )
+        all_docs_updated = await sg_user.get_all_documents(sg_db)
         for row in all_docs_updated.rows:
             sg_doc = await sg.get_document(sg_db, row.id, "_default", "_default")
             if sg_doc is not None:
@@ -538,9 +528,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Verify '{username}' sees all docs as deleted via _changes (public API)"
         )
-        changes_deleted = await sg_user.get_changes(
-            sg_db, "_default", "_default", use_public_api=True
-        )
+        changes_deleted = await sg_user.get_changes(sg_db)
         sg_deleted_count = sum(1 for entry in changes_deleted.results if entry.deleted)
         assert sg_deleted_count == num_docs * 2, (
             f"Expected {num_docs * 2} docs to be deleted via SG, got {sg_deleted_count}"
@@ -633,9 +621,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Verify '{username}' sees all docs via _all_docs (public API)"
         )
-        sg_all_docs = await sg_user.get_all_documents(
-            sg_db, "_default", "_default", use_public_api=True
-        )
+        sg_all_docs = await sg_user.get_all_documents(sg_db)
         assert len(sg_all_docs.rows) == num_docs * 2, (
             f"Expected {num_docs * 2} docs, got {len(sg_all_docs.rows)}"
         )
@@ -800,9 +786,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Verify '{username}' sees all docs as deleted via _changes (public API)"
         )
-        changes_deleted = await sg_user.get_changes(
-            sg_db, "_default", "_default", use_public_api=True
-        )
+        changes_deleted = await sg_user.get_changes(sg_db)
         sg_deleted_count = sum(1 for entry in changes_deleted.results if entry.deleted)
         assert sg_deleted_count == num_docs * 2, (
             f"Expected {num_docs * 2} docs deleted via SG, got {sg_deleted_count}"
@@ -897,7 +881,7 @@ class TestXattrs(CBLTestClass):
             )
 
         self.mark_test_step("Wait for SG to import all docs (as admin)")
-        sg_all_docs = await sg.get_all_documents(sg_db, "_default", "_default")
+        sg_all_docs = await sg.get_all_documents(sg_db)
         assert len(sg_all_docs.rows) >= num_docs, (
             f"Expected at least {num_docs} docs to be imported, got {len(sg_all_docs.rows)}"
         )
@@ -906,9 +890,7 @@ class TestXattrs(CBLTestClass):
             f"Verify user '{username1}' can see all docs in channel '{sg_channel1}'"
         )
 
-        user1_changes = await sg_user1.get_changes(
-            sg_db, "_default", "_default", use_public_api=True
-        )
+        user1_changes = await sg_user1.get_changes(sg_db)
         unique_user1_docs = {e.id for e in user1_changes.results if e.id in sdk_doc_ids}
         user1_doc_count = len(unique_user1_docs)
         assert user1_doc_count == num_docs, (
@@ -934,9 +916,7 @@ class TestXattrs(CBLTestClass):
         async def query_as_user2() -> None:
             """Repeatedly query as user2 to trigger sync function processing"""
             for _ in range(20):
-                await sg_user2.get_changes(
-                    sg_db, "_default", "_default", use_public_api=True
-                )
+                await sg_user2.get_changes(sg_db)
                 await asyncio.sleep(0.1)
 
         await asyncio.gather(update_xattrs_and_docs(), query_as_user2())
@@ -962,9 +942,7 @@ class TestXattrs(CBLTestClass):
         )
 
         self.mark_test_step(f"Verify user '{username2}' can now see all docs")
-        user2_changes = await sg_user2.get_changes(
-            sg_db, "_default", "_default", use_public_api=True
-        )
+        user2_changes = await sg_user2.get_changes(sg_db)
         unique_user2_docs = {e.id for e in user2_changes.results if e.id in sdk_doc_ids}
         user2_count = len(unique_user2_docs)
         assert user2_count == num_docs, (
@@ -973,9 +951,7 @@ class TestXattrs(CBLTestClass):
         )
 
         self.mark_test_step(f"Verify user '{username1}' can no longer see any docs")
-        user1_changes_after = await sg_user1.get_changes(
-            sg_db, "_default", "_default", use_public_api=True
-        )
+        user1_changes_after = await sg_user1.get_changes(sg_db)
         unique_user1_after = {
             e.id for e in user1_changes_after.results if e.id in sdk_doc_ids
         }
