@@ -9,9 +9,6 @@ Functions:
     get_ec2_hostname(hostname: str) -> str:
         Convert an IP address to an EC2 hostname.
 
-    check_aws_key_checking() -> None:
-        Ensure that SSH key checking is configured correctly for AWS hosts.
-
     main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
         Set up the LogSlurp service on an AWS EC2 instance.
 """
@@ -22,7 +19,6 @@ import click
 import paramiko
 
 from environment.aws.common.docker import (
-    check_aws_key_checking,
     start_container,
 )
 from environment.aws.common.io import LIGHT_GRAY, get_ec2_hostname, sftp_progress_bar
@@ -63,7 +59,7 @@ def remote_exec(
     click.echo()
 
 
-def main(topology: TopologyConfig, private_key: str | None = None) -> None:
+def main(topology: TopologyConfig) -> None:
     """
     Set up the LogSlurp service on an AWS EC2 instance.
 
@@ -76,14 +72,10 @@ def main(topology: TopologyConfig, private_key: str | None = None) -> None:
         return
 
     header("Setting up logslurp")
-    check_aws_key_checking()
     ec2_hostname = get_ec2_hostname(topology.logslurp)
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    pkey: paramiko.Ed25519Key | None = (
-        paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
-    )
-    ssh.connect(ec2_hostname, username="ec2-user", pkey=pkey)
+    ssh.connect(ec2_hostname, username="ec2-user", pkey=topology.ssh_key)
 
     global current_ssh
     current_ssh = topology.logslurp
@@ -95,12 +87,11 @@ def main(topology: TopologyConfig, private_key: str | None = None) -> None:
     sftp.close()
     ssh.close()
 
-    context_name = "aws" if topology.tag == "" else f"aws-{topology.tag}"
     docker_args = ["-p", "8180:8180"]
     start_container(
         "logslurp",
-        context_name,
         "public.ecr.aws/q8y4w9v7/couchbase/logslurp",
         ec2_hostname,
+        topology.ssh_key,
         docker_args,
     )

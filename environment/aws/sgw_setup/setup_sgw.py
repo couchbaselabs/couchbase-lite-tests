@@ -18,13 +18,10 @@ Functions:
     remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
         Execute a remote command via SSH with a description and optional error handling.
 
-    setup_server(hostname: str, pkey: Optional[paramiko.Ed25519Key], sgw_info: SgwDownloadInfo) -> None:
+    setup_server(hostname: str, pkey: paramiko.Ed25519Key, sgw_info: SgwDownloadInfo) -> None:
         Set up a Sync Gateway server on an EC2 instance.
 
-    setup_topology(pkey: Optional[paramiko.Ed25519Key], sgw_info: SgwDownloadInfo, topology: TopologyConfig) -> None:
-        Set up the Sync Gateway topology on EC2 instances.
-
-    main(download_url: str, topology: TopologyConfig, private_key: Optional[str] = None) -> None:
+    main(download_url: str, topology: TopologyConfig) -> None:
         Main function to set up the Sync Gateway topology.
 """
 
@@ -233,14 +230,14 @@ def remote_exec(
 
 
 def setup_server(
-    hostname: str, pkey: paramiko.Ed25519Key | None, sgw_info: SgwDownloadInfo
+    hostname: str, pkey: paramiko.Ed25519Key, sgw_info: SgwDownloadInfo
 ) -> None:
     """
     Set up a Sync Gateway server on an EC2 instance.
 
     Args:
         hostname (str): The hostname or IP address of the EC2 instance.
-        pkey (Optional[paramiko.Ed25519Key]): The private key for SSH access.
+        pkey (paramiko.Ed25519Key): The private key for SSH access.
         sgw_info (SgwDownloadInfo): The download information for Sync Gateway.
     """
     if sgw_info.is_release:
@@ -272,7 +269,7 @@ def setup_server(
     else:
         try:
             existing_remote = sftp.stat(f"/tmp/{sgw_info.local_filename}")
-        except IOError:
+        except OSError:
             existing_remote = None  # File doesn't exist on remote
         existing_local = os.stat(SCRIPT_DIR / sgw_info.local_filename)
         if existing_remote and existing_remote.st_size == existing_local.st_size:
@@ -316,40 +313,20 @@ def setup_server(
     ssh.close()
 
 
-def setup_topology(
-    pkey: paramiko.Ed25519Key | None,
-    topology: TopologyConfig,
-) -> None:
+def main(topology: TopologyConfig) -> None:
     """
     Set up the Sync Gateway topology on EC2 instances.
 
     Args:
-        pkey (Optional[paramiko.Ed25519Key]): The private key for SSH access.
-        sgw_info (SgwDownloadInfo): The download information for Sync Gateway.
         topology (TopologyConfig): The topology configuration.
     """
+    if len(topology.sync_gateways) == 0:
+        return
+
     i = 0
     for sgw in topology.sync_gateways:
         sgw_info = SgwDownloadInfo(sgw.version)
         download_sgw_package(sgw_info)
         setup_config(sgw.cluster_hostname)
-        setup_server(sgw.hostname, pkey, sgw_info)
+        setup_server(sgw.hostname, topology.ssh_key, sgw_info)
         i += 1
-
-
-def main(topology: TopologyConfig, private_key: str | None = None) -> None:
-    """
-    Main function to set up the Sync Gateway topology.
-
-    Args:
-        topology (TopologyConfig): The topology configuration.
-        private_key (Optional[str]): The path to the private key for SSH access.
-    """
-    if len(topology.sync_gateways) == 0:
-        return
-
-    pkey = (
-        paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
-    )
-
-    setup_topology(pkey, topology)

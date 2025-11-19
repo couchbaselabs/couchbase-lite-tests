@@ -1,124 +1,67 @@
-import os
 import subprocess
-from pathlib import Path
 
 import click
+import paramiko
 
+from environment.aws.common.io import LIGHT_GRAY
 from environment.aws.common.output import header
 
 
-def check_aws_key_checking() -> None:
-    """
-    Ensure that SSH key checking is configured correctly for AWS hosts.
-    There should be a section titled Host *.amazonaws.com in the SSH config file
-    with StrictHostKeyChecking set to accept-new.
+def remote_exec(
+    ssh: paramiko.SSHClient,
+    command: str,
+    fail_on_error: bool = True,
+    capture_output: bool = True,
+) -> str | None:
+    _, stdout, stderr = ssh.exec_command(command, get_pty=True)
 
-    Raises:
-        FileNotFoundError: If the SSH config file is not found.
-        Exception: If the SSH config is not set correctly for AWS hosts.
-    """
-    ssh_config_path = Path.home() / ".ssh" / "config"
-    if not ssh_config_path.exists():
-        raise FileNotFoundError(f"SSH config file not found at {ssh_config_path}")
+    if not capture_output:
+        for line in iter(stdout.readline, ""):
+            click.secho(line, fg=LIGHT_GRAY, nl=False)  # type: ignore
 
-    with ssh_config_path.open() as f:
-        lines = f.readlines()
+    exit_status = stdout.channel.recv_exit_status()
+    if fail_on_error and exit_status != 0:
+        click.secho(stderr.read().decode(), fg="red")
+        raise Exception(f"Command '{command}' failed with exit status {exit_status}")
 
-    host_found = False
-    for line in lines:
-        if line.strip() == "Host *.amazonaws.com":
-            host_found = True
-            continue
-
-        if host_found:
-            if line.strip().startswith("Host"):
-                raise Exception(
-                    "No StrictHostKeyChecking line found for Host *.amazonaws.com, please modify your ssh config to set it to accept-new"
-                )
-
-            if "StrictHostKeyChecking" in line:
-                if "accept-new" not in line:
-                    raise Exception(
-                        "StrictHostKeyChecking is not set to accept-new for Host *.amazonaws.com, please modify your ssh config to set it to accept-new"
-                    )
-
-                return
-
-    if host_found:
-        raise Exception(
-            "No StrictHostKeyChecking line found for Host *.amazonaws.com, please modify your ssh config to set it to accept-new"
-        )
-    else:
-        raise Exception(
-            "Host *.amazonaws.com not found in SSH config, please add it with StrictHostKeyChecking accept-new"
-        )
+    header("Done!")
+    click.echo()
+    return stdout.read().decode() if capture_output else None
 
 
 def start_container(
     name: str,
-    context_name: str,
     image_name: str,
     host: str,
+    pkey: paramiko.Ed25519Key,
     docker_args: list[str] | None = None,
     container_args: list[str] | None = None,
     replace_existing: bool = False,
 ) -> None:
-    context_result = subprocess.run(
-        ["docker", "context", "ls", "--format", "{{.Name}}"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    if context_name in context_result.stdout:
-        header(f"Updating docker context '{context_name}'")
-        subprocess.run(
-            [
-                "docker",
-                "context",
-                "update",
-                context_name,
-                "--docker",
-                f"host=ssh://ec2-user@{host}",
-            ]
-        )
-    else:
-        header(f"Creating docker context '{context_name}'")
-        subprocess.run(
-            [
-                "docker",
-                "context",
-                "create",
-                context_name,
-                "--docker",
-                f"host=ssh://ec2-user@{host}",
-            ]
-        )
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(host, username="ec2-user", pkey=pkey)
 
     header(f"Starting {name} on {host}")
-    env = os.environ.copy()
-    env["DOCKER_CONTEXT"] = context_name
-
-    container_check = subprocess.run(
-        ["docker", "ps", "-a", "--filter", f"name={name}", "--format", "{{.Status}}"],
-        check=True,
+    container_check = remote_exec(
+        ssh,
+        f"docker ps -a --filter name={name} --format {{{{.Status}}}}",
+        fail_on_error=True,
         capture_output=True,
-        text=True,
-        env=env,
     )
 
-    if container_check.stdout.strip() != "":
-        if container_check.stdout.startswith("Up"):
+    if container_check and container_check.strip() != "":
+        if container_check.startswith("Up"):
             if not replace_existing:
                 click.echo(f"{name} already running, returning...")
                 return
 
             click.echo(f"Stopping existing {name} container...")
-            subprocess.run(["docker", "stop", name], check=True, env=env)
+            subprocess.run(["docker", "stop", name], check=True)
 
         if not replace_existing:
             click.echo(f"Restarting existing {name} container...")
-            subprocess.run(["docker", "start", name], check=False, env=env)
+            subprocess.run(["docker", "start", name], check=False)
             return
 
     click.echo(f"Starting new {name} container...")
@@ -139,8 +82,5 @@ def start_container(
     if container_args:
         args.extend(container_args)
 
-    subprocess.run(
-        args,
-        check=True,
-        env=env,
-    )
+    final_cmd = " ".join(args)
+    remote_exec(ssh, final_cmd, fail_on_error=True)

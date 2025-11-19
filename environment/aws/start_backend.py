@@ -32,7 +32,6 @@ if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
         cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
-from environment.aws.common.io import pushd
 from environment.aws.common.output import header
 from environment.aws.es_setup.setup_edge_servers import main as es_main
 from environment.aws.lb_setup.setup_load_balancers import main as lb_main
@@ -80,7 +79,7 @@ def topology_has_aws_resources(topology: TopologyConfig) -> bool:
     )
 
 
-def terraform_apply(public_key_name: str | None, topology: TopologyConfig) -> None:
+def terraform_apply(topology: TopologyConfig) -> None:
     """
     Apply the Terraform configuration to set up the AWS environment.
 
@@ -92,53 +91,48 @@ def terraform_apply(public_key_name: str | None, topology: TopologyConfig) -> No
         Exception: If any Terraform command fails.
     """
 
-    with pushd(SCRIPT_DIR):
-        header("Starting terraform apply")
-        if not topology_has_aws_resources(topology):
-            click.secho("No AWS resources requested, skipping terraform", fg="yellow")
-            return
+    header("Starting terraform apply")
+    if not topology_has_aws_resources(topology):
+        click.secho("No AWS resources requested, skipping terraform", fg="yellow")
+        return
 
-        if public_key_name is None:
-            raise Exception(
-                "--public-key-name was not provided, but it is required for AWS resources."
-            )
+    result = subprocess.run(
+        ["terraform", "init"], capture_output=False, text=True, cwd=SCRIPT_DIR
+    )
+    if result.returncode != 0:
+        raise Exception(
+            f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
+        )
 
-        result = subprocess.run(["terraform", "init"], capture_output=False, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
-            )
+    sgw_count = topology.total_sgw_count
+    es_count = topology.total_es_count
+    cbs_count = topology.total_cbs_count
+    lb_count = topology.total_lb_count
+    wants_logslurp = str(topology.wants_logslurp).lower()
 
-        sgw_count = topology.total_sgw_count
-        es_count = topology.total_es_count
-        cbs_count = topology.total_cbs_count
-        lb_count = topology.total_lb_count
-        wants_logslurp = str(topology.wants_logslurp).lower()
+    command = [
+        "terraform",
+        "apply",
+        f"-var=server_count={cbs_count}",
+        f"-var=sgw_count={sgw_count}",
+        f"-var=es_count={es_count}",
+        f"-var=lb_count={lb_count}",
+        f"-var=logslurp={wants_logslurp}",
+        "-auto-approve",
+    ]
+    result = subprocess.run(command, capture_output=False, text=True, cwd=SCRIPT_DIR)
 
-        command = [
-            "terraform",
-            "apply",
-            f"-var=key_name={public_key_name}",
-            f"-var=server_count={cbs_count}",
-            f"-var=sgw_count={sgw_count}",
-            f"-var=es_count={es_count}",
-            f"-var=lb_count={lb_count}",
-            f"-var=logslurp={wants_logslurp}",
-            "-auto-approve",
-        ]
-        result = subprocess.run(command, capture_output=False, text=True)
+    if result.returncode != 0:
+        raise Exception(
+            f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
+        )
 
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
+    topology.read_from_terraform(str(SCRIPT_DIR))
 
-        topology.read_from_terraform()
-
-        header("Done, sleeping for 5s")
-        # The machines won't be ready immediately, so we need to wait a bit
-        # before SSH access succeeds
-        sleep(5)
+    header("Done, sleeping for 5s")
+    # The machines won't be ready immediately, so we need to wait a bit
+    # before SSH access succeeds
+    sleep(5)
 
 
 def write_config(
@@ -242,9 +236,7 @@ class BackendSteps(Flag):
 
 def main(
     topology: TopologyConfig,
-    public_key_name: str | None,
     tdk_config_in: str,
-    private_key: str | None = None,
     tdk_config_out: str | None = None,
     steps: BackendSteps = BackendSteps.ALL,
 ) -> None:
@@ -260,48 +252,47 @@ def main(
         steps (BackendSteps, optional): The steps to execute. Defaults to BackendSteps.ALL.
     """
     if steps & BackendSteps.TERRAFORM_APPLY:
-        terraform_apply(public_key_name, topology)
+        terraform_apply(topology)
     else:
-        with pushd(SCRIPT_DIR):
-            result = subprocess.run(
-                ["terraform", "init"], capture_output=False, text=True
+        result = subprocess.run(
+            ["terraform", "init"], capture_output=False, text=True, cwd=SCRIPT_DIR
+        )
+        if result.returncode != 0:
+            raise Exception(
+                f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
             )
-            if result.returncode != 0:
-                raise Exception(
-                    f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
-                )
 
-            click.echo()
-            click.secho("Skipping terraform apply...", fg="yellow")
-            click.echo()
-            if topology_has_aws_resources(topology):
-                topology.read_from_terraform()
+        click.echo()
+        click.secho("Skipping terraform apply...", fg="yellow")
+        click.echo()
+        if topology_has_aws_resources(topology):
+            topology.read_from_terraform(str(SCRIPT_DIR))
 
     topology.resolve_test_servers()
     topology.dump()
 
     if steps & BackendSteps.CBS_PROVISION:
-        server_main(topology, private_key)
+        server_main(topology)
     else:
         click.secho("Skipping Couchbase Server provisioning...", fg="yellow")
 
     if steps & BackendSteps.SGW_PROVISION:
-        sgw_main(topology, private_key)
+        sgw_main(topology)
     else:
         click.secho("Skipping Sync Gateway provisioning...", fg="yellow")
 
     if steps & BackendSteps.ES_PROVISION:
-        es_main(topology, private_key)
+        es_main(topology)
     else:
         click.secho("Skipping Edge Server provisioning...", fg="yellow")
 
     if steps & BackendSteps.LB_PROVISION:
-        lb_main(topology, private_key)
+        lb_main(topology)
     else:
         click.secho("Skipping load balancer provisioning...", fg="yellow")
 
     if steps & BackendSteps.LS_PROVISION:
-        logslurp_main(topology, private_key)
+        logslurp_main(topology)
     else:
         click.secho("Skipping Logslurp provisioning...", fg="yellow")
 
@@ -323,15 +314,6 @@ def main(
     help="The path to the topology configuration file",
     default=TopologyConfig(),
     type=TopologyParamType(),
-)
-@click.option(
-    "--public-key-name",
-    help="The public key stored in AWS that pairs with the private key (required if using any AWS elements)",
-)
-@click.option(
-    "--private-key",
-    help="The private key to use for the SSH connection (if not default)",
-    type=click.Path(exists=True),
 )
 @click.option(
     "--tdk-config-out",
@@ -395,9 +377,7 @@ def main(
 )
 def cli_entry(
     topology: TopologyConfig,
-    public_key_name: str | None,
     tdk_config_in: str,
-    private_key: str | None,
     tdk_config_out: str | None,
     no_terraform_apply: bool,
     no_cbs_provision: bool,
@@ -425,9 +405,7 @@ def cli_entry(
 
     main(
         topology,
-        public_key_name,
         tdk_config_in,
-        private_key,
         tdk_config_out,
         steps,
     )
@@ -435,18 +413,14 @@ def cli_entry(
 
 def script_entry(
     topology: TopologyConfig,
-    public_key_name: str | None,
     tdk_config_in: str,
-    private_key: str | None = None,
     tdk_config_out: str | None = None,
     steps: BackendSteps | None = None,
 ) -> None:
     if steps is not None:
         main(
             topology,
-            public_key_name,
             tdk_config_in,
-            private_key,
             tdk_config_out,
             steps,
         )
@@ -454,12 +428,8 @@ def script_entry(
         args = [
             "--topology",
             topology,
-            "--public-key-name",
-            public_key_name,
             "--tdk-config-in",
             tdk_config_in,
-            "--private-key",
-            private_key,
             "--tdk-config-out",
             tdk_config_out,
         ]

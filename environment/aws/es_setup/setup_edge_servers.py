@@ -18,13 +18,7 @@ Functions:
     remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
         Execute a remote command via SSH with a description and optional error handling.
 
-    setup_server(hostname: str, pkey: Optional[paramiko.Ed25519Key], es_info: EsDownloadInfo) -> None:
-        Set up an Edge Server on an EC2 instance.
-
-    setup_topology(pkey: Optional[paramiko.Ed25519Key], es_info: EsDownloadInfo, topology: TopologyConfig) -> None:
-        Set up the Edge Server topology on EC2 instances.
-
-    main(download_url: str, topology: TopologyConfig, private_key: Optional[str] = None) -> None:
+    main(download_url: str, topology: TopologyConfig) -> None:
         Main function to set up the Edge Server topology.
 """
 
@@ -209,14 +203,14 @@ def remote_exec(
 
 
 def setup_server(
-    hostname: str, pkey: paramiko.Ed25519Key | None, es_info: EsDownloadInfo
+    hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadInfo
 ) -> None:
     """
     Set up an Edge Server on an EC2 instance.
 
     Args:
         hostname (str): The hostname or IP address of the EC2 instance.
-        pkey (Optional[paramiko.Ed25519Key]): The private key for SSH access.
+        pkey (paramiko.Ed25519Key): The private key for SSH access.
         es_info (EsDownloadInfo): The download information for Edge Server.
     """
     if es_info.is_release:
@@ -289,39 +283,19 @@ def setup_server(
     ssh.close()
 
 
-def setup_topology(
-    pkey: paramiko.Ed25519Key | None,
-    topology: TopologyConfig,
-) -> None:
+def main(topology: TopologyConfig) -> None:
     """
     Set up the Sync Gateway topology on EC2 instances.
 
     Args:
-        pkey (Optional[paramiko.Ed25519Key]): The private key for SSH access.
-        es_info (EsDownloadInfo): The download information for Edge Server.
         topology (TopologyConfig): The topology configuration.
-    """
-    i = 0
-    for es in topology.edge_servers:
-        es_info = EsDownloadInfo(es.version)
-        download_es_package(es_info)
-        setup_server(es.hostname, pkey, es_info)
-        i += 1
-
-
-def main(topology: TopologyConfig, private_key: str | None = None) -> None:
-    """
-    Main function to set up the Sync Gateway topology.
-
-    Args:
-        topology (TopologyConfig): The topology configuration.
-        private_key (Optional[str]): The path to the private key for SSH access.
     """
     if len(topology.edge_servers) == 0:
         return
 
-    pkey = (
-        paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
-    )
-
-    setup_topology(pkey, topology)
+    i = 0
+    for es in topology.edge_servers:
+        es_info = EsDownloadInfo(es.version)
+        download_es_package(es_info)
+        setup_server(es.hostname, topology.ssh_key, es_info)
+        i += 1

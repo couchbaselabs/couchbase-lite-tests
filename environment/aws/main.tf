@@ -4,6 +4,14 @@ terraform {
         source  = "hashicorp/aws"
         version = "~> 4.16"
       }
+      random = {
+        source  = "hashicorp/random"
+        version = "~> 3.4"
+      }
+      tls = {
+        source  = "hashicorp/tls"
+        version = "~> 4.0"
+      }
     }
 
     required_version = ">= 1.2.0"
@@ -39,12 +47,30 @@ data "aws_security_group" "main" {
 
 # Below are the resources that we will create
 
+# An SSH key for connecting to the below instances
+
+resource "tls_private_key" "ssh" {
+  algorithm = "ED25519"
+}
+
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
+resource "aws_key_pair" "ec2" {
+    key_name = "cbs-e2e-${random_id.suffix.hex}"
+    public_key = tls_private_key.ssh.public_key_openssh
+    tags = {
+        CreatedBy = local.created_by
+    }
+}
+
 # This is the machine(s) that will run Couchbase Server
 resource "aws_instance" "couchbaseserver" {
     count = var.server_count
     ami = "ami-0cae6d6fe6048ca2c"
     instance_type = "m5.xlarge"
-    key_name = var.key_name
+    key_name = aws_key_pair.ec2.key_name
 
     subnet_id = data.aws_subnet.main.id
     vpc_security_group_ids = [data.aws_security_group.main.id]
@@ -72,7 +98,7 @@ resource "aws_instance" "sync_gateway" {
     count = var.sgw_count
     ami = "ami-0cae6d6fe6048ca2c"
     instance_type = "m5.xlarge"
-    key_name = var.key_name
+    key_name = aws_key_pair.ec2.key_name
 
     subnet_id = data.aws_subnet.main.id
     vpc_security_group_ids = [data.aws_security_group.main.id]
@@ -100,7 +126,7 @@ resource "aws_instance" "edge_server" {
     count = var.es_count
     ami = "ami-0cae6d6fe6048ca2c"
     instance_type = "t3.micro"
-    key_name = var.key_name
+    key_name = aws_key_pair.ec2.key_name
 
     subnet_id = data.aws_subnet.main.id
     vpc_security_group_ids = [data.aws_security_group.main.id]
@@ -123,7 +149,7 @@ resource "aws_instance" "load_balancer" {
     count = var.lb_count
     ami = "ami-0cae6d6fe6048ca2c"
     instance_type = "m5.large"
-    key_name = var.key_name
+    key_name = aws_key_pair.ec2.key_name
 
     subnet_id = data.aws_subnet.main.id
     vpc_security_group_ids = [data.aws_security_group.main.id]
@@ -146,7 +172,7 @@ resource "aws_instance" "log_slurp" {
     for_each = var.logslurp ? { "log_slurp": 1 } : {}
     ami = "ami-0cae6d6fe6048ca2c"
     instance_type = "m5.large"
-    key_name = var.key_name
+    key_name = aws_key_pair.ec2.key_name
 
     subnet_id = data.aws_subnet.main.id
     vpc_security_group_ids = [data.aws_security_group.main.id]
@@ -170,13 +196,6 @@ locals {
     "YYYY-MM-DD'T'hh:mm:ss'Z'",
     timeadd(timestamp(), format("%dh", 3 * 24))
   )
-}
-
-# This is a variable that needs to be specified and it specifies
-# the name (in AWS) of the public key that will be allowed SSH access
-variable "key_name" {
-    description = "The name of the EC2 key pair to use"
-    type        = string
 }
 
 # This controls how many Couchbase Server instances are created
@@ -246,4 +265,9 @@ output "edge_server_instance_private_ips" {
 
 output "logslurp_instance_public_ip" {
     value = var.logslurp ? aws_instance.log_slurp["log_slurp"].public_ip : null
+}
+
+output "private_key_material" {
+    value = tls_private_key.ssh.private_key_openssh
+    sensitive = true
 }
