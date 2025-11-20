@@ -51,9 +51,7 @@ class TestUsersChannels(CBLTestClass):
         self.mark_test_step(
             f"Create user '{username}' with access to {channels} (stored in shared bucket)"
         )
-        sg_user = await sgs[0].create_user_client(
-            sgs[0], sg_db, username, password, channels
-        )
+        sg_user = await sgs[0].create_user_client(sg_db, username, password, channels)
 
         self.mark_test_step(
             f"Bulk create {total_docs} documents in {num_batches} batches of {batch_size} docs "
@@ -111,7 +109,7 @@ class TestUsersChannels(CBLTestClass):
         assert len(unexpected_ids) == 0, f"Unexpected document IDs: {unexpected_ids}"
 
         self.mark_test_step(
-            "Verify user can retrieve all documents via _all_docs from any SGW node"
+            "Verify user can retrieve all documents via _all_docs from one SGW node"
         )
         all_docs = await sg_user.get_all_documents(sg_db)
         all_docs_ids = [row.id for row in all_docs.rows if row.id in doc_ids]
@@ -147,9 +145,7 @@ class TestUsersChannels(CBLTestClass):
             "Verify all documents are accessible from each SGW node independently"
         )
         for i, sg in enumerate(sgs):
-            test_user = await sg.create_user_client(
-                sg, sg_db, username, password, channels
-            )
+            test_user = await sg.create_user_client(sg_db, username, password, channels)
             node_all_docs = await test_user.get_all_documents(sg_db)
             node_doc_ids = [row.id for row in node_all_docs.rows if row.id in doc_ids]
             assert len(node_doc_ids) == total_docs, (

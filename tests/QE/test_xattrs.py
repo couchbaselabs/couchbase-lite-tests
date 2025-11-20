@@ -7,7 +7,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
+from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 from packaging.version import Version
 
 
@@ -50,9 +50,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Create user {username} with access to SG and SDK channels"
         )
-        sg_user = await sg.create_user_client(
-            sg, sg_db, username, password, ["SG", "SDK"]
-        )
+        sg_user = await sg.create_user_client(sg_db, username, password, ["SG", "SDK"])
 
         self.mark_test_step(f"Bulk create {num_docs} docs via Sync Gateway")
         sg_docs: list[DocumentUpdateEntry] = []
@@ -129,9 +127,7 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step("Restart Sync Gateway (recreate database endpoint)")
         await sg.put_database(sg_db, db_payload)
-        sg_user = await sg.create_user_client(
-            sg, sg_db, username, password, ["SG", "SDK"]
-        )
+        sg_user = await sg.create_user_client(sg_db, username, password, ["SG", "SDK"])
 
         self.mark_test_step("Verify revisions, versions and contents of all documents")
         sgw_docs_now, sdk_docs_now = 0, 0
@@ -206,7 +202,7 @@ class TestXattrs(CBLTestClass):
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user {username} with access to channels")
-        sg_user = await sg.create_user_client(sg, sg_db, username, password, channels)
+        sg_user = await sg.create_user_client(sg_db, username, password, channels)
 
         self.mark_test_step(f"Bulk create {num_docs} docs via Sync Gateway")
         sg_docs: list[DocumentUpdateEntry] = []
@@ -402,9 +398,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Create user '{username}' with access to SDK and SG channels"
         )
-        sg_user = await sg.create_user_client(
-            sg, sg_db, username, password, ["sdk", "sg"]
-        )
+        sg_user = await sg.create_user_client(sg_db, username, password, ["sdk", "sg"])
 
         self.mark_test_step(f"Bulk create {num_docs} docs via SDK")
         sdk_doc_ids: list[str] = []
@@ -568,7 +562,7 @@ class TestXattrs(CBLTestClass):
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to shared channel")
-        sg_user = await sg.create_user_client(sg, sg_db, username, password, ["shared"])
+        sg_user = await sg.create_user_client(sg_db, username, password, ["shared"])
 
         self.mark_test_step(
             f"Bulk create {num_docs} docs via SDK with tracking properties"
@@ -853,10 +847,10 @@ class TestXattrs(CBLTestClass):
             f"Create users '{username1}', '{username2}' with access to '{sg_channel1}', '{sg_channel2}'"
         )
         sg_user1 = await sg.create_user_client(
-            sg, sg_db, username1, password, [sg_channel1]
+            sg_db, username1, password, [sg_channel1]
         )
         sg_user2 = await sg.create_user_client(
-            sg, sg_db, username2, password, [sg_channel2]
+            sg_db, username2, password, [sg_channel2]
         )
 
         self.mark_test_step(
@@ -934,12 +928,8 @@ class TestXattrs(CBLTestClass):
         await sg.put_database(sg_db, db_payload)
 
         # Recreate users after database restart
-        await SyncGateway.create_user_client(
-            sg, sg_db, username1, password, [sg_channel1]
-        )
-        await SyncGateway.create_user_client(
-            sg, sg_db, username2, password, [sg_channel2]
-        )
+        await sg.create_user_client(sg_db, username1, password, [sg_channel1])
+        await sg.create_user_client(sg_db, username2, password, [sg_channel2])
 
         self.mark_test_step(f"Verify user '{username2}' can now see all docs")
         user2_changes = await sg_user2.get_changes(sg_db)

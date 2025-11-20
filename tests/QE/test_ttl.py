@@ -42,7 +42,7 @@ class TestTTL(CBLTestClass):
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to {channels}")
-        sg_user = await sg.create_user_client(sg, sg_db, username, password, channels)
+        sg_user = await sg.create_user_client(sg_db, username, password, channels)
 
         self.mark_test_step("Create documents with different expiry times")
         current_time = datetime.now()
@@ -146,7 +146,7 @@ class TestTTL(CBLTestClass):
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to {channels}")
-        sg_user = await sg.create_user_client(sg, sg_db, username, password, channels)
+        sg_user = await sg.create_user_client(sg_db, username, password, channels)
 
         self.mark_test_step("Create documents with ISO-8601 expiry dates")
         current_time = datetime.now().astimezone()

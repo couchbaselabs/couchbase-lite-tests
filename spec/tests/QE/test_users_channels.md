@@ -14,7 +14,7 @@ Tests that a single user with access to multiple channels can correctly view and
 6. Verify user sees all 5000 docs via changes feed from first SGW
 7. Verify no duplicate documents in changes feed
 8. Verify all expected document IDs are present
-9. Verify user can retrieve all documents via _all_docs from any SGW node
+9. Verify user can retrieve all documents via _all_docs from one SGW node
 10. Verify all documents have correct revision format (generation 1)
 11. Verify all documents have correct version vector format (SGW 4.0+, optional)
 12. Verify all documents are accessible from each SGW node independently
