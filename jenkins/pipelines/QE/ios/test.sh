@@ -10,12 +10,11 @@ function usage() {
     exit 1
 }
 
-if [ "$#" -lt 4 ] || [ "$#" -gt 5 ]; then usage; fi
+if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then usage; fi
 
 EDITION=${1}
 CBL_VERSION=${2}
 SGW_VERSION=${3}
-private_key_path=${4}
 SETUP_ONLY=false
 
 # Check for --setup-only flag
@@ -34,11 +33,7 @@ echo "Setup backend..."
 create_venv venv
 source venv/bin/activate
 pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-if [ -n "$private_key_path" ]; then
-   python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION --private_key $private_key_path
-else
-   python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
-fi
+python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
 deactivate
 
 # Exit early if setup-only mode

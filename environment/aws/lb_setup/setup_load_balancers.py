@@ -6,13 +6,7 @@ Functions:
     remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
         Execute a remote command via SSH with a description and optional error handling.
 
-    get_ec2_hostname(hostname: str) -> str:
-        Convert an IP address to an EC2 hostname.
-
-    check_aws_key_checking() -> None:
-        Ensure that SSH key checking is configured correctly for AWS hosts.
-
-    main(topology: TopologyConfig, private_key: Optional[str] = None) -> None:
+    main(topology: TopologyConfig) -> None:
         Set up the load balancers on an AWS EC2 instance.
 """
 
@@ -24,7 +18,6 @@ import paramiko
 import yaml
 
 from environment.aws.common.docker import (
-    check_aws_key_checking,
     start_container,
 )
 from environment.aws.common.io import LIGHT_GRAY, get_ec2_hostname, sftp_progress_bar
@@ -110,7 +103,7 @@ def create_traefik_config(upstreams: list[str]) -> None:
         yaml.dump(config, fout)
 
 
-def main(topology: TopologyConfig, private_key: str | None = None) -> None:
+def main(topology: TopologyConfig) -> None:
     """
     Set up the load balancers on an AWS EC2 instance.
 
@@ -123,18 +116,12 @@ def main(topology: TopologyConfig, private_key: str | None = None) -> None:
         return
 
     header("Setting up load balancers")
-    check_aws_key_checking()
     for lb in topology.load_balancers:
         create_traefik_config(lb.upstreams)
         ec2_hostname = get_ec2_hostname(lb.hostname)
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        pkey: paramiko.Ed25519Key | None = (
-            paramiko.Ed25519Key.from_private_key_file(private_key)
-            if private_key
-            else None
-        )
-        ssh.connect(ec2_hostname, username="ec2-user", pkey=pkey)
+        ssh.connect(ec2_hostname, username="ec2-user", pkey=topology.ssh_key)
 
         global current_ssh
         current_ssh = lb.hostname
@@ -162,7 +149,7 @@ def main(topology: TopologyConfig, private_key: str | None = None) -> None:
             "-v",
             "/home/ec2-user/http_config.yml:/etc/traefik/http_config.yml:ro",
         ]
-        context_name = "lb" if topology.tag == "" else f"lb-{topology.tag}"
+
         start_container(
-            "traefik", context_name, "traefik:v3", ec2_hostname, docker_args
+            "traefik", "traefik:v3", ec2_hostname, topology.ssh_key, docker_args
         )

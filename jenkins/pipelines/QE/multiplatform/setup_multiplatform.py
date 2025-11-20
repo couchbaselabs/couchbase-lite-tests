@@ -347,7 +347,6 @@ def run_platform_specific_setup(
     platform_key: str,
     full_version: str,
     sgw_version: str,
-    private_key: str | None = None,
     target_os: str | None = None,
 ) -> None:
     """
@@ -357,7 +356,6 @@ def run_platform_specific_setup(
         platform_key: Platform identifier (ios, android, dotnet, java, c)
         full_version: Full version string (version-build)
         sgw_version: Sync Gateway version
-        private_key: Optional SSH private key path
         target_os: Optional OS specification (windows, macos, linux, android, ios)
     """
     QE_dir = SCRIPT_DIR.parent
@@ -366,13 +364,9 @@ def run_platform_specific_setup(
     if platform_key == "android":
         main_script = QE_dir / "android_tests.sh"
         if main_script.exists():
-            # Android script expects: <cbl_version> <sg_version> [private_key_path]
+            # Android script expects: <cbl_version> <sg_version>
             # Android expects combined version (e.g., "3.2.3-6")
             cmd = ["bash", str(main_script), full_version, sgw_version]
-            if private_key:
-                cmd.append(private_key)
-            else:
-                cmd.append("")  # Android script expects 3 parameters
             click.echo(f"Running: {' '.join(cmd)}")
             subprocess.run(cmd, check=True, cwd=str(QE_dir))
         else:
@@ -398,10 +392,6 @@ def run_platform_specific_setup(
                 build_num,
                 sgw_version,
             ]
-            if private_key:
-                cmd.append(private_key)
-            else:
-                cmd.append("")  # iOS script expects 5 parameters
             click.echo(f"Running: {' '.join(cmd)}")
             subprocess.run(cmd, check=True, cwd=str(QE_dir))
         else:
@@ -413,9 +403,7 @@ def setup_multiplatform_test(
     sgw_version: str,
     config_file_in: Path,
     topology_tag: str,
-    private_key: str | None = None,
     couchbase_version: str = "7.6.4",
-    public_key_name: str = "jborden",
     setup_dir: str = "QE",
     auto_fetch_builds: bool = True,
     topology_file: str = "",
@@ -440,7 +428,6 @@ def setup_multiplatform_test(
     click.secho("===============================", fg="green")
     click.secho(f"📋 Platform configurations: {platform_versions_str}", fg="green")
     click.secho(f"🔄 SG version: {sgw_version}", fg="green")
-    click.secho(f"🔑 Private key: {private_key or '~/.ssh/jborden.pem'}", fg="green")
     click.echo()
 
     # Parse platform versions
@@ -482,10 +469,8 @@ def setup_multiplatform_test(
 
     start_backend(
         topology_config,
-        public_key_name,
         str(config_file_in),
-        private_key=private_key,
-        tdk_config_out=str(config_file_out),
+        str(config_file_out),
     )
 
 

@@ -11,7 +11,6 @@ function usage() {
     echo "version: CBL version (e.g. 3.2.1-2)"
     echo "platform: The .NET platform to build (e.g. ios)"
     echo "sgw_version: Version of Sync Gateway to download and use"
-    echo "private_key_path: Path to the private key to use for SSH connections"
     echo "  --setup-only: Only build test server and setup backend, skip test execution"
 }
 
@@ -32,7 +31,6 @@ fi
 cbl_version=$1
 platform=$2
 sgw_version=$3
-private_key_path=""
 SETUP_ONLY=false
 
 # Parse optional arguments
@@ -42,23 +40,12 @@ for arg in "$@"; do
     fi
 done
 
-if [ $# -gt 3 ]; then
-    # Check if 4th argument is --setup-only
-    if [ "$4" != "--setup-only" ]; then
-        private_key_path=$4
-    fi
-fi
-
 prepare_dotnet
 
 create_venv venv
 source venv/bin/activate
 pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-if [ -n "$private_key_path" ]; then
-    python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version --private_key $private_key_path
-else
-    python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
-fi
+python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
 deactivate
 
 # Exit early if setup-only mode

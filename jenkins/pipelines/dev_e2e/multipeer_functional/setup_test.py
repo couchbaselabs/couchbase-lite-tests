@@ -29,9 +29,6 @@ def edit_platform_map(dict: dict[str, str], key: str, value: str | None) -> None
 @click.option("--java", help="The version of Java to use")
 @click.option("--c", help="The version of C to use")
 @click.option("--global-version", help="The default version for all platforms")
-@click.option(
-    "--private-key-path", help="The path to the private key file (if not default)"
-)
 def main(
     ios: str | None,
     android: str | None,
@@ -39,7 +36,6 @@ def main(
     java: str | None,
     c: str | None,
     global_version: str | None,
-    private_key_path: str | None,
 ):
     click.secho("🚀 Multiplatform CBL Setup", fg="blue", bold=True)
     click.secho("Platform specifications:", fg="cyan")
@@ -49,7 +45,6 @@ def main(
     print_platform_spec(".NET", dotnet)
     print_platform_spec("Java", java)
     print_platform_spec("C", c)
-    print_platform_spec("Private Key Path", private_key_path)
     click.echo()
 
     platform_map: dict[str, str] = {}
@@ -78,7 +73,6 @@ def main(
             topology_file_in,
             config_file_in,
             "multipeer_functional",
-            private_key_path,
         )
         click.secho("🎉 Setup completed successfully!", fg="green", bold=True)
     except Exception as e:

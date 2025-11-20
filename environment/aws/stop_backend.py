@@ -46,7 +46,6 @@ def main(topology: str | None) -> None:
     command = [
         "terraform",
         "destroy",
-        "-var=key_name=x",
         "-auto-approve",
     ]
 

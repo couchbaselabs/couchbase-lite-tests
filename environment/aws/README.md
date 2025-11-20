@@ -36,16 +36,6 @@ You need to configure the aws CLI to login with Okta.  You can do so by followin
 1. Choose "default" as the profile name, and then you are done (this will have an effect on any existing AWS config you have so be careful)
 2. Choose any other profile name, including the default provided one, and set it in the environment variable `AWS_PROFILE` before running the orchestrator
 
-### Public / Private Key Pair
-
-One of the core principles of making this backend work is SSH key access.  This requires that as part of deploying containers into EC2, a public key must be set up for SSH access to the various machines.  The process for doing this is [documented by Amazon](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/create-key-pairs.html) but the summary is that as part of this two very important things happen.
-
-1. The public key gets stored on Amazon servers for deployment to EC2 containers, and it has a user-selected name that you must remember (mine is jborden, for example)
-2. The private key gets stored by YOU.  Don't lose it or you will have to repeat this process.
-
-> [!NOTE]  
-> Use the ED25519 key type.  RSA keys will not work correctly.  This is a limitation I accidentally created and I could probably work around but I doubt it will give any sort of benefit.
-
 ### Python dependencies
 
 First of all you need to be using Python 3.10 or higher, but less than 3.13 (it might work but it's been known to cause issues sometimes).  You also need to make sure that the [python dependencies](./requirements.txt) are installed in whatever environment you are using.  If you know nothing about python that means that when you use this orchestration you need to run `pip install -r requirements.txt` before trying to do anything, so that its dependencies are installed.  The most sane way to do this is to install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then run the following:
@@ -152,9 +142,9 @@ Starting and stopping the system has dedicated python scripts.  These scripts ar
 ### Starting
 
 ```
-usage: start_backend.py [-h] [--cbs-version CBS_VERSION] [--private-key PRIVATE_KEY] [--tdk-config-out TDK_CONFIG_OUT]
+usage: start_backend.py [-h] [--cbs-version CBS_VERSION] [--tdk-config-out TDK_CONFIG_OUT]
                         [--topology TOPOLOGY] [--no-terraform-apply] [--no-cbs-provision] [--no-sgw-provision]
-                        [--no-ls-provision] [--no-ts-run] [--sgw-url SGW_URL] [--public-key-name PUBLIC_KEY_NAME]
+                        [--no-ls-provision] [--no-ts-run] [--sgw-url SGW_URL]
                         --tdk-config-in TDK_CONFIG_IN
 
 Prepare an AWS EC2 environment for running E2E tests
@@ -163,8 +153,6 @@ optional arguments:
   -h, --help            show this help message and exit
   --cbs-version CBS_VERSION
                         The version of Couchbase Server to install.
-  --private-key PRIVATE_KEY
-                        The private key to use for the SSH connection (if not default)
   --tdk-config-out TDK_CONFIG_OUT
                         The path to the write the resulting TDK configuration file (stdout if empty)
   --topology TOPOLOGY   The path to the topology configuration file
@@ -176,9 +164,6 @@ optional arguments:
 
 conditionally required arguments:
   --sgw-url SGW_URL     The URL of Sync Gateway to install (required if using SGW)
-  --public-key-name PUBLIC_KEY_NAME
-                        The public key stored in AWS that pairs with the private key (required if using any AWS
-                        elements)
 
 required arguments:
   --tdk-config-in TDK_CONFIG_IN
@@ -187,8 +172,6 @@ required arguments:
 
 The Sync Gateway URL and Couchbase Server version properties should be self explanatory but the others are as follows:
 
-- public key name: The name of the key created in step 0
-- private key: The path to the private key created in step 0 (you didn't lose it right?)
 - TDK config in: A template TDK compatible config file.  
 - TDK config out: An optional file to write the resulting TDK config file to (otherwise it will go to stdout)
 - Topology is the toplogy JSON file that will describe how to set up AWS instances (see the [topology README](./topology_setup/README.md) for more information.)

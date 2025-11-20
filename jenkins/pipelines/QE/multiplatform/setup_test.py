@@ -24,9 +24,7 @@ from jenkins.pipelines.shared.setup_test import resolved_version
 def setup_multiplatform_test(
     platform_versions: dict,
     sgw_version: str,
-    private_key: str | None = None,
     couchbase_version: str = "7.6",
-    public_key_name: str = "jborden",
     setup_dir: str = "QE",
 ) -> None:
     """
@@ -35,9 +33,7 @@ def setup_multiplatform_test(
     Args:
         platform_versions: Dict mapping platform names to their versions (e.g., {"ios": "3.1.5", "android": "3.2.3"})
         sgw_version: Sync Gateway version to use
-        private_key: Optional SSH private key path
         couchbase_version: Couchbase Server version
-        public_key_name: SSH public key name
         setup_dir: Setup directory name
     """
     topology_file_in = SCRIPT_DIR / "topology.json"
@@ -118,10 +114,8 @@ def setup_multiplatform_test(
     topology_config = TopologyConfig(str(topology_file_out))
     start_backend(
         topology_config,
-        public_key_name,
         str(config_file_in),
-        private_key=private_key,
-        tdk_config_out=str(config_file_out),
+        str(config_file_out),
     )
 
 
@@ -155,14 +149,9 @@ def parse_platform_configs(platform_configs: str) -> dict:
 @click.command()
 @click.argument("platform_configs")
 @click.argument("sgw_version")
-@click.option(
-    "--private_key",
-    help="The private key to use for the SSH connection (if not default)",
-)
 def cli_entry(
     platform_configs: str,
     sgw_version: str,
-    private_key: str | None,
 ) -> None:
     """
     Setup multiplatform testing environment with platform-specific CBL versions.
@@ -180,7 +169,6 @@ def cli_entry(
     setup_multiplatform_test(
         platform_versions,
         sgw_version,
-        private_key,
         setup_dir="QE",
     )
 

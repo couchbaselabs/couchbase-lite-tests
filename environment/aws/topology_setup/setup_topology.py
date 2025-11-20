@@ -17,17 +17,19 @@ Functions:
         Main function to run the test servers based on the provided topology configuration.
 """
 
+import io
 import json
-import subprocess
 from pathlib import Path
 from time import sleep
 from typing import Final, cast
 
 import click
 import requests
+from paramiko import Ed25519Key
 
 from environment.aws.common.io import get_ec2_hostname
 from environment.aws.common.output import header
+from environment.aws.common.terraform import get_terraform_json
 from environment.aws.topology_setup.test_server import TestServer
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -519,6 +521,7 @@ class TopologyConfig:
         self._wants_logslurp: bool | None = None
         self.__logslurp: str | None = None
         self.__tag: str = ""
+        self.__ssh_key_path: str | None = None
 
         with open(config_file) as fin:
             config = cast(dict, json.load(fin))
@@ -665,114 +668,49 @@ class TopologyConfig:
     def tag(self) -> str:
         return self.__tag
 
-    def read_from_terraform(self):
+    @property
+    def ssh_key(self) -> Ed25519Key:
+        if self.__ssh_key is None:
+            raise Exception("SSH key has not been set by terraform")
+
+        return self.__ssh_key
+
+    def read_from_terraform(self, terraform_dir: str):
         """
         Read the topology configuration from Terraform outputs.
 
         Raises:
             Exception: If any Terraform command fails.
         """
-        cbs_command = ["terraform", "output", "-json", "couchbase_instance_public_ips"]
-        result = subprocess.run(cbs_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(cbs_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
-
-        cbs_ips = cast(list[str], json.loads(result.stdout))
-
-        cbs_command = ["terraform", "output", "-json", "couchbase_instance_private_ips"]
-        result = subprocess.run(cbs_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(cbs_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
-
-        cbs_internal_ips = cast(list[str], json.loads(result.stdout))
+        all_info = get_terraform_json(terraform_dir)
+        cbs_ips = cast(list[str], all_info["couchbase_instance_public_ips"]["value"])
+        cbs_internal_ips = cast(
+            list[str], all_info["couchbase_instance_private_ips"]["value"]
+        )
         self.apply_server_hostnames(cbs_ips, cbs_internal_ips)
 
-        sgw_command = [
-            "terraform",
-            "output",
-            "-json",
-            "sync_gateway_instance_public_ips",
-        ]
-        result = subprocess.run(sgw_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(sgw_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
-
-        sgw_ips = cast(list[str], json.loads(result.stdout))
-
-        sgw_command = [
-            "terraform",
-            "output",
-            "-json",
-            "sync_gateway_instance_private_ips",
-        ]
-        result = subprocess.run(sgw_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(sgw_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
-
-        sgw_internal_ips = cast(list[str], json.loads(result.stdout))
+        sgw_ips = cast(list[str], all_info["sync_gateway_instance_public_ips"]["value"])
+        sgw_internal_ips = cast(
+            list[str], all_info["sync_gateway_instance_private_ips"]["value"]
+        )
         self.apply_sgw_hostnames(sgw_ips, sgw_internal_ips)
 
-        es_command = [
-            "terraform",
-            "output",
-            "-json",
-            "edge_server_instance_public_ips",
-        ]
-        result = subprocess.run(es_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(es_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
-
-        es_ips = cast(list[str], json.loads(result.stdout))
-
-        es_command = [
-            "terraform",
-            "output",
-            "-json",
-            "edge_server_instance_private_ips",
-        ]
-        result = subprocess.run(es_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(es_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
-
-        es_internal_ips = cast(list[str], json.loads(result.stdout))
+        es_ips = cast(list[str], all_info["edge_server_instance_public_ips"]["value"])
+        es_internal_ips = cast(
+            list[str], all_info["edge_server_instance_private_ips"]["value"]
+        )
         self.apply_es_hostnames(es_ips, es_internal_ips)
 
-        lb_command = [
-            "terraform",
-            "output",
-            "-json",
-            "load_balancer_instance_public_ips",
-        ]
-        result = subprocess.run(lb_command, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(
-                f"Command '{' '.join(lb_command)}' failed with exit status {result.returncode}: {result.stderr}"
-            )
-
-        lb_ips = cast(list[str], json.loads(result.stdout))
+        lb_ips = cast(list[str], all_info["load_balancer_instance_public_ips"]["value"])
         self.apply_lb_hostnames(lb_ips)
 
         if self._wants_logslurp:
-            logslurp_command = ["terraform", "output", "logslurp_instance_public_ip"]
-            result = subprocess.run(logslurp_command, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise Exception(
-                    f"Command '{' '.join(logslurp_command)}' failed with exit status {result.returncode}: {result.stderr}"
-                )
+            self.__logslurp = cast(
+                str, all_info["logslurp_instance_public_ip"]["value"]
+            )
 
-            self.__logslurp = cast(str, json.loads(result.stdout))
+        ssh_key_material = cast(str, all_info["private_key_material"]["value"])
+        self.__ssh_key = Ed25519Key.from_private_key(io.StringIO(ssh_key_material))
 
     def resolve_test_servers(self):
         """

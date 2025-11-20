@@ -6,13 +6,10 @@ Functions:
     remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
         Execute a remote command via SSH with a description and optional error handling.
 
-    setup_node(hostname: str, pkey: Optional[paramiko.Ed25519Key], version: str, cluster: Optional[str] = None) -> None:
+    setup_node(hostname: str, pkey: paramiko.Ed25519Key, version: str, cluster: Optional[str] = None) -> None:
         Set up a Couchbase Server node on an EC2 instance.
 
-    setup_topology(pkey: Optional[paramiko.Ed25519Key], version: str, topology: TopologyConfig) -> None:
-        Use the indicated topology to set up the desired number of Couchbase Server nodes
-
-    main(version: str, topology: TopologyConfig, private_key: Optional[str] = None) -> None:
+    main(version: str, topology: TopologyConfig) -> None:
         Main function to set up the Couchbase Server topology.
 """
 
@@ -62,9 +59,8 @@ def remote_exec(
 
 def setup_node(
     hostname: str,
-    pkey: paramiko.Ed25519Key | None,
+    pkey: paramiko.Ed25519Key,
     version: str,
-    tag: str,
     cluster: str | None = None,
 ) -> None:
     """
@@ -72,14 +68,13 @@ def setup_node(
 
     Args:
         hostname (str): The hostname or IP address of the EC2 instance.
-        pkey (Optional[paramiko.Ed25519Key]): The private key for SSH access.
+        pkey (paramiko.Ed25519Key): The private key for SSH access.
         version (str): The version of Couchbase Server to install.
         cluster (Optional[str]): The cluster to join, if any.
     """
     header(f"Setting up server {hostname} with version {version}")
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
     ssh.connect(hostname, username="ec2-user", pkey=pkey)
 
     sftp = ssh.open_sftp()
@@ -114,57 +109,36 @@ def setup_node(
                 f"E2E_PARENT_CLUSTER={cluster}",
             ]
         )
-    context_name = "cbs" if tag == "" else f"cbs-{tag}"
     start_container(
         "cbs-e2e",
-        context_name,
         f"couchbase/server:enterprise-{version}",
         ec2_hostname,
+        pkey,
         docker_args,
         replace_existing=True,
     )
 
 
-def setup_topology(pkey: paramiko.Ed25519Key | None, topology: TopologyConfig) -> None:
+def main(topology: TopologyConfig) -> None:
     """
     Set up the Couchbase Server topology on EC2 instances.
 
     Args:
-        pkey (Optional[paramiko.Ed25519Key]): The private key for SSH access.
-        version (str): The version of Couchbase Server to install.
         topology (TopologyConfig): The topology configuration.
     """
+
     if len(topology.clusters) == 0:
         return
-
     for cluster_config in topology.clusters:
         setup_node(
             cluster_config.public_hostnames[0],
-            pkey,
+            topology.ssh_key,
             cluster_config.version,
-            topology.tag,
         )
         for server in cluster_config.public_hostnames[1:]:
             setup_node(
                 server,
-                pkey,
+                topology.ssh_key,
                 cluster_config.version,
-                topology.tag,
                 cluster_config.internal_hostnames[0],
             )
-
-
-def main(topology: TopologyConfig, private_key: str | None = None) -> None:
-    """
-    Main function to set up the Couchbase Server topology.
-
-    Args:
-        version (str): The version of Couchbase Server to install.
-        topology (TopologyConfig): The topology configuration.
-        private_key (Optional[str]): The path to the private key for SSH access.
-    """
-    pkey = (
-        paramiko.Ed25519Key.from_private_key_file(private_key) if private_key else None
-    )
-
-    setup_topology(pkey, topology)
