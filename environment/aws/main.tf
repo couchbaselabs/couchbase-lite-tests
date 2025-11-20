@@ -21,6 +21,36 @@ provider "aws" {
     region = "us-east-1"
 }
 
+# Latest Amazon Linux 2023 (x86_64)
+data "aws_ami" "al2023_x86_64" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+}
+
+# Latest Amazon Linux 2023 (arm64 / Graviton)
+data "aws_ami" "al2023_arm64" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-arm64"]
+  }
+  filter {
+    name   = "architecture"
+    values = ["arm64"]
+  }
+}
+
 # Who is running Terraform
 data "aws_caller_identity" "current" {}
 
@@ -68,8 +98,8 @@ resource "aws_key_pair" "ec2" {
 # This is the machine(s) that will run Couchbase Server
 resource "aws_instance" "couchbaseserver" {
     count = var.server_count
-    ami = "ami-0cae6d6fe6048ca2c"
-    instance_type = "m5.xlarge"
+    ami = local.ami_arm64
+    instance_type = "t4g.xlarge"
     key_name = aws_key_pair.ec2.key_name
 
     subnet_id = data.aws_subnet.main.id
@@ -96,8 +126,8 @@ resource "aws_instance" "couchbaseserver" {
 # And the machine(s) that will run Sync Gateway
 resource "aws_instance" "sync_gateway" {
     count = var.sgw_count
-    ami = "ami-0cae6d6fe6048ca2c"
-    instance_type = "m5.xlarge"
+    ami = local.ami_arm64
+    instance_type = "t4g.xlarge"
     key_name = aws_key_pair.ec2.key_name
 
     subnet_id = data.aws_subnet.main.id
@@ -124,8 +154,8 @@ resource "aws_instance" "sync_gateway" {
 # And the machine(s) that will run Edge Server
 resource "aws_instance" "edge_server" {
     count = var.es_count
-    ami = "ami-0cae6d6fe6048ca2c"
-    instance_type = "t3.micro"
+    ami = local.ami_x86_64
+    instance_type = "t3a.micro"
     key_name = aws_key_pair.ec2.key_name
 
     subnet_id = data.aws_subnet.main.id
@@ -147,8 +177,8 @@ resource "aws_instance" "edge_server" {
 # And the machine(s) that will run load balancers
 resource "aws_instance" "load_balancer" {
     count = var.lb_count
-    ami = "ami-0cae6d6fe6048ca2c"
-    instance_type = "m5.large"
+    ami = local.ami_arm64
+    instance_type = "t4g.medium"
     key_name = aws_key_pair.ec2.key_name
 
     subnet_id = data.aws_subnet.main.id
@@ -170,8 +200,8 @@ resource "aws_instance" "load_balancer" {
 # And the machine that will run LogSlurp
 resource "aws_instance" "log_slurp" {
     for_each = var.logslurp ? { "log_slurp": 1 } : {}
-    ami = "ami-0cae6d6fe6048ca2c"
-    instance_type = "m5.large"
+    ami = local.ami_arm64
+    instance_type = "t4g.medium"
     key_name = aws_key_pair.ec2.key_name
 
     subnet_id = data.aws_subnet.main.id
@@ -196,6 +226,8 @@ locals {
     "YYYY-MM-DD'T'hh:mm:ss'Z'",
     timeadd(timestamp(), format("%dh", 3 * 24))
   )
+  ami_x86_64 = data.aws_ami.al2023_x86_64.id
+  ami_arm64  = data.aws_ami.al2023_arm64.id
 }
 
 # This controls how many Couchbase Server instances are created
