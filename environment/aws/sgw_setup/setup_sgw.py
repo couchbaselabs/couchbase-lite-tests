@@ -83,14 +83,14 @@ class SgwDownloadInfo:
         self.__version = version
         self.__build_no = 0
         self.__local_filename = (
-            f"couchbase-sync-gateway-enterprise_{self.__version}_x86_64.rpm"
+            f"couchbase-sync-gateway-enterprise_{self.__version}_aarch64.rpm"
         )
         self.__url = f"https://packages.couchbase.com/releases/couchbase-sync-gateway/{self.__version}/{self.__local_filename}"
 
     def _init_internal(self, version: str, build_no: int):
         self.__version = version
         self.__build_no = build_no
-        self.__local_filename = f"couchbase-sync-gateway-enterprise_{self.__version}-{self.__build_no}_x86_64.rpm"
+        self.__local_filename = f"couchbase-sync-gateway-enterprise_{self.__version}-{self.__build_no}_aarch64.rpm"
         self.__url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/sync_gateway/{self.__version}/{self.__build_no}/{self.__local_filename}"
 
     def __init__(self, version: str):

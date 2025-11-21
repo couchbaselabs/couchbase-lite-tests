@@ -5,8 +5,9 @@ USER app
 WORKDIR /app
 EXPOSE 8180
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
+ARG TARGETARCH
 WORKDIR /src
 COPY ["LogSlurp/LogSlurp.csproj", "LogSlurp/"]
 RUN dotnet restore "./LogSlurp/LogSlurp.csproj"
@@ -16,7 +17,8 @@ RUN dotnet build "./LogSlurp.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./LogSlurp.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=true
+RUN dotnet publish LogSlurp.csproj -c $BUILD_CONFIGURATION -o /app/publish \
+    -r linux-musl-$TARGETARCH --self-contained false /p:UseAppHost=true
 
 FROM base AS final
 WORKDIR /app
