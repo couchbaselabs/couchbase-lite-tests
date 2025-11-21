@@ -1,9 +1,7 @@
-import subprocess
-
 import click
 import paramiko
 
-from environment.aws.common.io import LIGHT_GRAY
+from environment.aws.common.io import realtime_output
 from environment.aws.common.output import header
 
 
@@ -11,13 +9,12 @@ def remote_exec(
     ssh: paramiko.SSHClient,
     command: str,
     fail_on_error: bool = True,
-    capture_output: bool = True,
+    capture_output: bool = False,
 ) -> str | None:
     _, stdout, stderr = ssh.exec_command(command, get_pty=True)
 
     if not capture_output:
-        for line in iter(stdout.readline, ""):
-            click.secho(line, fg=LIGHT_GRAY, nl=False)  # type: ignore
+        realtime_output(stdout)
 
     exit_status = stdout.channel.recv_exit_status()
     if fail_on_error and exit_status != 0:
@@ -57,11 +54,11 @@ def start_container(
                 return
 
             click.echo(f"Stopping existing {name} container...")
-            subprocess.run(["docker", "stop", name], check=True)
+            remote_exec(ssh, f"docker stop {name}", fail_on_error=True)
 
         if not replace_existing:
             click.echo(f"Restarting existing {name} container...")
-            subprocess.run(["docker", "start", name], check=False)
+            remote_exec(ssh, f"docker start {name}", fail_on_error=True)
             return
 
     click.echo(f"Starting new {name} container...")

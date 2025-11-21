@@ -19,7 +19,11 @@ import click
 import paramiko
 
 from environment.aws.common.docker import start_container
-from environment.aws.common.io import LIGHT_GRAY, get_ec2_hostname, sftp_progress_bar
+from environment.aws.common.io import (
+    get_ec2_hostname,
+    realtime_output,
+    sftp_progress_bar,
+)
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
@@ -45,8 +49,7 @@ def remote_exec(
     header(desc)
 
     _, stdout, stderr = ssh.exec_command(command)
-    for line in iter(stdout.readline, ""):
-        click.secho(f"[{current_ssh}] {line}", fg=LIGHT_GRAY, nl=False)  # type: ignore
+    realtime_output(stdout)
 
     exit_status = stdout.channel.recv_exit_status()
     if fail_on_error and exit_status != 0:
@@ -82,6 +85,7 @@ def setup_node(
     sftp_progress_bar(
         sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
     )
+    sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
     sftp.close()
 
     global current_ssh
@@ -92,6 +96,7 @@ def setup_node(
         "chmod +x /tmp/configure-node.sh && bash /tmp/configure-system.sh",
         "Setting up machine",
     )
+    remote_exec(ssh, "/home/ec2-user/caddy start", "Starting CBS log fileserver")
     ssh.close()
 
     ec2_hostname = get_ec2_hostname(hostname)
@@ -100,6 +105,8 @@ def setup_node(
         "host",
         "-v",
         "/tmp/configure-node.sh:/etc/service/couchbase-config/run",
+        "-v",
+        "/home/ec2-user/log:/opt/couchbase/var/lib/couchbase/logs",
     ]
 
     if cluster is not None:
