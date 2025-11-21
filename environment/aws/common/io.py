@@ -18,6 +18,7 @@ Functions:
 
 import os
 import tarfile
+import time
 import zipfile
 from contextlib import contextmanager
 from fnmatch import fnmatch
@@ -25,10 +26,32 @@ from pathlib import Path
 
 import click
 import paramiko
+from paramiko import Channel, ChannelFile
 from requests import Response
 from tqdm import tqdm
 
 LIGHT_GRAY = (128, 128, 128)
+
+
+def write_chunk(channel: Channel) -> None:
+    chunk = channel.recv(1024).decode(errors="ignore")
+    if chunk:
+        click.secho(chunk, fg=LIGHT_GRAY, nl=False)  # type: ignore
+
+
+def realtime_output(stdout: ChannelFile) -> None:
+    channel = stdout.channel
+    while True:
+        if channel.recv_ready():
+            write_chunk(channel)
+        if channel.exit_status_ready():
+            # drain remaining output
+            while channel.recv_ready():
+                write_chunk(channel)
+
+            break
+
+        time.sleep(0.1)
 
 
 def download_progress_bar(response: Response, output_path: Path) -> None:

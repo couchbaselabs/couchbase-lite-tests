@@ -95,7 +95,7 @@ It's not enough to simply spin up virtual machines.  The creator (i.e. the perso
 
 - Subnet covering 10.0.1.1 to 10.0.1.255 (read)
 - Routing rules inside VPC for ingress and egress (read)
-- x86_64 EC2 containers running AWS Linux 2 (created)
+- Graviton EC2 containers running AWS Linux 2023 (created)
 
 "read" here means that there is a permanent resource created in the AWS account already.  "created" means that resources must be provisioned for a particular session.
 

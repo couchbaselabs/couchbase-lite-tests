@@ -250,6 +250,7 @@ def setup_server(
     sftp_progress_bar(
         sftp, SCRIPT_DIR / "es_config.json", "/home/ec2-user/config/es_config.json"
     )
+    sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
     cert = create_self_signed_certificate(hostname)
     cert_pem = cert.pem_bytes()
     key_pem = cert.private_pem_bytes()
@@ -278,6 +279,7 @@ def setup_server(
         f"sudo rpm -i /tmp/{es_info.local_filename}",
         "Installing Edge Server",
     )
+    remote_exec(ssh, "/home/ec2-user/caddy start", "Starting ES log fileserver")
     remote_exec(ssh, "bash /home/ec2-user/start-es.sh", "Starting Edge Server")
 
     ssh.close()

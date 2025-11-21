@@ -294,6 +294,7 @@ def setup_server(
     sftp_progress_bar(
         sftp, SCRIPT_DIR / "cert" / "sg_key.pem", "/home/ec2-user/cert/sg_key.pem"
     )
+    sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
     sftp.close()
 
     remote_exec(
@@ -308,6 +309,8 @@ def setup_server(
         f"sudo rpm -i /tmp/{sgw_info.local_filename}",
         "Installing Sync Gateway",
     )
+
+    remote_exec(ssh, "/home/ec2-user/caddy start", "Starting SGW log fileserver")
     remote_exec(ssh, "bash /home/ec2-user/start-sgw.sh", "Starting SGW")
 
     ssh.close()
