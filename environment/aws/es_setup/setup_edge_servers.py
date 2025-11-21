@@ -25,20 +25,26 @@ Functions:
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Final, cast
 
 import click
 import paramiko
 import requests
+from cryptography.x509 import load_pem_x509_certificate
 from tqdm import tqdm
 
-from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
+from environment.aws.common.io import LIGHT_GRAY, get_ec2_hostname, sftp_progress_bar
 from environment.aws.common.output import header
-from environment.aws.common.x509_certificate import create_self_signed_certificate
+from environment.aws.common.x509_certificate import create_certificate, load_private_key
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+
+# Borrow this from Sync Gateway
+CA_KEY_PATH = SCRIPT_DIR / ".." / "sgw_setup" / "cert" / "ca_key.pem"
+CA_CERT_PATH = SCRIPT_DIR / ".." / "sgw_setup" / "cert" / "ca_cert.pem"
 current_ssh = ""
 
 
@@ -251,20 +257,27 @@ def setup_server(
         sftp, SCRIPT_DIR / "es_config.json", "/home/ec2-user/config/es_config.json"
     )
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
-    cert = create_self_signed_certificate(hostname)
+
+    ca_key = load_private_key(open(CA_KEY_PATH, "rb"))
+    with open(CA_CERT_PATH, "rb") as f:
+        ca_cert = load_pem_x509_certificate(f.read())
+
+    cert = create_certificate(
+        get_ec2_hostname(hostname), ca_cert, ca_key, san_entries={hostname}
+    )
     cert_pem = cert.pem_bytes()
     key_pem = cert.private_pem_bytes()
-    with open("/tmp/es_key.pem", "wb") as f:
-        f.write(key_pem)
+    temp_dir = Path(tempfile.gettempdir())
+    key_path = temp_dir / "es_key.pem"
+    cert_path = temp_dir / "es_cert.pem"
+    key_path.write_bytes(key_pem)
+    cert_path.write_bytes(cert_pem)
 
-    with open("/tmp/es_cert.pem", "wb") as f:
-        f.write(cert_pem)
+    sftp_progress_bar(sftp, key_path, "/home/ec2-user/cert/es_key.pem")
+    sftp_progress_bar(sftp, cert_path, "/home/ec2-user/cert/es_cert.pem")
 
-    sftp_progress_bar(sftp, Path("/tmp/es_cert.pem"), "/home/ec2-user/cert/es_cert.pem")
-    sftp_progress_bar(sftp, Path("/tmp/es_key.pem"), "/home/ec2-user/cert/es_key.pem")
-
-    Path("/tmp/es_key.pem").unlink()
-    Path("/tmp/es_cert.pem").unlink()
+    key_path.unlink()
+    cert_path.unlink()
     sftp.close()
 
     remote_exec(
