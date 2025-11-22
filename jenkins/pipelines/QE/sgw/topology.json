@@ -1,5 +1,21 @@
 {
     "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
     "test_servers": [],
-    "include": "../../../../environment/aws/topology_setup/default_topology.json"
+    "clusters": [
+        {
+            "server_count": 1
+        }
+    ],
+    "sync_gateways": [
+        {
+            "cluster": 0
+        },
+        {
+            "cluster": 0
+        },
+        {
+            "cluster": 0
+        }
+    ],
+    "logslurp": true
 }

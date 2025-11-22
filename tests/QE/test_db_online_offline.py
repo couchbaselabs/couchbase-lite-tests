@@ -97,7 +97,7 @@ class TestDbOnlineOffline(CBLTestClass):
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to {channels}")
-        sg_user = await sg.create_user_client(sg, sg_db, username, password, channels)
+        sg_user = await sg.create_user_client(sg_db, username, password, channels)
 
         self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
         sg_docs: list[DocumentUpdateEntry] = []
@@ -168,7 +168,7 @@ class TestDbOnlineOffline(CBLTestClass):
                 await sg.delete_database(db_name)
             await sg.put_database(db_name, db_payload)
             db_configs[i][4] = await sg.create_user_client(
-                sg, db_name, username, "pass", [channel]
+                db_name, username, "pass", [channel]
             )
 
             self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")

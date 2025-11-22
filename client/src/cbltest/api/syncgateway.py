@@ -429,7 +429,7 @@ class SyncGatewayVersion(CouchbaseVersion):
 
 class SyncGateway:
     """
-    A class for interacting with a given Sync Gateway instance
+    A class for interacting with a given Sync Gateway instance (Admin API)
     """
 
     def __init__(
@@ -450,9 +450,17 @@ class SyncGateway:
         self.__hostname: str = url
         self.__port: int = port
         self.__admin_port: int = admin_port
-        self.__admin_session: ClientSession = self._create_session(
-            secure, scheme, url, admin_port, BasicAuth(username, password, "ascii")
+        self.__session: ClientSession = self._create_session(
+            secure,
+            scheme,
+            url,
+            self._get_api_port(),
+            BasicAuth(username, password, "ascii"),
         )
+
+    def _get_api_port(self) -> int:
+        """Returns the port to use for API calls. Override in subclasses."""
+        return self.__admin_port
 
     @property
     def hostname(self) -> str:
@@ -473,48 +481,6 @@ class SyncGateway:
     def secure(self) -> bool:
         """Gets whether the Sync Gateway instance uses TLS"""
         return self.__secure
-
-    @classmethod
-    async def create_user_client(
-        cls,
-        admin_sg: "SyncGateway",
-        db_name: str,
-        username: str,
-        password: str,
-        channels: list[str],
-    ) -> "SyncGateway":
-        """
-        Helper method to create a user with channel access and return a user-specific SG client.
-
-        This is a convenience method for tests that need to verify user-level access control.
-
-        :param admin_sg: The admin SyncGateway instance
-        :param db_name: The database name
-        :param username: The username to create
-        :param password: The password for the user
-        :param channels: List of channels the user should have access to
-        :return: A SyncGateway instance authenticated as the user for public API access
-        """
-        # Clean up user if exists from previous run
-        await admin_sg.delete_user(db_name, username)
-
-        # Create user with channel access
-        await admin_sg.add_user(
-            db_name,
-            username,
-            password=password,
-            collection_access={"_default": {"_default": {"admin_channels": channels}}},
-        )
-
-        # Return user-specific SG client for public API access
-        return cls(
-            admin_sg.hostname,
-            username,
-            password,
-            port=admin_sg.port,
-            admin_port=admin_sg.admin_port,
-            secure=admin_sg.secure,
-        )
 
     def _create_session(
         self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None
@@ -538,29 +504,9 @@ class SyncGateway:
         payload: JSONSerializable | None = None,
         params: dict[str, str] | None = None,
         session: ClientSession | None = None,
-        use_public_api: bool = False,
     ) -> Any:
-        if use_public_api and session is None:
-            # Use public port (4984) with current session's credentials
-            scheme = "https://" if self.__secure else "http://"
-            async with self._create_session(
-                self.__secure,
-                scheme,
-                self.__hostname,
-                4984,
-                self.__admin_session.auth,
-            ) as public_session:
-                return await self._send_request(
-                    method,
-                    path,
-                    payload,
-                    params,
-                    session=public_session,
-                    use_public_api=False,
-                )
-
         if session is None:
-            session = self.__admin_session
+            session = self.__session
 
         with self.__tracer.start_as_current_span(
             "send_request", attributes={"http.method": method, "http.path": path}
@@ -924,7 +870,6 @@ class SyncGateway:
         db_name: str,
         scope: str = "_default",
         collection: str = "_default",
-        use_public_api: bool = False,
     ) -> AllDocumentsResponse:
         """
         Gets all the documents in the given collection from Sync Gateway (id and revid)
@@ -932,7 +877,6 @@ class SyncGateway:
         :param db_name: The name of the Sync Gateway database to query
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
-        :param use_public_api: If True, uses public port (4984) with user auth instead of admin port (4985)
         """
         with self.__tracer.start_as_current_span(
             "get_all_documents",
@@ -945,7 +889,6 @@ class SyncGateway:
             resp = await self._send_request(
                 "get",
                 f"/{db_name}.{scope}.{collection}/_all_docs",
-                use_public_api=use_public_api,
             )
 
             assert isinstance(resp, dict)
@@ -957,7 +900,6 @@ class SyncGateway:
         scope: str = "_default",
         collection: str = "_default",
         version_type: str = "rev",
-        use_public_api: bool = False,
     ) -> ChangesResponse:
         """
         Gets the changes feed from Sync Gateway, including deleted documents
@@ -966,7 +908,6 @@ class SyncGateway:
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
         :param version_type: The version type to use ('rev' for revision IDs, 'cv' for version vectors in SGW 4.0+)
-        :param use_public_api: If True, uses public port (4984) with user auth instead of admin port (4985)
         """
         with self.__tracer.start_as_current_span(
             "get_changes",
@@ -980,7 +921,6 @@ class SyncGateway:
             resp = await self._send_request(
                 "get",
                 f"/{db_name}.{scope}.{collection}/_changes?{query_params}",
-                use_public_api=use_public_api,
             )
 
             assert isinstance(resp, dict)
@@ -1197,7 +1137,6 @@ class SyncGateway:
         doc_id: str,
         scope: str = "_default",
         collection: str = "_default",
-        use_public_api: bool = False,
     ) -> RemoteDocument | None:
         """
         Gets a document from Sync Gateway
@@ -1206,7 +1145,6 @@ class SyncGateway:
         :param doc_id: The document ID to get
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
-        :param use_public_api: If True, uses public port (4984) - automatically set when using user client
         """
         with self.__tracer.start_as_current_span(
             "get_document",
@@ -1220,7 +1158,6 @@ class SyncGateway:
             response = await self._send_request(
                 "get",
                 f"/{db_name}.{scope}.{collection}/{doc_id}",
-                use_public_api=use_public_api,
             )
             if not isinstance(response, dict):
                 raise ValueError(
@@ -1238,12 +1175,49 @@ class SyncGateway:
 
             return RemoteDocument(cast_resp)
 
+    async def create_user_client(
+        self,
+        db_name: str,
+        username: str,
+        password: str,
+        channels: list[str],
+    ) -> "SyncGatewayUserClient":
+        """
+        Helper method to create a user with channel access and return a user-specific SG client.
+
+        This is a convenience method for tests that need to verify user-level access control.
+
+        :param db_name: The database name
+        :param username: The username to create
+        :param password: The password for the user
+        :param channels: List of channels the user should have access to
+        :return: A SyncGatewayUserClient instance authenticated as the user (uses public port 4984)
+        """
+        # Clean up user if exists from previous run
+        await self.delete_user(db_name, username)
+        await self.add_user(
+            db_name,
+            username,
+            password=password,
+            collection_access={"_default": {"_default": {"admin_channels": channels}}},
+        )
+
+        # Return user-specific SG client for public API access
+        return SyncGatewayUserClient(
+            self.hostname,
+            username,
+            password,
+            port=self.port,
+            admin_port=self.admin_port,
+            secure=self.secure,
+        )
+
     async def close(self) -> None:
         """
         Closes the Sync Gateway session
         """
-        if not self.__admin_session.closed:
-            await self.__admin_session.close()
+        if not self.__session.closed:
+            await self.__session.close()
 
     async def get_database_config(self, db_name: str) -> dict[str, Any]:
         """
@@ -1304,3 +1278,26 @@ class SyncGateway:
             self.__secure, scheme, self.__hostname, 4984, auth
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
+
+
+class SyncGatewayUserClient(SyncGateway):
+    """
+    A Sync Gateway client that uses the public API (port 4984) for user-level access.
+
+    This class inherits from SyncGateway but overrides the port selection to use
+    the public API port (4984) instead of the admin port (4985). All methods
+    automatically use the public API without needing to pass use_public_api=True.
+
+    Use SyncGateway.create_user_client() to create instances with proper user credentials
+    and channel access.
+
+    Example:
+        admin_sg = SyncGateway("localhost", "admin", "password")
+        user_sg = await admin_sg.create_user_client("db", "alice", "pass", ["channel1"])
+        # user_sg automatically uses port 4984 for all API calls
+        docs = await user_sg.get_all_documents("db")
+    """
+
+    def _get_api_port(self) -> int:
+        """Returns the public API port (4984) for user-level access."""
+        return self.port
