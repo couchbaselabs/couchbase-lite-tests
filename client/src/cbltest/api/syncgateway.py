@@ -497,7 +497,7 @@ class _SyncGatewayBase:
         session: ClientSession | None = None,
     ) -> Any:
         if session is None:
-            session = self.__session
+            session = self._session
 
         with self._tracer.start_as_current_span(
             "send_request", attributes={"http.method": method, "http.path": path}
@@ -1033,8 +1033,8 @@ class _SyncGatewayBase:
         """
         Closes the Sync Gateway session
         """
-        if not self.__session.closed:
-            await self.__session.close()
+        if not self._session.closed:
+            await self._session.close()
 
     async def get_database_config(self, db_name: str) -> dict[str, Any]:
         """
@@ -1090,9 +1090,9 @@ class _SyncGatewayBase:
         )
         params = {"rev": revision}
 
-        scheme = "https://" if self.__secure else "http://"
+        scheme = "https://" if self._secure else "http://"
         async with self._create_session(
-            self.__secure, scheme, self.__hostname, 4984, auth
+            self._secure, scheme, self._hostname, 4984, auth
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
