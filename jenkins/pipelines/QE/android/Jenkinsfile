@@ -1,7 +1,6 @@
 pipeline {
     agent none
     parameters {
-        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
         string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
     }
@@ -11,7 +10,8 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "android ${params.CBL_VERSION} (#${currentBuild.number})"
+                    currentBuild.displayName = "Android CBL:${params.CBL_VERSION} (#${currentBuild.number})"
+                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
                 }
             }
         }
@@ -27,7 +27,7 @@ pipeline {
             }
         }
         stage('Android') {
-            agent { label 'mac-laptop1-new' }
+            agent { label 'mac-mini-CBL-Android1' }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
                 ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
