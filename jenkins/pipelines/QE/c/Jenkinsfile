@@ -17,7 +17,6 @@ pipeline {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
                     currentBuild.displayName = "c ${params.CBL_VERSION} (#${currentBuild.number})"
-                    currentBuild.description = "Platform: ${params.PLATFORM}"
                 }
             }
         }
