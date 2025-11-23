@@ -4,17 +4,16 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-    echo "Usage: $0 <edition> <version> <sgw_version> <private_key_path> [--setup-only]"
+    echo "Usage: $0 <version> <sgw_version> [--setup-only]"
     echo "  --setup-only: Only build test server and setup backend, skip test execution"
     echo "  Build number will be auto-fetched for the specified version"
     exit 1
 }
 
-if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then usage; fi
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then usage; fi
 
-EDITION=${1}
-CBL_VERSION=${2}
-SGW_VERSION=${3}
+CBL_VERSION=${1}
+SGW_VERSION=${2}
 SETUP_ONLY=false
 
 # Check for --setup-only flag
