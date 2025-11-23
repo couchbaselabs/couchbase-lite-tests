@@ -1,8 +1,9 @@
 pipeline {
     agent none
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
-        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
+        string(name: 'CBL_VERSION', defaultValue: '3.2.3', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
+        string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
     }
     stages {
         stage('Init') {
@@ -53,11 +54,6 @@ pipeline {
                     archiveArtifacts artifacts: 'tests/QE/android/**/*', fingerprint: true, allowEmptyArchive: true
                 }
             }
-        }
-    }
-    post {
-        failure {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
         }
     }
 }
