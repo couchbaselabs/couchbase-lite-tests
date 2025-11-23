@@ -3,7 +3,7 @@ pipeline {
     parameters {
         choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
-        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+        string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
     }
     options {
         timeout(time: 60, unit: 'MINUTES')
@@ -15,7 +15,6 @@ pipeline {
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.PLATFORM == '') { error "PLATFORM is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
                     currentBuild.displayName = "dotnet ${params.CBL_VERSION}"
                     currentBuild.description = "SGW: ${params.SGW_VERSION}"
@@ -26,12 +25,10 @@ pipeline {
             steps {
                 script {
                     def platforms = [
-                        'dotnet_ios', 'dotnet_windows'
+                        'dotnet_ios', 'dotnet_windows', 'dotnet_macos', 'dotnet_android'
                     ]
                     def parallelBuilds = [:]
                     for(p in platforms) {
-                        // Groovy stupidness.  Need to set a local variable here
-                        // to avoid late binding (all jobs use the same platform).
                         def platform = p
                         parallelBuilds[platform] = {
                             build job: 'prebuild-test-server',
@@ -62,7 +59,7 @@ pipeline {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "Run iOS Test"
                         timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ${params.PLATFORM} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} ~/.ssh/jborden.pem"
                         }
                     }
                     post {
@@ -72,6 +69,56 @@ pipeline {
                                 sh "jenkins/pipelines/QE/dotnet/teardown.sh"
                             }
                             archiveArtifacts artifacts: 'tests/QE/dotnet_ios/**/*', fingerprint: true, allowEmptyArchive: true
+                        }
+                    }
+                }
+                stage("macOS") {
+                    agent { label 'mac-mini-new' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        AWS_PROFILE = "mobile-for-now"
+                        TS_ARTIFACTS_DIR = 'dotnet_macos'
+                    }
+                    steps {
+                        // Unlock keychain:
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post {
+                        always {
+                            echo "Teardown macOS Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh "jenkins/pipelines/QE/dotnet/teardown.sh"
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/dotnet_macos/**/*', fingerprint: true, allowEmptyArchive: true
+                        }
+                    }
+                }
+                stage("Android") {
+                    agent { label 'mac-laptop1-new' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        AWS_PROFILE = "mobile-for-now"
+                        TS_ARTIFACTS_DIR = 'dotnet_android'
+                    }
+                    steps {
+                        // Unlock keychain:
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} ~/.ssh/jborden.pem"
+                        }
+                    }
+                    post {
+                        always {
+                            echo "Teardown Android Test"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh "jenkins/pipelines/QE/dotnet/teardown.sh"
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/dotnet_android/**/*', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
