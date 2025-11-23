@@ -2,7 +2,7 @@ pipeline {
     agent none
     parameters {
         choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
-        string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be auto-fetched)')
+        string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
         string(name: 'SGW_VERSION', defaultValue: '3.2.4', description: "The version of Sync Gateway to download")
     }
     stages {
