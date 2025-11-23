@@ -2,8 +2,9 @@
 pipeline {
     agent none
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
-        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
+        string(name: 'CBL_VERSION', defaultValue: '3.2.3', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
+        string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
     }
     stages {
         stage('Init') {
@@ -24,8 +25,6 @@ pipeline {
                     ]
                     def parallelBuilds = [:]
                     for(p in platforms) {
-                        // Groovy stupidness.  Need to set a local variable here
-                        // to avoid late binding (all jobs use dotnet_macos).
                         def platform = p
                         parallelBuilds[platform] = {
                             build job: 'prebuild-test-server',
@@ -45,7 +44,7 @@ pipeline {
         stage('Tests') {
             parallel {
                 stage('Linux Desktop Test') {
-                    agent { label 'cbl-java-desktop-centos-7-2' }
+                    agent { label 'cbl-java-desktop-centos-7' }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
@@ -97,11 +96,6 @@ pipeline {
                     }
                 }
             }
-        }
-    }
-    post {
-        failure {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
         }
     }
 }
