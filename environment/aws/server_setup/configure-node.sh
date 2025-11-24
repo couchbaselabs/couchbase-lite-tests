@@ -66,10 +66,11 @@ curl_check() {
 wait_for_uri 200 http://localhost:8091/ui/index.html
 echo "Couchbase Server up!"
 
+my_ip=$(ifconfig | grep "inet 10" | awk '{print $2}')
+
 if [[ ! -z $E2E_PARENT_CLUSTER ]]; then
-  my_ip=$(ifconfig | grep "inet 10" | awk '{print $2}')
-  echo "Adding node to cluster $E2E_PARENT_CLUSTER"
-  couchbase_cli_check server-add -c $E2E_PARENT_CLUSTER -u Administrator -p password --server-add  $my_ip \
+  echo "Adding node to cluster $E2E_PARENT_CLUSTER with private IP $my_ip"
+  couchbase_cli_check server-add -c $E2E_PARENT_CLUSTER -u Administrator -p password --server-add $my_ip \
     --server-add-username Administrator --server-add-password password --services data,index,query
   echo
   echo "Rebalancing cluster"
@@ -82,6 +83,14 @@ else
   echo
 fi
 
+# Set alternate address for external access (after cluster init/join)
+if [[ ! -z $E2E_PUBLIC_HOSTNAME ]]; then
+  echo "Setting alternate address to $E2E_PUBLIC_HOSTNAME for external access (node: $my_ip)"
+  couchbase_cli_check setting-alternate-address -c localhost -u Administrator -p password \
+    --set --node $my_ip --hostname $E2E_PUBLIC_HOSTNAME
+  echo
+fi
+
 echo "Verify credentials"
 curl_check http://localhost:8091/settings/web -d port=8091 -d username=Administrator -d password=password -u Administrator:password
 echo
@@ -91,7 +100,7 @@ couchbase_cli_check user-manage --set \
   -c localhost -u Administrator -p password \
   --rbac-username admin --rbac-password password \
   --auth-domain local \
-  --roles 'sync_gateway_dev_ops,sync_gateway_configurator[*],mobile_sync_gateway[*],bucket_full_access[*],bucket_admin[*]'
+  --roles 'admin'
 echo
 
 echo "Couchbase Server configured"

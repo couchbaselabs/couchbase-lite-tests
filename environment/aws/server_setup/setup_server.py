@@ -107,6 +107,8 @@ def setup_node(
         "/tmp/configure-node.sh:/etc/service/couchbase-config/run",
         "-v",
         "/home/ec2-user/log:/opt/couchbase/var/lib/couchbase/logs",
+        "-e",
+        f"E2E_PUBLIC_HOSTNAME={hostname}",
     ]
 
     if cluster is not None:
@@ -147,5 +149,7 @@ def main(topology: TopologyConfig) -> None:
                 server,
                 topology.ssh_key,
                 cluster_config.version,
-                cluster_config.internal_hostnames[0],
+                cluster_config.public_hostnames[
+                    0
+                ],  # Use public hostname for external access
             )
