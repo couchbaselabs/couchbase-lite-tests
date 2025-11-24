@@ -184,6 +184,14 @@ def write_config(
         if len(topology.test_servers) > 0:
             test_servers = []
             for ts in topology.test_servers:
+                port = 5555 if ts.platform.startswith("dotnet") else 8080
+                test_servers.append(
+                    {
+                        "url": f"http://{ts.ip_address}:{port}",
+                        # TODO: Convert all test servers to URLs to this is not needed
+                        "dataset_version": "3.2",
+                    }
+                )
                 port = (
                     5555
                     if ts.platform.startswith("dotnet")
