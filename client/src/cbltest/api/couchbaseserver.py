@@ -593,3 +593,228 @@ class CouchbaseServer:
                         f"http://{self.__hostname}:8091/controller/cancelXDCR/{encoded}",
                     )
                     resp.raise_for_status()
+
+    def add_node(
+        self,
+        node_to_add: "CouchbaseServer",
+        services: list[str] | None = None,
+    ) -> None:
+        """
+        Adds a node to the cluster.
+
+        :param node_to_add: The CouchbaseServer instance representing the node to add
+        :param services: List of services to enable on the node (e.g. ["kv", "index", "n1ql"])
+                        Defaults to ["kv", "index", "n1ql"] (data, index, query)
+        """
+        if services is None:
+            services = ["kv", "index", "n1ql"]
+
+        with self.__tracer.start_as_current_span(
+            "add_node",
+            attributes={
+                "cbl.cluster.hostname": self.__hostname,
+                "cbl.node.hostname": node_to_add.__hostname,
+            },
+        ):
+            with requests.Session() as session:
+                session.auth = (self.__username, self.__password)
+
+                # Get the node's internal IP by querying it directly
+                # CBS nodes communicate via private IPs in AWS, so we need the internal IP for addNode
+                # Retry a few times as the node might be restarting after rebalance_out
+                hostname_to_use = node_to_add.__hostname
+                import time
+
+                for attempt in range(3):
+                    try:
+                        node_session = requests.Session()
+                        node_session.auth = ("Administrator", "password")
+                        node_resp = node_session.get(
+                            f"http://{node_to_add.__hostname}:8091/nodes/self",
+                            timeout=5,
+                        )
+                        if node_resp.status_code == 200:
+                            node_data = node_resp.json()
+                            internal_hostname = node_data.get("hostname", "").split(
+                                ":"
+                            )[0]
+                            if internal_hostname and not internal_hostname.startswith(
+                                "127."
+                            ):
+                                hostname_to_use = internal_hostname
+                                break
+                    except Exception:
+                        if attempt < 2:
+                            time.sleep(5)  # Wait before retry
+
+                # Add the node to the cluster
+                # Note: Use "Administrator" for cluster operations, not the RBAC user
+                resp = session.post(
+                    f"http://{self.__hostname}:8091/controller/addNode",
+                    data={
+                        "hostname": hostname_to_use,
+                        "user": "Administrator",
+                        "password": "password",
+                        "services": ",".join(services),
+                    },
+                )
+
+                # If 400 error, provide detailed error message
+                if resp.status_code == 400:
+                    error_detail = resp.text
+                    raise CblTestError(
+                        f"Failed to add node {node_to_add.__hostname} (using hostname: {hostname_to_use}) to cluster: {error_detail}"
+                    )
+
+                resp.raise_for_status()
+
+                # Set alternate address so external clients (TDK) can reach the node via public IP
+                # This is needed when re-adding nodes after rebalance_out, as the alternate
+                # address configuration is lost when the node is removed from the cluster.
+                if hostname_to_use != node_to_add.__hostname:
+                    try:
+                        alt_resp = session.put(
+                            f"http://{node_to_add.__hostname}:8091/node/controller/setupAlternateAddresses/external",
+                            data={
+                                "hostname": node_to_add.__hostname,
+                                "mgmt": "8091",
+                            },
+                        )
+                        alt_resp.raise_for_status()
+                    except Exception as e:
+                        # Log but don't fail - alternate address might already be set
+                        cbl_warning(
+                            f"Failed to set alternate address for {node_to_add.__hostname}: {e}"
+                        )
+
+    def rebalance_out(
+        self, cluster_nodes: list["CouchbaseServer"], node_to_remove: "CouchbaseServer"
+    ) -> None:
+        """
+        Rebalances a node out of the cluster (removes it).
+
+        :param cluster_nodes: List of all nodes currently in the cluster
+        :param node_to_remove: The node to remove from the cluster
+        """
+        with self.__tracer.start_as_current_span(
+            "rebalance_out",
+            attributes={
+                "cbl.cluster.hostname": self.__hostname,
+                "cbl.node.hostname": node_to_remove.__hostname,
+            },
+        ):
+            with requests.Session() as session:
+                session.auth = (self.__username, self.__password)
+
+                # Get all node OTP IDs
+                resp = session.get(f"http://{self.__hostname}:8091/pools/default")
+                resp.raise_for_status()
+                pool_data = resp.json()
+
+                # Find the OTP node ID for the node to remove
+                ejected_node = None
+                known_nodes = []
+                for node in pool_data.get("nodes", []):
+                    hostname = node.get("hostname", "").split(":")[0]
+                    otp_node = node.get("otpNode")
+                    known_nodes.append(otp_node)
+
+                    # Check both regular hostname and alternate address
+                    if hostname == node_to_remove.__hostname:
+                        ejected_node = otp_node
+                    else:
+                        # Check alternate addresses
+                        alt_addrs = node.get("alternateAddresses", {}).get(
+                            "external", {}
+                        )
+                        alt_hostname = alt_addrs.get("hostname", "")
+                        if alt_hostname == node_to_remove.__hostname:
+                            ejected_node = otp_node
+
+                if ejected_node is None:
+                    raise CblTestError(
+                        f"Node {node_to_remove.__hostname} not found in cluster. "
+                        f"Available nodes: {[n.get('hostname') for n in pool_data.get('nodes', [])]}"
+                    )
+
+                # Start rebalance with the node ejected
+                resp = session.post(
+                    f"http://{self.__hostname}:8091/controller/rebalance",
+                    data={
+                        "knownNodes": ",".join(known_nodes),
+                        "ejectedNodes": ejected_node,
+                    },
+                )
+                resp.raise_for_status()
+
+                # Wait for rebalance to complete
+                self._wait_for_rebalance_completion(session)
+
+    def rebalance_in(
+        self, cluster_nodes: list["CouchbaseServer"], node_to_add: "CouchbaseServer"
+    ) -> None:
+        """
+        Rebalances a node into the cluster (completes adding it).
+
+        :param cluster_nodes: List of all nodes currently in the cluster
+        :param node_to_add: The node that was added and needs rebalancing
+        """
+        with self.__tracer.start_as_current_span(
+            "rebalance_in",
+            attributes={
+                "cbl.cluster.hostname": self.__hostname,
+                "cbl.node.hostname": node_to_add.__hostname,
+            },
+        ):
+            with requests.Session() as session:
+                session.auth = (self.__username, self.__password)
+
+                # Get all node OTP IDs
+                resp = session.get(f"http://{self.__hostname}:8091/pools/default")
+                resp.raise_for_status()
+                pool_data = resp.json()
+
+                known_nodes = [
+                    node.get("otpNode") for node in pool_data.get("nodes", [])
+                ]
+
+                # Start rebalance with all current nodes
+                resp = session.post(
+                    f"http://{self.__hostname}:8091/controller/rebalance",
+                    data={
+                        "knownNodes": ",".join(known_nodes),
+                    },
+                )
+                resp.raise_for_status()
+
+                # Wait for rebalance to complete
+                self._wait_for_rebalance_completion(session)
+
+    def _wait_for_rebalance_completion(
+        self, session: requests.Session, timeout_seconds: int = 300
+    ) -> None:
+        """
+        Waits for a rebalance operation to complete.
+
+        :param session: The requests session to use
+        :param timeout_seconds: Maximum time to wait (default 300 seconds / 5 minutes)
+        """
+        import time
+
+        start_time = time.time()
+        while time.time() - start_time < timeout_seconds:
+            resp = session.get(
+                f"http://{self.__hostname}:8091/pools/default/rebalanceProgress"
+            )
+            resp.raise_for_status()
+            status = resp.json()
+
+            if status.get("status") == "none":
+                # Rebalance completed
+                return
+
+            sleep(2)
+
+        raise CblTestError(
+            f"Rebalance did not complete within {timeout_seconds} seconds"
+        )
