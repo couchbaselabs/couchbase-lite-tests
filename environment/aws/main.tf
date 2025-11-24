@@ -135,7 +135,7 @@ resource "aws_instance" "sync_gateway" {
     associate_public_ip_address = true
 
     root_block_device {
-        volume_size = 10  # 10 GiB
+        volume_size = 30  # 30 GiB
         volume_type = "gp2"
     }
 
