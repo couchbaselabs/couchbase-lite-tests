@@ -52,6 +52,15 @@ class CouchbaseServer:
             self.__cluster = Cluster(url, opts)
             self.__cluster.wait_until_ready(timedelta(seconds=10))
 
+    @property
+    def hostname(self) -> str:
+        """
+        Gets the hostname of this Couchbase Server instance.
+
+        :return: The hostname
+        """
+        return self.__hostname
+
     def create_collections(self, bucket: str, scope: str, names: list[str]) -> None:
         """
         A function that will create a specified set of collections in the specified scope

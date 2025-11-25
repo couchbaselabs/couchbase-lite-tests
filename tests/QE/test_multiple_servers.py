@@ -34,9 +34,7 @@ class TestMultipleServers(CBLTestClass):
         # Check if cbs_two is in the cluster by checking the cluster node count
         session = requests.Session()
         session.auth = ("Administrator", "password")
-        resp = session.get(
-            f"http://{cbs_one._CouchbaseServer__hostname}:8091/pools/default"
-        )
+        resp = session.get(f"http://{cbs_one.hostname}:8091/pools/default")
         cluster_data = resp.json()
         node_count = len(cluster_data.get("nodes", []))
 
@@ -47,9 +45,7 @@ class TestMultipleServers(CBLTestClass):
                 cbs_one.rebalance_in(cluster_servers, cbs_two)
                 print("Successfully added cbs_two to cluster")
                 # Verify node was added
-                resp = session.get(
-                    f"http://{cbs_one._CouchbaseServer__hostname}:8091/pools/default"
-                )
+                resp = session.get(f"http://{cbs_one.hostname}:8091/pools/default")
                 cluster_data = resp.json()
                 node_count = len(cluster_data.get("nodes", []))
             except Exception as e:
