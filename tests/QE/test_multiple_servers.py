@@ -35,7 +35,7 @@ def _recover_or_add_node(cbs_one, cbs_two):
         cbs_one.recover(cbs_two)
     else:
         cbs_one.add_node(cbs_two)
-    cbs_one.rebalance_in(cbs_two)
+    cbs_one.rebalance_in()
 
 
 async def _cleanup_test_resources(sg, cbs, sg_db: str, bucket_name: str):
@@ -204,7 +204,7 @@ class TestMultipleServers(CBLTestClass):
         cbs_one.add_node(cbs_two)
 
         self.mark_test_step("Rebalance IN cbs_two to cluster")
-        cbs_one.rebalance_in(cbs_two)
+        cbs_one.rebalance_in()
         await asyncio.sleep(5)
 
         self.mark_test_step("Wait for all updates to complete")
