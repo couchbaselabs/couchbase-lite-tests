@@ -1114,10 +1114,14 @@ class _SyncGatewayBase:
             return await self._send_request("GET", path, params=params, session=session)
 
 
-class _SyncGatewayAdminMethods:
+class SyncGateway(_SyncGatewayBase):
     """
-    Mixin class containing admin-only methods for Sync Gateway.
-    Requires _SyncGatewayBase to be in the MRO (Method Resolution Order).
+    A class for interacting with a given Sync Gateway instance.
+    Provides full admin API access including user management, role management,
+    and all document/database operations.
+
+    This class inherits common document/database operations from _SyncGatewayBase
+    and adds admin-only operations directly in this class.
     """
 
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
@@ -1181,8 +1185,7 @@ class _SyncGatewayAdminMethods:
             :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
         :param admin_roles: The admin roles
         """
-        # Access via MRO - requires _SyncGatewayBase
-        with self._tracer.start_as_current_span(  # type: ignore
+        with self._tracer.start_as_current_span(
             "add_user", attributes={"cbl.user.name": name}
         ):
             body: dict[str, Any] = {
@@ -1198,7 +1201,7 @@ class _SyncGatewayAdminMethods:
             if admin_roles is not None:
                 body["admin_roles"] = admin_roles
 
-            await self._send_request(  # type: ignore
+            await self._send_request(
                 "put", f"/{db_name}/_user/{name}", JSONDictionary(body)
             )
 
@@ -1209,11 +1212,11 @@ class _SyncGatewayAdminMethods:
         :param db_name: The name of the Database
         :param name: The username to delete
         """
-        with self._tracer.start_as_current_span(  # type: ignore
+        with self._tracer.start_as_current_span(
             "delete_user", attributes={"cbl.user.name": name}
         ):
             try:
-                await self._send_request("delete", f"/{db_name}/_user/{name}")  # type: ignore
+                await self._send_request("delete", f"/{db_name}/_user/{name}")
             except CblSyncGatewayBadResponseError as e:
                 if e.code == 404:
                     # User doesn't exist, that's fine
@@ -1242,12 +1245,12 @@ class _SyncGatewayAdminMethods:
             .
             .
         """
-        with self._tracer.start_as_current_span(  # type: ignore
+        with self._tracer.start_as_current_span(
             "add_role", attributes={"cbl.role.name": role}
         ):
             body = {"collection_access": collection_access}
 
-            await self._send_request(  # type: ignore
+            await self._send_request(
                 "put", f"/{db_name}/_role/{role}", JSONDictionary(body)
             )
 
@@ -1257,7 +1260,7 @@ class _SyncGatewayAdminMethods:
         username: str,
         password: str,
         channels: list[str],
-    ) -> "SyncGatewayPublic":
+    ) -> "SyncGatewayUserClient":
         """
         Helper method to create a user with channel access and return a user-specific SG client.
 
@@ -1267,7 +1270,7 @@ class _SyncGatewayAdminMethods:
         :param username: The username to create
         :param password: The password for the user
         :param channels: List of channels the user should have access to
-        :return: A SyncGatewayPublic instance authenticated as the user (uses public port 4984)
+        :return: A SyncGatewayUserClient instance authenticated as the user (uses public port 4984)
         """
         # Clean up user if exists from previous run
         await self.delete_user(db_name, username)
@@ -1279,36 +1282,21 @@ class _SyncGatewayAdminMethods:
         )
 
         # Return user-specific SG client for public API access
-        # Access via MRO - requires _SyncGatewayBase
-        return SyncGatewayPublic(
-            self.hostname,  # type: ignore
+        return SyncGatewayUserClient(
+            self.hostname,
             username,
             password,
-            port=self.port,  # type: ignore
-            admin_port=self.admin_port,  # type: ignore
-            secure=self.secure,  # type: ignore
+            port=self.port,
+            admin_port=self.admin_port,
+            secure=self.secure,
         )
 
 
-class SyncGateway(_SyncGatewayBase, _SyncGatewayAdminMethods):
-    """
-    A class for interacting with a given Sync Gateway instance.
-    Provides full admin API access including user management, role management,
-    and all document/database operations.
-
-    This is the primary class used by tests and combines:
-    - Common document/database operations (from _SyncGatewayBase)
-    - Admin-only operations (from _SyncGatewayAdminMethods)
-    """
-
-    pass
-
-
-class SyncGatewayPublic(_SyncGatewayBase):
+class SyncGatewayUserClient(_SyncGatewayBase):
     """
     A Sync Gateway client that uses the public API (port 4984) for user-level access.
 
-    This class inherits only common operations from _SyncGatewayBase and does NOT
+    This class inherits common operations from _SyncGatewayBase and does NOT
     include admin methods (user management, roles, etc.).
 
     Use SyncGateway.create_user_client() to create instances with proper user credentials
