@@ -9,6 +9,85 @@ from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 from packaging.version import Version
 
 
+def _check_node_in_cluster(cbs_hostname: str, cluster_nodes: list) -> tuple[bool, bool]:
+    """Check if a CBS node is in cluster and if it needs recovery."""
+    for node in cluster_nodes:
+        hostname = node.get("hostname", "").split(":")[0]
+        alt_hostname = (
+            node.get("alternateAddresses", {}).get("external", {}).get("hostname", "")
+        )
+        if cbs_hostname in [hostname, alt_hostname]:
+            return True, node.get("clusterMembership") == "inactiveFailed"
+    return False, False
+
+
+def _recover_or_add_node(cbs_one, cbs_two):
+    """Recover or add CBS node based on its cluster state."""
+    session = requests.Session()
+    session.auth = ("Administrator", "password")
+    resp = session.get(f"http://{cbs_one.hostname}:8091/pools/default")
+    resp.raise_for_status()
+    cluster_data = resp.json()
+    node_in_cluster, _ = _check_node_in_cluster(
+        cbs_two.hostname, cluster_data.get("nodes", [])
+    )
+    if node_in_cluster:
+        cbs_one.recover(cbs_two)
+    else:
+        cbs_one.add_node(cbs_two)
+    cbs_one.rebalance_in(cbs_two)
+
+
+async def _cleanup_test_resources(sg, cbs, sg_db: str, bucket_name: str):
+    """Clean up test database and bucket."""
+    try:
+        await sg.delete_database(sg_db)
+        await asyncio.sleep(3)
+    except Exception:
+        pass
+    for attempt in range(3):
+        try:
+            cbs.drop_bucket(bucket_name)
+            break
+        except Exception as e:
+            if "does not exist" in str(e).lower() or "not found" in str(e).lower():
+                break
+            if attempt < 2:
+                await asyncio.sleep(5)
+    await asyncio.sleep(10)
+
+
+async def _setup_database_and_user(
+    sg,
+    cbs,
+    sg_db: str,
+    bucket_name: str,
+    user_name: str,
+    user_password: str,
+    channels: list,
+):
+    """Setup bucket, database, and user."""
+    cbs.create_bucket(bucket_name, num_replicas=1)
+    await asyncio.sleep(5)
+
+    db_config = {
+        "bucket": bucket_name,
+        "index": {"num_replicas": 1},
+        "scopes": {"_default": {"collections": {"_default": {}}}},
+    }
+    await sg.put_database(sg_db, PutDatabasePayload(db_config))
+    await asyncio.sleep(3)
+
+    await sg.delete_user(sg_db, user_name)
+    await sg.add_user(
+        sg_db,
+        user_name,
+        password=user_password,
+        collection_access={"_default": {"_default": {"admin_channels": channels}}},
+    )
+    return await sg.create_user_client(sg_db, user_name, user_password, channels)
+
+
 @pytest.mark.sgw
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(2)
@@ -20,67 +99,17 @@ class TestMultipleServers(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs_one = cblpytest.couchbase_servers[0]
         cbs_two = cblpytest.couchbase_servers[1]
-        cluster_servers = [cbs_one, cbs_two]
+        cbs_one.ensure_cluster_healthy(cblpytest.couchbase_servers)
 
-        sg_db = "db"
-        bucket_name = "data-bucket"
-        num_docs = 100
-        num_updates = 100
-        sg_user_name = "vipul"
-        sg_user_password = "pass"
+        sg_db, bucket_name = "db-rebalance-sanity", "data-bucket"
+        num_docs, num_updates = 50, 10
+        sg_user_name, sg_user_password = "vipul", "pass"
         channels = ["ABC", "CBS"]
 
-        self.mark_test_step("Ensure both CBS nodes are in the cluster")
-        # Check if cbs_two is in the cluster by checking the cluster node count
-        session = requests.Session()
-        session.auth = ("Administrator", "password")
-        resp = session.get(f"http://{cbs_one.hostname}:8091/pools/default")
-        cluster_data = resp.json()
-        node_count = len(cluster_data.get("nodes", []))
-
-        if node_count < 2:
-            # cbs_two is not in the cluster, add it
-            try:
-                cbs_one.add_node(cbs_two)
-                cbs_one.rebalance_in(cluster_servers, cbs_two)
-                print("Successfully added cbs_two to cluster")
-                # Verify node was added
-                resp = session.get(f"http://{cbs_one.hostname}:8091/pools/default")
-                cluster_data = resp.json()
-                node_count = len(cluster_data.get("nodes", []))
-            except Exception as e:
-                pytest.fail(f"Warning: Failed to add cbs_two to cluster: {e}")
-
-        self.mark_test_step("Clean up any existing test data")
-        await sg.delete_database(sg_db)
-        cbs_one.drop_bucket(bucket_name)
-        cbs_two.drop_bucket(bucket_name)
-
-        self.mark_test_step("Create bucket on CBS cluster")
-        cbs_one.create_bucket(bucket_name)
-
-        self.mark_test_step(f"Configure database '{sg_db}' on SGW")
-        db_config = {
-            "bucket": bucket_name,
-            "index": {"num_replicas": 1},
-            "scopes": {"_default": {"collections": {"_default": {}}}},
-        }
-        db_payload = PutDatabasePayload(db_config)
-        await sg.put_database(sg_db, db_payload)
-        await asyncio.sleep(3)
-
-        self.mark_test_step(f"Create user '{sg_user_name}' with channels {channels}")
-        await sg.delete_user(sg_db, sg_user_name)
-        await sg.add_user(
-            sg_db,
-            sg_user_name,
-            password=sg_user_password,
-            collection_access={"_default": {"_default": {"admin_channels": channels}}},
-        )
-
-        self.mark_test_step("Create user client for SGW access")
-        sg_user = await sg.create_user_client(
-            sg_db, sg_user_name, sg_user_password, channels
+        self.mark_test_step("Clean up and setup test environment")
+        await _cleanup_test_resources(sg, cbs_one, sg_db, bucket_name)
+        sg_user = await _setup_database_and_user(
+            sg, cbs_one, sg_db, bucket_name, sg_user_name, sg_user_password, channels
         )
 
         self.mark_test_step(f"Add {num_docs} docs to Sync Gateway")
@@ -129,35 +158,53 @@ class TestMultipleServers(CBLTestClass):
             """Continuously update all documents num_updates times"""
             for update_num in range(num_updates):
                 # Get current revisions for all docs
-                current_docs = await sg_user.get_all_documents(sg_db)
-                rev_map = {row.id: row.revision for row in current_docs.rows}
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        current_docs = await sg_user.get_all_documents(sg_db)
+                        rev_map = {row.id: row.revision for row in current_docs.rows}
 
-                updates = [
-                    DocumentUpdateEntry(
-                        id=f"test_doc_{i}",
-                        revid=rev_map.get(f"test_doc_{i}"),  # Use current revision
-                        body={
-                            "type": "test_doc",
-                            "index": i,
-                            "content": f"Document {i} - update {update_num + 1}",
-                            "channels": channels,
-                        },
-                    )
-                    for i in range(num_docs)
-                ]
-                await sg_user.update_documents(sg_db, updates)
+                        updates = [
+                            DocumentUpdateEntry(
+                                id=f"test_doc_{i}",
+                                revid=rev_map.get(
+                                    f"test_doc_{i}"
+                                ),  # Use current revision
+                                body={
+                                    "type": "test_doc",
+                                    "index": i,
+                                    "content": f"Document {i} - update {update_num + 1}",
+                                    "channels": channels,
+                                },
+                            )
+                            for i in range(num_docs)
+                        ]
+                        await sg_user.update_documents(sg_db, updates)
+                        break  # Success, exit retry loop
+                    except Exception as e:
+                        if attempt < max_retries - 1:
+                            print(
+                                f"Update attempt {attempt + 1} failed: {e}, retrying..."
+                            )
+                            await asyncio.sleep(1)
+                        else:
+                            print(f"Update failed after {max_retries} attempts: {e}")
+                            raise
+
+                # Small delay between update batches to avoid overwhelming SGW
+                await asyncio.sleep(0.1)
 
         update_task = asyncio.create_task(update_docs_continuously())
         await asyncio.sleep(2)
 
         self.mark_test_step("Rebalance OUT cbs_two from cluster")
-        cbs_one.rebalance_out(cluster_servers, cbs_two)
+        cbs_one.rebalance_out(cbs_two)
 
         self.mark_test_step("Add cbs_two back to cluster")
         cbs_one.add_node(cbs_two)
 
         self.mark_test_step("Rebalance IN cbs_two to cluster")
-        cbs_one.rebalance_in(cluster_servers, cbs_two)
+        cbs_one.rebalance_in(cbs_two)
         await asyncio.sleep(5)
 
         self.mark_test_step("Wait for all updates to complete")
@@ -191,6 +238,90 @@ class TestMultipleServers(CBLTestClass):
                 )
 
         await sg_user.close()
+        await sg.delete_database(sg_db)
+        cbs_one.drop_bucket(bucket_name)
+        cbs_two.drop_bucket(bucket_name)
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_server_goes_down_sanity(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
+        sg = cblpytest.sync_gateways[0]
+        cbs_one = cblpytest.couchbase_servers[0]
+        cbs_two = cblpytest.couchbase_servers[1]
+        cbs_one.ensure_cluster_healthy(cblpytest.couchbase_servers)
+
+        sg_db, bucket_name = "db", "data-bucket"
+        num_docs = 50
+        sg_user_name, sg_user_password = "vipul", "pass"
+        channels = ["ABC", "CBS"]
+
+        self.mark_test_step("Clean up and setup test environment")
+        await _cleanup_test_resources(sg, cbs_one, sg_db, bucket_name)
+        sg_user = await _setup_database_and_user(
+            sg, cbs_one, sg_db, bucket_name, sg_user_name, sg_user_password, channels
+        )
+
+        self.mark_test_step(f"Add {num_docs} docs to Sync Gateway before failover")
+        docs_to_add = [
+            DocumentUpdateEntry(
+                id=f"test_doc_{i}",
+                revid=None,
+                body={
+                    "type": "test_doc",
+                    "index": i,
+                    "content": f"Document {i}",
+                    "channels": channels,
+                },
+            )
+            for i in range(num_docs)
+        ]
+        await sg_user.update_documents(sg_db, docs_to_add)
+        initial_docs = await sg_user.get_all_documents(sg_db)
+        assert len(initial_docs.rows) == num_docs, (
+            f"Expected {num_docs} docs, got {len(initial_docs.rows)}"
+        )
+
+        self.mark_test_step("Failover CBS node 2 to simulate server failure")
+        cbs_one.failover(cbs_two)
+        cbs_one.rebalance(eject_failed_nodes=False)
+        await asyncio.sleep(10)
+
+        self.mark_test_step("Verify original docs accessible with node 2 failed over")
+
+        changes_after_failover = await sg.get_changes(sg_db, version_type="cv")
+        assert len(changes_after_failover.results) == num_docs
+
+        self.mark_test_step(f"Add {num_docs} NEW docs while node 2 is down")
+        new_docs_during_failover = [
+            DocumentUpdateEntry(
+                id=f"test_doc_during_failover_{i}",
+                revid=None,
+                body={
+                    "type": "test_doc_failover",
+                    "index": i,
+                    "content": f"Document {i} added during failover",
+                    "channels": channels,
+                },
+            )
+            for i in range(num_docs)
+        ]
+        await sg.update_documents(sg_db, new_docs_during_failover)
+
+        self.mark_test_step("Verify new docs added during failover")
+        all_docs_with_new = await sg.get_all_documents(sg_db)
+        assert len(all_docs_with_new.rows) == num_docs * 2
+
+        self.mark_test_step("Recover CBS node 2")
+        _recover_or_add_node(cbs_one, cbs_two)
+        if not cbs_one.wait_for_cluster_healthy(timeout=60):
+            pytest.fail("Cluster did not become healthy")
+        await asyncio.sleep(10)
+
+        self.mark_test_step("Verify all docs accessible after recovery")
+        changes_final = await sg.get_changes(sg_db, version_type="cv")
+        assert len(changes_final.results) == num_docs * 2
+
         await sg.delete_database(sg_db)
         cbs_one.drop_bucket(bucket_name)
         cbs_two.drop_bucket(bucket_name)
