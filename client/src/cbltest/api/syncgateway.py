@@ -182,32 +182,6 @@ class AllDocumentsResponseRow:
         self.__cv = cv
 
 
-class DatabaseStatusResponse:
-    """
-    A class representing a database status response from Sync Gateway
-    """
-
-    @property
-    def db_name(self) -> str:
-        """Gets the database name"""
-        return self.__db_name
-
-    @property
-    def state(self) -> str:
-        """Gets the database state ('Online', 'Offline', etc.)"""
-        return self.__state
-
-    @property
-    def update_seq(self) -> int:
-        """Gets the update sequence number"""
-        return self.__update_seq
-
-    def __init__(self, response: dict):
-        self.__db_name = response.get("db_name", "")
-        self.__state = response.get("state", "Unknown")
-        self.__update_seq = response.get("update_seq", 0)
-
-
 class AllDocumentsResponse:
     """
     A class representing an all_docs response from Sync Gateway
@@ -429,7 +403,7 @@ class SyncGatewayVersion(CouchbaseVersion):
 
 class SyncGateway:
     """
-    A class for interacting with a given Sync Gateway instance (Admin API)
+    A class for interacting with a given Sync Gateway instance
     """
 
     def __init__(
@@ -450,17 +424,9 @@ class SyncGateway:
         self.__hostname: str = url
         self.__port: int = port
         self.__admin_port: int = admin_port
-        self.__session: ClientSession = self._create_session(
-            secure,
-            scheme,
-            url,
-            self._get_api_port(),
-            BasicAuth(username, password, "ascii"),
+        self.__admin_session: ClientSession = self._create_session(
+            secure, scheme, url, admin_port, BasicAuth(username, password, "ascii")
         )
-
-    def _get_api_port(self) -> int:
-        """Returns the port to use for API calls. Override in subclasses."""
-        return self.__admin_port
 
     @property
     def hostname(self) -> str:
@@ -481,6 +447,48 @@ class SyncGateway:
     def secure(self) -> bool:
         """Gets whether the Sync Gateway instance uses TLS"""
         return self.__secure
+
+    @classmethod
+    async def create_user_client(
+        cls,
+        admin_sg: "SyncGateway",
+        db_name: str,
+        username: str,
+        password: str,
+        channels: list[str],
+    ) -> "SyncGateway":
+        """
+        Helper method to create a user with channel access and return a user-specific SG client.
+
+        This is a convenience method for tests that need to verify user-level access control.
+
+        :param admin_sg: The admin SyncGateway instance
+        :param db_name: The database name
+        :param username: The username to create
+        :param password: The password for the user
+        :param channels: List of channels the user should have access to
+        :return: A SyncGateway instance authenticated as the user for public API access
+        """
+        # Clean up user if exists from previous run
+        await admin_sg.delete_user(db_name, username)
+
+        # Create user with channel access
+        await admin_sg.add_user(
+            db_name,
+            username,
+            password=password,
+            collection_access={"_default": {"_default": {"admin_channels": channels}}},
+        )
+
+        # Return user-specific SG client for public API access
+        return cls(
+            admin_sg.hostname,
+            username,
+            password,
+            port=admin_sg.port,
+            admin_port=admin_sg.admin_port,
+            secure=admin_sg.secure,
+        )
 
     def _create_session(
         self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None
@@ -506,7 +514,7 @@ class SyncGateway:
         session: ClientSession | None = None,
     ) -> Any:
         if session is None:
-            session = self.__session
+            session = self.__admin_session
 
         with self.__tracer.start_as_current_span(
             "send_request", attributes={"http.method": method, "http.path": path}
@@ -620,24 +628,20 @@ class SyncGateway:
         """
         await self._put_database(db_name, payload, 0)
 
-    async def get_database_status(self, db_name: str) -> DatabaseStatusResponse | None:
+    async def database_exists(self, db_name: str) -> bool:
         """
-        Gets the status of a database including its online/offline state.
+        Checks if a database exists in Sync Gateway's configuration.
 
-        :param db_name: The name of the Database
-        :return: DatabaseStatusResponse with state, sequences, etc. Returns None if database doesn't exist (404/403)
+        :param db_name: The name of the Database to check
+        :return: True if the database exists, False otherwise
         """
-        with self.__tracer.start_as_current_span(
-            "get_database_status", attributes={"cbl.database.name": db_name}
-        ):
-            try:
-                resp = await self._send_request("get", f"/{db_name}/")
-                assert isinstance(resp, dict)
-                return DatabaseStatusResponse(cast(dict, resp))
-            except CblSyncGatewayBadResponseError as e:
-                if e.code in [403, 404]:  # Database doesn't exist
-                    return None
-                raise
+        try:
+            await self._send_request("get", f"/{db_name}")
+            return True
+        except CblSyncGatewayBadResponseError as e:
+            if e.code == 403:  # Database does not exist
+                return False
+            raise
 
     async def _delete_database(self, db_name: str, retry_count: int = 0) -> None:
         with self.__tracer.start_as_current_span(
@@ -870,6 +874,7 @@ class SyncGateway:
         db_name: str,
         scope: str = "_default",
         collection: str = "_default",
+        use_public_api: bool = False,
     ) -> AllDocumentsResponse:
         """
         Gets all the documents in the given collection from Sync Gateway (id and revid)
@@ -877,6 +882,7 @@ class SyncGateway:
         :param db_name: The name of the Sync Gateway database to query
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
+        :param use_public_api: If True, uses public port (4984) with user auth instead of admin port (4985)
         """
         with self.__tracer.start_as_current_span(
             "get_all_documents",
@@ -886,10 +892,27 @@ class SyncGateway:
                 "cbl.collection.name": collection,
             },
         ):
-            resp = await self._send_request(
-                "get",
-                f"/{db_name}.{scope}.{collection}/_all_docs",
-            )
+            if use_public_api:
+                # Use public port (4984) - required for regular user access
+                scheme = "https://" if self.__secure else "http://"
+                # Create session with user's credentials on public port
+                async with self._create_session(
+                    self.__secure,
+                    scheme,
+                    self.__hostname,
+                    4984,
+                    self.__admin_session.auth,
+                ) as session:
+                    resp = await self._send_request(
+                        "get",
+                        f"/{db_name}.{scope}.{collection}/_all_docs",
+                        session=session,
+                    )
+            else:
+                # Use admin port (4985) - default behavior
+                resp = await self._send_request(
+                    "get", f"/{db_name}.{scope}.{collection}/_all_docs"
+                )
 
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
@@ -900,6 +923,7 @@ class SyncGateway:
         scope: str = "_default",
         collection: str = "_default",
         version_type: str = "rev",
+        use_public_api: bool = False,
     ) -> ChangesResponse:
         """
         Gets the changes feed from Sync Gateway, including deleted documents
@@ -908,6 +932,7 @@ class SyncGateway:
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
         :param version_type: The version type to use ('rev' for revision IDs, 'cv' for version vectors in SGW 4.0+)
+        :param use_public_api: If True, uses public port (4984) with user auth instead of admin port (4985)
         """
         with self.__tracer.start_as_current_span(
             "get_changes",
@@ -918,10 +943,28 @@ class SyncGateway:
             },
         ):
             query_params = f"version_type={version_type}"
-            resp = await self._send_request(
-                "get",
-                f"/{db_name}.{scope}.{collection}/_changes?{query_params}",
-            )
+
+            if use_public_api:
+                # Use public port (4984) - required for regular user access
+                scheme = "https://" if self.__secure else "http://"
+                # Create session with user's credentials on public port
+                async with self._create_session(
+                    self.__secure,
+                    scheme,
+                    self.__hostname,
+                    4984,
+                    self.__admin_session.auth,
+                ) as session:
+                    resp = await self._send_request(
+                        "get",
+                        f"/{db_name}.{scope}.{collection}/_changes?{query_params}",
+                        session=session,
+                    )
+            else:
+                # Use admin port (4985) - default behavior
+                resp = await self._send_request(
+                    "get", f"/{db_name}.{scope}.{collection}/_changes?{query_params}"
+                )
 
             assert isinstance(resp, dict)
             return ChangesResponse(cast(dict, resp))
@@ -1156,8 +1199,7 @@ class SyncGateway:
             },
         ):
             response = await self._send_request(
-                "get",
-                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                "get", f"/{db_name}.{scope}.{collection}/{doc_id}"
             )
             if not isinstance(response, dict):
                 raise ValueError(
@@ -1175,49 +1217,12 @@ class SyncGateway:
 
             return RemoteDocument(cast_resp)
 
-    async def create_user_client(
-        self,
-        db_name: str,
-        username: str,
-        password: str,
-        channels: list[str],
-    ) -> "SyncGatewayUserClient":
-        """
-        Helper method to create a user with channel access and return a user-specific SG client.
-
-        This is a convenience method for tests that need to verify user-level access control.
-
-        :param db_name: The database name
-        :param username: The username to create
-        :param password: The password for the user
-        :param channels: List of channels the user should have access to
-        :return: A SyncGatewayUserClient instance authenticated as the user (uses public port 4984)
-        """
-        # Clean up user if exists from previous run
-        await self.delete_user(db_name, username)
-        await self.add_user(
-            db_name,
-            username,
-            password=password,
-            collection_access={"_default": {"_default": {"admin_channels": channels}}},
-        )
-
-        # Return user-specific SG client for public API access
-        return SyncGatewayUserClient(
-            self.hostname,
-            username,
-            password,
-            port=self.port,
-            admin_port=self.admin_port,
-            secure=self.secure,
-        )
-
     async def close(self) -> None:
         """
         Closes the Sync Gateway session
         """
-        if not self.__session.closed:
-            await self.__session.close()
+        if not self.__admin_session.closed:
+            await self.__admin_session.close()
 
     async def get_database_config(self, db_name: str) -> dict[str, Any]:
         """
@@ -1279,25 +1284,148 @@ class SyncGateway:
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
+    async def fetch_log_file_via_caddy(
+        self,
+        log_type: str,
+        caddy_port: int = 20000,
+    ) -> str:
+        """
+        Fetches a log file from the remote Sync Gateway server via Caddy HTTP server
 
-class SyncGatewayUserClient(SyncGateway):
-    """
-    A Sync Gateway client that uses the public API (port 4984) for user-level access.
+        :param log_type: The type of log to fetch (e.g., 'debug', 'info', 'error', 'warn', 'trace', 'stats')
+        :param caddy_port: Port where Caddy is serving log files (default: 20000)
+        :return: Contents of the log file as a string
+        """
+        log_filename = f"sg_{log_type}.log"
+        caddy_url = f"http://{self.__hostname}:{caddy_port}/{log_filename}"
 
-    This class inherits from SyncGateway but overrides the port selection to use
-    the public API port (4984) instead of the admin port (4985). All methods
-    automatically use the public API without needing to pass use_public_api=True.
+        with self.__tracer.start_as_current_span(
+            "fetch_log_file_via_caddy",
+            attributes={
+                "log.type": log_type,
+                "caddy.url": caddy_url,
+            },
+        ):
+            try:
+                # Create a new session without base_url for Caddy requests
+                async with ClientSession() as session:
+                    async with session.get(caddy_url) as response:
+                        if response.status == 404:
+                            raise FileNotFoundError(
+                                f"Log file '{log_filename}' not found on Caddy server. "
+                                f"Make sure the log level is enabled in bootstrap.json"
+                            )
+                        response.raise_for_status()
+                        log_contents = await response.text()
+                        return log_contents
+            except Exception as e:
+                raise Exception(f"Failed to fetch log file from Caddy: {e}") from e
 
-    Use SyncGateway.create_user_client() to create instances with proper user credentials
-    and channel access.
+    async def download_file_via_caddy(
+        self,
+        remote_filename: str,
+        local_path: str,
+        caddy_port: int = 20000,
+    ) -> None:
+        """
+        Downloads a file from the remote server via Caddy HTTP server
 
-    Example:
-        admin_sg = SyncGateway("localhost", "admin", "password")
-        user_sg = await admin_sg.create_user_client("db", "alice", "pass", ["channel1"])
-        # user_sg automatically uses port 4984 for all API calls
-        docs = await user_sg.get_all_documents("db")
-    """
+        :param remote_filename: Name of the file on the remote server (e.g., 'sgcollectinfo-xxx-redacted.zip')
+        :param local_path: Local path where the file should be saved
+        :param caddy_port: Port where Caddy is serving files (default: 20000)
+        """
+        caddy_url = f"http://{self.__hostname}:{caddy_port}/{remote_filename}"
 
-    def _get_api_port(self) -> int:
-        """Returns the public API port (4984) for user-level access."""
-        return self.port
+        with self.__tracer.start_as_current_span(
+            "download_file_via_caddy",
+            attributes={
+                "remote.filename": remote_filename,
+                "local.path": local_path,
+                "caddy.url": caddy_url,
+            },
+        ):
+            try:
+                # Create a new session without base_url for Caddy requests
+                async with ClientSession() as session:
+                    async with session.get(caddy_url) as response:
+                        if response.status == 404:
+                            raise FileNotFoundError(
+                                f"File '{remote_filename}' not found on Caddy server"
+                            )
+                        response.raise_for_status()
+                        content = await response.read()
+
+                        # Write to local file
+                        with open(local_path, "wb") as f:
+                            f.write(content)
+            except Exception as e:
+                raise Exception(f"Failed to download file from Caddy: {e}") from e
+
+    async def start_sgcollect_via_api(
+        self,
+        redact_level: str | None = None,
+        redact_salt: str | None = None,
+        output_dir: str | None = None,
+    ) -> dict:
+        """
+        Starts SGCollect using the REST API endpoint
+
+        :param redact_level: Redaction level ('none', 'partial', 'full')
+        :param redact_salt: Custom salt for redaction hashing
+        :param output_dir: Output directory on the remote server
+        :return: Response dict with status
+        """
+        with self.__tracer.start_as_current_span(
+            "start_sgcollect_via_api",
+            attributes={
+                "redact.level": redact_level or "none",
+            },
+        ):
+            body: dict[str, Any] = {"upload": False}
+
+            if redact_level is not None:
+                body["redact_level"] = redact_level
+            if redact_salt is not None:
+                body["redact_salt"] = redact_salt
+            if output_dir is not None:
+                body["output_dir"] = output_dir
+
+            resp = await self._send_request(
+                "post",
+                "/_sgcollect_info",
+                JSONDictionary(body),
+            )
+
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
+
+    async def wait_for_sgcollect_to_complete(
+        self, max_attempts: int = 60, wait_time: int = 5
+    ) -> None:
+        """
+        Waits for SGCollect to complete
+
+        :param max_attempts: Maximum number of attempts to wait for SGCollect to complete
+        :param wait_time: Time to wait between attempts
+        """
+        for _ in range(max_attempts):
+            status_resp = await self.get_sgcollect_status()
+            if status_resp.get("status") in ["stopped", "completed"]:
+                return
+            await asyncio.sleep(wait_time)
+        raise Exception(
+            f"SGCollect did not complete after {max_attempts * wait_time} seconds.\n"
+            f"Status: {status_resp.get('status')}.\n"
+            f"Error: {status_resp.get('error')}"
+        )
+
+    async def get_sgcollect_status(self) -> dict:
+        """
+        Gets the current status of SGCollect operation
+
+        :return: Response dict with status ('stopped' or 'running')
+        """
+        with self.__tracer.start_as_current_span("get_sgcollect_status"):
+            resp = await self._send_request("get", "/_sgcollect_info")
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
