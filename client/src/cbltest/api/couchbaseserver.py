@@ -60,6 +60,10 @@ class CouchbaseServer:
         nodes_in_cluster = cluster_data.get("nodes", [])
 
         for cbs_node in cbs_servers:
+            # Skip self - can't add the primary node to its own cluster
+            if cbs_node.hostname == self.__hostname:
+                continue
+
             node_in_cluster = False
             node_needs_recovery = False
 
@@ -73,18 +77,22 @@ class CouchbaseServer:
 
                 if cbs_node.hostname in [hostname, alt_hostname]:
                     node_in_cluster = True
-                    if cluster_node.get("clusterMembership") == "inactiveFailed":
+                    cluster_membership = cluster_node.get("clusterMembership")
+
+                    if cluster_membership == "inactiveFailed":
                         node_needs_recovery = True
                     break
 
+            # Only act if node needs recovery or is missing
             if node_needs_recovery:
                 self.recover(cbs_node)
-                self.rebalance_in()
+                self.rebalance()
                 time.sleep(5)
             elif not node_in_cluster:
                 self.add_node(cbs_node)
-                self.rebalance_in()
+                self.rebalance()
                 time.sleep(5)
+            # If node is in cluster and active, do nothing
 
         if not self.wait_for_cluster_healthy(timeout=120):
             raise CblTestError("CBS cluster did not become healthy")
@@ -679,184 +687,233 @@ class CouchbaseServer:
         if services is None:
             services = ["kv", "index", "n1ql"]
 
-        with requests.Session() as session:
-            session.auth = (self.__username, self.__password)
+        with self.__tracer.start_as_current_span(
+            "add_node",
+            attributes={
+                "cbl.node.hostname": node_to_add.__hostname,
+                "cbl.node.services": ",".join(services),
+            },
+        ) as span:
+            with requests.Session() as session:
+                session.auth = (self.__username, self.__password)
 
-            hostname_to_use = node_to_add.__hostname
-            for attempt in range(3):
-                try:
-                    node_session = requests.Session()
-                    node_session.auth = (self.__username, self.__password)
-                    node_resp = node_session.get(
-                        f"http://{node_to_add.__hostname}:8091/nodes/self",
-                        timeout=5,
-                    )
-                    if node_resp.status_code == 200:
-                        internal_hostname = (
-                            node_resp.json().get("hostname", "").split(":")[0]
+                hostname_to_use = node_to_add.__hostname
+                for attempt in range(3):
+                    try:
+                        node_session = requests.Session()
+                        node_session.auth = (self.__username, self.__password)
+                        node_resp = node_session.get(
+                            f"http://{node_to_add.__hostname}:8091/nodes/self",
+                            timeout=5,
                         )
-                        if internal_hostname and not internal_hostname.startswith(
-                            "127."
-                        ):
-                            hostname_to_use = internal_hostname
-                            break
-                except Exception:
-                    if attempt < 2:
-                        time.sleep(5)
+                        if node_resp.status_code == 200:
+                            internal_hostname = (
+                                node_resp.json().get("hostname", "").split(":")[0]
+                            )
+                            if internal_hostname and not internal_hostname.startswith(
+                                "127."
+                            ):
+                                hostname_to_use = internal_hostname
+                                break
+                    except Exception as e:
+                        if attempt < 2:
+                            cbl_warning(
+                                f"Failed to query node {node_to_add.__hostname} /nodes/self (attempt {attempt + 1}/3): {e}"
+                            )
+                            span.add_event(
+                                "query_node_failed",
+                                attributes={"attempt": attempt + 1, "error": str(e)},
+                            )
+                            time.sleep(5)
 
-            for attempt in range(5):
-                resp = session.post(
-                    f"http://{self.__hostname}:8091/controller/addNode",
-                    data={
-                        "hostname": hostname_to_use,
-                        "user": self.__username,
-                        "password": self.__password,
-                        "services": ",".join(services),
-                    },
-                )
-                if resp.status_code == 200:
-                    break
-                elif attempt < 4:
-                    time.sleep(1)
+                for attempt in range(5):
+                    resp = session.post(
+                        f"http://{self.__hostname}:8091/controller/addNode",
+                        data={
+                            "hostname": hostname_to_use,
+                            "user": self.__username,
+                            "password": self.__password,
+                            "services": ",".join(services),
+                        },
+                    )
+                    if resp.status_code == 200:
+                        break
+                    elif attempt < 4:
+                        cbl_warning(
+                            f"Failed to add node (attempt {attempt + 1}/5): Status {resp.status_code}, Response: {resp.text}"
+                        )
+                        span.add_event(
+                            "add_node_retry",
+                            attributes={
+                                "attempt": attempt + 1,
+                                "status_code": resp.status_code,
+                            },
+                        )
+                        time.sleep(1)
                 else:
                     raise CblTestError(
                         f"Failed to add node {node_to_add.__hostname}: {resp.text}"
                     )
 
-            if hostname_to_use != node_to_add.__hostname:
-                try:
-                    session.put(
-                        f"http://{node_to_add.__hostname}:8091/node/controller/setupAlternateAddresses/external",
-                        data={"hostname": node_to_add.__hostname, "mgmt": "8091"},
-                    ).raise_for_status()
-                except Exception:
-                    pass
+                if hostname_to_use != node_to_add.__hostname:
+                    # Set alternate address so external clients can connect via public IP
+                    # This is critical for AWS VPC where nodes use private IPs internally
+                    try:
+                        session.put(
+                            f"http://{node_to_add.__hostname}:8091/node/controller/setupAlternateAddresses/external",
+                            data={"hostname": node_to_add.__hostname, "mgmt": "8091"},
+                        ).raise_for_status()
+                        span.add_event(
+                            "alternate_address_set",
+                            attributes={"hostname": node_to_add.__hostname},
+                        )
+                    except Exception as e:
+                        # Node is already added to cluster, but external SDK connections may fail
+                        # Common causes: Node not fully initialized, auth issues, network problems
+                        cbl_warning(
+                            f"Failed to set alternate address for {node_to_add.__hostname}: {e}. "
+                            f"Node added successfully, but external SDK connections (from TDK) may fail. "
+                            f"Internal cluster communication will work normally."
+                        )
+                        span.add_event(
+                            "alternate_address_failed", attributes={"error": str(e)}
+                        )
 
-    def rebalance_out(self, node_to_remove: "CouchbaseServer") -> None:
+    def rebalance(
+        self,
+        eject_node: "CouchbaseServer | None" = None,
+        eject_failed_nodes: bool = False,
+    ) -> None:
         """
-        Rebalances a node out of the cluster (removes it).
+        Rebalances the cluster with optional node ejection.
 
-        :param node_to_remove: The node to remove from the cluster
+        Can be used for three scenarios:
+        1. Rebalance in (after add_node): rebalance()
+        2. Rebalance out (remove node): rebalance(eject_node=node)
+        3. Rebalance after failover: rebalance() or rebalance(eject_failed_nodes=True)
+
+        :param eject_node: Optional node to eject during rebalance (rebalance out)
+        :param eject_failed_nodes: If True, removes all inactiveFailed nodes from cluster
         """
-        self._rebalance_with_node(eject_node=node_to_remove)
+        attributes: dict[str, str | int | float] = {}
+        if eject_node:
+            attributes["cbl.node.eject"] = eject_node.hostname
+        if eject_failed_nodes:
+            attributes["cbl.eject_failed"] = "true"
 
-    def rebalance_in(self) -> None:
-        """
-        Rebalances the cluster to activate all nodes.
-        Call this after add_node() to complete the addition.
-        """
-        self._rebalance_with_node()
+        with self.__tracer.start_as_current_span(
+            "rebalance",
+            attributes=attributes,
+        ) as span:
+            with requests.Session() as session:
+                session.auth = (self.__username, self.__password)
 
-    def _rebalance_with_node(self, eject_node: "CouchbaseServer | None" = None) -> None:
-        """
-        Internal method to perform cluster rebalance with optional node ejection.
+                # Get cluster information
+                pool_data = self._get_cluster_info(session)
 
-        :param eject_node: Optional node to eject during rebalance
-        """
-        with requests.Session() as session:
-            session.auth = (self.__username, self.__password)
+                known_nodes = []
+                ejected_nodes_list = []
 
-            # Get all node OTP IDs
-            resp = session.get(f"http://{self.__hostname}:8091/pools/default")
-            resp.raise_for_status()
-            pool_data = resp.json()
+                for node in pool_data.get("nodes", []):
+                    otp_node = node.get("otpNode")
+                    cluster_membership = node.get("clusterMembership")
 
-            known_nodes = []
-            ejected_node = None
+                    known_nodes.append(otp_node)
 
-            for node in pool_data.get("nodes", []):
-                otp_node = node.get("otpNode")
-                known_nodes.append(otp_node)
+                    # If we need to eject a specific node, find its OTP ID
+                    if eject_node:
+                        hostname = node.get("hostname", "").split(":")[0]
+                        alt_hostname = (
+                            node.get("alternateAddresses", {})
+                            .get("external", {})
+                            .get("hostname", "")
+                        )
 
-                # If we need to eject a node, find its OTP ID
-                if eject_node:
-                    hostname = node.get("hostname", "").split(":")[0]
-                    alt_hostname = (
-                        node.get("alternateAddresses", {})
-                        .get("external", {})
-                        .get("hostname", "")
+                        if eject_node.hostname in [hostname, alt_hostname]:
+                            ejected_nodes_list.append(otp_node)
+
+                    # Or eject all failed nodes if requested
+                    elif eject_failed_nodes and cluster_membership == "inactiveFailed":
+                        ejected_nodes_list.append(otp_node)
+
+                # If ejecting a specific node, make sure we found it
+                if eject_node and not ejected_nodes_list:
+                    raise CblTestError(
+                        f"Node {eject_node.hostname} not found in cluster. "
+                        f"Available nodes: {[n.get('hostname') for n in pool_data.get('nodes', [])]}"
                     )
 
-                    if eject_node.hostname in [hostname, alt_hostname]:
-                        ejected_node = otp_node
+                # Start rebalance
+                data = {"knownNodes": ",".join(known_nodes)}
+                if ejected_nodes_list:
+                    data["ejectedNodes"] = ",".join(ejected_nodes_list)
 
-            # If ejecting a node, make sure we found it
-            if eject_node and not ejected_node:
-                raise CblTestError(
-                    f"Node {eject_node.hostname} not found in cluster. "
-                    f"Available nodes: {[n.get('hostname') for n in pool_data.get('nodes', [])]}"
-                )
-
-            # Start rebalance
-            data = {"knownNodes": ",".join(known_nodes)}
-            if ejected_node:
-                data["ejectedNodes"] = ejected_node
-
-            for attempt in range(5):
-                try:
-                    resp = session.post(
-                        f"http://{self.__hostname}:8091/controller/rebalance",
-                        data=data,
-                    )
-                    resp.raise_for_status()
-                    break
-                except Exception:
-                    if attempt < 4:
-                        time.sleep(1)
-                    else:
-                        raise
+                for attempt in range(5):
+                    try:
+                        resp = session.post(
+                            f"http://{self.__hostname}:8091/controller/rebalance",
+                            data=data,
+                        )
+                        resp.raise_for_status()
+                        break
+                    except Exception as e:
+                        if attempt < 4:
+                            cbl_warning(
+                                f"Rebalance request failed (attempt {attempt + 1}/5): {e}"
+                            )
+                            span.add_event(
+                                "rebalance_retry",
+                                attributes={"attempt": attempt + 1, "error": str(e)},
+                            )
+                            time.sleep(1)
+                        else:
+                            raise
 
             # Wait for rebalance to complete
             self._wait_for_rebalance_completion(session)
 
-    def rebalance(self, eject_failed_nodes: bool = False) -> None:
+    def _get_cluster_info(self, session: requests.Session) -> dict:
         """
-        Rebalances the cluster in its current state.
-        Useful after failover to activate replica vBuckets.
+        Internal method to get cluster information from /pools/default.
 
-        :param eject_failed_nodes: If True, removes failed nodes from cluster.
-                                   If False, keeps them for later recovery.
+        :param session: Authenticated requests session
+        :return: Cluster pool data containing node information
         """
-        with requests.Session() as session:
-            session.auth = (self.__username, self.__password)
+        resp = session.get(f"http://{self.__hostname}:8091/pools/default")
+        resp.raise_for_status()
+        return resp.json()
 
-            # Get all node OTP IDs
-            resp = session.get(f"http://{self.__hostname}:8091/pools/default")
-            resp.raise_for_status()
-            pool_data = resp.json()
+    def _find_node_otp(
+        self, pool_data: dict, target_node: "CouchbaseServer", operation: str
+    ) -> str:
+        """
+        Internal method to find the OTP node ID for a given CouchbaseServer instance.
+        Checks both regular hostname and alternate address (for AWS VPC deployments).
 
-            known_nodes = []
-            ejected_nodes = []
+        :param pool_data: Cluster pool data from /pools/default
+        :param target_node: The CouchbaseServer instance to find
+        :param operation: Operation name (for error message, e.g., "failover", "recovery")
+        :return: OTP node ID string
+        :raises CblTestError: If node is not found in cluster
+        """
+        for node in pool_data.get("nodes", []):
+            hostname = node.get("hostname", "").split(":")[0]
+            otp_node = node.get("otpNode")
 
-            for node in pool_data.get("nodes", []):
-                otp_node = node.get("otpNode")
-                cluster_membership = node.get("clusterMembership")
+            # Check both regular hostname and alternate address
+            if hostname == target_node.hostname:
+                return otp_node
 
-                # knownNodes must include ALL nodes (even failed ones)
-                known_nodes.append(otp_node)
+            # Check alternate address (AWS VPC external hostname)
+            alt_addrs = node.get("alternateAddresses", {}).get("external", {})
+            alt_hostname = alt_addrs.get("hostname", "")
+            if alt_hostname == target_node.hostname:
+                return otp_node
 
-                # Only eject if explicitly requested
-                if eject_failed_nodes and cluster_membership == "inactiveFailed":
-                    ejected_nodes.append(otp_node)
-
-            # Start rebalance
-            rebalance_data = {"knownNodes": ",".join(known_nodes)}
-            if ejected_nodes:
-                rebalance_data["ejectedNodes"] = ",".join(ejected_nodes)
-
-            resp = session.post(
-                f"http://{self.__hostname}:8091/controller/rebalance",
-                data=rebalance_data,
-            )
-
-            if not resp.ok:
-                error_msg = f"Rebalance failed: {resp.status_code} - {resp.text}"
-                raise CblTestError(error_msg)
-
-            resp.raise_for_status()
-
-            # Wait for rebalance to complete
-            self._wait_for_rebalance_completion(session)
+        # Node not found
+        raise CblTestError(
+            f"Node {target_node.hostname} not found in cluster for {operation}"
+        )
 
     def failover(self, node_to_failover: "CouchbaseServer") -> None:
         """
@@ -867,32 +924,9 @@ class CouchbaseServer:
         with requests.Session() as session:
             session.auth = (self.__username, self.__password)
 
-            # Get all node OTP IDs
-            resp = session.get(f"http://{self.__hostname}:8091/pools/default")
-            resp.raise_for_status()
-            pool_data = resp.json()
-
-            # Find the OTP node ID for the node to failover
-            failover_node = None
-            for node in pool_data.get("nodes", []):
-                hostname = node.get("hostname", "").split(":")[0]
-                otp_node = node.get("otpNode")
-
-                # Check both regular hostname and alternate address
-                if hostname == node_to_failover.__hostname:
-                    failover_node = otp_node
-                    break
-                else:
-                    alt_addrs = node.get("alternateAddresses", {}).get("external", {})
-                    alt_hostname = alt_addrs.get("hostname", "")
-                    if alt_hostname == node_to_failover.__hostname:
-                        failover_node = otp_node
-                        break
-
-            if failover_node is None:
-                raise CblTestError(
-                    f"Node {node_to_failover.__hostname} not found in cluster for failover"
-                )
+            # Get cluster information and find the node to failover
+            pool_data = self._get_cluster_info(session)
+            failover_node = self._find_node_otp(pool_data, node_to_failover, "failover")
 
             # Perform hard failover
             resp = session.post(
@@ -910,32 +944,9 @@ class CouchbaseServer:
         with requests.Session() as session:
             session.auth = (self.__username, self.__password)
 
-            # Get all node OTP IDs
-            resp = session.get(f"http://{self.__hostname}:8091/pools/default")
-            resp.raise_for_status()
-            pool_data = resp.json()
-
-            # Find the OTP node ID for the node to recover
-            recovery_node = None
-            for node in pool_data.get("nodes", []):
-                hostname = node.get("hostname", "").split(":")[0]
-                otp_node = node.get("otpNode")
-
-                # Check both regular hostname and alternate address
-                if hostname == node_to_recover.__hostname:
-                    recovery_node = otp_node
-                    break
-                else:
-                    alt_addrs = node.get("alternateAddresses", {}).get("external", {})
-                    alt_hostname = alt_addrs.get("hostname", "")
-                    if alt_hostname == node_to_recover.__hostname:
-                        recovery_node = otp_node
-                        break
-
-            if recovery_node is None:
-                raise CblTestError(
-                    f"Node {node_to_recover.__hostname} not found in cluster for recovery"
-                )
+            # Get cluster information and find the node to recover
+            pool_data = self._get_cluster_info(session)
+            recovery_node = self._find_node_otp(pool_data, node_to_recover, "recovery")
 
             # Set recovery type to delta (faster than full recovery)
             resp = session.post(
