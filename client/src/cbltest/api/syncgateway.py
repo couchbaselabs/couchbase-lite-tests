@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
-import requests
 from aiohttp import BasicAuth, ClientSession, TCPConnector
 from opentelemetry.trace import get_tracer
 
@@ -443,14 +442,14 @@ class _SyncGatewayBase:
     ):
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
-        self._http_url = f"{scheme}{url}:{port}"
+        self.__http_url = f"{scheme}{url}:{port}"
         # Replication always uses public port 4984
-        self._replication_url = f"{ws_scheme}{url}:4984"
+        self.__replication_url = f"{ws_scheme}{url}:4984"
         self._tracer = get_tracer(__name__, VERSION)
-        self._secure: bool = secure
-        self._hostname: str = url
-        self._port: int = port
-        self._session: ClientSession = self._create_session(
+        self.__secure: bool = secure
+        self.__hostname: str = url
+        self.__port: int = port
+        self.__session: ClientSession = self._create_session(
             secure,
             scheme,
             url,
@@ -461,17 +460,17 @@ class _SyncGatewayBase:
     @property
     def hostname(self) -> str:
         """Gets the hostname of the Sync Gateway instance"""
-        return self._hostname
+        return self.__hostname
 
     @property
     def port(self) -> int:
         """Gets the HTTP API port of the Sync Gateway instance"""
-        return self._port
+        return self.__port
 
     @property
     def secure(self) -> bool:
         """Gets whether the Sync Gateway instance uses TLS"""
-        return self._secure
+        return self.__secure
 
     def _create_session(
         self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None
@@ -497,7 +496,7 @@ class _SyncGatewayBase:
         session: ClientSession | None = None,
     ) -> Any:
         if session is None:
-            session = self._session
+            session = self.__session
 
         with self._tracer.start_as_current_span(
             "send_request", attributes={"http.method": method, "http.path": path}
@@ -508,7 +507,7 @@ class _SyncGatewayBase:
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
             writer.write_begin(
-                f"Sync Gateway [{self._http_url}] -> {method.upper()} {path}", data
+                f"Sync Gateway [{self.__http_url}] -> {method.upper()} {path}", data
             )
             resp = await session.request(
                 method, path, data=data, headers=headers, params=params
@@ -520,7 +519,7 @@ class _SyncGatewayBase:
                 data = await resp.text()
                 ret_val = data
             writer.write_end(
-                f"Sync Gateway [{self._http_url}] <- {method.upper()} {path} {resp.status}",
+                f"Sync Gateway [{self.__http_url}] <- {method.upper()} {path} {resp.status}",
                 data,
             )
             if not resp.ok:
@@ -532,9 +531,9 @@ class _SyncGatewayBase:
 
     async def get_version(self) -> CouchbaseVersion:
         # Telemetry not really important for this call
-        scheme = "https://" if self._secure else "http://"
+        scheme = "https://" if self.__secure else "http://"
         async with self._create_session(
-            self._secure, scheme, self._hostname, 4984, None
+            self.__secure, scheme, self.__hostname, 4984, None
         ) as s:
             resp = await self._send_request("get", "/", session=s)
             assert isinstance(resp, dict)
@@ -544,13 +543,13 @@ class _SyncGatewayBase:
             return SyncGatewayVersion(raw_version.split("/")[1])
 
     def tls_cert(self) -> str | None:
-        if not self._secure:
+        if not self.__secure:
             cbl_warning(
                 "Sync Gateway instance not using TLS, returning empty tls_cert..."
             )
             return None
 
-        return ssl.get_server_certificate((self._hostname, self._port))
+        return ssl.get_server_certificate((self.__hostname, self.__port))
 
     def replication_url(self, db_name: str, load_balancer: str | None = None) -> str:
         """
@@ -559,11 +558,11 @@ class _SyncGatewayBase:
         :param db_name: The DB to replicate with
         """
         _assert_not_null(db_name, "db_name")
-        sgw_address = urljoin(self._replication_url, db_name)
+        sgw_address = urljoin(self.__replication_url, db_name)
         if not load_balancer:
             return sgw_address
 
-        return sgw_address.replace("wss", "ws").replace(self._hostname, load_balancer)
+        return sgw_address.replace("wss", "ws").replace(self.__hostname, load_balancer)
 
     async def bytes_transferred(self, dataset_name: str) -> tuple[int, int]:
         """
@@ -571,13 +570,9 @@ class _SyncGatewayBase:
 
         :param dataset_name: The name of the dataset to get the bytes transferred for
         """
-        resp = requests.get(
-            urljoin(self._http_url, "_expvar"),
-            verify=False,
-            auth=("admin", "password"),
-        )
-        resp.raise_for_status()
-        expvars = resp.json()
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
 
         db_stats = expvars["syncgateway"]["per_db"][dataset_name]["database"]
         doc_reads_bytes = db_stats["doc_reads_bytes_blip"]
@@ -1040,8 +1035,8 @@ class _SyncGatewayBase:
         """
         Closes the Sync Gateway session
         """
-        if not self._session.closed:
-            await self._session.close()
+        if not self.__session.closed:
+            await self.__session.close()
 
     async def get_database_config(self, db_name: str) -> dict[str, Any]:
         """
@@ -1097,9 +1092,9 @@ class _SyncGatewayBase:
         )
         params = {"rev": revision}
 
-        scheme = "https://" if self._secure else "http://"
+        scheme = "https://" if self.__secure else "http://"
         async with self._create_session(
-            self._secure, scheme, self._hostname, 4984, auth
+            self.__secure, scheme, self.__hostname, 4984, auth
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
@@ -1121,6 +1116,7 @@ class SyncGateway(_SyncGatewayBase):
         password: str,
         port: int = 4985,
         secure: bool = False,
+        public_port: int = 4984,
     ):
         """
         Initialize a SyncGateway admin client.
@@ -1130,8 +1126,10 @@ class SyncGateway(_SyncGatewayBase):
         :param password: Admin password
         :param port: Admin API port (default 4985)
         :param secure: Whether to use TLS/HTTPS
+        :param public_port: Public API port (default 4984)
         """
         super().__init__(url, username, password, port, secure)
+        self.__public_port = public_port
 
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
@@ -1269,7 +1267,6 @@ class SyncGateway(_SyncGatewayBase):
         username: str,
         password: str,
         channels: list[str],
-        port: int = 4984,
     ) -> "SyncGatewayUserClient":
         """
         Helper method to create a user with channel access and return a user-specific SG client.
@@ -1280,8 +1277,7 @@ class SyncGateway(_SyncGatewayBase):
         :param username: The username to create
         :param password: The password for the user
         :param channels: List of channels the user should have access to
-        :param port: Public API port for the user client (default 4984)
-        :return: A SyncGatewayUserClient instance authenticated as the user (uses public port 4984)
+        :return: A SyncGatewayUserClient instance authenticated as the user (uses public port)
         """
         # Clean up user if exists from previous run
         await self.delete_user(db_name, username)
@@ -1297,7 +1293,7 @@ class SyncGateway(_SyncGatewayBase):
             self.hostname,
             username,
             password,
-            port=port,
+            port=self.__public_port,
             secure=self.secure,
         )
 
