@@ -35,7 +35,7 @@ def _recover_or_add_node(cbs_one, cbs_two):
         cbs_one.recover(cbs_two)
     else:
         cbs_one.add_node(cbs_two)
-    cbs_one.rebalance_in()
+    cbs_one.rebalance()
 
 
 async def _cleanup_test_resources(sg, cbs, sg_db: str, bucket_name: str):
@@ -198,14 +198,17 @@ class TestMultipleServers(CBLTestClass):
         await asyncio.sleep(2)
 
         self.mark_test_step("Rebalance OUT cbs_two from cluster")
-        cbs_one.rebalance_out(cbs_two)
+        cbs_one.rebalance(eject_node=cbs_two)
+        if not cbs_one.wait_for_cluster_healthy(timeout=120):
+            pytest.fail("Cluster did not become healthy after rebalance out")
 
         self.mark_test_step("Add cbs_two back to cluster")
         cbs_one.add_node(cbs_two)
 
         self.mark_test_step("Rebalance IN cbs_two to cluster")
-        cbs_one.rebalance_in()
-        await asyncio.sleep(5)
+        cbs_one.rebalance()
+        if not cbs_one.wait_for_cluster_healthy(timeout=120):
+            pytest.fail("Cluster did not become healthy after rebalance in")
 
         self.mark_test_step("Wait for all updates to complete")
         await update_task
@@ -240,7 +243,6 @@ class TestMultipleServers(CBLTestClass):
         await sg_user.close()
         await sg.delete_database(sg_db)
         cbs_one.drop_bucket(bucket_name)
-        cbs_two.drop_bucket(bucket_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_server_goes_down_sanity(
@@ -285,7 +287,8 @@ class TestMultipleServers(CBLTestClass):
         self.mark_test_step("Failover CBS node 2 to simulate server failure")
         cbs_one.failover(cbs_two)
         cbs_one.rebalance(eject_failed_nodes=False)
-        await asyncio.sleep(10)
+        if not cbs_one.wait_for_cluster_healthy(timeout=120):
+            pytest.fail("Cluster did not become healthy after failover")
 
         self.mark_test_step("Verify original docs accessible with node 2 failed over")
 
@@ -314,9 +317,8 @@ class TestMultipleServers(CBLTestClass):
 
         self.mark_test_step("Recover CBS node 2")
         _recover_or_add_node(cbs_one, cbs_two)
-        if not cbs_one.wait_for_cluster_healthy(timeout=60):
-            pytest.fail("Cluster did not become healthy")
-        await asyncio.sleep(10)
+        if not cbs_one.wait_for_cluster_healthy(timeout=120):
+            pytest.fail("Cluster did not become healthy after recovery")
 
         self.mark_test_step("Verify all docs accessible after recovery")
         changes_final = await sg.get_changes(sg_db, version_type="cv")
@@ -324,4 +326,3 @@ class TestMultipleServers(CBLTestClass):
 
         await sg.delete_database(sg_db)
         cbs_one.drop_bucket(bucket_name)
-        cbs_two.drop_bucket(bucket_name)
