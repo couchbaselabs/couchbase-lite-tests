@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
-import requests
 from aiohttp import BasicAuth, ClientSession, TCPConnector
 from opentelemetry.trace import get_tracer
 
@@ -401,9 +400,10 @@ class SyncGatewayVersion(CouchbaseVersion):
         return input[0:first_lparen], int(input[first_lparen + 1 : first_semicol])
 
 
-class SyncGateway:
+class _SyncGatewayBase:
     """
-    A class for interacting with a given Sync Gateway instance
+    Base class for Sync Gateway clients containing common document and database operations.
+    This class should not be instantiated directly - use SyncGateway or SyncGatewayPublic instead.
     """
 
     def __init__(
@@ -411,21 +411,24 @@ class SyncGateway:
         url: str,
         username: str,
         password: str,
-        port: int = 4984,
-        admin_port: int = 4985,
+        port: int,
         secure: bool = False,
     ):
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
-        self.__admin_url = f"{scheme}{url}:{admin_port}"
-        self.__replication_url = f"{ws_scheme}{url}:{port}"
-        self.__tracer = get_tracer(__name__, VERSION)
+        self.__http_url = f"{scheme}{url}:{port}"
+        # Replication always uses public port 4984
+        self.__replication_url = f"{ws_scheme}{url}:4984"
+        self._tracer = get_tracer(__name__, VERSION)
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__port: int = port
-        self.__admin_port: int = admin_port
-        self.__admin_session: ClientSession = self._create_session(
-            secure, scheme, url, admin_port, BasicAuth(username, password, "ascii")
+        self.__session: ClientSession = self._create_session(
+            secure,
+            scheme,
+            url,
+            port,
+            BasicAuth(username, password, "ascii"),
         )
 
     @property
@@ -435,13 +438,8 @@ class SyncGateway:
 
     @property
     def port(self) -> int:
-        """Gets the public port of the Sync Gateway instance"""
+        """Gets the HTTP API port of the Sync Gateway instance"""
         return self.__port
-
-    @property
-    def admin_port(self) -> int:
-        """Gets the admin port of the Sync Gateway instance"""
-        return self.__admin_port
 
     @property
     def secure(self) -> bool:
@@ -516,7 +514,7 @@ class SyncGateway:
         if session is None:
             session = self.__admin_session
 
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "send_request", attributes={"http.method": method, "http.path": path}
         ):
             headers = (
@@ -525,7 +523,7 @@ class SyncGateway:
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
             writer.write_begin(
-                f"Sync Gateway [{self.__admin_url}] -> {method.upper()} {path}", data
+                f"Sync Gateway [{self.__http_url}] -> {method.upper()} {path}", data
             )
             resp = await session.request(
                 method, path, data=data, headers=headers, params=params
@@ -537,7 +535,7 @@ class SyncGateway:
                 data = await resp.text()
                 ret_val = data
             writer.write_end(
-                f"Sync Gateway [{self.__admin_url}] <- {method.upper()} {path} {resp.status}",
+                f"Sync Gateway [{self.__http_url}] <- {method.upper()} {path} {resp.status}",
                 data,
             )
             if not resp.ok:
@@ -567,7 +565,7 @@ class SyncGateway:
             )
             return None
 
-        return ssl.get_server_certificate((self.__hostname, self.__admin_port))
+        return ssl.get_server_certificate((self.__hostname, self.__port))
 
     def replication_url(self, db_name: str, load_balancer: str | None = None) -> str:
         """
@@ -588,13 +586,9 @@ class SyncGateway:
 
         :param dataset_name: The name of the dataset to get the bytes transferred for
         """
-        resp = requests.get(
-            urljoin(self.__admin_url, "_expvar"),
-            verify=False,
-            auth=("admin", "password"),
-        )
-        resp.raise_for_status()
-        expvars = resp.json()
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
 
         db_stats = expvars["syncgateway"]["per_db"][dataset_name]["database"]
         doc_reads_bytes = db_stats["doc_reads_bytes_blip"]
@@ -604,7 +598,7 @@ class SyncGateway:
     async def _put_database(
         self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0
     ) -> None:
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "put_database", attributes={"cbl.database.name": db_name}
         ) as current_span:
             try:
@@ -635,16 +629,20 @@ class SyncGateway:
         :param db_name: The name of the Database to check
         :return: True if the database exists, False otherwise
         """
-        try:
-            await self._send_request("get", f"/{db_name}")
-            return True
-        except CblSyncGatewayBadResponseError as e:
-            if e.code == 403:  # Database does not exist
-                return False
-            raise
+        with self._tracer.start_as_current_span(
+            "get_database_status", attributes={"cbl.database.name": db_name}
+        ):
+            try:
+                resp = await self._send_request("get", f"/{db_name}/")
+                assert isinstance(resp, dict)
+                return DatabaseStatusResponse(cast(dict, resp))
+            except CblSyncGatewayBadResponseError as e:
+                if e.code in [403, 404]:  # Database doesn't exist
+                    return None
+                raise
 
     async def _delete_database(self, db_name: str, retry_count: int = 0) -> None:
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "delete_database", attributes={"cbl.database.name": db_name}
         ) as current_span:
             try:
@@ -674,136 +672,6 @@ class SyncGateway:
         """
         await self._delete_database(db_name, 0)
 
-    def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
-        """
-        Creates a collection access dictionary in the format that Sync Gateway expects,
-        given an input dictionary keyed by collection with a list of channels
-
-        :param input: The simplified input dictionary of collection -> channels
-        """
-
-        ret_val = {}
-        for c in input:
-            if not isinstance(c, str):
-                raise ValueError(
-                    "Non-string key found in input dictionary to create_collection_access_dict"
-                )
-
-            channels = input[c]
-            if not isinstance(channels, list):
-                raise ValueError(
-                    f"Non-list found for value of collection {c} in create_collection_access_dict"
-                )
-
-            if "." not in c:
-                raise ValueError(
-                    f"Input collection '{c}' in create_collection_access_dict needs to be fully qualified"
-                )
-
-            spec = c.split(".")
-            if len(spec) != 2:
-                raise ValueError(
-                    f"Input collection '{c}' has too many dots in create_collection_access_dict"
-                )
-
-            if spec[0] not in ret_val:
-                scope_dict: dict[str, dict] = {}
-                ret_val[spec[0]] = scope_dict
-            else:
-                scope_dict = ret_val[spec[0]]
-
-            scope_dict[spec[1]] = {"admin_channels": input[c]}
-
-        return ret_val
-
-    async def add_user(
-        self,
-        db_name: str,
-        name: str,
-        password: str | None = None,
-        collection_access: dict | None = None,
-        admin_roles: list[str] | None = None,
-    ) -> None:
-        """
-        Adds or updates the specified user to a Sync Gateway database with the specified channel access
-
-        :param db_name: The name of the Database to add the user to
-        :param name: The username to add
-        :param password: The password for the user that will be added
-        :param collection_access: The collections that the user will have access to.  This needs to
-            be formatted in the way Sync Gateway expects it, so if you are unsure use
-            :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
-        :param admin_roles: The admin roles
-        """
-        with self.__tracer.start_as_current_span(
-            "add_user", attributes={"cbl.user.name": name}
-        ):
-            body: dict[str, Any] = {
-                "name": name,
-            }
-
-            if password is not None:
-                body["password"] = password
-
-            if collection_access is not None:
-                body["collection_access"] = collection_access
-
-            if admin_roles is not None:
-                body["admin_roles"] = admin_roles
-
-            await self._send_request(
-                "put", f"/{db_name}/_user/{name}", JSONDictionary(body)
-            )
-
-    async def delete_user(self, db_name: str, name: str) -> None:
-        """
-        Deletes a user from a Sync Gateway database
-
-        :param db_name: The name of the Database
-        :param name: The username to delete
-        """
-        with self.__tracer.start_as_current_span(
-            "delete_user", attributes={"cbl.user.name": name}
-        ):
-            try:
-                await self._send_request("delete", f"/{db_name}/_user/{name}")
-            except CblSyncGatewayBadResponseError as e:
-                if e.code == 404:
-                    # User doesn't exist, that's fine
-                    pass
-                else:
-                    raise
-
-    async def add_role(self, db_name: str, role: str, collection_access: dict) -> None:
-        """
-        Adds the specified role to a Sync Gateway database with the specified collection access
-
-        :param db_name: The name of the Database to add the user to
-        :param role: The role to add
-        :param collection_access: The collections to which role members will have access.
-            This needs to be formatted in the way Sync Gateway expects it:
-            "<scope1>": {
-                "<collection1>: {"admin_channels" : ["<channel1>", ... ] }
-                .
-                .
-                .
-            }
-            "<scope2>": {
-                ...
-            }
-            .
-            .
-            .
-        """
-        with self.__tracer.start_as_current_span(
-            "add_role", attributes={"cbl.role.name": role}
-        ):
-            body = {"collection_access": collection_access}
-
-            await self._send_request(
-                "put", f"/{db_name}/_role/{role}", JSONDictionary(body)
-            )
-
     def _analyze_dataset_response(self, response: list) -> None:
         assert isinstance(response, list), "Invalid bulk docs response (not a list)"
         typed_response = cast(list, response)
@@ -828,7 +696,7 @@ class SyncGateway:
         :param db_name: The name of the database to populate
         :param path: The path of the JSON file to use as input
         """
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "load_dataset",
             attributes={"cbl.database.name": db_name, "cbl.dataset.path": str(path)},
         ):
@@ -884,7 +752,7 @@ class SyncGateway:
         :param collection: The collection to use when querying Sync Gateway
         :param use_public_api: If True, uses public port (4984) with user auth instead of admin port (4985)
         """
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "get_all_documents",
             attributes={
                 "cbl.database.name": db_name,
@@ -934,7 +802,7 @@ class SyncGateway:
         :param version_type: The version type to use ('rev' for revision IDs, 'cv' for version vectors in SGW 4.0+)
         :param use_public_api: If True, uses public port (4984) with user auth instead of admin port (4985)
         """
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "get_changes",
             attributes={
                 "cbl.database.name": db_name,
@@ -1021,7 +889,7 @@ class SyncGateway:
         :param scope: The scope that the updates will be applied to (default '_default')
         :param collection: The collection that the updates will be applied to (default '_default')
         """
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "update_documents",
             attributes={
                 "cbl.database.name": db_name,
@@ -1058,7 +926,7 @@ class SyncGateway:
         :param scope: The scope that the upserts will be applied to (default '_default')
         :param collection: The collection that the upserts will be applied to (default '_default')
         """
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "update_documents",
             attributes={
                 "cbl.database.name": db_name,
@@ -1122,7 +990,7 @@ class SyncGateway:
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
         """
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "delete_document",
             attributes={
                 "cbl.database.name": db_name,
@@ -1159,7 +1027,7 @@ class SyncGateway:
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
         """
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "purge_document",
             attributes={
                 "cbl.database.name": db_name,
@@ -1189,7 +1057,7 @@ class SyncGateway:
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
         """
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "get_document",
             attributes={
                 "cbl.database.name": db_name,
@@ -1235,7 +1103,7 @@ class SyncGateway:
             Dictionary containing the database configuration
         """
         _assert_not_null(db_name, "db_name")
-        with self.__tracer.start_as_current_span(
+        with self._tracer.start_as_current_span(
             "get_database_config", attributes={"cbl.database.name": db_name}
         ):
             return await self._send_request("GET", f"/{db_name}/_config")
@@ -1292,34 +1160,211 @@ class SyncGateway:
         """
         Fetches a log file from the remote Sync Gateway server via Caddy HTTP server
 
-        :param log_type: The type of log to fetch (e.g., 'debug', 'info', 'error', 'warn', 'trace', 'stats')
-        :param caddy_port: Port where Caddy is serving log files (default: 20000)
-        :return: Contents of the log file as a string
-        """
-        log_filename = f"sg_{log_type}.log"
-        caddy_url = f"http://{self.__hostname}:{caddy_port}/{log_filename}"
+class SyncGateway(_SyncGatewayBase):
+    """
+    A class for interacting with a given Sync Gateway instance.
+    Provides full admin API access including user management, role management,
+    and all document/database operations.
 
-        with self.__tracer.start_as_current_span(
-            "fetch_log_file_via_caddy",
-            attributes={
-                "log.type": log_type,
-                "caddy.url": caddy_url,
-            },
+    This class inherits common document/database operations from _SyncGatewayBase
+    and adds admin-only operations directly in this class.
+    """
+
+    def __init__(
+        self,
+        url: str,
+        username: str,
+        password: str,
+        port: int = 4985,
+        secure: bool = False,
+        public_port: int = 4984,
+    ):
+        """
+        Initialize a SyncGateway admin client.
+
+        :param url: The hostname/URL of the Sync Gateway instance
+        :param username: Admin username
+        :param password: Admin password
+        :param port: Admin API port (default 4985)
+        :param secure: Whether to use TLS/HTTPS
+        :param public_port: Public API port (default 4984)
+        """
+        super().__init__(url, username, password, port, secure)
+        self.__public_port = public_port
+
+    def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
+        """
+        Creates a collection access dictionary in the format that Sync Gateway expects,
+        given an input dictionary keyed by collection with a list of channels
+
+        :param input: The simplified input dictionary of collection -> channels
+        """
+
+        ret_val = {}
+        for c in input:
+            if not isinstance(c, str):
+                raise ValueError(
+                    "Non-string key found in input dictionary to create_collection_access_dict"
+                )
+
+            channels = input[c]
+            if not isinstance(channels, list):
+                raise ValueError(
+                    f"Non-list found for value of collection {c} in create_collection_access_dict"
+                )
+
+            if "." not in c:
+                raise ValueError(
+                    f"Input collection '{c}' in create_collection_access_dict needs to be fully qualified"
+                )
+
+            spec = c.split(".")
+            if len(spec) != 2:
+                raise ValueError(
+                    f"Input collection '{c}' has too many dots in create_collection_access_dict"
+                )
+
+            if spec[0] not in ret_val:
+                scope_dict: dict[str, dict] = {}
+                ret_val[spec[0]] = scope_dict
+            else:
+                scope_dict = ret_val[spec[0]]
+
+            scope_dict[spec[1]] = {"admin_channels": input[c]}
+
+        return ret_val
+
+    async def add_user(
+        self,
+        db_name: str,
+        name: str,
+        password: str | None = None,
+        collection_access: dict | None = None,
+        admin_roles: list[str] | None = None,
+    ) -> None:
+        """
+        Adds or updates the specified user to a Sync Gateway database with the specified channel access
+
+        :param db_name: The name of the Database to add the user to
+        :param name: The username to add
+        :param password: The password for the user that will be added
+        :param collection_access: The collections that the user will have access to.  This needs to
+            be formatted in the way Sync Gateway expects it, so if you are unsure use
+            :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
+        :param admin_roles: The admin roles
+        """
+        with self._tracer.start_as_current_span(
+            "add_user", attributes={"cbl.user.name": name}
+        ):
+            body: dict[str, Any] = {
+                "name": name,
+            }
+
+            if password is not None:
+                body["password"] = password
+
+            if collection_access is not None:
+                body["collection_access"] = collection_access
+
+            if admin_roles is not None:
+                body["admin_roles"] = admin_roles
+
+            await self._send_request(
+                "put", f"/{db_name}/_user/{name}", JSONDictionary(body)
+            )
+
+    async def delete_user(self, db_name: str, name: str) -> None:
+        """
+        Deletes a user from a Sync Gateway database
+
+        :param db_name: The name of the Database
+        :param name: The username to delete
+        """
+        with self._tracer.start_as_current_span(
+            "delete_user", attributes={"cbl.user.name": name}
         ):
             try:
-                # Create a new session without base_url for Caddy requests
-                async with ClientSession() as session:
-                    async with session.get(caddy_url) as response:
-                        if response.status == 404:
-                            raise FileNotFoundError(
-                                f"Log file '{log_filename}' not found on Caddy server. "
-                                f"Make sure the log level is enabled in bootstrap.json"
-                            )
-                        response.raise_for_status()
-                        log_contents = await response.text()
-                        return log_contents
-            except Exception as e:
-                raise Exception(f"Failed to fetch log file from Caddy: {e}") from e
+                await self._send_request("delete", f"/{db_name}/_user/{name}")
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 404:
+                    # User doesn't exist, that's fine
+                    pass
+                else:
+                    raise
+
+    async def add_role(self, db_name: str, role: str, collection_access: dict) -> None:
+        """
+        Adds the specified role to a Sync Gateway database with the specified collection access
+
+        :param db_name: The name of the Database to add the user to
+        :param role: The role to add
+        :param collection_access: The collections to which role members will have access.
+            This needs to be formatted in the way Sync Gateway expects it:
+            "<scope1>": {
+                "<collection1>: {"admin_channels" : ["<channel1>", ... ] }
+                .
+                .
+                .
+            }
+            "<scope2>": {
+                ...
+            }
+            .
+            .
+            .
+        """
+        with self._tracer.start_as_current_span(
+            "add_role", attributes={"cbl.role.name": role}
+        ):
+            body = {"collection_access": collection_access}
+
+            await self._send_request(
+                "put", f"/{db_name}/_role/{role}", JSONDictionary(body)
+            )
+
+    async def create_user_client(
+        self,
+        db_name: str,
+        username: str,
+        password: str,
+        channels: list[str],
+    ) -> "SyncGatewayUserClient":
+        """
+        Helper method to create a user with channel access and return a user-specific SG client.
+
+        This is a convenience method for tests that need to verify user-level access control.
+
+        :param db_name: The database name
+        :param username: The username to create
+        :param password: The password for the user
+        :param channels: List of channels the user should have access to
+        :return: A SyncGatewayUserClient instance authenticated as the user (uses public port)
+        """
+        # Clean up user if exists from previous run
+        await self.delete_user(db_name, username)
+        await self.add_user(
+            db_name,
+            username,
+            password=password,
+            collection_access={"_default": {"_default": {"admin_channels": channels}}},
+        )
+
+        # Return user-specific SG client for public API access
+        return SyncGatewayUserClient(
+            self.hostname,
+            username,
+            password,
+            port=self.__public_port,
+            secure=self.secure,
+        )
+
+
+class SyncGatewayUserClient(_SyncGatewayBase):
+    """
+    A Sync Gateway client that uses the public API (port 4984) for user-level access.
+
+    This class inherits common operations from _SyncGatewayBase and does NOT
+    include admin methods (user management, roles, etc.).
 
     async def download_file_via_caddy(
         self,
@@ -1336,96 +1381,21 @@ class SyncGateway:
         """
         caddy_url = f"http://{self.__hostname}:{caddy_port}/{remote_filename}"
 
-        with self.__tracer.start_as_current_span(
-            "download_file_via_caddy",
-            attributes={
-                "remote.filename": remote_filename,
-                "local.path": local_path,
-                "caddy.url": caddy_url,
-            },
-        ):
-            try:
-                # Create a new session without base_url for Caddy requests
-                async with ClientSession() as session:
-                    async with session.get(caddy_url) as response:
-                        if response.status == 404:
-                            raise FileNotFoundError(
-                                f"File '{remote_filename}' not found on Caddy server"
-                            )
-                        response.raise_for_status()
-                        content = await response.read()
-
-                        # Write to local file
-                        with open(local_path, "wb") as f:
-                            f.write(content)
-            except Exception as e:
-                raise Exception(f"Failed to download file from Caddy: {e}") from e
-
-    async def start_sgcollect_via_api(
+    def __init__(
         self,
-        redact_level: str | None = None,
-        redact_salt: str | None = None,
-        output_dir: str | None = None,
-    ) -> dict:
+        url: str,
+        username: str,
+        password: str,
+        port: int = 4984,
+        secure: bool = False,
+    ):
         """
-        Starts SGCollect using the REST API endpoint
+        Initialize a SyncGatewayUserClient for public API access.
 
-        :param redact_level: Redaction level ('none', 'partial', 'full')
-        :param redact_salt: Custom salt for redaction hashing
-        :param output_dir: Output directory on the remote server
-        :return: Response dict with status
+        :param url: The hostname/URL of the Sync Gateway instance
+        :param username: Username for authentication
+        :param password: Password for authentication
+        :param port: Public API port (default 4984)
+        :param secure: Whether to use TLS/HTTPS
         """
-        with self.__tracer.start_as_current_span(
-            "start_sgcollect_via_api",
-            attributes={
-                "redact.level": redact_level or "none",
-            },
-        ):
-            body: dict[str, Any] = {"upload": False}
-
-            if redact_level is not None:
-                body["redact_level"] = redact_level
-            if redact_salt is not None:
-                body["redact_salt"] = redact_salt
-            if output_dir is not None:
-                body["output_dir"] = output_dir
-
-            resp = await self._send_request(
-                "post",
-                "/_sgcollect_info",
-                JSONDictionary(body),
-            )
-
-            assert isinstance(resp, dict)
-            return cast(dict, resp)
-
-    async def wait_for_sgcollect_to_complete(
-        self, max_attempts: int = 60, wait_time: int = 5
-    ) -> None:
-        """
-        Waits for SGCollect to complete
-
-        :param max_attempts: Maximum number of attempts to wait for SGCollect to complete
-        :param wait_time: Time to wait between attempts
-        """
-        for _ in range(max_attempts):
-            status_resp = await self.get_sgcollect_status()
-            if status_resp.get("status") in ["stopped", "completed"]:
-                return
-            await asyncio.sleep(wait_time)
-        raise Exception(
-            f"SGCollect did not complete after {max_attempts * wait_time} seconds.\n"
-            f"Status: {status_resp.get('status')}.\n"
-            f"Error: {status_resp.get('error')}"
-        )
-
-    async def get_sgcollect_status(self) -> dict:
-        """
-        Gets the current status of SGCollect operation
-
-        :return: Response dict with status ('stopped' or 'running')
-        """
-        with self.__tracer.start_as_current_span("get_sgcollect_status"):
-            resp = await self._send_request("get", "/_sgcollect_info")
-            assert isinstance(resp, dict)
-            return cast(dict, resp)
+        super().__init__(url, username, password, port, secure)
