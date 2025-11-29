@@ -3,7 +3,7 @@
     "test_servers": [],
     "clusters": [
         {
-            "server_count": 1
+            "server_count": 2
         }
     ],
     "sync_gateways": [
