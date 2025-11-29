@@ -1,4 +1,4 @@
 :20000
 bind 0.0.0.0
 root * /home/ec2-user/log
-file_server
+file_server browse
