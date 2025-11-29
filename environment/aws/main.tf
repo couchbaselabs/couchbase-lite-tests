@@ -212,6 +212,7 @@ resource "aws_instance" "log_slurp" {
         Name = "ls"
         Type = "logslurp"
         ExpireAt = local.expire_at
+        CreatedBy = local.created_by
     }
 
     lifecycle {

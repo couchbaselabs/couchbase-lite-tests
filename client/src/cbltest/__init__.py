@@ -124,7 +124,6 @@ class CBLPyTest:
                         sgw_info.hostname,
                         sgw_info.rbac_user,
                         sgw_info.rbac_password,
-                        sgw_info.port,
                         sgw_info.admin_port,
                         sgw_info.uses_tls,
                     )

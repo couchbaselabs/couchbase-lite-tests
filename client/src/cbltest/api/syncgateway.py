@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
-import requests
 from aiohttp import BasicAuth, ClientSession, TCPConnector
 from opentelemetry.trace import get_tracer
 
@@ -438,30 +437,25 @@ class _SyncGatewayBase:
         url: str,
         username: str,
         password: str,
-        port: int = 4984,
-        admin_port: int = 4985,
+        port: int,
         secure: bool = False,
     ):
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
-        self._admin_url = f"{scheme}{url}:{admin_port}"
-        self._replication_url = f"{ws_scheme}{url}:{port}"
+        self.__http_url = f"{scheme}{url}:{port}"
+        # Replication always uses public port 4984
+        self.__replication_url = f"{ws_scheme}{url}:4984"
         self._tracer = get_tracer(__name__, VERSION)
-        self._secure: bool = secure
-        self._hostname: str = url
-        self._port: int = port
-        self._admin_port: int = admin_port
-        self._session: ClientSession = self._create_session(
+        self.__secure: bool = secure
+        self.__hostname: str = url
+        self.__port: int = port
+        self.__session: ClientSession = self._create_session(
             secure,
             scheme,
             url,
-            self._get_api_port(),
+            port,
             BasicAuth(username, password, "ascii"),
         )
-
-    def _get_api_port(self) -> int:
-        """Returns the port to use for API calls. Override in subclasses."""
-        return self._admin_port
 
     @property
     def hostname(self) -> str:
@@ -470,13 +464,8 @@ class _SyncGatewayBase:
 
     @property
     def port(self) -> int:
-        """Gets the public port of the Sync Gateway instance"""
-        return self._port
-
-    @property
-    def admin_port(self) -> int:
-        """Gets the admin port of the Sync Gateway instance"""
-        return self._admin_port
+        """Gets the HTTP API port of the Sync Gateway instance"""
+        return self.__port
 
     @property
     def secure(self) -> bool:
@@ -518,7 +507,7 @@ class _SyncGatewayBase:
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
             writer.write_begin(
-                f"Sync Gateway [{self._admin_url}] -> {method.upper()} {path}", data
+                f"Sync Gateway [{self.__http_url}] -> {method.upper()} {path}", data
             )
             resp = await session.request(
                 method, path, data=data, headers=headers, params=params
@@ -530,7 +519,7 @@ class _SyncGatewayBase:
                 data = await resp.text()
                 ret_val = data
             writer.write_end(
-                f"Sync Gateway [{self._admin_url}] <- {method.upper()} {path} {resp.status}",
+                f"Sync Gateway [{self.__http_url}] <- {method.upper()} {path} {resp.status}",
                 data,
             )
             if not resp.ok:
@@ -560,7 +549,7 @@ class _SyncGatewayBase:
             )
             return None
 
-        return ssl.get_server_certificate((self._hostname, self._admin_port))
+        return ssl.get_server_certificate((self.__hostname, self.__port))
 
     def replication_url(self, db_name: str, load_balancer: str | None = None) -> str:
         """
@@ -581,13 +570,9 @@ class _SyncGatewayBase:
 
         :param dataset_name: The name of the dataset to get the bytes transferred for
         """
-        resp = requests.get(
-            urljoin(self._admin_url, "_expvar"),
-            verify=False,
-            auth=("admin", "password"),
-        )
-        resp.raise_for_status()
-        expvars = resp.json()
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
 
         db_stats = expvars["syncgateway"]["per_db"][dataset_name]["database"]
         doc_reads_bytes = db_stats["doc_reads_bytes_blip"]
@@ -1114,11 +1099,37 @@ class _SyncGatewayBase:
             return await self._send_request("GET", path, params=params, session=session)
 
 
-class _SyncGatewayAdminMethods:
+class SyncGateway(_SyncGatewayBase):
     """
-    Mixin class containing admin-only methods for Sync Gateway.
-    Requires _SyncGatewayBase to be in the MRO (Method Resolution Order).
+    A class for interacting with a given Sync Gateway instance.
+    Provides full admin API access including user management, role management,
+    and all document/database operations.
+
+    This class inherits common document/database operations from _SyncGatewayBase
+    and adds admin-only operations directly in this class.
     """
+
+    def __init__(
+        self,
+        url: str,
+        username: str,
+        password: str,
+        port: int = 4985,
+        secure: bool = False,
+        public_port: int = 4984,
+    ):
+        """
+        Initialize a SyncGateway admin client.
+
+        :param url: The hostname/URL of the Sync Gateway instance
+        :param username: Admin username
+        :param password: Admin password
+        :param port: Admin API port (default 4985)
+        :param secure: Whether to use TLS/HTTPS
+        :param public_port: Public API port (default 4984)
+        """
+        super().__init__(url, username, password, port, secure)
+        self.__public_port = public_port
 
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
@@ -1181,8 +1192,7 @@ class _SyncGatewayAdminMethods:
             :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
         :param admin_roles: The admin roles
         """
-        # Access via MRO - requires _SyncGatewayBase
-        with self._tracer.start_as_current_span(  # type: ignore
+        with self._tracer.start_as_current_span(
             "add_user", attributes={"cbl.user.name": name}
         ):
             body: dict[str, Any] = {
@@ -1198,7 +1208,7 @@ class _SyncGatewayAdminMethods:
             if admin_roles is not None:
                 body["admin_roles"] = admin_roles
 
-            await self._send_request(  # type: ignore
+            await self._send_request(
                 "put", f"/{db_name}/_user/{name}", JSONDictionary(body)
             )
 
@@ -1209,11 +1219,11 @@ class _SyncGatewayAdminMethods:
         :param db_name: The name of the Database
         :param name: The username to delete
         """
-        with self._tracer.start_as_current_span(  # type: ignore
+        with self._tracer.start_as_current_span(
             "delete_user", attributes={"cbl.user.name": name}
         ):
             try:
-                await self._send_request("delete", f"/{db_name}/_user/{name}")  # type: ignore
+                await self._send_request("delete", f"/{db_name}/_user/{name}")
             except CblSyncGatewayBadResponseError as e:
                 if e.code == 404:
                     # User doesn't exist, that's fine
@@ -1242,12 +1252,12 @@ class _SyncGatewayAdminMethods:
             .
             .
         """
-        with self._tracer.start_as_current_span(  # type: ignore
+        with self._tracer.start_as_current_span(
             "add_role", attributes={"cbl.role.name": role}
         ):
             body = {"collection_access": collection_access}
 
-            await self._send_request(  # type: ignore
+            await self._send_request(
                 "put", f"/{db_name}/_role/{role}", JSONDictionary(body)
             )
 
@@ -1257,7 +1267,7 @@ class _SyncGatewayAdminMethods:
         username: str,
         password: str,
         channels: list[str],
-    ) -> "SyncGatewayPublic":
+    ) -> "SyncGatewayUserClient":
         """
         Helper method to create a user with channel access and return a user-specific SG client.
 
@@ -1267,7 +1277,7 @@ class _SyncGatewayAdminMethods:
         :param username: The username to create
         :param password: The password for the user
         :param channels: List of channels the user should have access to
-        :return: A SyncGatewayPublic instance authenticated as the user (uses public port 4984)
+        :return: A SyncGatewayUserClient instance authenticated as the user (uses public port)
         """
         # Clean up user if exists from previous run
         await self.delete_user(db_name, username)
@@ -1279,36 +1289,20 @@ class _SyncGatewayAdminMethods:
         )
 
         # Return user-specific SG client for public API access
-        # Access via MRO - requires _SyncGatewayBase
-        return SyncGatewayPublic(
-            self.hostname,  # type: ignore
+        return SyncGatewayUserClient(
+            self.hostname,
             username,
             password,
-            port=self.port,  # type: ignore
-            admin_port=self.admin_port,  # type: ignore
-            secure=self.secure,  # type: ignore
+            port=self.__public_port,
+            secure=self.secure,
         )
 
 
-class SyncGateway(_SyncGatewayBase, _SyncGatewayAdminMethods):
-    """
-    A class for interacting with a given Sync Gateway instance.
-    Provides full admin API access including user management, role management,
-    and all document/database operations.
-
-    This is the primary class used by tests and combines:
-    - Common document/database operations (from _SyncGatewayBase)
-    - Admin-only operations (from _SyncGatewayAdminMethods)
-    """
-
-    pass
-
-
-class SyncGatewayPublic(_SyncGatewayBase):
+class SyncGatewayUserClient(_SyncGatewayBase):
     """
     A Sync Gateway client that uses the public API (port 4984) for user-level access.
 
-    This class inherits only common operations from _SyncGatewayBase and does NOT
+    This class inherits common operations from _SyncGatewayBase and does NOT
     include admin methods (user management, roles, etc.).
 
     Use SyncGateway.create_user_client() to create instances with proper user credentials
@@ -1321,6 +1315,21 @@ class SyncGatewayPublic(_SyncGatewayBase):
         docs = await user_sg.get_all_documents("db")
     """
 
-    def _get_api_port(self) -> int:
-        """Returns the public API port (4984) for user-level access."""
-        return self.port
+    def __init__(
+        self,
+        url: str,
+        username: str,
+        password: str,
+        port: int = 4984,
+        secure: bool = False,
+    ):
+        """
+        Initialize a SyncGatewayUserClient for public API access.
+
+        :param url: The hostname/URL of the Sync Gateway instance
+        :param username: Username for authentication
+        :param password: Password for authentication
+        :param port: Public API port (default 4984)
+        :param secure: Whether to use TLS/HTTPS
+        """
+        super().__init__(url, username, password, port, secure)
