@@ -497,7 +497,7 @@ class _SyncGatewayBase:
         session: ClientSession | None = None,
     ) -> Any:
         if session is None:
-            session = self._session
+            session = self.__session
 
         with self._tracer.start_as_current_span(
             "send_request", attributes={"http.method": method, "http.path": path}
@@ -532,9 +532,9 @@ class _SyncGatewayBase:
 
     async def get_version(self) -> CouchbaseVersion:
         # Telemetry not really important for this call
-        scheme = "https://" if self.__secure else "http://"
+        scheme = "https://" if self.secure else "http://"
         async with self._create_session(
-            self.__secure, scheme, self.__hostname, 4984, None
+            self.secure, scheme, self.hostname, 4984, None
         ) as s:
             resp = await self._send_request("get", "/", session=s)
             assert isinstance(resp, dict)
@@ -544,13 +544,13 @@ class _SyncGatewayBase:
             return SyncGatewayVersion(raw_version.split("/")[1])
 
     def tls_cert(self) -> str | None:
-        if not self.__secure:
+        if not self.secure:
             cbl_warning(
                 "Sync Gateway instance not using TLS, returning empty tls_cert..."
             )
             return None
 
-        return ssl.get_server_certificate((self.__hostname, self.__port))
+        return ssl.get_server_certificate((self.hostname, self.port))
 
     def replication_url(self, db_name: str, load_balancer: str | None = None) -> str:
         """
@@ -563,7 +563,7 @@ class _SyncGatewayBase:
         if not load_balancer:
             return sgw_address
 
-        return sgw_address.replace("wss", "ws").replace(self.__hostname, load_balancer)
+        return sgw_address.replace("wss", "ws").replace(self.hostname, load_balancer)
 
     async def bytes_transferred(self, dataset_name: str) -> tuple[int, int]:
         """
@@ -1033,8 +1033,8 @@ class _SyncGatewayBase:
         """
         Closes the Sync Gateway session
         """
-        if not self._session.closed:
-            await self._session.close()
+        if not self.__session.closed:
+            await self.__session.close()
 
     async def get_database_config(self, db_name: str) -> dict[str, Any]:
         """
@@ -1090,9 +1090,9 @@ class _SyncGatewayBase:
         )
         params = {"rev": revision}
 
-        scheme = "https://" if self._secure else "http://"
+        scheme = "https://" if self.secure else "http://"
         async with self._create_session(
-            self._secure, scheme, self._hostname, 4984, auth
+            self.secure, scheme, self.hostname, 4984, auth
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
