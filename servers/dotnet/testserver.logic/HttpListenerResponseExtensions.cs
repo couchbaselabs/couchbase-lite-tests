@@ -20,25 +20,25 @@ namespace TestServer
             Options.Converters.Add(new BlobConverter());
         }
 
-        public static void AddHeaders(this HttpListenerResponse response, int version)
+        public static void AddHeaders(this HttpListenerResponse response)
         {
-            response.AddHeader("CBLTest-API-Version", version.ToString());
+            response.AddHeader("CBLTest-API-Version", CBLTestServer.ApiVersion.ToString());
             response.AddHeader("CBLTest-Server-ID", CBLTestServer.ServerID);
         }
 
-        public static void WriteBody<T>(this HttpListenerResponse response, T bodyObj, int version, HttpStatusCode status = HttpStatusCode.OK)
+        public static void WriteBody<T>(this HttpListenerResponse response, T bodyObj, HttpStatusCode status = HttpStatusCode.OK)
         {
             if (response.OutputStream == null) {
                 throw new InvalidOperationException("Cannot write to a response with a null OutputStream");
             }
-            
+
             var body = JsonSerializer.SerializeToUtf8Bytes(bodyObj, Options);
             try {
                 response.ContentType = "application/json";
                 response.ContentLength64 = body.LongLength;
                 response.ContentEncoding = Encoding.UTF8;
                 response.StatusCode = (int)status;
-                response.AddHeaders(version);
+                response.AddHeaders();
                 response.OutputStream.Write(body, 0, body.Length);
                 response.Close();
             } catch (ObjectDisposedException) {
@@ -46,7 +46,7 @@ namespace TestServer
             }
         }
 
-        public static void WriteRawBody(this HttpListenerResponse response, string bodyStr, int version, HttpStatusCode status = HttpStatusCode.OK)
+        public static void WriteRawBody(this HttpListenerResponse response, string bodyStr, HttpStatusCode status = HttpStatusCode.OK)
         {
             if (response.OutputStream == null) {
                 throw new InvalidOperationException("Cannot write to a response with a null OutputStream");
@@ -58,7 +58,7 @@ namespace TestServer
                 response.ContentLength64 = body.LongLength;
                 response.ContentEncoding = Encoding.UTF8;
                 response.StatusCode = (int)status;
-                response.AddHeaders(version);
+                response.AddHeaders();
                 response.OutputStream.Write(body, 0, body.Length);
                 response.Close();
             } catch (ObjectDisposedException) {
@@ -66,7 +66,7 @@ namespace TestServer
             }
         }
 
-        public static void WriteEmptyBody([NotNull] this HttpListenerResponse response, int version, HttpStatusCode code = HttpStatusCode.OK)
+        public static void WriteEmptyBody([NotNull] this HttpListenerResponse response, HttpStatusCode code = HttpStatusCode.OK)
         {
             try {
                 var body = Encoding.UTF8.GetBytes("{}");
@@ -74,7 +74,7 @@ namespace TestServer
                 response.ContentLength64 = body.LongLength;
                 response.ContentEncoding = Encoding.UTF8;
                 response.StatusCode = (int)code;
-                response.AddHeaders(version);
+                response.AddHeaders();
                 response.OutputStream.Write(body, 0, body.Length);
                 response.Close();
             } catch (ObjectDisposedException) {

@@ -18,7 +18,7 @@ internal static partial class HandlerList
         public required IReadOnlyList<UpdateDatabaseEntry> changes { get; init; }
 
         [JsonConstructor]
-        public VerifyDocumentsBody(string database, string snapshot, IReadOnlyList<UpdateDatabaseEntry> changes) 
+        public VerifyDocumentsBody(string database, string snapshot, IReadOnlyList<UpdateDatabaseEntry> changes)
         {
             this.database = database;
             this.snapshot = snapshot;
@@ -185,7 +185,7 @@ internal static partial class HandlerList
         return new CompareResult();
     }
 
-    public static void HandleCompareFailure(Document existing, CompareResult compareResult, HttpListenerResponse response, int version)
+    public static void HandleCompareFailure(Document existing, CompareResult compareResult, HttpListenerResponse response)
     {
         dynamic responseBody = new ExpandoObject();
         responseBody.result = false;
@@ -204,30 +204,30 @@ internal static partial class HandlerList
         responseBody.document = existing.ToDictionary();
 
         try {
-            response.WriteBody((object)responseBody, version);
+            response.WriteBody((object)responseBody);
         } catch(Exception ex) {
             Serilog.Log.Logger.Error(ex, "Error writing VerifyDocuments body to response");
         }
     }
 
     [HttpHandler("verifyDocuments")]
-    public static async Task VerifyDocumentsHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
+    public static async Task VerifyDocumentsHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<VerifyDocumentsBody>(response, version, out var verifyBody)) {
+        if (!body.RootElement.TryDeserialize<VerifyDocumentsBody>(response, out var verifyBody)) {
             return;
         }
 
         var db = session.ObjectManager.GetDatabase(verifyBody.database);
         if (db == null) {
             // Error 1 : The specified database was not found.
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{verifyBody.database}'!"), version, HttpStatusCode.BadRequest);
+            response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{verifyBody.database}'!"), HttpStatusCode.BadRequest);
             return;
         }
 
         var snapshot = session.ObjectManager.GetObject<Snapshot>(verifyBody.snapshot);
         if(snapshot == null) {
             // Error 2 : The specified snapshot was not found.
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find snapshot named '{verifyBody.snapshot}'!"), version, HttpStatusCode.BadRequest);
+            response.WriteBody(Router.CreateErrorResponse($"Unable to find snapshot named '{verifyBody.snapshot}'!"), HttpStatusCode.BadRequest);
             return;
         }
 
@@ -238,7 +238,7 @@ internal static partial class HandlerList
             seenKeys.Add(key);
             if(!snapshot.ContainsKey(key)) {
                 // Error 3 : The document in the collection didn't exist in the snapshot.
-                response.WriteBody(Router.CreateErrorResponse($"Document '{change.documentID}' in '{change.collection}' does not exist in the snapshot"), version, HttpStatusCode.BadRequest);
+                response.WriteBody(Router.CreateErrorResponse($"Document '{change.documentID}' in '{change.collection}' does not exist in the snapshot"), HttpStatusCode.BadRequest);
                 return;
             }
 
@@ -248,10 +248,10 @@ internal static partial class HandlerList
                     // Case 2 : Document should be deleted but it wasn't.
                     // Case 3 : Document should be purged but it wasn't.
                     var verb = change.Type == UpdateDatabaseType.Purge ? "purged" : "deleted";
-                    response.WriteBody(new { 
-                        result = false, 
-                        description = $"Document '{change.documentID}' in '{change.collection}' was not {verb}" 
-                    }, version);
+                    response.WriteBody(new {
+                        result = false,
+                        description = $"Document '{change.documentID}' in '{change.collection}' was not {verb}"
+                    });
                     return;
                 }
 
@@ -260,10 +260,10 @@ internal static partial class HandlerList
 
             if (existing == null) {
                 // Case 1: Document should exist in the collection but it doesn't exist to verify.
-                response.WriteBody(new { 
+                response.WriteBody(new {
                     result = false,
-                    description = $"Document '{change.documentID}' in '{change.collection}' was not found" 
-                }, version);
+                    description = $"Document '{change.documentID}' in '{change.collection}' was not found"
+                });
                 return;
             }
 
@@ -293,7 +293,7 @@ internal static partial class HandlerList
             var compareResult = IsEqual(db, "$", mutableCopy, existing);
             if(!compareResult.Success) {
                 // Case 4 : Document has unexpected properties.
-                HandleCompareFailure(existing, compareResult, response, version);
+                HandleCompareFailure(existing, compareResult, response);
                 return;
             }
         }
@@ -319,26 +319,26 @@ internal static partial class HandlerList
                 {
                     result = false,
                     description = $"Document '{components[2]}' in '{collection}' should not exist"
-                }, version);
+                });
             } else if (entry.Value != null && existing == null) {
                 // Case 1: Document should exist in the collection but it doesn't exist to verify.
                 response.WriteBody(new
                 {
                     result = false,
                     description = $"Document '{components[2]}' in '{collection}' was not found"
-                }, version);
+                });
 
                 return;
             } else if (existing != null) {
                 var compareResult = IsEqual(db, "$", entry.Value, existing);
                 if (!compareResult.Success) {
                     // Case 4 : Document has unexpected properties.
-                    HandleCompareFailure(existing, compareResult, response, version);
+                    HandleCompareFailure(existing, compareResult, response);
                     return;
                 }
             }
         }
 
-        response.WriteBody(new { result = true }, version);
+        response.WriteBody(new { result = true });
     }
 }

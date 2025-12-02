@@ -17,14 +17,14 @@ namespace TestServer.Utilities
 
         public ObjectManager ObjectManager { get; }
 
-        private Session(IServiceProvider serviceProvider, string id, string datasetVersion)
+        private Session(IServiceProvider serviceProvider, string id)
         {
             var fileSystem = serviceProvider.GetRequiredService<IFileSystem>();
-            ObjectManager = new ObjectManager(Path.Join(fileSystem.AppDataDirectory, "testfiles"), datasetVersion);
+            ObjectManager = new ObjectManager(Path.Join(fileSystem.AppDataDirectory, "testfiles"));
             _id = id;
         }
 
-        public static void Create(IServiceProvider serviceProvider, string id, string datasetVersion)
+        public static void Create(IServiceProvider serviceProvider, string id)
         {
             if(ActiveSessions.ContainsKey(id)) {
                 throw new BadRequestException($"Session '{id}' already started");
@@ -36,7 +36,7 @@ namespace TestServer.Utilities
             }
 
             ActiveSessions.Clear();
-            ActiveSessions[id] = new Session(serviceProvider, id, datasetVersion);
+            ActiveSessions[id] = new Session(serviceProvider, id);
         }
 
         public static Session For(string? id)

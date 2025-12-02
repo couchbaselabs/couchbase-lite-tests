@@ -15,9 +15,9 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("stopListener")]
-    public static Task StopListenerHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
+    public static Task StopListenerHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<StopListenerBody>(response, version, out var deserializedBody)) {
+        if (!body.RootElement.TryDeserialize<StopListenerBody>(response, out var deserializedBody)) {
             return Task.CompletedTask;
         }
 
@@ -30,12 +30,12 @@ internal static partial class HandlerList
                 message = $"listener with specified ID not registered!"
             };
 
-            response.WriteBody(errorObject, version, HttpStatusCode.BadRequest);
+            response.WriteBody(errorObject, HttpStatusCode.BadRequest);
             return Task.CompletedTask;
         }
 
         listenerObject.Stop();
-        response.WriteEmptyBody(version);
+        response.WriteEmptyBody();
         return Task.CompletedTask;
     }
 }

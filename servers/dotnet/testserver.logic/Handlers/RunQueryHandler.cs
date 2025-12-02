@@ -14,15 +14,15 @@ internal static partial class HandlerList
     internal readonly record struct RunQueryBody(string database, string query);
 
     [HttpHandler("runQuery")]
-    public static Task RunQueryHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
+    public static Task RunQueryHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<RunQueryBody>(response, version, out var runQueryBody)) {
+        if (!body.RootElement.TryDeserialize<RunQueryBody>(response, out var runQueryBody)) {
             return Task.CompletedTask;
         }
 
         var db = session.ObjectManager.GetDatabase(runQueryBody.database);
         if (db == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{runQueryBody.database}'"), version, HttpStatusCode.BadRequest);
+            response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{runQueryBody.database}'"), HttpStatusCode.BadRequest);
             return Task.CompletedTask;
         }
 
@@ -33,7 +33,7 @@ internal static partial class HandlerList
             results = results.Select(x => x.ToDictionary())
         };
 
-        response.WriteBody(retVal, version);
+        response.WriteBody(retVal);
         return Task.CompletedTask;
     }
 }

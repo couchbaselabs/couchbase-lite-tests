@@ -13,9 +13,9 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("stopReplicator")]
-    public static Task StopReplicatorHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
+    public static Task StopReplicatorHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<StopReplicatorConfig>(response, version, out var deserializedBody)) {
+        if (!body.RootElement.TryDeserialize<StopReplicatorConfig>(response, out var deserializedBody)) {
             return Task.CompletedTask;
         }
 
@@ -26,7 +26,7 @@ internal static partial class HandlerList
 
         replicator.Stop();
 
-        response.WriteEmptyBody(version);
+        response.WriteEmptyBody();
         return Task.CompletedTask;
     }
 }
