@@ -110,12 +110,8 @@ class CouchbaseServer:
             opts = ClusterOptions(auth)
             self.__username = username
             self.__password = password
-
-            try:
-                self.__cluster = Cluster(url, opts)
-                self.__cluster.wait_until_ready(timedelta(seconds=10))
-            except Exception:
-                self.__cluster = None
+            self.__cluster = Cluster(url, opts)
+            self.__cluster.wait_until_ready(timedelta(seconds=10))
 
     @property
     def hostname(self) -> str:
