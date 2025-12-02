@@ -13,65 +13,78 @@ TEST_COMPONENTS_MAPPING = {
         "sync-gateways": 1,
         "couchbase-servers": 1,
         "edge-servers": 0,
-        "http-clients": 0
+        "http-clients": 0,
     },
     "test_end_to_end": {
         "test-servers": 0,
         "sync-gateways": 1,
         "couchbase-servers": 1,
         "edge-servers": 1,
-        "http-clients": 0
+        "http-clients": 0,
     },
     "test_changes_feed": {
         "test-servers": 0,
         "sync-gateways": 1,
         "couchbase-servers": 1,
         "edge-servers": 1,
-        "http-clients": 0
+        "http-clients": 0,
     },
     "test_db_uuid": {
         "test-servers": 0,
         "sync-gateways": 0,
         "couchbase-servers": 0,
         "edge-servers": 1,
-        "http-clients": 0
+        "http-clients": 0,
     },
     "test_audit_logging": {
         "test-servers": 0,
         "sync-gateways": 1,
         "couchbase-servers": 1,
         "edge-servers": 1,
-        "http-clients": 0
+        "http-clients": 0,
     },
     "test_system": {
         "test-servers": 0,
         "sync-gateways": 1,
         "couchbase-servers": 1,
         "edge-servers": 1,
-        "http-clients": 1
+        "http-clients": 1,
     },
-    "test_chaos_scenarios":{
+    "test_chaos_scenarios": {
         "test-servers": 0,
         "sync-gateways": 1,
         "couchbase-servers": 1,
         "edge-servers": 3,
-        "http-clients": 5
+        "http-clients": 5,
     },
-    "test_functional":{
+    "test_functional": {
         "test-servers": 0,
         "sync-gateways": 1,
         "couchbase-servers": 1,
         "edge-servers": 2,
-        "http-clients": 3
+        "http-clients": 3,
     },
-    "test_database_query":{
+    "test_database_query": {
         "test-servers": 0,
         "sync-gateways": 0,
         "couchbase-servers": 0,
         "edge-servers": 1,
-        "http-clients": 1
-    }
-
+        "http-clients": 1,
+    },
+    "test_conflicts": {
+        "test-servers": 0,
+        "sync-gateways": 1,
+        "couchbase-servers": 1,
+        "edge-servers": 1,
+        "http-clients": 0,
+    },
+    "test_ttl_expiration": {
+        "test-servers": 0,
+        "sync-gateways": 1,
+        "couchbase-servers": 1,
+        "edge-servers": 1,
+        "http-clients": 1,
+    },
 }
 
 def load_pool_data():
