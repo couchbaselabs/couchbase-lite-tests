@@ -8,6 +8,8 @@ from .api.testserver import TestServer
 from .assertions import _assert_not_null
 from .configparser import (
     CouchbaseServerInfo,
+    EdgeServerInfo,
+    HTTPClientInfo,
     ParsedConfig,
     SyncGatewayInfo,
     TestServerInfo,
@@ -67,11 +69,11 @@ class CBLPyTest:
 
 
     @property
-    def edge_servers(self)-> List[EdgeServer]:
+    def edge_servers(self) -> list[EdgeServer]:
         return self.__edge_servers
 
     @property
-    def http_clients(self) -> List[str]:
+    def http_clients(self) -> list[str]:
         return self.__http_clients
 
     @staticmethod
@@ -167,9 +169,22 @@ class CBLPyTest:
         """
         Closes all the test servers and sync gateways
         """
-        await self.request_factory.close()
+        try:
+            await self.request_factory.close()
+        except Exception:
+            pass
+
         for sg in self.__sync_gateways:
-            await sg.close()
+            try:
+                await sg.close()
+            except Exception:
+                pass
+
+        for es in self.__edge_servers:
+            try:
+                await es.close()
+            except Exception:
+                pass
 
 
     def __str__(self) -> str:
