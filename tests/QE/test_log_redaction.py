@@ -116,7 +116,7 @@ class TestLogRedaction(CBLTestClass):
 
         for log_type in log_types:
             try:
-                log_contents = await sg.fetch_log_file_via_caddy(log_type)
+                log_contents = await sg.fetch_log_file(log_type)
                 violations = scan_logs_for_untagged_sensitive_data(
                     log_contents, sensitive_patterns
                 )
@@ -203,7 +203,7 @@ class TestLogRedaction(CBLTestClass):
         )
 
         self.mark_test_step("Trigger SGCollect with redaction enabled")
-        sgcollect_resp = await sg.start_sgcollect_via_api(
+        sgcollect_resp = await sg.start_sgcollect(
             redact_level="partial", output_dir="/home/ec2-user/log"
         )
         assert sgcollect_resp.get("status") in ["running", "started"], (
