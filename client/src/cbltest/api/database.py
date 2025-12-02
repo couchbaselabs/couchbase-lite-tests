@@ -6,32 +6,23 @@ from typing import Any, Final, cast
 
 from opentelemetry.trace import get_tracer
 
-from cbltest.api.database_types import MaintenanceType
+from cbltest.api.database_types import DocumentEntry, MaintenanceType
 from cbltest.api.error import CblTestError
 from cbltest.logging import cbl_error, cbl_trace
+from cbltest.request_types import DatabaseUpdateEntry, DatabaseUpdateType
 from cbltest.requests import RequestFactory, TestServerRequestType
-from cbltest.v1.requests import (
-    DatabaseUpdateEntry,
-    DatabaseUpdateType,
-    DocumentEntry,
-    PostGetAllDocumentsRequestBody,
-    PostGetDocumentRequestBody,
-    PostPerformMaintenanceRequestBody,
-    PostRunQueryRequestBody,
-    PostSnapshotDocumentsRequestBody,
-    PostUpdateDatabaseRequestBody,
-    PostVerifyDocumentsRequestBody,
-)
-from cbltest.v1.responses import (
+from cbltest.response_types import (
     PostGetAllDocumentsEntry,
-    PostGetAllDocumentsResponse,
-    PostGetDocumentResponse,
-    PostRunQueryResponse,
-    PostSnapshotDocumentsResponse,
-    PostVerifyDocumentsResponse,
+    PostGetAllDocumentsResponseMethods,
+    PostGetDocumentResponseMethods,
+    PostRunQueryResponseMethods,
+    PostSnapshotDocumentsResponseMethods,
+    PostVerifyDocumentsResponseMethods,
     ValueOrMissing,
 )
 from cbltest.version import VERSION
+
+BASE_BLOB_URL = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/blobs/"
 
 
 class SnapshotUpdater:
@@ -87,6 +78,11 @@ class SnapshotUpdater:
                 "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
             )
 
+        if new_blobs is not None:
+            for keypath in new_blobs:
+                blob_name = new_blobs[keypath]
+                new_blobs[keypath] = BASE_BLOB_URL + blob_name
+
         self._updates.append(
             DatabaseUpdateEntry(
                 DatabaseUpdateType.UPDATE,
@@ -105,9 +101,6 @@ class DatabaseUpdater:
     """
 
     def __init__(self, db_name: str, request_factory: RequestFactory, index: int):
-        assert request_factory.version == 1, (
-            "This version of the CBLTest API requires request API v1"
-        )
         self._db_name = db_name
         self._updates: list[DatabaseUpdateEntry] = []
         self.__request_factory = request_factory
@@ -124,9 +117,10 @@ class DatabaseUpdater:
             if self.__error is not None:
                 raise CblTestError(self.__error)
 
-            payload = PostUpdateDatabaseRequestBody(self._db_name, self._updates)
             request = self.__request_factory.create_request(
-                TestServerRequestType.UPDATE_DB, payload
+                TestServerRequestType.UPDATE_DB,
+                database=self._db_name,
+                updates=self._updates,
             )
             resp = await self.__request_factory.send_request(self.__index, request)
             if resp.error is not None:
@@ -181,6 +175,11 @@ class DatabaseUpdater:
         if new_properties is not None and not isinstance(new_properties, list):
             self.__error = "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
             return
+
+        if new_blobs is not None:
+            for keypath in new_blobs:
+                blob_name = new_blobs[keypath]
+                new_blobs[keypath] = BASE_BLOB_URL + blob_name
 
         self._updates.append(
             DatabaseUpdateEntry(
@@ -269,7 +268,7 @@ class VerifyResult:
         """Gets the document body of the document with the faulty keypath, if applicable"""
         return self.__response.document
 
-    def __init__(self, rest_response: PostVerifyDocumentsResponse) -> None:
+    def __init__(self, rest_response: PostVerifyDocumentsResponseMethods) -> None:
         self.__response = rest_response
 
 
@@ -384,12 +383,13 @@ class Database:
                 "cbl.collection.names": collections,
             },
         ):
-            payload = PostGetAllDocumentsRequestBody(self.__name, *collections)
             req = self.__request_factory.create_request(
-                TestServerRequestType.ALL_DOC_IDS, payload
+                TestServerRequestType.ALL_DOC_IDS,
+                database=self.__name,
+                collections=list(collections),
             )
             resp = await self.__request_factory.send_request(self.__index, req)
-            cast_resp = cast(PostGetAllDocumentsResponse, resp)
+            cast_resp = cast(PostGetAllDocumentsResponseMethods, resp)
             ret_val: dict[str, list[AllDocumentsEntry]] = {}
             for c in cast_resp.collection_keys:
                 ret_val[c] = list(
@@ -412,12 +412,13 @@ class Database:
                 "cbl.document.id": document.id,
             },
         ):
-            payload = PostGetDocumentRequestBody(self.__name, document)
             req = self.__request_factory.create_request(
-                TestServerRequestType.GET_DOCUMENT, payload
+                TestServerRequestType.GET_DOCUMENT,
+                database=self.__name,
+                document=document,
             )
             resp = await self.__request_factory.send_request(self.__index, req)
-            cast_resp = cast(PostGetDocumentResponse, resp)
+            cast_resp = cast(PostGetDocumentResponseMethods, resp)
             return GetDocumentResult(cast_resp.raw_body)
 
     async def create_snapshot(self, documents: list[DocumentEntry]) -> str:
@@ -427,12 +428,13 @@ class Database:
         :param documents: A list of documents to include in the snapshot
         """
         with self.__tracer.start_as_current_span("create_snapshot"):
-            payload = PostSnapshotDocumentsRequestBody(self.__name, documents)
             req = self.__request_factory.create_request(
-                TestServerRequestType.SNAPSHOT_DOCS, payload
+                TestServerRequestType.SNAPSHOT_DOCS,
+                database=self.__name,
+                entries=documents,
             )
             resp = await self.__request_factory.send_request(self.__index, req)
-            return cast(PostSnapshotDocumentsResponse, resp).snapshot_id
+            return cast(PostSnapshotDocumentsResponseMethods, resp).snapshot_id
 
     async def verify_documents(self, updater: SnapshotUpdater) -> VerifyResult:
         """
@@ -442,14 +444,14 @@ class Database:
         :param updater: The id and expected updates
         """
         with self.__tracer.start_as_current_span("verify_documents"):
-            payload = PostVerifyDocumentsRequestBody(
-                self.__name, updater._id, updater._updates
-            )
             req = self.__request_factory.create_request(
-                TestServerRequestType.VERIFY_DOCS, payload
+                TestServerRequestType.VERIFY_DOCS,
+                database=self.__name,
+                snapshot=updater._id,
+                changes=updater._updates,
             )
             resp = await self.__request_factory.send_request(self.__index, req)
-            return VerifyResult(cast(PostVerifyDocumentsResponse, resp))
+            return VerifyResult(cast(PostVerifyDocumentsResponseMethods, resp))
 
     async def perform_maintenance(self, type: MaintenanceType) -> None:
         """
@@ -458,9 +460,10 @@ class Database:
         :param type: The type of maintenance to perform
         """
         with self.__tracer.start_as_current_span("perform_maintenance"):
-            payload = PostPerformMaintenanceRequestBody(self.__name, str(type))
             req = self.__request_factory.create_request(
-                TestServerRequestType.PERFORM_MAINTENANCE, payload
+                TestServerRequestType.PERFORM_MAINTENANCE,
+                db=self.__name,
+                op_type=str(type),
             )
             await self.__request_factory.send_request(self.__index, req)
 
@@ -471,9 +474,8 @@ class Database:
         :param query: The SQL++ query to run
         """
         with self.__tracer.start_as_current_span("run_query"):
-            payload = PostRunQueryRequestBody(self.__name, query)
             req = self.__request_factory.create_request(
-                TestServerRequestType.RUN_QUERY, payload
+                TestServerRequestType.RUN_QUERY, database=self.__name, query=query
             )
             resp = await self.__request_factory.send_request(self.__index, req)
-            return cast(PostRunQueryResponse, resp).results
+            return cast(PostRunQueryResponseMethods, resp).results

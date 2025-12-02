@@ -58,7 +58,6 @@ In addition to AWS resources, this system can also build / download, install, ru
             "platform": "dotnet_ios",
             "location": "123456",
             "cbl_version": "3.2.2-24",
-            "dataset_version": "3.2"
         }
     ]
 }
@@ -75,7 +74,6 @@ If downloading a prebuilt test server instead, simply add `{"download": true}` t
             "platform": "dotnet_ios",
             "location": "123456",
             "cbl_version": "3.2.2-24",
-            "dataset_version": "3.2",
             "download": true
         }
     ]

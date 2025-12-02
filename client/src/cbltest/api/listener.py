@@ -5,11 +5,7 @@ from opentelemetry.trace import get_tracer
 from cbltest.api.database import Database
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import TestServerRequestType
-from cbltest.v1.requests import (
-    PostStartListenerRequestBody,
-    PostStopListenerRequestBody,
-)
-from cbltest.v1.responses import PostStartListenerResponse
+from cbltest.response_types import PostStartListenerResponseMethods
 from cbltest.version import VERSION
 
 
@@ -47,18 +43,15 @@ class Listener:
         self.__tracer = get_tracer(__name__, VERSION)
         self.__id: str = ""
 
-        assert database._request_factory.version == 1, (
-            "This version of the cbl test API requires request API v1"
-        )
-
     async def start(self) -> None:
         """Start listening for incoming connections"""
         with self.__tracer.start_as_current_span("start_listener"):
-            payload = PostStartListenerRequestBody(
-                self.database.name, self.collections, self.port, self.disable_tls
-            )
             request = self.__request_factory.create_request(
-                TestServerRequestType.START_LISTENER, payload
+                TestServerRequestType.START_LISTENER,
+                db=self.database.name,
+                collections=self.collections,
+                port=self.port,
+                disable_tls=self.disable_tls,
             )
             resp = await self.__request_factory.send_request(self.__index, request)
             if resp.error is not None:
@@ -66,7 +59,7 @@ class Listener:
                 cbl_trace(resp.error.message)
                 return
 
-            cast_resp = cast(PostStartListenerResponse, resp)
+            cast_resp = cast(PostStartListenerResponseMethods, resp)
             self.port = cast_resp.port
             self.__id = cast_resp.listener_id
 
@@ -75,7 +68,7 @@ class Listener:
         with self.__tracer.start_as_current_span("stop_listener"):
             request = self.__request_factory.create_request(
                 TestServerRequestType.STOP_LISTENER,
-                PostStopListenerRequestBody(self.__id),
+                id=self.__id,
             )
             resp = await self.__request_factory.send_request(self.__index, request)
             if resp.error is not None:

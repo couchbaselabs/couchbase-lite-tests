@@ -15,6 +15,7 @@ from .extrapropsparser import _parse_extra_props
 from .globals import CBLPyTestGlobal
 from .logging import LogLevel, cbl_log_init, cbl_setLogLevel
 from .requests import RequestFactory
+from .version import available_api_version
 
 
 class CBLPyTest:
@@ -81,6 +82,7 @@ class CBLPyTest:
         cbl_log_init(str(ret_val.request_factory.uuid), ret_val.config.logslurp_url)
 
         ts_index = 0
+        await ret_val.resolve_api_version()
         for ts in ret_val.test_servers:
             await ts.new_session(
                 str(ret_val.request_factory.uuid),
@@ -112,7 +114,6 @@ class CBLPyTest:
         index = 0
         for ts in self.__config.test_servers:
             ts_info = TestServerInfo(ts)
-
             dataset_version = ts_info.dataset_version or dataset_version
             self.__test_servers.append(
                 TestServer(self.__request_factory, index, ts_info.url, dataset_version)
@@ -144,6 +145,23 @@ class CBLPyTest:
                         cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password
                     )
                 )
+
+    async def resolve_api_version(self) -> None:
+        ts_index = 0
+        apiVersion = 0
+        for ts in self.test_servers:
+            root_info = await ts.get_info()
+            if apiVersion != 0 and root_info.version != apiVersion:
+                raise ValueError(
+                    f"Test Server at index {ts_index} has API version "
+                    f"{root_info.version} which does not match other test servers' "
+                    f"API version {apiVersion}"
+                )
+
+            apiVersion = available_api_version(root_info.version)
+            ts_index += 1
+
+        self.__request_factory.version = apiVersion
 
     async def close(self) -> None:
         """

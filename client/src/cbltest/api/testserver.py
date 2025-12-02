@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Final, cast
 from urllib.parse import urljoin, urlparse
 
 from opentelemetry.trace import get_tracer
@@ -6,13 +6,9 @@ from opentelemetry.trace import get_tracer
 from cbltest.api.database import Database
 from cbltest.assertions import _assert_not_null
 from cbltest.globals import CBLPyTestGlobal
+from cbltest.request_types import PostResetRequestMethods
 from cbltest.requests import RequestFactory, TestServerRequestType
 from cbltest.responses import GetRootResponse
-from cbltest.v1.requests import (
-    PostLogRequestBody,
-    PostNewSessionRequestBody,
-    PostResetRequestBody,
-)
 from cbltest.version import VERSION
 
 
@@ -20,6 +16,10 @@ class TestServer:
     """
     A class for interacting with a Couchbase Lite test server
     """
+
+    __dataset_base_url: Final[str] = (
+        "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/dbs/"
+    )
 
     @property
     def url(self) -> str:
@@ -38,9 +38,6 @@ class TestServer:
         url: str,
         dataset_version: str,
     ):
-        assert request_factory.version == 1, (
-            "This version of the CBLTest API requires request API v1"
-        )
         self.__index = index
         self.__url = url
         self.__request_factory = request_factory
@@ -85,15 +82,22 @@ class TestServer:
         )
 
         with self.__tracer.start_as_current_span("create_and_reset_db"):
-            payload = PostResetRequestBody(CBLPyTestGlobal.running_test_name)
+            request = self.__request_factory.create_request(
+                TestServerRequestType.RESET,
+                name=CBLPyTestGlobal.running_test_name,
+            )
+            payload = cast(PostResetRequestMethods, request.payload)
             if dataset is not None:
-                payload.add_dataset(dataset, db_names)
+                dataset_url = (
+                    self.__dataset_base_url
+                    + self.__dataset_version
+                    + "/"
+                    + f"{dataset}.cblite2.zip"
+                )
+                payload.add_dataset(dataset_url, db_names)
             else:
                 payload.add_empty(db_names, collections)
 
-            request = self.__request_factory.create_request(
-                TestServerRequestType.RESET, payload
-            )
             await self.__request_factory.send_request(self.__index, request)
             ret_val: list[Database] = []
             for db_name in db_names:
@@ -110,9 +114,12 @@ class TestServer:
         :param tag: The tag to use for this test server
         """
         with self.__tracer.start_as_current_span("new_session"):
-            payload = PostNewSessionRequestBody(id, self.__dataset_version, url, tag)
             request = self.__request_factory.create_request(
-                TestServerRequestType.NEW_SESSION, payload
+                TestServerRequestType.NEW_SESSION,
+                id=id,
+                dataset_version=self.__dataset_version,
+                url=url,
+                tag=tag,
             )
             await self.__request_factory.send_request(self.__index, request)
 
@@ -121,9 +128,7 @@ class TestServer:
         Resets the test server
         """
         with self.__tracer.start_as_current_span("create_and_reset_db"):
-            request = self.__request_factory.create_request(
-                TestServerRequestType.RESET, PostResetRequestBody()
-            )
+            request = self.__request_factory.create_request(TestServerRequestType.RESET)
             await self.__request_factory.send_request(self.__index, request)
 
     async def log(self, msg: str) -> None:
@@ -132,9 +137,9 @@ class TestServer:
         """
 
         # I'll exclude this from telemetry since it's not really related to any testing
-        payload = PostLogRequestBody(msg)
         request = self.__request_factory.create_request(
-            TestServerRequestType.LOG, payload
+            TestServerRequestType.LOG,
+            msg=msg,
         )
         await self.__request_factory.send_request(self.__index, request)
 
