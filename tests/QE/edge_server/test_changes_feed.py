@@ -21,7 +21,6 @@ from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, Syn
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.utils import assert_not_null
 
-from conftest import cblpytest
 
 from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 import logging
@@ -37,7 +36,7 @@ class TestChangesFeed(CBLTestClass):
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
-        self.mark_test_step("Creating a bucket in Couchbase Server and adding 10 documents.")
+        self.mark_test_step("Creating a bucket in Couchbase Server and adding 5 documents.")
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 6):
@@ -46,7 +45,7 @@ class TestChangesFeed(CBLTestClass):
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat()
             }
-            server.add_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc["id"], doc)
         logger.info("5 documents created in Couchbase Server.")
 
         self.mark_test_step("Creating a database in Sync Gateway and adding a user and role.")
@@ -140,7 +139,7 @@ class TestChangesFeed(CBLTestClass):
         last_seq = changes["last_seq"]
 
         self.mark_test_step("Check that updates reflected in changes feed")
-        doc_counter = 11
+        doc_counter = 6
         for i in range(1, 6):
             doc_id = f"doc_{doc_counter}"
             doc = {
@@ -167,9 +166,3 @@ class TestChangesFeed(CBLTestClass):
 
         self.mark_test_step("Test for longpoll changes feed completed.")
         logger.info("Test completed.")
-
-
-
-
-
-

@@ -18,9 +18,6 @@ from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.utils import assert_not_null
-
-from conftest import cblpytest
-
 from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 import logging
 
@@ -31,7 +28,7 @@ class TestEndtoEnd(CBLTestClass):
     async def test_end_to_end_sgw(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Starting E2E test with Server, Sync Gateway, Edge Server and 1 client")
         # Calculate end time for 30 minutes from now
-        end_time = datetime.now() + timedelta(minutes=30)
+        end_time = datetime.now() + timedelta(minutes=2)
 
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         server = cblpytest.couchbase_servers[0]
@@ -46,7 +43,7 @@ class TestEndtoEnd(CBLTestClass):
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat()
             }
-            server.add_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc["id"], doc)
         logger.info("10 documents created in Couchbase Server.")
 
         self.mark_test_step("Creating a database in Sync Gateway and adding a user and role.")

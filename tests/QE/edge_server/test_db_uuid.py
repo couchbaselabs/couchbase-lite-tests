@@ -21,7 +21,6 @@ from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, Syn
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.utils import assert_not_null
 
-from conftest import cblpytest
 
 from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 import logging
@@ -73,7 +72,7 @@ class TestDbUUID(CBLTestClass):
         self.mark_test_step("Reset the database UUID")
 
         file_path = os.path.abspath(os.path.dirname(__file__))
-        file_path = str(Path(file_path, ".."))
+        file_path = str(Path(file_path, "../../.."))
         config_path =f"{file_path}/environment/edge_server/config/config_reset_uuid.json"
         with open(config_path, "r") as file:
             config = json.load(file)

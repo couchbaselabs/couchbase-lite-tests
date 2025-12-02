@@ -19,8 +19,6 @@ from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, Syn
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.utils import assert_not_null
 
-from conftest import cblpytest
-
 from cbltest.api.jsonserializable import JSONSerializable, JSONDictionary
 import logging
 
