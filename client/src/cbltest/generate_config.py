@@ -78,13 +78,20 @@ TEST_COMPONENTS_MAPPING = {
         "edge-servers": 1,
         "http-clients": 0,
     },
+    "test_blobs": {
+        "test-servers": 0,
+        "sync-gateways": 1,
+        "couchbase-servers": 1,
+        "edge-servers": 1,
+        "http-clients": 0,
+    },
     "test_ttl_expiration": {
         "test-servers": 0,
         "sync-gateways": 1,
         "couchbase-servers": 1,
         "edge-servers": 1,
         "http-clients": 1,
-    },
+    }
 }
 
 def load_pool_data():
