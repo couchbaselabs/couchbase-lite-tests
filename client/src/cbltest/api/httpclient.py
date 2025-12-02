@@ -85,9 +85,11 @@ class HTTPClient:
         db_name: str,
         scope: str = "",
         collection: str = "",
+        expires: int = 0,
+        ttl: int = 0
     ):
         curl = await self.edge_server.delete_document(
-            doc_id, revid, db_name, scope, collection, curl=True
+            doc_id, revid, db_name, scope, collection, curl=True, expires=expires, ttl=ttl
         )
         response = await self.remote_shell.run_command(curl)
         try:
@@ -238,11 +240,12 @@ class HTTPClient:
     async def all_replication_status(self):
         curl = await self.edge_server.all_replication_status(curl=True)
         response = await self.remote_shell.run_command(curl)
+        print(curl, response)
         try:
             response_dict = json.loads(response)
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(
-                    500, f"Adhoc query had error '{response_dict['reason']}'"
+                    500, f" Get replication status had error '{response_dict['error']}'"
                 )
             return response_dict
         except Exception:
@@ -322,12 +325,13 @@ class HTTPClient:
         curl_command = await self.edge_server.named_query(
             db_name, scope, collection, name, params, curl=True
         )
+        print(f"Named query: {curl_command}")
         response = await self.remote_shell.run_command(curl_command)
         try:
             response_dict = json.loads(response)
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(
-                    500, f"Named query had error '{response_dict['reason']}'"
+                    500, f"Named query had error '{response_dict}'"
                 )
             return response_dict
         except Exception:
@@ -346,12 +350,13 @@ class HTTPClient:
         curl_command = await self.edge_server.adhoc_query(
             db_name, scope, collection, query, params, curl=True
         )
+        print(f"adhoc query: {curl_command}")
         response = await self.remote_shell.run_command(curl_command)
         try:
             response_dict = json.loads(response)
             if "error" in response_dict:
                 raise CblEdgeServerBadResponseError(
-                    500, f"Adhoc query had error '{response_dict['reason']}'"
+                    500, f"Adhoc query had error '{response_dict}'"
                 )
             return response_dict
         except Exception:
@@ -360,12 +365,13 @@ class HTTPClient:
             )
 
     async def add_document_auto_id(
-        self, document: dict, db_name: str, scope: str = "", collection: str = ""
+        self, document: dict, db_name: str, scope: str = "", collection: str = "", expires:int=0,ttl:int=0
     ):
         curl_command = await self.edge_server.add_document_auto_id(
-            document, db_name, scope, collection, curl=True
+            document, db_name, scope, collection, curl=True, expires=expires, ttl=ttl
         )
         response = await self.remote_shell.run_command(curl_command)
+        print(curl_command, response)
         try:
             response_dict = json.loads(response)
             if "error" in response_dict:
@@ -387,9 +393,11 @@ class HTTPClient:
         scope: str = "",
         collection: str = "",
         rev: Optional[str] = None,
+        expires: int = 0,
+        ttl: int = 0
     ) -> dict:
         curl_command = await self.edge_server.put_document_with_id(
-            document, doc_id, db_name, scope, collection, curl=True, rev=rev
+            document, doc_id, db_name, scope, collection, curl=True, rev=rev, ttl=ttl, expires=expires
         )
 
         response = await self.remote_shell.run_command(curl_command)

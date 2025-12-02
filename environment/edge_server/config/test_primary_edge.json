@@ -5,6 +5,14 @@
     "databases": {
         "travel": {
             "path": "/opt/couchbase-edge-server/database/travel.cblite2",
+            "collections":[
+            "travel.airlines",
+            "travel.airports",
+            "travel.hotels",
+            "travel.landmarks",
+            "travel.routes"
+        ],
+            "create": true,
             "enable_adhoc_queries": true,
             "enable_client_writes": true,
             "enable_client_sync": true

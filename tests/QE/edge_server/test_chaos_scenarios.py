@@ -5,7 +5,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import List
-
+import asyncio
 import pytest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
@@ -41,7 +41,7 @@ class TestEdgeServerChaos(CBLTestClass):
 
         # 1. Configure Edge Server with travel dataset
         file_path = os.path.abspath(os.path.dirname(__file__))
-        file_path = str(Path(file_path, ".."))
+        file_path = str(Path(file_path, "../../.."))
         self.mark_test_step("Configure Edge Server with travel dataset")
         source_db = sgw.replication_url("travel")
 
@@ -107,8 +107,6 @@ class TestEdgeServerChaos(CBLTestClass):
         assert "error" not in status[0].keys(), (
             f"Replication setup failure: {status[0]}"
         )
-        print(status)
-
         # get all documents from travel.hotels
 
         all_docs = await client.get_all_documents(
@@ -121,8 +119,7 @@ class TestEdgeServerChaos(CBLTestClass):
             BulkDocOperation({"_deleted": True}, _id=doc_id, rev=rev, optype="delete")
             for doc_id, rev in revmap.items()
         ]
-        resp = await client.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
-        print(resp)
+        await client.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
         # kill server.
         await edge_server3.kill_server()
 
@@ -151,9 +148,8 @@ class TestEdgeServerChaos(CBLTestClass):
         self.mark_test_step("Test document inserts")
         docgen = JSONGenerator(seed=10, size=10000)
         create_docs = docgen.generate_all_documents()
-        bulk_ops = [BulkDocOperation(doc, optype="create") for doc in create_docs]
-        resp = await edge_server3.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
-        print(resp)
+        bulk_ops = [BulkDocOperation(body=doc,_id=id, optype="create") for id,doc in create_docs.items()]
+        await edge_server3.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
         self.mark_test_step("Verify document inserted")
         # Update via Edge HTTP client
         all_docs = await client.get_all_documents(
@@ -188,11 +184,12 @@ class TestEdgeServerChaos(CBLTestClass):
         self, client, optype, docs_dict, docgen, db_name, scope, collection, revmap
     ):
         """Perform async CRUD operation based on random optype"""
+        doc_id=None
         try:
             if optype == "create":
                 # Generate new document
-                new_doc = docgen.generate_document(str(uuid.uuid4()))
-                doc_id = new_doc["_id"]
+                doc_id = str(uuid.uuid4())
+                new_doc = docgen.generate_document(doc_id)
                 response = await client.put_document_with_id(
                     document=new_doc,
                     db_name=db_name,
@@ -208,7 +205,7 @@ class TestEdgeServerChaos(CBLTestClass):
             doc_id = random.choice(list(docs_dict.keys()))
 
             if optype == "update":
-                updated_doc = docgen.update_document(docs_dict[doc_id])
+                updated_doc = docgen.update_document(doc=docs_dict[doc_id],doc_id=doc_id)
                 response = await client.put_document_with_id(
                     doc_id=doc_id,
                     document=updated_doc,
@@ -229,7 +226,6 @@ class TestEdgeServerChaos(CBLTestClass):
                     scope=scope,
                     collection=collection,
                 )
-                print(response)
                 if response.get("ok"):
                     del docs_dict[doc_id]  # Remove from local dict
                 return response["ok"]
@@ -256,7 +252,7 @@ class TestEdgeServerChaos(CBLTestClass):
         http_clients = cblpytest.http_clients
         # setup  config
         file_path = os.path.abspath(os.path.dirname(__file__))
-        file_path = str(Path(file_path, ".."))
+        file_path = str(Path(file_path, "../../.."))
         config_path = f"{file_path}/environment/edge_server/config/test_edge_server_with_multiple_rest_clients.json"
         edge_server = await edge_server.set_config(
             config_path, "/opt/couchbase-edge-server/etc/config.json"
@@ -267,8 +263,8 @@ class TestEdgeServerChaos(CBLTestClass):
         )
         await factory.create_clients()
         docgen = JSONGenerator(seed=10, size=10000)
-        docs_list = docgen.generate_all_documents()
-        bulk_ops = [BulkDocOperation(doc, optype="create") for doc in docs_list]
+        docs_dict = docgen.generate_all_documents()
+        bulk_ops = [BulkDocOperation(body=doc,_id=id, optype="create") for id,doc in docs_dict.items()]
         await edge_server.bulk_doc_op(bulk_ops, db_name="db")
         self.mark_test_step("Verify document inserted")
         try:
@@ -276,7 +272,7 @@ class TestEdgeServerChaos(CBLTestClass):
             all_docs = await edge_server.get_all_documents(db_name="db")
             assert len(all_docs.rows) == docgen.size, "Inserted document count mismatch"
             revmap = all_docs.revmap
-            docs_dict = {x["_id"]: x for x in docs_list}
+            # docs_dict = {x["_id"]: x for x in docs_list}
 
             # random CRUD and verification
             optype = ["create", "update", "delete", "read"]
@@ -316,12 +312,13 @@ class TestEdgeServerChaos(CBLTestClass):
         primary_server = ops_server[0]
         update_docs = docgen.update_all_documents(docs_list)
         bulk_ops = [
-            BulkDocOperation(doc, optype="update", rev=revmap.get(doc.get("_id")))
-            for doc in update_docs
+            BulkDocOperation(
+                body=doc, _id=id, optype="update", rev=revmap.get(id)
+            )
+            for id, doc in update_docs.items()
         ]
-        resp = await primary_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
+        await primary_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
         self.mark_test_step(f"Docs updated in {ops_server}")
-        print(resp)
         # validate in op_list
         all_docs_list = []
         for server in ops_server:
@@ -352,7 +349,7 @@ class TestEdgeServerChaos(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_3_edge_with_sync(self, cblpytest, dataset_path) -> None:
         self.mark_test_step("test_3_edge_with_sync")
-        # kill each server one by and and update docs on other 2, verify consistency
+        # kill each server one by and update docs on other 2, verify consistency
         # Preconditions
 
         # Get infrastructure components
@@ -419,8 +416,7 @@ class TestEdgeServerChaos(CBLTestClass):
             BulkDocOperation({"_deleted": True}, _id=doc_id, rev=rev, optype="delete")
             for doc_id, rev in revmap.items()
         ]
-        resp = await edge_server1.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
-        print(resp)
+        await edge_server1.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
 
         self.mark_test_step("Verify document deleted")
         edge1_docs = await edge_server1.get_all_documents(
@@ -441,8 +437,8 @@ class TestEdgeServerChaos(CBLTestClass):
 
         docgen = JSONGenerator(seed=10, size=10000)
         docs_list = docgen.generate_all_documents()
-        bulk_ops = [BulkDocOperation(doc, optype="create") for doc in docs_list]
-        resp = await edge_server1.bulk_doc_op(
+        bulk_ops = [BulkDocOperation(body=doc,_id=id, optype="create") for id,doc in docs_list.items()]
+        await edge_server1.bulk_doc_op(
             bulk_ops, db_name="travel", collection="travel.hotels"
         )
 
@@ -522,7 +518,7 @@ class TestEdgeServerChaos(CBLTestClass):
             "travel", collection="travel.hotels"
         )
         self.mark_test_step("killing edge_server2,edge_server3  ")
-        docs_list = await self.kill_edge_perform_ops(
+        await self.kill_edge_perform_ops(
             [edge_server2, edge_server3],
             [edge_server1],
             docgen,
@@ -546,7 +542,7 @@ class TestEdgeServerChaos(CBLTestClass):
 
         # 1. Configure Edge Server with travel dataset
         file_path = os.path.abspath(os.path.dirname(__file__))
-        file_path = str(Path(file_path, ".."))
+        file_path = str(Path(file_path, "../../.."))
         self.mark_test_step("Configure Edge Server with travel dataset")
         source_db = sgw.replication_url("travel")
         # Load the existing config
@@ -572,19 +568,19 @@ class TestEdgeServerChaos(CBLTestClass):
         self.mark_test_step("Monitor replication progress")
         status = await client.all_replication_status()
         assert "error" not in status[0].keys(), f"Replication setup failure: {status}"
-        hotel_docs = await client.get_all_documents(
-            "travel",
-            collection="travel.hotels",
-        )
+        # hotel_docs = await client.get_all_documents(
+        #     "travel",
+        #     collection="travel.hotels",
+        # )
+        hotel_docs= await edge_server.get_all_documents("travel", collection="travel.hotels")
         bulk_ops = [
             BulkDocOperation({"_deleted": True}, _id=doc_id, rev=rev, optype="delete")
             for doc_id, rev in hotel_docs.revmap.items()
         ]
 
-        resp = await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
-        print(resp)
-
+        await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
         self.mark_test_step("Verify document deleted")
+        await asyncio.sleep(120)
         edge_docs = await edge_server.get_all_documents(
             "travel", collection="travel.hotels"
         )
@@ -597,7 +593,7 @@ class TestEdgeServerChaos(CBLTestClass):
 
         docgen = JSONGenerator(seed=10, size=10000)
         docs_list = docgen.generate_all_documents()
-        bulk_ops = [BulkDocOperation(doc, optype="create") for doc in docs_list]
+        bulk_ops = [BulkDocOperation(body=doc,_id=id, optype="create") for id,doc in docs_list.items()]
         await edge_server.bulk_doc_op(
             bulk_ops, db_name="travel", collection="travel.hotels"
         )
@@ -618,25 +614,166 @@ class TestEdgeServerChaos(CBLTestClass):
         update_docs = docgen.update_all_documents(docs_list)
         bulk_ops = [
             BulkDocOperation(
-                doc, optype="update", rev=edge_docs.revmap.get(doc.get("_id"))
+                body=doc,_id=id, optype="update", rev=edge_docs.revmap.get(id)
             )
-            for doc in update_docs
+            for id,doc in update_docs.items()
         ]
         result = await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
 
-        sgw.kill_server()
+        await sgw.kill_server()
         revmap = {doc.get("id"): doc.get("rev") for doc in result}
+        # edge_docs = await edge_server.get_all_documents(
+        #     "travel", collection="travel.hotels"
+        # )
 
         update_docs = docgen.update_all_documents(update_docs)
         bulk_ops = [
-            BulkDocOperation(doc, optype="update", rev=revmap.get(doc.get("_id")))
-            for doc in update_docs
+            BulkDocOperation(
+                body=doc, _id=id, optype="update", rev=revmap.get(id)
+            )
+            for id, doc in update_docs.items()
         ]
         await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
 
-        sgw.start_server()
+        await sgw.start_server()
+        self.mark_test_step("Sleep for 2 minutes")
+        await asyncio.sleep(120)
+        self.mark_test_step("Verify document updated")
+        edge_docs = await edge_server.get_all_documents(
+            "travel", collection="travel.hotels"
+        )
+        sgw_docs = await sgw.get_all_documents(
+            "travel", scope="travel", collection="hotels"
+        )
+        assert len(edge_docs.rows) == len(sgw_docs.rows) == docgen.size, (
+            f"Collection hotels count mismatch in len(edge_docs.rows): {len(edge_docs.rows)} ,  len(sgw_docs.rows): {len(sgw_docs.rows)}"
+        )
+    async def test_ttl_with_sgw_edge(self, cblpytest, dataset_path) -> None:
+        self.mark_test_step("test_ttl_with_sgw_edge")
+        cloud = CouchbaseCloud(
+            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
+        )
+        await cloud.configure_dataset(dataset_path, "travel")
+
+        # Get infrastructure components
+        edge_server1 = cblpytest.edge_servers[0]
+        await edge_server1.reset_db()
+        edge_server2 = cblpytest.edge_servers[1]
+        await edge_server2.reset_db()
+        sgw = cblpytest.sync_gateways[0]
+        http_client = cblpytest.http_clients[0]
+
+        # 1. Configure Edge Server with travel dataset
+        file_path = os.path.abspath(os.path.dirname(__file__))
+        file_path = str(Path(file_path, "../../.."))
+        self.mark_test_step("Configure Edge Server with travel dataset")
+        source_db = sgw.replication_url("travel")
+        # Load the existing config
+        config_path = (
+            f"{file_path}/environment/edge_server/config/test_sgw_edge_server.json"
+        )
+        with open(config_path, "r") as file:
+            config = json.load(file)
+
+        # Update the source dynamically
+        config["replications"][0]["source"] = source_db
+
+        # Save the updated config
+        with open(config_path, "w") as file:
+            json.dump(config, file, indent=4)
+        edge_server1 = await edge_server1.set_config(
+            config_path, "/opt/couchbase-edge-server/etc/config.json"
+        )
+
+        client = HTTPClient(http_client, edge_server)
+        await client.connect()
+
+        config_path2 = (
+            f"{file_path}/environment/edge_server/config/test_edge_to_edge_server.json"
+        )
+        source_db = edge_server1.replication_url("travel")
+        with open(config_path2, "r") as file:
+            config = json.load(file)
+
+        # Update the source dynamically
+        config["replications"][0]["source"] = source_db
+
+        # Save the updated config
+        with open(config_path2, "w") as file:
+            json.dump(config, file, indent=4)
+        edge_server2 = await edge_server2.set_config(
+            config_path2, "/opt/couchbase-edge-server/etc/config.json"
+        )
+        # # 5. Monitor replication status
+        self.mark_test_step("Monitor replication progress")
+        status = await client.all_replication_status()
+        assert "error" not in status[0].keys(), f"Replication setup failure: {status}"
+        hotel_docs= await edge_server1.get_all_documents("travel", collection="travel.hotels")
+        bulk_ops = [
+            BulkDocOperation({"_deleted": True}, _id=doc_id, rev=rev, optype="delete")
+            for doc_id, rev in hotel_docs.revmap.items()
+        ]
+
+        await edge_server1.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
+        self.mark_test_step("Verify document deleted")
+        await asyncio.sleep(120)
+        edge_docs = await edge_server2.get_all_documents(
+            "travel", collection="travel.hotels"
+        )
+        sgw_docs = await sgw.get_all_documents(
+            "travel", scope="travel", collection="hotels"
+        )
+        assert len(edge_docs.rows) == len(sgw_docs.rows) == 0, (
+            f"Collection hotels count mismatch in len(edge_docs.rows): {len(edge_docs.rows)} ,  len(sgw_docs.rows): {len(sgw_docs.rows)}"
+        )
+
+        docgen = JSONGenerator(seed=10, size=10000)
+        docs_list = docgen.generate_all_documents()
+        bulk_ops = [BulkDocOperation(body=doc,_id=id, optype="create") for id,doc in docs_list.items()]
+        await edge_server.bulk_doc_op(
+            bulk_ops, db_name="travel", collection="travel.hotels"
+        )
+
         self.mark_test_step("Sleep for 2 minutes")
         time.sleep(120)
+        self.mark_test_step("Verify document created")
+        edge_docs = await edge_server.get_all_documents(
+            "travel", collection="travel.hotels"
+        )
+        sgw_docs = await sgw.get_all_documents(
+            "travel", scope="travel", collection="hotels"
+        )
+        assert len(edge_docs.rows) == len(sgw_docs.rows) == 10000, (
+            f"Collection hotels count mismatch in len(edge_docs.rows): {len(edge_docs.rows)} ,  len(sgw_docs.rows): {len(sgw_docs.rows)}"
+        )
+
+        update_docs = docgen.update_all_documents(docs_list)
+        bulk_ops = [
+            BulkDocOperation(
+                body=doc,_id=id, optype="update", rev=edge_docs.revmap.get(id)
+            )
+            for id,doc in update_docs.items()
+        ]
+        result = await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
+
+        await sgw.kill_server()
+        revmap = {doc.get("id"): doc.get("rev") for doc in result}
+        # edge_docs = await edge_server.get_all_documents(
+        #     "travel", collection="travel.hotels"
+        # )
+
+        update_docs = docgen.update_all_documents(update_docs)
+        bulk_ops = [
+            BulkDocOperation(
+                body=doc, _id=id, optype="update", rev=revmap.get(id)
+            )
+            for id, doc in update_docs.items()
+        ]
+        await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
+
+        await sgw.start_server()
+        self.mark_test_step("Sleep for 2 minutes")
+        await asyncio.sleep(120)
         self.mark_test_step("Verify document updated")
         edge_docs = await edge_server.get_all_documents(
             "travel", collection="travel.hotels"

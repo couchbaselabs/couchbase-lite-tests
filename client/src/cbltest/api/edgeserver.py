@@ -17,6 +17,7 @@ from cbltest.api.syncgateway import (
     CouchbaseVersion,
     RemoteDocument,
 )
+from pathlib import Path
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
@@ -44,7 +45,7 @@ class BulkDocOperation(JSONSerializable):
         body: dict,
         _id: Optional[str] = None,
         rev: Optional[str] = None,
-        optype: str = "create",
+        optype: str = "create"
     ):
         if _id is None:
             _id = body.get("_id")
@@ -88,9 +89,9 @@ class EdgeServer:
     ):
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
-            # repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
-            # config_file = str(repo_root / "environment" / "edge_server" / "config" / "config.json")
-            config_file = "../environment/edge_server/config/config.json"
+            repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+            config_file = str(repo_root / "environment" / "edge_server" / "config" / "config.json")
+            # config_file = "../environment/edge_server/config/config.json"
             # config_file= file_path + "/" + "environment/edge_server/config/config.json"
         port, secure, mtls, certfile, keyfile, is_auth, databases, is_anonymous_auth = (
             self._decode_config_file(config_file)
@@ -253,8 +254,11 @@ class EdgeServer:
             )
 
             if not resp.ok:
+                req=self._build_curl_command(
+                    method, path, headers=headers, data=payload, params=params
+                )
                 raise CblEdgeServerBadResponseError(
-                    resp.status, f"{method} {path} returned {resp.status}"
+                    resp.status, f"{method} {path} returned {resp.status} for {req}"
                 )
 
             return ret_val
@@ -292,6 +296,7 @@ class EdgeServer:
         endkey=None,
         keys=None,
         startkey=None,
+        include_docs=False,
         curl: bool = False,
     ):
         with self.__tracer.start_as_current_span(
@@ -314,6 +319,8 @@ class EdgeServer:
                 query_params.append(f"keys={encoded_keys}")
             if startkey:
                 query_params.append(f"startkey={urllib.parse.quote(startkey)}")
+            if include_docs:
+                query_params.append(f"include_docs=true")
             request_url = f"?{'&'.join(query_params)}" if query_params else ""
             resp = await self._send_request(
                 "get", f"/{keyspace}/_all_docs{request_url}", curl=curl
@@ -331,6 +338,9 @@ class EdgeServer:
         scope: str = "",
         collection: str = "",
         curl: bool = False,
+        expires: int = 0,
+        ttl: int = 0,
+
     ):
         with self.__tracer.start_as_current_span(
             "delete_document",
@@ -342,8 +352,14 @@ class EdgeServer:
             },
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
+            params = [f"rev={revid}"]
+            if expires!=0:
+                params.append(f"expires={expires}")
+            if ttl!=0:
+                params.append(f"ttl={ttl}")
+            qp = "?" + "&".join(params)
             return await self._send_request(
-                "delete", f"/{keyspace}/{doc_id}?rev={revid}", curl=curl
+                "delete", f"/{keyspace}/{doc_id}{qp}", curl=curl
             )
 
     async def get_document(
@@ -564,13 +580,13 @@ class EdgeServer:
                 )
             return cast_resp
 
-    async def stop_replication(self, replicator_id: str, curl: bool = False):
+    async def stop_replication(self, replicator_id: int, curl: bool = False):
         with self.__tracer.start_as_current_span(
             "Stop Replication with Edge Server",
             attributes={"cbl.replicator.id": replicator_id},
         ):
             response = await self._send_request(
-                "post", "/_replicate", payload=JSONDictionary({"cancel": replicator_id})
+                "delete", f"/_replicate/{replicator_id}"
             )
             if curl:
                 return response
@@ -669,11 +685,12 @@ class EdgeServer:
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
             payload = {}
-            if params is not None:
-                payload["params"] = params
+            if params:
+                for key, value in params.items():
+                    payload[key] = value
             response = await self._send_request(
                 "post",
-                f"{keyspace}/_query/{name}",
+                f"/{keyspace}/_query/{name}",
                 payload=JSONDictionary(payload),
                 curl=curl,
             )
@@ -739,6 +756,8 @@ class EdgeServer:
         db_name: str,
         scope: str = "",
         collection: str = "",
+        expires:int =0,
+        ttl:int =0,
         curl: bool = False,
     ):
         with self.__tracer.start_as_current_span(
@@ -750,8 +769,15 @@ class EdgeServer:
             },
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
+            params = []
+            if expires!=0:
+                params.append(f"expires={expires}")
+            if ttl!=0:
+                params.append(f"ttl={ttl}")
+            qp = "?" + "&".join(params) if params else ""
+
             response = await self._send_request(
-                "post", f"{keyspace}/", payload=JSONDictionary(document), curl=curl
+                "post", f"/{keyspace}/{qp}", payload=JSONDictionary(document), curl=curl
             )
             if curl:
                 return response
@@ -777,6 +803,9 @@ class EdgeServer:
         collection: str = "",
         curl: bool = False,
         rev: Optional[str] = None,
+        expires: int = 0,
+        ttl: int = 0,
+
     ) -> dict:
         with self.__tracer.start_as_current_span(
             "add document with ID",
@@ -787,10 +816,21 @@ class EdgeServer:
             },
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
+
             if rev:
                 document["_rev"] = rev
+            params = []
+            if rev:
+                params.append(f"rev={rev}")
+            if expires!=0:
+                params.append(f"expires={expires}")
+            if ttl!=0:
+                params.append(f"ttl={ttl}")
+
+            qp = "?" + "&".join(params) if params else ""
+
             response = await self._send_request(
-                "put", f"/{keyspace}/{id}", payload=JSONDictionary(document), curl=curl
+                "put", f"/{keyspace}/{id}{qp}", payload=JSONDictionary(document), curl=curl
             )
             if curl:
                 return response

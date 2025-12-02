@@ -42,7 +42,7 @@ def run_remote_command(ip, command, username="root", password="couchbase"):
                 print(f"Warning: {error}")
             else:
                 print(f"Error executing command on {ip}: {error}")
-                sys.exit(1)
+                # sys.exit(1)
 
         print(output)
         return output

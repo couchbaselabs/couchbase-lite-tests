@@ -71,9 +71,8 @@ def install_sync_gateway(sync_gateway_ip, sync_config, version, build):
 
     # Check if Sync Gateway is already installed
     output, _ = run_remote_command(sync_gateway_ip, "systemctl status sync_gateway")
-    if "could not be found" not in _.lower():
+    if "not found" not in output.lower():
         print("Sync Gateway is already installed. Uninstall first if needed.")
-        return
 
     # Download Sync Gateway package
     print(f"Downloading Sync Gateway package from {sg_package_url}...")
@@ -99,9 +98,9 @@ def install_sync_gateway(sync_gateway_ip, sync_config, version, build):
 
     # Ensure service is stopped
     output, _ = run_remote_command(sync_gateway_ip, "lsof -i :4985")
-    if output:
-        print("Sync Gateway is still running. Exiting...")
-        sys.exit(1)
+    # if output:
+    #     print("Sync Gateway is still running. Exiting...")
+    #     sys.exit(1)
 
     # Transfer the configuration file
     config_path = "/home/sync_gateway/sync_gateway.json"

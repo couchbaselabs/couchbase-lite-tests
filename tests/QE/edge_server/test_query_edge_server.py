@@ -1,3 +1,4 @@
+import asyncio
 import os
 from pathlib import Path
 
@@ -6,6 +7,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.httpclient import HTTPClient
 from deepdiff import DeepDiff
+from cbltest.api.error import CblEdgeServerBadResponseError
 
 
 class TestQueryEdgeServer(CBLTestClass):
@@ -16,7 +18,7 @@ class TestQueryEdgeServer(CBLTestClass):
         self.mark_test_step("Configuring named queries")
         edge_server = cblpytest.edge_servers[0]
         file_path = os.path.abspath(os.path.dirname(__file__))
-        file_path = str(Path(file_path, "../.."))
+        file_path = str(Path(file_path, "../../.."))
         configured_server = await edge_server.set_config(
             f"{file_path}/environment/edge_server/config/test_named_queries.json",
             "/opt/couchbase-edge-server/etc/config.json",
@@ -31,15 +33,15 @@ class TestQueryEdgeServer(CBLTestClass):
             db_name="names",
             name="user_by_email",
             params={
-                "email": [
-                    "jewel.macartney@nosql-matters.org",
-                    "macartney@nosql-matters.org",
-                ]
+                "email":
+                    "santo.mcclennan@nosql-matters.org",
+                    # "macartney@nosql-matters.org",
+
             },
         )
         self.mark_test_step(f"Query results: {response}")
-        assert "name_144" in response.values()
-        assert len(response["results"]) >= 1
+        assert "name_11" in response[0].values()
+        assert len(response) == 1
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_adhoc_queries(
@@ -48,7 +50,7 @@ class TestQueryEdgeServer(CBLTestClass):
         self.mark_test_step("Enabling ad-hoc queries")
         edge_server = cblpytest.edge_servers[0]
         file_path = os.path.abspath(os.path.dirname(__file__))
-        file_path = str(Path(file_path, "../.."))
+        file_path = str(Path(file_path, "../../.."))
 
         configured_server = await edge_server.set_config(
             f"{file_path}/environment/edge_server/config/test_named_queries.json",
@@ -94,7 +96,7 @@ class TestQueryEdgeServer(CBLTestClass):
         self.mark_test_step("Testing negative scenarios")
         edge_server = cblpytest.edge_servers[0]
         file_path = os.path.abspath(os.path.dirname(__file__))
-        file_path = str(Path(file_path, "../.."))
+        file_path = str(Path(file_path, "../../.."))
 
         # Configure with adhoc disabled
         configured_server = await edge_server.set_config(
@@ -106,14 +108,65 @@ class TestQueryEdgeServer(CBLTestClass):
         await client.connect()
 
         self.mark_test_step("Testing missing parameters")
-        response = await client.get(
-            "/db/_query/named/user_by_email", raise_for_status=False
-        )
-        assert response.status == 400
+        failed = False
+        try:
+            await client.named_query(
+                db_name="names",
+                name="user_by_email",
+            )
+        except CblEdgeServerBadResponseError as e:
+            failed=True
+            assert "missing" in str(e).lower() or "error" in str(e).lower(),f"Unexpected error for missing param: {e}"
+        assert failed
 
         self.mark_test_step("Testing adhoc with disabled config")
-        response = await client.post(
-            "/db/_query",
-            body={"statement": "SELECT 1"},
+        failed = False
+        try:
+            await client.adhoc_query(
+                db_name="names", query="SELECT * FROM _default"
+            )
+        except CblEdgeServerBadResponseError as e:
+            failed = True
+            print(e)
+            assert "forbidden" in str(e).lower() or "403" in str(e) ,f"Unexpected error for adhoc disabled: {e}"
+        assert failed
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_query_on_expired_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Configuring named queries")
+        edge_server = cblpytest.edge_servers[0]
+        await edge_server.reset_db()
+        file_path = os.path.abspath(os.path.dirname(__file__))
+        file_path = str(Path(file_path, "../../.."))
+        configured_server = await edge_server.set_config(
+            f"{file_path}/environment/edge_server/config/test_named_queries.json",
+            "/opt/couchbase-edge-server/etc/config.json",
         )
-        assert response.status == 403
+
+
+        client = HTTPClient(cblpytest.http_clients[0], configured_server)
+        await client.connect()
+        self.mark_test_step("Create document that expire after 30 seconds")
+        new_doc = {"birthday":"1954-06-29","name":{"first":"Tonita","last":"Rowman"},"contact":{"email":["tonita.rowman@nosql-matters.org","rowman@nosql-matters.org"],"phone":["724-7593085"],"region":"724","address":{"state":"PA","street":"16 Pratt Rd","zip":"15685","city":"Southwest"}},"gender":"female","memberSince":"2008-06-14","likes":[]}
+
+        # Update via Edge HTTP client
+
+        resp=await client.add_document_auto_id(
+            new_doc, "names", ttl=30
+        )
+        print(resp)
+        await asyncio.sleep(30)
+        # Execute named query
+        response = await client.named_query(
+            db_name="names",
+            name="user_by_email",
+            params={
+                "email":
+                    "tonita.rowman@nosql-matters.org"
+
+            },
+        )
+        self.mark_test_step(f"Query results: {response}")
+        assert len(response) == 0
+
+

@@ -15,7 +15,7 @@ class TestDatabase(CBLTestClass):
         self.mark_test_step("test_create_database")
         edge_server = cblpytest.edge_servers[0]
         file_path = os.path.abspath(os.path.dirname(__file__))
-        file_path = str(Path(file_path, ".."))
+        file_path = str(Path(file_path, "../../.."))
         config_path = f"{file_path}/environment/edge_server/config/test_edge_server_with_multiple_rest_clients.json"
         edge_server = await edge_server.set_config(
             config_path, "/opt/couchbase-edge-server/etc/config.json"
@@ -35,7 +35,7 @@ class TestDatabase(CBLTestClass):
         self.mark_test_step("test_edge_server_incorrect_db_config")
         edge_server = cblpytest.edge_servers[0]
         file_path = os.path.abspath(os.path.dirname(__file__))
-        file_path = str(Path(file_path, ".."))
+        file_path = str(Path(file_path, "../../.."))
         config_path = f"{file_path}/environment/edge_server/config/test_edge_server_incorrect_db_config.json"
         try:
             edge_server = await edge_server.set_config(

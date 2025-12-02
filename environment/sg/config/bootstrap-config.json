@@ -1,6 +1,6 @@
 {
     "bootstrap": {
-     "server": "couchbases://172.23.96.166",
+     "server": "couchbases://10.100.150.153",
      "server_tls_skip_verify": true,
      "username": "admin",
      "password": "password"

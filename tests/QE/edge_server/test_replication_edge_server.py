@@ -1,5 +1,6 @@
 import json
 import os
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -28,7 +29,7 @@ class TestEdgeServerSync(CBLTestClass):
 
         # 1. Configure Edge Server with travel dataset
         file_path = os.path.abspath(os.path.dirname(__file__))
-        file_path = str(Path(file_path, ".."))
+        file_path = str(Path(file_path, "../../.."))
         self.mark_test_step("Configure Edge Server with travel dataset")
         source_db = sgw.replication_url("travel")
         # Load the existing config
@@ -47,8 +48,6 @@ class TestEdgeServerSync(CBLTestClass):
         edge_server = await edge_server.set_config(
             config_path, "/opt/couchbase-edge-server/etc/config.json"
         )
-        await edge_server.add_user("admin", "password")
-        edge_server.set_auth("admin", "password")
         client = HTTPClient(http_client, edge_server)
         await client.connect()
         # # 5. Monitor replication status
@@ -86,12 +85,12 @@ class TestEdgeServerSync(CBLTestClass):
             "_id": "airline_10000",
             "type": "airline",
             "name": "Updated Airline",
-            "iata": "UPD",
+            "data": "UPD",
         }
 
         # Update via Edge HTTP client
-        await client.put_document_with_id(
-            update_doc, "airline_10000", "travel", collection="travel.airlines"
+        await edge_server.put_document_with_id(
+            update_doc, "airline_10000", "travel", collection="travel.airlines",ttl=30
         )
 
         # Verify update propagated to SGW
@@ -102,6 +101,25 @@ class TestEdgeServerSync(CBLTestClass):
             doc_id="airline_10000",
         )
         assert sgw_doc.body["name"] == "Updated Airline", "Update not propagated"
+        await asyncio.sleep(60)
+        self.mark_test_step("Verify TTL document purged on Edge server and not Sync Gateway")
+        sgw_doc = await sgw.get_document(
+            db_name="travel",
+            scope="travel",
+            collection="airlines",
+            doc_id="airline_10000",
+        )
+        assert sgw_doc.body["name"] == "Updated Airline", "Document should not have purged from Sync gateway"
+        failed=False
+        edge_doc=None
+        try:
+            edge_doc = await edge_server.get_document("travel", collection="travel.airlines", doc_id="airline_10000")
+        except Exception as e:
+            failed = True
+            self.mark_test_step(f"Document purged on Edge server as expected: {e}")
+        assert failed, f"Document not purged on Edge server {edge_doc}"
+        await edge_server.stop_replication(status[0]["task_id"])
+
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_to_edge_replication(
@@ -117,7 +135,7 @@ class TestEdgeServerSync(CBLTestClass):
         await edge_server2.reset_db()
         # 1. Configure Edge Server with travel dataset
         file_path = os.path.abspath(os.path.dirname(__file__))
-        file_path = str(Path(file_path, ".."))
+        file_path = str(Path(file_path, "../../.."))
         self.mark_test_step("Configure Edge Server with travel dataset")
         # Load the existing config to edge1
         config_path1 = (
@@ -181,19 +199,36 @@ class TestEdgeServerSync(CBLTestClass):
             "_id": "airline_10000",
             "type": "airline",
             "name": "Updated Airline",
-            "iata": "UPD",
+            "data": "UPD",
         }
 
         # Update via Edge HTTP client
         await client.put_document_with_id(
-            update_doc, "airline_10000", "travel", collection="travel.airlines"
+            update_doc, "airline_10000", "travel", collection="travel.airlines", ttl=30
         )
 
-        # Verify update propagated to SGW
-        sgw_doc = await edge_server2.get_document(
+        # Verify update propagated to ES1
+        edge_doc = await edge_server1.get_document(
             db_name="travel",
             scope="travel",
             collection="airlines",
             doc_id="airline_10000",
         )
-        assert sgw_doc.body["name"] == "Updated Airline", "Update not propagated"
+        assert edge_doc.body["name"] == "Updated Airline", "Update not propagated"
+        await asyncio.sleep(60)
+        self.mark_test_step("Verify TTL document purged on Edge server2 and not Edge server1")
+        edge_doc = await edge_server1.get_document(
+            db_name="travel",
+            scope="travel",
+            collection="airlines",
+            doc_id="airline_10000",
+        )
+        assert edge_doc.body["name"] == "Updated Airline", "Document should not have purged from Edge server1"
+        failed = False
+        try:
+            edge_doc = await edge_server2.get_document("travel", collection="travel.airlines", doc_id="airline_10000")
+        except Exception as e:
+            failed = True
+            self.mark_test_step(f"Document purged on Edge server2 as expected: {e}")
+        assert failed, f"Document not purged on Edge server2 {edge_doc}"
+        await edge_server2.stop_replication(status[0]["task_id"])

@@ -13,7 +13,7 @@
     "users": "/opt/couchbase-edge-server/users/users.json",
     "replications": [
         {
-            "source": "ws://10.100.150.164:4984/travel",
+            "source": "ws://10.100.150.166:4984/travel",
             "target": "travel",
             "bidirectional": true,
             "continuous": true,

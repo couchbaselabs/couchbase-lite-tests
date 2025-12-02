@@ -11,18 +11,6 @@
             "enable_client_sync": true
         }
     },
-    "replications": [
-        {
-            "source": "ws://172.23.96.195:4984/db-1",
-            "target": "db",
-            "bidirectional": true,
-            "continuous": true,
-            "auth": {
-                "user": "sync_gateway",
-                "password": "password"
-            }
-        }
-    ],
     "logging": {
         "console": false,
         "file": {

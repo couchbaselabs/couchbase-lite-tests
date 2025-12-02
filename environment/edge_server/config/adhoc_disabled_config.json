@@ -6,7 +6,7 @@
         "names":
         {
             "path": "/opt/couchbase-edge-server/database/names.cblite2",
-            "enable_adhoc_queries": true,
+            "enable_adhoc_queries": false,
             "enable_client_writes": true,
             "enable_client_sync": true,
             "queries":{"user_by_email": "SELECT meta().id FROM _default WHERE ARRAY_CONTAINS(contact.email, $email)\n"}
