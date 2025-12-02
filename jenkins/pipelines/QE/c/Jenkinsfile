@@ -61,7 +61,7 @@ pipeline {
                     
                     switch(platform) {
                         case 'ios':
-                            agentLabel = 'mac-mini-new'
+                            agentLabel = 'mac-mini-m4'
                             testCommand = "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                             artifactsDir = 'c_ios'
                             teardownScript = 'jenkins/pipelines/QE/c/teardown.sh'
@@ -86,7 +86,7 @@ pipeline {
                             usePowershell = true
                             break
                         case 'macos':
-                            agentLabel = 'mac-mini-new'
+                            agentLabel = 'mac-mini-m4'
                             testCommand = "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} macos '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
                             artifactsDir = 'c_macos'
                             teardownScript = 'jenkins/pipelines/QE/c/teardown.sh'
