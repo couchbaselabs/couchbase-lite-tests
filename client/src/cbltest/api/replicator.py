@@ -19,13 +19,9 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import TestServerRequestType
-from cbltest.v1.requests import (
-    PostGetReplicatorStatusRequestBody,
-    PostStartReplicatorRequestBody,
-)
-from cbltest.v1.responses import (
-    PostGetReplicatorStatusResponse,
-    PostStartReplicatorResponse,
+from cbltest.response_types import (
+    PostGetReplicatorStatusResponseMethods,
+    PostStartReplicatorResponseMethods,
 )
 from cbltest.version import VERSION
 
@@ -77,9 +73,6 @@ class Replicator:
         pinned_server_cert: str | None = None,
         headers: dict[str, str] | None = None,
     ):
-        assert database._request_factory.version == 1, (
-            "This version of the cbl test API requires request API v1"
-        )
         self.__database = database
         self.__index = database._index
         self.__request_factory = database._request_factory
@@ -130,20 +123,19 @@ class Replicator:
         Sends a replicatorStart request to the remote server
         """
         with self.__tracer.start_as_current_span("start_replicator"):
-            payload = PostStartReplicatorRequestBody(
-                self.__database.name, self.__endpoint
-            )
-            payload.replicatorType = self.replicator_type
-            payload.continuous = self.continuous
-            payload.authenticator = self.authenticator
-            payload.enableDocumentListener = self.enable_document_listener
-            payload.enableAutoPurge = self.enable_auto_purge
-            payload.pinnedServerCert = self.pinned_server_cert
-            payload.reset = self.reset
-            payload.collections = self.collections
-            payload.headers = self.headers
             req = self.__request_factory.create_request(
-                TestServerRequestType.START_REPLICATOR, payload
+                TestServerRequestType.START_REPLICATOR,
+                database=self.__database.name,
+                endpoint=self.__endpoint,
+                replicatorType=self.replicator_type,
+                continuous=self.continuous,
+                authenticator=self.authenticator,
+                enableDocumentListener=self.enable_document_listener,
+                enableAutoPurge=self.enable_auto_purge,
+                pinnedServerCert=self.pinned_server_cert,
+                reset=self.reset,
+                collections=self.collections,
+                headers=self.headers,
             )
             resp = await self.__request_factory.send_request(self.__index, req)
             if resp.error is not None:
@@ -151,7 +143,7 @@ class Replicator:
                 cbl_trace(resp.error.message)
                 return None
 
-            cast_resp = cast(PostStartReplicatorResponse, resp)
+            cast_resp = cast(PostStartReplicatorResponseMethods, resp)
             self.__id = cast_resp.replicator_id
 
     async def get_status(self) -> ReplicatorStatus:
@@ -160,12 +152,12 @@ class Replicator:
             if not self.is_started:
                 raise CblTestError("Replicator start call has not completed!")
 
-            payload = PostGetReplicatorStatusRequestBody(self.__id)
             req = self.__request_factory.create_request(
-                TestServerRequestType.REPLICATOR_STATUS, payload
+                TestServerRequestType.REPLICATOR_STATUS,
+                id=self.__id,
             )
             resp = await self.__request_factory.send_request(self.__index, req)
-            cast_resp = cast(PostGetReplicatorStatusResponse, resp)
+            cast_resp = cast(PostGetReplicatorStatusResponseMethods, resp)
             self.__document_updates.extend(cast_resp.documents)
             return ReplicatorStatus(
                 cast_resp.progress, cast_resp.activity, cast_resp.replicator_error

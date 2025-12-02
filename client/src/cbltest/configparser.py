@@ -1,5 +1,6 @@
 from enum import Enum
 from json import dumps, load
+from logging import warning
 from pathlib import Path
 from typing import Final
 
@@ -25,15 +26,15 @@ class TestServerInfo:
         return self.__url
 
     @property
-    def dataset_version(self) -> str:
+    def dataset_version(self) -> str | None:
         """Gets the dataset version of the test server instance"""
         return self.__dataset_version
 
     def __init__(self, data: dict):
         self.__url: str = _assert_string_entry(data, self.___url_key)
-        self.__dataset_version: str = _assert_string_entry(
-            data, self.__dataset_version_key
-        )
+        self.__dataset_version: str | None = None
+        if self.__dataset_version_key in data:
+            self.__dataset_version = _get_typed(data, self.__dataset_version_key, str)
 
 
 class SyncGatewayInfo:
@@ -181,18 +182,9 @@ class ParsedConfig:
         return self.__greenboard["password"]
 
     @property
-    def api_version(self) -> int:
-        """The passed API version that governs the creation of the request factory"""
-        return self.__api_version
-
-    @property
     def logslurp_url(self) -> str | None:
         """The URL of the optional logslurp server to send and collect logs"""
         return self.__logslurp_url
-
-    def dataset_version_at(self, i: int) -> str:
-        """The dataset version of the test server instance"""
-        return self.__test_servers[i][self.__dataset_version_key]
 
     def __init__(self, json: dict):
         self.__test_servers = _get_typed_nonnull(
@@ -203,7 +195,12 @@ class ParsedConfig:
             json, self.__cbs_key, list[dict], []
         )
         self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, list[str], [])
-        self.__api_version = _get_int_or_default(json, self.__api_version_key, 1)
+        if self.__api_version_key in json:
+            warning(
+                "The 'api-version' field in the config file is deprecated and will be "
+                "removed in future versions. Please remove it from your config."
+            )
+
         self.__greenboard = _get_typed(json, self.__greenboard_key, dict[str, str])
         if self.__greenboard is not None and (
             "hostname" not in self.__greenboard
@@ -218,10 +215,7 @@ class ParsedConfig:
 
     def __str__(self) -> str:
         ret_val = (
-            "API Version: "
-            + str(self.__api_version)
-            + "\n"
-            + "Test Servers: "
+            "Test Servers: "
             + dumps(self.__test_servers)
             + "\n"
             + "Sync Gateways: "

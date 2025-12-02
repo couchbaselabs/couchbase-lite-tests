@@ -56,6 +56,7 @@ info:
     * This is a breaking change: CBLTest-API-Version is now "2"
     * deprecate dataset_version
     * In ResetConfiguration, change the value for the "dataset" key to a url.
+    * In UpdateDatabase and VerifyDocuments change the updatedBlobs keys to urls
 
     1.2.2 (09/19/2025)
     * Add headers property to ReplicatorConfiguration

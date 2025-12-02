@@ -1,6 +1,5 @@
 import json
 from abc import ABC, abstractmethod
-from importlib import import_module
 from typing import cast
 from urllib.parse import urljoin
 from uuid import uuid4
@@ -12,6 +11,7 @@ from cbltest.configparser import TransportType
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.logging import cbl_trace, cbl_warning
 from cbltest.request_types import GetRootRequest, TestServerRequest, TestServerResponse
+from cbltest.responses import _response_registry
 from cbltest.websocket_router import WebSocketRouter
 
 
@@ -93,9 +93,12 @@ class _RequestHttpTransport(RequestTransport):
     async def _create_response(
         self, request_type: type, resp: ClientResponse, version: int, uuid: str
     ) -> TestServerResponse:
-        module = import_module(f"cbltest.v{version}.responses")
-        class_name = request_type.__name__.replace("Request", "Response")
-        response_class = getattr(module, class_name)
+        if (request_type, version) not in _response_registry:
+            raise ValueError(
+                f"Response type for '{request_type}' not registered for version {version}"
+            )
+
+        response_class = _response_registry[(request_type, version)]
         content: dict = {}
         if resp.content_length != 0:
             content_type = resp.headers["Content-Type"]
@@ -175,9 +178,12 @@ class _RequestWebSocketTransport(RequestTransport):
     def _create_response(
         self, request_type: type, ws_payload: dict, version: int, uuid: str
     ) -> TestServerResponse:
-        module = import_module(f"cbltest.v{version}.responses")
-        class_name = request_type.__name__.replace("Request", "Response")
-        response_class = getattr(module, class_name)
+        if (request_type, version) not in _response_registry:
+            raise ValueError(
+                f"Response type for '{request_type}' not registered for version {version}"
+            )
+
+        response_class = _response_registry[(request_type, version)]
 
         status = 200
         error = cast(dict | None, ws_payload.get("ts_error"))

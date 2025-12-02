@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import importlib
 import traceback
 from enum import Enum
-from importlib import import_module
 from pathlib import Path
 from shutil import rmtree
 from typing import cast
@@ -11,13 +11,13 @@ from uuid import UUID, uuid4
 from aiohttp import ClientSession
 
 from .api.error import CblTestServerBadResponseError
+from .api.jsonserializable import JSONSerializable
 from .configparser import ParsedConfig, TransportType
 from .httplog import get_next_writer
 from .logging import cbl_error, cbl_info
-from .request_types import GetRootRequest, TestServerRequest, TestServerRequestBody
+from .request_types import GetRootRequest, TestServerRequest
 from .requests_transport import RequestTransportFactory
-from .responses import TestServerResponse
-from .version import available_api_version
+from .responses import TestServerResponse, _response_registry
 from .websocket_router import WebSocketRouter
 
 
@@ -45,6 +45,34 @@ class TestServerRequestType(Enum):
         return self.value
 
 
+_request_registry: dict[tuple[TestServerRequestType, int], type] = {}
+_body_registry: dict[tuple[TestServerRequestType, int], type] = {}
+
+
+def register_request(request_type: TestServerRequestType, version: int | list[int]):
+    def deco(cls: type[TestServerRequest]) -> type:
+        if isinstance(version, list):
+            for v in version:
+                _request_registry[(request_type, v)] = cls
+        else:
+            _request_registry[(request_type, version)] = cls
+        return cls
+
+    return deco
+
+
+def register_body(request_type: TestServerRequestType, version: int | list[int]):
+    def deco(cls: type[JSONSerializable]) -> type:
+        if isinstance(version, list):
+            for v in version:
+                _body_registry[(request_type, v)] = cls
+        else:
+            _body_registry[(request_type, version)] = cls
+        return cls
+
+    return deco
+
+
 class RequestFactory:
     """
     This class is responsible for creating requests to send to the test server in a way
@@ -56,20 +84,12 @@ class RequestFactory:
 
     __first_run: bool = True
 
-    @property
-    def version(self) -> int:
-        """Gets the API version that this factory is using"""
-        return self.__version
-
-    @property
-    def uuid(self) -> UUID:
-        """Gets the UUID identifying this request factory"""
-        return self.__uuid
-
     def __init__(self, config: ParsedConfig):
         self.__record_path = Path("http_log")
-        if RequestFactory.__first_run and self.__record_path.exists():
-            rmtree(self.__record_path)
+        self.__version = 0
+        if RequestFactory.__first_run:
+            if self.__record_path.exists():
+                rmtree(self.__record_path)
 
         RequestFactory.__first_run = False
 
@@ -77,7 +97,6 @@ class RequestFactory:
             self.__record_path.mkdir()
 
         self.__uuid = uuid4()
-        self.__version = available_api_version(config.api_version)
         self.__server_infos: list[tuple[str, TransportType]] = []
         self.__session = ClientSession()
         ws_urls: list[str] = []
@@ -92,32 +111,59 @@ class RequestFactory:
 
         self.__ws_router = WebSocketRouter(ws_urls)
 
+        cbl_info(f"RequestFactory created ({self.__uuid})")
+
+    @property
+    def version(self) -> int:
+        """Gets the API version that this factory is using"""
+        assert self.__version > 0, "API version not set"
+        return self.__version
+
+    @version.setter
+    def version(self, value: int) -> None:
+        assert self.__version == 0, "API version can only be set once"
+        self.__version = value
+
+        for api_version in range(1, self.__version + 1):
+            importlib.import_module(f"cbltest.v{api_version}.requests")
+            importlib.import_module(f"cbltest.v{api_version}.responses")
+
+        for request_tuple in _request_registry:
+            version = request_tuple[1]
+            request_cls = _request_registry[request_tuple]
+            if (request_cls, version) not in _response_registry:
+                raise ValueError(
+                    f"Response type for '{request_cls}' not registered for version {version}!"
+                )
+
         cbl_info(
-            f"RequestFactory created with API version {self.__version} ({self.__uuid})"
+            f"RequestFactory ({self.__uuid}) initialized for version {self.__version}"
         )
+
+    @property
+    def uuid(self) -> UUID:
+        """Gets the UUID identifying this request factory"""
+        return self.__uuid
 
     async def start(self) -> None:
         await self.__ws_router.start()
 
     def _create_request(
-        self, name: str, payload: TestServerRequestBody | None = None
+        self, type: TestServerRequestType, **kwargs
     ) -> TestServerRequest:
-        if payload is not None and self.__version != payload.version:
+        if (type, self.__version) not in _request_registry:
             raise ValueError(
-                f"Request factory version {self.__version} does not match payload version {payload.version}!"
+                f"Request type '{type}' not registered for version {self.__version}"
             )
 
-        module = import_module(f"cbltest.v{self.__version}.requests")
-        request_class = getattr(module, name)
-        if payload is None:
-            return cast(TestServerRequest, request_class(self.__uuid))
-
-        return cast(TestServerRequest, request_class(self.__uuid, payload))
+        request_class = _request_registry[(type, self.__version)]
+        payload = self._create_body(type, **kwargs)
+        return cast(
+            TestServerRequest, request_class(self.__version, self.__uuid, payload)
+        )
 
     def create_request(
-        self,
-        type: TestServerRequestType,
-        payload: TestServerRequestBody | None = None,
+        self, type: TestServerRequestType, **kwargs
     ) -> TestServerRequest:
         """
         Creates a request to send.
@@ -125,14 +171,25 @@ class RequestFactory:
         :param type: The type of request to create
         :param payload: The payload to send with the request
         """
-        if type != TestServerRequestType.ROOT and payload is None:
-            raise ValueError("No payload provided!")
-
         return (
             GetRootRequest(self.__uuid)
             if type == TestServerRequestType.ROOT
-            else self._create_request(str(type), payload)
+            else self._create_request(type, **kwargs)
         )
+
+    def _create_body(
+        self, type: TestServerRequestType, **kwargs
+    ) -> JSONSerializable | None:
+        if type == TestServerRequestType.ROOT:
+            return None
+
+        if (type, self.__version) not in _body_registry:
+            raise ValueError(
+                f"Request body type '{type}' not registered for version {self.__version}"
+            )
+
+        body_class = _body_registry[(type, self.__version)]
+        return cast(JSONSerializable, body_class(**kwargs))
 
     async def send_request(
         self, index: int, r: TestServerRequest

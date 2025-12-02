@@ -6,7 +6,20 @@ from typing import Any, Final
 from cbltest.api.error_types import ErrorResponseBody
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.jsonhelper import _get_typed, _get_typed_required
-from cbltest.version import available_api_version
+
+_response_registry: dict[tuple[type, int], type] = {}
+
+
+def register_response(request_type: type, version: int | list[int]):
+    def deco(cls: type[TestServerResponse]) -> type:
+        if isinstance(version, list):
+            for v in version:
+                _response_registry[(request_type, v)] = cls
+        else:
+            _response_registry[(request_type, version)] = cls
+        return cls
+
+    return deco
 
 
 class ServerVariant(Flag):
@@ -30,11 +43,6 @@ class ServerVariant(Flag):
 
 class TestServerResponse(JSONSerializable):
     @property
-    def version(self) -> int:
-        """Gets the API version of the response, as specified by the remote server"""
-        return self.__version
-
-    @property
     def uuid(self) -> str:
         """Gets the UUID of the remote server that sent this response"""
         return self.__uuid
@@ -53,12 +61,10 @@ class TestServerResponse(JSONSerializable):
         self,
         status_code: int,
         uuid: str,
-        version: int,
         body: dict,
         http_name: str,
         http_method: str = "post",
     ):
-        self.__version = available_api_version(version)
         self.__status_code = status_code
         self.__uuid = uuid
         self.__error = ErrorResponseBody.create(body)
@@ -71,7 +77,7 @@ class TestServerResponse(JSONSerializable):
         return self.__payload
 
     def __str__(self) -> str:
-        return f"<- {self.__uuid} v{self.__version} {self.__http_method.upper()} /{self.__http_name} {self.__status_code}"
+        return f"<- {self.__uuid} {self.__http_method.upper()} /{self.__http_name} {self.__status_code}"
 
 
 class GetRootResponse(TestServerResponse):
@@ -143,4 +149,4 @@ class GetRootResponse(TestServerResponse):
         self.__device = _get_typed_required(json, self.__device_key, dict)
         self.__additional_info = _get_typed(json, self.__additional_info_key, str)
 
-        super().__init__(status_code, uuid, self.__api_version, json, "", "get")
+        super().__init__(status_code, uuid, json, "", "get")
