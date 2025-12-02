@@ -51,7 +51,7 @@ class RemoteShellConnection:
 
     async def take_offline(self) -> bool:
         try:
-            command = "sudo iptables -A OUTPUT -d 172.23.96.195 -j REJECT"
+            command = "sudo iptables -A OUTPUT -d 172.23.104.211 -j REJECT"
             await self.ssh_client.run(command, check=True)
             return True
         except Exception as e:
@@ -59,7 +59,7 @@ class RemoteShellConnection:
 
     async def bring_online(self) -> bool:
         try:
-            command = "sudo iptables -D OUTPUT -d 172.23.96.195 -j REJECT"
+            command = "sudo iptables -D OUTPUT -d 172.23.104.211 -j REJECT"
             await self.ssh_client.run(command, check=True)
             return True
         except Exception as e:
@@ -84,7 +84,6 @@ class RemoteShellConnection:
         except Exception as e:
             return []
 
-
     async def is_edge_server_running(self) -> bool:
         try:
             result = await self.ssh_client.run("systemctl status couchbase-edge-server", check=True)
@@ -104,6 +103,7 @@ class RemoteShellConnection:
             return True
         except Exception as e:
             return False
+            
     async def add_user(self,name,password, role):
         try:
             command=f"/opt/couchbase-edge-server/bin/couchbase-edge-server --add-user /opt/couchbase-edge-server/users/users.json {name} --create --role {role} --password {password}"
@@ -121,6 +121,7 @@ class RemoteShellConnection:
             return response
         except Exception as e:
             return e
+
     async def reset_db(self,local_database_path=None):
         await self.ssh_client.run(
             "find /opt/couchbase-edge-server/database/ -type f -name '*.cblite2' -delete; "
@@ -154,4 +155,3 @@ class RemoteShellConnection:
             return True
         except Exception as e:
             return False
-

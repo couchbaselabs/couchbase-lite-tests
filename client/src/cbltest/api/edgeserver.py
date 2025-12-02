@@ -5,7 +5,6 @@ import json
 from json import dumps, loads
 from operator import truediv
 from pathlib import Path
-from symbol import raise_stmt
 from typing import Dict, List, Tuple, cast, Any, Optional
 from urllib.parse import urljoin
 import pyjson5 as json5
@@ -85,7 +84,7 @@ class EdgeServer:
         if config_file is None:
             # repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
             # config_file = str(repo_root / "environment" / "edge_server" / "config" / "config.json")
-            config_file = "../environment/edge_server/config/config.json"
+            config_file = "environment/edge_server/config/config.json"
             # config_file= file_path + "/" + "environment/edge_server/config/config.json"
         port,secure,mtls,certfile,keyfile,is_auth,databases,is_anonymous_auth=self._decode_config_file(config_file)
         self.__secure: bool = secure
@@ -168,6 +167,14 @@ class EdgeServer:
         if '?' in path:
             path = path.replace('?','\?')
 
+        # Add query parameters to URL if present
+        if params:
+            query_string = "&".join([f"{k}={v}" for k, v in params.items()])
+            if "?" in path:
+                path = f"{path}&{query_string}"
+            else:
+                path = f"{path}?{query_string}"
+
         curl_command+= f"{self.scheme}{self.__hostname}:{self.__port}{path} "
         if headers:
             for key, value in headers.items():
@@ -179,9 +186,7 @@ class EdgeServer:
                 json_data=json.dumps(data)
             json_data = json_data.replace('"', '\\"')
             json_data = json_data.replace("$", "\$")
-            curl_command += f" -d \"{json_data}\""
-        if params:
-            curl_command += f" {' '.join([f'--{k}={v}' for k, v in params.items()])}"
+            curl_command += f' -d "{json_data}"'
 
         print(curl_command)
         return curl_command
@@ -522,15 +527,38 @@ class EdgeServer:
                 raise CblEdgeServerBadResponseError(500,
                                                     f"add document with auto ID Edge Server had error '{cast_resp['reason']}'")
             return cast_resp
+
     # single create or update . For update provide rev_id
-    async def put_document_with_id(self,document: dict,id:str,db_name:str,scope:str="",collection:str="",curl:bool=False, rev:str=None)->dict:
+    async def put_document_with_id(
+        self,
+        document: dict,
+        id: str,
+        db_name: str,
+        scope: str = "",
+        collection: str = "",
+        curl: bool = False,
+        rev: str = None,
+        ttl: int = None,
+        expires: int = None,
+    ) -> dict:
         with self.__tracer.start_as_current_span("add document with ID", attributes={"cbl.database.name": db_name,
                                                                                   "cbl.scope.name": scope,
                                                                                   "cbl.collection.name": collection}):
             keyspace = self.keyspace_builder(db_name, scope, collection)
             if rev:
                 document["_rev"] = rev
-            response = await self._send_request("put",f"/{keyspace}/{id}",payload=JSONDictionary(document),curl=curl)
+            params = {}
+            if ttl is not None:
+                params["ttl"] = str(ttl)
+            if expires is not None:
+                params["expires"] = str(expires)
+            response = await self._send_request(
+                "put",
+                f"/{keyspace}/{id}",
+                payload=JSONDictionary(document),
+                curl=curl,
+                params=params if params else None,
+            )
             if curl:
                 return response
             if not isinstance(response, dict):
@@ -697,5 +725,28 @@ class EdgeServer:
             await self.__ssh_client.close()
             return result
 
+    async def close(self) -> None:
+        """
+        Closes the Edge Server session
+        """
+        if self.__session and not self.__session.closed:
+            try:
+                await self.__session.close()
+            except Exception:
+                # Ignore errors during cleanup to ensure other resources can still be closed
+                pass
 
+    async def reset_db_uuid(self, db_name: str) -> bool:
+        await self.kill_server()
+        await self.__ssh_client.connect()
+        await self.__ssh_client.reset_db_uuid(db_name)
+        await self.start_server()
 
+    async def check_log(
+        self, search_string: str, log_file: str = "/tmp/EdgeServerAuditLog.txt"
+    ) -> List[str]:
+        await self.__ssh_client.connect()
+        try:
+            return await self.__ssh_client.check_log(search_string, log_file)
+        finally:
+            await self.__ssh_client.close()

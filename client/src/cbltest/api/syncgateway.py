@@ -3,7 +3,7 @@ import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Dict, List, cast
 from urllib.parse import urljoin
 
 import paramiko
@@ -1235,7 +1235,11 @@ class SyncGateway:
         Closes the Sync Gateway session
         """
         if not self.__admin_session.closed:
-            await self.__admin_session.close()
+            try:
+                await self.__admin_session.close()
+            except Exception:
+                # Ignore errors during cleanup to ensure other resources can still be closed
+                pass
 
     async def get_database_config(self, db_name: str) -> dict[str, Any]:
         """
@@ -1379,7 +1383,6 @@ class SyncGateway:
 
             return RemoteDocument(cast_resp)
 
-
     async def fetch_log_file(
         self,
         log_type: str,
@@ -1432,7 +1435,6 @@ class SyncGateway:
                 ssh.close()
 
             return log_contents
-
 
 def scan_logs_for_untagged_sensitive_data(
     log_content: str,
