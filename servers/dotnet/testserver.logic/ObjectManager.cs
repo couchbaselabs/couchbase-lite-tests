@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System.IO.Compression;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
 using TestServer.Handlers;
@@ -19,15 +21,13 @@ namespace TestServer
         private readonly Dictionary<string, IDisposable> _activeDisposables = new();
         private readonly HashSet<object> _keepAlives = new();
         private readonly AsyncReaderWriterLock _lock = new AsyncReaderWriterLock();
-        private readonly string _datasetVersion;
         private readonly HttpClient _httpClient = new HttpClient();
 
         public readonly string FilesDirectory;
 
-        public ObjectManager(string filesDirectory, string datasetVersion)
+        public ObjectManager(string filesDirectory)
         {
             FilesDirectory = filesDirectory;
-            _datasetVersion = datasetVersion;
             Directory.CreateDirectory(FilesDirectory);
         }
 
@@ -52,21 +52,28 @@ namespace TestServer
 
             _activeDisposables.Clear();
 
-            
+
             _keepAlives.Clear();
         }
 
-        public async Task LoadDatabase(string? datasetName, IEnumerable<string> targetDbNames, IEnumerable<string>? collections = null)
+        public async Task LoadDatabase(string? datasetUrlString, IEnumerable<string> targetDbNames, IEnumerable<string>? collections = null)
         {
-            IEnumerable<string> targetsToCreate = default!;
+            Uri? datasetUrl = null;
+            string? datasetName = null;
+            if (datasetUrlString != null) {
+                datasetUrl = new(datasetUrlString);
+                datasetName = datasetUrl.AbsolutePath.Split('/').Last().Split('.').First();
+            }
+
+            IEnumerable<string> targetsToCreate;
             using (var rl = _lock.ReaderLock()) {
-                targetsToCreate = targetDbNames.Where(x => !_activeDatabases.ContainsKey(x));
+                targetsToCreate = targetDbNames.Where(x => !_activeDatabases.ContainsKey(x)).ToArray();
                 if (!targetsToCreate.Any()) {
                     return;
                 }
             }
 
-            void CreateNewDatabases(string? datasetName, IEnumerable<string>? collections)
+            void CreateNewDatabases()
             {
                 foreach (var targetName in targetsToCreate) {
                     if (Database.Exists(targetName, FilesDirectory)) {
@@ -80,27 +87,29 @@ namespace TestServer
 
                     if (datasetName != null) {
                         Database.Copy(Path.Join(FilesDirectory, $"{datasetName}.cblite2"), targetName, dbConfig);
-                        _activeDatabases[targetName] = new Database(targetName, dbConfig);
+                        _activeDatabases[targetName] = new(targetName, dbConfig);
                     } else {
                         var newDb = new Database(targetName, dbConfig);
                         _activeDatabases[targetName] = newDb;
-                        if (collections != null) {
-                            foreach (var c in collections) {
-                                var collSpec = HandlerList.CollectionSpec(c);
-                                using var coll = newDb.CreateCollection(collSpec.name, collSpec.scope);
-                            }
+                        if (collections == null) {
+                            continue;
+                        }
+
+                        foreach (var c in collections) {
+                            var collSpec = HandlerList.CollectionSpec(c);
+                            using var coll = newDb.CreateCollection(collSpec.name, collSpec.scope);
                         }
                     }
 
                 }
             }
 
-            if(datasetName == null) {
-                CreateNewDatabases(null, collections);
+            if(datasetUrl == null || datasetName == null) {
+                CreateNewDatabases();
                 return;
             }
 
-            using var asset = await DownloadIfNecessary($"dbs/{_datasetVersion}/{datasetName}.cblite2.zip");
+            await using var asset = await DownloadIfNecessary(datasetUrl);
             if(asset == null) {
                 throw new JsonException($"Request for nonexistent dataset '{datasetName}'");
             }
@@ -110,9 +119,8 @@ namespace TestServer
                 File.Delete(destinationZip);
             }
 
-            using (var fout = File.OpenWrite(destinationZip)) {
-                asset.CopyTo(fout);
-                asset.Dispose();
+            await using (var fout = File.OpenWrite(destinationZip)) {
+                await asset.CopyToAsync(fout);
             }
 
             if (Database.Exists(datasetName, FilesDirectory)) {
@@ -120,14 +128,19 @@ namespace TestServer
             }
 
             ZipFile.ExtractToDirectory(destinationZip, FilesDirectory);
-            CreateNewDatabases(datasetName, null);
+            CreateNewDatabases();
             Database.Delete(datasetName, FilesDirectory);
         }
 
-        public async Task<Stream> LoadBlob(string name)
+        public async Task<Stream> LoadBlob(string blobUrlString)
         {
-            var retVal = await DownloadIfNecessary($"blobs/{name}").ConfigureAwait(false);
-            return retVal ?? throw new JsonException($"Request for nonexistent blob '{name}'");
+            var retVal = await DownloadIfNecessary(new(blobUrlString)).ConfigureAwait(false);
+            if (retVal != null) {
+                return retVal;
+            }
+
+            var name = blobUrlString.Split('/').Last();
+            throw new JsonException($"Request for nonexistent blob '{name}'");
         }
 
         public Database? GetDatabase(string name)
@@ -151,19 +164,27 @@ namespace TestServer
         public T? GetObject<T>(string name) where T : class, IDisposable
         {
             if(!_activeDisposables.TryGetValue(name, out var retVal)) {
-                return default;
+                return null;
             }
 
-            if(retVal is not T castVal) {
-                return default;
-            }
-
-            return castVal;
+            return retVal as T;
         }
 
-        private async Task<Stream?> DownloadIfNecessary(string relativePath)
+        private static string ToHexFolderName(byte[] bytes)
         {
-            var downloadedPath = Path.Combine(FilesDirectory, "downloaded", relativePath);
+            var sb = new StringBuilder(bytes.Length * 2);
+            foreach (var b in bytes)
+            {
+                sb.Append(b.ToString("x2"));
+            }
+            return sb.ToString();
+        }
+
+        private async Task<Stream?> DownloadIfNecessary(Uri datasetUrl)
+        {
+            var localFile = datasetUrl.AbsolutePath.Split('/').Last();
+            var subfolder = SHA1.HashData(Encoding.ASCII.GetBytes(datasetUrl.AbsolutePath));
+            var downloadedPath = Path.Combine(FilesDirectory, "downloaded", ToHexFolderName(subfolder), localFile);
             if (File.Exists(downloadedPath)) {
                 return File.OpenRead(downloadedPath);
             }
@@ -175,7 +196,7 @@ namespace TestServer
 
             Stream retVal;
             try {
-                retVal = await _httpClient.GetStreamAsync($"{GithubBaseUrl}/{relativePath}");
+                retVal = await _httpClient.GetStreamAsync(datasetUrl).ConfigureAwait(false);
             } catch (HttpRequestException ex) {
                 if(ex.StatusCode == HttpStatusCode.NotFound) {
                     return null;
@@ -183,11 +204,11 @@ namespace TestServer
 
                 throw;
             } catch (Exception ex) {
-                throw new ApplicationException($"Unable to download item '{relativePath}'", ex);
+                throw new ApplicationException($"Unable to download item '{localFile}'", ex);
             }
 
             using var wl = await _lock.WriterLockAsync();
-            using (var fout = File.Create(downloadedPath)) {
+            await using (var fout = File.Create(downloadedPath)) {
                 await retVal.CopyToAsync(fout).ConfigureAwait(false);
             }
 

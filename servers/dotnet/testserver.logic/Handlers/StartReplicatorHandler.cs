@@ -11,7 +11,7 @@ using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 using FilterGenerator = Func<IReadOnlyDictionary<string, JsonElement>?, HandlerList.IReplicatorFilter>;
-using FilterFunction = Func<Document, DocumentFlags, bool>; 
+using FilterFunction = Func<Document, DocumentFlags, bool>;
 
 internal static partial class HandlerList
 {
@@ -164,7 +164,7 @@ internal static partial class HandlerList
             if (type != BasicType) {
                 return;
             }
-            
+
             this.username = username ?? throw new JsonException("Missing username property in auth");
             this.password = password ?? throw new JsonException("Missing password property in auth");
         }
@@ -261,7 +261,7 @@ internal static partial class HandlerList
         public bool enableAutoPurge { get; init; }
 
         public string? pinnedServerCert { get; init; }
-        
+
         public IReadOnlyDictionary<string, string?>? headers { get; init; }
 
         [JsonConstructor]
@@ -291,7 +291,7 @@ internal static partial class HandlerList
                 throw new JsonException($"Invalid replicatorType '{replicatorType}' (expecting push, pull, or pushAndPull)");
             }
         }
-    } 
+    }
 
     [SuppressMessage("ReSharper", "InconsistentNaming")]
     [method: JsonConstructor]
@@ -305,7 +305,7 @@ internal static partial class HandlerList
         if (input is null) {
             return null;
         }
-        
+
         if(!ReplicatorFilters.FilterMap.TryGetValue(input.name, out var filterGen)) {
             throw new JsonException($"Unknown push filter {input.name}");
         }
@@ -316,15 +316,15 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("startReplicator")]
-    public static Task StartReplicatorHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
+    public static Task StartReplicatorHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if(!body.RootElement.TryDeserialize<StartReplicatorBody>(response, version, out var deserializedBody)) {
+        if(!body.RootElement.TryDeserialize<StartReplicatorBody>(response, out var deserializedBody)) {
             return Task.CompletedTask;
         }
 
         var db = session.ObjectManager.GetDatabase(deserializedBody.config.database);
         if (db == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{deserializedBody.config.database}'!"), version, HttpStatusCode.BadRequest);
+            response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{deserializedBody.config.database}'!"), HttpStatusCode.BadRequest);
             return Task.CompletedTask;
         }
 
@@ -336,7 +336,7 @@ internal static partial class HandlerList
                     var spec = CollectionSpec(name);
                     var coll = db.GetCollection(spec.name, spec.scope);
                     if (coll == null) {
-                        response.WriteBody(Router.CreateErrorResponse($"Unable to find collection '{name}'"), version, HttpStatusCode.BadRequest);
+                        response.WriteBody(Router.CreateErrorResponse($"Unable to find collection '{name}'"), HttpStatusCode.BadRequest);
                         return Task.CompletedTask;
                     }
 
@@ -361,8 +361,8 @@ internal static partial class HandlerList
             Continuous = deserializedBody.config.continuous,
             ReplicatorType = deserializedBody.config.ReplicatorType,
             EnableAutoPurge = deserializedBody.config.enableAutoPurge,
-            PinnedServerCertificate = deserializedBody.config.pinnedServerCert != null 
-                ? new(Encoding.ASCII.GetBytes(deserializedBody.config.pinnedServerCert)) 
+            PinnedServerCertificate = deserializedBody.config.pinnedServerCert != null
+                ? new(Encoding.ASCII.GetBytes(deserializedBody.config.pinnedServerCert))
                 : null,
             Headers = deserializedBody.config.headers?.ToImmutableDictionary() ?? ImmutableDictionary<string, string?>.Empty,
         };
@@ -374,7 +374,7 @@ internal static partial class HandlerList
 
         repl.Start(deserializedBody.reset);
 
-        response.WriteBody(new { id }, version);
+        response.WriteBody(new { id });
         return Task.CompletedTask;
     }
 }

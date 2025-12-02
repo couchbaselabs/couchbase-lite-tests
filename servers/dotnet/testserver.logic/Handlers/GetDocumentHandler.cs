@@ -17,9 +17,9 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("getDocument")]
-    public static Task GetDocumentHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
+    public static Task GetDocumentHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<GetDocumentBody>(response, version, out var deserializedBody)) {
+        if (!body.RootElement.TryDeserialize<GetDocumentBody>(response, out var deserializedBody)) {
             return Task.CompletedTask;
         }
 
@@ -32,17 +32,17 @@ internal static partial class HandlerList
                 message = $"database '{deserializedBody.database}' not registered!"
             };
 
-            response.WriteBody(errorObject, version, HttpStatusCode.BadRequest);
+            response.WriteBody(errorObject, HttpStatusCode.BadRequest);
             return Task.CompletedTask;
         }
 
         var collSpec = CollectionSpec(deserializedBody.document.collection);
-        using var collection = dbObject.GetCollection(collSpec.name, collSpec.scope) 
+        using var collection = dbObject.GetCollection(collSpec.name, collSpec.scope)
             ?? throw new JsonException($"Collection {deserializedBody.document.id} does not exist in db!");
 
         using var doc = collection.GetDocument(deserializedBody.document.id);
         if(doc == null) {
-            response.WriteEmptyBody(version, HttpStatusCode.NotFound);
+            response.WriteEmptyBody(HttpStatusCode.NotFound);
             return Task.CompletedTask;
         }
 
@@ -50,7 +50,7 @@ internal static partial class HandlerList
         documentBody["_id"] = deserializedBody.document.id;
         documentBody["_revs"] = doc.RevisionIDs();
 
-        response.WriteBody(documentBody, version);
+        response.WriteBody(documentBody);
         return Task.CompletedTask;
     }
 }

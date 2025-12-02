@@ -24,19 +24,19 @@ internal static partial class HandlerList
     internal readonly record struct ErrorReturnBody(string domain, int code, string message);
 
     [SuppressMessage("ReSharper", "InconsistentNaming")]
-    internal record struct ReplicatorStatusReturnBody(string activity, ReplicatorProgressReturnBody progress, 
+    internal record struct ReplicatorStatusReturnBody(string activity, ReplicatorProgressReturnBody progress,
         IReadOnlyList<DocumentReplicationEvent> documents, ErrorReturnBody? error = null);
 
     [HttpHandler("getReplicatorStatus")]
-    public static Task ReplicatorStatusHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
+    public static Task ReplicatorStatusHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if(!body.RootElement.TryDeserialize<ReplicatorStatusBody>(response, version, out var replicatorStatusBody)) {
+        if(!body.RootElement.TryDeserialize<ReplicatorStatusBody>(response, out var replicatorStatusBody)) {
             return Task.CompletedTask;
         }
 
         var replicator = session.ObjectManager.GetObject<Replicator>(replicatorStatusBody.id);
         if(replicator == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find replicator with id '{replicatorStatusBody.id}'"), version, HttpStatusCode.BadRequest);
+            response.WriteBody(Router.CreateErrorResponse($"Unable to find replicator with id '{replicatorStatusBody.id}'"), HttpStatusCode.BadRequest);
             return Task.CompletedTask;
         }
 
@@ -61,7 +61,7 @@ internal static partial class HandlerList
         }
 
         var retVal = new ReplicatorStatusReturnBody(activity, new ReplicatorProgressReturnBody(complete), docs, error);
-        response.WriteBody(retVal, version);
+        response.WriteBody(retVal);
         return Task.CompletedTask;
     }
 }

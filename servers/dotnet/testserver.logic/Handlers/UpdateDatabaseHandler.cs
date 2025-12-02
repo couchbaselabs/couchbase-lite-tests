@@ -81,7 +81,7 @@ internal static partial class HandlerList
         ["jpg"] = "image/jpeg"
     };
 
-    private static string BlobType(string filename) => 
+    private static string BlobType(string filename) =>
         BlobTypeMap.TryGetValue(filename.Split(".").Last(), out var type) ? type : "application/octet-stream";
 
     private static Collection GetCollection(Database db, string name)
@@ -111,15 +111,15 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("updateDatabase")]
-    public static async Task UpdateDatabaseHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
+    public static async Task UpdateDatabaseHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if(!body.RootElement.TryDeserialize<UpdateDatabaseBody>(response, version, out var updateBody)) {
+        if(!body.RootElement.TryDeserialize<UpdateDatabaseBody>(response, out var updateBody)) {
             return;
         }
 
         var db = session.ObjectManager.GetDatabase(updateBody.database);
         if(db == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{updateBody.database}'"), version, HttpStatusCode.BadRequest);
+            response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{updateBody.database}'"), HttpStatusCode.BadRequest);
             return;
         }
 
@@ -167,7 +167,7 @@ internal static partial class HandlerList
 
                             if (entry.updatedBlobs != null) {
                                 UpdateDictionaryProperties(doc, entry.updatedBlobs
-                                        .Select(x => new Dictionary<string, object> { 
+                                        .Select(x => new Dictionary<string, object> {
                                             [x.Key] = blobUpdate[$"{entry.collection}/{entry.documentID}/{x.Key}"] })
                                         .ToList());
                             }
@@ -184,13 +184,13 @@ internal static partial class HandlerList
                 domain = TestServerErrorDomain.TestServer,
                 code = 1,
                 message = e.Message
-            }, version, HttpStatusCode.BadRequest);
+            }, HttpStatusCode.BadRequest);
         } finally {
             foreach(var blob in blobUpdate.Values) {
                 ((Blob)blob).ContentStream?.Dispose();
             }
         }
 
-        response.WriteEmptyBody(version);
+        response.WriteEmptyBody();
     }
 }

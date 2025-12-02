@@ -51,15 +51,15 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("snapshotDocuments")]
-    public static Task SnapshotDocumentsHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
+    public static Task SnapshotDocumentsHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<SnapshotDocumentBody>(response, version, out var snapshotBody)) {
+        if (!body.RootElement.TryDeserialize<SnapshotDocumentBody>(response, out var snapshotBody)) {
             return Task.CompletedTask;
         }
 
         var db = session.ObjectManager.GetDatabase(snapshotBody.database);
         if (db == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{snapshotBody.database}'!"), version, HttpStatusCode.BadRequest);
+            response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{snapshotBody.database}'!"), HttpStatusCode.BadRequest);
             return Task.CompletedTask;
         }
 
@@ -70,7 +70,7 @@ internal static partial class HandlerList
             snapshot[$"{collSpec.scope}.{collSpec.name}.{snapshotEntry.id}"] = doc;
         }
 
-        response.WriteBody(new { id }, version);
+        response.WriteBody(new { id });
         return Task.CompletedTask;
     }
 }

@@ -46,7 +46,7 @@ internal sealed class LogSlurpSink : ILogEventSink
     }
 }
 
-internal static class SerilogExtensions 
+internal static class SerilogExtensions
 {
     internal const string DefaultSlurpOutputTemplate = "[{@l:u3}]: {@m}\n{@x}";
 
@@ -59,23 +59,23 @@ internal static class SerilogExtensions
 
 internal record NewSessionLoggingInfo(string url, string tag);
 
-internal readonly record struct NewSessionBody(string id, string dataset_version = "3.2", NewSessionLoggingInfo? logging = null);
+internal readonly record struct NewSessionBody(string id, NewSessionLoggingInfo? logging = null);
 
 internal static partial class HandlerList
 {
     private static Serilog.ILogger? Original = null;
 
     [HttpHandler("newSession", noSession: true)]
-    public static Task NewSessionHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task NewSessionHandler(JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<NewSessionBody>(response, version, out var newSessionBody)) {
+        if (!body.RootElement.TryDeserialize<NewSessionBody>(response, out var newSessionBody)) {
             return Task.CompletedTask;
         }
 
-        Session.Create(CBLTestServer.ServiceProvider, newSessionBody.id, newSessionBody.dataset_version);
+        Session.Create(CBLTestServer.ServiceProvider, newSessionBody.id);
 
         if(newSessionBody.logging == null) {
-            response.WriteEmptyBody(version);
+            response.WriteEmptyBody();
             return Task.CompletedTask;
         }
 
@@ -93,7 +93,7 @@ internal static partial class HandlerList
 
         Log.Information("Test server consolidated logging started");
 
-        response.WriteEmptyBody(version);
+        response.WriteEmptyBody();
         return Task.CompletedTask;
     }
 }

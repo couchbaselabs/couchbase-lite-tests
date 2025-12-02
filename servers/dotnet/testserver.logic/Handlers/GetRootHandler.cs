@@ -12,18 +12,17 @@ namespace TestServer.Handlers;
 internal static partial class HandlerList
 {
     [HttpHandler("", noSession: true)]
-    public static Task GetRootHandler(int version, JsonDocument body, HttpListenerResponse response)
+    public static Task GetRootHandler(JsonDocument body, HttpListenerResponse response)
     {
-        var resolvedVersion = version != 0 ? version : CBLTestServer.MaxApiVersion;
         var responseBody = new
         {
             version = typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
-            apiVersion = resolvedVersion,
+            apiVersion = CBLTestServer.ApiVersion,
             cbl = "couchbase-lite-net",
-            device = CBLTestServer.ServiceProvider.GetRequiredService<IDeviceInformation>() 
+            device = CBLTestServer.ServiceProvider.GetRequiredService<IDeviceInformation>()
         };
 
-        response.WriteBody(responseBody, resolvedVersion);
+        response.WriteBody(responseBody);
         return Task.CompletedTask;
     }
 }

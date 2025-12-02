@@ -1,7 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using System.Net;
+﻿using System.Net;
 using System.Reflection;
-using TestServer.Services;
 
 namespace TestServer
 {
@@ -9,7 +7,7 @@ namespace TestServer
     {
         #region Constants
 
-        public static readonly int MaxApiVersion = 1;
+        public static readonly int ApiVersion = 2;
 
         public static readonly string ServerID = Guid.NewGuid().ToString();
 
@@ -84,7 +82,7 @@ namespace TestServer
                 }
 
                 if (!IsValidMethod(nextRequest.Request)) {
-                    nextRequest.Response.WriteEmptyBody(MaxApiVersion, HttpStatusCode.MethodNotAllowed);
+                    nextRequest.Response.WriteEmptyBody(HttpStatusCode.MethodNotAllowed);
                     continue;
                 }
 
@@ -94,7 +92,7 @@ namespace TestServer
                     int.TryParse(versionHeader, out version);
                 }
 
-                var clientId = nextRequest.Request.Headers.Get(Router.ClientIdHeader);                
+                var clientId = nextRequest.Request.Headers.Get(Router.ClientIdHeader);
                 var _ = Router.Handle(clientId, nextRequest.Request.Url, nextRequest.Request.InputStream ?? NullStream, nextRequest.Response, version)
                     .ContinueWith(t => Serilog.Log.Logger.Warning("Exception caught during router handling: {e}", t.Exception?.InnerException),
                     TaskContinuationOptions.OnlyOnFaulted);
