@@ -1307,10 +1307,11 @@ class _SyncGatewayBase:
             return cast(dict, resp)
 
     async def wait_for_sgcollect_to_complete(
-        self, max_attempts: int = 60, wait_time: int = 5
+        self, max_attempts: int = 60, wait_time: int = 2
     ) -> None:
         """
-        Waits for SGCollect to complete
+        Waits for SGCollect to complete, polling until the status is 'stopped' or 'completed'.
+        Polls 60 times, waiting 2 seconds between each poll.
 
         :param max_attempts: Maximum number of attempts to wait for SGCollect to complete
         :param wait_time: Time to wait between attempts
