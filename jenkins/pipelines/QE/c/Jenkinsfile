@@ -79,7 +79,7 @@ pipeline {
                             teardownScript = 'jenkins/pipelines/QE/c/teardown.sh'
                             break
                         case 'windows':
-                            agentLabel = 'net-windows-client-sync-gateway-agent'
+                            agentLabel = 'net-windows'
                             testCommand = "jenkins\\pipelines\\QE\\c\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
                             artifactsDir = 'c_windows'
                             teardownScript = 'jenkins\\pipelines\\QE\\c\\teardown.ps1'
