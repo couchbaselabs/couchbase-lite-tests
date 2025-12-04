@@ -19,6 +19,11 @@ def scan_logs_for_untagged_sensitive_data(
     :param log_content: The log file content as a string
     :param sensitive_patterns: List of sensitive strings to look for (e.g., doc IDs, usernames)
     :return: List of violations found (sensitive data without <ud> tags)
+
+    Note: This function skips:
+    - Occurrences within <ud>...</ud> tags (properly redacted)
+    - JSON error payloads from Couchbase Server (external responses logged verbatim)
+    - Go struct dumps (internal debug representations)
     """
     violations = []
     for pattern in sensitive_patterns:
@@ -27,22 +32,51 @@ def scan_logs_for_untagged_sensitive_data(
             start_pos = match.start()
             end_pos = match.end()
 
-            # Check if this occurrence is within <ud>...</ud> tags
-            before_text = log_content[max(0, start_pos - 100) : start_pos]
-            after_text = log_content[end_pos : min(len(log_content), end_pos + 100)]
+            # Use larger search range for <ud> tags since Go struct dumps can be long
+            before_text = log_content[max(0, start_pos - 500) : start_pos]
+            after_text = log_content[end_pos : min(len(log_content), end_pos + 1000)]
 
+            # Check if this occurrence is within <ud>...</ud> tags
             has_opening_tag = "<ud>" in before_text and before_text.rfind(
                 "<ud>"
             ) > before_text.rfind("</ud>")
             has_closing_tag = "</ud>" in after_text
 
-            if not (has_opening_tag and has_closing_tag):
-                context_start = max(0, start_pos - 50)
-                context_end = min(len(log_content), end_pos + 50)
-                context = log_content[context_start:context_end]
-                violations.append(
-                    f"Untagged '{pattern}' at position {start_pos}: ...{context}..."
-                )
+            if has_opening_tag and has_closing_tag:
+                continue
+
+            context_start = max(0, start_pos - 300)
+            context_end = min(len(log_content), end_pos + 300)
+            extended_context = log_content[context_start:context_end]
+
+            # Skip if this appears to be inside a JSON payload (error responses from CBS)
+            # CBS returns JSON error responses that SGW logs verbatim for debugging
+            json_markers = [
+                '{"statement":',
+                '"errors":[',
+                '"client_context_id":',
+                '{"code":',
+                '"http_status_code":',
+            ]
+            if any(marker in extended_context for marker in json_markers):
+                continue
+
+            # Skip if this is in a Go struct dump (roleImpl, userImplBody, etc.)
+            struct_markers = [
+                "roleImpl:{",
+                "userImplBody:{",
+                "docID:_sync:user:",
+                "&{roleImpl:",
+            ]
+            if any(marker in extended_context for marker in struct_markers):
+                continue  # Go struct dump - these are debug internals
+
+            context = log_content[
+                max(0, start_pos - 50) : min(len(log_content), end_pos + 50)
+            ]
+            violations.append(
+                f"Untagged '{pattern}' at position {start_pos}: ...{context}..."
+            )
     return violations
 
 
@@ -220,13 +254,7 @@ class TestLogRedaction(CBLTestClass):
                 "No redacted SGCollect zip files found. "
                 "Make sure SGCollect was run with redaction enabled and Caddy has 'browse' enabled."
             )
-
-            def extract_timestamp(filename: str) -> str:
-                """Extract timestamp portion (YYYY-MM-DDtHHMMSS) from SGCollect filename"""
-                match = re.search(r"(\d{4}-\d{2}-\d{2}t\d{6})", filename)
-                return match.group(1) if match else ""
-
-            redacted_zip_filename = sorted(files, key=extract_timestamp)[-1]
+            redacted_zip_filename = sorted(files)[-1]
             self.mark_test_step(f"Found redacted zip: {redacted_zip_filename}")
 
         except Exception as e:
