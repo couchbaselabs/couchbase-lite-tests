@@ -14,7 +14,11 @@ function create_venv() {
     REQUIRED_VERSION="${2:-3.10}"
     if ! command -v uv >/dev/null 2>&1; then
         curl -LsSf https://astral.sh/uv/install.sh | sh
-        source $HOME/.local/bin/env
+        if [[ -f $HOME/.local/bin/env ]]; then
+            # Irritatingly sometimes uv doesn't create this file
+            # but in that case we don't need it anyway
+            source $HOME/.local/bin/env
+        fi
     fi
 
     uv venv --python $REQUIRED_VERSION $1
