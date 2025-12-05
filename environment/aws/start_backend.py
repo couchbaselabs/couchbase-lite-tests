@@ -194,7 +194,7 @@ def write_config(
                 ts_definition = {
                     "url": f"http://{ts.ip_address}:{port}",
                     # TODO: Convert all test servers to URLs to this is not needed
-                    "dataset_version": "4.0",
+                    "dataset_version": "3.2",
                 }
 
                 if ts.platform == "js":
