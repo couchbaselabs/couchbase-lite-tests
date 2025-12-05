@@ -99,7 +99,7 @@ public class EndptListenerManager {
         if (port != null) { listenerConfig.setPort(port); }
 
         final Boolean disableTLS = req.getBoolean(KEY_DISABLE_TLS);
-        if (disableTLS != null) { listenerConfig.setDisableTLS(disableTLS); }
+        if (disableTLS != null) { listenerConfig.setDisableTls(disableTLS); }
 
         final URLEndpointListener listener = new URLEndpointListener(listenerConfig);
         try { listener.start(); }
