@@ -1101,6 +1101,7 @@ class _SyncGatewayBase:
         url: str,
         operation: str,
         timeout: int = 30,
+        headers: dict[str, str] | None = None,
     ) -> tuple[int, bytes]:
         """
         Internal helper to make HTTP requests to Caddy server.
@@ -1108,6 +1109,7 @@ class _SyncGatewayBase:
         :param url: Full Caddy URL to request
         :param operation: Description of operation (for error messages)
         :param timeout: Request timeout in seconds
+        :param headers: Optional HTTP headers to include in the request
         :return: Tuple of (status_code, content as bytes)
         :raises FileNotFoundError: If resource returns 404
         :raises Exception: For other HTTP or network errors
@@ -1115,7 +1117,7 @@ class _SyncGatewayBase:
         try:
             async with ClientSession() as session:
                 async with session.get(
-                    url, timeout=ClientTimeout(total=timeout)
+                    url, timeout=ClientTimeout(total=timeout), headers=headers
                 ) as response:
                     if response.status == 404:
                         raise FileNotFoundError(f"{operation} not found at {url}")
@@ -1132,25 +1134,23 @@ class _SyncGatewayBase:
         except ClientError as e:
             raise Exception(f"Network error during {operation}: {e}") from e
 
-    async def fetch_log_file_via_caddy(
+    async def fetch_log_file(
         self,
         log_type: str,
-        caddy_port: int = 20000,
     ) -> str:
         """
         Fetches a log file from the remote Sync Gateway server via Caddy HTTP server
 
         :param log_type: Type of log file to fetch (e.g., 'debug', 'info', 'warn', 'error')
-        :param caddy_port: Port where Caddy is serving files (default: 20000)
         :return: Content of the log file as a string
         :raises FileNotFoundError: If the log file doesn't exist
         :raises Exception: For other HTTP errors
         """
         log_filename = f"sg_{log_type}.log"
-        caddy_url = f"http://{self.hostname}:{caddy_port}/{log_filename}"
+        caddy_url = f"http://{self.hostname}:20000/{log_filename}"
 
         with self._tracer.start_as_current_span(
-            "fetch_log_file_via_caddy",
+            "fetch_log_file",
             attributes={
                 "cbl.log.type": log_type,
                 "cbl.log.filename": log_filename,
@@ -1168,18 +1168,16 @@ class _SyncGatewayBase:
         self,
         remote_filename: str,
         local_path: str,
-        caddy_port: int = 20000,
     ) -> None:
         """
         Downloads a file from the remote server via Caddy HTTP server
 
         :param remote_filename: Name of the file on the remote server (e.g., 'sgcollectinfo-xxx-redacted.zip')
         :param local_path: Local path where the file should be saved
-        :param caddy_port: Port where Caddy is serving files (default: 20000)
         :raises FileNotFoundError: If the file doesn't exist
         :raises Exception: For other HTTP errors
         """
-        caddy_url = f"http://{self.hostname}:{caddy_port}/{remote_filename}"
+        caddy_url = f"http://{self.hostname}:20000/{remote_filename}"
 
         with self._tracer.start_as_current_span(
             "download_file_via_caddy",
@@ -1204,18 +1202,16 @@ class _SyncGatewayBase:
 
     async def list_files_via_caddy(
         self,
-        caddy_port: int = 20000,
         pattern: str | None = None,
     ) -> list[str]:
         """
         Lists files available in the Caddy-served directory (requires 'browse' enabled in Caddyfile)
 
-        :param caddy_port: Port where Caddy is serving files (default: 20000)
         :param pattern: Optional regex pattern to filter filenames (e.g., 'sgcollect_info.*redacted.zip')
         :return: List of filenames available in the directory
         :raises Exception: If directory browsing is not enabled or request fails
         """
-        caddy_url = f"http://{self.hostname}:{caddy_port}/"
+        caddy_url = f"http://{self.hostname}:20000/"
 
         with self._tracer.start_as_current_span(
             "list_files_via_caddy",
@@ -1226,7 +1222,10 @@ class _SyncGatewayBase:
         ):
             try:
                 _, content = await self._caddy_http_request(
-                    caddy_url, "List directory", timeout=30
+                    caddy_url,
+                    "List directory",
+                    timeout=30,
+                    headers={"Accept": "application/json"},
                 )
             except FileNotFoundError:
                 raise Exception(
@@ -1234,18 +1233,20 @@ class _SyncGatewayBase:
                     "Ensure Caddy is configured with 'file_server browse'"
                 )
 
-            html_content = content.decode("utf-8")
+            # Parse JSON response from Caddy
+            try:
+                dir_listing = loads(content.decode("utf-8"))
+            except ValueError as e:
+                raise Exception(f"Failed to parse Caddy JSON response: {e}")
 
-            # Extract filenames from HTML anchor tags
-            # Caddy browse uses: <a href="./filename.ext">
-            href_pattern = re.compile(r'<a\s+href="\.?/([^"]+)"')
-            files = []
-
-            for match in href_pattern.finditer(html_content):
-                filename = match.group(1)
-                # Skip parent directory link and query parameters
-                if filename and filename != "../" and not filename.startswith("?"):
-                    files.append(filename)
+            # Extract filenames from the JSON array
+            files = [
+                entry["name"]
+                for entry in dir_listing
+                if isinstance(entry, dict)
+                and "name" in entry
+                and not entry.get("is_dir", False)
+            ]
 
             # Filter by pattern if provided
             if pattern:
@@ -1253,12 +1254,12 @@ class _SyncGatewayBase:
                 files = [f for f in files if regex.search(f)]
 
             cbl_info(
-                f"Found {len(files)} files via Caddy browse"
+                f"Found {len(files)} files via Caddy browse (JSON)"
                 + (f" (filtered by '{pattern}')" if pattern else "")
             )
             return files
 
-    async def start_sgcollect_via_api(
+    async def start_sgcollect(
         self,
         redact_level: str | None = None,
         redact_salt: str | None = None,
@@ -1273,7 +1274,7 @@ class _SyncGatewayBase:
         :return: Response dict with status
         """
         with self._tracer.start_as_current_span(
-            "start_sgcollect_via_api",
+            "start_sgcollect",
             attributes={
                 "redact.level": redact_level or "none",
             },
@@ -1306,10 +1307,11 @@ class _SyncGatewayBase:
             return cast(dict, resp)
 
     async def wait_for_sgcollect_to_complete(
-        self, max_attempts: int = 60, wait_time: int = 5
+        self, max_attempts: int = 60, wait_time: int = 2
     ) -> None:
         """
-        Waits for SGCollect to complete
+        Waits for SGCollect to complete, polling until the status is 'stopped' or 'completed'.
+        Polls 60 times, waiting 2 seconds between each poll.
 
         :param max_attempts: Maximum number of attempts to wait for SGCollect to complete
         :param wait_time: Time to wait between attempts
