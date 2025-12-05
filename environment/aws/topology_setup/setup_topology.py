@@ -406,7 +406,7 @@ class TestServerInput:
         return self.__cbl_version
 
     @property
-    def dataset_version(self) -> str:
+    def dataset_version(self) -> str | None:
         return self.__dataset_version
 
     @property
@@ -425,7 +425,7 @@ class TestServerInput:
         self,
         location: str,
         cbl_version: str,
-        dataset_version: str,
+        dataset_version: str | None,
         platform: str,
         download: bool,
         *,
@@ -458,7 +458,7 @@ class TestServerConfig:
         return self.__cbl_version
 
     @property
-    def dataset_version(self) -> str:
+    def dataset_version(self) -> str | None:
         return self.__dataset_version
 
     @property
@@ -466,7 +466,11 @@ class TestServerConfig:
         return self.__platform
 
     def __init__(
-        self, ip_address: str, cbl_version: str, dataset_version: str, platform: str
+        self,
+        ip_address: str,
+        cbl_version: str,
+        dataset_version: str | None,
+        platform: str,
     ):
         self.__ip_address = ip_address
         self.__cbl_version = cbl_version
@@ -521,7 +525,6 @@ class TopologyConfig:
         self._wants_logslurp: bool | None = None
         self.__logslurp: str | None = None
         self.__tag: str = ""
-        self.__ssh_key_path: str | None = None
 
         with open(config_file) as fin:
             config = cast(dict, json.load(fin))
@@ -575,7 +578,7 @@ class TopologyConfig:
                         TestServerInput(
                             raw_server["location"],
                             raw_server["cbl_version"],
-                            raw_server.get("dataset_version", "4.0"),
+                            raw_server.get("dataset_version"),
                             raw_server["platform"],
                             cast(bool, raw_server.get("download", False)),
                             ip_hint=raw_server.get("ip_hint"),

@@ -14,13 +14,14 @@ function usage() {
     exit 1
 }
 
-if [ "$#" -ne 2 ] ; then usage; fi
+if [ "$#" -lt 2 ] ; then usage; fi
 
 CBL_VERSION="$1"
 if [ -z "$CBL_VERSION" ]; then usage; fi
 
 SG_VERSION="$2"
 if [ -z "$SG_VERSION" ]; then usage; fi
+DATASET_VERSION=${3:-"4.0"}
 
 STATUS=0
 
@@ -49,4 +50,4 @@ echo "Run the tests"
 # To re-enable this, this script needs to become aware of the 
 # serial number of the device, which is not currently passed
 #adb shell input keyevent KEYCODE_WAKEUP
-pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
+pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version $DATASET_VERSION || STATUS=$?

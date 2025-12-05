@@ -22,14 +22,15 @@ function prepare_dotnet() {
     fi
 }
 
-if [ $# -ne 3 ]; then
+if [ $# -lt 3 ]; then
     usage
     exit 1
-fi
+field
 
 cbl_version=$1
 platform=$2
 sgw_version=$3
+dataset_version=${4:-"4.0"}
 
 prepare_dotnet
 
@@ -42,4 +43,4 @@ python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
 
 pushd $DEV_E2E_TESTS_DIR
 uv pip install -r requirements.txt
-pytest -v --no-header --config config.json
+pytest -v --no-header --config config.json --dataset-version $dataset_version

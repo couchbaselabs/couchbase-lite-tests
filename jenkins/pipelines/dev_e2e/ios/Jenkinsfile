@@ -5,6 +5,7 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+        string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
     }
     stages {
         stage('Init') {
@@ -45,7 +46,7 @@ pipeline {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run iOS Test"
                 timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/dev_e2e/ios/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                    sh "jenkins/pipelines/dev_e2e/ios/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
                 }
             }
             post { 
