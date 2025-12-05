@@ -1,0 +1,24 @@
+[project]
+name = "qe-tests"
+version = "0.1.0"
+description = "QE test suite for Couchbase Lite"
+requires-python = ">=3.10"
+
+# cbltest brings most dependencies (aiohttp, couchbase, pytest, requests, opentelemetry, etc.)
+# We only need to add what's not in cbltest
+dependencies = [
+    "cbltest",
+    "mypy==1.14.1",
+    "mypy-extensions==1.0.0",
+    "ruff==0.9.2",
+    "types-Deprecated==1.2.15.20241117",
+    "types-requests==2.32.0.20241016",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+cbltest = { path = "../../client", editable = true }
+
