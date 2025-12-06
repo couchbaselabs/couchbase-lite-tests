@@ -78,13 +78,13 @@ This particular example indicates that there are two test servers running, along
 
 1. Complete the prerequisites in [the orchestrator](environment/aws/README.md).
 
-2. Create a topology file and set up your backend environment (refer to the same README as 1)
+2. Create a topology file and set up your backend environment (refer to the same README as 1).  At this phase you have a decision to make.  Either leave `"download": true` out of your test server entries in the topology file, or if you need to use an older version of the test server (to build with an older version of CBL), then make use of the [prebuild script](environment/aws/topology_setup/build_test_server.py) and the upload flag.  You will need to set the environment variable `LATESTBUILDS_PASSWORD` appropriately in order to be able to write the resulting artifact.  TIP:  You don't need to do this unless you are curious, instead just make an ad-hoc run of the [Jenkins job](http://jenkins.mobiledev.couchbase.com/view/End%20to%20End/job/prebuild-test-server/) which does the same thing.
 
-3. Using pytest, run the test you are interested in running (repeat as many times as you'd like)
+4. Using pytest, run the test you are interested in running (repeat as many times as you'd like)
 
-4. Tip: You can access SGW logs by sending http requests to port 20000 on that machine (http://<ec2-address>:20000/sg_debug.log for example)
+5. Tip: You can access SGW logs by sending http requests to port 20000 on that machine (http://<ec2-address>:20000/sg_debug.log for example)
 
-5. Tip: If you have LogSlurp enabled, session.log will appear after a normal session finish containing the logs of all test servers and the TDK client interlaced.
+6. Tip: If you have LogSlurp enabled, session.log will appear after a normal session finish containing the logs of all test servers and the TDK client interlaced.
 
 ### Contributing
 
