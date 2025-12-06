@@ -3,10 +3,13 @@ import subprocess
 import tempfile
 import time
 import zipfile
+from collections.abc import Callable
 from datetime import timedelta
 from pathlib import Path
 from time import sleep
-from typing import cast
+from typing import TypeVar, cast
+
+T = TypeVar("T")
 from urllib.parse import quote_plus, urlparse
 
 import requests
@@ -47,11 +50,10 @@ class CouchbaseServer:
         if len(cbs_servers) < 2:
             return
 
-        session = requests.Session()
-        session.auth = (self.__username, self.__password)
-
         try:
-            resp = session.get(f"http://{self.__hostname}:8091/pools/default")
+            resp = self.__http_session.get(
+                f"http://{self.__hostname}:8091/pools/default"
+            )
             resp.raise_for_status()
             cluster_data = resp.json()
         except Exception as e:
@@ -112,6 +114,10 @@ class CouchbaseServer:
             self.__password = password
             self.__cluster = Cluster(url, opts)
             self.__cluster.wait_until_ready(timedelta(seconds=10))
+
+            # Create a reusable HTTP session for REST API calls
+            self.__http_session = requests.Session()
+            self.__http_session.auth = (username, password)
 
     @property
     def hostname(self) -> str:
@@ -526,88 +532,85 @@ class CouchbaseServer:
                 "cbl.target.hostname": target.__hostname,
             },
         ):
-            with requests.Session() as session:
-                session.auth = (self.__username, self.__password)
+            # Get the existing remote cluster, if any...
+            resp = self.__http_session.get(
+                f"http://{self.__hostname}:8091/pools/default/remoteClusters"
+            )
+            resp.raise_for_status()
+            resp_body = resp.json()
+            remote_cluster_uuid: str | None = None
+            for cluster in resp_body:
+                if (
+                    "name" in cluster
+                    and cast(str, cluster["name"]) == target.__hostname
+                ):
+                    remote_cluster_uuid = cluster["uuid"]
+                    break
 
-                # Get the existing remote cluster, if any...
-                resp = session.get(
-                    f"http://{self.__hostname}:8091/pools/default/remoteClusters"
+            # https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-active-active-sgw.html#xdcr-active-active-sgw-prerequisites
+            # Set the prerequisite properties.  These return 409 is they are already set.
+            resp = self.__http_session.post(
+                f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}",
+                data={"enableCrossClusterVersioning": "true"},
+            )
+            if resp.status_code != 409:
+                resp.raise_for_status()
+
+            resp = self.__http_session.post(
+                f"http://{target.__hostname}:8091/pools/default/buckets/{bucket_name}",
+                data={"enableCrossClusterVersioning": "true"},
+            )
+            if resp.status_code != 409:
+                resp.raise_for_status()
+
+            # https://docs.couchbase.com/server/current/manage/manage-xdcr/create-xdcr-replication.html#create-an-xdcr-replication-with-the-rest-api
+            # Create the remote cluster, if necessary
+            if remote_cluster_uuid is None:
+                resp = self.__http_session.post(
+                    f"http://{self.__hostname}:8091/pools/default/remoteClusters",
+                    data={
+                        "username": target.__username,
+                        "password": target.__password,
+                        "hostname": target.__hostname,
+                        "name": target.__hostname,
+                        "demandEncryption": 0,
+                    },
                 )
                 resp.raise_for_status()
-                resp_body = resp.json()
-                remote_cluster_uuid: str | None = None
-                for cluster in resp_body:
-                    if (
-                        "name" in cluster
-                        and cast(str, cluster["name"]) == target.__hostname
-                    ):
-                        remote_cluster_uuid = cluster["uuid"]
-                        break
 
-                # https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-active-active-sgw.html#xdcr-active-active-sgw-prerequisites
-                # Set the prerequisite properties.  These return 409 is they are already set.
-                resp = session.post(
-                    f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}",
-                    data={"enableCrossClusterVersioning": "true"},
+            needs_replication = True
+            if remote_cluster_uuid is not None:
+                # If the remote cluster didn't exist, the replication could not have existed
+                # so skip the lookup.  Otherwise, check for a replication that is already
+                # going out to the remote cluster in question.
+                resp = self.__http_session.get(
+                    f"http://{self.__hostname}:8091/pools/default/tasks"
                 )
-                if resp.status_code != 409:
-                    resp.raise_for_status()
+                resp.raise_for_status()
+                for task in resp.json():
+                    if "type" in task and task["type"] == "xdcr":
+                        if "id" in task:
+                            id = task["id"]
+                            if (
+                                id
+                                == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}"
+                            ):
+                                needs_replication = False
+                                break
 
-                resp = session.post(
-                    f"http://{target.__hostname}:8091/pools/default/buckets/{bucket_name}",
-                    data={"enableCrossClusterVersioning": "true"},
+            if needs_replication:
+                resp = self.__http_session.post(
+                    f"http://{self.__hostname}:8091/controller/createReplication",
+                    data={
+                        "fromBucket": bucket_name,
+                        "toCluster": target.__hostname,
+                        "toBucket": bucket_name,
+                        "replicationType": "continuous",
+                        "compressionLevel": "Auto",
+                        "mobile": "active",
+                    },
                 )
-                if resp.status_code != 409:
-                    resp.raise_for_status()
-
-                # https://docs.couchbase.com/server/current/manage/manage-xdcr/create-xdcr-replication.html#create-an-xdcr-replication-with-the-rest-api
-                # Create the remote cluster, if necessary
-                if remote_cluster_uuid is None:
-                    resp = session.post(
-                        f"http://{self.__hostname}:8091/pools/default/remoteClusters",
-                        data={
-                            "username": target.__username,
-                            "password": target.__password,
-                            "hostname": target.__hostname,
-                            "name": target.__hostname,
-                            "demandEncryption": 0,
-                        },
-                    )
-                    resp.raise_for_status()
-
-                needs_replication = True
-                if remote_cluster_uuid is not None:
-                    # If the remote cluster didn't exist, the replication could not have existed
-                    # so skip the lookup.  Otherwise, check for a replication that is already
-                    # going out to the remote cluster in question.
-                    resp = session.get(
-                        f"http://{self.__hostname}:8091/pools/default/tasks"
-                    )
-                    resp.raise_for_status()
-                    for task in resp.json():
-                        if "type" in task and task["type"] == "xdcr":
-                            if "id" in task:
-                                id = task["id"]
-                                if (
-                                    id
-                                    == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}"
-                                ):
-                                    needs_replication = False
-                                    break
-
-                if needs_replication:
-                    resp = session.post(
-                        f"http://{self.__hostname}:8091/controller/createReplication",
-                        data={
-                            "fromBucket": bucket_name,
-                            "toCluster": target.__hostname,
-                            "toBucket": bucket_name,
-                            "replicationType": "continuous",
-                            "compressionLevel": "Auto",
-                            "mobile": "active",
-                        },
-                    )
-                    resp.raise_for_status()
+                resp.raise_for_status()
 
     def stop_xcdr(self, target: "CouchbaseServer", bucket_name: str) -> None:
         """
@@ -625,48 +628,44 @@ class CouchbaseServer:
                 "cbl.target.hostname": target.__hostname,
             },
         ):
-            with requests.Session() as session:
-                session.auth = (self.__username, self.__password)
+            # See if the remote cluster already exists
+            resp = self.__http_session.get(
+                f"http://{self.__hostname}:8091/pools/default/remoteClusters"
+            )
+            resp.raise_for_status()
+            resp_body = resp.json()
+            remote_cluster_uuid: str | None = None
+            for cluster in resp_body:
+                if (
+                    "name" in cluster
+                    and cast(str, cluster["name"]) == target.__hostname
+                ):
+                    remote_cluster_uuid = cluster["uuid"]
+                    break
 
-                # See if the remote cluster already exists
-                resp = session.get(
-                    f"http://{self.__hostname}:8091/pools/default/remoteClusters"
+            if remote_cluster_uuid is None:
+                return
+
+            # See if the XDCR already exists
+            resp = self.__http_session.get(
+                f"http://{self.__hostname}:8091/pools/default/tasks"
+            )
+            resp.raise_for_status()
+            xdcr_id: str | None = None
+            for task in resp.json():
+                if "type" in task and task["type"] == "xdcr":
+                    if "id" in task:
+                        id = task["id"]
+                        if id == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}":
+                            xdcr_id = id
+                            break
+
+            if xdcr_id is not None:
+                encoded = quote_plus(xdcr_id)
+                resp = self.__http_session.delete(
+                    f"http://{self.__hostname}:8091/controller/cancelXDCR/{encoded}",
                 )
                 resp.raise_for_status()
-                resp_body = resp.json()
-                remote_cluster_uuid: str | None = None
-                for cluster in resp_body:
-                    if (
-                        "name" in cluster
-                        and cast(str, cluster["name"]) == target.__hostname
-                    ):
-                        remote_cluster_uuid = cluster["uuid"]
-                        break
-
-                if remote_cluster_uuid is None:
-                    return
-
-                # See if the XDCR already exists
-                resp = session.get(f"http://{self.__hostname}:8091/pools/default/tasks")
-                resp.raise_for_status()
-                xdcr_id: str | None = None
-                for task in resp.json():
-                    if "type" in task and task["type"] == "xdcr":
-                        if "id" in task:
-                            id = task["id"]
-                            if (
-                                id
-                                == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}"
-                            ):
-                                xdcr_id = id
-                                break
-
-                if xdcr_id is not None:
-                    encoded = quote_plus(xdcr_id)
-                    resp = session.delete(
-                        f"http://{self.__hostname}:8091/controller/cancelXDCR/{encoded}",
-                    )
-                    resp.raise_for_status()
 
     def add_node(
         self,
@@ -690,90 +689,73 @@ class CouchbaseServer:
                 "cbl.node.services": ",".join(services),
             },
         ) as span:
-            with requests.Session() as session:
-                session.auth = (self.__username, self.__password)
+            # Try to get internal hostname (best effort - falls back to original on failure)
+            def get_internal_hostname() -> str:
+                node_resp = node_to_add.__http_session.get(
+                    f"http://{node_to_add.__hostname}:8091/nodes/self",
+                    timeout=5,
+                )
+                if node_resp.status_code != 200:
+                    raise CblTestError(f"Status {node_resp.status_code}")
+                internal = node_resp.json().get("hostname", "").split(":")[0]
+                if not internal or internal.startswith("127."):
+                    raise CblTestError("Invalid internal hostname")
+                return internal
 
+            try:
+                hostname_to_use = self._retry(
+                    get_internal_hostname,
+                    max_attempts=3,
+                    wait_seconds=5,
+                    operation_name=f"Query node {node_to_add.__hostname}",
+                )
+            except Exception:
+                # Best effort - use original hostname if we can't get internal
                 hostname_to_use = node_to_add.__hostname
-                for attempt in range(3):
-                    try:
-                        node_session = requests.Session()
-                        node_session.auth = (self.__username, self.__password)
-                        node_resp = node_session.get(
-                            f"http://{node_to_add.__hostname}:8091/nodes/self",
-                            timeout=5,
-                        )
-                        if node_resp.status_code == 200:
-                            internal_hostname = (
-                                node_resp.json().get("hostname", "").split(":")[0]
-                            )
-                            if internal_hostname and not internal_hostname.startswith(
-                                "127."
-                            ):
-                                hostname_to_use = internal_hostname
-                                break
-                    except Exception as e:
-                        if attempt < 2:
-                            cbl_warning(
-                                f"Failed to query node {node_to_add.__hostname} /nodes/self (attempt {attempt + 1}/3): {e}"
-                            )
-                            span.add_event(
-                                "query_node_failed",
-                                attributes={"attempt": attempt + 1, "error": str(e)},
-                            )
-                            time.sleep(5)
 
-                for attempt in range(5):
-                    resp = session.post(
-                        f"http://{self.__hostname}:8091/controller/addNode",
-                        data={
-                            "hostname": hostname_to_use,
-                            "user": self.__username,
-                            "password": self.__password,
-                            "services": ",".join(services),
-                        },
-                    )
-                    if resp.status_code == 200:
-                        break
-                    elif attempt < 4:
-                        cbl_warning(
-                            f"Failed to add node (attempt {attempt + 1}/5): Status {resp.status_code}, Response: {resp.text}"
-                        )
-                        span.add_event(
-                            "add_node_retry",
-                            attributes={
-                                "attempt": attempt + 1,
-                                "status_code": resp.status_code,
-                            },
-                        )
-                        time.sleep(1)
-                else:
-                    raise CblTestError(
-                        f"Failed to add node {node_to_add.__hostname}: {resp.text}"
-                    )
+            def do_add_node() -> None:
+                resp = self.__http_session.post(
+                    f"http://{self.__hostname}:8091/controller/addNode",
+                    data={
+                        "hostname": hostname_to_use,
+                        "user": self.__username,
+                        "password": self.__password,
+                        "services": ",".join(services),
+                    },
+                )
+                if resp.status_code != 200:
+                    raise CblTestError(f"Status {resp.status_code}: {resp.text}")
 
-                if hostname_to_use != node_to_add.__hostname:
-                    # Set alternate address so external clients can connect via public IP
-                    # This is critical for AWS VPC where nodes use private IPs internally
-                    try:
-                        session.put(
-                            f"http://{node_to_add.__hostname}:8091/node/controller/setupAlternateAddresses/external",
-                            data={"hostname": node_to_add.__hostname, "mgmt": "8091"},
-                        ).raise_for_status()
-                        span.add_event(
-                            "alternate_address_set",
-                            attributes={"hostname": node_to_add.__hostname},
-                        )
-                    except Exception as e:
-                        # Node is already added to cluster, but external SDK connections may fail
-                        # Common causes: Node not fully initialized, auth issues, network problems
-                        cbl_warning(
-                            f"Failed to set alternate address for {node_to_add.__hostname}: {e}. "
-                            f"Node added successfully, but external SDK connections (from TDK) may fail. "
-                            f"Internal cluster communication will work normally."
-                        )
-                        span.add_event(
-                            "alternate_address_failed", attributes={"error": str(e)}
-                        )
+            self._retry(
+                do_add_node,
+                max_attempts=5,
+                wait_seconds=1,
+                operation_name=f"Add node {node_to_add.__hostname}",
+            )
+
+            if hostname_to_use != node_to_add.__hostname:
+                # Set alternate address so external clients can connect via public IP
+                # This is critical for AWS VPC where nodes use private IPs internally
+                try:
+                    self.__http_session.put(
+                        f"http://{node_to_add.__hostname}:8091/node/controller/setupAlternateAddresses/external",
+                        data={"hostname": node_to_add.__hostname, "mgmt": "8091"},
+                    ).raise_for_status()
+                    span.add_event(
+                        "alternate_address_set",
+                        attributes={"hostname": node_to_add.__hostname},
+                    )
+                except Exception as e:
+                    # Node is already added to cluster, but external SDK connections may fail
+                    # Common causes: Node not fully initialized, auth issues, network problems
+                    cbl_warning(
+                        f"Failed to set alternate address for {node_to_add.__hostname}: {e}. "
+                        f"Node added successfully, but external SDK connections (from TDK) may fail. "
+                        f"Internal cluster communication will work normally."
+                    )
+                    span.add_event(
+                        "alternate_address_failed", attributes={"error": str(e)}
+                    )
 
     def rebalance(
         self,
@@ -800,82 +782,102 @@ class CouchbaseServer:
         with self.__tracer.start_as_current_span(
             "rebalance",
             attributes=attributes,
-        ) as span:
-            with requests.Session() as session:
-                session.auth = (self.__username, self.__password)
+        ):
+            # Get cluster information
+            pool_data = self._get_cluster_info()
 
-                # Get cluster information
-                pool_data = self._get_cluster_info(session)
+            known_nodes = []
+            ejected_nodes_list = []
 
-                known_nodes = []
-                ejected_nodes_list = []
+            for node in pool_data.get("nodes", []):
+                otp_node = node.get("otpNode")
+                cluster_membership = node.get("clusterMembership")
 
-                for node in pool_data.get("nodes", []):
-                    otp_node = node.get("otpNode")
-                    cluster_membership = node.get("clusterMembership")
+                known_nodes.append(otp_node)
 
-                    known_nodes.append(otp_node)
-
-                    # If we need to eject a specific node, find its OTP ID
-                    if eject_node:
-                        hostname = node.get("hostname", "").split(":")[0]
-                        alt_hostname = (
-                            node.get("alternateAddresses", {})
-                            .get("external", {})
-                            .get("hostname", "")
-                        )
-
-                        if eject_node.hostname in [hostname, alt_hostname]:
-                            ejected_nodes_list.append(otp_node)
-
-                    # Or eject all failed nodes if requested
-                    elif eject_failed_nodes and cluster_membership == "inactiveFailed":
-                        ejected_nodes_list.append(otp_node)
-
-                # If ejecting a specific node, make sure we found it
-                if eject_node and not ejected_nodes_list:
-                    raise CblTestError(
-                        f"Node {eject_node.hostname} not found in cluster. "
-                        f"Available nodes: {[n.get('hostname') for n in pool_data.get('nodes', [])]}"
+                # If we need to eject a specific node, find its OTP ID
+                if eject_node:
+                    hostname = node.get("hostname", "").split(":")[0]
+                    alt_hostname = (
+                        node.get("alternateAddresses", {})
+                        .get("external", {})
+                        .get("hostname", "")
                     )
 
-                # Start rebalance
-                data = {"knownNodes": ",".join(known_nodes)}
-                if ejected_nodes_list:
-                    data["ejectedNodes"] = ",".join(ejected_nodes_list)
+                    if eject_node.hostname in [hostname, alt_hostname]:
+                        ejected_nodes_list.append(otp_node)
 
-                for attempt in range(5):
-                    try:
-                        resp = session.post(
-                            f"http://{self.__hostname}:8091/controller/rebalance",
-                            data=data,
-                        )
-                        resp.raise_for_status()
-                        break
-                    except Exception as e:
-                        if attempt < 4:
-                            cbl_warning(
-                                f"Rebalance request failed (attempt {attempt + 1}/5): {e}"
-                            )
-                            span.add_event(
-                                "rebalance_retry",
-                                attributes={"attempt": attempt + 1, "error": str(e)},
-                            )
-                            time.sleep(1)
-                        else:
-                            raise
+                # Or eject all failed nodes if requested
+                elif eject_failed_nodes and cluster_membership == "inactiveFailed":
+                    ejected_nodes_list.append(otp_node)
+
+            # If ejecting a specific node, make sure we found it
+            if eject_node and not ejected_nodes_list:
+                raise CblTestError(
+                    f"Node {eject_node.hostname} not found in cluster. "
+                    f"Available nodes: {[n.get('hostname') for n in pool_data.get('nodes', [])]}"
+                )
+
+            # Start rebalance
+            data = {"knownNodes": ",".join(known_nodes)}
+            if ejected_nodes_list:
+                data["ejectedNodes"] = ",".join(ejected_nodes_list)
+
+            def do_rebalance() -> None:
+                resp = self.__http_session.post(
+                    f"http://{self.__hostname}:8091/controller/rebalance",
+                    data=data,
+                )
+                resp.raise_for_status()
+
+            self._retry(
+                do_rebalance, max_attempts=5, wait_seconds=1, operation_name="Rebalance"
+            )
 
             # Wait for rebalance to complete
-            self._wait_for_rebalance_completion(session)
+            self._wait_for_rebalance_completion()
 
-    def _get_cluster_info(self, session: requests.Session) -> dict:
+    def _retry(
+        self,
+        func: Callable[[], T],
+        max_attempts: int = 3,
+        wait_seconds: float = 1,
+        operation_name: str = "operation",
+    ) -> T:
+        """
+        Retry a function with exponential backoff and logging.
+
+        :param func: The function to call (should take no arguments, use lambda if needed)
+        :param max_attempts: Maximum number of attempts (default: 3)
+        :param wait_seconds: Seconds to wait between attempts (default: 1)
+        :param operation_name: Name for logging purposes
+        :return: The result of the function call
+        :raises: The last exception if all attempts fail
+        """
+        last_exception: Exception | None = None
+
+        for attempt in range(max_attempts):
+            try:
+                return func()
+            except Exception as e:
+                last_exception = e
+                if attempt < max_attempts - 1:
+                    cbl_warning(
+                        f"{operation_name} failed (attempt {attempt + 1}/{max_attempts}): {e}"
+                    )
+                    time.sleep(wait_seconds)
+
+        # All attempts failed - last_exception is guaranteed to be set
+        assert last_exception is not None
+        raise last_exception
+
+    def _get_cluster_info(self) -> dict:
         """
         Internal method to get cluster information from /pools/default.
 
-        :param session: Authenticated requests session
         :return: Cluster pool data containing node information
         """
-        resp = session.get(f"http://{self.__hostname}:8091/pools/default")
+        resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default")
         resp.raise_for_status()
         return resp.json()
 
@@ -917,19 +919,16 @@ class CouchbaseServer:
 
         :param node_to_failover: The node to failover
         """
-        with requests.Session() as session:
-            session.auth = (self.__username, self.__password)
+        # Get cluster information and find the node to failover
+        pool_data = self._get_cluster_info()
+        failover_node = self._find_node_otp(pool_data, node_to_failover, "failover")
 
-            # Get cluster information and find the node to failover
-            pool_data = self._get_cluster_info(session)
-            failover_node = self._find_node_otp(pool_data, node_to_failover, "failover")
-
-            # Perform hard failover
-            resp = session.post(
-                f"http://{self.__hostname}:8091/controller/failOver",
-                data={"otpNode": failover_node},
-            )
-            resp.raise_for_status()
+        # Perform hard failover
+        resp = self.__http_session.post(
+            f"http://{self.__hostname}:8091/controller/failOver",
+            data={"otpNode": failover_node},
+        )
+        resp.raise_for_status()
 
     def recover(self, node_to_recover: "CouchbaseServer") -> None:
         """
@@ -937,19 +936,16 @@ class CouchbaseServer:
 
         :param node_to_recover: The node to recover
         """
-        with requests.Session() as session:
-            session.auth = (self.__username, self.__password)
+        # Get cluster information and find the node to recover
+        pool_data = self._get_cluster_info()
+        recovery_node = self._find_node_otp(pool_data, node_to_recover, "recovery")
 
-            # Get cluster information and find the node to recover
-            pool_data = self._get_cluster_info(session)
-            recovery_node = self._find_node_otp(pool_data, node_to_recover, "recovery")
-
-            # Set recovery type to delta (faster than full recovery)
-            resp = session.post(
-                f"http://{self.__hostname}:8091/controller/setRecoveryType",
-                data={"otpNode": recovery_node, "recoveryType": "delta"},
-            )
-            resp.raise_for_status()
+        # Set recovery type to delta (faster than full recovery)
+        resp = self.__http_session.post(
+            f"http://{self.__hostname}:8091/controller/setRecoveryType",
+            data={"otpNode": recovery_node, "recoveryType": "delta"},
+        )
+        resp.raise_for_status()
 
     def wait_for_cluster_healthy(
         self, timeout: int = 60, check_interval: int = 2
@@ -966,76 +962,72 @@ class CouchbaseServer:
 
         while (time.time() - start_time) < timeout:
             try:
-                with requests.Session() as session:
-                    session.auth = (self.__username, self.__password)
+                # Check cluster status
+                resp = self.__http_session.get(
+                    f"http://{self.__hostname}:8091/pools/default"
+                )
+                resp.raise_for_status()
+                pool_data = resp.json()
 
-                    # Check cluster status
-                    resp = session.get(f"http://{self.__hostname}:8091/pools/default")
-                    resp.raise_for_status()
-                    pool_data = resp.json()
+                # Check rebalance status
+                if pool_data.get("rebalanceStatus", "none") != "none":
+                    time.sleep(check_interval)
+                    continue
 
-                    # Check rebalance status
-                    if pool_data.get("rebalanceStatus", "none") != "none":
-                        time.sleep(check_interval)
-                        continue
+                # Check active nodes are healthy
+                all_healthy = all(
+                    node.get("status") == "healthy"
+                    for node in pool_data.get("nodes", [])
+                    if node.get("clusterMembership") == "active"
+                )
 
-                    # Check active nodes are healthy
-                    all_healthy = all(
-                        node.get("status") == "healthy"
-                        for node in pool_data.get("nodes", [])
-                        if node.get("clusterMembership") == "active"
-                    )
+                if not all_healthy:
+                    time.sleep(check_interval)
+                    continue
 
-                    if not all_healthy:
-                        time.sleep(check_interval)
-                        continue
+                # Check bucket vBuckets
+                buckets_resp = self.__http_session.get(
+                    f"http://{self.__hostname}:8091/pools/default/buckets"
+                )
+                buckets_resp.raise_for_status()
 
-                    # Check bucket vBuckets
-                    buckets_resp = session.get(
-                        f"http://{self.__hostname}:8091/pools/default/buckets"
-                    )
-                    buckets_resp.raise_for_status()
+                all_buckets_healthy = True
+                for bucket in buckets_resp.json():
+                    vbucket_map = bucket.get("vBucketServerMap", {})
+                    if not vbucket_map.get("serverList") or not vbucket_map.get(
+                        "vBucketMap"
+                    ):
+                        all_buckets_healthy = False
+                        break
 
-                    all_buckets_healthy = True
-                    for bucket in buckets_resp.json():
-                        vbucket_map = bucket.get("vBucketServerMap", {})
-                        if not vbucket_map.get("serverList") or not vbucket_map.get(
-                            "vBucketMap"
-                        ):
-                            all_buckets_healthy = False
-                            break
+                    # Check all vBuckets have active nodes
+                    if any(
+                        not vb or vb[0] == -1
+                        for vb in vbucket_map.get("vBucketMap", [])
+                    ):
+                        all_buckets_healthy = False
+                        break
 
-                        # Check all vBuckets have active nodes
-                        if any(
-                            not vb or vb[0] == -1
-                            for vb in vbucket_map.get("vBucketMap", [])
-                        ):
-                            all_buckets_healthy = False
-                            break
+                if not all_buckets_healthy:
+                    time.sleep(check_interval)
+                    continue
 
-                    if not all_buckets_healthy:
-                        time.sleep(check_interval)
-                        continue
-
-                    return True
+                return True
 
             except Exception:
                 time.sleep(check_interval)
 
         return False
 
-    def _wait_for_rebalance_completion(
-        self, session: requests.Session, timeout_seconds: int = 300
-    ) -> None:
+    def _wait_for_rebalance_completion(self, timeout_seconds: int = 300) -> None:
         """
         Waits for a rebalance operation to complete.
 
-        :param session: The requests session to use
         :param timeout_seconds: Maximum time to wait (default 300 seconds / 5 minutes)
         """
         start_time = time.time()
         while time.time() - start_time < timeout_seconds:
-            resp = session.get(
+            resp = self.__http_session.get(
                 f"http://{self.__hostname}:8091/pools/default/rebalanceProgress"
             )
             resp.raise_for_status()
