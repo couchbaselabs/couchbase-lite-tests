@@ -244,7 +244,7 @@ def check_sts_status() -> bool:
         return False
 
     attempt_login = click.confirm(
-        "Do you want to run single sign on now? (Y/n)", default="n", show_default=False
+        "Do you want to run single sign on now? (Y/n)", show_default=False
     )
     if not attempt_login:
         return False
