@@ -62,19 +62,7 @@ The tests use a configuration JSON file to get information about the environment
 
 This particular example indicates that there are two test servers running, along with one Sync Gateway and a Couchbase Server at the URLs provided.  Normally you don't write this file yourself, but rather generate it using [the orchestrator](environment/aws/README.md).
 
-### Steps for Running Tests Only (i.e. I want to act like Jenkins)
-
-1. Clone the repository.
-   ```
-   $ git clone https://github.com/couchbaselabs/couchbase-lite-tests.git
-   ```
-   This repository uses Git LFS to store binary dataset files. Ensure that you have [Git LFS](https://git-lfs.com) installed, and run `git lfs install` once to setup the extension hook before cloning the repository.
-
-2. Complete the prerequisites in [the orchestrator](environment/aws/README.md).
-
-3. From the jenkins/pipelines directory of your choice, run the relevant script (such as run_test.ps1, test.sh, etc) with the various arguments regarding versions of things to use.
-
-### Steps for Running Test Diagnostically (i.e. I want to act like a developer triaging an issue)
+### Steps for Running Test Diagnostically
 
 1. Complete the prerequisites in [the orchestrator](environment/aws/README.md).
 
