@@ -25,15 +25,15 @@ class TestServerInfo:
         return self.__url
 
     @property
-    def dataset_version(self) -> str:
+    def dataset_version(self) -> str | None:
         """Gets the dataset version of the test server instance"""
         return self.__dataset_version
 
     def __init__(self, data: dict):
         self.__url: str = _assert_string_entry(data, self.___url_key)
-        self.__dataset_version: str = _assert_string_entry(
-            data, self.__dataset_version_key
-        )
+        self.__dataset_version: str | None = None
+        if self.__dataset_version_key in data:
+            self.__dataset_version = _get_typed(data, self.__dataset_version_key, str)
 
 
 class SyncGatewayInfo:
@@ -189,10 +189,6 @@ class ParsedConfig:
     def logslurp_url(self) -> str | None:
         """The URL of the optional logslurp server to send and collect logs"""
         return self.__logslurp_url
-
-    def dataset_version_at(self, i: int) -> str:
-        """The dataset version of the test server instance"""
-        return self.__test_servers[i][self.__dataset_version_key]
 
     def __init__(self, json: dict):
         self.__test_servers = _get_typed_nonnull(

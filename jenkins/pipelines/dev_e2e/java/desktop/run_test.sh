@@ -12,13 +12,14 @@ function usage() {
     echo "sgw_version: Version of Sync Gateway to download and use"
 }
 
-if [ $# -ne 2 ]; then
+if [ $# -lt 2 ]; then
     usage
     exit 1
 fi
 
 cbl_version=$1
 sgw_version=$2
+dataset_version=${3:-"4.0"}
 
 stop_venv
 create_venv venv
@@ -29,5 +30,5 @@ python3 $SCRIPT_DIR/setup_test.py $cbl_version $sgw_version
 
 pushd $DEV_E2E_TESTS_DIR
 uv pip install -r requirements.txt
-pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
+pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version $dataset_version
 deactivate

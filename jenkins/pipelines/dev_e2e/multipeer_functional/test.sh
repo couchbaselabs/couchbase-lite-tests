@@ -6,6 +6,26 @@ set -euo pipefail
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
 
+dataset_version="4.0"
+setup_args=()
+# Get arguments for pytest, and send the rest to setup_test
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --*)
+            if [[ "$1" == "--dataset-version" ]]; then
+                dataset_version="$2"
+            else
+                setup_args+=("$1" "$2")
+            fi
+            shift 2
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            exit 1
+            ;;
+    esac
+done
+
 # Phase 1: Setup all platforms using centralized multiplatform setup
 echo "🔧 PHASE 1: SETTING UP CBL TEST SERVERS"
 echo "======================================="
@@ -18,7 +38,7 @@ uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
 
 # Use the centralized multiplatform setup script
 echo "🚀 Running setup..."
-python3 setup_test.py $@
+python3 setup_test.py "${setup_args[@]}"
 SETUP_SUCCESS=$?
 deactivate
 
@@ -41,7 +61,7 @@ create_venv venv
 source venv/bin/activate
 uv pip install -r requirements.txt
 
-if pytest -v --no-header --config config.json test_multipeer.py; then
+if pytest -v --no-header --config config.json --dataset-version=$dataset_version test_multipeer.py; then
     echo "========== PYTEST OUTPUT END =========="
     echo ""
     echo "🎉 COORDINATED TEST PASSED!"

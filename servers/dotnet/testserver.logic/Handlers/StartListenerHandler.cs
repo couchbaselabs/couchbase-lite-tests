@@ -17,7 +17,7 @@ internal static partial class HandlerList
 
         public ushort port { get; init; }
 
-        public bool disableTLS { get; init; } = false;
+        public bool disableTLS { get; init; }
     }
 
     [HttpHandler("startListener")]

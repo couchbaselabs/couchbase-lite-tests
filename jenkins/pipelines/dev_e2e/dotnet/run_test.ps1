@@ -1,6 +1,7 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
-    [Parameter(Mandatory=$true)][string]$SgwVersion
+    [Parameter(Mandatory=$true)][string]$SgwVersion,
+    [Parameter][string]$DatasetVersion = "4.0"
 )
 
 Import-Module $PSScriptRoot/../../shared/config.psm1 -Force

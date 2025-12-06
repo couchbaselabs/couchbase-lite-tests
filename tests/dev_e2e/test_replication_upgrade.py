@@ -33,7 +33,7 @@ class TestReplicationUpgrade(CBLTestClass):
     async def setup_env(self, cblpytest: CBLPyTest, dataset_path: Path) -> Database:
         await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
 
-        dataset_ver = cblpytest.config.dataset_version_at(0)
+        dataset_ver = cblpytest.test_servers[0].dataset_version
         self.skip_if_not(
             dataset_ver == "4.0", f"Requires dataset v4.0 (current: {dataset_ver})."
         )
@@ -101,7 +101,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
         self.mark_test_step(f"""
-            Start a replicator: 
+            Start a replicator:
             * endpoint: '/upgrade'
             * collections : '_default._default'
             * type: {replicator_type}

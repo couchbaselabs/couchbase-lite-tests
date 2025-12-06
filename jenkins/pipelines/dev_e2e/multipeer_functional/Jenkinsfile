@@ -6,6 +6,11 @@ pipeline {
             defaultValue: '3.3.0',
             description: 'The version of the library to use on all platforms'
         )
+        string(
+            name: 'TS_DATASET_VERSION',
+            defaultValue: '4.0',
+            description: 'The version of the dataset to use on the test servers'
+        )
     }
     stages {
         stage('Init') {
@@ -58,7 +63,7 @@ pipeline {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/dev_e2e/multipeer_functional/test.sh --global-version ${params.CBL_VERSION}"
+                    sh "jenkins/pipelines/dev_e2e/multipeer_functional/test.sh --global-version ${params.CBL_VERSION} --dataset-version ${params.TS_DATASET_VERSION}"
                 }
             }
 

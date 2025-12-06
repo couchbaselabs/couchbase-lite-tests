@@ -69,8 +69,11 @@ class CBLPyTest:
         log_level: LogLevel = LogLevel.VERBOSE,
         extra_props_path: str | None = None,
         test_server_only: bool = False,
+        dataset_version: str = "4.0",
     ):
-        ret_val = CBLPyTest(config_path, log_level, extra_props_path, test_server_only)
+        ret_val = CBLPyTest(
+            config_path, log_level, extra_props_path, test_server_only, dataset_version
+        )
         if not ret_val.extra_props.get("auto_start_tdk_page", True):
             CBLPyTestGlobal.auto_start_tdk_page = False
 
@@ -81,7 +84,6 @@ class CBLPyTest:
         for ts in ret_val.test_servers:
             await ts.new_session(
                 str(ret_val.request_factory.uuid),
-                ret_val.config.dataset_version_at(ts_index),
                 ret_val.config.logslurp_url,
                 f"test-server[{ts_index}]",
             )
@@ -95,6 +97,7 @@ class CBLPyTest:
         log_level: LogLevel = LogLevel.VERBOSE,
         extra_props_path: str | None = None,
         test_server_only: bool = False,
+        dataset_version: str = "4.0",
     ):
         _assert_not_null(config_path, "config_path")
         self.__config = _parse_config(config_path)
@@ -109,8 +112,10 @@ class CBLPyTest:
         index = 0
         for ts in self.__config.test_servers:
             ts_info = TestServerInfo(ts)
+
+            dataset_version = ts_info.dataset_version or dataset_version
             self.__test_servers.append(
-                TestServer(self.__request_factory, index, ts_info.url)
+                TestServer(self.__request_factory, index, ts_info.url, dataset_version)
             )
             index += 1
 

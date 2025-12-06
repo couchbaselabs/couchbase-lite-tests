@@ -139,6 +139,10 @@
                     "ip_hint": {
                         "type": "string",
                         "default": ""
+                    },
+                    "dataset_version": {
+                        "type": "string",
+                        "default": "4.0"
                     }
                 },
                 "required": ["location", "cbl_version", "platform"],
