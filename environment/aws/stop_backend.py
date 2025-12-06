@@ -24,6 +24,7 @@ if __name__ == "__main__":
         cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
 from environment.aws.common.output import header
+from environment.aws.start_backend import check_sts_status
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 
@@ -40,6 +41,7 @@ def main(topology: str | None) -> None:
     Args:
         topology_file (Optional[str]): The topology file that was used to start the environment.
     """
+    check_sts_status()
     topology_obj = TopologyConfig(topology) if topology else TopologyConfig()
 
     header("Starting terraform destroy")

@@ -214,6 +214,50 @@ def write_config(
         json.dump(config_json, output, indent=2)
 
 
+def check_sts_status() -> bool:
+    """
+    Check if AWS STS is enabled by calling the GetCallerIdentity API.
+
+    Returns:
+        bool: True if STS is enabled, False otherwise.
+    """
+    result = subprocess.run(
+        ["aws", "sts", "get-caller-identity"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return True
+
+    click.Choice
+
+    click.secho(
+        "The TDK has detected that you don't have valid STS credentials configured.",
+        fg="red",
+    )
+    stdin_is_tty = click.get_text_stream("stdin").isatty()
+    if not stdin_is_tty:
+        click.secho(
+            "Non-interactive terminal detected, cannot prompt for SSO login. Giving up...",
+            fg="red",
+        )
+        return False
+
+    attempt_login = click.confirm(
+        "Do you want to run single sign on now? (Y/n)", default="n", show_default=False
+    )
+    if not attempt_login:
+        return False
+
+    result = subprocess.run(["aws", "sso", "login"], capture_output=False, text=True)
+
+    if result.returncode != 0:
+        click.secho("AWS SSO login failed.", fg="red")
+        return False
+
+    return True
+
+
 class BackendSteps(Flag):
     NONE = 0
     TERRAFORM_APPLY = auto()
@@ -252,6 +296,9 @@ def main(
         steps (BackendSteps, optional): The steps to execute. Defaults to BackendSteps.ALL.
     """
     if steps & BackendSteps.TERRAFORM_APPLY:
+        if not check_sts_status():
+            return
+
         terraform_apply(topology)
     else:
         result = subprocess.run(
@@ -266,6 +313,9 @@ def main(
         click.secho("Skipping terraform apply...", fg="yellow")
         click.echo()
         if topology_has_aws_resources(topology):
+            if not check_sts_status():
+                return
+
             topology.read_from_terraform(str(SCRIPT_DIR))
 
     topology.resolve_test_servers()
