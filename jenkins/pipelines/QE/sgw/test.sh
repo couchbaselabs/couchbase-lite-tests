@@ -29,12 +29,9 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
 
 echo "Setup backend..."
-
-create_venv venv
-source venv/bin/activate
-pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
-deactivate
+pushd $AWS_ENVIRONMENT_DIR > /dev/null
+uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
+popd > /dev/null
 
 # Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then
@@ -44,11 +41,6 @@ fi
 
 # Run Tests :
 echo "Run tests..."
-
-pushd "${QE_TESTS_DIR}" > /dev/null
-create_venv venv
-. venv/bin/activate
-pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m sgw
-deactivate
+pushd $QE_TESTS_DIR > /dev/null
+uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m sgw
 popd > /dev/null
