@@ -51,7 +51,6 @@ import com.couchbase.lite.DocumentReplication;
 import com.couchbase.lite.MutableArray;
 import com.couchbase.lite.MutableDictionary;
 import com.couchbase.lite.MutableDocument;
-import com.couchbase.lite.PeerInfo;
 import com.couchbase.lite.ReplicationFilter;
 import com.couchbase.lite.Replicator;
 import com.couchbase.lite.ReplicatorConfiguration;
@@ -59,7 +58,6 @@ import com.couchbase.lite.ReplicatorStatus;
 import com.couchbase.lite.ReplicatorType;
 import com.couchbase.lite.SessionAuthenticator;
 import com.couchbase.lite.URLEndpoint;
-import com.couchbase.lite.android.mobiletest.endpoints.v1.MultipeerReplicatorManager;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
@@ -202,18 +200,18 @@ public class ReplicatorManager extends BaseReplicatorManager {
 
             final Dictionary localDict = localDoc.getDictionary(docProp);
             final Dictionary remoteDict = remoteDoc.getDictionary(docProp);
-            if(localDict == null || remoteDict == null) {
+            if (localDict == null || remoteDict == null) {
                 return doc.setString(docProp, "Both values are not dictionary");
             }
 
             final MutableDictionary mergedDict = new MutableDictionary();
-            for(String key : localDict) {
+            for (String key : localDict) {
                 mergedDict.setValue(docProp, localDict.getValue(key));
             }
 
-            for(String key : remoteDict) {
+            for (String key : remoteDict) {
                 final Object remoteValue = remoteDict.getValue(key);
-                if(mergedDict.contains(key) && !Objects.equals(remoteValue, mergedDict.getValue(key))) {
+                if (mergedDict.contains(key) && !Objects.equals(remoteValue, mergedDict.getValue(key))) {
                     return doc.setString(key, String.format("Conflicting values found at key named %s", key));
                 }
 
