@@ -5,6 +5,7 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+        string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
     }
     stages {
         stage('Init') {
@@ -40,7 +41,7 @@ pipeline {
                 echo "Run Android Tests"
                 timeout(time: 60, unit: 'MINUTES') {
                     sh """
-                        jenkins/pipelines/dev_e2e/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
+                        jenkins/pipelines/dev_e2e/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.SGW_VERSION}" ${params.TS_DATASET_VERSION}
                     """
                 }
             }

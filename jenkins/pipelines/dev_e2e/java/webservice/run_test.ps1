@@ -1,6 +1,7 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
-    [Parameter(Mandatory=$true)][string]$SgwVersion
+    [Parameter(Mandatory=$true)][string]$SgwVersion,
+    [Parameter][string]$DatasetVersion = "4.0"
 )
 $ErrorActionPreference = "Stop"  
 Import-Module $PSScriptRoot\..\..\..\shared\config.psm1 -Force
@@ -15,7 +16,7 @@ python $PSScriptRoot\setup_test.py $Version $SgwVersion
 Push-Location $DEV_E2E_TESTS_DIR
 try {
     uv pip install -r requirements.txt
-    pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json
+    pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version $DatasetVersion
     $saved_exit = $LASTEXITCODE
     deactivate
 } finally {

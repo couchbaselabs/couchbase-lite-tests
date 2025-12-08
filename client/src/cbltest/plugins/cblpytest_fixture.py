@@ -18,6 +18,7 @@ async def cblpytest(request: pytest.FixtureRequest):
     log_level = request.config.getoption("--cbl-log-level")
     test_props = request.config.getoption("--test-props")
     otel_endpoint = request.config.getoption("--otel-endpoint")
+    dataset_version = request.config.getoption("--dataset-version", "4.0")
     if otel_endpoint is not None:
         # This section is all about setting up the OpenTelemetry report
         # and can be ignored if not using OpenTelemetry.
@@ -30,7 +31,9 @@ async def cblpytest(request: pytest.FixtureRequest):
         provider.add_span_processor(processor)
         trace.set_tracer_provider(provider)
 
-    cblpytest = await CBLPyTest.create(config, log_level, test_props)
+    cblpytest = await CBLPyTest.create(
+        config, log_level, test_props, dataset_version=dataset_version
+    )
     yield cblpytest
     await cblpytest.close()
 
@@ -63,4 +66,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--otel-endpoint",
         metavar="HOST",
         help="The IP address or host name running OTEL collector",
+    )
+    group.addoption(
+        "--dataset-version",
+        metavar="VERSION",
+        help="The default dataset version to use for test servers",
+        default="4.0",
     )

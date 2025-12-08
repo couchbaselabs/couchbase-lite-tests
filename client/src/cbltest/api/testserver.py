@@ -26,7 +26,18 @@ class TestServer:
         """Gets the URL of the test server being communicated with"""
         return self.__url
 
-    def __init__(self, request_factory: RequestFactory, index: int, url: str):
+    @property
+    def dataset_version(self) -> str:
+        """Gets the dataset version of the test server instance"""
+        return self.__dataset_version
+
+    def __init__(
+        self,
+        request_factory: RequestFactory,
+        index: int,
+        url: str,
+        dataset_version: str,
+    ):
         assert request_factory.version == 1, (
             "This version of the CBLTest API requires request API v1"
         )
@@ -35,6 +46,7 @@ class TestServer:
         self.__request_factory = request_factory
         self.__tracer = get_tracer(__name__, VERSION)
         self.__info: GetRootResponse | None = None
+        self.__dataset_version = dataset_version
 
     async def get_info(self) -> GetRootResponse:
         """
@@ -89,9 +101,7 @@ class TestServer:
 
             return ret_val
 
-    async def new_session(
-        self, id: str, dataset_version: str, url: str | None, tag: str | None
-    ):
+    async def new_session(self, id: str, url: str | None, tag: str | None):
         """
         Instructs this test server to log to the given LogSlurp instance
 
@@ -100,7 +110,7 @@ class TestServer:
         :param tag: The tag to use for this test server
         """
         with self.__tracer.start_as_current_span("new_session"):
-            payload = PostNewSessionRequestBody(id, dataset_version, url, tag)
+            payload = PostNewSessionRequestBody(id, self.__dataset_version, url, tag)
             request = self.__request_factory.create_request(
                 TestServerRequestType.NEW_SESSION, payload
             )

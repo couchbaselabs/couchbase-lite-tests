@@ -7,6 +7,7 @@ EDITION=${1}
 CBL_VERSION=${2}
 CBL_BLD_NUM=${3}
 SGW_VERSION=${4}
+DATASET_VERSION=${5:-"4.0"}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
@@ -25,4 +26,4 @@ echo "Run tests..."
 
 pushd "${DEV_E2E_TESTS_DIR}" > /dev/null
 uv pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json
+pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version $DATASET_VERSION
