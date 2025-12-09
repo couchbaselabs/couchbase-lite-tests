@@ -40,7 +40,7 @@ pipeline {
                 echo "Run Android Tests"
                 timeout(time: 60, unit: 'MINUTES') {
                     sh """
-                        jenkins/pipelines/dev_e2e/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
+                        jenkins/pipelines/dev_e2e/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.SGW_VERSION}"
                     """
                 }
             }
@@ -60,7 +60,7 @@ pipeline {
     }
     post {
         failure {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "blake.meike@couchbase.com";
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "aniket.singh@couchbase.com";
         }
     }
 }

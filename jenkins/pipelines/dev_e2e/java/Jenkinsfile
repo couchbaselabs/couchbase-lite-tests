@@ -64,7 +64,7 @@ pipeline {
                         echo "=== Run OSX Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION}
                             """
                         }
                         echo "=== OSX Desktop Tests Complete"
@@ -124,7 +124,7 @@ pipeline {
                         echo "=== Run Linux Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION}
                             """
                         }
                         echo "=== Linux Desktop Tests Complete"
@@ -155,7 +155,7 @@ pipeline {
                         echo "=== Run OSX Web Service Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION}
                             """
                         }
                         echo "=== OSX Web Service Tests Complete"
@@ -186,7 +186,7 @@ pipeline {
                         echo "=== Run Windows Web Service Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             pwsh """
-                                jenkins\\pipelines\\dev_e2e\\java\\webservice\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem
+                                jenkins\\pipelines\\dev_e2e\\java\\webservice\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION}
                             """
                         }
                         echo "=== Windows Web Service Tests Complete"
@@ -217,7 +217,7 @@ pipeline {
                         echo "=== Run Linux Web Service Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh """
-                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ~/.ssh/jborden.pem
+                                jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION}
                             """
                         }
                         echo "=== Linux Web Service Tests Complete"
@@ -240,7 +240,7 @@ pipeline {
     }
     post {
         failure {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "blake.meike@couchbase.com";
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "aniket.singh@couchbase.com";
         }
     }
 }
