@@ -13,15 +13,10 @@ from cbltest.api.replicator_types import ReplicatorActivityLevel
 from cbltest.api.x509_certificate import CertKeyPair, create_leaf_certificate
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import TestServerRequestType
-from cbltest.v1.requests import (
-    PostGetMultipeerReplicatorStatusRequestBody,
-    PostStartMultipeerReplicatorRequestBody,
-    PostStopMultipeerReplicatorRequestBody,
-)
-from cbltest.v1.responses import (
+from cbltest.response_types import (
     MultipeerReplicatorStatusEntry,
-    PostGetMultipeerReplicatorStatusResponse,
-    PostStartMultipeerReplicatorResponse,
+    PostGetMultipeerReplicatorStatusResponseMethods,
+    PostStartMultipeerReplicatorResponseMethods,
 )
 from cbltest.version import VERSION
 
@@ -74,9 +69,6 @@ class MultipeerReplicator:
         authenticator: MultipeerReplicatorAuthenticator | None = None,
         identity: CertKeyPair | None = None,
     ):
-        assert database._request_factory.version == 1, (
-            "This version of the cbl test API requires request API v1"
-        )
         self.__index = database._index
         self.__request_factory = database._request_factory
         self.__peerGroupID = peerGroupID
@@ -97,16 +89,13 @@ class MultipeerReplicator:
         Starts the multipeer replicator
         """
         with self.__tracer.start_as_current_span("start_multipeer_replicator"):
-            payload = PostStartMultipeerReplicatorRequestBody(
-                self.__peerGroupID,
-                self.__database.name,
-                self.__collections,
-                self.__identity,
-                authenticator=self.__authenticator,
-            )
-
             req = self.__request_factory.create_request(
-                TestServerRequestType.START_MULTIPEER_REPLICATOR, payload
+                TestServerRequestType.START_MULTIPEER_REPLICATOR,
+                peerGroupID=self.__peerGroupID,
+                database=self.__database.name,
+                collections=self.__collections,
+                identity=self.__identity,
+                authenticator=self.__authenticator,
             )
             resp = await self.__request_factory.send_request(self.__index, req)
             if resp.error is not None:
@@ -116,7 +105,7 @@ class MultipeerReplicator:
                 cbl_trace(resp.error.message)
                 return None
 
-            cast_resp = cast(PostStartMultipeerReplicatorResponse, resp)
+            cast_resp = cast(PostStartMultipeerReplicatorResponseMethods, resp)
             self.__id = cast_resp.replicator_id
 
     async def stop(self) -> None:
@@ -130,7 +119,7 @@ class MultipeerReplicator:
 
             req = self.__request_factory.create_request(
                 TestServerRequestType.STOP_MULTIPEER_REPLICATOR,
-                PostStopMultipeerReplicatorRequestBody(self.__id),
+                id=self.__id,
             )
             resp = await self.__request_factory.send_request(self.__index, req)
             if resp.error is not None:
@@ -152,10 +141,10 @@ class MultipeerReplicator:
 
             req = self.__request_factory.create_request(
                 TestServerRequestType.MULTIPEER_REPLICATOR_STATUS,
-                PostGetMultipeerReplicatorStatusRequestBody(self.__id),
+                id=self.__id,
             )
             resp = await self.__request_factory.send_request(self.__index, req)
-            cast_resp = cast(PostGetMultipeerReplicatorStatusResponse, resp)
+            cast_resp = cast(PostGetMultipeerReplicatorStatusResponseMethods, resp)
             return MultipeerReplicatorStatus(cast_resp.replicators)
 
     async def wait_for_idle(

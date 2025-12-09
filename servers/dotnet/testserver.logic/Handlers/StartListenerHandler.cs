@@ -21,9 +21,9 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("startListener")]
-    public static Task StartListenerHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
+    public static Task StartListenerHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<StartListenerBody>(response, version, out var deserializedBody)) {
+        if (!body.RootElement.TryDeserialize<StartListenerBody>(response, out var deserializedBody)) {
             return Task.CompletedTask;
         }
 
@@ -36,7 +36,7 @@ internal static partial class HandlerList
                 message = $"database '{deserializedBody.database}' not registered!"
             };
 
-            response.WriteBody(errorObject, version, HttpStatusCode.BadRequest);
+            response.WriteBody(errorObject, HttpStatusCode.BadRequest);
             return Task.CompletedTask;
         }
 
@@ -62,7 +62,7 @@ internal static partial class HandlerList
             { "port", listener.Port }
         };
 
-        response.WriteBody(responseBody, version);
+        response.WriteBody(responseBody);
         return Task.CompletedTask;
     }
 }

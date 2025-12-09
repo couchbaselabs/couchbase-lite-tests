@@ -1,3 +1,4 @@
+import importlib
 from typing import Any, Final, cast
 
 from cbltest.api.replicator_types import (
@@ -5,8 +6,27 @@ from cbltest.api.replicator_types import (
     ReplicatorDocumentEntry,
     ReplicatorProgress,
 )
-from cbltest.jsonhelper import _assert_string_entry, _get_typed, _get_typed_required
-from cbltest.responses import ErrorResponseBody, TestServerResponse
+from cbltest.jsonhelper import _get_typed, _get_typed_required
+from cbltest.response_types import (
+    MultipeerReplicatorStatusEntry,
+    PostGetAllDocumentsEntry,
+    PostGetAllDocumentsResponseMethods,
+    PostGetDocumentResponseMethods,
+    PostGetMultipeerReplicatorStatusResponseMethods,
+    PostGetReplicatorStatusResponseMethods,
+    PostRunQueryResponseMethods,
+    PostSnapshotDocumentsResponseMethods,
+    PostStartListenerResponseMethods,
+    PostStartMultipeerReplicatorResponseMethods,
+    PostStartReplicatorResponseMethods,
+    PostVerifyDocumentsResponseMethods,
+    ReplicatorStatusBody,
+    ValueOrMissing,
+)
+from cbltest.responses import ErrorResponseBody, TestServerResponse, register_response
+
+v1_request_module = importlib.import_module("cbltest.v1.requests")
+v2_request_module = importlib.import_module("cbltest.v2.requests")
 
 # Like the requests file, this file also follows the convention that all of the
 # received responses are classes that end in 'Response'.  However, unlike the
@@ -18,6 +38,8 @@ from cbltest.responses import ErrorResponseBody, TestServerResponse
 # type of PostResetResponse.
 
 
+@register_response(getattr(v1_request_module, "PostResetRequest"), [1, 2])
+@register_response(getattr(v2_request_module, "PostResetRequest"), [1, 2])
 class PostResetResponse(TestServerResponse):
     """
     A POST /reset response as specified in version 1 of the
@@ -25,30 +47,13 @@ class PostResetResponse(TestServerResponse):
     """
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "reset")
+        super().__init__(status_code, uuid, body, "reset")
 
 
-class PostGetAllDocumentsEntry:
-    __id_key: Final[str] = "id"
-    __rev_key: Final[str] = "rev"
-
-    @property
-    def id(self) -> str:
-        return self.__id
-
-    @property
-    def rev(self) -> str:
-        return self.__rev
-
-    def __init__(self, body: dict):
-        assert isinstance(body, dict), (
-            "Invalid PostGetAllDocumentsEntry received (not an object)"
-        )
-        self.__id = _assert_string_entry(body, self.__id_key)
-        self.__rev = _assert_string_entry(body, self.__rev_key)
-
-
-class PostGetAllDocumentsResponse(TestServerResponse):
+@register_response(getattr(v1_request_module, "PostGetAllDocumentsRequest"), [1, 2])
+class PostGetAllDocumentsResponse(
+    TestServerResponse, PostGetAllDocumentsResponseMethods
+):
     """
     A POST /getAllDocuments response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -95,7 +100,7 @@ class PostGetAllDocumentsResponse(TestServerResponse):
         return cast(list[PostGetAllDocumentsEntry], self.__payload.get(collection))
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "getAllDocuments")
+        super().__init__(status_code, uuid, body, "getAllDocuments")
         self.__payload: dict[str, list[PostGetAllDocumentsEntry]] = {}
         for k in body:
             key = cast(str, k)
@@ -109,6 +114,8 @@ class PostGetAllDocumentsResponse(TestServerResponse):
                 self.__payload[k].append(PostGetAllDocumentsEntry(entry))
 
 
+@register_response(getattr(v1_request_module, "PostUpdateDatabaseRequest"), [1, 2])
+@register_response(getattr(v2_request_module, "PostUpdateDatabaseRequest"), [1, 2])
 class PostUpdateDatabaseResponse(TestServerResponse):
     """
     A POST /updateDatabase response as specified in version 1 of the
@@ -116,10 +123,13 @@ class PostUpdateDatabaseResponse(TestServerResponse):
     """
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "updateDatabase")
+        super().__init__(status_code, uuid, body, "updateDatabase")
 
 
-class PostSnapshotDocumentsResponse(TestServerResponse):
+@register_response(getattr(v1_request_module, "PostSnapshotDocumentsRequest"), [1, 2])
+class PostSnapshotDocumentsResponse(
+    TestServerResponse, PostSnapshotDocumentsResponseMethods
+):
     """
     A POST /snapshotDocuments response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -139,17 +149,15 @@ class PostSnapshotDocumentsResponse(TestServerResponse):
         return self.__snapshot_id
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "snapshotDocuments")
+        super().__init__(status_code, uuid, body, "snapshotDocuments")
         self.__snapshot_id = cast(str, body.get(self.__id_key))
 
 
-class ValueOrMissing:
-    def __init__(self, value: Any | None = None, exists: bool = False):
-        self.value = value
-        self.exists = exists if value is None else True
-
-
-class PostVerifyDocumentsResponse(TestServerResponse):
+@register_response(getattr(v1_request_module, "PostVerifyDocumentsRequest"), [1, 2])
+@register_response(getattr(v2_request_module, "PostVerifyDocumentsRequest"), [1, 2])
+class PostVerifyDocumentsResponse(
+    TestServerResponse, PostVerifyDocumentsResponseMethods
+):
     """
     A POST /verifyDocuments response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -194,7 +202,7 @@ class PostVerifyDocumentsResponse(TestServerResponse):
         return self.__document
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "verifyDocuments")
+        super().__init__(status_code, uuid, body, "verifyDocuments")
         if self.__result_key not in body:
             return
 
@@ -213,7 +221,10 @@ class PostVerifyDocumentsResponse(TestServerResponse):
         self.__document = _get_typed(body, self.__document_key, dict[str, Any])
 
 
-class PostStartReplicatorResponse(TestServerResponse):
+@register_response(getattr(v1_request_module, "PostStartReplicatorRequest"), [1, 2])
+class PostStartReplicatorResponse(
+    TestServerResponse, PostStartReplicatorResponseMethods
+):
     """
     A POST /startReplicator response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -233,60 +244,14 @@ class PostStartReplicatorResponse(TestServerResponse):
         return self.__replicator_id
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "startReplicator")
+        super().__init__(status_code, uuid, body, "startReplicator")
         self.__replicator_id = cast(str, body.get(self.__id_key))
 
 
-class ReplicatorStatusBody:
-    """
-    A class representing the body of a replicator status response.
-    This is used to encapsulate the common properties of a replicator status.
-    """
-
-    __activity_key: Final[str] = "activity"
-    __progress_key: Final[str] = "progress"
-    __replicator_error_key: Final[str] = "error"
-    __documents_key: Final[str] = "documents"
-
-    @property
-    def activity(self) -> ReplicatorActivityLevel:
-        """Gets the activity level of the replicator"""
-        return self.__activity
-
-    @property
-    def progress(self) -> ReplicatorProgress:
-        """Gets the current progress of the replicator"""
-        return self.__progress
-
-    @property
-    def replicator_error(self) -> ErrorResponseBody | None:
-        """Gets the error that occurred during replication, if any"""
-        return self.__replicator_error
-
-    @property
-    def documents(self) -> list[ReplicatorDocumentEntry]:
-        """Gets the unseen list of documents replicated previously.  Note
-        that once viewed it will be cleared"""
-        return self.__documents
-
-    def __init__(self, body: dict):
-        if self.__activity_key not in body:
-            return
-
-        self.__activity = ReplicatorActivityLevel[
-            cast(str, body.get(self.__activity_key)).upper()
-        ]
-        self.__progress = ReplicatorProgress(cast(dict, body.get(self.__progress_key)))
-        self.__replicator_error = ErrorResponseBody.create(
-            body.get(self.__replicator_error_key)
-        )
-        docs = _get_typed(body, self.__documents_key, list)
-        self.__documents = (
-            [ReplicatorDocumentEntry(d) for d in docs] if docs is not None else []
-        )
-
-
-class PostGetReplicatorStatusResponse(TestServerResponse):
+@register_response(getattr(v1_request_module, "PostGetReplicatorStatusRequest"), [1, 2])
+class PostGetReplicatorStatusResponse(
+    TestServerResponse, PostGetReplicatorStatusResponseMethods
+):
     """
     A POST /getReplicatorStatus response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -342,10 +307,11 @@ class PostGetReplicatorStatusResponse(TestServerResponse):
         return self.__status.documents
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "getReplicatorStatus")
+        super().__init__(status_code, uuid, body, "getReplicatorStatus")
         self.__status = ReplicatorStatusBody(body)
 
 
+@register_response(getattr(v1_request_module, "PostPerformMaintenanceRequest"), [1, 2])
 class PostPerformMaintenanceResponse(TestServerResponse):
     """
     A POST /performMaintenance response as specified in version 1 of the
@@ -353,9 +319,11 @@ class PostPerformMaintenanceResponse(TestServerResponse):
     """
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "performMaintenance")
+        super().__init__(status_code, uuid, body, "performMaintenance")
 
 
+@register_response(getattr(v1_request_module, "PostNewSessionRequest"), [1, 2])
+@register_response(getattr(v2_request_module, "PostNewSessionRequest"), [1, 2])
 class PostNewSessionResponse(TestServerResponse):
     """
     A POST /newSession response as specified in version 1 of the
@@ -363,10 +331,11 @@ class PostNewSessionResponse(TestServerResponse):
     """
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "newSession")
+        super().__init__(status_code, uuid, body, "newSession")
 
 
-class PostRunQueryResponse(TestServerResponse):
+@register_response(getattr(v1_request_module, "PostRunQueryRequest"), [1, 2])
+class PostRunQueryResponse(TestServerResponse, PostRunQueryResponseMethods):
     """
     A POST /runQuery response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -388,7 +357,7 @@ class PostRunQueryResponse(TestServerResponse):
         return self.__results
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "runQuery")
+        super().__init__(status_code, uuid, body, "runQuery")
         if self.__results_key not in body:
             return
 
@@ -396,7 +365,8 @@ class PostRunQueryResponse(TestServerResponse):
         self.__results = [dict(e) for e in results] if results is not None else []
 
 
-class PostGetDocumentResponse(TestServerResponse):
+@register_response(getattr(v1_request_module, "PostGetDocumentRequest"), [1, 2])
+class PostGetDocumentResponse(TestServerResponse, PostGetDocumentResponseMethods):
     """
     A POST /getDocument response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -416,10 +386,11 @@ class PostGetDocumentResponse(TestServerResponse):
         return self.__body
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "getDocument")
+        super().__init__(status_code, uuid, body, "getDocument")
         self.__body = body
 
 
+@register_response(getattr(v1_request_module, "PostLogRequest"), [1, 2])
 class PostLogResponse(TestServerResponse):
     """
     A POST /log response as specified in version 1 of the
@@ -427,10 +398,11 @@ class PostLogResponse(TestServerResponse):
     """
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "log")
+        super().__init__(status_code, uuid, body, "log")
 
 
-class PostStartListenerResponse(TestServerResponse):
+@register_response(getattr(v1_request_module, "PostStartListenerRequest"), [1, 2])
+class PostStartListenerResponse(TestServerResponse, PostStartListenerResponseMethods):
     """
     A POST /startListener response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -457,11 +429,12 @@ class PostStartListenerResponse(TestServerResponse):
         return self.__port
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "startListener")
+        super().__init__(status_code, uuid, body, "startListener")
         self.__listener_id = cast(str, body.get(self.__listener_id_key))
         self.__port = cast(int, body.get(self.__port_key))
 
 
+@register_response(getattr(v1_request_module, "PostStopListenerRequest"), [1, 2])
 class PostStopListenerResponse(TestServerResponse):
     """
     A POST /stopListener response as specified in version 1 of the
@@ -469,10 +442,15 @@ class PostStopListenerResponse(TestServerResponse):
     """
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "stopListener")
+        super().__init__(status_code, uuid, body, "stopListener")
 
 
-class PostStartMultipeerReplicatorResponse(TestServerResponse):
+@register_response(
+    getattr(v1_request_module, "PostStartMultipeerReplicatorRequest"), [1, 2]
+)
+class PostStartMultipeerReplicatorResponse(
+    TestServerResponse, PostStartMultipeerReplicatorResponseMethods
+):
     """
     A POST /startMultipeerReplicator response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -491,10 +469,13 @@ class PostStartMultipeerReplicatorResponse(TestServerResponse):
         return self.__replicator_id
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "startMultipeerReplicator")
+        super().__init__(status_code, uuid, body, "startMultipeerReplicator")
         self.__replicator_id = cast(str, body.get(self.__id_key))
 
 
+@register_response(
+    getattr(v1_request_module, "PostStopMultipeerReplicatorRequest"), [1, 2]
+)
 class PostStopMultipeerReplicatorResponse(TestServerResponse):
     """
     A POST /stopMultipeerReplicator response as specified in version 1 of the
@@ -502,37 +483,15 @@ class PostStopMultipeerReplicatorResponse(TestServerResponse):
     """
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "stopMultipeerReplicator")
+        super().__init__(status_code, uuid, body, "stopMultipeerReplicator")
 
 
-class MultipeerReplicatorStatusEntry:
-    """
-    A class representing a single entry in the multipeer replicator status response.
-    """
-
-    __peer_id_key: Final[str] = "peerID"
-    __status_key: Final[str] = "status"
-
-    @property
-    def peer_id(self) -> str:
-        """Gets the peer ID of the replicator"""
-        return self.__peer_id
-
-    @property
-    def status(self) -> ReplicatorStatusBody:
-        """Gets the status of the replicator"""
-        return self.__status
-
-    def __init__(self, body: dict):
-        assert isinstance(body, dict), (
-            "Invalid MultipeerReplicatorStatusEntry received (not an object)"
-        )
-
-        self.__peer_id = _assert_string_entry(body, self.__peer_id_key)
-        self.__status = ReplicatorStatusBody(body.get(self.__status_key, {}))
-
-
-class PostGetMultipeerReplicatorStatusResponse(TestServerResponse):
+@register_response(
+    getattr(v1_request_module, "PostGetMultipeerReplicatorStatusRequest"), [1, 2]
+)
+class PostGetMultipeerReplicatorStatusResponse(
+    TestServerResponse, PostGetMultipeerReplicatorStatusResponseMethods
+):
     """
     A POST /getMultipeerReplicatorStatus response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -555,7 +514,7 @@ class PostGetMultipeerReplicatorStatusResponse(TestServerResponse):
         return self.__replicators
 
     def __init__(self, status_code: int, uuid: str, body: dict):
-        super().__init__(status_code, uuid, 1, body, "getMultipeerReplicatorStatus")
+        super().__init__(status_code, uuid, body, "getMultipeerReplicatorStatus")
         self.__replicators: list[MultipeerReplicatorStatusEntry] = []
         if self.__replicators_key in body:
             for entry in body[self.__replicators_key]:

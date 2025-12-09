@@ -8,15 +8,13 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
 using TestServer.Handlers;
 using TestServer.Utilities;
 
 // This is a shim between the received HTTP message
 // and the actual invocation which will transform
 // the clientID into a session IF NEEDED
-using HandlerAction = System.Func<int,
-    System.String?,
+using HandlerAction = System.Func<System.String?,
     System.Text.Json.JsonDocument,
     System.Net.HttpListenerResponse,
     System.Threading.Tasks.Task>;
@@ -35,7 +33,7 @@ namespace TestServer.Handlers
             return (split[0], split[1]);
         }
 
-        private static bool TryDeserialize<T>(this JsonElement element, HttpListenerResponse response, int version, [NotNullWhen(true)]out T? result)
+        private static bool TryDeserialize<T>(this JsonElement element, HttpListenerResponse response, [NotNullWhen(true)]out T? result)
         {
             result = default;
             try {
@@ -45,7 +43,7 @@ namespace TestServer.Handlers
                 })!;
                 return true;
             } catch (JsonException ex) {
-                response.WriteBody(Router.CreateErrorResponse($"Invalid json received: {ex.Message}"), version, HttpStatusCode.BadRequest);
+                response.WriteBody(Router.CreateErrorResponse($"Invalid json received: {ex.Message}"), HttpStatusCode.BadRequest);
             }
 
             return false;
@@ -117,12 +115,12 @@ namespace TestServer
         static Router()
         {
             foreach(var (key, method) in HandlerMethods(false)) {
-                var invocation = new HandlerAction((version, clientId, body, response) => (Task)method.Invoke(null, [version, Session.For(clientId), body, response])!);
+                var invocation = new HandlerAction((clientId, body, response) => (Task)method.Invoke(null, [Session.For(clientId), body, response])!);
                 RouteMap.Add(key, invocation);
             }
 
             foreach (var (key, method) in HandlerMethods(true)) {
-                var invocation = new HandlerAction((version, clientId, body, response) => (Task)method.Invoke(null, [version, body, response])!);
+                var invocation = new HandlerAction((clientId, body, response) => (Task)method.Invoke(null, [body, response])!);
                 RouteMap.Add(key, invocation);
             }
         }
@@ -165,39 +163,42 @@ namespace TestServer
 
         #region Internal Methods
 
-        internal static void HandleException(Exception ex, Uri endpoint, int version, HttpListenerResponse response)
+        internal static void HandleException(Exception ex, Uri endpoint, HttpListenerResponse response)
         {
             if(ex is JsonException) {
-                response.WriteBody(CreateErrorResponse(ex.Message), version, HttpStatusCode.BadRequest);
+                response.WriteBody(CreateErrorResponse(ex.Message), HttpStatusCode.BadRequest);
                 return;
             }
 
             if(ex is ApplicationStatusException e) {
-                response.WriteBody(CreateErrorResponse(ex.Message), version, e.StatusCode);
+                response.WriteBody(CreateErrorResponse(ex.Message), e.StatusCode);
                 return;
             }
 
             var msg = MultiExceptionString(ex);
             Serilog.Log.Logger.Warning("Error in handler for {endpoint}", endpoint);
             Serilog.Log.Logger.Warning("{msg}", msg);
-            response.WriteBody(CreateErrorResponse(msg), version, HttpStatusCode.InternalServerError);
+            response.WriteBody(CreateErrorResponse(msg), HttpStatusCode.InternalServerError);
         }
 
         internal static async Task Handle(string? clientId, Uri endpoint, Stream body, HttpListenerResponse response, int version)
         {
-            if(version > CBLTestServer.MaxApiVersion) {
-                response.WriteBody("The API version specified is not supported", CBLTestServer.MaxApiVersion, HttpStatusCode.Forbidden);
-                return;
-            }
-
             var path = endpoint.AbsolutePath!.TrimStart('/');
-            if (version == 0 && path != "") {
-                response.WriteBody($"{ApiVersionHeader} missing or set to 0 on a versioned endpoint", CBLTestServer.MaxApiVersion, HttpStatusCode.Forbidden);
-                return;
+            if (path != "") {
+                if (version == 0) {
+                    response.WriteBody($"{ApiVersionHeader} missing or set to 0 on a versioned endpoint",
+                        HttpStatusCode.Forbidden);
+                    return;
+                }
+
+                if(version != CBLTestServer.ApiVersion) {
+                    response.WriteBody("The API version specified does not match this server", HttpStatusCode.Forbidden);
+                    return;
+                }
             }
 
             if (!RouteMap.TryGetValue(path, out var action)) {
-                response.WriteEmptyBody(version, HttpStatusCode.NotFound);
+                response.WriteEmptyBody(HttpStatusCode.NotFound);
                 return;
             }
 
@@ -213,23 +214,23 @@ namespace TestServer
                 Serilog.Log.Logger.Error("Error deserializing POST body for {endpoint}", endpoint);
                 Serilog.Log.Logger.Error("{msg}", msg);
                 var topEx = new ApplicationException($"Error deserializing POST body for {endpoint}", ex);
-                response.WriteBody(CreateErrorResponse(topEx), version, HttpStatusCode.BadRequest);
+                response.WriteBody(CreateErrorResponse(topEx), HttpStatusCode.BadRequest);
                 return;
             }
 
             try {
-                await action(version, clientId, bodyObj, response).ConfigureAwait(false);
+                await action(clientId, bodyObj, response).ConfigureAwait(false);
             } catch (TargetInvocationException ex) {
                 switch(ex.InnerException) {
                     case null:
-                        HandleException(ex, endpoint, version, response);
+                        HandleException(ex, endpoint, response);
                         break;
                     default:
-                        HandleException(ex.InnerException, endpoint, version, response);
+                        HandleException(ex.InnerException, endpoint, response);
                         break;
                 }
             } catch (Exception ex) {
-                HandleException(ex, endpoint, version, response);
+                HandleException(ex, endpoint, response);
             }
         }
 

@@ -13,15 +13,15 @@ internal readonly record struct LogHandlerBody
 internal static partial class HandlerList
 {
     [HttpHandler("log")]
-    public static Task LogHandler(int version, Session session, JsonDocument body, HttpListenerResponse response)
+    public static Task LogHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<LogHandlerBody>(response, version, out var logBody)) {
+        if (!body.RootElement.TryDeserialize<LogHandlerBody>(response, out var logBody)) {
             return Task.CompletedTask;
         }
 
         Serilog.Log.Logger.Information(logBody.message);
 
-        response.WriteEmptyBody(version);
+        response.WriteEmptyBody();
         return Task.CompletedTask;
     }
 }

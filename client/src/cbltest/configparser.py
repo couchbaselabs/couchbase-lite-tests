@@ -1,5 +1,6 @@
 from enum import Enum
 from json import dumps, load
+from logging import warning
 from pathlib import Path
 from typing import Final
 
@@ -181,11 +182,6 @@ class ParsedConfig:
         return self.__greenboard["password"]
 
     @property
-    def api_version(self) -> int:
-        """The passed API version that governs the creation of the request factory"""
-        return self.__api_version
-
-    @property
     def logslurp_url(self) -> str | None:
         """The URL of the optional logslurp server to send and collect logs"""
         return self.__logslurp_url
@@ -199,7 +195,12 @@ class ParsedConfig:
             json, self.__cbs_key, list[dict], []
         )
         self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, list[str], [])
-        self.__api_version = _get_int_or_default(json, self.__api_version_key, 1)
+        if self.__api_version_key in json:
+            warning(
+                "The 'api-version' field in the config file is deprecated and will be "
+                "removed in future versions. Please remove it from your config."
+            )
+
         self.__greenboard = _get_typed(json, self.__greenboard_key, dict[str, str])
         if self.__greenboard is not None and (
             "hostname" not in self.__greenboard
@@ -214,10 +215,7 @@ class ParsedConfig:
 
     def __str__(self) -> str:
         ret_val = (
-            "API Version: "
-            + str(self.__api_version)
-            + "\n"
-            + "Test Servers: "
+            "Test Servers: "
             + dumps(self.__test_servers)
             + "\n"
             + "Sync Gateways: "
