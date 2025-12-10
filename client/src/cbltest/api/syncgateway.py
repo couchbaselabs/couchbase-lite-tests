@@ -15,7 +15,7 @@ from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_info, cbl_warning
+from cbltest.logging import cbl_error, cbl_info, cbl_warning
 from cbltest.utils import assert_not_null
 from cbltest.version import VERSION
 
@@ -1526,6 +1526,154 @@ class SyncGateway(_SyncGatewayBase):
             port=self.__public_port,
             secure=self.secure,
         )
+
+    async def start_isgr(
+        self,
+        db_name: str,
+        replication_id: str,
+        remote_url: str,
+        remote_db: str,
+        direction: str,
+        continuous: bool = False,
+        remote_username: str | None = None,
+        remote_password: str | None = None,
+        collections_local: list[str] | None = None,
+        collections_remote: list[str] | None = None,
+    ) -> str:
+        """
+        Starts an Inter-Sync Gateway Replication (ISGR) from this SG to a remote SG.
+
+        :param db_name: The local database name
+        :param replication_id: A unique identifier for this replication
+        :param remote_url: The URL of the remote Sync Gateway (e.g., "https://sg2.example.com:4985")
+        :param remote_db: The database name on the remote Sync Gateway
+        :param direction: Replication direction - "push", "pull", or "pushAndPull"
+        :param continuous: Whether the replication should be continuous (default False)
+        :param remote_username: Username for authenticating with the remote SG (optional for admin auth)
+        :param remote_password: Password for authenticating with the remote SG (optional for admin auth)
+        :param collections_local: List of local collections in "scope.collection" format
+        :param collections_remote: List of remote collections to map to (parallel array with collections_local)
+        :return: The replication ID
+        """
+        with self._tracer.start_as_current_span(
+            "start_isgr",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.replication.id": replication_id,
+                "cbl.replication.direction": direction,
+            },
+        ):
+            body: dict[str, Any] = {
+                "replication_id": replication_id,
+                "remote": f"{remote_url}/{remote_db}",
+                "direction": direction,
+                "continuous": continuous,
+            }
+            if remote_username is not None:
+                body["remote_username"] = remote_username
+            if remote_password is not None:
+                body["remote_password"] = remote_password
+            if collections_local is not None or collections_remote is not None:
+                body["collections_enabled"] = True
+            if collections_local is not None:
+                body["collections_local"] = collections_local
+            if collections_remote is not None:
+                body["collections_remote"] = collections_remote
+
+            await self._send_request(
+                "put", f"/{db_name}/_replication/{replication_id}", JSONDictionary(body)
+            )
+            return replication_id
+
+    async def get_isgr_status(self, db_name: str, replication_id: str) -> dict:
+        """
+        Gets the status of an Inter-Sync Gateway Replication.
+
+        :param db_name: The local database name
+        :param replication_id: The replication identifier
+        :return: A dictionary containing the replication status
+        """
+        with self._tracer.start_as_current_span(
+            "get_isgr_status",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.replication.id": replication_id,
+            },
+        ):
+            resp = await self._send_request(
+                "get", f"/{db_name}/_replicationStatus/{replication_id}"
+            )
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
+
+    async def stop_isgr(
+        self, db_name: str, replication_id: str, continuous: bool = False
+    ) -> None:
+        """
+        Stops and removes an Inter-Sync Gateway Replication.
+
+        :param db_name: The local database name
+        :param replication_id: The replication identifier to stop
+        :param continuous: Replication type
+        """
+        with self._tracer.start_as_current_span(
+            "stop_isgr",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.replication.id": replication_id,
+            },
+        ):
+            try:
+                await self._send_request(
+                    "delete", f"/{db_name}/_replication/{replication_id}"
+                )
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 404 and continuous:
+                    cbl_error(f"ISGR {replication_id} is continuous but does not exist")
+                    raise
+            return None
+
+    async def wait_for_isgr_status(
+        self,
+        db_name: str,
+        replication_id: str,
+        target_status: str,
+        timeout: int = 60,
+        poll_interval: int = 2,
+    ) -> dict:
+        """
+        Waits for an ISGR to reach a specific status.
+
+        :param db_name: The local database name
+        :param replication_id: The replication identifier
+        :param target_status: The status to wait for (default "stopped")
+        :param timeout: Maximum seconds to wait (default 180)
+        :param poll_interval: Seconds between status checks (default 2)
+        :return: The final replication status
+        :raises TimeoutError: If the target status is not reached within timeout
+        """
+        with self._tracer.start_as_current_span(
+            "wait_for_isgr_status",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.replication.id": replication_id,
+                "cbl.target.status": target_status,
+            },
+        ):
+            for _ in range(timeout // poll_interval):
+                status = await self.get_isgr_status(db_name, replication_id)
+                current_status = status.get("status", "")
+                if current_status == target_status:
+                    return status
+                if current_status == "error":
+                    raise Exception(
+                        f"ISGR {replication_id} entered error state: {status.get('error_message', 'unknown error')}"
+                    )
+                await asyncio.sleep(poll_interval)
+
+            raise TimeoutError(
+                f"ISGR {replication_id} did not reach status '{target_status}' within {timeout} seconds"
+            )
 
 
 class SyncGatewayUserClient(_SyncGatewayBase):

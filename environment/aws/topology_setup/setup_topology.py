@@ -883,11 +883,10 @@ class TopologyConfig:
         i = 1
         for cluster in self.__clusters:
             click.echo(f"Cluster {i} ({cluster.version}):")
-            for i in range(0, len(cluster.public_hostnames)):
+            for j in range(0, len(cluster.public_hostnames)):
                 click.echo(
-                    f"\t{cluster.public_hostnames[i]} / {cluster.internal_hostnames[i]}"
+                    f"\t{cluster.public_hostnames[j]} / {cluster.internal_hostnames[j]}"
                 )
-
             i += 1
 
         if len(self.__clusters) > 0:
