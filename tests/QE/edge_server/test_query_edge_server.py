@@ -169,4 +169,49 @@ class TestQueryEdgeServer(CBLTestClass):
         self.mark_test_step(f"Query results: {response}")
         assert len(response) == 0
 
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_adhoc_queries_incorrect_field(
+            self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
+        self.mark_test_step("Enabling ad-hoc queries")
+        edge_server = cblpytest.edge_servers[0]
+        file_path = os.path.abspath(os.path.dirname(__file__))
+        file_path = str(Path(file_path, "../../.."))
+
+        configured_server = await edge_server.set_config(
+            f"{file_path}/environment/edge_server/config/test_named_queries.json",
+            "/opt/couchbase-edge-server/etc/config.json",
+        )
+
+        client = HTTPClient(cblpytest.http_clients[0], configured_server)
+        await client.connect()
+        query = {
+            "query": "SELECT first, name.last, gender, birthday, contact.email, contact.phone, contact.address.city, contact.address.state, likes FROM _default WHERE gender = $gender AND birthday BETWEEN $start_date AND $end_date AND ARRAY_CONTAINS(likes, $hobby) AND (ANY email IN contact.email SATISFIES email LIKE $email_filter END) AND contact.address.state = $state ORDER BY birthday ASC LIMIT 10",
+            "params": {
+                "gender": "female",
+                "start_date": "1950-01-01",
+                "end_date": "2000-12-31",
+                "hobby": "driving",
+                "email_filter": "%nosql-matters.org%",
+                "state": "OH",
+            },
+        }
+        expected_results = {
+            "last": "Gracy",
+            "gender": "female",
+            "birthday": "1967-08-25",
+            "email": ["dorthey.gracy@nosql-matters.org", "gracy@nosql-matters.org"],
+            "phone": ["740-8360831"],
+            "city": "Waldo",
+            "state": "OH",
+            "likes": ["snowboarding", "driving"],
+        }
+
+        self.mark_test_step("Executing ad-hoc query")
+        response = await client.adhoc_query(
+            db_name="names", query=query["query"], params=query["params"]
+        )
+        self.mark_test_step(f"Query result: {response}")
+        assert DeepDiff(expected_results, response[0]) == {}
+
 
