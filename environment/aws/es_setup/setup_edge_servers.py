@@ -202,6 +202,13 @@ def remote_exec(
     click.echo()
 
 
+def remote_exec_bg(ssh: paramiko.SSHClient, command: str, desc: str) -> None:
+    header(desc)
+    ssh.exec_command(command, get_pty=False)
+    header("Done!")
+    click.echo()
+
+
 def setup_server(
     hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadInfo
 ) -> None:
@@ -232,6 +239,15 @@ def setup_server(
     )
     remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
 
+    sftp_progress_bar(
+        sftp, SCRIPT_DIR / "cert" / "es_cert.pem", "/home/ec2-user/cert/es_cert.pem"
+    )
+    sftp_progress_bar(
+        sftp, SCRIPT_DIR / "cert" / "es_key.pem", "/home/ec2-user/cert/es_key.pem"
+    )
+    for file in (SCRIPT_DIR / "shell2http").iterdir():
+        sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
+
     if es_info.is_release:
         remote_exec(
             ssh,
@@ -246,10 +262,6 @@ def setup_server(
             f"/tmp/{es_info.local_filename}",
         )
 
-    sftp_progress_bar(sftp, SCRIPT_DIR / "start-es.sh", "/home/ec2-user/start-es.sh")
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "es_config.json", "/home/ec2-user/config/es_config.json"
-    )
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
     cert = create_self_signed_certificate(hostname)
     cert_pem = cert.pem_bytes()
@@ -280,7 +292,9 @@ def setup_server(
         "Installing Edge Server",
     )
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting ES log fileserver")
-    remote_exec(ssh, "bash /home/ec2-user/start-es.sh", "Starting Edge Server")
+    remote_exec_bg(
+        ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES management server"
+    )
 
     ssh.close()
 
