@@ -14,3 +14,9 @@ pushd $HOME/shell2http
 curl -LO https://github.com/msoap/shell2http/releases/download/v1.17.0/shell2http_1.17.0_linux_amd64.tar.gz
 tar xvf shell2http_1.17.0_linux_amd64.tar.gz shell2http
 rm shell2http_1.17.0_linux_amd64.tar.gz
+
+if ! command -v iptables &> /dev/null; then
+  sudo yum install iptables-services -y
+  sudo systemctl enable iptables
+  sudo systemctl start iptables
+fi
