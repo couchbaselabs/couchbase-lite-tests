@@ -38,23 +38,17 @@ def _recover_or_add_node(cbs_one, cbs_two):
     cbs_one.rebalance()
 
 
-async def _cleanup_test_resources(sg, cbs, sg_db: str, bucket_name: str):
-    """Clean up test database and bucket."""
-    try:
-        await sg.delete_database(sg_db)
-        await asyncio.sleep(3)
-    except Exception:
-        pass
-    for attempt in range(3):
-        try:
+async def _cleanup_test_resources(
+    sg, cbs, bucket_names: list[str] | None = None
+) -> None:
+    """Clean up all databases from SG and specified buckets from CBS."""
+    db_names = await sg.get_all_database_names()
+    for db_name in db_names:
+        await sg.delete_database(db_name)
+
+    if bucket_names:
+        for bucket_name in bucket_names:
             cbs.drop_bucket(bucket_name)
-            break
-        except Exception as e:
-            if "does not exist" in str(e).lower() or "not found" in str(e).lower():
-                break
-            if attempt < 2:
-                await asyncio.sleep(5)
-    await asyncio.sleep(10)
 
 
 async def _setup_database_and_user(
@@ -107,7 +101,7 @@ class TestMultipleServers(CBLTestClass):
         channels = ["ABC", "CBS"]
 
         self.mark_test_step("Clean up and setup test environment")
-        await _cleanup_test_resources(sg, cbs_one, sg_db, bucket_name)
+        await _cleanup_test_resources(sg, cbs_one, [bucket_name])
         sg_user = await _setup_database_and_user(
             sg, cbs_one, sg_db, bucket_name, sg_user_name, sg_user_password, channels
         )
@@ -259,7 +253,7 @@ class TestMultipleServers(CBLTestClass):
         channels = ["ABC", "CBS"]
 
         self.mark_test_step("Clean up and setup test environment")
-        await _cleanup_test_resources(sg, cbs_one, sg_db, bucket_name)
+        await _cleanup_test_resources(sg, cbs_one, [bucket_name])
         sg_user = await _setup_database_and_user(
             sg, cbs_one, sg_db, bucket_name, sg_user_name, sg_user_password, channels
         )
@@ -329,17 +323,16 @@ class TestMultipleServers(CBLTestClass):
 
 
 @pytest.mark.sgw
-@pytest.mark.min_sync_gateways(5)
-@pytest.mark.min_couchbase_servers(4)
+@pytest.mark.min_sync_gateways(3)
+@pytest.mark.min_couchbase_servers(1)
 class TestISGRCollectionMapping(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_isgr_explicit_collection_mapping(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         sgs = cblpytest.sync_gateways
-        cbs_servers = cblpytest.couchbase_servers
-        sg1, sg2, sg3 = sgs[0], sgs[3], sgs[4]
-        cbs1, cbs2, cbs3 = cbs_servers[0], cbs_servers[2], cbs_servers[3]
+        cbs = cblpytest.couchbase_servers[0]
+        sg1, sg2, sg3 = sgs[0], sgs[1], sgs[2]
         bucket1, bucket2, bucket3 = "isgr_bucket1", "isgr_bucket2", "isgr_bucket3"
         sg_db1, sg_db2, sg_db3 = "db1", "db2", "db3"
         b1_collections = ["collection1", "collection2", "collection3"]
@@ -347,105 +340,54 @@ class TestISGRCollectionMapping(CBLTestClass):
         b3_collections = ["collection6", "collection7", "collection8", "collection9"]
         num_docs = 3
 
-        self.mark_test_step("Create buckets on each Couchbase Server cluster")
-        cbs1.drop_bucket(bucket1)
-        cbs1.create_bucket(bucket1)
-        cbs2.drop_bucket(bucket2)
-        cbs2.create_bucket(bucket2)
-        cbs3.drop_bucket(bucket3)
-        cbs3.create_bucket(bucket3)
+        self.mark_test_step("Clean up and setup test environment")
+        for sg in sgs:
+            await _cleanup_test_resources(sg, cbs, [bucket1, bucket2, bucket3])
 
-        self.mark_test_step("Create collections in _default scope on each CBS cluster")
-        cbs1.create_collections(bucket1, "_default", b1_collections)
-        cbs2.create_collections(bucket2, "_default", b2_collections)
-        cbs3.create_collections(bucket3, "_default", b3_collections)
+        self.mark_test_step("Create collections in _default scope for each bucket")
+        for bucket, collections in [
+            (bucket1, b1_collections),
+            (bucket2, b2_collections),
+            (bucket3, b3_collections),
+        ]:
+            cbs.create_bucket(bucket)
+            cbs.create_collections(bucket, "_default", collections)
         await asyncio.sleep(5)
 
         self.mark_test_step(
-            "Configure SG1 with bucket1 (_default scope with collections)"
+            "Configure all SGs with their respective buckets and collections"
         )
-        config_1 = {
-            "bucket": bucket1,
-            "num_index_replicas": 0,
-            "scopes": {
-                "_default": {
-                    "collections": {"_default": {}, **{c: {} for c in b1_collections}}
-                },
-            },
-            "unsupported": {"sgr_tls_skip_verify": True},
-        }
-
-        self.mark_test_step(
-            "Configure SG2 with bucket2 (_default scope with collections)"
-        )
-        config_2 = {
-            "bucket": bucket2,
-            "num_index_replicas": 0,
-            "scopes": {
-                "_default": {
-                    "collections": {"_default": {}, **{c: {} for c in b2_collections}}
-                },
-            },
-            "unsupported": {"sgr_tls_skip_verify": True},
-        }
-
-        self.mark_test_step(
-            "Configure SG3 with bucket3 (_default scope with collections)"
-        )
-        config_3 = {
-            "bucket": bucket3,
-            "num_index_replicas": 0,
-            "scopes": {
-                "_default": {
-                    "collections": {"_default": {}, **{c: {} for c in b3_collections}}
-                },
-            },
-            "unsupported": {"sgr_tls_skip_verify": True},
-        }
-        for sg, sg_db, config in [
-            (sg1, sg_db1, config_1),
-            (sg2, sg_db2, config_2),
-            (sg3, sg_db3, config_3),
+        for sg, sg_db, bucket, collections in [
+            (sg1, sg_db1, bucket1, b1_collections),
+            (sg2, sg_db2, bucket2, b2_collections),
+            (sg3, sg_db3, bucket3, b3_collections),
         ]:
+            config = {
+                "bucket": bucket,
+                "num_index_replicas": 0,
+                "scopes": {
+                    "_default": {
+                        "collections": {"_default": {}, **{c: {} for c in collections}}
+                    },
+                },
+                "unsupported": {"sgr_tls_skip_verify": True},
+            }
             db_status = await sg.get_database_status(sg_db)
             if db_status is not None:
                 await sg.delete_database(sg_db)
             await sg.put_database(sg_db, PutDatabasePayload(config))
 
         self.mark_test_step(f"Upload {num_docs} docs to each collection in SG1")
-        collection1_docs = [
-            DocumentUpdateEntry(
-                id=f"collection_1_doc_{i}",
-                revid=None,
-                body={"type": "test", "collection": "collection1", "index": i},
-            )
-            for i in range(num_docs)
-        ]
-        await sg1.update_documents(
-            sg_db1, collection1_docs, "_default", b1_collections[0]
-        )
-        collection2_docs = [
-            DocumentUpdateEntry(
-                id=f"collection_2_doc_{i}",
-                revid=None,
-                body={"type": "test", "collection": "collection2", "index": i},
-            )
-            for i in range(num_docs)
-        ]
-        await sg1.update_documents(
-            sg_db1, collection2_docs, "_default", b1_collections[1]
-        )
-        collection3_docs = [
-            DocumentUpdateEntry(
-                id=f"collection_3_doc_{i}",
-                revid=None,
-                body={"type": "test", "collection": "collection3", "index": i},
-            )
-            for i in range(num_docs)
-        ]
-        await sg1.update_documents(
-            sg_db1, collection3_docs, "_default", b1_collections[2]
-        )
+        for collection in b1_collections:
+            docs = [
+                DocumentUpdateEntry(
+                    id=f"{collection}_doc_{i}",
+                    revid=None,
+                    body={"type": "test", "collection": collection, "index": i},
+                )
+                for i in range(num_docs)
+            ]
+            await sg1.update_documents(sg_db1, docs, "_default", collection)
         await asyncio.sleep(2)
 
         self.mark_test_step("""
@@ -460,7 +402,6 @@ class TestISGRCollectionMapping(CBLTestClass):
             remote_url=f"https://{sg2.hostname}:4985",
             remote_db=sg_db2,
             direction="push",
-            continuous=False,
             remote_username="admin",
             remote_password="password",
             collections_local=[
@@ -486,7 +427,6 @@ class TestISGRCollectionMapping(CBLTestClass):
             remote_url=f"https://{sg1.hostname}:4985",
             remote_db=sg_db1,
             direction="pull",
-            continuous=False,
             remote_username="admin",
             remote_password="password",
             collections_local=[
@@ -519,11 +459,11 @@ class TestISGRCollectionMapping(CBLTestClass):
         sg2_collection4_ids = {row.id for row in sg2_collection4_docs.rows}
         sg2_collection5_ids = {row.id for row in sg2_collection5_docs.rows}
         for i in range(num_docs):
-            assert f"collection_1_doc_{i}" in sg2_collection4_ids, (
-                f"SG2 collection4 missing document: collection_1_doc_{i}"
+            assert f"collection1_doc_{i}" in sg2_collection4_ids, (
+                f"SG2 collection4 missing document: collection1_doc_{i}"
             )
-            assert f"collection_2_doc_{i}" in sg2_collection5_ids, (
-                f"SG2 collection5 missing document: collection_2_doc_{i}"
+            assert f"collection2_doc_{i}" in sg2_collection5_ids, (
+                f"SG2 collection5 missing document: collection2_doc_{i}"
             )
 
         self.mark_test_step("""
@@ -545,18 +485,17 @@ class TestISGRCollectionMapping(CBLTestClass):
         sg3_collection7_ids = {row.id for row in sg3_collection7_docs.rows}
         sg3_collection8_ids = {row.id for row in sg3_collection8_docs.rows}
         for i in range(num_docs):
-            assert f"collection_1_doc_{i}" in sg3_collection6_ids, (
-                f"SG3 collection6 missing document: collection_1_doc_{i}"
+            assert f"collection1_doc_{i}" in sg3_collection6_ids, (
+                f"SG3 collection6 missing document: collection1_doc_{i}"
             )
-            assert f"collection_2_doc_{i}" in sg3_collection7_ids, (
-                f"SG3 collection7 missing document: collection_2_doc_{i}"
+            assert f"collection2_doc_{i}" in sg3_collection7_ids, (
+                f"SG3 collection7 missing document: collection2_doc_{i}"
             )
-            assert f"collection_3_doc_{i}" in sg3_collection8_ids, (
-                f"SG3 collection8 missing document: collection_3_doc_{i}"
+            assert f"collection3_doc_{i}" in sg3_collection8_ids, (
+                f"SG3 collection8 missing document: collection3_doc_{i}"
             )
 
         for sg, sg_db in [(sg1, sg_db1), (sg2, sg_db2), (sg3, sg_db3)]:
             await sg.delete_database(sg_db)
-        cbs1.drop_bucket(bucket1)
-        cbs2.drop_bucket(bucket2)
-        cbs3.drop_bucket(bucket3)
+        for bucket in [bucket1, bucket2, bucket3]:
+            cbs.drop_bucket(bucket)

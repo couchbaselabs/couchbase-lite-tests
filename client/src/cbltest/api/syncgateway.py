@@ -657,6 +657,17 @@ class _SyncGatewayBase:
         """
         await self._delete_database(db_name, 0)
 
+    async def get_all_database_names(self) -> list[str]:
+        """
+        Gets the names of all databases configured on this Sync Gateway instance.
+
+        :return: A list of database names
+        """
+        with self._tracer.start_as_current_span("get_all_database_names"):
+            resp = await self._send_request("get", "/_all_dbs")
+            assert isinstance(resp, list)
+            return cast(list[str], resp)
+
     def _analyze_dataset_response(self, response: list) -> None:
         assert isinstance(response, list), "Invalid bulk docs response (not a list)"
         typed_response = cast(list, response)

@@ -84,12 +84,10 @@ else
 fi
 
 # Set alternate address for external access (after cluster init/join)
-# Use REST API to set all service ports so SDK can reach KV from outside VPC
 if [[ ! -z $E2E_PUBLIC_HOSTNAME ]]; then
   echo "Setting alternate address to $E2E_PUBLIC_HOSTNAME for external access (node: $my_ip)"
-  curl_check -X PUT "http://localhost:8091/node/controller/setupAlternateAddresses/external" \
-    -u Administrator:password \
-    -d "hostname=${E2E_PUBLIC_HOSTNAME}&kv=11210&kvSSL=11207&mgmt=8091&mgmtSSL=18091&capi=8092&capiSSL=18092&n1ql=8093&n1qlSSL=18093"
+  couchbase_cli_check setting-alternate-address -c localhost -u Administrator -p password \
+    --set --node $my_ip --hostname $E2E_PUBLIC_HOSTNAME
   echo
 fi
 
