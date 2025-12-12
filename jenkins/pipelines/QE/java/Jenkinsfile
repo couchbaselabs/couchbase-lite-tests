@@ -4,7 +4,6 @@ pipeline {
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
         string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
-        choice(name: 'PLATFORM', choices: ['desktop', 'webservice'], description: 'Platform to test (default: desktop)')
     }
     stages {
         stage('Init') {
@@ -13,9 +12,7 @@ pipeline {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
                     
-                    def platform = params.PLATFORM
-                    
-                    currentBuild.displayName = "Java CBL:${params.CBL_VERSION} Platform:${platform} (#${currentBuild.number})"
+                    currentBuild.displayName = "Java Desktop CBL:${params.CBL_VERSION} (#${currentBuild.number})"
                     currentBuild.description = "SGW: ${params.SGW_VERSION}"
                 }
             }
@@ -23,72 +20,42 @@ pipeline {
 
         stage('Prebuild Servers') {
             steps {
-                script {
-                    def platform = params.PLATFORM
-                    
-                    def platformMap = [
-                        'desktop': 'jak_desktop',
-                        'webservice': 'jak_webservice'
-                    ]
-                    
-                    def tsPlatform = platformMap[platform]
-                    
-                    build job: 'prebuild-test-server',
-                    parameters: [
-                        string(name: 'TS_PLATFORM', value: tsPlatform),
-                        string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                    ],
-                    wait: true,
-                    propagate: true
-                }
+                build job: 'prebuild-test-server',
+                parameters: [
+                    string(name: 'TS_PLATFORM', value: 'jak_desktop'),
+                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                ],
+                wait: true,
+                propagate: true
             }
         }
 
         stage('Tests') {
+            agent { label 'linux-java' }
+            environment {
+                TS_ARTIFACTS_DIR = 'java_desktop'
+            }
             steps {
-                script {
-                    def platform = params.PLATFORM
-                    def agentLabel
-                    def testScript
-                    def teardownScript
-                    def artifactsDir
-                    
-                    switch(platform) {
-                        case 'desktop':
-                            agentLabel = 'cbl-java-desktop-centos-7'
-                            testScript = "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
-                            teardownScript = 'jenkins/pipelines/QE/java/desktop/teardown.sh'
-                            artifactsDir = 'java_desktop'
-                            break
-                        case 'webservice':
-                            agentLabel = 'cbl-java-webservice-centos-7'
-                            testScript = "jenkins/pipelines/QE/java/webservice/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
-                            teardownScript = 'jenkins/pipelines/QE/java/webservice/teardown.sh'
-                            artifactsDir = 'java_webservice'
-                            break
+                withEnv([
+                    "KEYCHAIN_PASSWORD=${credentials('mobile-qe-keychain')}",
+                    "PATH=/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}",
+                    "AWS_PROFILE=mobile-for-now"
+                ]) {
+                    echo "=== Run Desktop Tests"
+                    timeout(time: 120, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
                     }
-                    
-                    node(agentLabel) {
-                        withEnv([
-                            "KEYCHAIN_PASSWORD=${credentials('mobile-qe-keychain')}",
-                            "PATH=/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}",
-                            "AWS_PROFILE=mobile-for-now",
-                            "TS_ARTIFACTS_DIR=${artifactsDir}"
-                        ]) {
-                            echo "=== Run ${platform} Tests"
-                            timeout(time: 120, unit: 'MINUTES') {
-                                sh testScript
-                            }
-                            echo "=== ${platform} Tests Complete"
-                            
-                            echo "=== Teardown ${platform} Tests"
-                            timeout(time: 5, unit: 'MINUTES') {
-                                sh teardownScript
-                            }
-                            archiveArtifacts artifacts: "tests/QE/${artifactsDir}/**/*", fingerprint: true, allowEmptyArchive: true
-                            echo "=== ${platform} Test Teardown Complete"
-                        }
+                    echo "=== Desktop Tests Complete"
+                }
+            }
+            post {
+                always {
+                    echo "=== Teardown Desktop Tests"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'
                     }
+                    archiveArtifacts artifacts: 'tests/QE/java_desktop/**/*', fingerprint: true, allowEmptyArchive: true
+                    echo "=== Desktop Test Teardown Complete"
                 }
             }
         }
