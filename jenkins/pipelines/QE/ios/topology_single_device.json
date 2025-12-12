@@ -4,7 +4,7 @@
         {
             "platform": "swift_ios",
             "cbl_version": "{{version}}",
-            "location": "CB7ACCF5-8830-5C6C-8484-19DA7C461DE8"
+            "location": "00008140-0006458A0C22801C"
         }
     ],
     "include": "../../../../environment/aws/topology_setup/default_topology.json"
