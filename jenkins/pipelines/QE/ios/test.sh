@@ -27,23 +27,19 @@ done
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
 
-# Debug: why is STS failing?
-echo "=== AWS DEBUG ==="
-echo "User: $(whoami)"
-echo "HOME: $HOME"
-echo "AWS_PROFILE: ${AWS_PROFILE:-not set}"
-ls -la ~/.aws/ 2>/dev/null || echo "No ~/.aws directory!"
-cat ~/.aws/credentials 2>/dev/null | head -20 || echo "No credentials file!"
-which aws
-aws --version
-aws sts get-caller-identity 2>&1 || true
-echo "=== END DEBUG ==="
-
 echo "Setup backend..."
 
 create_venv venv
 source venv/bin/activate
 pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
+
+# Debug: check AWS after venv activation
+echo "=== AWS DEBUG (in venv) ==="
+echo "PATH: $PATH"
+which aws || echo "aws not in PATH!"
+aws sts get-caller-identity 2>&1 || echo "STS FAILED in venv!"
+echo "=== END DEBUG ==="
+
 python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
 deactivate
 
