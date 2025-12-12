@@ -5,7 +5,7 @@ import pytest
 import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from cbltest.api.syncgateway import DocumentUpdateEntry, ISGRPayload, PutDatabasePayload
 from packaging.version import Version
 
 
@@ -49,6 +49,27 @@ async def _cleanup_test_resources(
     if bucket_names:
         for bucket_name in bucket_names:
             cbs.drop_bucket(bucket_name)
+
+
+def _set_alternate_addresses(cbs_servers: list) -> None:
+    """Set alternate addresses with all service ports for all CBS nodes."""
+    session = requests.Session()
+    session.auth = ("Administrator", "password")
+    for cbs_node in cbs_servers:
+        session.put(
+            f"http://{cbs_node.hostname}:8091/node/controller/setupAlternateAddresses/external",
+            data={
+                "hostname": cbs_node.hostname,
+                "kv": "11210",
+                "kvSSL": "11207",
+                "mgmt": "8091",
+                "mgmtSSL": "18091",
+                "capi": "8092",
+                "capiSSL": "18092",
+                "n1ql": "8093",
+                "n1qlSSL": "18093",
+            },
+        )
 
 
 async def _setup_database_and_user(
@@ -341,6 +362,7 @@ class TestISGRCollectionMapping(CBLTestClass):
         num_docs = 3
 
         self.mark_test_step("Clean up and setup test environment")
+        _set_alternate_addresses(cblpytest.couchbase_servers)
         for sg in sgs:
             await _cleanup_test_resources(sg, cbs, [bucket1, bucket2, bucket3])
 
@@ -395,10 +417,8 @@ class TestISGRCollectionMapping(CBLTestClass):
                 * _default.collection1 -> _default.collection4
                 * _default.collection2 -> _default.collection5
         """)
-        replication_1_id = "isgr_sg1_to_sg2"
-        await sg1.start_isgr(
-            db_name=sg_db1,
-            replication_id=replication_1_id,
+        isgr_1_payload = ISGRPayload(
+            replication_id="isgr_sg1_to_sg2",
             remote_url=f"https://{sg2.hostname}:4985",
             remote_db=sg_db2,
             direction="push",
@@ -413,6 +433,7 @@ class TestISGRCollectionMapping(CBLTestClass):
                 f"_default.{b2_collections[1]}",
             ],
         )
+        await sg1.start_isgr(sg_db1, isgr_1_payload)
 
         self.mark_test_step("""
             Start one-shot pull ISGR from SG1 to SG3 with collection remapping:
@@ -420,10 +441,8 @@ class TestISGRCollectionMapping(CBLTestClass):
                 * _default.collection2 -> _default.collection7
                 * _default.collection3 -> _default.collection8
         """)
-        replication_2_id = "isgr_sg3_from_sg1"
-        await sg3.start_isgr(
-            db_name=sg_db3,
-            replication_id=replication_2_id,
+        isgr_2_payload = ISGRPayload(
+            replication_id="isgr_sg3_from_sg1",
             remote_url=f"https://{sg1.hostname}:4985",
             remote_db=sg_db1,
             direction="pull",
@@ -440,10 +459,15 @@ class TestISGRCollectionMapping(CBLTestClass):
                 f"_default.{b1_collections[2]}",
             ],
         )
+        await sg3.start_isgr(sg_db3, isgr_2_payload)
 
         self.mark_test_step("Wait for ISGR replications to complete")
-        await sg1.wait_for_isgr_status(sg_db1, replication_1_id, "stopped", timeout=60)
-        await sg3.wait_for_isgr_status(sg_db3, replication_2_id, "stopped", timeout=60)
+        await sg1.wait_for_isgr_status(
+            sg_db1, isgr_1_payload.replication_id, "stopped", timeout=60
+        )
+        await sg3.wait_for_isgr_status(
+            sg_db3, isgr_2_payload.replication_id, "stopped", timeout=60
+        )
 
         self.mark_test_step("""
             Verify docs replicated to SG2 (collection4 and collection5):

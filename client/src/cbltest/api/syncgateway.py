@@ -145,6 +145,82 @@ class PutDatabasePayload(JSONSerializable):
         return self.__config
 
 
+class ISGRPayload(JSONSerializable):
+    """
+    A class containing configuration options for Inter-Sync Gateway Replication (ISGR)
+    """
+
+    @property
+    def replication_id(self) -> str:
+        """Gets the replication ID"""
+        return self.__replication_id
+
+    @property
+    def direction(self) -> str:
+        """Gets the replication direction"""
+        return self.__direction
+
+    def __init__(
+        self,
+        replication_id: str,
+        remote_url: str,
+        remote_db: str,
+        direction: str,
+        continuous: bool = False,
+        remote_username: str | None = None,
+        remote_password: str | None = None,
+        collections_local: list[str] | None = None,
+        collections_remote: list[str] | None = None,
+    ):
+        """
+        Creates an ISGR configuration payload.
+
+        :param replication_id: A unique identifier for this replication
+        :param remote_url: The URL of the remote Sync Gateway (e.g., "https://sg2.example.com:4985")
+        :param remote_db: The database name on the remote Sync Gateway
+        :param direction: Replication direction - "push", "pull", or "pushAndPull"
+        :param continuous: Whether the replication should be continuous (default False)
+        :param remote_username: Username for authenticating with the remote SG
+        :param remote_password: Password for authenticating with the remote SG
+        :param collections_local: List of local collections in "scope.collection" format
+        :param collections_remote: List of remote collections to map to (parallel array with collections_local)
+        """
+        if direction not in ["push", "pull", "pushAndPull"]:
+            raise ValueError(
+                f"Invalid direction: {direction}. Must be 'push', 'pull', or 'pushAndPull'"
+            )
+        self.__replication_id = replication_id
+        self.__remote = f"{remote_url}/{remote_db}"
+        self.__direction = direction
+        self.__continuous = continuous
+        self.__remote_username = remote_username
+        self.__remote_password = remote_password
+        self.__collections_local = collections_local
+        self.__collections_remote = collections_remote
+
+    def to_json(self) -> Any:
+        body: dict[str, Any] = {
+            "replication_id": self.__replication_id,
+            "remote": self.__remote,
+            "direction": self.__direction,
+            "continuous": self.__continuous,
+        }
+        if self.__remote_username is not None:
+            body["remote_username"] = self.__remote_username
+        if self.__remote_password is not None:
+            body["remote_password"] = self.__remote_password
+        if (
+            self.__collections_local is not None
+            or self.__collections_remote is not None
+        ):
+            body["collections_enabled"] = True
+        if self.__collections_local is not None:
+            body["collections_local"] = self.__collections_local
+        if self.__collections_remote is not None:
+            body["collections_remote"] = self.__collections_remote
+        return body
+
+
 class AllDocumentsResponseRow:
     """
     A class representing a single entry in an all_docs response from Sync Gateway
@@ -1538,63 +1614,26 @@ class SyncGateway(_SyncGatewayBase):
             secure=self.secure,
         )
 
-    async def start_isgr(
-        self,
-        db_name: str,
-        replication_id: str,
-        remote_url: str,
-        remote_db: str,
-        direction: str,
-        continuous: bool = False,
-        remote_username: str | None = None,
-        remote_password: str | None = None,
-        collections_local: list[str] | None = None,
-        collections_remote: list[str] | None = None,
-    ) -> str:
+    async def start_isgr(self, db_name: str, payload: ISGRPayload) -> str:
         """
         Starts an Inter-Sync Gateway Replication (ISGR) from this SG to a remote SG.
 
         :param db_name: The local database name
-        :param replication_id: A unique identifier for this replication
-        :param remote_url: The URL of the remote Sync Gateway (e.g., "https://sg2.example.com:4985")
-        :param remote_db: The database name on the remote Sync Gateway
-        :param direction: Replication direction - "push", "pull", or "pushAndPull"
-        :param continuous: Whether the replication should be continuous (default False)
-        :param remote_username: Username for authenticating with the remote SG (optional for admin auth)
-        :param remote_password: Password for authenticating with the remote SG (optional for admin auth)
-        :param collections_local: List of local collections in "scope.collection" format
-        :param collections_remote: List of remote collections to map to (parallel array with collections_local)
+        :param payload: The ISGR configuration payload
         :return: The replication ID
         """
         with self._tracer.start_as_current_span(
             "start_isgr",
             attributes={
                 "cbl.database.name": db_name,
-                "cbl.replication.id": replication_id,
-                "cbl.replication.direction": direction,
+                "cbl.replication.id": payload.replication_id,
+                "cbl.replication.direction": payload.direction,
             },
         ):
-            body: dict[str, Any] = {
-                "replication_id": replication_id,
-                "remote": f"{remote_url}/{remote_db}",
-                "direction": direction,
-                "continuous": continuous,
-            }
-            if remote_username is not None:
-                body["remote_username"] = remote_username
-            if remote_password is not None:
-                body["remote_password"] = remote_password
-            if collections_local is not None or collections_remote is not None:
-                body["collections_enabled"] = True
-            if collections_local is not None:
-                body["collections_local"] = collections_local
-            if collections_remote is not None:
-                body["collections_remote"] = collections_remote
-
             await self._send_request(
-                "put", f"/{db_name}/_replication/{replication_id}", JSONDictionary(body)
+                "put", f"/{db_name}/_replication/{payload.replication_id}", payload
             )
-            return replication_id
+            return payload.replication_id
 
     async def get_isgr_status(self, db_name: str, replication_id: str) -> dict:
         """
