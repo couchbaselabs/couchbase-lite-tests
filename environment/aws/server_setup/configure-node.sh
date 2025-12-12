@@ -66,10 +66,11 @@ curl_check() {
 wait_for_uri 200 http://localhost:8091/ui/index.html
 echo "Couchbase Server up!"
 
+my_ip=$(ifconfig | grep "inet 10" | awk '{print $2}')
+
 if [[ ! -z $E2E_PARENT_CLUSTER ]]; then
-  my_ip=$(ifconfig | grep "inet 10" | awk '{print $2}')
-  echo "Adding node to cluster $E2E_PARENT_CLUSTER"
-  couchbase_cli_check server-add -c $E2E_PARENT_CLUSTER -u Administrator -p password --server-add  $my_ip \
+  echo "Adding node to cluster $E2E_PARENT_CLUSTER with private IP $my_ip"
+  couchbase_cli_check server-add -c $E2E_PARENT_CLUSTER -u Administrator -p password --server-add $my_ip \
     --server-add-username Administrator --server-add-password password --services data,index,query
   echo
   echo "Rebalancing cluster"
@@ -79,6 +80,14 @@ else
   echo "Set up the cluster"
   couchbase_cli_check cluster-init -c localhost --cluster-name couchbase-lite-test --cluster-username Administrator \
     --cluster-password password --services data,index,query --cluster-ramsize 8192 --cluster-index-ramsize 2048 --index-storage-setting default
+  echo
+fi
+
+# Set alternate address for external access (after cluster init/join)
+if [[ ! -z $E2E_PUBLIC_HOSTNAME ]]; then
+  echo "Setting alternate address to $E2E_PUBLIC_HOSTNAME for external access (node: $my_ip)"
+  couchbase_cli_check setting-alternate-address -c localhost -u Administrator -p password \
+    --set --node $my_ip --hostname $E2E_PUBLIC_HOSTNAME
   echo
 fi
 
