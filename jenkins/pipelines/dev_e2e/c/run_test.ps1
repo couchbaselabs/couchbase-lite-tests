@@ -1,7 +1,7 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
     [Parameter(Mandatory=$true)][string]$SgwVersion,
-    [Parameter][string]$DatasetVersion = "4.0"
+    [Parameter()][string]$DatasetVersion = "4.0"
 )
 
 $ErrorActionPreference = "Stop" 
