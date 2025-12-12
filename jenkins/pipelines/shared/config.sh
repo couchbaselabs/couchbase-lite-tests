@@ -1,24 +1,5 @@
 # This file should be sourced at the beginning of testing and teardown scripts
 
-realpath() {
-    if command -v grealpath >/dev/null 2>&1; then
-        grealpath "$1"
-        return
-    fi
-
-    if command -v realpath >/dev/null 2>&1; then
-        command realpath "$1"
-        return
-    fi
-
-    # Portable fallback using Python
-    python3 - <<EOF
-import os, sys
-print(os.path.realpath(sys.argv[1]))
-EOF
-    "$1"
-}
-
 function create_venv() {
     if [ $# -lt 1 ]; then
         echo "Invalid call to create_venv()"
