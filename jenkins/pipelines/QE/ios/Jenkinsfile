@@ -28,9 +28,9 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'qe-mac-india' }
+            agent { label 'mac-mini-new' }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                KEYCHAIN_PASSWORD = credentials('mobile-qe')
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 AWS_PROFILE = "mobile-qe"
                 TS_ARTIFACTS_DIR = 'ios'
