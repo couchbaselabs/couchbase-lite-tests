@@ -31,15 +31,10 @@ echo "Setup backend..."
 
 create_venv venv
 source venv/bin/activate
+
+export PATH="/opt/homebrew/bin:$PATH"
+
 pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-
-# Debug: check AWS after venv activation
-echo "=== AWS DEBUG (in venv) ==="
-echo "PATH: $PATH"
-which aws || echo "aws not in PATH!"
-aws sts get-caller-identity 2>&1 || echo "STS FAILED in venv!"
-echo "=== END DEBUG ==="
-
 python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
 deactivate
 
