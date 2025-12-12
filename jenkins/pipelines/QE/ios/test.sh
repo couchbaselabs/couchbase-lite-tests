@@ -27,6 +27,18 @@ done
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
 
+# Debug: why is STS failing?
+echo "=== AWS DEBUG ==="
+echo "User: $(whoami)"
+echo "HOME: $HOME"
+echo "AWS_PROFILE: ${AWS_PROFILE:-not set}"
+ls -la ~/.aws/ 2>/dev/null || echo "No ~/.aws directory!"
+cat ~/.aws/credentials 2>/dev/null | head -20 || echo "No credentials file!"
+which aws
+aws --version
+aws sts get-caller-identity 2>&1 || true
+echo "=== END DEBUG ==="
+
 echo "Setup backend..."
 
 create_venv venv
