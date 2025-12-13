@@ -214,7 +214,7 @@ class iOSBridge(PlatformBridge):
                 "apple",
                 "mlaunch",
                 "--xcode",
-                xcode_path,
+                f"/{xcode_path}",
                 "--",
                 "--devname",
                 location,
