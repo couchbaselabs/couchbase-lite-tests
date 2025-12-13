@@ -200,6 +200,14 @@ class iOSBridge(PlatformBridge):
         )
 
     def __install_xharness(self, location: str) -> None:
+        xcode_select_path = subprocess.run(
+            ["xcode-select", "-p"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+        xcode_path = "/".join(xcode_select_path.split("/")[1:3])
         subprocess.run(
             [
                 str(XHARNESS_PATH),
@@ -210,6 +218,8 @@ class iOSBridge(PlatformBridge):
                 location,
                 "--installdev",
                 self.__app_path,
+                "--xcode",
+                xcode_path,
             ],
             check=True,
             capture_output=False,
