@@ -7,10 +7,11 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
-    echo "Usage: $0 <version> <platform> <sgw_version> [private_key_path]"
+    echo "Usage: $0 <version> <platform> <sgw_version> [dataset-version]"
     echo "version: CBL version (e.g. 3.2.1-2)"
     echo "platform: The .NET platform to build (e.g. ios)"
     echo "sgw_version: Version of Sync Gateway to download and use"
+    echo "dataset-version: Version of CBL dataset to use (default: 4.0)"
 }
 
 function prepare_dotnet() {
@@ -25,7 +26,7 @@ function prepare_dotnet() {
 if [ $# -lt 3 ]; then
     usage
     exit 1
-field
+fi
 
 cbl_version=$1
 platform=$2
