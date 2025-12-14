@@ -29,9 +29,9 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'mac-mini-new' }
+            agent { label 'qe-mac-india' }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 TS_ARTIFACTS_DIR = 'ios'
                 TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
