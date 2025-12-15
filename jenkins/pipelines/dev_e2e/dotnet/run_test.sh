@@ -35,6 +35,7 @@ sgw_version=$3
 dataset_version=${4:-"4.0"}
 
 echo "WTF Xcode $(xcode-select -p)"
+echo "WTF DEVELOPER_DIR $DEVELOPER_DIR"
 echo "WTF Path $PATH"
 exit 1
 
