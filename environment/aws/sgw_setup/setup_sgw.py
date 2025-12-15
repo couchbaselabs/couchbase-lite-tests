@@ -229,6 +229,21 @@ def remote_exec(
     click.echo()
 
 
+def remote_exec_bg(ssh: paramiko.SSHClient, command: str, desc: str) -> None:
+    """
+    Execute a remote command in background via SSH.
+
+    Args:
+        ssh (paramiko.SSHClient): The SSH client.
+        command (str): The command to execute.
+        desc (str): A description of the command.
+    """
+    header(desc)
+    ssh.exec_command(command, get_pty=False)
+    header("Done!")
+    click.echo()
+
+
 def setup_server(
     hostname: str, pkey: paramiko.Ed25519Key, sgw_info: SgwDownloadInfo
 ) -> None:
@@ -295,6 +310,11 @@ def setup_server(
         sftp, SCRIPT_DIR / "cert" / "sg_key.pem", "/home/ec2-user/cert/sg_key.pem"
     )
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
+
+    # Upload shell2http scripts (directory created by configure-system.sh)
+    shell2http_dir = SCRIPT_DIR / "shell2http"
+    for file in shell2http_dir.iterdir():
+        sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
     sftp.close()
 
     remote_exec(
@@ -311,6 +331,9 @@ def setup_server(
     )
 
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting SGW log fileserver")
+    remote_exec_bg(
+        ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting SGW management server"
+    )
     remote_exec(ssh, "bash /home/ec2-user/start-sgw.sh", "Starting SGW")
 
     ssh.close()
