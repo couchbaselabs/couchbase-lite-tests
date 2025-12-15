@@ -3,12 +3,7 @@ pipeline {
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
         string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
-        choice(name: 'PLATFORM', choices: ['windows', 'ios', 'android', 'macos'], description: 'Platform to test (default: windows)')
-    }
-    options {
-        timeout(time: 60, unit: 'MINUTES')
-        ansiColor('xterm')
-        timestamps()
+        string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
     }
     stages {
         stage('Init') {
@@ -16,111 +11,43 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    
-                    def platform = params.PLATFORM
-                    
-                    currentBuild.displayName = "Dotnet CBL:${params.CBL_VERSION} Platform:${platform} (#${currentBuild.number})"
+                    currentBuild.displayName = "Dotnet CBL:${params.CBL_VERSION} (#${currentBuild.number})"
                     currentBuild.description = "SGW: ${params.SGW_VERSION}"
                 }
             }
         }
         stage('Prebuild Servers') {
             steps {
-                script {
-                    def platform = params.PLATFORM
-                    
-                    def platformMap = [
-                        'ios': 'dotnet_ios',
-                        'android': 'dotnet_android',
-                        'windows': 'dotnet_windows',
-                        'macos': 'dotnet_macos'
-                    ]
-                    
-                    def tsPlatform = platformMap[platform]
-                    
-                    build job: 'prebuild-test-server',
-                    parameters: [
-                        string(name: 'TS_PLATFORM', value: tsPlatform),
-                        string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                    ],
-                    wait: true,
-                    propagate: true
-                }
+                build job: 'prebuild-test-server',
+                parameters: [
+                    string(name: 'TS_PLATFORM', value: 'dotnet_windows'),
+                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                ],
+                wait: true,
+                propagate: true
             }
         }
         stage('Run Tests') {
+            agent { label 'net-windows' }
+            environment {
+                TS_ARTIFACTS_DIR = 'dotnet_windows'
+                TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+            }
             steps {
-                script {
-                    def platform = params.PLATFORM
-                    def agentLabel
-                    def testCommand
-                    def artifactsDir
-                    def teardownScript
-                    def usePowershell = false
-                    
-                    switch(platform) {
-                        case 'ios':
-                            agentLabel = 'mac-mini-m4'
-                            testCommand = "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} ~/.ssh/jborden.pem"
-                            artifactsDir = 'dotnet_ios'
-                            teardownScript = 'jenkins/pipelines/QE/dotnet/teardown.sh'
-                            break
-                        case 'android':
-                            agentLabel = 'mac-mini-CBL-Android1'
-                            testCommand = "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} ~/.ssh/jborden.pem"
-                            artifactsDir = 'dotnet_android'
-                            teardownScript = 'jenkins/pipelines/QE/dotnet/teardown.sh'
-                            break
-                        case 'windows':
-                            agentLabel = 'net-windows'
-                            testCommand = "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
-                            artifactsDir = 'dotnet_windows'
-                            teardownScript = 'jenkins\\pipelines\\QE\\dotnet\\teardown.ps1'
-                            usePowershell = true
-                            break
-                        case 'macos':
-                            agentLabel = 'mac-mini-m4'
-                            testCommand = "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} ~/.ssh/jborden.pem"
-                            artifactsDir = 'dotnet_macos'
-                            teardownScript = 'jenkins/pipelines/QE/dotnet/teardown.sh'
-                            break
+                echo "=== Run Dotnet Tests"
+                timeout(time: 60, unit: 'MINUTES') {
+                    pwsh "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION}"
+                }
+                echo "=== Dotnet Tests Complete"
+            }
+            post {
+                always {
+                    echo "=== Teardown Dotnet Tests"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        pwsh "jenkins\\pipelines\\QE\\dotnet\\teardown.ps1"
                     }
-                    
-                    node(agentLabel) {
-                        withEnv([
-                            "KEYCHAIN_PASSWORD=${credentials('mobile-qe-keychain')}",
-                            "PATH=/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}",
-                            "AWS_PROFILE=mobile-for-now",
-                            "TS_ARTIFACTS_DIR=${artifactsDir}"
-                        ]) {
-                            if (platform != 'windows') {
-                                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                            }
-                            
-                            echo "=== Run Dotnet Tests"
-                            timeout(time: 60, unit: 'MINUTES') {
-                                if (usePowershell) {
-                                    pwsh testCommand
-                                } else {
-                                    sh testCommand
-                                }
-                            }
-                            echo "=== Dotnet Tests Complete"
-                            
-                            echo "=== Teardown Dotnet Tests"
-                            timeout(time: 5, unit: 'MINUTES') {
-                                if (usePowershell) {
-                                    pwsh teardownScript
-                                } else {
-                                    sh teardownScript
-                                }
-                            }
-                            
-                            def artifactsPattern = usePowershell ? "tests\\QE\\${artifactsDir}\\**\\*" : "tests/QE/${artifactsDir}/**/*"
-                            archiveArtifacts artifacts: artifactsPattern, fingerprint: true, allowEmptyArchive: true
-                            echo "=== Dotnet Test Teardown Complete"
-                        }
-                    }
+                    archiveArtifacts artifacts: 'tests\\QE\\dotnet_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
+                    echo "=== Dotnet Test Teardown Complete"
                 }
             }
         }
