@@ -32,7 +32,8 @@ pipeline {
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe')
                 ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
-                PATH = "\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                JAVA_HOME = "/opt/homebrew/opt/openjdk@17"
+                PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 TS_ARTIFACTS_DIR = 'android'
                 TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
             }
