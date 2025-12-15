@@ -97,7 +97,7 @@ pipeline {
                                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                             }
                             
-                            echo "Run Dotnet Tests"
+                            echo "=== Run Dotnet Tests"
                             timeout(time: 60, unit: 'MINUTES') {
                                 if (usePowershell) {
                                     pwsh testCommand
@@ -105,8 +105,9 @@ pipeline {
                                     sh testCommand
                                 }
                             }
+                            echo "=== Dotnet Tests Complete"
                             
-                            echo "Teardown Dotnet Tests"
+                            echo "=== Teardown Dotnet Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 if (usePowershell) {
                                     pwsh teardownScript
@@ -117,6 +118,7 @@ pipeline {
                             
                             def artifactsPattern = usePowershell ? "tests\\QE\\${artifactsDir}\\**\\*" : "tests/QE/${artifactsDir}/**/*"
                             archiveArtifacts artifacts: artifactsPattern, fingerprint: true, allowEmptyArchive: true
+                            echo "=== Dotnet Test Teardown Complete"
                         }
                     }
                 }
