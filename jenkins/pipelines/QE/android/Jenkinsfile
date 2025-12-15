@@ -2,7 +2,8 @@ pipeline {
     agent none
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
-        string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
+        string(name: 'SGW_VERSION', defaultValue: '3.3.0', description: "The version of Sync Gateway to download")
+        string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
     }
     stages {
         stage('Init') {
@@ -29,11 +30,11 @@ pipeline {
         stage('Android') {
             agent { label 'mac-mini-CBL-Android1' }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                KEYCHAIN_PASSWORD = credentials('mobile-qe')
                 ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
                 PATH = "\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                AWS_PROFILE = "mobile-for-now"
                 TS_ARTIFACTS_DIR = 'android'
+                TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
             }
             steps {
                 // Unlock keychain:
@@ -41,7 +42,7 @@ pipeline {
                 echo "Run Android Tests"
                 timeout(time: 120, unit: 'MINUTES') {
                     sh """
-                        jenkins/pipelines/QE/android/android_tests.sh "${params.CBL_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
+                        jenkins/pipelines/QE/android/android_tests.sh "${params.CBL_VERSION}" "${params.SGW_VERSION}"
                     """
                 }
             }
