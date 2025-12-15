@@ -34,9 +34,11 @@ platform=$2
 sgw_version=$3
 dataset_version=${4:-"4.0"}
 
+export MD_APPLE_SDK_ROOT="/$(echo "$(xcode-select -p)" | cut -d'/' -f2-3)"
 echo "WTF Xcode $(xcode-select -p)"
 echo "WTF DEVELOPER_DIR $DEVELOPER_DIR"
-echo "WTF Path $PATH"
+echo "WTF MD_APPLE_SDK_ROOT $MD_APPLE_SDK_ROOT"
+
 exit 1
 
 prepare_dotnet
