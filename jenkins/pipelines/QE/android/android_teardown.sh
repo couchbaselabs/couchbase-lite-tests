@@ -3,6 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:/opt/homebrew/bin:$PATH"
 source $SCRIPT_DIR/../../shared/config.sh
 
 export PYTHONPATH=$SCRIPT_DIR/../../../
