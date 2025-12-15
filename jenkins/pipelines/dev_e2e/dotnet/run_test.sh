@@ -34,6 +34,9 @@ platform=$2
 sgw_version=$3
 dataset_version=${4:-"4.0"}
 
+echo "WTF Xcode $(xcode-select -p)"
+echo "WTF Path $PATH"
+
 prepare_dotnet
 
 stop_venv
