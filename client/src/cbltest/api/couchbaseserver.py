@@ -147,7 +147,6 @@ class CouchbaseServer:
         dataset_path: Path,
         dataset_name: str,
         *,
-        tools_version: str = "7.6.7",
         repo_name: str | None = None,
     ) -> None:
         """
@@ -163,7 +162,7 @@ class CouchbaseServer:
             bin_name = (
                 "cbbackupmgr.exe" if platform.system() == "Windows" else "cbbackupmgr"
             )
-            cbbackupmgr_path = tools_path / "cbbackupmgr" / tools_version / bin_name
+            cbbackupmgr_path = tools_path / "cbbackupmgr" / bin_name
             if not cbbackupmgr_path.exists():
                 raise FileNotFoundError(
                     "cbbackupmgr not found, please download it with the environment/aws/download_tool script"

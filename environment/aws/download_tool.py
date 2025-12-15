@@ -99,21 +99,24 @@ def download_cbbackupmgr(version: str):
     ext = _get_ext(os)
 
     dest_dir = (
-        SCRIPT_DIR.parent.parent
-        / "tests"
-        / ".tools"
-        / ToolName.BackupManager.value
-        / version
+        SCRIPT_DIR.parent.parent / "tests" / ".tools" / ToolName.BackupManager.value
     )
     dest_name = (
         f"{ToolName.BackupManager.value}.exe"
         if os == _WINDOWS
         else ToolName.BackupManager.value
     )
+    dest_version_name = ".version"
+    version_location = dest_dir / dest_version_name
+    if version_location.exists():
+        existing_version = version_location.read_text().strip()
+        if existing_version == version and (dest_dir / dest_name).exists():
+            click.secho("\t...already downloaded", fg="green")
+            return
+
     location = dest_dir / dest_name
-    if location.exists():
-        click.secho("\t...already downloaded", fg="green")
-        return
+    version_location.unlink(missing_ok=True)
+    location.unlink(missing_ok=True)
 
     dest_dir.mkdir(parents=True, exist_ok=True)
     url = f"https://latestbuilds.service.couchbase.com/builds/releases/{version}/couchbase-server-admin-tools-{version}-{os}_{arch}.{ext}"
@@ -123,6 +126,7 @@ def download_cbbackupmgr(version: str):
     download_progress_bar(download, tmp_file)
     _extract(tmp_file)
     tmp_file.unlink()
+    version_location.write_text(version)
 
     # Find the cbbackupmgr binary in the extracted contents under TMP_LOCATION
     target_in_archive = "cbbackupmgr.exe" if os == _WINDOWS else "cbbackupmgr"
