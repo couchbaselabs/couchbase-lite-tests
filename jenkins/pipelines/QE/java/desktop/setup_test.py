@@ -30,6 +30,7 @@ def cli_entry(
         SCRIPT_DIR / "topology_single_host.json",
         SCRIPT_DIR / "config_java_desktop.json",
         "jak_desktop",
+        setup_dir="QE",
     )
 
 
