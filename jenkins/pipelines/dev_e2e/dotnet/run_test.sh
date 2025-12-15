@@ -36,6 +36,7 @@ dataset_version=${4:-"4.0"}
 
 echo "WTF Xcode $(xcode-select -p)"
 echo "WTF Path $PATH"
+exit 1
 
 prepare_dotnet
 
