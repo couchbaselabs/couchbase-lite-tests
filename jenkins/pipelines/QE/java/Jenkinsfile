@@ -3,7 +3,8 @@ pipeline {
     agent none
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
-        string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
+        string(name: 'SGW_VERSION', defaultValue: '3.3.0', description: "The version of Sync Gateway to download")
+        string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
     }
     stages {
         stage('Init') {
@@ -34,19 +35,14 @@ pipeline {
             agent { label 'linux-java' }
             environment {
                 TS_ARTIFACTS_DIR = 'java_desktop'
+                TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
             }
             steps {
-                withEnv([
-                    "KEYCHAIN_PASSWORD=${credentials('mobile-qe-keychain')}",
-                    "PATH=/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}",
-                    "AWS_PROFILE=mobile-for-now"
-                ]) {
-                    echo "=== Run Desktop Tests"
-                    timeout(time: 120, unit: 'MINUTES') {
-                        sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
-                    }
-                    echo "=== Desktop Tests Complete"
+                echo "=== Run Desktop Tests"
+                timeout(time: 120, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
                 }
+                echo "=== Desktop Tests Complete"
             }
             post {
                 always {
