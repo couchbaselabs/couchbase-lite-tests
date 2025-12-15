@@ -39,18 +39,20 @@ pipeline {
             steps {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                echo "Run iOS Test"
+                echo "=== Run iOS Tests"
                 timeout(time: 60, unit: 'MINUTES') {
                     sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
                 }
+                echo "=== iOS Tests Complete"
             }
             post {
                 always {
-                    echo "Teardown iOS Test"
+                    echo "=== Teardown iOS Tests"
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/ios/teardown.sh"
                     }
                     archiveArtifacts artifacts: 'tests/QE/ios/**/*', fingerprint: true, allowEmptyArchive: true
+                    echo "=== iOS Test Teardown Complete"
                 }
             }
         }
