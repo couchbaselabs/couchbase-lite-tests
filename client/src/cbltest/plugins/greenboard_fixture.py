@@ -49,9 +49,13 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
         sgw_version: str = "n/a"
         if len(cblpytest.sync_gateways) > 0:
             sgw_version_parts = await cblpytest.sync_gateways[0].get_version()
-            sgw_version = f"{sgw_version_parts.version}-{sgw_version_parts.build_number}"
+            sgw_version = (
+                f"{sgw_version_parts.version}-{sgw_version_parts.build_number}"
+            )
         os_name = (
-            test_server_info.device["systemName"] if "systemName" in test_server_info.device else ""
+            test_server_info.device["systemName"]
+            if "systemName" in test_server_info.device
+            else ""
         )
         uploader.upload(
             test_server_info.cbl, os_name, test_server_info.library_version, sgw_version
