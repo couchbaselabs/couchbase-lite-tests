@@ -8,7 +8,7 @@ pipeline {
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
     }
     options {
-        timeout(time: 60, unit: 'MINUTES')
+        timeout(time: 120, unit: 'MINUTES')
     }
     stages {
         stage('Init') {
@@ -77,7 +77,7 @@ pipeline {
                 stage('iOS') {
                     agent { label 'mob-e2e-mac-01' }
                     options {
-                        lock('mob-e2e-iphone-01')
+                        lock('mob-e2e-mac-01')
                     }
                     environment { 
                         KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
@@ -104,7 +104,7 @@ pipeline {
                 stage('Android') {
                     agent { label 'mob-e2e-mac-01' }
                     options {
-                        lock('mob-e2e-android-01')
+                        lock('mob-e2e-mac-01')
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'android'
