@@ -15,7 +15,7 @@ from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_info, cbl_warning
+from cbltest.logging import cbl_error, cbl_info, cbl_warning
 from cbltest.utils import assert_not_null
 from cbltest.version import VERSION
 
@@ -143,6 +143,82 @@ class PutDatabasePayload(JSONSerializable):
 
     def to_json(self) -> Any:
         return self.__config
+
+
+class ISGRPayload(JSONSerializable):
+    """
+    A class containing configuration options for Inter-Sync Gateway Replication (ISGR)
+    """
+
+    @property
+    def replication_id(self) -> str:
+        """Gets the replication ID"""
+        return self.__replication_id
+
+    @property
+    def direction(self) -> str:
+        """Gets the replication direction"""
+        return self.__direction
+
+    def __init__(
+        self,
+        replication_id: str,
+        remote_url: str,
+        remote_db: str,
+        direction: str,
+        continuous: bool = False,
+        remote_username: str | None = None,
+        remote_password: str | None = None,
+        collections_local: list[str] | None = None,
+        collections_remote: list[str] | None = None,
+    ):
+        """
+        Creates an ISGR configuration payload.
+
+        :param replication_id: A unique identifier for this replication
+        :param remote_url: The URL of the remote Sync Gateway (e.g., "https://sg2.example.com:4985")
+        :param remote_db: The database name on the remote Sync Gateway
+        :param direction: Replication direction - "push", "pull", or "pushAndPull"
+        :param continuous: Whether the replication should be continuous (default False)
+        :param remote_username: Username for authenticating with the remote SG
+        :param remote_password: Password for authenticating with the remote SG
+        :param collections_local: List of local collections in "scope.collection" format
+        :param collections_remote: List of remote collections to map to (parallel array with collections_local)
+        """
+        if direction not in ["push", "pull", "pushAndPull"]:
+            raise ValueError(
+                f"Invalid direction: {direction}. Must be 'push', 'pull', or 'pushAndPull'"
+            )
+        self.__replication_id = replication_id
+        self.__remote = f"{remote_url}/{remote_db}"
+        self.__direction = direction
+        self.__continuous = continuous
+        self.__remote_username = remote_username
+        self.__remote_password = remote_password
+        self.__collections_local = collections_local
+        self.__collections_remote = collections_remote
+
+    def to_json(self) -> Any:
+        body: dict[str, Any] = {
+            "replication_id": self.__replication_id,
+            "remote": self.__remote,
+            "direction": self.__direction,
+            "continuous": self.__continuous,
+        }
+        if self.__remote_username is not None:
+            body["remote_username"] = self.__remote_username
+        if self.__remote_password is not None:
+            body["remote_password"] = self.__remote_password
+        if (
+            self.__collections_local is not None
+            or self.__collections_remote is not None
+        ):
+            body["collections_enabled"] = True
+        if self.__collections_local is not None:
+            body["collections_local"] = self.__collections_local
+        if self.__collections_remote is not None:
+            body["collections_remote"] = self.__collections_remote
+        return body
 
 
 class AllDocumentsResponseRow:
@@ -532,9 +608,9 @@ class _SyncGatewayBase:
 
     async def get_version(self) -> CouchbaseVersion:
         # Telemetry not really important for this call
-        scheme = "https://" if self.__secure else "http://"
+        scheme = "https://" if self.secure else "http://"
         async with self._create_session(
-            self.__secure, scheme, self.__hostname, 4984, None
+            self.secure, scheme, self.hostname, 4984, None
         ) as s:
             resp = await self._send_request("get", "/", session=s)
             assert isinstance(resp, dict)
@@ -544,13 +620,13 @@ class _SyncGatewayBase:
             return SyncGatewayVersion(raw_version.split("/")[1])
 
     def tls_cert(self) -> str | None:
-        if not self.__secure:
+        if not self.secure:
             cbl_warning(
                 "Sync Gateway instance not using TLS, returning empty tls_cert..."
             )
             return None
 
-        return ssl.get_server_certificate((self.__hostname, self.__port))
+        return ssl.get_server_certificate((self.hostname, self.port))
 
     def replication_url(self, db_name: str, load_balancer: str | None = None) -> str:
         """
@@ -563,7 +639,7 @@ class _SyncGatewayBase:
         if not load_balancer:
             return sgw_address
 
-        return sgw_address.replace("wss", "ws").replace(self.__hostname, load_balancer)
+        return sgw_address.replace("wss", "ws").replace(self.hostname, load_balancer)
 
     async def bytes_transferred(self, dataset_name: str) -> tuple[int, int]:
         """
@@ -656,6 +732,17 @@ class _SyncGatewayBase:
         :param db_name: The name of the Database to delete
         """
         await self._delete_database(db_name, 0)
+
+    async def get_all_database_names(self) -> list[str]:
+        """
+        Gets the names of all databases configured on this Sync Gateway instance.
+
+        :return: A list of database names
+        """
+        with self._tracer.start_as_current_span("get_all_database_names"):
+            resp = await self._send_request("get", "/_all_dbs")
+            assert isinstance(resp, list)
+            return cast(list[str], resp)
 
     def _analyze_dataset_response(self, response: list) -> None:
         assert isinstance(response, list), "Invalid bulk docs response (not a list)"
@@ -1090,9 +1177,9 @@ class _SyncGatewayBase:
         )
         params = {"rev": revision}
 
-        scheme = "https://" if self.__secure else "http://"
+        scheme = "https://" if self.secure else "http://"
         async with self._create_session(
-            self.__secure, scheme, self.__hostname, 4984, auth
+            self.secure, scheme, self.hostname, 4984, auth
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
@@ -1526,6 +1613,117 @@ class SyncGateway(_SyncGatewayBase):
             port=self.__public_port,
             secure=self.secure,
         )
+
+    async def start_isgr(self, db_name: str, payload: ISGRPayload) -> str:
+        """
+        Starts an Inter-Sync Gateway Replication (ISGR) from this SG to a remote SG.
+
+        :param db_name: The local database name
+        :param payload: The ISGR configuration payload
+        :return: The replication ID
+        """
+        with self._tracer.start_as_current_span(
+            "start_isgr",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.replication.id": payload.replication_id,
+                "cbl.replication.direction": payload.direction,
+            },
+        ):
+            await self._send_request(
+                "put", f"/{db_name}/_replication/{payload.replication_id}", payload
+            )
+            return payload.replication_id
+
+    async def get_isgr_status(self, db_name: str, replication_id: str) -> dict:
+        """
+        Gets the status of an Inter-Sync Gateway Replication.
+
+        :param db_name: The local database name
+        :param replication_id: The replication identifier
+        :return: A dictionary containing the replication status
+        """
+        with self._tracer.start_as_current_span(
+            "get_isgr_status",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.replication.id": replication_id,
+            },
+        ):
+            resp = await self._send_request(
+                "get", f"/{db_name}/_replicationStatus/{replication_id}"
+            )
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
+
+    async def stop_isgr(
+        self, db_name: str, replication_id: str, continuous: bool = False
+    ) -> None:
+        """
+        Stops and removes an Inter-Sync Gateway Replication.
+
+        :param db_name: The local database name
+        :param replication_id: The replication identifier to stop
+        :param continuous: Replication type
+        """
+        with self._tracer.start_as_current_span(
+            "stop_isgr",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.replication.id": replication_id,
+            },
+        ):
+            try:
+                await self._send_request(
+                    "delete", f"/{db_name}/_replication/{replication_id}"
+                )
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 404 and continuous:
+                    cbl_error(f"ISGR {replication_id} is continuous but does not exist")
+                    raise
+            return None
+
+    async def wait_for_isgr_status(
+        self,
+        db_name: str,
+        replication_id: str,
+        target_status: str,
+        timeout: int = 60,
+        poll_interval: int = 2,
+    ) -> dict:
+        """
+        Waits for an ISGR to reach a specific status.
+
+        :param db_name: The local database name
+        :param replication_id: The replication identifier
+        :param target_status: The status to wait for (default "stopped")
+        :param timeout: Maximum seconds to wait (default 180)
+        :param poll_interval: Seconds between status checks (default 2)
+        :return: The final replication status
+        :raises TimeoutError: If the target status is not reached within timeout
+        """
+        with self._tracer.start_as_current_span(
+            "wait_for_isgr_status",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.replication.id": replication_id,
+                "cbl.target.status": target_status,
+            },
+        ):
+            for _ in range(timeout // poll_interval):
+                status = await self.get_isgr_status(db_name, replication_id)
+                current_status = status.get("status", "")
+                if current_status == target_status:
+                    return status
+                if current_status == "error":
+                    raise Exception(
+                        f"ISGR {replication_id} entered error state: {status.get('error_message', 'unknown error')}"
+                    )
+                await asyncio.sleep(poll_interval)
+
+            raise TimeoutError(
+                f"ISGR {replication_id} did not reach status '{target_status}' within {timeout} seconds"
+            )
 
 
 class SyncGatewayUserClient(_SyncGatewayBase):

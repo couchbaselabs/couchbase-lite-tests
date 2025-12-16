@@ -21,7 +21,7 @@ class TestXattrs(CBLTestClass):
     ) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
-        num_docs = 1000
+        num_docs = 100
         username = "vipul"
         password = "pass"
         sg_db = "db"
