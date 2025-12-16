@@ -176,16 +176,27 @@ def download_sgw_package(download_info: SgwDownloadInfo) -> None:
 
 def setup_config(server_hostname: str) -> None:
     """
-    Write the server hostname to the bootstrap configuration file.
+    Write the server hostname to the bootstrap configuration files.
 
     Args:
         server_hostname (str): The hostname of the Couchbase Server.
     """
-    header(f"Writing {server_hostname} to bootstrap.json as CBS IP")
+    header(f"Writing {server_hostname} to bootstrap configs as CBS IP")
+
+    # Generate default bootstrap.json
     with open(SCRIPT_DIR / "config" / "bootstrap.json") as fin:
         with open(SCRIPT_DIR / "bootstrap.json", "w") as fout:
             config_content = cast(dict, json.load(fin))
             config_content["bootstrap"]["server"] = f"couchbases://{server_hostname}"
+            json.dump(config_content, fout, indent=4)
+
+    # Generate alternate bootstrap config (with explicit port for alternate address testing)
+    with open(SCRIPT_DIR / "config" / "bootstrap-alternate.json") as fin:
+        with open(SCRIPT_DIR / "bootstrap-alternate.json", "w") as fout:
+            config_content = cast(dict, json.load(fin))
+            config_content["bootstrap"]["server"] = (
+                f"couchbases://{server_hostname}:11207"
+            )
             json.dump(config_content, fout, indent=4)
 
     with open(SCRIPT_DIR / "start-sgw.sh.in") as file:
@@ -304,6 +315,11 @@ def setup_server(
         sftp, SCRIPT_DIR / "bootstrap.json", "/home/ec2-user/config/bootstrap.json"
     )
     sftp_progress_bar(
+        sftp,
+        SCRIPT_DIR / "bootstrap-alternate.json",
+        "/home/ec2-user/config/bootstrap-alternate.json",
+    )
+    sftp_progress_bar(
         sftp, SCRIPT_DIR / "cert" / "sg_cert.pem", "/home/ec2-user/cert/sg_cert.pem"
     )
     sftp_progress_bar(
@@ -316,6 +332,13 @@ def setup_server(
     for file in shell2http_dir.iterdir():
         sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
     sftp.close()
+
+    # Make shell2http scripts executable
+    remote_exec(
+        ssh,
+        "chmod +x /home/ec2-user/shell2http/*.sh",
+        "Making shell2http scripts executable",
+    )
 
     remote_exec(
         ssh,

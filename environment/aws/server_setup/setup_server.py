@@ -117,6 +117,13 @@ def setup_node(
         sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
     sftp.close()
 
+    # Make shell2http scripts executable
+    remote_exec(
+        ssh,
+        "chmod +x /home/ec2-user/shell2http/*.sh",
+        "Making shell2http scripts executable",
+    )
+
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting CBS log fileserver")
     remote_exec_bg(
         ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting CBS management server"
