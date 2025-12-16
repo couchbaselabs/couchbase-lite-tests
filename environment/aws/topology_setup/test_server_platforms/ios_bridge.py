@@ -28,12 +28,12 @@ Functions:
 import platform
 import re
 import shutil
+import socket
 import subprocess
 from os import environ
 from pathlib import Path
 
 import click
-import netifaces
 
 from environment.aws.common.output import header
 
@@ -159,7 +159,7 @@ class iOSBridge(PlatformBridge):
         click.echo("iOS app uninstall deliberately not implemented")
 
     def __validate_libimobiledevice(self, location: str) -> bool:
-        self.__verify_libimobiledevice()
+        self.__verify_ip_prerequisites()
         result = subprocess.run(
             ["ideviceinfo", "-u", location], check=False, capture_output=True
         )
@@ -387,34 +387,18 @@ class iOSBridge(PlatformBridge):
             capture_output=False,
         )
 
-    def __verify_libimobiledevice(self) -> None:
+    def __verify_ip_prerequisites(self) -> None:
         if shutil.which("ideviceinfo") is None:
             raise RuntimeError("ideviceinfo not found, aborting...")
 
-    def __broadcast_ping_request(self) -> None:
-        for interface in netifaces.interfaces():
-            if interface == "lo":
-                continue
+        if shutil.which("arping") is None:
+            raise RuntimeError("arping not found, aborting...")
 
-            addr = netifaces.ifaddresses(interface)
-            if netifaces.AF_INET in addr:
-                if "broadcast" not in addr[netifaces.AF_INET][0]:
-                    continue
-
-                ip = addr[netifaces.AF_INET][0]["broadcast"]
-                if ip.startswith("169.254"):
-                    continue
-
-                click.echo(f"Broadcasting ping request on {interface} ({ip})")
-                result = subprocess.run(
-                    ["ping", ip, "-c", "3"], check=False, capture_output=True, text=True
-                )
-
-                if result.returncode != 0:
-                    click.secho(
-                        f"Failed to ping {ip} on {interface}: {result.stderr}",
-                        fg="yellow",
-                    )
+        arpd_sock = Path("/var/run/arpd.sock")
+        if not arpd_sock.exists():
+            raise RuntimeError(
+                "arpd socket not found, please install the script at environment/aws/topology_setup/test_server_platforms/arpd.py"
+            )
 
     def _get_ip(self, location: str) -> str | None:
         """
@@ -431,10 +415,8 @@ class iOSBridge(PlatformBridge):
         """
         # Apple provides no sane way to do this so the following dance is performed:
         #    1. Retrieve MAC address of device (this requires the default "Private Wifi Address" to be turned off on device)
-        #    2. Broadcast a ping to the broadcast address of all network interfaces that have one, to ensure that the device
-        #       responds and has an ARP table entry
-        #    3. Retrieve the ARP table and find the IP address that corresponds to the MAC address
-        self.__verify_libimobiledevice()
+        #    2. Send the MAC address to the arpd daemon which uses arping to determine the IP address
+        self.__verify_ip_prerequisites()
         result = subprocess.run(
             ["ideviceinfo", "-u", location, "-k", "WiFiAddress"],
             check=True,
@@ -447,13 +429,11 @@ class iOSBridge(PlatformBridge):
         ]
         mac_address = ":".join(stripped_mac_parts)
 
-        self.__broadcast_ping_request()
+        s = socket.socket(socket.AF_UNIX)
+        s.connect("/var/run/arpd.sock")
+        s.send(mac_address.encode())
+        ip_addr = s.recv(8192).decode()
+        if "." not in ip_addr:
+            return None
 
-        result = subprocess.run(
-            ["arp", "-an"], check=True, capture_output=True, text=True
-        )
-        for line in result.stdout.split("\n"):
-            if mac_address in line:
-                return line.split(" ")[1].strip("()")
-
-        return None
+        return ip_addr

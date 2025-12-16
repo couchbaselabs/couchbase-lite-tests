@@ -79,9 +79,9 @@ This is required because of a command usage that was introduced in this version 
 
 The "Private Wi-Fi Address" setting of any iOS devices intended to be used *must* be set to `Off` for auto detection of iOS device IP addresses to work.
 
-### libimobiledevice (iOS only)
+### libimobiledevice and arping (iOS only)
 
-You need to install this package from homebrew as it is a dependency for the iOS IP discovery process
+You need to install these packages from homebrew as they are dependencies for the iOS IP discovery process
 
 ### XHarness (optional, iOS only)
 

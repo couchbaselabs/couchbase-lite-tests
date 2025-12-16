@@ -27,7 +27,7 @@ class WebSocketRouter:
         if len(self.__server_urls) == 0:
             cbl_info("No WS test servers to connect to; skipping router start")
             return
-        
+
         self.__stopping = False
         await self.__runner.setup()
 
