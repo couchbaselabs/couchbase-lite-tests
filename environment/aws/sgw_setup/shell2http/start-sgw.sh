@@ -4,9 +4,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
 CONFIG_DIR="/home/ec2-user/config"
-BOOTSTRAP_CONFIG_FILE="${CONFIG_DIR}/bootstrap.json"
 
-echo "Starting Sync Gateway..."
+# Support config parameter: ?config=alternate uses bootstrap-alternate.json
+# Default is bootstrap.json
+CONFIG_NAME="${HTTP_config:-bootstrap}"
+BOOTSTRAP_CONFIG_FILE="${CONFIG_DIR}/${CONFIG_NAME}.json"
+
+if [ ! -f "$BOOTSTRAP_CONFIG_FILE" ]; then
+    echo "ERROR: Config file not found: $BOOTSTRAP_CONFIG_FILE"
+    exit 1
+fi
+
+echo "Starting Sync Gateway with config: ${CONFIG_NAME}.json"
 
 # Check if already running
 if pgrep -f "sync_gateway" > /dev/null; then

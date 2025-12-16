@@ -1578,6 +1578,40 @@ class SyncGateway(_SyncGatewayBase):
                 "put", f"/{db_name}/_role/{role}", JSONDictionary(body)
             )
 
+    async def restart_with_config(self, config_name: str = "bootstrap") -> None:
+        """
+        Restart Sync Gateway with a specific bootstrap configuration.
+
+        This method calls the shell2http management endpoint to restart SGW
+        with the specified config file. The config file should exist at
+        /home/ec2-user/config/{config_name}.json on the SGW host.
+
+        :param config_name: Name of the config file (without .json extension).
+                           Default is "bootstrap" for the standard config.
+                           Use "bootstrap-alternate" for alternate address testing.
+        :raises Exception: If the restart fails
+        """
+        with self._tracer.start_as_current_span(
+            "restart_with_config",
+            attributes={
+                "cbl.config.name": config_name,
+            },
+        ):
+            shell2http_url = (
+                f"http://{self.hostname}:20002/restart-sgw?config={config_name}"
+            )
+            async with ClientSession() as session:
+                async with session.get(
+                    shell2http_url, timeout=ClientTimeout(total=120)
+                ) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        raise Exception(
+                            f"Failed to restart SGW: {resp.status} - {body}"
+                        )
+                    # Wait a bit for SGW to fully initialize
+                    await asyncio.sleep(5)
+
     async def create_user_client(
         self,
         db_name: str,
