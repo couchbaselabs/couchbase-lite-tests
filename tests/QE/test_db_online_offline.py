@@ -8,6 +8,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
+from conftest import cleanup_test_resources
 
 
 @pytest.mark.sgw
@@ -51,7 +52,7 @@ class TestDbOnlineOffline(CBLTestClass):
             ),
         ]
 
-        for endpoint_name, test_func in test_operations:
+        for _, test_func in test_operations:
             try:
                 await test_func()
                 endpoints_tested += 1
@@ -77,8 +78,7 @@ class TestDbOnlineOffline(CBLTestClass):
         sg_db = "db"
         bucket_name = "data-bucket"
         channels = ["ABC"]
-        username = "vipul"
-        password = "pass"
+        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -95,9 +95,6 @@ class TestDbOnlineOffline(CBLTestClass):
         if db_status is not None:
             await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
-
-        self.mark_test_step(f"Create user '{username}' with access to {channels}")
-        sg_user = await sg.create_user_client(sg_db, username, password, channels)
 
         self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
         sg_docs: list[DocumentUpdateEntry] = []
@@ -135,8 +132,6 @@ class TestDbOnlineOffline(CBLTestClass):
             f"DB is offline but only {errors_403}/{endpoints_tested} endpoints returned 403"
         )
 
-        await sg_user.close()
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_dbs_bucket_deletion(
         self, cblpytest: CBLPyTest, dataset_path: Path
@@ -144,6 +139,11 @@ class TestDbOnlineOffline(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
+        await cleanup_test_resources(
+            sg,
+            cbs,
+            ["data-bucket-1", "data-bucket-2", "data-bucket-3", "data-bucket-4"],
+        )
 
         db_configs: list[list[Any]] = [
             ["db1", "data-bucket-1", "ABC", "vipul", None],
@@ -220,7 +220,7 @@ class TestDbOnlineOffline(CBLTestClass):
                 f"{db_name}: Expected all {endpoints_tested} endpoints to return 403, got {errors_403}"
             )
 
-        for [db_name, bucket_name, _, _, user_client] in db_configs:
-            await user_client.close()
-            await sg.delete_database(db_name)
-            cbs.drop_bucket(bucket_name)
+        # Close user clients (cleanup of DBs and buckets handled by cleanup_test_resources)
+        for [_, _, _, _, user_client] in db_configs:
+            if user_client is not None:
+                await user_client.close()

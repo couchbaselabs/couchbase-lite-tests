@@ -5,6 +5,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import PutDatabasePayload
+from conftest import cleanup_test_resources
 from packaging.version import Version
 
 
@@ -22,14 +23,13 @@ class TestHighAvailability(CBLTestClass):
         bucket_name = "bucket-ha"
         num_docs = 100
         sg1, sg2, sg3 = sgs[0], sgs[1], sgs[2]
-        await sg2.start(config_name="bootstrap")
+        await cleanup_test_resources(sgs, cbs, [bucket_name])
 
         self.mark_test_step("Create shared bucket for all SGW nodes")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step(
-            f"Configure database '{sg_db}' on all {len(sgs)} SGW nodes (pointing to shared bucket)"
+            f"Configure database on all {len(sgs)} SGW nodes (pointing to shared bucket)"
         )
         db_config = {
             "bucket": bucket_name,
@@ -37,15 +37,14 @@ class TestHighAvailability(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        for sg in sgs:
-            db_status = await sg.get_database_status(sg_db)
-            if db_status is not None:
-                await sg.delete_database(sg_db)
-            await sg.put_database(sg_db, db_payload)
-            await sg.wait_for_node_online(sg_db)
-
-        self.mark_test_step("Wait for all SGW nodes to be ready")
-        await asyncio.sleep(5)
+        await sg1.put_database(sg_db, db_payload)
+        for sg in [sg2, sg3]:
+            for _ in range(10):
+                if await sg.get_database_status(sg_db) is not None:
+                    break
+                await asyncio.sleep(2)
+            else:
+                raise TimeoutError("DB did not propagate to all SGWs")
 
         self.mark_test_step(
             f"Start concurrent SDK writes ({num_docs} docs) in background"
@@ -70,8 +69,6 @@ class TestHighAvailability(CBLTestClass):
 
         self.mark_test_step("Delete database on sg2 to simulate node being offline")
         await sg2.stop()
-
-        self.mark_test_step("Verify sg2 node is offline")
         await sg2.wait_for_node_offline(sg_db)
 
         self.mark_test_step("Get current doc count from sg1 and sg3 (sg2 offline)")
@@ -163,7 +160,3 @@ class TestHighAvailability(CBLTestClass):
                 assert sg2_doc_vv[doc_id] == doc_vv == sg3_doc_vv[doc_id], (
                     f"Document {doc_id} version vector mismatch: sg1={doc_vv}, sg2={sg2_doc_vv[doc_id]}, sg3={sg3_doc_vv[doc_id]}"
                 )
-
-        for sg in sgs:
-            await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
