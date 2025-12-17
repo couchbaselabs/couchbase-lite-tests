@@ -4,7 +4,8 @@
         {
             "platform": "jak_android",
             "cbl_version": "{{version}}",
-            "location": "HT79F1A00593"
+            "location": "R5CT20FYA7R",
+            "download": true
         }
     ],
     "include": "../../../../environment/aws/topology_setup/default_topology.json"

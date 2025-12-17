@@ -1,163 +1,56 @@
 pipeline {
     agent none
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '3.2.3', description: 'Couchbase Lite Version')
-        string(name: 'PLATFORM', defaultValue: 'ios', description: "The platform to test (e.g. ios, android, windows, linux)")
-        string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
-    }
-    options {
-        timeout(time: 60, unit: 'MINUTES')
-        ansiColor('xterm')
-        timestamps()
+        string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
+        string(name: 'SGW_VERSION', defaultValue: '3.3.0', description: "The version of Sync Gateway to download")
+        string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
     }
     stages {
         stage('Init') {
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.PLATFORM == '') { error "PLATFORM is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "c ${params.CBL_VERSION} (#${currentBuild.number})"
-                    currentBuild.description = "Platform: ${params.PLATFORM}"
+                    
+                    currentBuild.displayName = "C Linux CBL:${params.CBL_VERSION} (#${currentBuild.number})"
+                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
                 }
             }
         }
         stage('Prebuild Servers') {
             steps {
-                script {
-                    def platforms = [
-                        'c_ios', 'c_android', 'c_linux_x86_64', 'c_windows'
-                    ]
-                    def parallelBuilds = [:]
-                    for(p in platforms) {
-                        // Groovy stupidness.  Need to set a local variable here
-                        // to avoid late binding (all jobs use the same platform).
-                        def platform = p
-                        parallelBuilds[platform] = {
-                            build job: 'prebuild-test-server',
-                            parameters: [
-                                string(name: 'TS_PLATFORM', value: platform),
-                                string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                            ],
-                            wait: true,
-                            propagate: true
-                        }
-                    }
-                    parallel parallelBuilds
-                }
+                build job: 'prebuild-test-server',
+                parameters: [
+                    string(name: 'TS_PLATFORM', value: 'c_linux_x86_64'),
+                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                ],
+                wait: true,
+                propagate: true
             }
         }
-        stage('Run Tests') {
-            parallel {
-                stage('iOS') {
-                    agent { label 'mac-mini-new' }
-                    environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                        AWS_PROFILE = "mobile-for-now"
-                        TS_ARTIFACTS_DIR = 'c_ios'
-                    }
-                    steps {
-                        // Unlock keychain:
-                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        echo "Run iOS Test"
-                        timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
-                        }
-                    }
-                    post { 
-                        always { 
-                            echo "Teardown iOS Test"
-                            timeout(time: 5, unit: 'MINUTES') {
-                                sh 'jenkins/pipelines/QE/c/teardown.sh'
-                            } 
-                            archiveArtifacts artifacts: 'tests/QE/c_ios/**/*', fingerprint: true, allowEmptyArchive: true
-                        }
-                    }
+        stage('Tests') {
+            agent { label 'linux-c' }
+            environment {
+                TS_ARTIFACTS_DIR = 'c'
+                TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+            }
+            steps {
+                echo "=== Run C Linux Tests"
+                timeout(time: 120, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} linux_x86_64 ${params.SGW_VERSION}"
                 }
-                stage('Android') {
-                    agent { label 'mac-laptop1-new' }
-                    environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                        AWS_PROFILE = "mobile-for-now"
-                        TS_ARTIFACTS_DIR = 'c_android'
+                echo "=== C Linux Tests Complete"
+            }
+            post {
+                always {
+                    echo "=== Teardown C Linux Tests"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh 'jenkins/pipelines/QE/c/teardown.sh'
                     }
-                    steps {
-                        // Unlock keychain:
-                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        echo "Run Android Test"
-                        timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
-                        }
-                    }
-                    post { 
-                        always { 
-                            echo "Teardown Android Test"
-                            timeout(time: 5, unit: 'MINUTES') {
-                                sh 'jenkins/pipelines/QE/c/teardown.sh'
-                            }
-                            archiveArtifacts artifacts: 'tests/QE/c_android/**/*', fingerprint: true, allowEmptyArchive: true
-                        }
-                    }
-                }
-                stage('linux') {
-                    agent { label 'cbl-java-desktop-centos-7-2' }
-                    environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                        AWS_PROFILE = "mobile-for-now"
-                        TS_ARTIFACTS_DIR = 'c_linux'
-                    }
-                    steps {
-                        // Unlock keychain:
-                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        echo "Run linux Test"
-                        timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} linux_x86_64 '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
-                        }
-                    }
-                    post { 
-                        always { 
-                            echo "Teardown linux Test"
-                            timeout(time: 5, unit: 'MINUTES') {
-                                sh 'jenkins/pipelines/QE/c/teardown.sh'
-                            }
-                            archiveArtifacts artifacts: 'tests/QE/c_linux/**/*', fingerprint: true, allowEmptyArchive: true
-                        }
-                    }
-                }
-                stage('windows') {
-                    agent { label 'net-windows-client-sync-gateway-agent' }
-                    environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                        AWS_PROFILE = "mobile-for-now"
-                        TS_ARTIFACTS_DIR = 'c_windows'
-                    }
-                    steps {
-                        // Unlock keychain:
-                        pwsh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        timeout(time: 60, unit: 'MINUTES') {
-                            pwsh "jenkins\\pipelines\\QE\\c\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -PrivateKeyPath C:\\Users\\mob-e\\.ssh\\jborden.pem"
-                        }
-                    }
-                    post { 
-                        always { 
-                            echo "Teardown Windows Test"
-                            timeout(time: 5, unit: 'MINUTES') {
-                                pwsh 'jenkins\\pipelines\\QE\\c\\teardown.ps1'
-                            }
-                            archiveArtifacts artifacts: 'tests\\QE\\c_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
-                        }
-                    }
+                    archiveArtifacts artifacts: 'tests/QE/c_linux/**/*', fingerprint: true, allowEmptyArchive: true
+                    echo "=== C Linux Test Teardown Complete"
                 }
             }
-        }
-    }
-    post {
-        failure {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
         }
     }
 }

@@ -1,8 +1,9 @@
 pipeline {
     agent none
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite Version')
-        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+        string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
+        string(name: 'SGW_VERSION', defaultValue: '3.3.0', description: "The version of Sync Gateway to download")
+        string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
     }
     stages {
         stage('Init') {
@@ -10,7 +11,8 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "android ${params.CBL_VERSION} (#${currentBuild.number})"
+                    currentBuild.displayName = "Android CBL:${params.CBL_VERSION} (#${currentBuild.number})"
+                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
                 }
             }
         }
@@ -26,38 +28,36 @@ pipeline {
             }
         }
         stage('Android') {
-            agent { label 'mac-laptop1-new' }
+            agent { label 'mac-mini-CBL-Android1' }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                KEYCHAIN_PASSWORD = credentials('mobile-qe')
                 ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
-                PATH = "\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                AWS_PROFILE = "mobile-for-now"
+                JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
+                PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 TS_ARTIFACTS_DIR = 'android'
+                TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
             }
             steps {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                echo "Run Android Tests"
+                echo "=== Run Android Tests"
                 timeout(time: 120, unit: 'MINUTES') {
                     sh """
-                        jenkins/pipelines/QE/android/android_tests.sh "${params.CBL_VERSION}" "${params.SGW_VERSION}" ~/.ssh/jborden.pem
+                        jenkins/pipelines/QE/android/android_tests.sh "${params.CBL_VERSION}" "${params.SGW_VERSION}"
                     """
                 }
+                echo "=== Android Tests Complete"
             }
             post {
                 always {
-                    echo "Teardown Android Tests"
+                    echo "=== Teardown Android Tests"
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/android/android_teardown.sh"
                     }
                     archiveArtifacts artifacts: 'tests/QE/android/**/*', fingerprint: true, allowEmptyArchive: true
+                    echo "=== Android Test Teardown Complete"
                 }
             }
-        }
-    }
-    post {
-        failure {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
         }
     }
 }
