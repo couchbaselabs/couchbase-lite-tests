@@ -1,4 +1,4 @@
-import time
+import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -7,6 +7,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from conftest import cleanup_test_resources
 
 
 @pytest.mark.sgw
@@ -24,6 +25,7 @@ class TestTTL(CBLTestClass):
         channels = ["NBC", "ABC"]
         username = "vipul"
         password = "pass"
+        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -46,18 +48,18 @@ class TestTTL(CBLTestClass):
 
         self.mark_test_step("Create documents with different expiry times")
         current_time = datetime.now()
-        expire_3s = int((current_time + timedelta(seconds=3)).timestamp())
+        expire_5s = int((current_time + timedelta(seconds=5)).timestamp())
         expire_years = int((current_time + timedelta(days=365)).timestamp())
         await sg.update_documents(
             sg_db,
             [
                 DocumentUpdateEntry(
-                    "exp_3",
+                    "exp_5",
                     None,
                     body={
                         "type": "test_doc",
                         "channels": channels,
-                        "_exp": str(expire_3s),
+                        "_exp": str(expire_5s),
                     },
                 )
             ],
@@ -82,29 +84,29 @@ class TestTTL(CBLTestClass):
         )
 
         self.mark_test_step("Verify both documents exist initially")
-        doc_exp_3 = await sg_user.get_document(sg_db, "exp_3", "_default", "_default")
+        doc_exp_5 = await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
         doc_exp_years = await sg_user.get_document(
             sg_db, "exp_years", "_default", "_default"
         )
-        assert doc_exp_3 is not None, "exp_3 should exist"
+        assert doc_exp_5 is not None, "exp_5 should exist"
         assert doc_exp_years is not None, "exp_years should exist"
 
-        self.mark_test_step("Wait for exp_3 document to expire")
-        time.sleep(10)
+        self.mark_test_step("Wait for exp_5 document to expire")
+        await asyncio.sleep(10)
 
-        self.mark_test_step("Verify exp_3 document is expired (not accessible)")
+        self.mark_test_step("Verify exp_5 document is expired (not accessible)")
         try:
             expired_doc = await sg_user.get_document(
-                sg_db, "exp_3", "_default", "_default"
+                sg_db, "exp_5", "_default", "_default"
             )
             if expired_doc is not None:
-                pytest.fail("exp_3 should be expired/inaccessible")
+                pytest.fail("exp_5 should be expired/inaccessible")
         except CblSyncGatewayBadResponseError as e:
             assert e.code in [403, 404], (
                 f"Expected 403/404 for expired doc, got {e.code}"
             )
-        sdk_doc = cbs.get_document(bucket_name, "exp_3", "_default", "_default")
-        assert sdk_doc is None, "exp_3 should be purged"
+        sdk_doc = cbs.get_document(bucket_name, "exp_5", "_default", "_default")
+        assert sdk_doc is None, "exp_5 should be purged"
 
         self.mark_test_step("Verify exp_years document is still accessible")
         doc_still_valid = await sg_user.get_document(
@@ -114,8 +116,6 @@ class TestTTL(CBLTestClass):
         assert doc_still_valid.id == "exp_years"
 
         await sg_user.close()
-        await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_string_expiry_as_iso_8601_date(
@@ -150,19 +150,19 @@ class TestTTL(CBLTestClass):
 
         self.mark_test_step("Create documents with ISO-8601 expiry dates")
         current_time = datetime.now().astimezone()
-        expire_3s_iso = (current_time + timedelta(seconds=3)).isoformat()
+        expire_5s_iso = (current_time + timedelta(seconds=5)).isoformat()
         expire_years_iso = (current_time + timedelta(days=365)).isoformat()
 
         await sg.update_documents(
             sg_db,
             [
                 DocumentUpdateEntry(
-                    "exp_3",
+                    "exp_5",
                     None,
                     body={
                         "type": "test_doc",
                         "channels": channels,
-                        "_exp": expire_3s_iso,
+                        "_exp": expire_5s_iso,
                     },
                 )
             ],
@@ -187,29 +187,29 @@ class TestTTL(CBLTestClass):
         )
 
         self.mark_test_step("Verify both documents exist initially")
-        doc_exp_3 = await sg_user.get_document(sg_db, "exp_3", "_default", "_default")
+        doc_exp_5 = await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
         doc_exp_years = await sg_user.get_document(
             sg_db, "exp_years", "_default", "_default"
         )
-        assert doc_exp_3 is not None, "exp_3 should exist"
+        assert doc_exp_5 is not None, "exp_5 should exist"
         assert doc_exp_years is not None, "exp_years should exist"
 
-        self.mark_test_step("Wait for exp_3 document to expire")
-        time.sleep(10)
+        self.mark_test_step("Wait for exp_5 document to expire")
+        await asyncio.sleep(10)
 
-        self.mark_test_step("Verify exp_3 document is expired (not accessible)")
+        self.mark_test_step("Verify exp_5 document is expired (not accessible)")
         try:
             expired_doc = await sg_user.get_document(
-                sg_db, "exp_3", "_default", "_default"
+                sg_db, "exp_5", "_default", "_default"
             )
             if expired_doc is not None:
-                pytest.fail("exp_3 should be expired/inaccessible")
+                pytest.fail("exp_5 should be expired/inaccessible")
         except CblSyncGatewayBadResponseError as e:
             assert e.code in [403, 404], (
                 f"Expected 403/404 for expired doc, got {e.code}"
             )
-        sdk_doc = cbs.get_document(bucket_name, "exp_3", "_default", "_default")
-        assert sdk_doc is None, "exp_3 should be purged from bucket"
+        sdk_doc = cbs.get_document(bucket_name, "exp_5", "_default", "_default")
+        assert sdk_doc is None, "exp_5 should be purged from bucket"
 
         self.mark_test_step("Verify exp_years document is still accessible")
         doc_still_valid = await sg_user.get_document(
@@ -219,5 +219,3 @@ class TestTTL(CBLTestClass):
         assert doc_still_valid.id == "exp_years"
 
         await sg_user.close()
-        await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
