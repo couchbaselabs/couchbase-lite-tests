@@ -1,8 +1,9 @@
 import asyncio
 import json
 from pathlib import Path
+from datetime import timedelta
 from random import randint
-
+from cbltest.api.json_generator import JSONGenerator
 import pytest
 from aiohttp import BasicAuth
 from cbltest import CBLPyTest
@@ -21,21 +22,23 @@ from cbltest.api.replicator_types import (
 from cbltest.api.listener import Listener
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import TestServer
+from cbltest.api.test_functions import compare_doc_results_p2p
 
-from client.src.cbltest.api.test_functions import compare_doc_results_p2p
-
-
+import inspect
+# print("TestServer class:", inspect.getfile(TestServer))
 @pytest.mark.min_test_servers(2)
 class TestPeerToPeer(CBLTestClass):
-    def __init__(self):
-        super().__init__()
-        self.doc_ids=None
-        self.docgen=None
+    def setup_method(self, method):
+        super().setup_method(method)
+        self.doc_ids = None
+        self.docgen = None
 
     async def testserver_crud(self,db,num_of_docs,optype="insert",documents=None):
         async def insert_each_batch(start, value=10,documents=None):
             async with db.batch_updater() as b:
                 for i in self.doc_ids[start: start + value]:
+                    # print(f"upserting: ")
                     b.upsert_document(
                         "_default._default",
                         i,
@@ -44,15 +47,17 @@ class TestPeerToPeer(CBLTestClass):
         if optype=="insert":
             self.docgen=JSONGenerator(size=num_of_docs , format="key-value")
             documents = self.docgen.generate_all_documents()
+            print(f"documents:{documents}")
             self.doc_ids = list(documents.keys())
+            print(f"ids:{self.doc_ids}")
             for start in range(0, len(self.doc_ids), 10):
-                await insert_each_batch(start)
+                await insert_each_batch(start,documents=documents)
 
         elif optype=="update":
-            updated_docs = docgen.update_all_documents(documents)
+            updated_docs = self.docgen.update_all_documents(documents)
             documents.update(updated_docs)
-            for start in range(0, len(doc_ids), 10):
-                await insert_each_batch(start)
+            for start in range(0, len(self.doc_ids), 10):
+                await insert_each_batch(start,documents=documents)
         else:
             raise ValueError(f"Invalid optype: {optype}")
         return documents
@@ -76,20 +81,22 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Start listener on Device-1")
         listener = Listener(all_dbs[0], ["_default._default"], 59840)
         await listener.start()
-
+        await asyncio.sleep(0.3)
+        self.mark_test_step(f"listener started at {listener.port}")
+        port=listener.port if listener.port is not None else 59840
         self.mark_test_step(f"Add {num_of_docs} docs to Device-2")
         documents=await self.testserver_crud(all_dbs[1], num_of_docs)
-
+        endpoint=cblpytest.test_servers[1].replication_url("db1",port)
         self.mark_test_step(f"""
                     Start a replicator on Device-2 with listener endpoint
-                    * endpoint: `/db1`
+                    * endpoint: {endpoint}
                     * collections : `_default._default`
                     * type: {replicator_type}
                     * continuous: {continuous}
                 """)
         replicator = Replicator(
             all_dbs[1],
-            endpoint=cblpytest.test_servers[0].replication_url("db1",listener.port),
+            endpoint=endpoint,
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -119,9 +126,9 @@ class TestPeerToPeer(CBLTestClass):
 
         self.mark_test_step("Wait till replication is complete")
         if continuous:
-            status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
+            status = await replicator.wait_for(ReplicatorActivityLevel.IDLE,timeout=timedelta(seconds=200))
         else:
-            status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+            status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED,timeout=timedelta(seconds=200))
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )

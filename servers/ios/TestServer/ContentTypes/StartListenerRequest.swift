@@ -13,6 +13,7 @@ extension ContentTypes {
         let collections: [String]
         let port: UInt16?
         let disableTLS: Bool?
+        let identity: MultipeerReplicatorIdentity
         
         public var description: String {
             var result: String = "Endpoint Listener Configuration:\n"

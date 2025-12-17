@@ -11,6 +11,7 @@ from cbltest.v1.requests import (
 )
 from cbltest.v1.responses import PostStartListenerResponse
 from cbltest.version import VERSION
+from cbltest.api.x509_certificate import CertKeyPair, create_leaf_certificate
 
 
 class Listener:
@@ -40,6 +41,9 @@ class Listener:
 
         self.disable_tls = disable_tls
         """If True, TLS will be disabled for the listener"""
+        self.__identity=None
+        if not disable_tls:
+            self.__identity = create_leaf_certificate(f"Test Server {self.__index}")
 
         self.__original_port = port
         self.__index = database._index
@@ -51,11 +55,16 @@ class Listener:
             "This version of the cbl test API requires request API v1"
         )
 
+    @property
+    def identity(self) -> CertKeyPair:
+        """Gets the identity used by the replicator"""
+        return self.__identity
+
     async def start(self) -> None:
         """Start listening for incoming connections"""
         with self.__tracer.start_as_current_span("start_listener"):
             payload = PostStartListenerRequestBody(
-                self.database.name, self.collections, self.port, self.disable_tls
+                self.database.name, self.collections, self.port, self.disable_tls,self.__identity,
             )
             request = self.__request_factory.create_request(
                 TestServerRequestType.START_LISTENER, payload
