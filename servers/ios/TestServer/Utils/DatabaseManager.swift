@@ -124,7 +124,7 @@ class DatabaseManager {
             throw TestServerError.badRequest("Failed to import TLS identity")
         }
 
-        listenerConfig.identity = importedIdentity
+        listenerConfig.tlsIdentity = importedIdentity
     }
 
 
