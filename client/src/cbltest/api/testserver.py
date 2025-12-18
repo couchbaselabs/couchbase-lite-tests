@@ -128,11 +128,13 @@ class TestServer:
         )
         await self.__request_factory.send_request(self.__index, request)
 
-    def replication_url(self, db_name: str, port: int):
+    def replication_url(self, db_name: str, port: int,tls: bool=False):
         """
         Returns the URL of the replication endpoint for this test server
         """
-        ws_scheme = "ws://"  # For now not using secure
+        ws_scheme = "ws://"
+        if tls:
+            ws_scheme = "wss://"  # For now not using secure
 
         _assert_not_null(db_name, "db_name")
 

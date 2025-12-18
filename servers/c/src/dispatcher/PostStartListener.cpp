@@ -13,8 +13,19 @@ int Dispatcher::handlePOSTStartListener(Request &request, Session *session) {
 
     auto port = GetValue<int>(body, "port", 0);
     auto disableTLS = GetValue<bool>(body, "disableTLS", false);
+    string encoding = "";
+    string data = "";
+    string password = "";
 
-    string id = session->cblManager()->startListener(database, collections, port, disableTLS);
+    if (!disableTLS && body.contains("identity")) {
+        auto identity = body["identity"];
+        encoding = GetValue<string>(identity, "encoding", "");
+        data = GetValue<string>(identity, "data", "");
+        password = GetValue<string>(identity, "password", "");
+    }
+
+
+    string id = session->cblManager()->startListener(database, collections, port, disableTLS,encoding,data,password);
 
     json result;
     result["id"] = id;

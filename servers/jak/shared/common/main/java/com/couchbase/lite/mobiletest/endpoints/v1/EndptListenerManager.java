@@ -48,6 +48,11 @@ public class EndptListenerManager {
     private static final String KEY_PORT = "port";
     private static final String KEY_DISABLE_TLS = "disableTLS";
     private static final String KEY_ID = "id";
+    private static final String KEY_IDENTITY = "identity";
+    private static final String KEY_ENCODING = "encoding";
+    private static final String KEY_DATA = "data";
+    private static final String KEY_PASSWORD = "password";
+
 
     private static final Set<String> LEGAL_CREATE_KEYS;
     static {
@@ -56,6 +61,7 @@ public class EndptListenerManager {
         l.add(KEY_COLLECTIONS);
         l.add(KEY_PORT);
         l.add(KEY_DISABLE_TLS);
+        l.add(KEY_IDENTITY);
         LEGAL_CREATE_KEYS = Collections.unmodifiableSet(l);
     }
 
@@ -76,6 +82,34 @@ public class EndptListenerManager {
         this.dbSvc = dbSvc;
         this.listenerSvc = listenerSvc;
     }
+    private TLSIdentity importTlsIdentity(String dbName, TypedMap identity) {
+        String encoding = identity.getString(KEY_ENCODING);
+        String dataB64 = identity.getString(KEY_DATA);
+        String password = identity.getString(KEY_PASSWORD);
+        byte[] p12;
+        try {
+            p12 = java.util.Base64.getDecoder().decode(dataB64);
+        }
+        catch (IllegalArgumentException ex) {
+            throw new ClientError("Invalid base64 identity data");
+        }
+        String label = "java-p2p-" + dbName;
+        try { TLSIdentity.deleteIdentity(label); }
+        catch (CouchbaseLiteException ignore) {}
+        TLSIdentity imported;
+        try {
+            imported = TLSIdentity.importIdentity(
+                p12,
+                password.toCharArray(),
+                label
+            );
+        }
+        catch (CouchbaseLiteException e) {
+            throw new CblApiFailure("Failed to import TLS identity", e);
+        }
+        return imported;
+    }
+
 
     @NonNull
     public Map<String, Object> startListener(@NonNull TestContext ctxt, @NonNull TypedMap req) {
@@ -100,6 +134,12 @@ public class EndptListenerManager {
 
         final Boolean disableTLS = req.getBoolean(KEY_DISABLE_TLS);
         if (disableTLS != null) { listenerConfig.setDisableTLS(disableTLS); }
+
+        if (!tlsDisabled) {
+        TypedMap identity = req.getMap(KEY_IDENTITY);
+        TLSIdentity tlsId = importTlsIdentity(dbName, identity);
+        listenerConfig.setTlsIdentity(tlsId);
+    }
 
         final URLEndpointListener listener = new URLEndpointListener(listenerConfig);
         try { listener.start(); }

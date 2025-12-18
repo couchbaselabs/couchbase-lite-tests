@@ -83,7 +83,7 @@ namespace ts::cbl {
 
         /// Listener
 
-        std::string startListener(const std::string &database, const std::vector<std::string>&collections, int port, bool disableTLS = false);
+        std::string startListener(const std::string &database, const std::vector<std::string>&collections, int port, bool disableTLS = false,const string& identityEncoding, const string& identityData, const string& identityPassword);
 
         CBLURLEndpointListener *listener(const std::string &id);
 
@@ -154,5 +154,6 @@ namespace ts::cbl {
 
         /* Listener map */
         std::unordered_map<std::string, CBLURLEndpointListener*> _listeners;
+
     };
 }

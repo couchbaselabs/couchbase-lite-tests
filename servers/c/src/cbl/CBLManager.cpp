@@ -536,7 +536,7 @@ namespace ts::cbl {
 
     /// URLEndpointListener
 
-    string CBLManager::startListener(const string &database, const vector<std::string>&collNames, int port, bool disableTLS) {
+    string CBLManager::startListener(const string &database, const vector<std::string>&collNames, int port, bool disableTLS, const string& identityEncoding, const string& identityData, const string& identityPassword) {
         lock_guard <mutex> lock(_mutex);
 
         CBLError error{};
@@ -563,6 +563,32 @@ namespace ts::cbl {
         config.collectionCount = collections.size();
         config.port = port;
         config.disableTLS = disableTLS;
+
+        if (!disableTLS) {
+        std::string label = "cpp-p2p-" + database;
+
+        // Reuse identity if already loaded
+        auto existing = _tlsIdentities[label];
+        if (existing) {
+            config.tlsIdentity = existing;
+        } else {
+            std::vector<uint8_t> p12 = decodeBase64(identityData);
+            error = {};
+            CBLTLSIdentity_DeleteIdentity(FLS(label), &error);
+            auto imported = CBLTLSIdentity_ImportIdentity(
+                p12.data(), p12.size(),
+                FLS(identityPassword),
+                FLS(label),
+                &error);
+
+            if (!imported) {
+                throw CBLException(error);
+            }
+
+            _tlsIdentities[label] = imported;
+            config.tlsIdentity = imported;
+        }
+    }
 
         auto listener = CBLURLEndpointListener_Create(&config, &error);
         if (!listener) {

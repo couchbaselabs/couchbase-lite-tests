@@ -107,7 +107,7 @@ class DatabaseManager {
         listenerConfig.port = port
         listenerConfig.disableTLS = disableTLS
         if !listenerConfig.disableTLS {
-        let label = "ios-p2p"
+        let label = "ios-p2p-\(dbName)"
         guard let data = Data(base64Encoded: identity.data) else {
             throw TestServerError.badRequest("Invalid replicator identity data")
         }

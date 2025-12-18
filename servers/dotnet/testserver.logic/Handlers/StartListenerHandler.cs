@@ -9,6 +9,14 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    internal readonly record struct ReplicatorIdentityBody
+    {
+        public required string encoding { get; init; }
+
+        public required string data { get; init; }
+
+        public required string password { get; init; }
+    }
     internal readonly record struct StartListenerBody
     {
         public required string database { get; init; }
@@ -18,6 +26,9 @@ internal static partial class HandlerList
         public ushort port { get; init; }
 
         public bool disableTLS { get; init; } = false;
+
+        public ReplicatorIdentityBody? identity { get; init; }
+
     }
 
     [HttpHandler("startListener")]
@@ -53,6 +64,48 @@ internal static partial class HandlerList
             Port = deserializedBody.port,
             DisableTLS = deserializedBody.disableTLS
         };
+        if (!deserializedBody.disableTLS)
+        {
+            var identityBody = deserializedBody.identity.Value;
+            var label = $"dotnet-p2p-{deserializedBody.database}";
+            var existing = TlsIdentity.GetIdentity(label);
+            if (existing != null)
+            {
+                listenerConfig.TlsIdentity = existing;
+            }
+            else
+            {
+                byte[] p12bytes;
+                try {
+                    p12bytes = Convert.FromBase64String(identityBody.data);
+                }
+                catch {
+                    response.WriteBody(new {
+                        domain = "TESTSERVER",
+                        code = 400,
+                        message = "Invalid base64 identity data."
+                    }, version, HttpStatusCode.BadRequest);
+                    return Task.CompletedTask;
+                }
+                TlsIdentity.DeleteIdentity(label);
+                TlsIdentity imported;
+                try
+                {
+                    imported = TlsIdentity.ImportIdentity(p12bytes, identityBody.password, label);
+                }
+                catch (Exception e)
+                {
+                    response.WriteBody(new {
+                        domain = "TESTSERVER",
+                        code = 400,
+                        message = $"Failed to import TLS identity: {e.Message}"
+                    }, version, HttpStatusCode.BadRequest);
+                    return Task.CompletedTask;
+                }
+
+                listenerConfig.TlsIdentity = imported;
+            }
+        }
         (var listener, var id) = session.ObjectManager.RegisterObject(() => new URLEndpointListener(listenerConfig));
         listener.Start();
 
