@@ -1,10 +1,11 @@
-import time
+import asyncio
 from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from conftest import cleanup_test_resources
 from packaging.version import Version
 
 
@@ -18,8 +19,8 @@ class TestUsersChannels(CBLTestClass):
     ) -> None:
         sgs = cblpytest.sync_gateways
         cbs = cblpytest.couchbase_servers[0]
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_channels"
+        bucket_name = "bucket-channels"
         channels = ["ABC", "CBS", "NBC", "FOX"]
         username = "vipul"
         password = "pass"
@@ -28,8 +29,10 @@ class TestUsersChannels(CBLTestClass):
         total_docs = num_batches * batch_size
         num_sgs = len(sgs)
 
+        self.mark_test_step("Clean up any existing resources")
+        await cleanup_test_resources(sgs, cbs, [bucket_name])
+
         self.mark_test_step("Create single shared bucket for all SGW nodes")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step(
@@ -41,12 +44,8 @@ class TestUsersChannels(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-
-        for sg in sgs:
-            db_status = await sg.get_database_status(sg_db)
-            if db_status is not None:
-                await sg.delete_database(sg_db)
-            await sg.put_database(sg_db, db_payload)
+        await sgs[0].put_database(sg_db, db_payload)
+        await sgs[2].wait_for_node_online(sg_db)
 
         self.mark_test_step(
             f"Create user '{username}' with access to {channels} (stored in shared bucket)"
@@ -82,7 +81,7 @@ class TestUsersChannels(CBLTestClass):
             await target_sg.update_documents(sg_db, docs, "_default", "_default")
 
         self.mark_test_step("Wait for documents to propagate across all SGW nodes")
-        time.sleep(10)
+        await asyncio.sleep(10)
 
         self.mark_test_step(
             f"Verify user sees all {total_docs} docs via changes feed from first SGW"
@@ -154,5 +153,3 @@ class TestUsersChannels(CBLTestClass):
             await test_user.close()
 
         await sg_user.close()
-        await sgs[0].delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)

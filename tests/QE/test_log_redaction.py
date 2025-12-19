@@ -7,6 +7,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from conftest import cleanup_test_resources
 
 
 def scan_logs_for_untagged_sensitive_data(
@@ -92,11 +93,12 @@ class TestLogRedaction(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_redaction_partial"
+        bucket_name = "bucket-redaction-partial"
         channels = ["log-redaction"]
         username = "vipul"
         password = "pass"
+        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -177,8 +179,6 @@ class TestLogRedaction(CBLTestClass):
         )
 
         await sg_user.close()
-        await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sgcollect_redacted_files_and_contents(
@@ -187,11 +187,12 @@ class TestLogRedaction(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_redaction_sgcollect"
+        bucket_name = "bucket-redaction-sgcollect"
         channels = ["log-redaction-sgcollect"]
         username = "vipul_sgcollect"
         password = "password"
+        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -312,5 +313,3 @@ class TestLogRedaction(CBLTestClass):
             )
 
         await sg_user.close()
-        await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
