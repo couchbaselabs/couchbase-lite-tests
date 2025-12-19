@@ -326,10 +326,7 @@ def setup_server(
         sftp, SCRIPT_DIR / "cert" / "sg_key.pem", "/home/ec2-user/cert/sg_key.pem"
     )
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
-
-    # Upload shell2http scripts (directory created by configure-system.sh)
-    shell2http_dir = SCRIPT_DIR / "shell2http"
-    for file in shell2http_dir.iterdir():
+    for file in (SCRIPT_DIR / "shell2http").iterdir():
         sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
     sftp.close()
 
@@ -354,8 +351,10 @@ def setup_server(
     )
 
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting SGW log fileserver")
-    remote_exec_bg(
-        ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting SGW management server"
+    remote_exec(
+        ssh,
+        "bash /home/ec2-user/shell2http/start.sh",
+        "Starting SGW management server",
     )
     remote_exec(ssh, "bash /home/ec2-user/start-sgw.sh", "Starting SGW")
 

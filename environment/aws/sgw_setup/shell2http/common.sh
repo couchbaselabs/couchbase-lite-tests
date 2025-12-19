@@ -6,4 +6,3 @@ read_http_body() {
     cat
   fi
 }
-
