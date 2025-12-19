@@ -8,6 +8,7 @@ from typing import Any, cast
 from urllib.parse import urljoin
 
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
+from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblSyncGatewayBadResponseError
@@ -1188,7 +1189,7 @@ class _SyncGatewayBase:
             },
         ):
             _, content = await self._caddy_http_request(
-                caddy_url, f"Download {remote_filename}", timeout=120
+                caddy_url, f"Download {remote_filename}", timeout=600
             )
 
             # Ensure local directory exists and write file
@@ -1511,7 +1512,7 @@ class SyncGateway(_SyncGatewayBase):
             },
         ):
             shell2http_url = (
-                f"http://{self.hostname}:20002/restart-sgw?config={config_name}"
+                f"http://{self.hostname}:20001/restart-sgw?config={config_name}"
             )
             async with ClientSession() as session:
                 async with session.get(
@@ -1524,6 +1525,123 @@ class SyncGateway(_SyncGatewayBase):
                         )
                     # Wait a bit for SGW to fully initialize
                     await asyncio.sleep(5)
+
+    async def stop(self) -> None:
+        """
+        Stop the Sync Gateway process.
+
+        This method calls the shell2http management endpoint to stop SGW.
+
+        :raises Exception: If the stop fails
+        """
+        with self._tracer.start_as_current_span("stop_sgw"):
+            shell2http_url = f"http://{self.hostname}:20001/stop-sgw"
+            async with ClientSession() as session:
+                async with session.get(
+                    shell2http_url, timeout=ClientTimeout(total=60)
+                ) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        raise Exception(f"Failed to stop SGW: {resp.status} - {body}")
+
+    async def start(self, config_name: str = "bootstrap") -> None:
+        """
+        Start the Sync Gateway process.
+
+        This method calls the shell2http management endpoint to start SGW.
+
+        :param config_name: Name of the config file (without .json extension).
+        :raises Exception: If the start fails
+        """
+        # Check if SGW is already running by probing the public endpoint (4984)
+        try:
+            # Use a short timeout to distinguish "not running" from "slow"
+            scheme = "https://" if self.secure else "http://"
+            async with self._create_session(
+                self.secure, scheme, self.hostname, 4984, None
+            ) as session:
+                async with session.get("/", timeout=ClientTimeout(total=5)) as resp:
+                    if resp.status == 200:
+                        cbl_info("SGW is already running, skipping start")
+                        return
+        except (ClientConnectorError, asyncio.TimeoutError):
+            # SGW is not reachable or slow, proceed with start
+            pass
+
+        # Proceed with shell2http start call...
+        with self._tracer.start_as_current_span(
+            "start_sgw",
+            attributes={"cbl.config.name": config_name},
+        ):
+            shell2http_url = (
+                f"http://{self.hostname}:20001/start-sgw?config={config_name}"
+            )
+            async with ClientSession() as session:
+                async with session.get(
+                    shell2http_url, timeout=ClientTimeout(total=120)
+                ) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        raise Exception(f"Failed to start SGW: {resp.status} - {body}")
+                    # Wait a bit for SGW to fully initialize
+                    await asyncio.sleep(5)
+
+    async def wait_for_node_offline(
+        self,
+        db_name: str,
+        max_retries: int = 20,
+        retry_delay: int = 3,
+    ) -> None:
+        """
+        Wait until the SGW node is offline.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        for _ in range(max_retries):
+            try:
+                sg_status = await self.get_database_status(db_name)
+            except ClientConnectorError:
+                # connection refused -> node is offline
+                return
+            if sg_status is None:
+                return
+            await asyncio.sleep(retry_delay)
+        raise TimeoutError(
+            f"Node {db_name} is not offline within {max_retries * retry_delay} seconds"
+        )
+
+    async def wait_for_node_online(
+        self,
+        db_name: str,
+        max_retries: int = 20,
+        retry_delay: int = 3,
+        settle_online: int = 10,
+    ) -> None:
+        """
+        Wait until the SGW node is online.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        :param settle_online: Extra seconds to wait after seeing Online.
+        """
+        for _ in range(max_retries):
+            try:
+                sg_status = await self.get_database_status(db_name)
+            except ClientConnectorError:
+                sg_status = None
+            if sg_status is not None:
+                break
+            await asyncio.sleep(retry_delay)
+        else:
+            raise TimeoutError(
+                f"Node {db_name} is not online within {max_retries * retry_delay} seconds"
+            )
+
+        # Wait for the node to settle down after coming online
+        await asyncio.sleep(settle_online)
 
     async def create_user_client(
         self,

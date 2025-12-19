@@ -2,26 +2,21 @@
 
 echo "Stopping Sync Gateway..."
 
-# Stop the systemd service if running
-sudo systemctl stop sync_gateway 2>/dev/null
+if ! pgrep -f "sync_gateway" > /dev/null; then
+    echo "Sync Gateway is not running"
+    exit 0
+fi
 
-# Kill any remaining sync_gateway processes
-PID=$(pgrep -f "sync_gateway")
-if [[ -n "$PID" ]]; then
-    echo "Killing sync_gateway process(es): $PID"
-    sudo kill -SIGTERM $PID 2>/dev/null
-    sleep 2
-    # Force kill if still running
-    if pgrep -f "sync_gateway" > /dev/null; then
-        sudo kill -SIGKILL $(pgrep -f "sync_gateway") 2>/dev/null
+pkill -f "sync_gateway"
+
+for i in {1..15}; do
+    if ! pgrep -f "sync_gateway" > /dev/null; then
+        echo "Sync Gateway stopped successfully"
+        exit 0
     fi
-fi
+    sleep 1
+done
 
-# Verify stopped
-if pgrep -f "sync_gateway" > /dev/null; then
-    echo "ERROR: Sync Gateway still running"
-    exit 1
-else
-    echo "Sync Gateway stopped successfully"
-fi
-
+echo "Force killing Sync Gateway..."
+pkill -9 -f "sync_gateway"
+echo "Sync Gateway stopped"
