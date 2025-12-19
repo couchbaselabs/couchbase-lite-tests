@@ -25,9 +25,8 @@ class TestXattrs(CBLTestClass):
         num_docs = 100
         username = "vipul"
         password = "pass"
-        sg_db = "db"
-        bucket_name = "data-bucket"
-        await cleanup_test_resources(sg, cbs, [bucket_name])
+        sg_db = "db_xattrs_offline"
+        bucket_name = "bucket-xattrs-offline"
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -177,8 +176,8 @@ class TestXattrs(CBLTestClass):
         num_docs = 100
         username = "vipul"
         password = "pass"
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_xattrs_purge"
+        bucket_name = "bucket-xattrs-purge"
         channels = ["NASA"]
         await cleanup_test_resources(sg, cbs, [bucket_name])
 
@@ -372,9 +371,8 @@ class TestXattrs(CBLTestClass):
         num_updates = 10
         username = "vipul"
         password = "pass"
-        sg_db = "db"
-        bucket_name = "data-bucket"
-        await cleanup_test_resources(sg, cbs, [bucket_name])
+        sg_db = "db_xattrs_unique"
+        bucket_name = "bucket-xattrs-unique"
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -538,9 +536,8 @@ class TestXattrs(CBLTestClass):
         num_updates = 10
         username = "vipul"
         password = "pass"
-        sg_db = "db"
-        bucket_name = "data-bucket"
-        await cleanup_test_resources(sg, cbs, [bucket_name])
+        sg_db = "db_xattrs_shared"
+        bucket_name = "bucket-xattrs-shared"
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -792,8 +789,8 @@ class TestXattrs(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 20
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_xattrs_concurrent"
+        bucket_name = "bucket-xattrs-concurrent"
         user_custom_channel_xattr = "channel1"
         sg_channel1 = "abc"
         sg_channel2 = "xyz"

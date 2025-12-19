@@ -75,8 +75,8 @@ class TestDbOnlineOffline(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_offline_single"
+        bucket_name = "bucket-offline-single"
         channels = ["ABC"]
         await cleanup_test_resources(sg, cbs, [bucket_name])
 

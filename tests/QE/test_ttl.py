@@ -20,8 +20,8 @@ class TestTTL(CBLTestClass):
     ) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_ttl_unix"
+        bucket_name = "bucket-ttl-unix"
         channels = ["NBC", "ABC"]
         username = "vipul"
         password = "pass"
@@ -123,8 +123,8 @@ class TestTTL(CBLTestClass):
     ) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_ttl_iso"
+        bucket_name = "bucket-ttl-iso"
         channels = ["NBC", "ABC"]
         username = "vipul"
         password = "pass"

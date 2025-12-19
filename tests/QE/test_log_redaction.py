@@ -93,8 +93,8 @@ class TestLogRedaction(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_redaction_partial"
+        bucket_name = "bucket-redaction-partial"
         channels = ["log-redaction"]
         username = "vipul"
         password = "pass"
@@ -187,8 +187,8 @@ class TestLogRedaction(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_redaction_sgcollect"
+        bucket_name = "bucket-redaction-sgcollect"
         channels = ["log-redaction-sgcollect"]
         username = "vipul_sgcollect"
         password = "password"

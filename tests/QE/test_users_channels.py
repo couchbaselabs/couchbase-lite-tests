@@ -19,8 +19,8 @@ class TestUsersChannels(CBLTestClass):
     ) -> None:
         sgs = cblpytest.sync_gateways
         cbs = cblpytest.couchbase_servers[0]
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_channels"
+        bucket_name = "bucket-channels"
         channels = ["ABC", "CBS", "NBC", "FOX"]
         username = "vipul"
         password = "pass"
@@ -44,16 +44,8 @@ class TestUsersChannels(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-
         await sgs[0].put_database(sg_db, db_payload)
-        for sg in sgs[1:]:
-            for _ in range(30):
-                status = await sg.get_database_status(sg_db)
-                if status is not None:
-                    break
-                await asyncio.sleep(1)
-            else:
-                raise TimeoutError("DB not visible on SG node")
+        await sgs[2].wait_for_node_online(sg_db)
 
         self.mark_test_step(
             f"Create user '{username}' with access to {channels} (stored in shared bucket)"

@@ -104,7 +104,7 @@ class TestMultipleServers(CBLTestClass):
         cbs_two = cblpytest.couchbase_servers[1]
         cbs_one.ensure_cluster_healthy(cblpytest.couchbase_servers)
 
-        sg_db, bucket_name = "db-rebalance-sanity", "data-bucket"
+        sg_db, bucket_name = "db_rebalance", "bucket-rebalance"
         num_docs, num_updates = 50, 10
         sg_user_name, sg_user_password = "vipul", "pass"
         channels = ["ABC", "CBS"]
@@ -253,7 +253,7 @@ class TestMultipleServers(CBLTestClass):
         cbs_two = cblpytest.couchbase_servers[1]
         cbs_one.ensure_cluster_healthy(cblpytest.couchbase_servers)
 
-        sg_db, bucket_name = "db", "data-bucket"
+        sg_db, bucket_name = "db_failover", "bucket-failover"
         num_docs = 50
         sg_user_name, sg_user_password = "vipul", "pass"
         channels = ["ABC", "CBS"]
@@ -333,8 +333,8 @@ class TestISGRCollectionMapping(CBLTestClass):
         sgs = cblpytest.sync_gateways
         cbs = cblpytest.couchbase_servers[0]
         sg1, sg2, sg3 = sgs[0], sgs[1], sgs[2]
-        bucket1, bucket2, bucket3 = "isgr_bucket1", "isgr_bucket2", "isgr_bucket3"
-        sg_db1, sg_db2, sg_db3 = "db1", "db2", "db3"
+        bucket1, bucket2, bucket3 = "bucket-isgr-1", "bucket-isgr-2", "bucket-isgr-3"
+        sg_db1, sg_db2, sg_db3 = "db_isgr_1", "db_isgr_2", "db_isgr_3"
         b1_collections = ["collection1", "collection2", "collection3"]
         b2_collections = ["collection4", "collection5"]
         b3_collections = ["collection6", "collection7", "collection8", "collection9"]
