@@ -18,10 +18,11 @@ class TestHighAvailability(CBLTestClass):
     ) -> None:
         sgs = cblpytest.sync_gateways
         cbs = cblpytest.couchbase_servers[0]
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_ha"
+        bucket_name = "bucket-ha"
         num_docs = 100
         sg1, sg2, sg3 = sgs[0], sgs[1], sgs[2]
+        await sg2.start(config_name="bootstrap")
 
         self.mark_test_step("Create shared bucket for all SGW nodes")
         cbs.drop_bucket(bucket_name)
@@ -41,6 +42,7 @@ class TestHighAvailability(CBLTestClass):
             if db_status is not None:
                 await sg.delete_database(sg_db)
             await sg.put_database(sg_db, db_payload)
+            await sg.wait_for_node_online(sg_db)
 
         self.mark_test_step("Wait for all SGW nodes to be ready")
         await asyncio.sleep(5)
@@ -67,13 +69,10 @@ class TestHighAvailability(CBLTestClass):
         await asyncio.sleep(5)
 
         self.mark_test_step("Delete database on sg2 to simulate node being offline")
-        await sg2.delete_database(sg_db)
+        await sg2.stop()
 
-        self.mark_test_step("Verify sg2 database is offline")
-        sg2_status = await sg2.get_database_status(sg_db)
-        assert sg2_status is None, (
-            f"sg2 database should be offline, but status is: {sg2_status}"
-        )
+        self.mark_test_step("Verify sg2 node is offline")
+        await sg2.wait_for_node_offline(sg_db)
 
         self.mark_test_step("Get current doc count from sg1 and sg3 (sg2 offline)")
         sg1_docs_during = await sg1.get_all_documents(sg_db)
@@ -111,7 +110,7 @@ class TestHighAvailability(CBLTestClass):
         sg1_doc_vv = {}
         sg3_doc_revs = {}
         sg3_doc_vv = {}
-        for retry in range(max_retries):
+        for _ in range(max_retries):
             sg1_all_docs = await sg1.get_all_documents(sg_db)
             sg3_all_docs = await sg3.get_all_documents(sg_db)
             sg1_doc_revs = {row.id: row.revision for row in sg1_all_docs.rows}
@@ -133,13 +132,10 @@ class TestHighAvailability(CBLTestClass):
         self.mark_test_step(
             "Bring sg2 back online and verify it catches up (with retry logic)"
         )
-        # Check if database already exists (shared bucket might have recreated it)
-        sg2_status_before = await sg2.get_database_status(sg_db)
-        if sg2_status_before is not None:
-            await sg2.delete_database(sg_db)
-            await asyncio.sleep(2)
-        await sg2.put_database(sg_db, db_payload)
-        for retry in range(max_retries):
+        await sg2.start(config_name="bootstrap")
+        await sg2.wait_for_node_online(sg_db)
+
+        for _ in range(max_retries):
             sg2_all_docs = await sg2.get_all_documents(sg_db)
             sg2_doc_revs = {row.id: row.revision for row in sg2_all_docs.rows}
             if supports_version_vectors:
@@ -155,16 +151,13 @@ class TestHighAvailability(CBLTestClass):
                 f"Not all docs visible on sg2. Expected: {num_docs}, Got: {len(sg2_doc_vv)}"
             )
 
-        self.mark_test_step("Verify revision ID consistency between all three nodes")
+        self.mark_test_step("Verify version consistency between all three nodes")
         for doc_id, doc_rev in sg1_doc_revs.items():
             assert doc_id in sg2_doc_revs, f"Document {doc_id} not found on sg2"
             assert sg2_doc_revs[doc_id] == doc_rev == sg3_doc_revs[doc_id], (
                 f"Document {doc_id} revision mismatch: sg1={doc_rev}, sg2={sg2_doc_revs[doc_id]}, sg3={sg3_doc_revs[doc_id]}"
             )
         if supports_version_vectors:
-            self.mark_test_step(
-                "Verify version vector consistency between all three nodes (SGW 4.0+)"
-            )
             for doc_id, doc_vv in sg1_doc_vv.items():
                 assert doc_id in sg2_doc_vv, f"Document {doc_id} not found on sg2"
                 assert sg2_doc_vv[doc_id] == doc_vv == sg3_doc_vv[doc_id], (
