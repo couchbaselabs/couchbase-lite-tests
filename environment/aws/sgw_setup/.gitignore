@@ -1,1 +1,4 @@
+start-sgw.sh
+bootstrap.json
+bootstrap-alternate.json
 *.rpm
