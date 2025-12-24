@@ -20,9 +20,6 @@ Functions:
 
     uninstall(self, location: str) -> None:
         Uninstall the application from the specified device.
-
-    get_ip(self, location: str) -> str:
-        Retrieve the IP address of the specified device.
 """
 
 import platform
@@ -158,8 +155,13 @@ class iOSBridge(PlatformBridge):
         """
         click.echo("iOS app uninstall deliberately not implemented")
 
+    def _get_ip(self, location: str) -> str:
+        # Seriously, there is no sane way to do this.  Good luck if you want
+        # to try, but Apple seems to do everything in their power to thwart this.
+        return None
+
     def __validate_libimobiledevice(self, location: str) -> bool:
-        self.__verify_ip_prerequisites()
+        self.__verify_libimobiledevice()
         result = subprocess.run(
             ["ideviceinfo", "-u", location], check=False, capture_output=True
         )
@@ -387,53 +389,6 @@ class iOSBridge(PlatformBridge):
             capture_output=False,
         )
 
-    def __verify_ip_prerequisites(self) -> None:
+    def __verify_libimobiledevice(self) -> None:
         if shutil.which("ideviceinfo") is None:
             raise RuntimeError("ideviceinfo not found, aborting...")
-
-        if shutil.which("arping") is None:
-            raise RuntimeError("arping not found, aborting...")
-
-        arpd_sock = Path("/var/run/arpd.sock")
-        if not arpd_sock.exists():
-            raise RuntimeError(
-                "arpd socket not found, please install the script at environment/aws/topology_setup/test_server_platforms/arpd.py"
-            )
-
-    def _get_ip(self, location: str) -> str | None:
-        """
-        Retrieve the IP address of the specified device.
-
-        Args:
-            location (str): The device location (e.g., device UUID).
-
-        Returns:
-            str: The IP address of the device.
-
-        Raises:
-            RuntimeError: If the IP address cannot be determined.
-        """
-        # Apple provides no sane way to do this so the following dance is performed:
-        #    1. Retrieve MAC address of device (this requires the default "Private Wifi Address" to be turned off on device)
-        #    2. Send the MAC address to the arpd daemon which uses arping to determine the IP address
-        self.__verify_ip_prerequisites()
-        result = subprocess.run(
-            ["ideviceinfo", "-u", location, "-k", "WiFiAddress"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        mac_address = result.stdout.strip()
-        stripped_mac_parts = [
-            part.lstrip("0") or "0" for part in mac_address.split(":")
-        ]
-        mac_address = ":".join(stripped_mac_parts)
-
-        s = socket.socket(socket.AF_UNIX)
-        s.connect("/var/run/arpd.sock")
-        s.send(mac_address.encode())
-        ip_addr = s.recv(8192).decode()
-        if "." not in ip_addr:
-            return None
-
-        return ip_addr
