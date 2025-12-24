@@ -5,7 +5,7 @@ class CblTestError(Exception):
     """An error occurred in the test framework or test server"""
 
     def __init__(self, *args):
-        super().__init__(*args)
+        super().__init__(args)
 
 
 class CblTestServerBadResponseError(Exception):
@@ -35,7 +35,7 @@ class CblTimeoutError(Exception):
     """A timeout occurred while waiting for an event"""
 
     def __init__(self, *args):
-        super().__init__(*args)
+        super().__init__(args)
 
 
 class CblSyncGatewayBadResponseError(Exception):
@@ -48,8 +48,7 @@ class CblSyncGatewayBadResponseError(Exception):
 
     def __init__(self, code: int, *args):
         self.__code = code
-        super().__init__(*args)
-
+        super().__init__(args)
 
 class CblEdgeServerBadResponseError(Exception):
     """A bad HTTP code was returned from Edge Server"""
@@ -60,4 +59,4 @@ class CblEdgeServerBadResponseError(Exception):
 
     def __init__(self, code: int, *args):
         self.__code = code
-        super().__init__(*args)
+        super().__init__(args)

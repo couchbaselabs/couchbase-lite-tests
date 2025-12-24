@@ -275,6 +275,11 @@ def setup_server(
     sftp_progress_bar(sftp, Path("/tmp/es_cert.pem"), "/home/ec2-user/cert/es_cert.pem")
     sftp_progress_bar(sftp, Path("/tmp/es_key.pem"), "/home/ec2-user/cert/es_key.pem")
 
+    for file in (SCRIPT_DIR / "dataset").iterdir():
+        sftp_progress_bar(sftp, file, f"/home/ec2-user/database/{file.name}")
+
+    
+
     Path("/tmp/es_key.pem").unlink()
     Path("/tmp/es_cert.pem").unlink()
     sftp.close()

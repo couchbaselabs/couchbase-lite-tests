@@ -71,6 +71,10 @@ class CBLPyTest:
         """Gets the list of Load Balancers available"""
         return self.__config.load_balancers
 
+    @property
+    def edge_servers(self) -> list[EdgeServer]:
+        return self.__edge_servers
+
     @staticmethod
     async def create(
         config_path: str,
@@ -152,6 +156,11 @@ class CBLPyTest:
                         cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password
                     )
                 )
+        self.__edge_servers: list[EdgeServer] = []
+        if not test_server_only:
+            for es in self.__config.edge_servers:
+                es_info = EdgeServerInfo(es)
+                self.__edge_servers.append(EdgeServer(es_info.hostname))
 
         self.__edge_servers: list[EdgeServer] = []
         if not test_server_only:

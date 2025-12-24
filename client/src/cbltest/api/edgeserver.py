@@ -2,11 +2,10 @@ import json
 import urllib.parse
 import uuid
 from json import dumps
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, cast
 from urllib.parse import urljoin
 
-import pyjson5 as json5  # type: ignore[import-not-found]
+import pyjson5 as json5
 from aiohttp import BasicAuth, ClientSession
 from opentelemetry.trace import get_tracer
 
@@ -17,6 +16,7 @@ from cbltest.api.syncgateway import (
     CouchbaseVersion,
     RemoteDocument,
 )
+from pathlib import Path
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
@@ -44,7 +44,7 @@ class BulkDocOperation(JSONSerializable):
         body: dict,
         _id: Optional[str] = None,
         rev: Optional[str] = None,
-        optype: str = "create",
+        optype: str = "create"
     ):
         if _id is None:
             _id = body.get("_id")
@@ -89,9 +89,7 @@ class EdgeServer:
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
             repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
-            config_file = str(
-                repo_root / "environment" / "edge_server" / "config" / "config.json"
-            )
+            config_file = str(repo_root / "environment" / "edge_server" / "config" / "config.json")
         port, secure, mtls, certfile, keyfile, is_auth, databases, is_anonymous_auth = (
             self._decode_config_file(config_file)
         )
@@ -120,9 +118,7 @@ class EdgeServer:
                 port,
                 BasicAuth(self.__auth_name, self.__auth_password, "ascii"),
             )
-        self.__shell_session: ClientSession = self._create_session(
-            "http://", url, 20001, None
-        )
+        self.__shell_session: ClientSession= self._create_session("http://",url,20001,None)
 
     @property
     def hostname(self) -> str:
@@ -140,7 +136,7 @@ class EdgeServer:
 
         https = config.get("https", False)
         interface = config.get("interface", "0.0.0.0:59840")
-        port = int(interface.split(":")[1])
+        port = interface.split(":")[1]
         enable_anonymous_users = config.get("enable_anonymous_users", False)
         cert_path, key_path = "", ""
         mtls = False
@@ -155,7 +151,7 @@ class EdgeServer:
             if client_cert_path:
                 mtls = True
             https = True
-        users = bool(config.get("users"))
+        users = True if config.get("users", False) else False
         # Return parsed configuration as a tuple
         return (
             port,
@@ -173,6 +169,7 @@ class EdgeServer:
     ) -> ClientSession:
         return ClientSession(f"{scheme}{url}:{port}", auth=auth)
 
+
     async def _send_request(
         self,
         method: str,
@@ -180,10 +177,10 @@ class EdgeServer:
         payload: Optional[JSONSerializable] = None,
         params: Optional[Dict[str, str]] = None,
         session: Optional[ClientSession] = None,
-        shell: bool = False,
+        shell:bool = False,
     ) -> Any:
         if shell:
-            session = self.__shell_session
+            session= self.__shell_session
         if session is None:
             session = self.__session
 
@@ -215,7 +212,7 @@ class EdgeServer:
 
             if not resp.ok:
                 raise CblEdgeServerBadResponseError(
-                    resp.status, f"{method} {path} returned {resp.status} for {payload}"
+                    resp.status, f"{method} {path} returned {resp.status} for {req}"
                 )
 
             return ret_val
@@ -223,7 +220,12 @@ class EdgeServer:
     def keyspace_builder(
         self, db_name: str = "", scope: str = "", collection: str = ""
     ):
-        return ".".join((db_name, scope, collection)).rstrip(".")
+        keyspace = db_name
+        if scope:
+            keyspace += f".{scope}"
+        if collection:
+            keyspace += f".{collection}"
+        return keyspace
 
     async def get_version(self) -> CouchbaseVersion:
         scheme = "https://" if self.__secure else "http://"
@@ -246,7 +248,7 @@ class EdgeServer:
         endkey=None,
         keys=None,
         startkey=None,
-        include_docs=False,
+        include_docs=False
     ):
         with self.__tracer.start_as_current_span(
             "get_all_documents",
@@ -269,7 +271,7 @@ class EdgeServer:
             if startkey:
                 query_params.append(f"startkey={urllib.parse.quote(startkey)}")
             if include_docs:
-                query_params.append("include_docs=true")
+                query_params.append(f"include_docs=true")
             request_url = f"?{'&'.join(query_params)}" if query_params else ""
             resp = await self._send_request(
                 "get", f"/{keyspace}/_all_docs{request_url}"
@@ -286,6 +288,7 @@ class EdgeServer:
         collection: str = "",
         expires: int = 0,
         ttl: int = 0,
+
     ):
         with self.__tracer.start_as_current_span(
             "delete_document",
@@ -298,12 +301,14 @@ class EdgeServer:
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
             params = [f"rev={revid}"]
-            if expires != 0:
+            if expires!=0:
                 params.append(f"expires={expires}")
-            if ttl != 0:
+            if ttl!=0:
                 params.append(f"ttl={ttl}")
             qp = "?" + "&".join(params)
-            return await self._send_request("delete", f"/{keyspace}/{doc_id}{qp}")
+            return await self._send_request(
+                "delete", f"/{keyspace}/{doc_id}{qp}"
+            )
 
     async def get_document(
         self,
@@ -323,8 +328,9 @@ class EdgeServer:
             },
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
-            qp = f"?rev={revid}" if revid else ""
-            response = await self._send_request("get", f"/{keyspace}/{doc_id}{qp}")
+            response = await self._send_request(
+                "get", f"/{keyspace}/{doc_id}"
+            )
             if not isinstance(response, dict):
                 raise ValueError(
                     "Inappropriate response from edge server get /doc (not JSON)"
@@ -341,15 +347,20 @@ class EdgeServer:
 
             return RemoteDocument(cast_resp)
 
-    async def get_all_dbs(self) -> List[str]:
+    async def get_all_dbs(self):
         with self.__tracer.start_as_current_span("get all database"):
             response = await self._send_request("get", "/_all_dbs")
-            if isinstance(response, dict) and "error" in response:
+            if not isinstance(response, list):
+                raise ValueError(
+                    "Inappropriate response from edge server get /_all_dbs (not list)"
+                )
+            cast_resp = cast(dict, response)
+            if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get all database from edge server had error '{response.get('reason')}'",
+                    f"get all database from edge server had error '{cast_resp['reason']}'",
                 )
-            return cast(List[str], response)
+            return cast_resp
 
     async def get_active_tasks(self):
         with self.__tracer.start_as_current_span("get all active tasks"):
@@ -366,7 +377,9 @@ class EdgeServer:
                 )
             return cast_resp
 
-    async def get_db_info(self, db_name: str, scope: str = "", collection: str = ""):
+    async def get_db_info(
+        self, db_name: str, scope: str = "", collection: str = ""
+    ):
         with self.__tracer.start_as_current_span(
             "get database info",
             attributes={
@@ -385,7 +398,7 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get database info from edge server had error '{cast_resp['reason']}'",
+                    f"get detabase info  from edge server had error '{cast_resp['reason']}'",
                 )
             return cast_resp
 
@@ -465,7 +478,9 @@ class EdgeServer:
             "get replication status with Edge Server",
             attributes={"cbl.replicator.id": replicator_id},
         ):
-            response = await self._send_request("get", f"/_replicate/{replicator_id}")
+            response = await self._send_request(
+                "get", f"/_replicate/{replicator_id}"
+            )
             if not isinstance(response, dict):
                 raise ValueError(
                     "Inappropriate response from edge server get status  /_replicate (not JSON)"
@@ -537,7 +552,7 @@ class EdgeServer:
         active_only: Optional[bool] = False,
         descending: Optional[bool] = False,
         heartbeat: Optional[int] = None,
-        timeout: Optional[int] = None,
+        timeout: Optional[int] = None
     ):
         with self.__tracer.start_as_current_span(
             "Changes feed",
@@ -563,7 +578,9 @@ class EdgeServer:
             payload = {k: v for k, v in body.items() if v is not None}
             keyspace = self.keyspace_builder(db_name, scope, collection)
             response = await self._send_request(
-                "post", f"{keyspace}/_changes", payload=JSONDictionary(payload)
+                "post",
+                f"{keyspace}/_changes",
+                payload=JSONDictionary(payload)
             )
 
             if not isinstance(response, dict):
@@ -584,7 +601,7 @@ class EdgeServer:
         scope: str = "",
         collection: str = "",
         name: Optional[str] = None,
-        params: Optional[Dict] = None,
+        params: Optional[Dict] = None
     ):
         with self.__tracer.start_as_current_span(
             "Named query",
@@ -600,7 +617,9 @@ class EdgeServer:
                 for key, value in params.items():
                     payload[key] = value
             response = await self._send_request(
-                "post", f"/{keyspace}/_query/{name}", payload=JSONDictionary(payload)
+                "post",
+                f"/{keyspace}/_query/{name}",
+                payload=JSONDictionary(payload)
             )
 
             if not isinstance(response, dict):
@@ -622,7 +641,7 @@ class EdgeServer:
         scope: str = "",
         collection: str = "",
         query: Optional[str] = None,
-        params: Optional[Dict] = None,
+        params: Optional[Dict] = None
     ):
         with self.__tracer.start_as_current_span(
             "Adhoc query",
@@ -632,23 +651,25 @@ class EdgeServer:
                 "cbl.collection.name": collection,
             },
         ):
-            payload: Dict[str, Any] = {"query": query}
+            payload = {"query": query}
             if params is not None:
                 payload["params"] = params
             keyspace = self.keyspace_builder(db_name, scope, collection)
             response = await self._send_request(
-                "post", f"/{keyspace}/_query", payload=JSONDictionary(payload)
+                "post",
+                f"/{keyspace}/_query",
+                payload=JSONDictionary(payload)
             )
 
             if not isinstance(response, dict):
                 raise ValueError(
                     "Inappropriate response from edge server adhoc query (not JSON)"
                 )
-            cast_resp = cast(dict, response)
+            cast_resp = cast(list, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"adhoc query with Edge Server had error '{cast_resp.get('reason')}'",
+                    f"adhoc query with Edge Server had error '{cast_resp['reason']}'",
                 )
             return cast_resp
 
@@ -658,8 +679,8 @@ class EdgeServer:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        expires: int = 0,
-        ttl: int = 0,
+        expires:int =0,
+        ttl:int =0
     ):
         with self.__tracer.start_as_current_span(
             "add document with auto ID",
@@ -671,9 +692,9 @@ class EdgeServer:
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
             params = []
-            if expires != 0:
+            if expires!=0:
                 params.append(f"expires={expires}")
-            if ttl != 0:
+            if ttl!=0:
                 params.append(f"ttl={ttl}")
             qp = "?" + "&".join(params) if params else ""
 
@@ -704,6 +725,7 @@ class EdgeServer:
         rev: Optional[str] = None,
         expires: int = 0,
         ttl: int = 0,
+
     ) -> dict:
         with self.__tracer.start_as_current_span(
             "add document with ID",
@@ -720,9 +742,9 @@ class EdgeServer:
             params = []
             if rev:
                 params.append(f"rev={rev}")
-            if expires != 0:
+            if expires!=0:
                 params.append(f"expires={expires}")
-            if ttl != 0:
+            if ttl!=0:
                 params.append(f"ttl={ttl}")
 
             qp = "?" + "&".join(params) if params else ""
@@ -750,7 +772,7 @@ class EdgeServer:
         key: str,
         db_name: str,
         scope: str = "",
-        collection: str = "",
+        collection: str = ""
     ) -> dict:
         with self.__tracer.start_as_current_span(
             "delete sub-document",
@@ -786,7 +808,7 @@ class EdgeServer:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        value=None,
+        value=None
     ) -> dict:
         with self.__tracer.start_as_current_span(
             "put sub-document",
@@ -800,8 +822,9 @@ class EdgeServer:
             response = await self._send_request(
                 "put",
                 f"{keyspace}/{id}/{key}?rev={revid}",
-                payload=JSONDictionary({key: value}),
+                payload=JSONDictionary({key: value})
             )
+
 
             if not isinstance(response, dict):
                 raise ValueError(
@@ -816,7 +839,12 @@ class EdgeServer:
             return cast_resp
 
     async def get_sub_document(
-        self, id: str, key: str, db_name: str, scope: str = "", collection: str = ""
+        self,
+        id: str,
+        key: str,
+        db_name: str,
+        scope: str = "",
+        collection: str = ""
     ):
         with self.__tracer.start_as_current_span(
             "get sub-document",
@@ -828,7 +856,7 @@ class EdgeServer:
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
             resp = await self._send_request("get", f"{keyspace}/{id}/{key}")
-
+            
             if isinstance(resp, dict):
                 cast_resp = cast(dict, resp)
                 if "error" in cast_resp:
@@ -839,3 +867,107 @@ class EdgeServer:
                 return cast_resp
             else:
                 return resp
+
+    async def bulk_doc_op(
+        self,
+        docs: List[BulkDocOperation],
+        db_name: str,
+        scope: str = "",
+        collection: str = "",
+        new_edits: bool = True
+    ):
+        with self.__tracer.start_as_current_span(
+            "bulk_documents_operation",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+            },
+        ):
+            keyspace = self.keyspace_builder(db_name, scope, collection)
+            body = {"docs": list(u.body for u in docs), "new_edits": new_edits}
+            resp = await self._send_request(
+                "post", f"/{keyspace}/_bulk_docs", JSONDictionary(body)
+            )
+            
+            if not isinstance(resp, list):
+                raise ValueError(
+                    f"Inappropriate response from edge server  bulk doc op (not JSON), response:{resp}"
+                )
+
+            cast_resp = cast(list, resp)
+            if "error" in cast_resp:
+                raise CblEdgeServerBadResponseError(
+                    500,
+                    f"bulk_documents_operation Edge Server had error '{cast_resp['reason']}'",
+                )
+            return cast_resp
+
+    async def blip_sync(
+        self, db_name: str, scope: str = "", collection: str = ""
+    ):
+        with self.__tracer.start_as_current_span(
+            "get web socket connection for client ",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+            },
+        ):
+            keyspace = self.keyspace_builder(db_name, scope, collection)
+            resp = await self._send_request("get", f"{keyspace}/_blipsync")
+            
+            if resp and not isinstance(resp, dict):
+                raise ValueError(
+                    "Inappropriate response from edge server get /_blipsync (not JSON)"
+                )
+            cast_resp = cast(dict, resp) if resp else {}
+            if "error" in cast_resp:
+                raise CblEdgeServerBadResponseError(
+                    500,
+                    f"get web socket connection for client with Edge Server had error '{cast_resp['reason']}'",
+                )
+    async def set_auth(self, auth: bool = True, name="admin_user", password="password"):
+        if not auth:
+            self.__auth = False
+        self.__auth_name = name
+        self.__auth_password = password
+
+    async def kill_server(self) -> bool:
+        with self.__tracer.start_as_current_span("kill edge server"):
+            response = await self._send_request("post", "/kill-edgeserver")
+            return response
+
+    async def start_server(self,config: dict = None) -> bool:
+        with self.__tracer.start_as_current_span("start edge server"):
+            payload = config_json if config is not None else {}
+            response = await self._send_request("post", "/start-edgeserver",JSONDictionary( payload))
+            return response
+
+    async def set_config(self, config_file_path):
+        await self.kill_server()
+        with open(config_file_path) as f:
+            cfg = json.load(f)
+        await self.start_server(config=cfg)
+        return EdgeServer(self.__hostname, config_file=config_file_path)
+
+    async def reset_db(self, db_name="db"):
+        await self.kill_server()
+        filename=self.__databases.get(db_name).get("path")
+        await self._send_request("post", "/reset-db",JSONDictionary({"filename": filename}))
+        await self.start_server()
+
+    async def go_online_offline(self,allow:list=None, deny:list=None) -> bool:
+        with self.__tracer.start_as_current_span("go online offline"):
+            payload={}
+            if allow is not None:
+                payload["allow"] = allow
+            if deny is not None:
+                payload["deny"] = deny
+            response = await self._send_request("post", "firewall", JSONDictionary(payload))
+            return response
+
+    async def reset_firewall(self) -> bool:
+        with self.__tracer.start_as_current_span("reset firewall"):
+            response = await self._send_request("post", "firewall")
+            return response

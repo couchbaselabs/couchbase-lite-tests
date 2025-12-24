@@ -18,7 +18,14 @@ fi
 
 if [ ! -d "$DB_FILENAME" ]; then
   echo "Database file '$DB_FILENAME' does not exist"
-  exit 0
+else
+  rm -rf "$DB_FILENAME"
 fi
+ZIP_FILE="${DB_FILENAME}.zip"
 
-rm -rf "$DB_FILENAME"
+if [ -f "$ZIP_FILE" ]; then
+  echo "Found zip: $ZIP_FILE"
+  unzip -o "$ZIP_FILE" -d "$(dirname "$DB_FILENAME")" >/dev/null 2>&1
+else
+  echo "Zip file not found: $ZIP_FILE. Nothing to restore."
+fi
