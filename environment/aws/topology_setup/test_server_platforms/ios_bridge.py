@@ -20,9 +20,6 @@ Functions:
 
     uninstall(self, location: str) -> None:
         Uninstall the application from the specified device.
-
-    get_ip(self, location: str) -> str:
-        Retrieve the IP address of the specified device.
 """
 
 import platform
@@ -33,7 +30,6 @@ from os import environ
 from pathlib import Path
 
 import click
-import netifaces
 
 from environment.aws.common.output import header
 
@@ -158,6 +154,11 @@ class iOSBridge(PlatformBridge):
         """
         click.echo("iOS app uninstall deliberately not implemented")
 
+    def _get_ip(self, location: str) -> str | None:
+        # Seriously, there is no sane way to do this.  Good luck if you want
+        # to try, but Apple seems to do everything in their power to thwart this.
+        return None
+
     def __validate_libimobiledevice(self, location: str) -> bool:
         self.__verify_libimobiledevice()
         result = subprocess.run(
@@ -200,11 +201,21 @@ class iOSBridge(PlatformBridge):
         )
 
     def __install_xharness(self, location: str) -> None:
+        xcode_select_path = subprocess.run(
+            ["xcode-select", "-p"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+        xcode_path = "/".join(xcode_select_path.split("/")[1:3])
         subprocess.run(
             [
                 str(XHARNESS_PATH),
                 "apple",
                 "mlaunch",
+                "--xcode",
+                f"/{xcode_path}",
                 "--",
                 "--devname",
                 location,
@@ -380,70 +391,3 @@ class iOSBridge(PlatformBridge):
     def __verify_libimobiledevice(self) -> None:
         if shutil.which("ideviceinfo") is None:
             raise RuntimeError("ideviceinfo not found, aborting...")
-
-    def __broadcast_ping_request(self) -> None:
-        for interface in netifaces.interfaces():
-            if interface == "lo":
-                continue
-
-            addr = netifaces.ifaddresses(interface)
-            if netifaces.AF_INET in addr:
-                if "broadcast" not in addr[netifaces.AF_INET][0]:
-                    continue
-
-                ip = addr[netifaces.AF_INET][0]["broadcast"]
-                if ip.startswith("169.254"):
-                    continue
-
-                click.echo(f"Broadcasting ping request on {interface} ({ip})")
-                result = subprocess.run(
-                    ["ping", ip, "-c", "3"], check=False, capture_output=True, text=True
-                )
-
-                if result.returncode != 0:
-                    click.secho(
-                        f"Failed to ping {ip} on {interface}: {result.stderr}",
-                        fg="yellow",
-                    )
-
-    def _get_ip(self, location: str) -> str | None:
-        """
-        Retrieve the IP address of the specified device.
-
-        Args:
-            location (str): The device location (e.g., device UUID).
-
-        Returns:
-            str: The IP address of the device.
-
-        Raises:
-            RuntimeError: If the IP address cannot be determined.
-        """
-        # Apple provides no sane way to do this so the following dance is performed:
-        #    1. Retrieve MAC address of device (this requires the default "Private Wifi Address" to be turned off on device)
-        #    2. Broadcast a ping to the broadcast address of all network interfaces that have one, to ensure that the device
-        #       responds and has an ARP table entry
-        #    3. Retrieve the ARP table and find the IP address that corresponds to the MAC address
-        self.__verify_libimobiledevice()
-        result = subprocess.run(
-            ["ideviceinfo", "-u", location, "-k", "WiFiAddress"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        mac_address = result.stdout.strip()
-        stripped_mac_parts = [
-            part.lstrip("0") or "0" for part in mac_address.split(":")
-        ]
-        mac_address = ":".join(stripped_mac_parts)
-
-        self.__broadcast_ping_request()
-
-        result = subprocess.run(
-            ["arp", "-an"], check=True, capture_output=True, text=True
-        )
-        for line in result.stdout.split("\n"):
-            if mac_address in line:
-                return line.split(" ")[1].strip("()")
-
-        return None
