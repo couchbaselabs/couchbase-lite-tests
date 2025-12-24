@@ -25,7 +25,6 @@ Functions:
 import platform
 import re
 import shutil
-import socket
 import subprocess
 from os import environ
 from pathlib import Path
@@ -155,7 +154,7 @@ class iOSBridge(PlatformBridge):
         """
         click.echo("iOS app uninstall deliberately not implemented")
 
-    def _get_ip(self, location: str) -> str:
+    def _get_ip(self, location: str) -> str | None:
         # Seriously, there is no sane way to do this.  Good luck if you want
         # to try, but Apple seems to do everything in their power to thwart this.
         return None
