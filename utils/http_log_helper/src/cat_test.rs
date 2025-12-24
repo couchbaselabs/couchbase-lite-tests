@@ -38,9 +38,9 @@ pub fn run(in_path: &str, out_file: Option<String>, desired_test_name: &str) {
         None => {
             for (name, content) in collected {
                 println!("-- {name} --");
-                println!("");
+                println!();
                 println!("{}", content);
-                println!("");
+                println!();
                 println!("-- End of {name} --");
             }
         }

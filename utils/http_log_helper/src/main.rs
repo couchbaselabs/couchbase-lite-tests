@@ -16,6 +16,9 @@ enum Commands {
     ListTests {
         #[arg(short, long, help = "Path to the input file or directory containing HTTP logs")]
         in_path: String,
+
+        #[arg(short, long, help = "Output json instead of table")]
+        json: bool
     },
     CatTest {
         #[arg(short, long, help = "Path to the input file or directory containing HTTP logs")]
@@ -26,9 +29,6 @@ enum Commands {
 
         #[arg(short, long, help = "Name of the test to extract")]
         test_name: String,
-
-        #[arg(short, long, help = "Output json instead of table")]
-        json: bool
     }
 }
 
@@ -37,11 +37,11 @@ fn main() {
 
 
     match cli.command {
-        Commands::ListTests { in_path } => {
-            list_tests::run(&in_path);
+        Commands::ListTests { in_path, json } => {
+            list_tests::run(&in_path, json);
         }
-        Commands::CatTest { in_path, out_file, test_name, json } => {
-            cat_test::run(&in_path, out_file, &test_name, json);
+        Commands::CatTest { in_path, out_file, test_name } => {
+            cat_test::run(&in_path, out_file, &test_name);
         }
     }
 }

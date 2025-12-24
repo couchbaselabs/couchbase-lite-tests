@@ -3,13 +3,15 @@ use crate::utils;
 use walkdir::WalkDir;
 use std::collections::HashMap;
 use indicatif::ProgressBar;
+use serde_json::json;
 use tabled::{settings::{Margin, Panel, Style}, Table, Tabled};
+use serde::{Deserialize, Serialize};
 
-#[derive(Tabled)]
+#[derive(Tabled, Serialize, Deserialize)]
 #[tabled(rename_all = "Upper Title Case")]
 struct TestRow { test_name: String, found_count: u32 }
 
-pub fn run(in_path: &str) {
+pub fn run(in_path: &str, json: bool) {
     let mut seen: HashMap<String, u32> = HashMap::new();
 
     let total = WalkDir::new(in_path)
@@ -52,9 +54,16 @@ pub fn run(in_path: &str) {
         .collect();
 
     let found_count = rows.len();
-    println!("{}", Table::new(rows)
-        .with(Style::psql())
-        .with(Panel::header(format!("Found {} tests:", found_count)))
-        .with(Margin::new(0, 0, 2, 0)));
-
+    if json {
+        let mut output_collection: HashMap<String, serde_json::Value> = HashMap::with_capacity(2);
+        output_collection.insert("rows".to_string(), json!(rows));
+        output_collection.insert("total".to_string(), json!(found_count));
+        let output_json = serde_json::to_string_pretty(&output_collection).unwrap();
+        println!("{}", output_json);
+    } else {
+        println!("{}", Table::new(rows)
+            .with(Style::psql())
+            .with(Panel::header(format!("Found {} tests:", found_count)))
+            .with(Margin::new(0, 0, 2, 0)));
+    }
 }
