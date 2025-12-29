@@ -8,7 +8,6 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
-from conftest import cleanup_test_resources
 from packaging.version import Version
 
 
@@ -27,7 +26,6 @@ class TestXattrs(CBLTestClass):
         password = "pass"
         sg_db = "db"
         bucket_name = "data-bucket"
-        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -42,10 +40,8 @@ class TestXattrs(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        db_status = await sg.get_database_status(sg_db)
-        if db_status is not None:
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(
             f"Create user {username} with access to SG and SDK channels"
@@ -180,11 +176,10 @@ class TestXattrs(CBLTestClass):
         sg_db = "db"
         bucket_name = "data-bucket"
         channels = ["NASA"]
-        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
+        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_config = {
@@ -195,10 +190,8 @@ class TestXattrs(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        db_status = await sg.get_database_status(sg_db)
-        if db_status is not None:
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create user {username} with access to channels")
         sg_user = await sg.create_user_client(sg_db, username, password, channels)
@@ -374,11 +367,10 @@ class TestXattrs(CBLTestClass):
         password = "pass"
         sg_db = "db"
         bucket_name = "data-bucket"
-        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
+        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway with default sync function")
         # Default sync function reads doc.channels from document body
@@ -388,10 +380,8 @@ class TestXattrs(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        db_status = await sg.get_database_status(sg_db)
-        if db_status is not None:
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(
             f"Create user '{username}' with access to SDK and SG channels"
@@ -540,11 +530,10 @@ class TestXattrs(CBLTestClass):
         password = "pass"
         sg_db = "db"
         bucket_name = "data-bucket"
-        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
+        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway with default sync function")
         db_config = {
@@ -553,10 +542,8 @@ class TestXattrs(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        db_status = await sg.get_database_status(sg_db)
-        if db_status is not None:
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create user '{username}' with access to shared channel")
         sg_user = await sg.create_user_client(sg_db, username, password, ["shared"])
@@ -627,9 +614,7 @@ class TestXattrs(CBLTestClass):
             while docs_remaining:
                 doc_id = random.choice(docs_remaining)
                 try:
-                    sg_doc = await sg.get_document(
-                        sg_db, doc_id, "_default", "_default"
-                    )
+                    sg_doc = await sg.get_document(sg_db, doc_id)
                     if (
                         sg_doc is None
                         or sg_doc.body.get("sg_updates", 0) >= num_updates
@@ -643,8 +628,6 @@ class TestXattrs(CBLTestClass):
                     await sg.update_documents(
                         sg_db,
                         [DocumentUpdateEntry(doc_id, sg_doc.revid, updated_body)],
-                        "_default",
-                        "_default",
                     )
                 except CblSyncGatewayBadResponseError as e:
                     if e.code == 409:  # Conflict
@@ -657,20 +640,17 @@ class TestXattrs(CBLTestClass):
             docs_remaining = list(all_doc_ids)
             while docs_remaining:
                 doc_id = random.choice(docs_remaining)
-                sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
+                sdk_doc = cbs.get_document(bucket_name, doc_id)
                 if sdk_doc is None or sdk_doc.get("sdk_updates", 0) >= num_updates:
                     docs_remaining.remove(doc_id)
                     continue
 
                 # Ensure no _sync metadata in SDK docs
                 assert "_sync" not in sdk_doc, f"SDK doc {doc_id} contains _sync"
-
                 try:
                     sdk_doc["sdk_updates"] = sdk_doc.get("sdk_updates", 0) + 1
                     sdk_doc["updates"] = sdk_doc.get("updates", 0) + 1
-                    cbs.upsert_document(
-                        bucket_name, doc_id, sdk_doc, "_default", "_default"
-                    )
+                    cbs.upsert_document(bucket_name, doc_id, sdk_doc)
                 except Exception:
                     # CAS mismatch or other error, retry
                     continue
@@ -681,29 +661,25 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step("Verify all documents have correct update counts")
         for doc_id in all_doc_ids:
             # Verify from SDK side
-            sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
+            sdk_doc = cbs.get_document(bucket_name, doc_id)
             assert sdk_doc is not None, f"Doc {doc_id} should exist in SDK"
-            assert sdk_doc["updates"] == num_updates * 2, (
-                f"Doc {doc_id} should have {num_updates * 2} total updates, got {sdk_doc['updates']}"
-            )
-            assert sdk_doc["sg_updates"] == num_updates, (
-                f"Doc {doc_id} should have {num_updates} SG updates, got {sdk_doc['sg_updates']}"
-            )
-            assert sdk_doc["sdk_updates"] == num_updates, (
-                f"Doc {doc_id} should have {num_updates} SDK updates, got {sdk_doc['sdk_updates']}"
+            assert (
+                sdk_doc["updates"] == num_updates * 2
+                and sdk_doc["sg_updates"] == num_updates
+                and sdk_doc["sdk_updates"] == num_updates
+            ), (
+                f"Doc {doc_id} should have {num_updates * 2} total updates via SDK, got {sdk_doc['updates']}, ie, SG: {sdk_doc['sg_updates']}, SDK: {sdk_doc['sdk_updates']}"
             )
 
             # Verify from SG side
-            sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
+            sg_doc = await sg.get_document(sg_db, doc_id)
             assert sg_doc is not None, f"Doc {doc_id} should exist in SG"
-            assert sg_doc.body["updates"] == num_updates * 2, (
-                f"Doc {doc_id} should have {num_updates * 2} total updates via SG"
-            )
-            assert sg_doc.body["sg_updates"] == num_updates, (
-                f"Doc {doc_id} should have {num_updates} SG updates, got {sg_doc.body['sg_updates']}"
-            )
-            assert sg_doc.body["sdk_updates"] == num_updates, (
-                f"Doc {doc_id} should have {num_updates} SDK updates, got {sg_doc.body['sdk_updates']}"
+            assert (
+                sg_doc.body["updates"] == num_updates * 2
+                and sg_doc.body["sdk_updates"] == num_updates
+                and sg_doc.body["sg_updates"] == num_updates
+            ), (
+                f"Doc {doc_id} should have {num_updates * 2} total updates via SG, got {sg_doc.body['updates']}, ie, SDK: {sg_doc.body['sdk_updates']}, SG: {sg_doc.body['sg_updates']}"
             )
 
         self.mark_test_step("Perform concurrent deletes from SDK and SG")
@@ -716,17 +692,13 @@ class TestXattrs(CBLTestClass):
             while docs_to_delete:
                 doc_id = random.choice(docs_to_delete)
                 try:
-                    sg_doc = await sg.get_document(
-                        sg_db, doc_id, "_default", "_default"
-                    )
+                    sg_doc = await sg.get_document(sg_db, doc_id)
                     if sg_doc is None:
                         docs_to_delete.remove(doc_id)
                         continue
 
                     if sg_doc.revid is not None:
-                        await sg.delete_document(
-                            doc_id, sg_doc.revid, sg_db, "_default", "_default"
-                        )
+                        await sg.delete_document(doc_id, sg_doc.revid, sg_db)
                         deleted_count += 1
                     docs_to_delete.remove(doc_id)
                 except CblSyncGatewayBadResponseError as e:
@@ -737,24 +709,25 @@ class TestXattrs(CBLTestClass):
                 await asyncio.sleep(0.01)
             return deleted_count
 
-        def delete_from_sdk() -> int:
+        async def delete_from_sdk() -> int:
             """Delete documents from SDK"""
             deleted_count = 0
             docs_to_delete = list(all_doc_ids)
             while docs_to_delete:
                 doc_id = random.choice(docs_to_delete)
                 try:
-                    cbs.delete_document(bucket_name, doc_id, "_default", "_default")
+                    cbs.delete_document(bucket_name, doc_id)
                     deleted_count += 1
                     docs_to_delete.remove(doc_id)
                 except Exception:
                     # Document not found, must have been deleted by SG
                     docs_to_delete.remove(doc_id)
                     continue
+                await asyncio.sleep(0.01)
             return deleted_count
 
         sg_deleted, sdk_deleted = await asyncio.gather(
-            delete_from_sg(), asyncio.to_thread(delete_from_sdk)
+            delete_from_sg(), delete_from_sdk()
         )
 
         assert sg_deleted > 0, (
@@ -767,7 +740,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step("Verify all docs deleted from SDK side")
         sdk_deleted_count = 0
         for doc_id in all_doc_ids:
-            sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
+            sdk_doc = cbs.get_document(bucket_name, doc_id)
             if sdk_doc is None or len(sdk_doc) == 0:
                 sdk_deleted_count += 1
         assert sdk_deleted_count == num_docs * 2, (
@@ -800,20 +773,14 @@ class TestXattrs(CBLTestClass):
         username1 = "vipul"
         username2 = "lupiv"
         password = "password"
-        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
+        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step(
             "Configure Sync Gateway with custom sync function using xattrs"
         )
-        db_status = await sg.get_database_status(sg_db)
-        if db_status is not None:
-            await sg.delete_database(sg_db)
-
-        # Custom sync function that reads channel from user xattr via meta parameter
         sync_function = f"""
         function(doc, oldDoc, meta) {{
             if (doc._deleted) {{
@@ -826,7 +793,6 @@ class TestXattrs(CBLTestClass):
             }}
         }}
         """
-
         db_config = {
             "bucket": bucket_name,
             "import_docs": True,
@@ -838,6 +804,7 @@ class TestXattrs(CBLTestClass):
         }
         db_payload = PutDatabasePayload(db_config)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(
             f"Create users '{username1}', '{username2}' with access to '{sg_channel1}', '{sg_channel2}'"

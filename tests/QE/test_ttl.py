@@ -7,7 +7,6 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
-from conftest import cleanup_test_resources
 
 
 @pytest.mark.sgw
@@ -25,11 +24,10 @@ class TestTTL(CBLTestClass):
         channels = ["NBC", "ABC"]
         username = "vipul"
         password = "pass"
-        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
+        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_config = {
@@ -38,10 +36,8 @@ class TestTTL(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        db_status = await sg.get_database_status(sg_db)
-        if db_status is not None:
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create user '{username}' with access to {channels}")
         sg_user = await sg.create_user_client(sg_db, username, password, channels)
@@ -130,8 +126,8 @@ class TestTTL(CBLTestClass):
         password = "pass"
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
+        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_config = {
@@ -140,10 +136,8 @@ class TestTTL(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        db_status = await sg.get_database_status(sg_db)
-        if db_status is not None:
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create user '{username}' with access to {channels}")
         sg_user = await sg.create_user_client(sg_db, username, password, channels)

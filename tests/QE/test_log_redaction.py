@@ -7,7 +7,6 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
-from conftest import cleanup_test_resources
 
 
 def scan_logs_for_untagged_sensitive_data(
@@ -98,11 +97,10 @@ class TestLogRedaction(CBLTestClass):
         channels = ["log-redaction"]
         username = "vipul"
         password = "pass"
-        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
+        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway with log redaction enabled")
         db_config = {
@@ -111,9 +109,8 @@ class TestLogRedaction(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        if await sg.get_database_status(sg_db):
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create user '{username}' with access to channels")
         sg_user = await sg.create_user_client(sg_db, username, password, channels)
@@ -192,11 +189,10 @@ class TestLogRedaction(CBLTestClass):
         channels = ["log-redaction-sgcollect"]
         username = "vipul_sgcollect"
         password = "password"
-        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
+        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway with log redaction enabled")
         db_config = {
@@ -205,9 +201,8 @@ class TestLogRedaction(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        if await sg.get_database_status(sg_db):
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create user '{username}' with access to channels")
         sg_user = await sg.create_user_client(sg_db, username, password, channels)

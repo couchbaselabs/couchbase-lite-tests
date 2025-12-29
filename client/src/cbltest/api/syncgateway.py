@@ -620,6 +620,33 @@ class _SyncGatewayBase:
             assert "/" in raw_version
             return SyncGatewayVersion(raw_version.split("/")[1])
 
+    # async def wait_for_sgw_ready(self, retries: int = 60) -> None:
+    #     for attempt in range(1, retries + 1):
+    #         scheme = "https://" if self.secure else "http://"
+    #         try:
+    #             async with self._create_session(
+    #                 self.secure, scheme, self.hostname, 4985, None
+    #             ) as s:
+    #                 resp = await self._send_request("get", "/_status", session=s)
+    #                 if isinstance(resp, dict):
+    #                     state = resp.get("state", "").lower()
+    #                     if state in ("online", "running"):
+    #                         return
+    #                     cbl_info(
+    #                         f"SGW not ready yet (attempt {attempt}/{retries}): state={state}",
+    #                     )
+    #         except Exception as e:
+    #             last_error = e
+    #             cbl_info(
+    #                 f"SGW readiness check failed (attempt {attempt}/{retries}): {repr(e)}",
+    #             )
+    #         await asyncio.sleep(1)
+
+    #     msg = "Sync Gateway admin API did not become ready"
+    #     if last_error:
+    #         msg += f"; last error: {last_error!r}"
+    #     raise TimeoutError(msg)
+
     def tls_cert(self) -> str | None:
         if not self.secure:
             cbl_warning(
@@ -1673,33 +1700,33 @@ class SyncGateway(_SyncGatewayBase):
                     # Wait a bit for SGW to fully initialize
                     await asyncio.sleep(5)
 
-    async def wait_for_node_offline(
+    async def wait_for_db_gone_clusterwide(
         self,
+        sync_gateways: list["SyncGateway"],
         db_name: str,
-        max_retries: int = 20,
-        retry_delay: int = 3,
+        max_retries: int = 30,
+        retry_delay: int = 2,
     ) -> None:
         """
-        Wait until the SGW node is offline.
+        Wait until the SGW database is gone from the cluster.
 
         :param db_name: Database name to poll.
-        :param max_retries: Number of polls before timing out.
-        :param retry_delay: Seconds between polls.
+        :param max_retries: Maximum number of retries.
+        :param retry_delay: Seconds between retries.
         """
         for _ in range(max_retries):
-            try:
-                sg_status = await self.get_database_status(db_name)
-            except ClientConnectorError:
-                # connection refused -> node is offline
-                return
-            if sg_status is None:
+            gone_everywhere = True
+            for sg in sync_gateways:
+                dbs = await sg.get_all_database_names()
+                if db_name in dbs:
+                    gone_everywhere = False
+                    break
+            if gone_everywhere:
                 return
             await asyncio.sleep(retry_delay)
-        raise TimeoutError(
-            f"Node {db_name} is not offline within {max_retries * retry_delay} seconds"
-        )
+        raise TimeoutError(f"Database {db_name} still exists on some SG nodes")
 
-    async def wait_for_node_online(
+    async def wait_for_db_up(
         self,
         db_name: str,
         max_retries: int = 20,

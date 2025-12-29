@@ -5,7 +5,6 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
-from conftest import cleanup_test_resources
 from packaging.version import Version
 
 
@@ -29,11 +28,9 @@ class TestUsersChannels(CBLTestClass):
         total_docs = num_batches * batch_size
         num_sgs = len(sgs)
 
-        self.mark_test_step("Clean up any existing resources")
-        await cleanup_test_resources(sgs, cbs, [bucket_name])
-
         self.mark_test_step("Create single shared bucket for all SGW nodes")
         cbs.create_bucket(bucket_name)
+        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step(
             f"Configure database '{sg_db}' on all {num_sgs} SGW nodes (pointing to shared bucket)"
@@ -44,16 +41,9 @@ class TestUsersChannels(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-
         await sgs[0].put_database(sg_db, db_payload)
         for sg in sgs[1:]:
-            for _ in range(30):
-                status = await sg.get_database_status(sg_db)
-                if status is not None:
-                    break
-                await asyncio.sleep(1)
-            else:
-                raise TimeoutError("DB not visible on SG node")
+            await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(
             f"Create user '{username}' with access to {channels} (stored in shared bucket)"

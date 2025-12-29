@@ -1,3 +1,4 @@
+import asyncio
 import platform
 import subprocess
 import tempfile
@@ -219,6 +220,104 @@ class CouchbaseServer:
                 mgr.drop_bucket(name)
             except BucketDoesNotExistException:
                 pass
+
+    async def wait_for_bucket_ready(
+        self,
+        bucket_name: str,
+        retries: int = 60,
+        interval: float = 2.0,
+    ) -> None:
+        for _ in range(retries):
+            if (
+                self.bucket_healthy(bucket_name)
+                and self.bucket_kv_responding(bucket_name)
+                and self.collections_ready(bucket_name)
+            ):
+                return
+            await asyncio.sleep(interval)
+        raise TimeoutError(f"Bucket {bucket_name} did not become ready")
+
+    def bucket_healthy(self, bucket_name: str) -> bool:
+        """
+        Returns True only if the bucket is healthy on all nodes.
+        """
+        resp = self.__http_session.get(
+            f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}"
+        )
+        if resp.status_code != 200:
+            return False
+
+        bucket = resp.json()
+        nodes = bucket.get("nodes", [])
+        if not nodes:
+            return False
+
+        for node in nodes:
+            if node.get("status") != "healthy":
+                return False
+        return True
+
+    def bucket_kv_responding(self, bucket_name: str) -> bool:
+        """
+        Returns True if KV stats endpoint responds successfully.
+        This is a practical readiness signal for DCP / SDK / SG.
+        """
+        resp = self.__http_session.get(
+            f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}/stats",
+            timeout=5,
+        )
+        return resp.status_code == 200
+
+    def collections_ready(self, bucket_name: str) -> bool:
+        """
+        Checks if the collections manifest is available.
+        """
+        resp = self.__http_session.get(
+            f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}/scopes"
+        )
+        return resp.status_code == 200
+
+    def get_bucket_names(self) -> list[str]:
+        """
+        Gets the names of all buckets in the Couchbase cluster
+
+        :return: A list of bucket names
+        """
+        with self.__tracer.start_as_current_span("get_bucket_names"):
+            buckets_resp = self.__http_session.get(
+                f"http://{self.__hostname}:8091/pools/default/buckets"
+            )
+            buckets_resp.raise_for_status()
+            buckets_data = buckets_resp.json()
+            return [bucket["name"] for bucket in buckets_data]
+
+    async def wait_for_bucket_deleted(
+        self,
+        bucket_name: str,
+        max_retries: int = 30,
+        retry_delay: float = 2.0,
+    ) -> None:
+        """
+        Waits for a bucket to be fully deleted from the Couchbase cluster.
+        Async because deletion is eventual and requires polling remote state.
+        """
+        with self.__tracer.start_as_current_span(
+            "wait_for_bucket_deleted", attributes={"cbl.bucket.name": bucket_name}
+        ):
+            for _ in range(max_retries):
+                try:
+                    # If bucket no longer exists, deletion is complete
+                    if not self.bucket_healthy(bucket_name):
+                        return
+                except Exception:
+                    # Treat errors as "bucket gone"
+                    return
+                await asyncio.sleep(retry_delay)
+
+            raise CblTestError(
+                f"Bucket '{bucket_name}' was not deleted after "
+                f"{max_retries * retry_delay} seconds"
+            )
 
     def restore_bucket(
         self,
@@ -1034,10 +1133,8 @@ class CouchbaseServer:
             status = resp.json()
 
             if status.get("status") == "none":
-                # Rebalance completed
                 return
-
-            sleep(2)
+            time.sleep(10)
 
         raise CblTestError(
             f"Rebalance did not complete within {timeout_seconds} seconds"

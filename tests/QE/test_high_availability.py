@@ -1,5 +1,4 @@
 import asyncio
-from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
@@ -9,7 +8,6 @@ from cbltest.api.syncgateway import (
     PutDatabasePayload,
     SyncGatewayUserClient,
 )
-from conftest import cleanup_test_resources
 
 
 @pytest.mark.sgw
@@ -19,7 +17,7 @@ from conftest import cleanup_test_resources
 class TestHighAvailability(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sgw_high_availability_with_load_balancer(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cblpytest: CBLPyTest, cleanup_after_test
     ) -> None:
         sgs = cblpytest.sync_gateways
         cbs = cblpytest.couchbase_servers[0]
@@ -30,11 +28,12 @@ class TestHighAvailability(CBLTestClass):
         channels = ["*"]
         username = "vipul"
         password = "pass"
-        sg1, sg2, sg3 = sgs[0], sgs[1], sgs[2]
-        await cleanup_test_resources(sgs, cbs, [bucket_name])
+        sg1, sg2, _ = sgs[0], sgs[1], sgs[2]
+        await sg2.start()
 
         self.mark_test_step("Create shared bucket for all SGW nodes")
         cbs.create_bucket(bucket_name)
+        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure database on all SGW nodes")
         db_config = {
@@ -44,13 +43,8 @@ class TestHighAvailability(CBLTestClass):
         }
         db_payload = PutDatabasePayload(db_config)
         await sg1.put_database(sg_db, db_payload)
-        for sg in [sg2, sg3]:
-            for _ in range(10):
-                if await sg.get_database_status(sg_db) is not None:
-                    break
-                await asyncio.sleep(2)
-            else:
-                raise TimeoutError("DB did not propagate to all SGWs")
+        for sg in sgs[1:]:
+            await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(
             f"Create user '{username}' with access to channels {channels}"
@@ -100,7 +94,6 @@ class TestHighAvailability(CBLTestClass):
 
         self.mark_test_step("Take SG2 offline")
         await sg2.stop()
-        await sg2.wait_for_node_offline(sg_db)
 
         self.mark_test_step("Verify load balancer still works with SG2 offline")
         await asyncio.sleep(2)
@@ -132,7 +125,7 @@ class TestHighAvailability(CBLTestClass):
 
         self.mark_test_step("Bring SG2 back online")
         await sg2.start(config_name="bootstrap")
-        await sg2.wait_for_node_online(sg_db)
+        await sg2.wait_for_db_up(sg_db)
 
         self.mark_test_step("Verify load balancer now routes to all 3 nodes")
         # Create some final test docs through LB to verify all nodes are working

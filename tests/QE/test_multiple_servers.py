@@ -6,7 +6,6 @@ import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DocumentUpdateEntry, ISGRPayload, PutDatabasePayload
-from conftest import cleanup_test_resources
 from packaging.version import Version
 
 
@@ -71,7 +70,7 @@ async def _setup_database_and_user(
 ):
     """Setup bucket, database, and user."""
     cbs.create_bucket(bucket_name, num_replicas=1)
-    await asyncio.sleep(5)
+    await cbs.wait_for_bucket_ready(bucket_name)
 
     db_config = {
         "bucket": bucket_name,
@@ -79,7 +78,7 @@ async def _setup_database_and_user(
         "scopes": {"_default": {"collections": {"_default": {}}}},
     }
     await sg.put_database(sg_db, PutDatabasePayload(db_config))
-    await asyncio.sleep(3)
+    await sg.wait_for_db_up(sg_db)
 
     await sg.delete_user(sg_db, user_name)
     await sg.add_user(
@@ -110,7 +109,6 @@ class TestMultipleServers(CBLTestClass):
         channels = ["ABC", "CBS"]
 
         self.mark_test_step("Clean up and setup test environment")
-        await cleanup_test_resources(sg, cbs_one, [bucket_name])
         sg_user = await _setup_database_and_user(
             sg, cbs_one, sg_db, bucket_name, sg_user_name, sg_user_password, channels
         )
@@ -257,7 +255,6 @@ class TestMultipleServers(CBLTestClass):
         num_docs = 50
         sg_user_name, sg_user_password = "vipul", "pass"
         channels = ["ABC", "CBS"]
-        await cleanup_test_resources(sg, cbs_one, [bucket_name])
         sg_user = await _setup_database_and_user(
             sg, cbs_one, sg_db, bucket_name, sg_user_name, sg_user_password, channels
         )
@@ -321,6 +318,8 @@ class TestMultipleServers(CBLTestClass):
         changes_final = await sg.get_changes(sg_db, version_type="cv")
         assert len(changes_final.results) == num_docs * 2
 
+        await sg_user.close()
+
 
 @pytest.mark.sgw
 @pytest.mark.min_sync_gateways(3)
@@ -333,7 +332,7 @@ class TestISGRCollectionMapping(CBLTestClass):
         sgs = cblpytest.sync_gateways
         cbs = cblpytest.couchbase_servers[0]
         sg1, sg2, sg3 = sgs[0], sgs[1], sgs[2]
-        bucket1, bucket2, bucket3 = "isgr_bucket1", "isgr_bucket2", "isgr_bucket3"
+        bucket1, bucket2, bucket3 = "isgr-bucket1", "isgr-bucket2", "isgr-bucket3"
         sg_db1, sg_db2, sg_db3 = "db1", "db2", "db3"
         b1_collections = ["collection1", "collection2", "collection3"]
         b2_collections = ["collection4", "collection5"]
@@ -342,8 +341,6 @@ class TestISGRCollectionMapping(CBLTestClass):
 
         self.mark_test_step("Clean up and setup test environment")
         _set_alternate_addresses(cblpytest.couchbase_servers)
-        for sg in sgs:
-            await cleanup_test_resources(sg, cbs, [bucket1, bucket2, bucket3])
 
         self.mark_test_step("Create collections in _default scope for each bucket")
         for bucket, collections in [
@@ -353,7 +350,7 @@ class TestISGRCollectionMapping(CBLTestClass):
         ]:
             cbs.create_bucket(bucket)
             cbs.create_collections(bucket, "_default", collections)
-        await asyncio.sleep(5)
+            await cbs.wait_for_bucket_ready(bucket)
 
         self.mark_test_step(
             "Configure all SGs with their respective buckets and collections"
@@ -373,10 +370,8 @@ class TestISGRCollectionMapping(CBLTestClass):
                 },
                 "unsupported": {"sgr_tls_skip_verify": True},
             }
-            db_status = await sg.get_database_status(sg_db)
-            if db_status is not None:
-                await sg.delete_database(sg_db)
             await sg.put_database(sg_db, PutDatabasePayload(config))
+            await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Upload {num_docs} docs to each collection in SG1")
         for collection in b1_collections:

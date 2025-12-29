@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+import pytest_asyncio
 
 if TYPE_CHECKING:
     from cbltest.api.couchbaseserver import CouchbaseServer
@@ -18,55 +19,97 @@ def dataset_path() -> Path:
     return Path(script_path, "..", "..", "dataset", "sg")
 
 
-async def cleanup_test_resources(
-    sgs: "list[SyncGateway] | SyncGateway",
-    cbs_servers: "list[CouchbaseServer] | CouchbaseServer",
-    bucket_names: list[str] | None = None,
-) -> None:
+@pytest_asyncio.fixture(scope="function", autouse=True)
+async def cleanup_after_test(cblpytest, request):
     """
-    Clean up all databases from SGW(s) and specified buckets from CBS(s).
-
-    Args:
-        sgs: Single SyncGateway or list of SyncGateways to clean up
-        cbs_servers: Single CouchbaseServer or list of CouchbaseServers for bucket cleanup
-        bucket_names: Optional list of bucket names to drop from each CBS
+    Automatically clean up all test resources after each SGW test function completes.
+    This fixture only runs for tests marked with @pytest.mark.sgw.
     """
-    # Handle both single SGW and list of SGWs
-    sg_list = sgs if isinstance(sgs, list) else [sgs]
-
-    for sg in sg_list:
-        await wait_for_admin_ready(sg)
-
-        db_names = await sg.get_all_database_names()
-        for db_name in db_names:
-            db_status = await sg.get_database_status(db_name)
-            if db_status is not None:
-                await sg.delete_database(db_name)
-
-        retries = 10
-        for db_name in db_names:
-            for _ in range(retries):
-                db_status = await sg.get_database_status(db_name)
-                if db_status is None:
-                    break
-                await asyncio.sleep(6)
-            else:
-                raise TimeoutError(f"Database {db_name} did not delete after 1min")
-
-    if bucket_names:
-        cbs_list = cbs_servers if isinstance(cbs_servers, list) else [cbs_servers]
-        for cbs in cbs_list:
-            for bucket_name in bucket_names:
-                cbs.drop_bucket(bucket_name)
-
-
-async def wait_for_admin_ready(
-    sg: "SyncGateway", retries: int = 10, delay: float = 1.0
-) -> None:
-    for _ in range(retries):
+    test_name = request.node.name
+    try:
+        yield  # test runs here
+    finally:
         try:
-            await sg.get_version()
-            return
-        except Exception:
-            await asyncio.sleep(delay)
-    raise TimeoutError("Sync Gateway admin API did not become ready")
+            if request.node.get_closest_marker("sgw"):
+                print(
+                    "\n================== 🧹 CLEANUP FIXTURE STARTED =================="
+                )
+                await cleanup_all_test_resources(
+                    cblpytest.sync_gateways, cblpytest.couchbase_servers
+                )
+                print(
+                    f"🧹 CLEANUP FIXTURE: Cleanup completed successfully for {test_name}"
+                )
+            else:
+                print(f"🧹 CLEANUP FIXTURE: Skipping non-SGW test: {test_name}")
+        except Exception as e:
+            print(f"🧹 CLEANUP FIXTURE: Cleanup failed for {test_name}: {e}")
+        await asyncio.sleep(2)  # Let all the metadata dust settle down after cleanup
+
+
+async def cleanup_all_test_resources(
+    sync_gateways: "list[SyncGateway] | SyncGateway",
+    couchbase_servers: "list[CouchbaseServer] | CouchbaseServer",
+) -> None:
+    """
+    Clean up ALL databases from ALL SGW instances and test buckets from ALL CBS instances.
+
+    This automatic cleanup runs after each SGW test to prevent resource accumulation.
+    Includes robust error handling to avoid interfering with test execution.
+    """
+    # Handle both single and list inputs
+    sg_list = sync_gateways if isinstance(sync_gateways, list) else [sync_gateways]
+    cbs_list = (
+        couchbase_servers
+        if isinstance(couchbase_servers, list)
+        else [couchbase_servers]
+    )
+
+    # Clean up Sync Gateway databases
+    for i, sg in enumerate(sg_list):
+        print(f"\t🧹 Processing SGW {i + 1}/{len(sg_list)}")
+        try:
+            # Get all databases and delete them
+            db_names = await sg.get_all_database_names()
+            print(f"\t\t🧹 Found {len(db_names)} databases: {db_names}")
+
+            for db_name in db_names:
+                try:
+                    await sg.delete_database(db_name)
+                except Exception as e:
+                    print(f"🧹 Failed to delete database {db_name}: {e}")
+
+            # Wait for all databases to be deleted
+            for db_name in db_names:
+                try:
+                    await sg.wait_for_db_gone_clusterwide(sg_list, db_name)
+                except Exception as e:
+                    print(f"🧹 Failed to wait for database {db_name}: {e}")
+        except Exception as e:
+            print(f"🧹 Failed to clean up SG {sg}: {e}")
+
+    # Clean up Couchbase Server buckets
+    for i, cbs in enumerate(cbs_list):
+        print(f"\t🧹 Processing CBS {i + 1}/{len(cbs_list)}")
+        try:
+            bucket_names = cbs.get_bucket_names()
+            print(f"\t\t🧹 Found {len(bucket_names)} buckets: {bucket_names}")
+
+            deleted_buckets = []
+            for bucket_name in bucket_names:
+                try:
+                    cbs.drop_bucket(bucket_name)
+                    deleted_buckets.append(bucket_name)
+                except Exception as e:
+                    print(f"🧹 Failed to drop bucket {bucket_name}: {e}")
+
+            print(
+                f"\t\t🧹 Will wait for {len(deleted_buckets)} buckets to be deleted: {deleted_buckets}"
+            )
+            for bucket_name in deleted_buckets:
+                try:
+                    await cbs.wait_for_bucket_deleted(bucket_name)
+                except Exception as e:
+                    print(f"🧹 Failed to wait for bucket {bucket_name}: {e}")
+        except Exception as e:
+            print(f"🧹 Failed to clean up CBS {cbs}: {e}")

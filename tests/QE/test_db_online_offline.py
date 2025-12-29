@@ -8,7 +8,6 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
-from conftest import cleanup_test_resources
 
 
 @pytest.mark.sgw
@@ -78,11 +77,10 @@ class TestDbOnlineOffline(CBLTestClass):
         sg_db = "db"
         bucket_name = "data-bucket"
         channels = ["ABC"]
-        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
+        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_config = {
@@ -91,10 +89,8 @@ class TestDbOnlineOffline(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        db_status = await sg.get_database_status(sg_db)
-        if db_status is not None:
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
         sg_docs: list[DocumentUpdateEntry] = []
@@ -106,7 +102,7 @@ class TestDbOnlineOffline(CBLTestClass):
                     body={"type": "test_doc", "index": i, "channels": channels},
                 )
             )
-        await sg.update_documents(sg_db, sg_docs, "_default", "_default")
+        await sg.update_documents(sg_db, sg_docs)
 
         self.mark_test_step("Verify database is online - REST endpoints work")
         endpoints_tested, errors_403 = await self.scan_rest_endpoints(
@@ -139,11 +135,6 @@ class TestDbOnlineOffline(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
-        await cleanup_test_resources(
-            sg,
-            cbs,
-            ["data-bucket-1", "data-bucket-2", "data-bucket-3", "data-bucket-4"],
-        )
 
         db_configs: list[list[Any]] = [
             ["db1", "data-bucket-1", "ABC", "vipul", None],
@@ -154,8 +145,8 @@ class TestDbOnlineOffline(CBLTestClass):
 
         self.mark_test_step("Create buckets and configure databases")
         for i, [db_name, bucket_name, channel, username, _] in enumerate(db_configs):
-            cbs.drop_bucket(bucket_name)
             cbs.create_bucket(bucket_name)
+            await cbs.wait_for_bucket_ready(bucket_name)
 
             db_config = {
                 "bucket": bucket_name,
@@ -163,10 +154,8 @@ class TestDbOnlineOffline(CBLTestClass):
                 "scopes": {"_default": {"collections": {"_default": {}}}},
             }
             db_payload = PutDatabasePayload(db_config)
-            db_status = await sg.get_database_status(db_name)
-            if db_status is not None:
-                await sg.delete_database(db_name)
             await sg.put_database(db_name, db_payload)
+            await sg.wait_for_db_up(db_name)
             db_configs[i][4] = await sg.create_user_client(
                 db_name, username, "pass", [channel]
             )
@@ -196,6 +185,8 @@ class TestDbOnlineOffline(CBLTestClass):
         )
         cbs.drop_bucket("data-bucket-1")
         cbs.drop_bucket("data-bucket-3")
+        await cbs.wait_for_bucket_deleted("data-bucket-1")
+        await cbs.wait_for_bucket_deleted("data-bucket-3")
         for db_name in ["db1", "db3"]:
             db_status = await sg.get_database_status(db_name)
             while db_status is not None and db_status.state == "Online":
@@ -220,7 +211,6 @@ class TestDbOnlineOffline(CBLTestClass):
                 f"{db_name}: Expected all {endpoints_tested} endpoints to return 403, got {errors_403}"
             )
 
-        # Close user clients (cleanup of DBs and buckets handled by cleanup_test_resources)
         for [_, _, _, _, user_client] in db_configs:
             if user_client is not None:
                 await user_client.close()
