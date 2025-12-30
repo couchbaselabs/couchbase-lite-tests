@@ -51,14 +51,15 @@ pipeline {
                         lock('mac-mini-new')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:" + env.PATH
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         TS_ARTIFACTS_DIR = 'macos'
-                        TS_DATASET_VERSION = params.TS_DATASET_VERSION
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
                     }
                     steps {
                         // Unlock keychain:
-                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        withCredentials([string(credentialsId: 'mobile-qe', variable: 'KEYCHAIN_PASSWORD')]) {
+                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        }
                         echo "=== Run C macOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION}"
@@ -82,14 +83,15 @@ pipeline {
                         lock('00008101-000E0519020A001E')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:" + env.PATH
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         TS_ARTIFACTS_DIR = 'ios'
-                        TS_DATASET_VERSION = params.TS_DATASET_VERSION
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
                     }
                     steps {
                         // Unlock keychain:
-                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        withCredentials([string(credentialsId: 'mobile-qe', variable: 'KEYCHAIN_PASSWORD')]) {
+                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        }
                         echo "=== Run C iOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION}"
@@ -113,16 +115,17 @@ pipeline {
                         lock('R5CT20FYA7R')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
                         ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
                         JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
-                        PATH = '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home/bin:/Users/couchbase/Library/Android/sdk/platform-tools:/Users/couchbase/Library/Android/sdk/tools:/Users/couchbase/Library/Android/sdk/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:' + env.PATH
+                        PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         TS_ARTIFACTS_DIR = 'android'
-                        TS_DATASET_VERSION = params.TS_DATASET_VERSION
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
                     }
                     steps {
                         // Unlock keychain:
-                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        withCredentials([string(credentialsId: 'mobile-qe', variable: 'KEYCHAIN_PASSWORD')]) {
+                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        }
                         echo "=== Run C Android Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION}"
