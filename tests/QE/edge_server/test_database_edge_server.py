@@ -36,9 +36,7 @@ class TestDatabase(CBLTestClass):
         file_path = str(Path(file_path, ".."))
         config_path = f"{file_path}/environment/edge_server/config/test_edge_server_incorrect_db_config.json"
         try:
-            edge_server = await edge_server.set_config(
-                config_path, "/opt/couchbase-edge-server/etc/config.json"
-            )
+            edge_server = await edge_server.set_config(config_path)
             await edge_server.get_version()
             assert False, "Edge server should have failed with incorrect config"
         except AssertionError:
