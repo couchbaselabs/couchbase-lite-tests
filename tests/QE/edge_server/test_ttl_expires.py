@@ -11,7 +11,6 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.error import CblEdgeServerBadResponseError, CblSyncGatewayBadResponseError
 from cbltest.api.edgeserver import EdgeServer, BulkDocOperation
-from cbltest.api.httpclient import HTTPClient, ClientFactory
 from cbltest.api.error_types import ErrorDomain
 from cbltest.api.replicator import Replicator, ReplicatorType, ReplicatorCollectionEntry, ReplicatorActivityLevel, \
     WaitForDocumentEventEntry
@@ -250,81 +249,55 @@ class TestTTLExpires(CBLTestClass):
         es_db_name = "db"
         edge_server = cblpytest.edge_servers[0]
 
-        num_clients = 20
-        
-        # Distribution:
-        # - Half (50 docs) = 10s TTL
-        # - Quarter (25 docs) = 30s TTL
-        # - Quarter (25 docs) = 60s TTL
-        
-        self.mark_test_step(f"Setting up {num_clients} HTTP clients on 1 VM")
-        http_clients = [cblpytest.http_clients[0]]
-        factory = ClientFactory(vms=http_clients, edge_server=edge_server, num_clients_per_vm=num_clients)
-        await factory.create_clients()
-        logger.info(f"Created {len(factory.clients)} HTTP clients")
-        
-        # Create documents: each client creates 5 docs
-        # Distribute TTLs: first 10 clients create 5 docs each with 10s TTL (50 docs)
-        # Next 5 clients create 5 docs each with 30s TTL (25 docs)
-        # Last 5 clients create 5 docs each with 60s TTL (25 docs)
+        # Document distribution:
+        # - 50 docs with 10s TTL
+        # - 25 docs with 30s TTL
+        # - 25 docs with 60s TTL
         
         self.mark_test_step("Creating documents with different TTLs")
         
         # Create all documents concurrently
         tasks = []
         task_ttl_map = []  # Track which TTL category each task belongs to
-        doc_counter = 1
-        
-        # First 10 clients: 5 docs each with 10s TTL (50 docs total)
-        for client_id in range(1, 11):
-            for i in range(5):
-                doc_num = doc_counter
-                doc_id = f"ttl_doc_{doc_num}"
-                doc = {
-                    "id": doc_id,
-                    "channels": ["public"],
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "ttl": 10,
-                    "client_id": client_id,
-                    "doc_num": doc_num
-                }
-                tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=10))
-                task_ttl_map.append(10)  # Track this as 10s TTL
-                doc_counter += 1
-        
-        # Next 5 clients: 5 docs each with 30s TTL (25 docs total)
-        for client_id in range(11, 16):
-            for i in range(5):
-                doc_num = doc_counter
-                doc_id = f"ttl_doc_{doc_num}"
-                doc = {
-                    "id": doc_id,
-                    "channels": ["public"],
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "ttl": 30,
-                    "client_id": client_id,
-                    "doc_num": doc_num
-                }
-                tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=30))
-                task_ttl_map.append(30)  # Track this as 30s TTL
-                doc_counter += 1
-        
-        # Last 5 clients: 5 docs each with 60s TTL (25 docs total)
-        for client_id in range(16, 21):
-            for i in range(5):
-                doc_num = doc_counter
-                doc_id = f"ttl_doc_{doc_num}"
-                doc = {
-                    "id": doc_id,
-                    "channels": ["public"],
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "ttl": 60,
-                    "client_id": client_id,
-                    "doc_num": doc_num
-                }
-                tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=60))
-                task_ttl_map.append(60)  # Track this as 60s TTL
-                doc_counter += 1
+
+        # 50 docs with 10s TTL
+        for doc_num in range(1, 51):
+            doc_id = f"ttl_doc_{doc_num}"
+            doc = {
+                "id": doc_id,
+                "channels": ["public"],
+                "timestamp": datetime.utcnow().isoformat(),
+                "ttl": 10,
+                "doc_num": doc_num,
+            }
+            tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=10))
+            task_ttl_map.append(10)
+
+        # 25 docs with 30s TTL
+        for doc_num in range(51, 76):
+            doc_id = f"ttl_doc_{doc_num}"
+            doc = {
+                "id": doc_id,
+                "channels": ["public"],
+                "timestamp": datetime.utcnow().isoformat(),
+                "ttl": 30,
+                "doc_num": doc_num,
+            }
+            tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=30))
+            task_ttl_map.append(30)
+
+        # 25 docs with 60s TTL
+        for doc_num in range(76, 101):
+            doc_id = f"ttl_doc_{doc_num}"
+            doc = {
+                "id": doc_id,
+                "channels": ["public"],
+                "timestamp": datetime.utcnow().isoformat(),
+                "ttl": 60,
+                "doc_num": doc_num,
+            }
+            tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=60))
+            task_ttl_map.append(60)
         
         # Execute all document creations concurrently
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -390,8 +363,6 @@ class TestTTLExpires(CBLTestClass):
         assert count_60s == expected_60s, f"After 60s: Expected {expected_60s} documents, but found {count_60s}"
         
         logger.info("All documents expired as expected")
-        self.mark_test_step("Test completed successfully - all documents expired at their respective TTL times")
-
-        await factory.disconnect()
-
-        self.mark_test_step("Test completed successfully.")
+        self.mark_test_step(
+            "Test completed successfully - all documents expired at their respective TTL times"
+        )
