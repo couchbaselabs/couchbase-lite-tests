@@ -275,6 +275,9 @@ def setup_server(
     sftp_progress_bar(sftp, Path("/tmp/es_cert.pem"), "/home/ec2-user/cert/es_cert.pem")
     sftp_progress_bar(sftp, Path("/tmp/es_key.pem"), "/home/ec2-user/cert/es_key.pem")
 
+    for file in (SCRIPT_DIR / "dataset").iterdir():
+        sftp_progress_bar(sftp, file, f"/home/ec2-user/database/{file.name}")
+
     Path("/tmp/es_key.pem").unlink()
     Path("/tmp/es_cert.pem").unlink()
     sftp.close()
@@ -285,7 +288,6 @@ def setup_server(
         "Uninstalling Couchbase Edge Server",
         fail_on_error=False,
     )
-
     remote_exec(
         ssh,
         f"sudo rpm -i /tmp/{es_info.local_filename}",
@@ -293,9 +295,19 @@ def setup_server(
     )
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting ES log fileserver")
     remote_exec_bg(
-        ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES management server"
+        ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES manasgement server"
     )
-
+    remote_exec(
+        ssh, "/home/ec2-user/shell2http/kill-edgeserver.sh", "Stopping Edge Server"
+    )
+    sftp_progress_bar(
+        sftp,
+        SCRIPT_DIR / "config" / "config.json",
+        "/opt/couchbase-edge-server/etc/config.json",
+    )
+    remote_exec(
+        ssh, "/home/ec2-user/shell2http/start-edgeserver.sh", "Stopping Edge Server"
+    )
     ssh.close()
 
 
