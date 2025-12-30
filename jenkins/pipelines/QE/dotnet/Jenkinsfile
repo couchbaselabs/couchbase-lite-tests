@@ -5,6 +5,9 @@ pipeline {
         string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
     }
+    options {
+        timeout(time: 150, unit: 'MINUTES')
+    }
     stages {
         stage('Init') {
             steps {
@@ -18,36 +21,148 @@ pipeline {
         }
         stage('Prebuild Servers') {
             steps {
-                build job: 'prebuild-test-server',
-                parameters: [
-                    string(name: 'TS_PLATFORM', value: 'dotnet_windows'),
-                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                ],
-                wait: true,
-                propagate: true
+                script {
+                    def platforms = [
+                        'dotnet_windows', 'dotnet_ios', 'dotnet_android', 'dotnet_macos'
+                    ]
+                    def parallelBuilds = [:]
+                    for(p in platforms) {
+                        def platform = p
+                        parallelBuilds[platform] = {
+                            build job: 'prebuild-test-server',
+                            parameters: [
+                                string(name: 'TS_PLATFORM', value: platform),
+                                string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                            ],
+                            wait: true,
+                            propagate: true
+                        }
+                    }
+                    parallel parallelBuilds
+                }
             }
         }
         stage('Run Tests') {
-            agent { label 'net-windows' }
-            environment {
-                TS_ARTIFACTS_DIR = 'dotnet_windows'
-                TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
-            }
-            steps {
-                echo "=== Run Dotnet Tests"
-                timeout(time: 60, unit: 'MINUTES') {
-                    powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION}"
-                }
-                echo "=== Dotnet Tests Complete"
-            }
-            post {
-                always {
-                    echo "=== Teardown Dotnet Tests"
-                    timeout(time: 5, unit: 'MINUTES') {
-                        powershell "jenkins\\pipelines\\QE\\dotnet\\teardown.ps1"
+            parallel {
+                stage('Windows') {
+                    agent { label 'net-windows' }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'dotnet_windows'
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
                     }
-                    archiveArtifacts artifacts: 'tests\\QE\\dotnet_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
-                    echo "=== Dotnet Test Teardown Complete"
+                    steps {
+                        echo "=== Run Dotnet Windows Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION}"
+                        }
+                        echo "=== Dotnet Windows Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Dotnet Windows Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                powershell 'jenkins\\pipelines\\QE\\dotnet\\teardown.ps1'
+                            }
+                            archiveArtifacts artifacts: 'tests\\QE\\dotnet_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== Dotnet Windows Test Teardown Complete"
+                        }
+                    }
+                }
+                stage('macOS') {
+                    agent { label 'mac-mini-new' }
+                    options {
+                        lock('mac-mini-new')
+                    }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                        DEVELOPER_DIR = "/Applications/Xcode.app"
+                        MD_APPLE_SDK_ROOT = "/Applications/Xcode.app"
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        TS_ARTIFACTS_DIR = 'dotnet_macos'
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                    }
+                    steps {
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        echo "=== Run Dotnet macOS Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION}"
+                        }
+                        echo "=== Dotnet macOS Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Dotnet macOS Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/dotnet_macos/**/*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== Dotnet macOS Test Teardown Complete"
+                        }
+                    }
+                }
+                stage('iOS') {
+                    agent { label 'mac-mini-new' }
+                    options {
+                        lock('00008101-000E0519020A001E')
+                    }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                        DEVELOPER_DIR = "/Applications/Xcode.app"
+                        MD_APPLE_SDK_ROOT = "/Applications/Xcode.app"
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        TS_ARTIFACTS_DIR = 'dotnet_ios'
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                    }
+                    steps {
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        echo "=== Run Dotnet iOS Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION}"
+                        }
+                        echo "=== Dotnet iOS Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Dotnet iOS Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/dotnet_ios/**/*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== Dotnet iOS Test Teardown Complete"
+                        }
+                    }
+                }
+                stage('Android') {
+                    agent { label 'mac-mini-CBL-Android1' }
+                    options {
+                        lock('R5CT20FYA7R')
+                    }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                        ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
+                        JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
+                        PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        TS_ARTIFACTS_DIR = 'dotnet_android'
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                    }
+                    steps {
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        echo "=== Run Dotnet Android Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION}"
+                        }
+                        echo "=== Dotnet Android Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Dotnet Android Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/dotnet_android/**/*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== Dotnet Android Test Teardown Complete"
+                        }
+                    }
                 }
             }
         }
