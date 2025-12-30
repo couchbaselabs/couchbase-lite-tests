@@ -118,6 +118,8 @@ class CouchbaseServerInfo:
         self.__admin_password: str = _get_str_or_default(
             data, self.__admin_password_key, "password"
         )
+
+
 class EdgeServerInfo:
     __hostname_key: Final[str] = "hostname"
     __admin_user_key: Final[str] = "admin_user"

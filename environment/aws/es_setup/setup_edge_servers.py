@@ -278,7 +278,6 @@ def setup_server(
     for file in (SCRIPT_DIR / "dataset").iterdir():
         sftp_progress_bar(sftp, file, f"/home/ec2-user/database/{file.name}")
 
-
     Path("/tmp/es_key.pem").unlink()
     Path("/tmp/es_cert.pem").unlink()
     sftp.close()
@@ -298,13 +297,17 @@ def setup_server(
     remote_exec_bg(
         ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES manasgement server"
     )
-    remote_exec(ssh, "/home/ec2-user/shell2http/kill-edgeserver.sh", "Stopping Edge Server")
+    remote_exec(
+        ssh, "/home/ec2-user/shell2http/kill-edgeserver.sh", "Stopping Edge Server"
+    )
     sftp_progress_bar(
         sftp,
         SCRIPT_DIR / "config" / "config.json",
         "/opt/couchbase-edge-server/etc/config.json",
     )
-    remote_exec(ssh, "/home/ec2-user/shell2http/start-edgeserver.sh", "Stopping Edge Server")
+    remote_exec(
+        ssh, "/home/ec2-user/shell2http/start-edgeserver.sh", "Stopping Edge Server"
+    )
     ssh.close()
 
 

@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 
@@ -16,7 +15,6 @@ class TestCrud(CBLTestClass):
         self.mark_test_step("get server information")
         version = await edge_server.get_version()
         self.mark_test_step(f"VERSION:{version.raw}")
-
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_database_config(
