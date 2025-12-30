@@ -1,10 +1,12 @@
-
 pipeline {
     agent none
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
         string(name: 'SGW_VERSION', defaultValue: '3.3.0', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+    }
+    options {
+        timeout(time: 150, unit: 'MINUTES')
     }
     stages {
         stage('Init') {
@@ -18,7 +20,6 @@ pipeline {
                 }
             }
         }
-
         stage('Prebuild Servers') {
             steps {
                 build job: 'prebuild-test-server',
@@ -30,28 +31,85 @@ pipeline {
                 propagate: true
             }
         }
-
-        stage('Tests') {
-            agent { label 'linux-java' }
-            environment {
-                TS_ARTIFACTS_DIR = 'java_desktop'
-                TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
-            }
-            steps {
-                echo "=== Run Desktop Tests"
-                timeout(time: 120, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
-                }
-                echo "=== Desktop Tests Complete"
-            }
-            post {
-                always {
-                    echo "=== Teardown Desktop Tests"
-                    timeout(time: 5, unit: 'MINUTES') {
-                        sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'
+        stage('Run Tests') {
+            parallel {
+                stage('macOS Desktop') {
+                    agent { label 'mac-mini-new' }
+                    options {
+                        lock('mac-mini-new')
                     }
-                    archiveArtifacts artifacts: 'tests/QE/java_desktop/**/*', fingerprint: true, allowEmptyArchive: true
-                    echo "=== Desktop Test Teardown Complete"
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        TS_ARTIFACTS_DIR = 'java_macos_desktop'
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                    }
+                    steps {
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        echo "=== Run macOS Desktop Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
+                        }
+                        echo "=== macOS Desktop Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown macOS Desktop Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/java_macos_desktop/**/*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== macOS Desktop Test Teardown Complete"
+                        }
+                    }
+                }
+                stage('Windows Desktop') {
+                    agent { label 'net-windows' }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'java_windows_desktop'
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                    }
+                    steps {
+                        echo "=== Run Windows Desktop Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            powershell "jenkins\\pipelines\\QE\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION}"
+                        }
+                        echo "=== Windows Desktop Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Windows Desktop Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                powershell 'jenkins\\pipelines\\QE\\java\\desktop\\teardown.ps1'
+                            }
+                            archiveArtifacts artifacts: 'tests\\QE\\java_windows_desktop\\**\\*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== Windows Desktop Test Teardown Complete"
+                        }
+                    }
+                }
+                stage('Linux Desktop') {
+                    agent { label 'linux-java' }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'java_desktop'
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                    }
+                    steps {
+                        echo "=== Run Linux Desktop Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
+                        }
+                        echo "=== Linux Desktop Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Linux Desktop Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/java_desktop/**/*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== Linux Desktop Test Teardown Complete"
+                        }
+                    }
                 }
             }
         }
