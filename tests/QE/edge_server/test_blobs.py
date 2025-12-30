@@ -34,7 +34,7 @@ class TestBlobs(CBLTestClass):
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.add_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc["id"], doc)
         logger.info("2 documents created in Couchbase Server.")
 
         self.mark_test_step(
@@ -122,10 +122,10 @@ class TestBlobs(CBLTestClass):
             image_data = img_file.read()
 
         # Add the image as an attachment to the document
-        response = await edge_server.put_sub_document(
+        put_response = await edge_server.put_sub_document(
             doc_id, rev_id, attachment_name, es_db_name, value=image_data
         )
-        assert response is not None, "Failed to add attachment to document."
+        assert put_response is not None, "Failed to add attachment to document."
 
         logger.info(f"Blob added to document {doc_id} in Edge Server.")
 
@@ -180,11 +180,11 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Deleting the blob from the document in Edge Server.")
         logger.info(f"Deleting the blob from document {doc_id} in Edge Server.")
-        response = await edge_server.delete_sub_document(
+        delete_response = await edge_server.delete_sub_document(
             doc_id, rev_id, attachment_name, es_db_name
         )
 
-        assert response.get("ok"), (
+        assert delete_response.get("ok"), (
             f"Failed to delete blob from document {doc_id} in Edge Server."
         )
         logger.info(f"Blob deleted from document {doc_id} in Edge Server.")
@@ -266,10 +266,10 @@ class TestBlobs(CBLTestClass):
         attachment_name = "test.png"
 
         # Add the image as an attachment to the document
-        response = await edge_server.put_sub_document(
+        put_response = await edge_server.put_sub_document(
             doc_id, rev_id, attachment_name, es_db_name, value=empty_blob
         )
-        assert response is not None, "Failed to add attachment to document."
+        assert put_response is not None, "Failed to add attachment to document."
 
         logger.info(f"Empty blob added to document {doc_id} in Edge Server.")
 
@@ -345,10 +345,10 @@ class TestBlobs(CBLTestClass):
             image_data = img_file.read()
 
         # Add the image as an attachment to the document
-        response = await edge_server.put_sub_document(
+        put_response = await edge_server.put_sub_document(
             doc_id, rev_id, attachment_name, es_db_name, value=image_data
         )
-        assert response is not None, "Failed to update attachment in document."
+        assert put_response is not None, "Failed to update attachment in document."
 
         logger.info(f"Blob updated in document {doc_id} in Edge Server.")
 
@@ -751,7 +751,7 @@ class TestBlobs(CBLTestClass):
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.add_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc["id"], doc)
         logger.info("2 documents created in Couchbase Server.")
 
         self.mark_test_step(
@@ -846,11 +846,11 @@ class TestBlobs(CBLTestClass):
 
         # Add the image as an attachment to the document
         attachment_name = "im@g#e$%&*().png"
-        response = await edge_server.put_sub_document(
+        put_response = await edge_server.put_sub_document(
             doc_id, rev_id, attachment_name, es_db_name, value=image_data
         )
 
-        assert response is not None, "Failed to add attachment to document."
+        assert put_response is not None, "Failed to add attachment to document."
 
         logger.info(
             f"Blob with special characters added to document {doc_id} in Edge Server."

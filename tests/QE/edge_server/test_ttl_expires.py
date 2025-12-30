@@ -63,7 +63,7 @@ class TestTTLExpires(CBLTestClass):
 
         expires = datetime.utcnow() + timedelta(seconds=5)
         response = await edge_server.put_document_with_id(
-            doc, "ttl_doc", es_db_name, expires=expires.timestamp()
+            doc, "ttl_doc", es_db_name, expires=int(expires.timestamp())
         )
         assert response is not None, (
             "Failed to create document with Expires of 5 seconds"
@@ -110,7 +110,7 @@ class TestTTLExpires(CBLTestClass):
         assert response is not None, "Document is not present in the database"
         logger.info("Document is present in the database")
 
-        rev_id = response.revid
+        rev_id = response.get("rev")
 
         self.mark_test_step("Updating the TTL of the document to 5 seconds")
 

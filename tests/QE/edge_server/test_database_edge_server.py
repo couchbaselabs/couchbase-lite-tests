@@ -17,9 +17,7 @@ class TestDatabase(CBLTestClass):
         file_path = os.path.abspath(os.path.dirname(__file__))
         file_path = str(Path(file_path, ".."))
         config_path = f"{file_path}/environment/edge_server/config/test_edge_server_with_multiple_rest_clients.json"
-        edge_server = await edge_server.set_config(
-            config_path, "/opt/couchbase-edge-server/etc/config.json"
-        )
+        edge_server = await edge_server.set_config(config_path)
         dbs = await edge_server.get_all_dbs()
         assert len(dbs) == 1
         #     test write permission
@@ -54,9 +52,7 @@ class TestDatabase(CBLTestClass):
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
 
-        edge_server = await edge_server.set_config(
-            config_path, "/opt/couchbase-edge-server/etc/config.json"
-        )
+        edge_server = await edge_server.set_config(config_path)
         resp = await edge_server.get_db_info(db_name="db", collection="test")
         assert "test" in resp.get("collection_name"), "Collection not found"
         # REST API writes should fail
