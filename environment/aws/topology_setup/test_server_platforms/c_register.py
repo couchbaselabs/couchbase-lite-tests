@@ -143,16 +143,9 @@ class CTestServer_Desktop(CTestServer):
         shutil.rmtree(BUILD_DIR, ignore_errors=True)
         BUILD_DIR.mkdir(0o755, exist_ok=True)
         cbl_version = self.version.split("-")[0]
-
-        cmake_path = shutil.which("cmake")
-        if cmake_path is None:
-            raise FileNotFoundError(
-                "cmake not found in PATH. Please install CMake and ensure it's in your PATH."
-            )
-
         subprocess.run(
             [
-                cmake_path,
+                "cmake",
                 "-DCMAKE_BUILD_TYPE=Release",
                 f"-DCBL_VERSION={cbl_version}",
                 "..",
@@ -163,7 +156,7 @@ class CTestServer_Desktop(CTestServer):
 
         header("Installing C test server")
         args = [
-            cmake_path,
+            "cmake",
             "--build",
             ".",
             "--target",
