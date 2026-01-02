@@ -134,7 +134,7 @@ class JarBridge(JavaBridge):
         if platform.system() != "Windows":
             args.insert(0, "nohup")
 
-        info_dir = JAK_TEST_SERVER_DIR / "desktop"
+        info_dir = Path(self.__jar_path).parent
         log_file = open(info_dir / "server.log", "w")
         process = subprocess.Popen(
             args,
@@ -152,7 +152,8 @@ class JarBridge(JavaBridge):
         if location != "localhost":
             raise ValueError("JarBridge only supports running on localhost")
 
-        with open(JAK_TEST_SERVER_DIR / "desktop" / "server.pid") as pid_file:
+        info_dir = Path(self.__jar_path).parent
+        with open(info_dir / "server.pid") as pid_file:
             pid = int(pid_file.read())
             psutil.Process(pid).kill()
 
