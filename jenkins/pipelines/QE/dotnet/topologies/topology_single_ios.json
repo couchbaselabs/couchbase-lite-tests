@@ -4,7 +4,8 @@
         {
             "platform": "dotnet_ios",
             "cbl_version": "{{version}}",
-            "location": "00008101-000E0519020A001E"
+            "location": "00008101-000E0519020A001E",
+            "ip_hint": "10.100.150.115"
         }
     ],
     "include": "../../../../../environment/aws/topology_setup/default_topology.json"
