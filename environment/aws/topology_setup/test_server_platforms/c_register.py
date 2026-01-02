@@ -59,6 +59,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 LIB_DIR = C_TEST_SERVER_DIR / "lib"
 IOS_FRAMEWORKS_DIR = C_TEST_SERVER_DIR / "platforms" / "ios" / "Frameworks"
 IOS_VENDOR_DIR = C_TEST_SERVER_DIR / "platforms" / "ios" / "vendor"
+ASSETS_DIR = C_TEST_SERVER_DIR / "assets"
+DATASET_DIR = TEST_SERVER_DIR.parent / "dataset" / "server"
 
 
 class CTestServer(TestServer):
@@ -79,6 +81,23 @@ class CTestServer(TestServer):
     @property
     def product(self) -> str:
         return "couchbase-lite-c"
+
+    def _setup_assets(self):
+        """
+        Set up symlinks to the dataset assets required by iOS and Android builds.
+        """
+        header("Setting up dataset assets")
+        ASSETS_DIR.mkdir(0o755, exist_ok=True)
+
+        blobs_link = ASSETS_DIR / "blobs"
+        if blobs_link.is_symlink() or blobs_link.exists():
+            blobs_link.unlink()
+        blobs_link.symlink_to(DATASET_DIR / "blobs")
+
+        dbs_link = ASSETS_DIR / "dbs"
+        if dbs_link.is_symlink() or dbs_link.exists():
+            dbs_link.unlink()
+        dbs_link.symlink_to(DATASET_DIR / "dbs")
 
 
 class CTestServer_Desktop(CTestServer):
@@ -233,6 +252,7 @@ class CTestServer_iOS(CTestServer):
 
     def build(self):
         self._download_cbl()
+        self._setup_assets()
         header("Building")
         env = os.environ.copy()
         env["LANG"] = "en_US.UTF-8"
@@ -390,6 +410,7 @@ class CTestServer_Android(CTestServer):
         Build the C test server.
         """
         self._download_cbl()
+        self._setup_assets()
         gradle_path = C_TEST_SERVER_DIR / "platforms" / "android" / "gradlew"
         if platform.system() == "Windows":
             gradle_path = gradle_path.with_suffix(".bat")
