@@ -153,9 +153,18 @@ class JarBridge(JavaBridge):
             raise ValueError("JarBridge only supports running on localhost")
 
         info_dir = Path(self.__jar_path).parent
-        with open(info_dir / "server.pid") as pid_file:
+        pid_file_path = info_dir / "server.pid"
+        if not pid_file_path.exists():
+            click.secho("No PID file found, server may not be running", fg="yellow")
+            return
+
+        with open(pid_file_path) as pid_file:
             pid = int(pid_file.read())
-            psutil.Process(pid).kill()
+            try:
+                psutil.Process(pid).kill()
+                click.secho(f"Stopped PID {pid}", fg="green")
+            except psutil.NoSuchProcess:
+                click.secho(f"Process {pid} not found, may have already exited", fg="yellow")
 
 
 class JettyBridge(JavaBridge):
