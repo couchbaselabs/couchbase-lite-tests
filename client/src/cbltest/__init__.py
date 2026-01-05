@@ -1,7 +1,7 @@
 from json import dumps
 
 from .api.couchbaseserver import CouchbaseServer
-from .api.edge_server import EdgeServer
+from .api.edgeserver import EdgeServer
 from .api.syncgateway import SyncGateway
 from .api.testserver import TestServer
 from .assertions import _assert_not_null

@@ -6,13 +6,11 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblEdgeServerBadResponseError
-from cbltest.api.syncgateway import PutDatabasePayload
 
 logger = logging.getLogger(__name__)
 
 
 class TestBlobs(CBLTestClass):
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_get_nonexistent(
         self, cblpytest: CBLPyTest, dataset_path: Path
