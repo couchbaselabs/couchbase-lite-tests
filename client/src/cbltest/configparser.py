@@ -161,6 +161,7 @@ class ParsedConfig:
     __sgw_key: Final[str] = "sync-gateways"
     __cbs_key: Final[str] = "couchbase-servers"
     __lb_key: Final[str] = "load-balancers"
+    __es_key: Final[str] = "edge-servers"
     __greenboard_key: Final[str] = "greenboard"
     __api_version_key: Final[str] = "api-version"
     __logslurp_key: Final[str] = "logslurp"
@@ -185,6 +186,11 @@ class ParsedConfig:
     def load_balancers(self) -> list[str]:
         """The list of load balancers that can be interacted with"""
         return self.__load_balancers
+
+    @property
+    def edge_servers(self) -> list[dict]:
+        """The list of edge servers that can be interacted with"""
+        return self.__edge_servers
 
     @property
     def greenboard_url(self) -> str | None:
@@ -224,6 +230,7 @@ class ParsedConfig:
             json, self.__cbs_key, list[dict], []
         )
         self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, list[str], [])
+        self.__edge_servers = _get_typed_nonnull(json, self.__es_key, list[dict], [])
         if self.__api_version_key in json:
             warning(
                 "The 'api-version' field in the config file is deprecated and will be "
@@ -255,6 +262,9 @@ class ParsedConfig:
             + "\n"
             + "Load Balancers: "
             + dumps(self.__load_balancers)
+            + "\n"
+            + "Edge Servers: "
+            + dumps(self.__edge_servers)
             + "\n"
             + "Logslurp URL: "
             + (self.__logslurp_url if self.__logslurp_url is not None else "")
