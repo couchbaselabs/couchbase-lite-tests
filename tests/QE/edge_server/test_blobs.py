@@ -134,7 +134,8 @@ class TestBlobs(CBLTestClass):
         logger.info(f"Adding a blob to document {doc_id} in Edge Server.")
 
         # Read test image as binary data
-        with open("../resources/images/test.png", "rb") as img_file:
+        blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
+        with open(blob_path, "rb") as img_file:
             image_data = img_file.read()
 
         # Add the image as an attachment to the document
@@ -189,7 +190,8 @@ class TestBlobs(CBLTestClass):
 
         attachment_name = "test.png"
         # Read test image as binary data
-        with open("../resources/images/test.png", "rb") as img_file:
+        blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
+        with open(blob_path, "rb") as img_file:
             image_data = img_file.read()
 
         try:
@@ -233,7 +235,8 @@ class TestBlobs(CBLTestClass):
         logger.info(f"Adding multiple blobs to document {doc_id} in Edge Server.")
 
         # Read test image as binary data
-        with open("../resources/images/test.png", "rb") as img_file:
+        blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
+        with open(blob_path, "rb") as img_file:
             image_data = img_file.read()
 
         # Add the image as an attachment to the document
@@ -254,7 +257,8 @@ class TestBlobs(CBLTestClass):
         logger.info(f"First blob added to document {doc_id} in Edge Server.")
 
         # Read test image as binary data
-        with open("../resources/images/test2.png", "rb") as img_file:
+        blob_path = dataset_path.parent / "edge-server" / "blobs" / "test2.png"
+        with open(blob_path, "rb") as img_file:
             image_data = img_file.read()
 
         # Add the image as an attachment to the document
@@ -311,7 +315,8 @@ class TestBlobs(CBLTestClass):
         )
 
         # Read test image as binary data
-        with open("../resources/images/20mb.jpg", "rb") as img_file:
+        blob_path = dataset_path.parent / "edge-server" / "blobs" / "20mb.jpg"
+        with open(blob_path, "rb") as img_file:
             image_data = img_file.read()
 
         # Add the image as an attachment to the document
