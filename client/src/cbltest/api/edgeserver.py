@@ -27,6 +27,7 @@ class EdgeServerVersion(CouchbaseVersion):
     """
     A class for parsing Edge Server Version
     """
+
     def parse(self, input: str) -> Tuple[str, int]:
         first_lparen = input.find("(")
         first_semicol = input.find(";")

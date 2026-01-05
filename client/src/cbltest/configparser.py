@@ -122,6 +122,7 @@ class CouchbaseServerInfo:
 
 class EdgeServerInfo:
     """The parsed Edge Server information from the config file"""
+
     __hostname_key: Final[str] = "hostname"
     __admin_user_key: Final[str] = "admin_user"
     __admin_password_key: Final[str] = "admin_password"
