@@ -1,5 +1,6 @@
 import asyncio
 import platform
+import socket
 import subprocess
 import tempfile
 import time
@@ -9,6 +10,8 @@ from datetime import timedelta
 from pathlib import Path
 from time import sleep
 from typing import TypeVar, cast
+
+import aiohttp
 
 T = TypeVar("T")
 from urllib.parse import quote_plus, urlparse
@@ -106,9 +109,10 @@ class CouchbaseServer:
             if "://" not in url:
                 url = f"couchbase://{url}"
 
-            self.__hostname = (
-                urlparse(url).hostname or urlparse(url).netloc.split(":")[0]
-            )
+            parsed = urlparse(url)
+            self.__hostname = parsed.hostname or parsed.netloc.split(":")[0]
+            self.__rest_port = parsed.port or 8091  # Track REST port explicitly
+
             auth = PasswordAuthenticator(username, password)
             opts = ClusterOptions(auth)
             self.__username = username
@@ -1139,3 +1143,249 @@ class CouchbaseServer:
         raise CblTestError(
             f"Rebalance did not complete within {timeout_seconds} seconds"
         )
+
+    async def reconfigure_ports(
+        self,
+        rest_port: int = 9000,
+        ssl_port: int = 1900,
+        memcached_port: int = 9050,
+        memcached_ssl_port: int = 9057,
+    ) -> None:
+        """
+        Reconfigure CBS ports by calling shell2http endpoint on the CBS node.
+
+        :param rest_port: New REST API port (default 9000)
+        :param ssl_port: New SSL REST port (default 1900)
+        :param memcached_port: New memcached port (default 9050)
+        :param memcached_ssl_port: New SSL memcached port (default 9057)
+        """
+        shell2http_url = (
+            f"http://{self.hostname}:20001/configure-cbs-ports"
+            f"?rest_port={rest_port}"
+            f"&ssl_port={ssl_port}"
+            f"&memcached_port={memcached_port}"
+            f"&memcached_ssl_port={memcached_ssl_port}"
+        )
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(shell2http_url) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(
+                        f"Failed to reconfigure CBS ports: {resp.status} - {body}"
+                    )
+
+    async def stop_server(self) -> None:
+        """
+        Stop the Couchbase Server service via shell2http.
+        """
+        shell2http_url = f"http://{self.__hostname}:20001/stop-cbs"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(shell2http_url) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(f"Failed to stop CBS: {resp.status} - {body}")
+
+    async def start_server(self) -> None:
+        """
+        Start the Couchbase Server service via shell2http.
+        """
+        shell2http_url = f"http://{self.__hostname}:20001/start-cbs"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(shell2http_url) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(f"Failed to start CBS: {resp.status} - {body}")
+
+    async def reset_cluster(self) -> None:
+        """
+        Reset the Couchbase cluster via shell2http (removes all data and configuration).
+        """
+        shell2http_url = f"http://{self.__hostname}:20001/reset-cluster"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(shell2http_url) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(
+                        f"Failed to reset CBS cluster: {resp.status} - {body}"
+                    )
+
+    async def wait_for_server_ready(
+        self,
+        timeout: int = 120,
+        port: int = 8091,
+        check_interval: float = 1.0,
+    ) -> None:
+        """
+        Robust wait for Couchbase Server readiness.
+
+        Readiness definition:
+        1. TCP port is accepting connections
+        2. /pools/default returns HTTP 200
+
+        :param timeout: Total timeout in seconds
+        :param port: REST API port to check
+        :param check_interval: Sleep interval between checks
+        """
+        start_time = time.time()
+        hostname = self.__hostname
+        url = f"http://{hostname}:{port}/pools/default"
+
+        last_error: Exception | str | None = None
+
+        while time.time() - start_time < timeout:
+            try:
+                with socket.create_connection((hostname, port), timeout=2):
+                    pass
+            except Exception as e:
+                last_error = e
+                await asyncio.sleep(check_interval)
+                continue
+
+            try:
+                resp = self.__http_session.get(url, timeout=5)
+                if resp.status_code == 200:
+                    return
+                else:
+                    last_error = RuntimeError(
+                        f"REST not ready: HTTP {resp.status_code}"
+                    )
+            except requests.exceptions.ConnectionError as e:
+                last_error = f"REST connection error: {e}"
+            except requests.exceptions.ReadTimeout as e:
+                last_error = f"REST timeout: {e}"
+            except ValueError as e:
+                last_error = f"Invalid JSON from REST: {e}"
+
+            await asyncio.sleep(check_interval)
+
+        raise CblTestError(
+            f"CBS did not become ready on {hostname}:{port} within {timeout}s. "
+            f"Last error: {last_error}"
+        )
+
+    async def wait_for_server_stopped(self, timeout: int = 60) -> None:
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                resp = self.__http_session.get(
+                    f"http://{self.__hostname}:{self.__rest_port}/pools/default",
+                    timeout=2,
+                )
+                if resp.status_code != 200:
+                    return
+            except Exception:
+                return
+            await asyncio.sleep(1)
+
+        raise CblTestError("CBS did not stop cleanly within timeout")
+
+    def init_cluster(self, rest_port: int = 8091) -> None:
+        """
+        Initialize the CBS cluster with basic settings.
+
+        :param rest_port: REST API port to use (default 8091)
+        """
+        with self.__tracer.start_as_current_span("init_cluster"):
+            # Use the specified REST port for HTTP calls
+            base_url = f"http://{self.__hostname}:{rest_port}"
+
+            # Initialize cluster if not already done
+            resp = self.__http_session.post(
+                f"{base_url}/clusterInit",
+                data={
+                    "clusterName": "test-cluster",
+                    "username": self.__username,
+                    "password": self.__password,
+                    "port": str(rest_port),
+                    "services": "kv,index,n1ql",
+                },
+            )
+            # 200 = success, 400 = already initialized
+            if resp.status_code not in [200, 400]:
+                raise CblTestError(
+                    f"Failed to initialize cluster: {resp.status_code} - {resp.text}"
+                )
+
+    async def wait_for_kv_ready(self, timeout: int = 60) -> None:
+        """
+        Wait for KV (data) service to be ready.
+
+        :param timeout: Maximum time to wait in seconds
+        """
+        for attempt in range(timeout):
+            try:
+                # Check if we can connect to the data service
+                resp = self.__http_session.get(
+                    f"http://{self.__hostname}:{self.__rest_port}/pools/default/buckets"
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    # Check if any node has KV service available
+                    nodes = data.get("nodes", [])
+                    if nodes:
+                        # If we can get pool info, KV service is likely ready
+                        return
+            except Exception:
+                pass
+
+            if attempt % 10 == 0:
+                print(f"Waiting for KV service... ({attempt}/{timeout})")
+            await asyncio.sleep(1)
+
+        raise CblTestError(f"KV service did not become ready within {timeout} seconds")
+
+    def assert_ports_applied(
+        self, rest_port: int = 8091, memcached_port: int = 11211
+    ) -> None:
+        """
+        Verify that CBS is actually listening on the expected ports.
+
+        :param rest_port: Expected REST API port
+        :param memcached_port: Expected memcached port
+        """
+        with self.__tracer.start_as_current_span("assert_ports_applied"):
+            # Check REST port
+            try:
+                resp = self.__http_session.get(
+                    f"http://{self.__hostname}:{rest_port}/pools/default"
+                )
+                if resp.status_code != 200:
+                    raise CblTestError(
+                        f"REST port {rest_port} not responding correctly"
+                    )
+            except Exception as e:
+                raise CblTestError(f"Cannot connect to REST port {rest_port}: {e}")
+
+            # Note: Memcached port checking would require different approach
+            # as it's binary protocol, not HTTP
+            print(f"✓ CBS confirmed listening on REST port {rest_port}")
+
+    def reconnect(self, new_url: str) -> None:
+        """
+        Reconnect to CBS with a new URL (useful after port changes).
+
+        :param new_url: New CBS URL (e.g., "couchbase://hostname:9000")
+        """
+        with self.__tracer.start_as_current_span("reconnect_to_couchbase_server"):
+            if "://" not in new_url:
+                new_url = f"couchbase://{new_url}"
+
+            parsed = urlparse(new_url)
+            hostname = parsed.hostname or parsed.netloc.split(":")[0]
+            rest_port = parsed.port or 8091
+
+            # Reconnect SDK cluster
+            auth = PasswordAuthenticator(self.__username, self.__password)
+            opts = ClusterOptions(auth)
+            self.__cluster = Cluster(new_url, opts)
+            self.__cluster.wait_until_ready(timedelta(seconds=10))
+
+            # Update hostname, REST port, and recreate HTTP session
+            self.__hostname = hostname
+            self.__rest_port = rest_port
+            self.__http_session = requests.Session()
+            self.__http_session.auth = (self.__username, self.__password)
