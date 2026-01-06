@@ -223,12 +223,7 @@ class EdgeServer:
     def keyspace_builder(
         self, db_name: str = "", scope: str = "", collection: str = ""
     ):
-        keyspace = db_name
-        if scope:
-            keyspace += f".{scope}"
-        if collection:
-            keyspace += f".{collection}"
-        return keyspace
+        return ".".join((db_name, scope, collection)).rstrip(".")
 
     async def get_version(self) -> CouchbaseVersion:
         scheme = "https://" if self.__secure else "http://"
