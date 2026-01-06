@@ -193,7 +193,7 @@ class TestTTLExpires(CBLTestClass):
             )
 
         self.mark_test_step(
-            "Creating a document with TTL of 30 seconds and Expires of 5 seconds"
+            "Creating a document with TTL of 60 seconds and Expires of 10 seconds"
         )
 
         doc2 = {
@@ -202,15 +202,15 @@ class TestTTLExpires(CBLTestClass):
             "timestamp": datetime.utcnow().isoformat(),
         }
 
-        # Calculate expires as current timestamp + 5 seconds (Unix timestamp) - lower than TTL
-        expires_timestamp2 = int(time.time()) + 20
+        # Calculate expires as current timestamp + 10 seconds (Unix timestamp) - lower than TTL
+        expires_timestamp2 = int(time.time()) + 10
 
         response2 = await edge_server.put_document_with_id(
             doc2, "ttl_expires_doc2", es_db_name, ttl=60, expires=expires_timestamp2
         )
         assert response2 is not None, "Failed to create document with TTL and expires"
         logger.info(
-            f"Document created with TTL=60s and expires={expires_timestamp2} (current + 20s)"
+            f"Document created with TTL=60s and expires={expires_timestamp2} (current + 10s)"
         )
 
         # Verify document exists immediately
@@ -219,23 +219,23 @@ class TestTTLExpires(CBLTestClass):
         assert response2 is not None, "Document is not present in the database"
         logger.info("Document is present in the database")
 
-        # Wait 20 seconds - document should expire (expires=20s is lower than TTL=60s, so expires should take precedence)
+        # Wait 10 seconds - document should expire (expires=10s is lower than TTL=60s, so expires should take precedence)
         self.mark_test_step(
-            "Waiting 20 seconds - document should expire based on expires (lower value)"
+            "Waiting 10 seconds - document should expire based on expires (lower value)"
         )
-        time.sleep(20)
+        time.sleep(10)
 
         try:
             response2 = await edge_server.get_document(es_db_name, "ttl_expires_doc2")
             assert False, (
-                "Document should have expired after 20 seconds (expires takes precedence)"
+                "Document should have expired after 10 seconds (expires takes precedence)"
             )
         except CblEdgeServerBadResponseError:
             logger.info(
-                "Document expired after 20 seconds as expected (expires=20s took precedence over TTL=30s)"
+                "Document expired after 10 seconds as expected (expires=10s took precedence over TTL=60s)"
             )
             self.mark_test_step(
-                "Document expired after 20 seconds - expires took precedence over TTL"
+                "Document expired after 10 seconds - expires took precedence over TTL"
             )
 
         self.mark_test_step("Test completed successfully.")
