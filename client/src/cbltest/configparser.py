@@ -120,6 +120,36 @@ class CouchbaseServerInfo:
         )
 
 
+class EdgeServerInfo:
+    """The parsed Edge Server information from the config file"""
+
+    __hostname_key: Final[str] = "hostname"
+    __admin_user_key: Final[str] = "admin_user"
+    __admin_password_key: Final[str] = "admin_password"
+
+    @property
+    def hostname(self) -> str:
+        """Gets the hostname of the Edge Server instance"""
+        return self.__hostname
+
+    @property
+    def admin_user(self) -> str:
+        return self.__admin_user
+
+    @property
+    def admin_password(self) -> str:
+        return self.__admin_password
+
+    def __init__(self, data: dict):
+        self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
+        self.__admin_user = _get_str_or_default(
+            data, self.__admin_user_key, "Administrator"
+        )
+        self.__admin_password = _get_str_or_default(
+            data, self.__admin_password_key, "password"
+        )
+
+
 class TransportType(Enum):
     HTTP = "http"
     WS = "ws"
@@ -132,6 +162,7 @@ class ParsedConfig:
     __sgw_key: Final[str] = "sync-gateways"
     __cbs_key: Final[str] = "couchbase-servers"
     __lb_key: Final[str] = "load-balancers"
+    __es_key: Final[str] = "edge-servers"
     __greenboard_key: Final[str] = "greenboard"
     __api_version_key: Final[str] = "api-version"
     __logslurp_key: Final[str] = "logslurp"
@@ -156,6 +187,11 @@ class ParsedConfig:
     def load_balancers(self) -> list[str]:
         """The list of load balancers that can be interacted with"""
         return self.__load_balancers
+
+    @property
+    def edge_servers(self) -> list[dict]:
+        """The list of edge servers that can be interacted with"""
+        return self.__edge_servers
 
     @property
     def greenboard_url(self) -> str | None:
@@ -195,6 +231,7 @@ class ParsedConfig:
             json, self.__cbs_key, list[dict], []
         )
         self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, list[str], [])
+        self.__edge_servers = _get_typed_nonnull(json, self.__es_key, list[dict], [])
         if self.__api_version_key in json:
             warning(
                 "The 'api-version' field in the config file is deprecated and will be "
@@ -226,6 +263,9 @@ class ParsedConfig:
             + "\n"
             + "Load Balancers: "
             + dumps(self.__load_balancers)
+            + "\n"
+            + "Edge Servers: "
+            + dumps(self.__edge_servers)
             + "\n"
             + "Logslurp URL: "
             + (self.__logslurp_url if self.__logslurp_url is not None else "")
