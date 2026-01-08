@@ -199,6 +199,15 @@ def setup_config(server_hostname: str) -> None:
             )
             json.dump(config_content, fout, indent=4)
 
+    # Generate x509 ca_cert_path bootstrap config (for x509 testing)
+    with open(SCRIPT_DIR / "config" / "bootstrap-x509-cacert-only.json") as fin:
+        with open(SCRIPT_DIR / "bootstrap-x509-cacert-only.json", "w") as fout:
+            config_content = cast(dict, json.load(fin))
+            config_content["bootstrap"]["server"] = config_content["bootstrap"][
+                "server"
+            ].replace("{{server-ip}}", server_hostname)
+            json.dump(config_content, fout, indent=4)
+
     with open(SCRIPT_DIR / "start-sgw.sh.in") as file:
         start_sgw_content = file.read()
 
@@ -318,6 +327,11 @@ def setup_server(
         sftp,
         SCRIPT_DIR / "bootstrap-alternate.json",
         "/home/ec2-user/config/bootstrap-alternate.json",
+    )
+    sftp_progress_bar(
+        sftp,
+        SCRIPT_DIR / "bootstrap-x509-cacert-only.json",
+        "/home/ec2-user/config/bootstrap-x509-cacert-only.json",
     )
     sftp_progress_bar(
         sftp, SCRIPT_DIR / "cert" / "sg_cert.pem", "/home/ec2-user/cert/sg_cert.pem"
