@@ -4,7 +4,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 REQUEST_BODY=$(read_http_body)
 
-DB_FILENAME=$(echo $REQUEST_BODY | jq -r '.filename')
+DB_DIR="$HOME/database"
+DB_FILENAME="$DB_DIR/$(echo "$REQUEST_BODY" | jq -r '.filename')"
 if [ -z "$DB_FILENAME" ] || [ "$DB_FILENAME" == "null" ]; then
   echo "Error: 'filename' field is required in the request body"
   exit 1

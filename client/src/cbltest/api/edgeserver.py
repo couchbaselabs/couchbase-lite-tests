@@ -21,7 +21,8 @@ from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.version import VERSION
-
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Callable, Iterable, Tuple
 
 class EdgeServerVersion(CouchbaseVersion):
     """
@@ -89,7 +90,7 @@ class EdgeServer:
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
             repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
-            config_file = str(repo_root / "environment" / "edge_server" / "config" / "config.json")
+            config_file = str(repo_root / "environment" / "aws" /"es_setup"/"config" / "config.json")
         port, secure, mtls, certfile, keyfile, is_auth, databases, is_anonymous_auth = (
             self._decode_config_file(config_file)
         )
@@ -212,7 +213,7 @@ class EdgeServer:
 
             if not resp.ok:
                 raise CblEdgeServerBadResponseError(
-                    resp.status, f"{method} {path} returned {resp.status} for {req}"
+                    resp.status, f"{method} {path} returned {resp.status} for payload {data}"
                 )
 
             return ret_val
