@@ -1,0 +1,77 @@
+{
+    "bootstrap": {
+      "server": "couchbases://{{server-ip}}",
+      "server_tls_skip_verify": false,
+      "ca_cert_path": "/home/ec2-user/cert/cbs-ca-cert.pem",
+      "username": "admin",
+      "password": "password"
+    },
+    "api": {
+      "public_interface": ":4984",
+      "admin_interface": ":4985",
+      "https": {
+        "tls_cert_path": "cert/sg_cert.pem",
+        "tls_key_path": "cert/sg_key.pem"
+      },
+      "cors": {
+        "origin": [
+          "http://localhost:5173"
+        ],
+        "login_origin": [
+          "http://localhost:5173"
+        ],
+        "headers": [
+          "Authorization"
+        ]
+      }
+    },
+    "logging": {
+      "console": {
+        "enabled": true,
+        "log_level": "info",
+        "log_keys": ["*"]
+      },
+      "log_file_path": "/home/ec2-user/log",
+      "redaction_level": "partial",
+      "debug": {
+        "enabled": true,
+        "rotation": {
+          "max_size": 10240,
+          "max_age": 365,
+          "rotated_logs_size_limit": 10240
+        }
+      },
+      "info": {
+        "enabled": true,
+        "rotation": {
+          "max_size": 10240,
+          "max_age": 365,
+          "rotated_logs_size_limit": 10240
+        }
+      },
+      "warn": {
+        "enabled": true,
+        "rotation": {
+          "max_size": 10240,
+          "max_age": 365,
+          "rotated_logs_size_limit": 10240
+        }
+      },
+      "error": {
+        "enabled": true,
+        "rotation": {
+          "max_size": 10240,
+          "max_age": 365,
+          "rotated_logs_size_limit": 10240
+        }
+      },
+      "trace": {
+        "enabled": true,
+        "rotation": {
+          "max_size": 10240,
+          "max_age": 365,
+          "rotated_logs_size_limit": 10240
+        }
+      }
+    }
+  }
