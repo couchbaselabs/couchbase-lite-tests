@@ -8,6 +8,8 @@ mkdir -p $HOME/log
 mkdir -p $HOME/shell2http
 mkdir -p $HOME/user
 
+sudo yum install -y wget
+
 curl -LO https://github.com/caddyserver/caddy/releases/download/v2.10.2/caddy_2.10.2_linux_amd64.tar.gz
 tar xvf caddy_2.10.2_linux_amd64.tar.gz caddy
 rm caddy_2.10.2_linux_amd64.tar.gz
@@ -25,3 +27,4 @@ fi
 if ! command -v unzip >/dev/null 2>&1; then
   sudo yum install unzip -y
 fi
+sudo iptables -F

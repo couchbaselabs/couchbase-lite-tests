@@ -6,4 +6,4 @@ if [[ "$PID" == "" ]]; then
     exit 0
 fi
 
-kill -SIGHUP $PID
+sudo kill -SIGHUP $PID
