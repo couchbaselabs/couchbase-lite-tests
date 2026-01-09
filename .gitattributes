@@ -3,3 +3,5 @@ dataset/server/**/*.jpg filter=lfs diff=lfs merge=lfs -text
 dataset/server/**/*.png filter=lfs diff=lfs merge=lfs -text
 dataset/server/**/*.blob filter=lfs diff=lfs merge=lfs -text
 dataset/couchbase-server/**/*.zip filter=lfs diff=lfs merge=lfs -text
+dataset/edge-server/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+dataset/edge-server/**/*.png filter=lfs diff=lfs merge=lfs -text

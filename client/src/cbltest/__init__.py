@@ -62,6 +62,11 @@ class CBLPyTest:
         return self.__couchbase_servers
 
     @property
+    def edge_servers(self) -> list[EdgeServer]:
+        """Gets the list of Edge Servers available"""
+        return self.__edge_servers
+
+    @property
     def load_balancers(self) -> list[str]:
         """Gets the list of Load Balancers available"""
         return self.__config.load_balancers
@@ -151,6 +156,12 @@ class CBLPyTest:
                         cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password
                     )
                 )
+        self.__edge_servers: list[EdgeServer] = []
+        if not test_server_only:
+            for es in self.__config.edge_servers:
+                es_info = EdgeServerInfo(es)
+                self.__edge_servers.append(EdgeServer(es_info.hostname))
+
         self.__edge_servers: list[EdgeServer] = []
         if not test_server_only:
             for es in self.__config.edge_servers:
