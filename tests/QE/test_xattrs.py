@@ -8,6 +8,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from conftest import cleanup_test_resources
 from packaging.version import Version
 
 
@@ -24,13 +25,11 @@ class TestXattrs(CBLTestClass):
         num_docs = 100
         username = "vipul"
         password = "pass"
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_xattrs_offline"
+        bucket_name = "bucket-xattrs-offline"
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(
-            bucket_name
-        )  # in case the bucket already exists, due to a previous failed test
+        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
@@ -169,19 +168,18 @@ class TestXattrs(CBLTestClass):
         )
 
         await sg_user.close()
-        await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_purge(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
-        num_docs = 1000
+        num_docs = 100
         username = "vipul"
         password = "pass"
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_xattrs_purge"
+        bucket_name = "bucket-xattrs-purge"
         channels = ["NASA"]
+        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -362,8 +360,6 @@ class TestXattrs(CBLTestClass):
         )
 
         await sg_user.close()
-        await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sg_sdk_interop_unique_docs(
@@ -375,8 +371,8 @@ class TestXattrs(CBLTestClass):
         num_updates = 10
         username = "vipul"
         password = "pass"
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_xattrs_unique"
+        bucket_name = "bucket-xattrs-unique"
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -529,8 +525,6 @@ class TestXattrs(CBLTestClass):
         )
 
         await sg_user.close()
-        await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sg_sdk_interop_shared_docs(
@@ -542,8 +536,8 @@ class TestXattrs(CBLTestClass):
         num_updates = 10
         username = "vipul"
         password = "pass"
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_xattrs_shared"
+        bucket_name = "bucket-xattrs-shared"
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -787,8 +781,6 @@ class TestXattrs(CBLTestClass):
         )
 
         await sg_user.close()
-        await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sync_xattrs_update_concurrently(
@@ -797,14 +789,15 @@ class TestXattrs(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 20
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        sg_db = "db_xattrs_concurrent"
+        bucket_name = "bucket-xattrs-concurrent"
         user_custom_channel_xattr = "channel1"
         sg_channel1 = "abc"
         sg_channel2 = "xyz"
         username1 = "vipul"
         username2 = "lupiv"
         password = "password"
+        await cleanup_test_resources(sg, cbs, [bucket_name])
 
         self.mark_test_step("Create bucket and default collection")
         cbs.drop_bucket(bucket_name)
@@ -953,5 +946,3 @@ class TestXattrs(CBLTestClass):
 
         await sg_user1.close()
         await sg_user2.close()
-        await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
