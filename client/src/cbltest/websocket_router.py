@@ -24,9 +24,19 @@ class WebSocketRouter:
         self.__stopping = False
 
     async def start(self) -> None:
+        if len(self.__server_urls) == 0:
+            cbl_info("No WS test servers to connect to; skipping router start")
+            return
+
         self.__stopping = False
         await self.__runner.setup()
-        site = web.TCPSite(self.__runner, port=10000)
+
+        # Create a socket so that I can use an OS provided port
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(("", 0))
+        sock.listen(128)
+        site = web.SockSite(self.__runner, sock)
+        chosen_port = sock.getsockname()[1]
         await site.start()
 
         ws_index = 0
@@ -34,7 +44,7 @@ class WebSocketRouter:
             local_ip = self._lookup_ip(url)
             cbl_info(f"Connecting to test server at {url}...")
             params = {
-                "tdkURL": f"ws://{local_ip}:10000",
+                "tdkURL": f"ws://{local_ip}:{chosen_port}/",
                 "autostart": "true",
                 "device": f"ws{ws_index}",
             }

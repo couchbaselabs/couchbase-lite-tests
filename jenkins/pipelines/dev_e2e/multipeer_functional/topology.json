@@ -11,6 +11,7 @@
             "platform": "swift_ios",
             "cbl_version": "{{version}}",
             "location": "00008110-000A48A63E10401E",
+            "ip_hint": "10.100.150.63",
             "download": true
         },
         {
@@ -23,6 +24,7 @@
             "platform": "swift_ios",
             "cbl_version": "{{version}}",
             "location": "422841e97a85afc19bc869f216a5a81db9903ea6",
+            "ip_hint": "10.100.150.59",
             "download": true
         }
     ]

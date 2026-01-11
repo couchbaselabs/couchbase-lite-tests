@@ -1,14 +1,15 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
     [Parameter(Mandatory=$true)][string]$SgwVersion,
-    [Parameter][string]$DatasetVersion = "4.0"
+    [Parameter()][string]$DatasetVersion = "4.0"
 )
 
 Import-Module $PSScriptRoot/../../shared/config.psm1 -Force
 Import-Module $PSScriptRoot/prepare_env.psm1 -Force
 $ErrorActionPreference = "Stop" 
 
-Install-DotNet
+Install-DotNet -Version "9.0"
+Install-DotNetRuntime -Version "8.0"
 
 Stop-Venv
 New-Venv venv
