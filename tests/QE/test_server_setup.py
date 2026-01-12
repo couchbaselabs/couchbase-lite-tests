@@ -92,7 +92,7 @@ class TestServerSetup(CBLTestClass):
         self.mark_test_step("Fetch CBS root CA certificate and upload to SGW")
         ca_cert_pem = await cbs.get_root_ca_certificate()
         await sg.upload_certificate(
-            cert_content=ca_cert_pem, cert_name="cbs-ca-cert.pem", cert_type="ca"
+            cert_content=ca_cert_pem, cert_name="cbs-ca-cert.pem"
         )
 
         self.mark_test_step("Restart SGW with x509 cacert config")

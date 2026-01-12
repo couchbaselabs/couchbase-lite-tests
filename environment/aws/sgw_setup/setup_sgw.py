@@ -25,6 +25,7 @@ Functions:
         Main function to set up the Sync Gateway topology.
 """
 
+import copy
 import json
 import os
 import sys
@@ -183,30 +184,29 @@ def setup_config(server_hostname: str) -> None:
     """
     header(f"Writing {server_hostname} to bootstrap configs as CBS IP")
 
-    # Generate default bootstrap.json
+    # Load base template
     with open(SCRIPT_DIR / "config" / "bootstrap.json") as fin:
-        with open(SCRIPT_DIR / "bootstrap.json", "w") as fout:
-            config_content = cast(dict, json.load(fin))
-            config_content["bootstrap"]["server"] = f"couchbases://{server_hostname}"
-            json.dump(config_content, fout, indent=4)
+        base_config = cast(dict, json.load(fin))
 
-    # Generate alternate bootstrap config (with explicit port for alternate address testing)
-    with open(SCRIPT_DIR / "config" / "bootstrap-alternate.json") as fin:
-        with open(SCRIPT_DIR / "bootstrap-alternate.json", "w") as fout:
-            config_content = cast(dict, json.load(fin))
-            config_content["bootstrap"]["server"] = (
-                f"couchbases://{server_hostname}:11207"
-            )
-            json.dump(config_content, fout, indent=4)
+    # 1. Default bootstrap.json
+    default_config = copy.deepcopy(base_config)
+    default_config["bootstrap"]["server"] = f"couchbases://{server_hostname}"
+    with open(SCRIPT_DIR / "bootstrap.json", "w") as fout:
+        json.dump(default_config, fout, indent=4)
 
-    # Generate x509 ca_cert_path bootstrap config (for x509 testing)
-    with open(SCRIPT_DIR / "config" / "bootstrap-x509-cacert-only.json") as fin:
-        with open(SCRIPT_DIR / "bootstrap-x509-cacert-only.json", "w") as fout:
-            config_content = cast(dict, json.load(fin))
-            config_content["bootstrap"]["server"] = config_content["bootstrap"][
-                "server"
-            ].replace("{{server-ip}}", server_hostname)
-            json.dump(config_content, fout, indent=4)
+    # 2. bootstrap-alternate.json (with explicit port for alternate address testing)
+    alternate_config = copy.deepcopy(base_config)
+    alternate_config["bootstrap"]["server"] = f"couchbases://{server_hostname}:11207"
+    with open(SCRIPT_DIR / "bootstrap-alternate.json", "w") as fout:
+        json.dump(alternate_config, fout, indent=4)
+
+    # 3. bootstrap-x509-cacert-only.json (for x509 CA cert testing)
+    x509_config = copy.deepcopy(base_config)
+    x509_config["bootstrap"]["server"] = f"couchbases://{server_hostname}"
+    x509_config["bootstrap"]["server_tls_skip_verify"] = False
+    x509_config["bootstrap"]["ca_cert_path"] = "/home/ec2-user/cert/cbs-ca-cert.pem"
+    with open(SCRIPT_DIR / "bootstrap-x509-cacert-only.json", "w") as fout:
+        json.dump(x509_config, fout, indent=4)
 
     with open(SCRIPT_DIR / "start-sgw.sh.in") as file:
         start_sgw_content = file.read()

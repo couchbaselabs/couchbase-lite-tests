@@ -1,19 +1,18 @@
 #!/bin/bash
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
 
 echo "Restarting Sync Gateway..."
 
-# Parse config from QUERY_STRING (shell2http sets this, not HTTP_config)
-# QUERY_STRING format: config=value or config=value&other=...
-if [[ "$QUERY_STRING" =~ config=([^&]*) ]]; then
-    CONFIG_VALUE="${BASH_REMATCH[1]}"
-else
-    CONFIG_VALUE="bootstrap"
-fi
+# Read config name from POST body (first line)
+BODY=$(read_http_body)
+CONFIG_VALUE=$(echo "$BODY" | head -n 1)
 
-echo "DEBUG: QUERY_STRING=${QUERY_STRING:-<not set>}"
-echo "DEBUG: Parsed config: ${CONFIG_VALUE}"
+# Use default if empty
+CONFIG_VALUE="${CONFIG_VALUE:-bootstrap}"
+echo "DEBUG: Config name: ${CONFIG_VALUE}"
 
 bash "$SCRIPT_DIR/stop-sgw.sh"
 sleep 2

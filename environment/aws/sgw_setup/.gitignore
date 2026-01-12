@@ -1,5 +1,5 @@
 start-sgw.sh
 bootstrap.json
 bootstrap-alternate.json
-/bootstrap-x509-cacert-only.json
+bootstrap-x509-cacert-only.json
 *.rpm
