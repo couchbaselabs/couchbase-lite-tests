@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, cast
 from urllib.parse import urljoin
 
-import pyjson5 as json5
+import pyjson5 as json5  # type: ignore[import-not-found]
 from aiohttp import BasicAuth, ClientSession
 from opentelemetry.trace import get_tracer
 

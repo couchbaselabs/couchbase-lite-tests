@@ -230,7 +230,6 @@ class ParsedConfig:
         self.__couchbase_servers = _get_typed_nonnull(
             json, self.__cbs_key, list[dict], []
         )
-        self.__edge_servers = _get_typed_nonnull(json, self.__es_key, list[dict], [])
         self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, list[str], [])
         self.__edge_servers = _get_typed_nonnull(json, self.__es_key, list[dict], [])
         if self.__api_version_key in json:
@@ -273,8 +272,6 @@ class ParsedConfig:
             + "\n"
             + "Greenboard: "
             + (self.__greenboard["url"] if self.__greenboard is not None else "")
-            + "Edge Servers: "
-            + dumps(self.__edge_servers)
         )
 
         return ret_val
