@@ -15,7 +15,9 @@ class TestDatabase(CBLTestClass):
         self.mark_test_step("test_create_database")
         edge_server = cblpytest.edge_servers[0]
         file_path = os.path.abspath(os.path.dirname(__file__))
-        config_path = f"{file_path}/config/test_edge_server_with_multiple_rest_clients.json"
+        config_path = (
+            f"{file_path}/config/test_edge_server_with_multiple_rest_clients.json"
+        )
         edge_server = await edge_server.set_config(config_path)
         dbs = await edge_server.get_all_dbs()
         assert len(dbs) == 1

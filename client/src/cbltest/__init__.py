@@ -71,10 +71,6 @@ class CBLPyTest:
         """Gets the list of Load Balancers available"""
         return self.__config.load_balancers
 
-    @property
-    def edge_servers(self) -> list[EdgeServer]:
-        return self.__edge_servers
-
     @staticmethod
     async def create(
         config_path: str,

@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.edgeserver import BulkDocOperation
 
 
 class TestCrud(CBLTestClass):
@@ -58,7 +57,7 @@ class TestCrud(CBLTestClass):
         self.mark_test_step(f"update single doc of rev={rev2}")
         new_doc = {"test2": "This is updated test doc"}
         update = await edge_server.put_document_with_id(new_doc, id2, db_name, rev=rev2)
-        rev3 = update.get("rev")
+        rev3: str = update["rev"]
         self.mark_test_step(f"fetch updated doc of rev {rev3}")
         doc3 = await edge_server.get_document(db_name, doc_id=id2)
         self.mark_test_step(f"Fetched doc {doc3}")
@@ -97,7 +96,7 @@ class TestCrud(CBLTestClass):
         assert updated_doc.get("test_key") == sample_value
         self.mark_test_step("Delete the subdocument")
         resp = await edge_server.delete_sub_document(
-            id1, resp.get("rev"), "test_key", db_name
+            id1, resp["rev"], "test_key", db_name
         )
         self.mark_test_step(f" deleted sub document response: {resp}")
         try:
@@ -121,22 +120,26 @@ class TestCrud(CBLTestClass):
         id1 = resp1.get("id")
         self.mark_test_step("fetch single doc after ttl 20")
         await asyncio.sleep(20)
-        failed=False
+        failed = False
         try:
             await edge_server.get_document(db_name, doc_id=id1)
         except Exception as e:
             failed = True
             self.mark_test_step(f"Fetch doc {doc} failed as expected {e}")
-        assert failed,"Doc fetch successful despite expiry"
+        assert failed, "Doc fetch successful despite expiry"
 
-        self.mark_test_step("create single doc with id of a TTL=50 and update the TTL=20")
+        self.mark_test_step(
+            "create single doc with id of a TTL=50 and update the TTL=20"
+        )
         id2 = "test50"
         resp2 = await edge_server.put_document_with_id(doc, id2, db_name, ttl=50)
         rev2 = resp2.get("rev")
 
         self.mark_test_step(f"update doc of rev={rev2} to TTL 20")
         new_doc = {"test2": "This is updated test doc"}
-        update = await edge_server.put_document_with_id(new_doc, id2, db_name, rev=rev2, ttl=20)
+        update = await edge_server.put_document_with_id(
+            new_doc, id2, db_name, rev=rev2, ttl=20
+        )
         rev3 = update.get("rev")
         self.mark_test_step(f"fetch updated doc of rev {rev3} with TTL=20")
         doc3 = await edge_server.get_document(db_name, doc_id=id2)
@@ -154,9 +157,9 @@ class TestCrud(CBLTestClass):
 
         self.mark_test_step("delete a single doc of expiry 60 seconds")
         new_doc = {"test3": "This is new test doc"}
-        id3="test100"
+        id3 = "test100"
         update = await edge_server.put_document_with_id(new_doc, id3, db_name, ttl=60)
-        rev3 = update.get("rev")
+        rev3 = update["rev"]
         await edge_server.delete_document(doc_id=id3, revid=rev3, db_name=db_name)
         self.mark_test_step("fetch deleted doc")
         try:

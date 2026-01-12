@@ -118,32 +118,6 @@ class CouchbaseServerInfo:
         self.__admin_password: str = _get_str_or_default(
             data, self.__admin_password_key, "password"
         )
-class EdgeServerInfo:
-    __hostname_key: Final[str] = "hostname"
-    __admin_user_key: Final[str] = "admin_user"
-    __admin_password_key: Final[str] = "admin_password"
-
-    @property
-    def hostname(self) -> str:
-        """Gets the hostname of the Edge Server instance"""
-        return self.__hostname
-
-    @property
-    def admin_user(self) -> str:
-        return self.__admin_user
-
-    @property
-    def admin_password(self) -> str:
-        return self.__admin_password
-
-    def __init__(self, data: dict):
-        self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
-        self.__admin_user = _get_str_or_default(
-            data, self.__admin_user_key, "Administrator"
-        )
-        self.__admin_password = _get_str_or_default(
-            data, self.__admin_password_key, "password"
-        )
 
 
 class EdgeServerInfo:
@@ -208,10 +182,6 @@ class ParsedConfig:
     def couchbase_servers(self) -> list[dict]:
         """The list of couchbase servers that can be interacted with"""
         return self.__couchbase_servers
-
-    @property
-    def edge_servers(self) -> list[dict]:
-        return self.__edge_servers
 
     @property
     def load_balancers(self) -> list[str]:

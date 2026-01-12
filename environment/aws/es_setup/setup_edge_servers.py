@@ -239,7 +239,6 @@ def setup_server(
     )
     remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
 
-
     for file in (SCRIPT_DIR / "shell2http").iterdir():
         sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
 
@@ -284,7 +283,6 @@ def setup_server(
             fail_on_error=False,
         )
 
-
     Path("/tmp/es_key.pem").unlink()
     Path("/tmp/es_cert.pem").unlink()
     sftp.close()
@@ -305,9 +303,13 @@ def setup_server(
         ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES manasgement server"
     )
     remote_exec(
-        ssh, "echo '{\"name\":\"admin\",\"password\":\"password\",\"role\":\"admin\"}' | bash /home/ec2-user/shell2http/add-user.sh", "Adding user "
+        ssh,
+        'echo \'{"name":"admin","password":"password","role":"admin"}\' | bash /home/ec2-user/shell2http/add-user.sh',
+        "Adding user ",
     )
-    remote_exec(ssh, "bash /home/ec2-user/shell2http/kill-edgeserver.sh", "Stopping Edge Server")
+    remote_exec(
+        ssh, "bash /home/ec2-user/shell2http/kill-edgeserver.sh", "Stopping Edge Server"
+    )
     remote_exec(
         ssh,
         "sudo mv /tmp/config.json /opt/couchbase-edge-server/etc/config.json",
@@ -316,8 +318,8 @@ def setup_server(
 
     remote_exec(
         ssh,
-        "echo '{}' | bash /home/ec2-user/shell2http/start-edgeserver.sh", "Starting ES",
-        "Starting Edge Server",
+        "echo '{}' | bash /home/ec2-user/shell2http/start-edgeserver.sh",
+        "Starting ES",
     )
 
     ssh.close()

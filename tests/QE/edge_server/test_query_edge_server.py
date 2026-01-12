@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from deepdiff import DeepDiff
 from cbltest.api.error import CblEdgeServerBadResponseError
+from deepdiff import DeepDiff
 
 
 class TestQueryEdgeServer(CBLTestClass):
@@ -28,10 +28,8 @@ class TestQueryEdgeServer(CBLTestClass):
             db_name="names",
             name="user_by_email",
             params={
-                "email":
-                    "santo.mcclennan@nosql-matters.org",
-                    # "macartney@nosql-matters.org",
-
+                "email": "santo.mcclennan@nosql-matters.org",
+                # "macartney@nosql-matters.org",
             },
         )
         self.mark_test_step(f"Query results: {response}")
@@ -100,8 +98,10 @@ class TestQueryEdgeServer(CBLTestClass):
                 name="user_by_email",
             )
         except CblEdgeServerBadResponseError as e:
-            failed=True
-            assert "missing" in str(e).lower() or "error" in str(e).lower(),f"Unexpected error for missing param: {e}"
+            failed = True
+            assert "missing" in str(e).lower() or "error" in str(e).lower(), (
+                f"Unexpected error for missing param: {e}"
+            )
         assert failed
 
         self.mark_test_step("Testing adhoc with disabled config")
@@ -113,11 +113,15 @@ class TestQueryEdgeServer(CBLTestClass):
         except CblEdgeServerBadResponseError as e:
             failed = True
             print(e)
-            assert "forbidden" in str(e).lower() or "403" in str(e) ,f"Unexpected error for adhoc disabled: {e}"
+            assert "forbidden" in str(e).lower() or "403" in str(e), (
+                f"Unexpected error for adhoc disabled: {e}"
+            )
         assert failed
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_query_on_expired_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_query_on_expired_doc(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         self.mark_test_step("Configuring named queries")
         edge_server = cblpytest.edge_servers[0]
         file_path = os.path.abspath(os.path.dirname(__file__))
@@ -127,30 +131,43 @@ class TestQueryEdgeServer(CBLTestClass):
         await configured_server.reset_db(db_name="names")
 
         self.mark_test_step("Create document that expire after 30 seconds")
-        new_doc = {"birthday":"1954-06-29","name":{"first":"Tonita","last":"Rowman"},"contact":{"email":["tonita.rowman@nosql-matters.org","rowman@nosql-matters.org"],"phone":["724-7593085"],"region":"724","address":{"state":"PA","street":"16 Pratt Rd","zip":"15685","city":"Southwest"}},"gender":"female","memberSince":"2008-06-14","likes":[]}
+        new_doc = {
+            "birthday": "1954-06-29",
+            "name": {"first": "Tonita", "last": "Rowman"},
+            "contact": {
+                "email": [
+                    "tonita.rowman@nosql-matters.org",
+                    "rowman@nosql-matters.org",
+                ],
+                "phone": ["724-7593085"],
+                "region": "724",
+                "address": {
+                    "state": "PA",
+                    "street": "16 Pratt Rd",
+                    "zip": "15685",
+                    "city": "Southwest",
+                },
+            },
+            "gender": "female",
+            "memberSince": "2008-06-14",
+            "likes": [],
+        }
 
-
-        resp=await configured_server.add_document_auto_id(
-            new_doc, "names", ttl=30
-        )
+        resp = await configured_server.add_document_auto_id(new_doc, "names", ttl=30)
         print(resp)
         await asyncio.sleep(30)
         # Execute named query
         response = await configured_server.named_query(
             db_name="names",
             name="user_by_email",
-            params={
-                "email":
-                    "tonita.rowman@nosql-matters.org"
-
-            },
+            params={"email": "tonita.rowman@nosql-matters.org"},
         )
         self.mark_test_step(f"Query results: {response}")
         assert len(response) == 0
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_adhoc_queries_incorrect_field(
-            self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Enabling ad-hoc queries")
         edge_server = cblpytest.edge_servers[0]
@@ -188,5 +205,3 @@ class TestQueryEdgeServer(CBLTestClass):
         )
         self.mark_test_step(f"Query result: {response}")
         assert DeepDiff(expected_results, response[0]) == {}
-
-
