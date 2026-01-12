@@ -1,4 +1,5 @@
 import asyncio
+import os
 from pathlib import Path
 
 import pytest
@@ -39,6 +40,11 @@ class TestCrud(CBLTestClass):
         self.mark_test_step("test_single_doc_crud")
         db_name = "db"
         edge_server = cblpytest.edge_servers[0]
+        file_path = os.path.abspath(os.path.dirname(__file__))
+        config_path = (
+            f"{file_path}/config/test_edge_server_with_multiple_rest_clients.json"
+        )
+        edge_server = await edge_server.set_config(config_path)
         await edge_server.reset_db()
         self.mark_test_step("create single document with Auto ID")
         doc = {"test": "This is a test document"}
