@@ -1579,29 +1579,25 @@ class SyncGateway(_SyncGatewayBase):
                 "put", f"/{db_name}/_role/{role}", JSONDictionary(body)
             )
 
-    async def upload_certificate(
-        self, cert_content: bytes, cert_name: str, cert_type: str = "ca"
-    ) -> str:
+    async def upload_certificate(self, cert_content: bytes, cert_name: str) -> str:
         """
         Upload a certificate file to SGW instance.
 
         :param cert_content: Certificate content as bytes (PEM format)
         :param cert_name: Name for the certificate file (e.g., 'ca.pem', 'server.crt')
-        :param cert_type: Type of certificate ('ca', 'server', 'client')
         :return: Path to uploaded certificate on SGW instance
         :raises Exception: If upload fails
         """
         with self._tracer.start_as_current_span(
             "upload_certificate",
-            attributes={"cbl.cert.name": cert_name, "cbl.cert.type": cert_type},
+            attributes={"cbl.cert.name": cert_name},
         ):
-            shell2http_url = f"http://{self.hostname}:20001/upload-cert"
             # Use simple line-based protocol: first line is name, rest is content
             body = f"{cert_name}\n{cert_content.decode('utf-8')}"
 
             async with ClientSession() as session:
                 async with session.post(
-                    shell2http_url,
+                    f"http://{self.hostname}:20001/upload-cert",
                     data=body,
                     headers={"Content-Type": "text/plain"},
                     timeout=ClientTimeout(total=30),
@@ -1638,11 +1634,11 @@ class SyncGateway(_SyncGatewayBase):
                 "cbl.config.name": config_name,
             },
         ):
-            shell2http_url = f"http://{self.hostname}:20001/restart-sgw"
             async with ClientSession() as session:
-                async with session.get(
-                    shell2http_url,
-                    params={"config": config_name},
+                async with session.post(
+                    f"http://{self.hostname}:20001/restart-sgw",
+                    data=config_name,
+                    headers={"Content-Type": "text/plain"},
                     timeout=ClientTimeout(total=120),
                 ) as resp:
                     if resp.status != 200:
@@ -1662,10 +1658,10 @@ class SyncGateway(_SyncGatewayBase):
         :raises Exception: If the stop fails
         """
         with self._tracer.start_as_current_span("stop_sgw"):
-            shell2http_url = f"http://{self.hostname}:20001/stop-sgw"
             async with ClientSession() as session:
                 async with session.get(
-                    shell2http_url, timeout=ClientTimeout(total=60)
+                    f"http://{self.hostname}:20001/stop-sgw",
+                    timeout=ClientTimeout(total=60),
                 ) as resp:
                     if resp.status != 200:
                         body = await resp.text()
@@ -1700,12 +1696,10 @@ class SyncGateway(_SyncGatewayBase):
             "start_sgw",
             attributes={"cbl.config.name": config_name},
         ):
-            shell2http_url = (
-                f"http://{self.hostname}:20001/start-sgw?config={config_name}"
-            )
             async with ClientSession() as session:
                 async with session.get(
-                    shell2http_url, timeout=ClientTimeout(total=120)
+                    f"http://{self.hostname}:20001/start-sgw?config={config_name}",
+                    timeout=ClientTimeout(total=120),
                 ) as resp:
                     if resp.status != 200:
                         body = await resp.text()
