@@ -6,7 +6,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblEdgeServerBadResponseError
-from deepdiff import DeepDiff
+from deepdiff import DeepDiff  # type: ignore[import-not-found]
 
 
 class TestQueryEdgeServer(CBLTestClass):
