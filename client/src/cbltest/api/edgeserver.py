@@ -618,16 +618,18 @@ class EdgeServer:
                 "post", f"/{keyspace}/_query/{name}", payload=JSONDictionary(payload)
             )
 
-            if not isinstance(response, list):
-                cast_resp = cast(dict, response)
-                if "error" in cast_resp:
-                    raise CblEdgeServerBadResponseError(
-                        500,
-                        f"named query with Edge Server had error '{cast_resp['reason']}'",
-                    )
-            else:
-                cast_resp = cast(list, response)
-            return cast_resp
+            if isinstance(response, list):
+                return response
+
+            if isinstance(response, dict) and "error" in response:
+                raise CblEdgeServerBadResponseError(
+                    500,
+                    f"named query with Edge Server had error '{response.get('reason')}'",
+                )
+            raise CblEdgeServerBadResponseError(
+                500,
+                f"Unexpected response type from named query: {type(response)}",
+            )
 
     async def adhoc_query(
         self,
@@ -635,7 +637,7 @@ class EdgeServer:
         scope: str = "",
         collection: str = "",
         query: Optional[str] = None,
-        params: Optional[Dict] = None,
+        params: Optional[Dict[str, Any]] = None,
     ):
         with self.__tracer.start_as_current_span(
             "Adhoc query",
@@ -645,24 +647,26 @@ class EdgeServer:
                 "cbl.collection.name": collection,
             },
         ):
-            payload = {"query": query}
+            payload: Dict[str, Any] = {"query": query}
             if params is not None:
-                payload["params"] = params
+                payload["parameters"] = params
             keyspace = self.keyspace_builder(db_name, scope, collection)
             response = await self._send_request(
                 "post", f"/{keyspace}/_query", payload=JSONDictionary(payload)
             )
 
-            if not isinstance(response, list):
-                cast_resp = cast(dict, response)
-                if "error" in cast_resp:
-                    raise CblEdgeServerBadResponseError(
-                        500,
-                        f"Adhoc query with Edge Server had error '{cast_resp['reason']}'",
-                    )
-            else:
-                cast_resp = cast(list, response)
-            return cast_resp
+            if isinstance(response, list):
+                return response
+
+            if isinstance(response, dict) and "error" in response:
+                raise CblEdgeServerBadResponseError(
+                    500,
+                    f"adhoc query with Edge Server had error '{response.get('reason')}'",
+                )
+            raise CblEdgeServerBadResponseError(
+                500,
+                f"Unexpected response type from named query: {type(response)}",
+            )
 
     async def add_document_auto_id(
         self,
@@ -874,18 +878,15 @@ class EdgeServer:
                 "post", f"/{keyspace}/_bulk_docs", JSONDictionary(body)
             )
 
-            if not isinstance(resp, list):
-                raise ValueError(
-                    f"Inappropriate response from edge server  bulk doc op (not JSON), response:{resp}"
-                )
-
-            cast_resp = cast(list, resp)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"bulk_documents_operation Edge Server had error '{cast_resp['reason']}'",
-                )
-            return cast_resp
+            if isinstance(resp, dict):
+                cast_resp = cast(dict, resp)
+                if "error" in cast_resp:
+                    raise CblEdgeServerBadResponseError(
+                        500,
+                        f"bulk_documents_operation Edge Server had error '{cast_resp['reason']}'",
+                    )
+            if isinstance(resp, list):
+                return cast(list, resp)
 
     async def blip_sync(self, db_name: str, scope: str = "", collection: str = ""):
         with self.__tracer.start_as_current_span(
@@ -916,18 +917,15 @@ class EdgeServer:
         self.__auth_name = name
         self.__auth_password = password
 
-    async def kill_server(self) -> bool:
+    async def kill_server(self):
         with self.__tracer.start_as_current_span("kill edge server"):
-            response = await self._send_request("post", "/kill-edgeserver", shell=True)
-            return response
+            await self._send_request("post", "/kill-edgeserver", shell=True)
 
-    async def start_server(self, config: dict = None) -> bool:
+    async def start_server(self, config: dict = {}):
         with self.__tracer.start_as_current_span("start edge server"):
-            payload = config if config is not None else {}
-            response = await self._send_request(
-                "post", "/start-edgeserver", JSONDictionary(payload), shell=True
+            await self._send_request(
+                "post", "/start-edgeserver", JSONDictionary(config), shell=True
             )
-            return response
 
     async def set_config(self, config_file_path):
         await self.kill_server()
@@ -946,27 +944,28 @@ class EdgeServer:
         )
         await self.start_server()
 
-    async def go_online_offline(self, allow: list = None, deny: list = None) -> bool:
+    async def go_online_offline(
+        self,
+        allow: Optional[list[Any]] = None,
+        deny: Optional[list[Any]] = None,
+    ):
         with self.__tracer.start_as_current_span("go online offline"):
-            payload = {}
-            if allow is not None:
+            payload: dict[str, Any] = {}
+            if allow:
                 payload["allow"] = allow
-            if deny is not None:
+            if deny:
                 payload["deny"] = deny
-            response = await self._send_request(
+            await self._send_request(
                 "post", "firewall", JSONDictionary(payload), shell=True
             )
-            return response
 
-    async def reset_firewall(self) -> bool:
+    async def reset_firewall(self):
         with self.__tracer.start_as_current_span("reset firewall"):
-            response = await self._send_request("post", "firewall", shell=True)
-            return response
+            await self._send_request("post", "firewall", shell=True)
 
     async def add_user(self, name, password, role="admin"):
         with self.__tracer.start_as_current_span("Add user"):
             payload = {"name": name, "password": password, "role": role}
-            response = await self._send_request(
+            await self._send_request(
                 "post", "add-user", JSONDictionary(payload), shell=True
             )
-            return response
