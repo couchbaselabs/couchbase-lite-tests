@@ -111,7 +111,7 @@ class TestCrud(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("test_single_doc_crud_tll")
-        db_name = "names"
+        db_name = "db"
         edge_server = cblpytest.edge_servers[0]
         await edge_server.reset_db()
 

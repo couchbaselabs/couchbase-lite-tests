@@ -936,13 +936,13 @@ class EdgeServer:
 
     async def kill_server(self) -> bool:
         with self.__tracer.start_as_current_span("kill edge server"):
-            response = await self._send_request("post", "/kill-edgeserver")
+            response = await self._send_request("post", "/kill-edgeserver",shell=True)
             return response
 
     async def start_server(self,config: dict = None) -> bool:
         with self.__tracer.start_as_current_span("start edge server"):
             payload = config_json if config is not None else {}
-            response = await self._send_request("post", "/start-edgeserver",JSONDictionary( payload))
+            response = await self._send_request("post", "/start-edgeserver",JSONDictionary( payload),shell=True)
             return response
 
     async def set_config(self, config_file_path):
@@ -955,7 +955,7 @@ class EdgeServer:
     async def reset_db(self, db_name="db"):
         await self.kill_server()
         filename=self.__databases.get(db_name).get("path")
-        await self._send_request("post", "/reset-db",JSONDictionary({"filename": filename}))
+        await self._send_request("post", "/reset-db",JSONDictionary({"filename": filename}),shell=True)
         await self.start_server()
 
     async def go_online_offline(self,allow:list=None, deny:list=None) -> bool:
@@ -965,10 +965,16 @@ class EdgeServer:
                 payload["allow"] = allow
             if deny is not None:
                 payload["deny"] = deny
-            response = await self._send_request("post", "firewall", JSONDictionary(payload))
+            response = await self._send_request("post", "firewall", JSONDictionary(payload),shell=True)
             return response
 
     async def reset_firewall(self) -> bool:
         with self.__tracer.start_as_current_span("reset firewall"):
-            response = await self._send_request("post", "firewall")
+            response = await self._send_request("post", "firewall",shell=True)
             return response
+    async def add_user(self,name, password, role="admin"):
+        with self.__tracer.start_as_current_span("Add user"):
+            payload={"name": name, "password": password, "role": role}
+            response = await self._send_request("post", "add-user",JSONDictionary(payload),shell=True)
+            return response
+

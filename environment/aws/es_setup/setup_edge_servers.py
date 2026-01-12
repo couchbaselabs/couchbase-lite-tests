@@ -239,12 +239,7 @@ def setup_server(
     )
     remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
 
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "cert" / "es_cert.pem", "/home/ec2-user/cert/es_cert.pem"
-    )
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "cert" / "es_key.pem", "/home/ec2-user/cert/es_key.pem"
-    )
+
     for file in (SCRIPT_DIR / "shell2http").iterdir():
         sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
 
@@ -274,6 +269,11 @@ def setup_server(
 
     sftp_progress_bar(sftp, Path("/tmp/es_cert.pem"), "/home/ec2-user/cert/es_cert.pem")
     sftp_progress_bar(sftp, Path("/tmp/es_key.pem"), "/home/ec2-user/cert/es_key.pem")
+    sftp_progress_bar(
+        sftp,
+        SCRIPT_DIR / "config" / "config.json",
+        "/tmp/config.json",
+    )
 
     for file in (SCRIPT_DIR / "dataset").iterdir():
         sftp_progress_bar(sftp, file, f"/home/ec2-user/database/{file.name}")
@@ -298,13 +298,22 @@ def setup_server(
     remote_exec_bg(
         ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES manasgement server"
     )
-    remote_exec(ssh, "/home/ec2-user/shell2http/kill-edgeserver.sh", "Stopping Edge Server")
-    sftp_progress_bar(
-        sftp,
-        SCRIPT_DIR / "config" / "config.json",
-        "/opt/couchbase-edge-server/etc/config.json",
+    remote_exec(
+        ssh, "echo '{\"name\":\"admin\",\"password\":\"password\",\"role\":\"admin\"}' | bash /home/ec2-user/shell2http/add-user.sh", "Adding user "
     )
-    remote_exec(ssh, "/home/ec2-user/shell2http/start-edgeserver.sh", "Stopping Edge Server")
+    remote_exec(ssh, "bash /home/ec2-user/shell2http/kill-edgeserver.sh", "Stopping Edge Server")
+    remote_exec(
+        ssh,
+        "sudo mv /tmp/config.json /opt/couchbase-edge-server/etc/config.json",
+        "Moving Edge Server config",
+    )
+
+    remote_exec(
+        ssh,
+        "echo '{}' | bash /home/ec2-user/shell2http/start-edgeserver.sh", "Starting ES",
+        "Starting Edge Server",
+    )
+
     ssh.close()
 
 

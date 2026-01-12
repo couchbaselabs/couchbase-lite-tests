@@ -15,7 +15,8 @@ else
 fi
 
 LOG="$DIRLOG/edge.log"
-nohup /opt/couchbase-edge-server/bin/couchbase-edge-server $DIR/config.json > $LOG 2>&1 < /dev/null &
+setsid /opt/couchbase-edge-server/bin/couchbase-edge-server $DIR/config.json > $LOG 2>&1 < /dev/null &
+disown
 EDGE_SERVER_PID=$!
 sleep 1
 if kill -0 "$EDGE_SERVER_PID" 2>/dev/null; then
