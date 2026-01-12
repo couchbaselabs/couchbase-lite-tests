@@ -274,9 +274,15 @@ def setup_server(
         SCRIPT_DIR / "config" / "config.json",
         "/tmp/config.json",
     )
-
+    database_dir = "/home/ec2-user/database"
     for file in (SCRIPT_DIR / "dataset").iterdir():
-        sftp_progress_bar(sftp, file, f"/home/ec2-user/database/{file.name}")
+        sftp_progress_bar(sftp, file, f"{database_dir}/{file.name}")
+        remote_exec(
+            ssh,
+            f"unzip -o {database_dir}/{file.name} -d {database_dir}",
+            f"Unzipping dataset {file.name}",
+            fail_on_error=False,
+        )
 
 
     Path("/tmp/es_key.pem").unlink()

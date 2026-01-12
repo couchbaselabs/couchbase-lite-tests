@@ -623,17 +623,15 @@ class EdgeServer:
                 payload=JSONDictionary(payload)
             )
 
-            if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server post   /_query (not JSON)"
-                )
-
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"named query with Edge Server had error '{cast_resp['reason']}'",
-                )
+            if not isinstance(response, list):
+                cast_resp = cast(dict, response)
+                if "error" in cast_resp:
+                    raise CblEdgeServerBadResponseError(
+                        500,
+                        f"named query with Edge Server had error '{cast_resp['reason']}'",
+                    )
+            else:
+                cast_resp = cast(list, response)
             return cast_resp
 
     async def adhoc_query(
@@ -662,17 +660,17 @@ class EdgeServer:
                 payload=JSONDictionary(payload)
             )
 
-            if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server adhoc query (not JSON)"
-                )
-            cast_resp = cast(list, response)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"adhoc query with Edge Server had error '{cast_resp['reason']}'",
-                )
+            if not isinstance(response, list):
+                cast_resp = cast(dict, response)
+                if "error" in cast_resp:
+                    raise CblEdgeServerBadResponseError(
+                        500,
+                        f"Adhoc query with Edge Server had error '{cast_resp['reason']}'",
+                    )
+            else:
+                cast_resp = cast(list, response)
             return cast_resp
+
 
     async def add_document_auto_id(
         self,
@@ -941,7 +939,7 @@ class EdgeServer:
 
     async def start_server(self,config: dict = None) -> bool:
         with self.__tracer.start_as_current_span("start edge server"):
-            payload = config_json if config is not None else {}
+            payload = config if config is not None else {}
             response = await self._send_request("post", "/start-edgeserver",JSONDictionary( payload),shell=True)
             return response
 
@@ -954,8 +952,7 @@ class EdgeServer:
 
     async def reset_db(self, db_name="db"):
         await self.kill_server()
-        filename=self.__databases.get(db_name).get("path")
-        await self._send_request("post", "/reset-db",JSONDictionary({"filename": filename}),shell=True)
+        await self._send_request("post", "/reset-db",JSONDictionary({"filename": f"{db_name}.cblite2"}),shell=True)
         await self.start_server()
 
     async def go_online_offline(self,allow:list=None, deny:list=None) -> bool:
