@@ -888,29 +888,6 @@ class EdgeServer:
             if isinstance(resp, list):
                 return cast(list, resp)
 
-    async def blip_sync(self, db_name: str, scope: str = "", collection: str = ""):
-        with self.__tracer.start_as_current_span(
-            "get web socket connection for client ",
-            attributes={
-                "cbl.database.name": db_name,
-                "cbl.scope.name": scope,
-                "cbl.collection.name": collection,
-            },
-        ):
-            keyspace = self.keyspace_builder(db_name, scope, collection)
-            resp = await self._send_request("get", f"{keyspace}/_blipsync")
-
-            if resp and not isinstance(resp, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server get /_blipsync (not JSON)"
-                )
-            cast_resp = cast(dict, resp) if resp else {}
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"get web socket connection for client with Edge Server had error '{cast_resp['reason']}'",
-                )
-
     async def set_auth(self, auth: bool = True, name="admin_user", password="password"):
         if not auth:
             self.__auth = False
