@@ -7,7 +7,10 @@ from opentelemetry.trace import get_tracer
 
 from cbltest.api.database import Database
 from cbltest.api.error import CblTestError, CblTimeoutError
-from cbltest.api.multipeer_replicator_types import MultipeerReplicatorAuthenticator
+from cbltest.api.multipeer_replicator_types import (
+    MultipeerReplicatorAuthenticator,
+    MultipeerTransportType,
+)
 from cbltest.api.replicator import ReplicatorCollectionEntry
 from cbltest.api.replicator_types import ReplicatorActivityLevel
 from cbltest.api.x509_certificate import CertKeyPair, create_leaf_certificate
@@ -68,6 +71,7 @@ class MultipeerReplicator:
         *,
         authenticator: MultipeerReplicatorAuthenticator | None = None,
         identity: CertKeyPair | None = None,
+        transports: MultipeerTransportType = MultipeerTransportType.ALL,
     ):
         self.__index = database._index
         self.__request_factory = database._request_factory
@@ -79,7 +83,9 @@ class MultipeerReplicator:
             if identity is not None
             else create_leaf_certificate(f"Test Server {self.__index}")
         )
+        assert transports.value != 0, "At least one transport type must be specified"
         assert len(collections) > 0, "At least one collection is required"
+        self.__transports = transports
         self.__collections = collections
         self.__tracer = get_tracer(__name__, VERSION)
         self.__id: str = ""
@@ -96,6 +102,7 @@ class MultipeerReplicator:
                 collections=self.__collections,
                 identity=self.__identity,
                 authenticator=self.__authenticator,
+                transports=self.__transports.to_json(),
             )
             resp = await self.__request_factory.send_request(self.__index, req)
             if resp.error is not None:

@@ -1,8 +1,26 @@
 from abc import abstractmethod
-from typing import Any
+from enum import Flag, auto
+from typing import Any, cast
 
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.api.x509_certificate import CertKeyPair
+
+
+class MultipeerTransportType(Flag):
+    """The transport types supported by the Multipeer Replicator"""
+
+    WIFI = auto()
+    BLUETOOTH = auto()
+    ALL = WIFI | BLUETOOTH
+
+    def to_json(self) -> list[str]:
+        cls = type(self)
+        # only single-bit members, and only those present in self
+        return [
+            cast(str, m.name)
+            for m in cls
+            if m.value != 0 and (m.value & (m.value - 1)) == 0 and (self & m) == m
+        ]
 
 
 class MultipeerReplicatorAuthenticator(JSONSerializable):
