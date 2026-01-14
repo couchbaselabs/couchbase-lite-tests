@@ -82,8 +82,8 @@ class EdgeServer:
     def __init__(
         self,
         url: str,
-        admin_user: str | None = "admin_user",
-        admin_password: str | None = "password",
+        admin_user: str = "admin_user",
+        admin_password: str = "password",
         config_file=None,
     ):
         self.__tracer = get_tracer(__name__, VERSION)
@@ -905,7 +905,7 @@ class EdgeServer:
             )
 
     async def configure_dataset(self, db_name="db", config_file: str | None = None):
-        if len(config_file) == 0:
+        if not config_file:
             repo_root = next(
                 p
                 for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents)
