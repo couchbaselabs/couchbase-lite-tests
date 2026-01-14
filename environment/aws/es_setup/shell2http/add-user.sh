@@ -19,6 +19,10 @@ fi
 USERS_JSON="$HOME/user/users.json"
 EDGE_SERVER_BIN="/opt/couchbase-edge-server/bin/couchbase-edge-server"
 
+if sed '/^\s*\/\//d' "$USERS_JSON" | jq -e --arg name "$NAME" '.[$name]' > /dev/null; then
+    echo "User '$NAME' already exists, skipping creation"
+    exit 0
+fi
 # Build command (matches Python implementation)
 COMMAND=(
     "$EDGE_SERVER_BIN"

@@ -126,6 +126,7 @@ class EdgeServerInfo:
     __hostname_key: Final[str] = "hostname"
     __admin_user_key: Final[str] = "admin_user"
     __admin_password_key: Final[str] = "admin_password"
+    __config_path_key: Final[str] = "config_path"
 
     @property
     def hostname(self) -> str:
@@ -140,13 +141,30 @@ class EdgeServerInfo:
     def admin_password(self) -> str:
         return self.__admin_password
 
+    @property
+    def config_path(self):
+        return self.__config_path
+
+    def _default_config_path(self):
+        repo_root = next(
+            p
+            for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents)
+            if p.name == "couchbase-lite-tests"
+        )
+        return repo_root
+
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
         self.__admin_user = _get_str_or_default(
-            data, self.__admin_user_key, "Administrator"
+            data, self.__admin_user_key, "admin_user"
         )
         self.__admin_password = _get_str_or_default(
             data, self.__admin_password_key, "password"
+        )
+        self.__config_path = self.__admin_password = _get_str_or_default(
+            data,
+            self.__config_path_key,
+            f"{self._default_config_path()}/environment/aws/es_setup/config/config.json",
         )
 
 

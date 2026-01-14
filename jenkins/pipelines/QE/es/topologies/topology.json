@@ -1,0 +1,9 @@
+{
+    "$schema": "./topology_schema.json",
+    "edge_servers": [
+        {
+            "version": "{{version}}"
+        }
+    ],
+    "logslurp": false
+}

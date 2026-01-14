@@ -1,5 +1,4 @@
 import asyncio
-import os
 from pathlib import Path
 
 import pytest
@@ -8,6 +7,8 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblEdgeServerBadResponseError
 from deepdiff import DeepDiff  # type: ignore[import-not-found]
 
+SCRIPT_DIR = str(Path(__file__).parent)
+
 
 class TestQueryEdgeServer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
@@ -15,16 +16,13 @@ class TestQueryEdgeServer(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Configuring named queries")
-        edge_server = cblpytest.edge_servers[0]
-        file_path = os.path.abspath(os.path.dirname(__file__))
-        configured_server = await edge_server.set_config(
-            f"{file_path}/config/test_named_queries.json"
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
         )
-        await configured_server.reset_db(db_name="names")
-        self.mark_test_step("Testing valid parameterized query")
 
+        self.mark_test_step("Testing valid parameterized query")
         # Execute named query
-        response = await configured_server.named_query(
+        response = await edge_server.named_query(
             db_name="names",
             name="user_by_email",
             params={
@@ -41,13 +39,9 @@ class TestQueryEdgeServer(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Enabling ad-hoc queries")
-        edge_server = cblpytest.edge_servers[0]
-        file_path = os.path.abspath(os.path.dirname(__file__))
-        configured_server = await edge_server.set_config(
-            f"{file_path}/config/test_named_queries.json"
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
         )
-        await configured_server.reset_db(db_name="names")
-
         query = {
             "query": "SELECT name.first, name.last, gender, birthday, contact.email, contact.phone, contact.address.city, contact.address.state, likes FROM _default WHERE gender = $gender AND birthday BETWEEN $start_date AND $end_date AND ARRAY_CONTAINS(likes, $hobby) AND (ANY email IN contact.email SATISFIES email LIKE $email_filter END) AND contact.address.state = $state ORDER BY birthday ASC LIMIT 10",
             "params": {
@@ -72,7 +66,7 @@ class TestQueryEdgeServer(CBLTestClass):
         }
 
         self.mark_test_step("Executing ad-hoc query")
-        response = await configured_server.adhoc_query(
+        response = await edge_server.adhoc_query(
             db_name="names", query=query["query"], params=query["params"]
         )
         self.mark_test_step(f"Query result: {response}")
@@ -83,17 +77,14 @@ class TestQueryEdgeServer(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Testing negative scenarios")
-        edge_server = cblpytest.edge_servers[0]
-        file_path = os.path.abspath(os.path.dirname(__file__))
-        # Configure with adhoc disabled
-        configured_server = await edge_server.set_config(
-            f"{file_path}/config/adhoc_disabled_config.json"
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            db_name="names",
+            config_file=f"{SCRIPT_DIR}/config/adhoc_disabled_config.json",
         )
-        await configured_server.reset_db(db_name="names")
         self.mark_test_step("Testing missing parameters")
         failed = False
         try:
-            await configured_server.named_query(
+            await edge_server.named_query(
                 db_name="names",
                 name="user_by_email",
             )
@@ -103,11 +94,10 @@ class TestQueryEdgeServer(CBLTestClass):
                 f"Unexpected error for missing param: {e}"
             )
         assert failed
-
         self.mark_test_step("Testing adhoc with disabled config")
         failed = False
         try:
-            await configured_server.adhoc_query(
+            await edge_server.adhoc_query(
                 db_name="names", query="SELECT * FROM _default"
             )
         except CblEdgeServerBadResponseError as e:
@@ -123,12 +113,9 @@ class TestQueryEdgeServer(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Configuring named queries")
-        edge_server = cblpytest.edge_servers[0]
-        file_path = os.path.abspath(os.path.dirname(__file__))
-        configured_server = await edge_server.set_config(
-            f"{file_path}/config/test_named_queries.json"
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
         )
-        await configured_server.reset_db(db_name="names")
 
         self.mark_test_step("Create document that expire after 30 seconds")
         new_doc = {
@@ -153,11 +140,11 @@ class TestQueryEdgeServer(CBLTestClass):
             "likes": [],
         }
 
-        resp = await configured_server.add_document_auto_id(new_doc, "names", ttl=30)
+        resp = await edge_server.add_document_auto_id(new_doc, "names", ttl=30)
         print(resp)
         await asyncio.sleep(30)
         # Execute named query
-        response = await configured_server.named_query(
+        response = await edge_server.named_query(
             db_name="names",
             name="user_by_email",
             params={"email": "tonita.rowman@nosql-matters.org"},
@@ -170,12 +157,9 @@ class TestQueryEdgeServer(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Enabling ad-hoc queries")
-        edge_server = cblpytest.edge_servers[0]
-        file_path = os.path.abspath(os.path.dirname(__file__))
-        configured_server = await edge_server.set_config(
-            f"{file_path}/config/test_named_queries.json",
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
         )
-        await configured_server.reset_db(db_name="names")
 
         query = {
             "query": "SELECT first, name.last, gender, birthday, contact.email, contact.phone, contact.address.city, contact.address.state, likes FROM _default WHERE gender = $gender AND birthday BETWEEN $start_date AND $end_date AND ARRAY_CONTAINS(likes, $hobby) AND (ANY email IN contact.email SATISFIES email LIKE $email_filter END) AND contact.address.state = $state ORDER BY birthday ASC LIMIT 10",
@@ -200,7 +184,7 @@ class TestQueryEdgeServer(CBLTestClass):
         }
 
         self.mark_test_step("Executing ad-hoc query")
-        response = await configured_server.adhoc_query(
+        response = await edge_server.adhoc_query(
             db_name="names", query=query["query"], params=query["params"]
         )
         self.mark_test_step(f"Query result: {response}")

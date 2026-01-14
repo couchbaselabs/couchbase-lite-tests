@@ -273,6 +273,12 @@ def setup_server(
         SCRIPT_DIR / "config" / "config.json",
         "/tmp/config.json",
     )
+    aws_dir = SCRIPT_DIR.parent
+    sftp_progress_bar(
+        sftp,
+        aws_dir / "sgw_setup" / "cert" / "sg_cert.pem",
+        "/home/ec2-user/cert/sg_cert.pem",
+    )
     database_dir = "/home/ec2-user/database"
     for file in (SCRIPT_DIR / "dataset").iterdir():
         sftp_progress_bar(sftp, file, f"{database_dir}/{file.name}")
@@ -304,7 +310,7 @@ def setup_server(
     )
     remote_exec(
         ssh,
-        'echo \'{"name":"admin","password":"password","role":"admin"}\' | bash /home/ec2-user/shell2http/add-user.sh',
+        'echo \'{"name":"admin_user","password":"password","role":"admin"}\' | bash /home/ec2-user/shell2http/add-user.sh',
         "Adding user ",
     )
     remote_exec(
