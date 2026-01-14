@@ -400,7 +400,7 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get detabase info  from edge server had error '{cast_resp['reason']}'",
+                    f"get database info  from edge server had error '{cast_resp['reason']}'",
                 )
             return cast_resp
 
