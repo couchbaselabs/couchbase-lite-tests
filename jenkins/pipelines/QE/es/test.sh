@@ -16,18 +16,18 @@ fi
 
 source $SCRIPT_DIR/../../shared/config.sh
 #
-#echo "Setup backend..."
-#
-#stop_venv
-#create_venv venv
-#source venv/bin/activate
-#trap stop_venv EXIT
-#uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-#python3 $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}"
+echo "Setup backend..."
+
+stop_venv
+create_venv venv
+source venv/bin/activate
+trap stop_venv EXIT
+uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
+python3 $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}"
 
 # Run Tests :
 echo "RUNNING COORDINATED TEST"
-#
+
 pushd "${QE_TESTS_DIR}" > /dev/null
 create_venv venv
 source venv/bin/activate
