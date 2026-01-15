@@ -1,0 +1,32 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
+    "interface": "0.0.0.0:59840",
+    "enable_anonymous_users": true,
+    "databases": {
+        "travel": {
+            "path": "/home/ec2-user/database/travel.cblite2",
+            "collections":[
+            "travel.airlines",
+            "travel.airports",
+            "travel.hotels",
+            "travel.landmarks",
+            "travel.routes"
+        ],
+            "create": true,
+            "enable_adhoc_queries": true,
+            "enable_client_writes": true,
+            "enable_client_sync": true
+        }
+    },
+    "users": "/home/ec2-user/user/users.json",
+    "logging": {
+        "console": false,
+        "file": {
+            "dir": "/home/ec2-user/log",
+            "format": "text"
+        },
+        "domains": {
+            "Listener": "info"
+        }
+    }
+}

@@ -98,7 +98,7 @@ class TestEdgeServerChaos(CBLTestClass):
         ]
         result = await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
 
-        await edge_server.go_online_offline(deny=[sgw.hostname])
+        await edge_server.set_firewall_rules(deny=[sgw.hostname])
         revmap = {doc.get("id"): doc.get("rev") for doc in result}
 
         update_docs = docgen.update_all_documents(update_docs)
@@ -108,7 +108,7 @@ class TestEdgeServerChaos(CBLTestClass):
         ]
         await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
 
-        await edge_server.go_online_offline(allow=[sgw.hostname])
+        await edge_server.set_firewall_rules(allow=[sgw.hostname])
         self.mark_test_step("Sleep for 2 minutes")
         await asyncio.sleep(120)
         self.mark_test_step("Verify document updated")

@@ -924,11 +924,17 @@ class EdgeServer:
         await self.start_server(config=cfg)
         return EdgeServer(self.__hostname, config_file=config_file)
 
-    async def go_online_offline(
+    async def set_firewall_rules(
         self,
         allow: list[Any] | None = None,
         deny: list[Any] | None = None,
     ):
+        """
+        Add firewall rules to the edge server host. Can be used to block SGW connection to ES.
+
+        :param allow: The IPs allowed to access edge-server. Used to accept incoming SGW connection.
+        :param deny: The IPs denied from accessing edge-server. Used to deny incoming SGW connection.
+        """
         with self.__tracer.start_as_current_span("go online offline"):
             payload: dict[str, Any] = {}
             if allow:
