@@ -35,15 +35,7 @@ class TestEdgeServerSync(CBLTestClass):
         )
 
         self.mark_test_step("Monitor replication progress")
-        is_idle = False
-        status = None
-        while not is_idle:
-            status = await edge_server.all_replication_status()
-            assert "error" not in status[0].keys(), (
-                f"Replication setup failure: {status}"
-            )
-            if status[0]["status"] == "Idle":
-                is_idle = True
+        await edge_server.wait_for_idle()
 
         self.mark_test_step("Verify document parity")
         for collection in [
@@ -81,26 +73,29 @@ class TestEdgeServerSync(CBLTestClass):
             update_doc, "airline_10000", "travel", collection="travel.airlines", ttl=30
         )
 
-        sgw_doc = await sgw.get_document(
+        sgw_doc_new = await sgw.get_document(
             db_name="travel",
             scope="travel",
             collection="airlines",
             doc_id="airline_10000",
         )
-        assert sgw_doc.body["name"] == "Updated Airline", "Update not propagated"
+
+        assert (
+            sgw_doc_new is not None and sgw_doc_new.body["name"] == "Updated Airline"
+        ), "Update not propagated"
         await asyncio.sleep(60)
         self.mark_test_step(
             "Verify TTL document purged on Edge server and not Sync Gateway"
         )
-        sgw_doc = await sgw.get_document(
+        sgw_doc_new = await sgw.get_document(
             db_name="travel",
             scope="travel",
             collection="airlines",
             doc_id="airline_10000",
         )
-        assert sgw_doc.body["name"] == "Updated Airline", (
-            "Document should not have purged from Sync gateway"
-        )
+        assert (
+            sgw_doc_new is not None and sgw_doc_new.body["name"] == "Updated Airline"
+        ), "Document should not have purged from Sync gateway"
         failed = False
         edge_doc = None
         try:
@@ -111,7 +106,7 @@ class TestEdgeServerSync(CBLTestClass):
             failed = True
             self.mark_test_step(f"Document purged on Edge server as expected: {e}")
         assert failed, f"Document not purged on Edge server {edge_doc}"
-        await edge_server.stop_replication(status[0]["task_id"])
+        await edge_server.stop_replication(1)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_to_edge_replication(
@@ -137,15 +132,7 @@ class TestEdgeServerSync(CBLTestClass):
         )
 
         self.mark_test_step("Monitor replication progress")
-        is_idle = False
-        status = None
-        while not is_idle:
-            status = await edge_server2.all_replication_status()
-            assert "error" not in status[0].keys(), (
-                f"Replication setup failure: {status}"
-            )
-            if status[0]["status"] == "Idle":
-                is_idle = True
+        await edge_server2.wait_for_idle()
 
         self.mark_test_step("Verify document parity")
         for collection in [
@@ -186,6 +173,7 @@ class TestEdgeServerSync(CBLTestClass):
             collection="airlines",
             doc_id="airline_10000",
         )
+        assert edge_doc is not None
         assert edge_doc.body["name"] == "Updated Airline", "Update not propagated"
         await asyncio.sleep(60)
         self.mark_test_step(
@@ -197,6 +185,7 @@ class TestEdgeServerSync(CBLTestClass):
             collection="airlines",
             doc_id="airline_10000",
         )
+        assert edge_doc is not None
         assert edge_doc.body["name"] == "Updated Airline", (
             "Document should not have purged from Edge server1"
         )
@@ -209,4 +198,4 @@ class TestEdgeServerSync(CBLTestClass):
             failed = True
             self.mark_test_step(f"Document purged on Edge server2 as expected: {e}")
         assert failed, f"Document not purged on Edge server2 {edge_doc}"
-        await edge_server2.stop_replication(status[0]["task_id"])
+        await edge_server2.stop_replication(1)

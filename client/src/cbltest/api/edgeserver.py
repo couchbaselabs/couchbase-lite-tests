@@ -1,4 +1,5 @@
 import json
+import time
 import urllib.parse
 import uuid
 from json import dumps
@@ -10,7 +11,11 @@ import pyjson5 as json5  # type: ignore[import-not-found]
 from aiohttp import BasicAuth, ClientSession
 from opentelemetry.trace import get_tracer
 
-from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
+from cbltest.api.error import (
+    CblEdgeServerBadResponseError,
+    CblTestError,
+    CblTimeoutError,
+)
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.api.syncgateway import (
     AllDocumentsResponse,
@@ -957,3 +962,19 @@ class EdgeServer:
                 "post", "add-user", JSONDictionary(payload), shell=True
             )
             await self.start_server()
+
+    async def wait_for_idle(self, replicator_key=0, timeout=30):
+        is_idle = False
+        retry = 6
+        while not is_idle and retry > 0:
+            status = await self.all_replication_status()
+            assert "error" not in status[replicator_key].keys(), (
+                f"Replication setup failure: {status}"
+            )
+            if status[replicator_key]["status"] == "Idle":
+                is_idle = True
+            else:
+                time.sleep(timeout)
+                retry -= 1
+        if not is_idle and retry == 0:
+            raise CblTimeoutError("Timeout waiting for replicator status")

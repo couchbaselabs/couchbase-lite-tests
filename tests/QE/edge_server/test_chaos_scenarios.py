@@ -1,6 +1,5 @@
 import asyncio
 import json
-import time
 from pathlib import Path
 
 import pytest
@@ -35,15 +34,7 @@ class TestEdgeServerChaos(CBLTestClass):
         )
 
         self.mark_test_step("Monitor replication progress")
-
-        is_idle = False
-        while not is_idle:
-            status = await edge_server.all_replication_status()
-            assert "error" not in status[0].keys(), (
-                f"Replication setup failure: {status}"
-            )
-            if status[0]["status"] == "Idle":
-                is_idle = True
+        await edge_server.wait_for_idle()
 
         hotel_docs = await edge_server.get_all_documents(
             "travel", collection="travel.hotels"
@@ -76,8 +67,9 @@ class TestEdgeServerChaos(CBLTestClass):
             bulk_ops, db_name="travel", collection="travel.hotels"
         )
 
-        self.mark_test_step("Sleep for 2 minutes")
-        time.sleep(120)
+        self.mark_test_step("Monitor replication progress")
+        await edge_server.wait_for_idle()
+
         self.mark_test_step("Verify document created")
         edge_docs = await edge_server.get_all_documents(
             "travel", collection="travel.hotels"
@@ -109,8 +101,9 @@ class TestEdgeServerChaos(CBLTestClass):
         await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
 
         await edge_server.set_firewall_rules(allow=[sgw.hostname])
-        self.mark_test_step("Sleep for 2 minutes")
-        await asyncio.sleep(120)
+        self.mark_test_step("Monitor replication progress")
+        await edge_server.wait_for_idle()
+
         self.mark_test_step("Verify document updated")
         edge_docs = await edge_server.get_all_documents(
             "travel", collection="travel.hotels"
