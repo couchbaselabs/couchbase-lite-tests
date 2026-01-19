@@ -249,7 +249,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
         Returns:
             str: The .NET framework version.
         """
-        return "net9.0-ios"
+        return "net8.0-ios"
 
     @property
     def rid(self) -> str:
@@ -308,7 +308,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-ios"
+            / "net8.0-ios"
             / "ios-arm64"
         )
         return iOSBridge(
@@ -329,7 +329,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-ios"
+            / "net8.0-ios"
             / "ios-arm64"
             / "testserver.app"
         )
@@ -378,7 +378,7 @@ class DotnetTestServer_Android(DotnetTestServer):
         Returns:
             str: The .NET framework version.
         """
-        return "net9.0-android"
+        return "net8.0-android"
 
     @property
     def publish(self) -> bool:
@@ -419,7 +419,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-android"
+            / "net8.0-android"
             / "com.couchbase.dotnet.testserver-Signed.apk"
         )
         return AndroidBridge(
@@ -440,7 +440,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-android"
+            / "net8.0-android"
             / "com.couchbase.dotnet.testserver-Signed.apk"
         )
         zip_path = apk_path.parents[5] / "testserver_android.apk"
@@ -587,7 +587,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
         Returns:
             str: The .NET framework version.
         """
-        return "net9.0-maccatalyst"
+        return "net8.0-maccatalyst"
 
     @property
     def publish(self) -> bool:
@@ -626,7 +626,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-maccatalyst"
+            / "net8.0-maccatalyst"
             / "maccatalyst-x64"
         )
         return macOSBridge(str(prefix / "testserver.app"))
@@ -644,7 +644,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-maccatalyst"
+            / "net8.0-maccatalyst"
             / "maccatalyst-x64"
             / "testserver.app"
         )
