@@ -627,7 +627,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "bin"
             / "Release"
             / "net8.0-maccatalyst"
-            / "maccatalyst-x64"
+            / "maccatalyst-arm64"
         )
         return macOSBridge(str(prefix / "testserver.app"))
 
@@ -645,7 +645,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "bin"
             / "Release"
             / "net8.0-maccatalyst"
-            / "maccatalyst-x64"
+            / "maccatalyst-arm64"
             / "testserver.app"
         )
         zip_path = publish_dir.parents[5] / "testserver_macos.zip"
