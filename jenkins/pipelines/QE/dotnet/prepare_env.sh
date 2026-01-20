@@ -3,7 +3,7 @@
 export PATH="/opt/homebrew/opt/util-linux/bin:$PATH"
 export DOTNET_ROOT="$HOME/.dotnet"
 export DOTNET_VERSION="8.0"
-export DEVELOPER_DIR="/Applications/Xcode-16.4.0.app/Contents/Developer"
+export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
