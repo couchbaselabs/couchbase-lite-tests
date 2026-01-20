@@ -30,6 +30,9 @@ pipeline {
         }
         stage('Run Test') {
             agent { label 'mac-mini-new' }
+            options {
+                lock('mac-mini-new')
+            }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe')
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"

@@ -65,6 +65,9 @@ pipeline {
                 }
                 stage('Windows Desktop') {
                     agent { label 'net-windows' }
+                    options {
+                        lock('net-windows')
+                    }
                     environment {
                         TS_ARTIFACTS_DIR = 'java_windows_desktop'
                         TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
@@ -89,6 +92,9 @@ pipeline {
                 }
                 stage('Linux Desktop') {
                     agent { label 'linux-java' }
+                    options {
+                        lock('linux-java')
+                    }
                     environment {
                         TS_ARTIFACTS_DIR = 'java_desktop'
                         TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"

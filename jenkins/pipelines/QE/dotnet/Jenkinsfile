@@ -46,6 +46,9 @@ pipeline {
             parallel {
                 stage('Windows') {
                     agent { label 'net-windows' }
+                    options {
+                        lock('net-windows')
+                    }
                     environment {
                         TS_ARTIFACTS_DIR = 'dotnet_windows'
                         TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
@@ -103,7 +106,7 @@ pipeline {
                 stage('iOS') {
                     agent { label 'qe-mac-india' }
                     options {
-                        lock('00008140-0006458A0C22801C')
+                        lock('qe-mac-india,00008140-0006458A0C22801C')
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
@@ -135,7 +138,7 @@ pipeline {
                 stage('Android') {
                     agent { label 'mac-mini-CBL-Android1' }
                     options {
-                        lock('R5CT20FYA7R')
+                        lock('mac-mini-CBL-Android1,R5CT20FYA7R')
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe')
