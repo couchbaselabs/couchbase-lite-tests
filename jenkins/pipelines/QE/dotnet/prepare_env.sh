@@ -10,4 +10,4 @@ PREPARE_DOTNET_SCRIPT="$SCRIPT_DIR/prepare_dotnet.sh"
 echo "Downloading prepare_dotnet.sh..."
 curl -L https://raw.githubusercontent.com/couchbaselabs/couchbase-mobile-tools/refs/heads/master/dotnet_testing_env/prepare_dotnet_new.sh -o $PREPARE_DOTNET_SCRIPT
 
-source $PREPARE_DOTNET_SCRIPT
+source $PREPARE_DOTNET_SCRIPT $DOTNET_VERSION
