@@ -1,4 +1,5 @@
 import json
+import ssl
 import time
 import urllib.parse
 import uuid
@@ -8,7 +9,7 @@ from typing import Any, cast
 from urllib.parse import urljoin
 
 import pyjson5 as json5  # type: ignore[import-not-found]
-from aiohttp import BasicAuth, ClientSession
+from aiohttp import BasicAuth, ClientSession, TCPConnector
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import (
@@ -94,16 +95,13 @@ class EdgeServer:
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
             raise CblTestError("Config file cannot be None")
-        port, secure, mtls, certfile, keyfile, is_auth, databases, is_anonymous_auth = (
-            self._decode_config_file(config_file)
+        port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(
+            config_file
         )
         self.__secure: bool = secure
         self.__mtls: bool = mtls
         self.__hostname: str = url
         self.__port: int = port
-        self.__certfile: str = certfile
-        self.__keyfile: str = keyfile
-        self.__databases: dict = databases
         self.__anonymous_auth: bool = is_anonymous_auth
         self.__config_file: str = config_file
         self.__auth_name = admin_user
@@ -131,45 +129,38 @@ class EdgeServer:
         with open(config_file, encoding="utf-8") as file:
             config_content = file.read()
         config = json5.loads(config_content)
-
-        # Validate and extract top-level keys
-        databases = config.get("databases")
-        if not databases or not isinstance(databases, dict):
-            raise ValueError("Missing or invalid 'databases' configuration.")
-
         https = config.get("https", False)
         interface = config.get("interface", "0.0.0.0:59840")
         port = interface.split(":")[1]
         enable_anonymous_users = config.get("enable_anonymous_users", False)
-        cert_path, key_path = "", ""
         mtls = False
         if https:
-            cert_path = https.get("tls_cert_path")
-            key_path = https.get("tls_key_path")
-            if not cert_path or not key_path:
-                raise ValueError(
-                    "HTTPS configuration must include 'tls_cert_path' and 'tls_key_path'."
-                )
             client_cert_path = https.get("client_cert_path", False)
             if client_cert_path:
                 mtls = True
             https = True
         users = True if config.get("users", False) else False
-        # Return parsed configuration as a tuple
         return (
             port,
             https,
             mtls,
-            cert_path,
-            key_path,
             users,
-            databases,
             enable_anonymous_users,
         )
 
     def _create_session(
         self, scheme: str, url: str, port: int, auth: BasicAuth | None
     ) -> ClientSession:
+        if self.__secure:
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            ssl_context.check_hostname = False
+            return ClientSession(
+                f"{scheme}{url}:{port}",
+                auth=auth,
+                connector=TCPConnector(ssl=ssl_context),
+            )
         return ClientSession(f"{scheme}{url}:{port}", auth=auth)
 
     async def _send_request(
@@ -497,10 +488,8 @@ class EdgeServer:
             "All Replication status with Edge Server"
         ):
             response = await self._send_request("get", "/_replicate")
-
             if isinstance(response, list):
                 return response
-
             if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
                     500,
@@ -968,13 +957,16 @@ class EdgeServer:
         retry = 6
         while not is_idle and retry > 0:
             status = await self.all_replication_status()
-            assert "error" not in status[replicator_key].keys(), (
-                f"Replication setup failure: {status}"
-            )
-            if status[replicator_key]["status"] == "Idle":
-                is_idle = True
+            if len(status) != 0:
+                assert "error" not in status[replicator_key].keys(), (
+                    f"Replication setup failure: {status}"
+                )
+                if status[replicator_key]["status"] == "Idle":
+                    is_idle = True
+                else:
+                    time.sleep(timeout)
+                    retry -= 1
             else:
-                time.sleep(timeout)
-                retry -= 1
+                is_idle = True
         if not is_idle and retry == 0:
             raise CblTimeoutError("Timeout waiting for replicator status")

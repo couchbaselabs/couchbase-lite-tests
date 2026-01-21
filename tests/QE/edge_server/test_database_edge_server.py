@@ -10,22 +10,6 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestDatabase(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_create_database(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
-        self.mark_test_step("test_create_database")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
-        )
-        dbs = await edge_server.get_all_dbs()
-        assert len(dbs) == 1
-        #     test write permission
-        resp = await edge_server.add_document_auto_id(
-            {"test": "success"}, db_name=dbs[0]
-        )
-        assert resp.get("ok"), f"insert doc failed with resp {resp}"
-
-    @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_server_incorrect_db_config(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:

@@ -42,3 +42,13 @@ class TestAuthentication(CBLTestClass):
             failed = True
             self.mark_test_step("No auth failed as expected")
         assert failed, "No auth did not fail as expected"
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_valid_tls(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("test_valid_tls")
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            db_name="names", config_file=f"{SCRIPT_DIR}/config/test_tls_config.json"
+        )
+        self.mark_test_step("get server information")
+        version = await edge_server.get_version()
+        self.mark_test_step(f"VERSION:{version}")
