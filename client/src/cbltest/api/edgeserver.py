@@ -318,7 +318,8 @@ class EdgeServer:
             },
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
-            response = await self._send_request("get", f"/{keyspace}/{doc_id}")
+            qp = f"?rev={revid}" if revid else ""
+            response = await self._send_request("get", f"/{keyspace}/{doc_id}{qp}")
             if not isinstance(response, dict):
                 raise ValueError(
                     "Inappropriate response from edge server get /doc (not JSON)"
