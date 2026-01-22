@@ -161,7 +161,7 @@ class EdgeServerInfo:
         self.__admin_password = _get_str_or_default(
             data, self.__admin_password_key, "password"
         )
-        self.__config_path = self.__admin_password = _get_str_or_default(
+        self.__config_path = _get_str_or_default(
             data,
             self.__config_path_key,
             f"{self._default_config_path()}/environment/aws/es_setup/config/config.json",

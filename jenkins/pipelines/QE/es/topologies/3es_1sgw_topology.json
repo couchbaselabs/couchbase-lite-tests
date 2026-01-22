@@ -1,5 +1,5 @@
 {
-    "$schema": "./topology_schema.json",
+    "$schema": "./../../../../../environment/aws/topology_setup/topology_schema.json",
     "edge_servers": [
         {
             "version": "{{version}}"
