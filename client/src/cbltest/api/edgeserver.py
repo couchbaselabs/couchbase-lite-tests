@@ -155,7 +155,6 @@ class EdgeServer:
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-            ssl_context.check_hostname = False
             return ClientSession(
                 f"{scheme}{url}:{port}",
                 auth=auth,
@@ -170,10 +169,7 @@ class EdgeServer:
         payload: JSONSerializable | None = None,
         params: dict[str, str] | None = None,
         session: ClientSession | None = None,
-        shell: bool = False,
     ) -> Any:
-        if shell:
-            session = self.__shell_session
         if session is None:
             if self.__auth:
                 session = self.__admin_session
@@ -339,20 +335,20 @@ class EdgeServer:
 
             return RemoteDocument(cast_resp)
 
-    async def get_all_dbs(self):
+    async def get_all_dbs(self) -> list:
         with self.__tracer.start_as_current_span("get all database"):
             response = await self._send_request("get", "/_all_dbs")
-            if not isinstance(response, list):
-                raise ValueError(
-                    "Inappropriate response from edge server get /_all_dbs (not list)"
-                )
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
+            if isinstance(response, list):
+                return response
+            if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get all database from edge server had error '{cast_resp['reason']}'",
+                    f"_all_dbs with Edge Server had error '{response.get('reason')}'",
                 )
-            return cast_resp
+            raise CblEdgeServerBadResponseError(
+                500,
+                f"Unexpected response type from adhoc query: {type(response)}",
+            )
 
     async def get_active_tasks(self):
         with self.__tracer.start_as_current_span("get all active tasks"):
@@ -890,12 +886,17 @@ class EdgeServer:
 
     async def kill_server(self):
         with self.__tracer.start_as_current_span("kill edge server"):
-            await self._send_request("post", "/kill-edgeserver", shell=True)
+            await self._send_request(
+                "post", "/kill-edgeserver", session=self.__shell_session
+            )
 
     async def start_server(self, config: dict = {}):
         with self.__tracer.start_as_current_span("start edge server"):
             await self._send_request(
-                "post", "/start-edgeserver", JSONDictionary(config), shell=True
+                "post",
+                "/start-edgeserver",
+                JSONDictionary(config),
+                session=self.__shell_session,
             )
 
     async def configure_dataset(self, db_name="db", config_file: str | None = None):
@@ -911,7 +912,7 @@ class EdgeServer:
             "post",
             "/reset-db",
             JSONDictionary({"filename": f"{db_name}.cblite2"}),
-            shell=True,
+            session=self.__shell_session,
         )
         with open(config_file) as f:
             cfg = json.load(f)
@@ -936,19 +937,25 @@ class EdgeServer:
             if deny:
                 payload["deny"] = deny
             await self._send_request(
-                "post", "firewall", JSONDictionary(payload), shell=True
+                "post",
+                "firewall",
+                JSONDictionary(payload),
+                session=self.__shell_session,
             )
 
     async def reset_firewall(self):
         with self.__tracer.start_as_current_span("reset firewall"):
-            await self._send_request("post", "firewall", shell=True)
+            await self._send_request("post", "firewall", session=self.__shell_session)
 
     async def add_user(self, name, password, role="admin"):
         with self.__tracer.start_as_current_span("Add user"):
             await self.kill_server()
             payload = {"name": name, "password": password, "role": role}
             await self._send_request(
-                "post", "add-user", JSONDictionary(payload), shell=True
+                "post",
+                "add-user",
+                JSONDictionary(payload),
+                session=self.__shell_session,
             )
             await self.start_server()
 
