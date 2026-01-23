@@ -600,6 +600,16 @@ class DotnetTestServer_macOS(DotnetTestServer):
         return False
 
     @property
+    def extra_args(self) -> str | None:
+        """
+        Get the extra arguments for the build command.
+
+        Returns:
+            Optional[str]: The extra arguments for the build command.
+        """
+        return f"-p:RuntimeIdentifier=maccatalyst-{self._mac_arch}"
+
+    @property
     def latestbuilds_path(self) -> str:
         """
         Get the path for the package on the latestbuilds server.
