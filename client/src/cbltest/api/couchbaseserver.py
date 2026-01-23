@@ -1,6 +1,5 @@
 import asyncio
 import platform
-import socket
 import subprocess
 import tempfile
 import time
@@ -14,6 +13,7 @@ from typing import TypeVar, cast
 import aiohttp
 
 T = TypeVar("T")
+import json
 from urllib.parse import quote_plus, urlparse
 
 import requests
@@ -109,9 +109,8 @@ class CouchbaseServer:
             if "://" not in url:
                 url = f"couchbase://{url}"
 
-            parsed = urlparse(url)
-            self.__hostname = parsed.hostname or parsed.netloc.split(":")[0]
-            self.__rest_port = parsed.port or 8091  # Track REST port explicitly
+            # Parse URL to extract hostname and REST port
+            self._parse_connection_url(url)
 
             auth = PasswordAuthenticator(username, password)
             opts = ClusterOptions(auth)
@@ -123,6 +122,16 @@ class CouchbaseServer:
             # Create a reusable HTTP session for REST API calls
             self.__http_session = requests.Session()
             self.__http_session.auth = (username, password)
+
+    def _parse_connection_url(self, url: str) -> None:
+        """
+        Parse connection URL to extract hostname and REST port.
+
+        :param url: Connection URL (e.g., "couchbase://hostname:port")
+        """
+        parsed = urlparse(url)
+        self.__hostname = parsed.hostname or parsed.netloc.split(":")[0]
+        self.__rest_port = parsed.port or 8091
 
     @property
     def hostname(self) -> str:
@@ -1146,29 +1155,33 @@ class CouchbaseServer:
 
     async def reconfigure_ports(
         self,
-        rest_port: int = 9000,
-        ssl_port: int = 1900,
-        memcached_port: int = 9050,
-        memcached_ssl_port: int = 9057,
+        rest_port: int = 8091,
+        ssl_port: int = 18091,
+        memcached_port: int = 11210,
+        memcached_ssl_port: int = 11207,
     ) -> None:
         """
         Reconfigure CBS ports by calling shell2http endpoint on the CBS node.
 
-        :param rest_port: New REST API port (default 9000)
-        :param ssl_port: New SSL REST port (default 1900)
-        :param memcached_port: New memcached port (default 9050)
-        :param memcached_ssl_port: New SSL memcached port (default 9057)
+        :param hostname: The hostname of the CBS node
+        :param rest_port: New REST API port (default 8091)
+        :param ssl_port: New SSL REST port (default 18091)
+        :param memcached_port: New memcached port (default 11210)
+        :param memcached_ssl_port: New SSL memcached port (default 11207)
         """
-        shell2http_url = (
-            f"http://{self.hostname}:20001/configure-cbs-ports"
-            f"?rest_port={rest_port}"
-            f"&ssl_port={ssl_port}"
-            f"&memcached_port={memcached_port}"
-            f"&memcached_ssl_port={memcached_ssl_port}"
-        )
-
+        payload = {
+            "hostname": self.hostname,
+            "rest_port": rest_port,
+            "ssl_port": ssl_port,
+            "memcached_port": memcached_port,
+            "memcached_ssl_port": memcached_ssl_port,
+        }
         async with aiohttp.ClientSession() as session:
-            async with session.get(shell2http_url) as resp:
+            async with session.post(
+                f"http://{self.hostname}:20001/configure-cbs-ports",
+                data=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            ) as resp:
                 if resp.status != 200:
                     body = await resp.text()
                     raise CblTestError(
@@ -1179,136 +1192,71 @@ class CouchbaseServer:
         """
         Stop the Couchbase Server service via shell2http.
         """
-        shell2http_url = f"http://{self.__hostname}:20001/stop-cbs"
-
         async with aiohttp.ClientSession() as session:
-            async with session.get(shell2http_url) as resp:
+            async with session.get(f"http://{self.hostname}:20001/stop-cbs") as resp:
                 if resp.status != 200:
                     body = await resp.text()
                     raise CblTestError(f"Failed to stop CBS: {resp.status} - {body}")
 
-    async def start_server(self) -> None:
+    async def start_server(self, port: int = 8091) -> None:
         """
         Start the Couchbase Server service via shell2http.
-        """
-        shell2http_url = f"http://{self.__hostname}:20001/start-cbs"
 
+        :param port: REST API port to wait for readiness (default 8091)
+        """
         async with aiohttp.ClientSession() as session:
-            async with session.get(shell2http_url) as resp:
+            async with session.post(
+                f"http://{self.hostname}:20001/start-cbs",
+                data=json.dumps({"port": port}),
+                headers={"Content-Type": "application/json"},
+            ) as resp:
                 if resp.status != 200:
                     body = await resp.text()
                     raise CblTestError(f"Failed to start CBS: {resp.status} - {body}")
 
-    async def reset_cluster(self) -> None:
-        """
-        Reset the Couchbase cluster via shell2http (removes all data and configuration).
-        """
-        shell2http_url = f"http://{self.__hostname}:20001/reset-cluster"
-
+    async def create_bucket_via_rest(self, bucket: str, port: int = 8091) -> None:
+        """Create bucket via shell2http (useful when SDK can't connect)."""
+        payload = {
+            "bucket": bucket,
+            "port": port,
+            "username": self.__username,
+            "password": self.__password,
+        }
         async with aiohttp.ClientSession() as session:
-            async with session.get(shell2http_url) as resp:
+            async with session.post(
+                f"http://{self.hostname}:20001/create-bucket",
+                data=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            ) as resp:
                 if resp.status != 200:
                     body = await resp.text()
                     raise CblTestError(
-                        f"Failed to reset CBS cluster: {resp.status} - {body}"
+                        f"Failed to create bucket: {resp.status} - {body}"
                     )
 
-    async def wait_for_server_ready(
-        self,
-        timeout: int = 120,
-        port: int = 8091,
-        check_interval: float = 1.0,
+    async def upsert_document_via_rest(
+        self, bucket: str, doc_id: str, doc_body: dict, port: int = 8091
     ) -> None:
-        """
-        Robust wait for Couchbase Server readiness.
-
-        Readiness definition:
-        1. TCP port is accepting connections
-        2. /pools/default returns HTTP 200
-
-        :param timeout: Total timeout in seconds
-        :param port: REST API port to check
-        :param check_interval: Sleep interval between checks
-        """
-        start_time = time.time()
-        hostname = self.__hostname
-        url = f"http://{hostname}:{port}/pools/default"
-
-        last_error: Exception | str | None = None
-
-        while time.time() - start_time < timeout:
-            try:
-                with socket.create_connection((hostname, port), timeout=2):
-                    pass
-            except Exception as e:
-                last_error = e
-                await asyncio.sleep(check_interval)
-                continue
-
-            try:
-                resp = self.__http_session.get(url, timeout=5)
-                if resp.status_code == 200:
-                    return
-                else:
-                    last_error = RuntimeError(
-                        f"REST not ready: HTTP {resp.status_code}"
+        """Insert document via shell2http (useful when SDK can't connect)."""
+        payload = {
+            "bucket": bucket,
+            "doc_id": doc_id,
+            "doc_body": doc_body,
+            "port": port,
+            "username": self.__username,
+            "password": self.__password,
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"http://{self.hostname}:20001/upsert-doc",
+                data=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            ) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(
+                        f"Failed to upsert document: {resp.status} - {body}"
                     )
-            except requests.exceptions.ConnectionError as e:
-                last_error = f"REST connection error: {e}"
-            except requests.exceptions.ReadTimeout as e:
-                last_error = f"REST timeout: {e}"
-            except ValueError as e:
-                last_error = f"Invalid JSON from REST: {e}"
-
-            await asyncio.sleep(check_interval)
-
-        raise CblTestError(
-            f"CBS did not become ready on {hostname}:{port} within {timeout}s. "
-            f"Last error: {last_error}"
-        )
-
-    async def wait_for_server_stopped(self, timeout: int = 60) -> None:
-        start = time.time()
-        while time.time() - start < timeout:
-            try:
-                resp = self.__http_session.get(
-                    f"http://{self.__hostname}:{self.__rest_port}/pools/default",
-                    timeout=2,
-                )
-                if resp.status_code != 200:
-                    return
-            except Exception:
-                return
-            await asyncio.sleep(1)
-
-        raise CblTestError("CBS did not stop cleanly within timeout")
-
-    def init_cluster(self, rest_port: int = 8091) -> None:
-        """
-        Initialize the CBS cluster with basic settings.
-
-        :param rest_port: REST API port to use (default 8091)
-        """
-        with self.__tracer.start_as_current_span("init_cluster"):
-            # Use the specified REST port for HTTP calls
-            base_url = f"http://{self.__hostname}:{rest_port}"
-
-            # Initialize cluster if not already done
-            resp = self.__http_session.post(
-                f"{base_url}/clusterInit",
-                data={
-                    "clusterName": "test-cluster",
-                    "username": self.__username,
-                    "password": self.__password,
-                    "port": str(rest_port),
-                    "services": "kv,index,n1ql",
-                },
-            )
-            # 200 = success, 400 = already initialized
-            if resp.status_code not in [200, 400]:
-                raise CblTestError(
-                    f"Failed to initialize cluster: {resp.status_code} - {resp.text}"
-                )
 
     async def wait_for_kv_ready(self, timeout: int = 60) -> None:
         """
@@ -1338,33 +1286,7 @@ class CouchbaseServer:
 
         raise CblTestError(f"KV service did not become ready within {timeout} seconds")
 
-    def assert_ports_applied(
-        self, rest_port: int = 8091, memcached_port: int = 11211
-    ) -> None:
-        """
-        Verify that CBS is actually listening on the expected ports.
-
-        :param rest_port: Expected REST API port
-        :param memcached_port: Expected memcached port
-        """
-        with self.__tracer.start_as_current_span("assert_ports_applied"):
-            # Check REST port
-            try:
-                resp = self.__http_session.get(
-                    f"http://{self.__hostname}:{rest_port}/pools/default"
-                )
-                if resp.status_code != 200:
-                    raise CblTestError(
-                        f"REST port {rest_port} not responding correctly"
-                    )
-            except Exception as e:
-                raise CblTestError(f"Cannot connect to REST port {rest_port}: {e}")
-
-            # Note: Memcached port checking would require different approach
-            # as it's binary protocol, not HTTP
-            print(f"✓ CBS confirmed listening on REST port {rest_port}")
-
-    def reconnect(self, new_url: str) -> None:
+    async def reconnect(self, new_url: str) -> None:
         """
         Reconnect to CBS with a new URL (useful after port changes).
 
@@ -1374,9 +1296,8 @@ class CouchbaseServer:
             if "://" not in new_url:
                 new_url = f"couchbase://{new_url}"
 
-            parsed = urlparse(new_url)
-            hostname = parsed.hostname or parsed.netloc.split(":")[0]
-            rest_port = parsed.port or 8091
+            # Parse new URL to extract hostname and REST port
+            self._parse_connection_url(new_url)
 
             # Reconnect SDK cluster
             auth = PasswordAuthenticator(self.__username, self.__password)
@@ -1384,8 +1305,6 @@ class CouchbaseServer:
             self.__cluster = Cluster(new_url, opts)
             self.__cluster.wait_until_ready(timedelta(seconds=10))
 
-            # Update hostname, REST port, and recreate HTTP session
-            self.__hostname = hostname
-            self.__rest_port = rest_port
+            # Recreate HTTP session with updated connection details
             self.__http_session = requests.Session()
             self.__http_session.auth = (self.__username, self.__password)

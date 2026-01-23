@@ -8,7 +8,8 @@ setsid /home/ec2-user/shell2http/shell2http -no-index -cgi -500 -port 20001 \
 /configure-cbs-ports "bash $SCRIPT_DIR/configure-cbs-ports.sh" \
 /stop-cbs "bash $SCRIPT_DIR/stop-cbs.sh" \
 /start-cbs "bash $SCRIPT_DIR/start-cbs.sh" \
-/reset-cluster "bash $SCRIPT_DIR/reset-cluster.sh" > /dev/null 2>&1 &
+/create-bucket "bash $SCRIPT_DIR/create-bucket.sh" \
+/upsert-doc "bash $SCRIPT_DIR/upsert-doc.sh" > /dev/null 2>&1 &
 
 # Wait for shell2http to start
 sleep 2

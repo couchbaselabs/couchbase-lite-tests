@@ -1,8 +1,8 @@
 {
   "bootstrap": {
-    "server": "couchbases://{{server-ip}}:9050",
+    "server": "couchbases://{{server-ip}}",
     "server_tls_skip_verify": true,
-    "username": "admin",
+    "username": "Administrator",
     "password": "password"
   },
     "api": {

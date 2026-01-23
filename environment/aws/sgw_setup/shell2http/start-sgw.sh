@@ -1,7 +1,13 @@
 #!/bin/bash
 
 CONFIG_DIR="/home/ec2-user/config"
-CONFIG_NAME="${HTTP_config:-bootstrap}"
+# Parse config from QUERY_STRING if HTTP_config not set
+if [ -z "$HTTP_config" ]; then
+    CONFIG_NAME=$(echo "$QUERY_STRING" | grep -oE 'config=[^&]+' | cut -d= -f2)
+    CONFIG_NAME="${CONFIG_NAME:-bootstrap}"
+else
+    CONFIG_NAME="$HTTP_config"
+fi
 CONFIG_FILE="${CONFIG_DIR}/${CONFIG_NAME}.json"
 
 echo "Starting Sync Gateway with config: ${CONFIG_FILE}..."

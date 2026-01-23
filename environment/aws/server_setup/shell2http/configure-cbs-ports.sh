@@ -1,81 +1,60 @@
 #!/bin/bash
+set -euo pipefail
 
-# Debug version - remove set -euo pipefail to see what fails
-# set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
 
-# Configure CBS ports by modifying static_config and restarting
-# Usage: configure-cbs-ports.sh <rest_port> <ssl_port> <memcached_port> <memcached_ssl_port>
+# Read config from JSON body
+REQUEST_BODY=$(read_http_body)
+HOSTNAME=$(echo "$REQUEST_BODY" | jq -r '.hostname // "localhost"')
+REST_PORT=$(echo "$REQUEST_BODY" | jq -r '.rest_port // 8091')
+SSL_PORT=$(echo "$REQUEST_BODY" | jq -r '.ssl_port // 18091')
+MEMCACHED_PORT=$(echo "$REQUEST_BODY" | jq -r '.memcached_port // 11210')
+MEMCACHED_SSL_PORT=$(echo "$REQUEST_BODY" | jq -r '.memcached_ssl_port // 11207')
 
-REST_PORT="${rest_port:-9000}"
-SSL_PORT="${ssl_port:-1900}"
-MEMCACHED_PORT="${memcached_port:-9050}"
-MEMCACHED_SSL_PORT="${memcached_ssl_port:-9057}"
+echo "Configuring CBS ports\nREST=$REST_PORT, SSL=$SSL_PORT, MEMCACHED=$MEMCACHED_PORT, MEMCACHED_SSL=$MEMCACHED_SSL_PORT"
 
-echo "Configuring CBS with ports: REST=$REST_PORT, SSL=$SSL_PORT, MEMCACHED=$MEMCACHED_PORT, MEMCACHED_SSL=$MEMCACHED_SSL_PORT"
-echo "Current user: $(whoami)"
-echo "Working directory: $(pwd)"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u Administrator:password -X PUT \
+  "http://localhost:8091/node/controller/setupAlternateAddresses/external" \
+  -d "hostname=$HOSTNAME" \
+  -d "kv=$MEMCACHED_PORT" \
+  -d "kvSSL=$MEMCACHED_SSL_PORT" \
+  -d "mgmt=$REST_PORT" \
+  -d "mgmtSSL=$SSL_PORT"
+)
 
-# Check if static_config file exists
-STATIC_CONFIG="/opt/couchbase/etc/couchbase/static_config"
-echo "Looking for static_config at: $STATIC_CONFIG"
-if [ ! -f "$STATIC_CONFIG" ]; then
-    echo "WARNING: static_config file does not exist at $STATIC_CONFIG"
-    echo "Checking alternative locations..."
-    find /opt/couchbase -name "*static*" -type f 2>/dev/null || echo "No static config files found"
-    echo "Creating static_config file..."
-    mkdir -p /opt/couchbase/etc/couchbase
-    touch "$STATIC_CONFIG"
-    ls -la /opt/couchbase/etc/couchbase/ || echo "Directory listing failed"
-else
-    echo "static_config file found"
+if [ "$HTTP_CODE" != "200" ]; then
+    echo "ERROR: Failed to configure alternate ports: HTTP: $HTTP_CODE"
+    exit 1
 fi
 
-echo "static_config file exists, checking permissions:"
-ls -la "$STATIC_CONFIG"
+echo "Alternate ports configured successfully"
 
-# Check if we can read the file
-echo "Current content of static_config:"
-cat "$STATIC_CONFIG" || echo "Failed to read static_config"
+# Setup iptables port forwarding for alternate ports
+echo "Setting up iptables forwarding..."
 
-# Backup current config
-echo "Backing up current config..."
-cp "$STATIC_CONFIG" "${STATIC_CONFIG}.bak" 2>/dev/null || echo "Backup failed, continuing..."
-cp /opt/couchbase/var/lib/couchbase/config/config.dat /opt/couchbase/var/lib/couchbase/config/config.dat.bak 2>/dev/null || echo "config.dat backup failed, continuing..."
+# Since Host Mode means the container uses the host IP, we forward to 127.0.0.1
+add_forward_socat() {
+    local EXTERNAL_PORT=$1
+    local INTERNAL_PORT=$2
 
-# Show current config before changes
-echo "=== STATIC_CONFIG BEFORE CHANGES ==="
-cat "$STATIC_CONFIG" || echo "Failed to read static_config"
-echo "=== END BEFORE ==="
+    echo "Forwarding port $EXTERNAL_PORT -> $INTERNAL_PORT via socat"
+    
+    # Check if socat is already running for this port to avoid duplicates
+    if ! pgrep -f "TCP-LISTEN:$EXTERNAL_PORT" > /dev/null; then
+        # Run socat in the background. 'fork' allows multiple simultaneous connections.
+        # 'reuseaddr' allows the script to restart without "address already in use" errors.
+        nohup socat TCP-LISTEN:"$EXTERNAL_PORT",fork,reuseaddr TCP:127.0.0.1:"$INTERNAL_PORT" > /dev/null 2>&1 &
+    else
+        echo "Socat forwarder for port $EXTERNAL_PORT already exists."
+    fi
+}
 
-# Remove old port entries if they exist
-echo "Removing old port entries..."
-sed -i '/{rest_port,/d' "$STATIC_CONFIG" && echo "Removed rest_port entries" || echo "Failed to remove rest_port entries"
-sed -i '/{memcached_port,/d' "$STATIC_CONFIG" && echo "Removed memcached_port entries" || echo "Failed to remove memcached_port entries"
-sed -i '/{ssl_rest_port,/d' "$STATIC_CONFIG" && echo "Removed ssl_rest_port entries" || echo "Failed to remove ssl_rest_port entries"
-sed -i '/{memcached_ssl_port,/d' "$STATIC_CONFIG" && echo "Removed memcached_ssl_port entries" || echo "Failed to remove memcached_ssl_port entries"
+# Apply to your ports
+add_forward_socat "$REST_PORT" 8091
+add_forward_socat "$SSL_PORT" 18091
+add_forward_socat "$MEMCACHED_PORT" 11210
+add_forward_socat "$MEMCACHED_SSL_PORT" 11207
 
-echo "=== STATIC_CONFIG AFTER REMOVING OLD ENTRIES ==="
-cat "$STATIC_CONFIG" || echo "Failed to read static_config after modifications"
-echo "=== END AFTER REMOVAL ==="
-
-# Add new port entries
-echo "Adding new port entries..."
-echo "{rest_port, $REST_PORT}." >> "$STATIC_CONFIG"
-echo "{memcached_port, $MEMCACHED_PORT}." >> "$STATIC_CONFIG"
-echo "{ssl_rest_port, $SSL_PORT}." >> "$STATIC_CONFIG"
-echo "{memcached_ssl_port, $MEMCACHED_SSL_PORT}." >> "$STATIC_CONFIG"
-
-echo "Final content of static_config:"
-cat "$STATIC_CONFIG" || echo "Failed to read final static_config"
-
-# Remove config.dat to force cluster recreation
-echo "Removing config.dat..."
-rm -rf /opt/couchbase/var/lib/couchbase/config/config.dat || echo "Failed to remove config.dat"
-rm -rf /opt/couchbase/var/lib/couchbase/config/chronicle/* || echo "Failed to remove chronicle files"
-
-echo "=== STATIC_CONFIG AFTER ADDING NEW ENTRIES ==="
-cat "$STATIC_CONFIG" || echo "Failed to read final static_config"
-echo "=== END FINAL CONFIG ==="
-
-echo "Configuration updated. CBS restart required for changes to take effect."
-echo "Script completed successfully"
+echo "Port forwarding complete. Alternate ports should now be reachable externally."
+exit 0

@@ -1625,12 +1625,10 @@ class SyncGateway(_SyncGatewayBase):
                 "cbl.config.name": config_name,
             },
         ):
-            shell2http_url = (
-                f"http://{self.hostname}:20001/restart-sgw?config={config_name}"
-            )
             async with ClientSession() as session:
                 async with session.get(
-                    shell2http_url, timeout=ClientTimeout(total=120)
+                    f"http://{self.hostname}:20001/restart-sgw?config={config_name}",
+                    timeout=ClientTimeout(total=120),
                 ) as resp:
                     if resp.status != 200:
                         body = await resp.text()
