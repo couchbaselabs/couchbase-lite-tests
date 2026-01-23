@@ -612,6 +612,11 @@ class DotnetTestServer_macOS(DotnetTestServer):
             f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
         )
 
+    @property
+    def _mac_arch(self) -> str:
+        """Get the Mac architecture (arm64 for Apple Silicon, x64 for Intel)."""
+        return "arm64" if platform.machine() == "arm64" else "x64"
+
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the .NET test server to be able to install, run, etc.
@@ -627,7 +632,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "bin"
             / "Release"
             / "net9.0-maccatalyst"
-            / "maccatalyst-x64"
+            / f"maccatalyst-{self._mac_arch}"
         )
         return macOSBridge(str(prefix / "testserver.app"))
 
@@ -645,7 +650,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "bin"
             / "Release"
             / "net9.0-maccatalyst"
-            / "maccatalyst-x64"
+            / f"maccatalyst-{self._mac_arch}"
             / "testserver.app"
         )
         zip_path = publish_dir.parents[5] / "testserver_macos.zip"
