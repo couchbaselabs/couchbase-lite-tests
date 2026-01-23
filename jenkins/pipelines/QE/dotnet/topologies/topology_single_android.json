@@ -4,7 +4,8 @@
         {
             "platform": "dotnet_android",
             "cbl_version": "{{version}}",
-            "location": "1BCACS00001MX3"
+            "location": "R5CT20FYA7R",
+            "download": true
         }
     ],
     "include": "../../../../../environment/aws/topology_setup/default_topology.json"
