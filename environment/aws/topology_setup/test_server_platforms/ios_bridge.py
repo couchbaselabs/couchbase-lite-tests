@@ -414,10 +414,7 @@ class iOSBridge(PlatformBridge):
             location (str): The device location (e.g., device UUID).
 
         Returns:
-            str: The IP address of the device.
-
-        Raises:
-            RuntimeError: If the IP address cannot be determined.
+            str | None: The IP address of the device, or None if it cannot be determined.
         """
         # Apple provides no sane way to do this so the following dance is performed:
         #    1. Retrieve MAC address of device (this requires the default "Private Wifi Address" to be turned off on device)
@@ -427,10 +424,17 @@ class iOSBridge(PlatformBridge):
         self.__verify_libimobiledevice()
         result = subprocess.run(
             ["ideviceinfo", "-u", location, "-k", "WiFiAddress"],
-            check=True,
+            check=False,
             capture_output=True,
             text=True,
         )
+        if result.returncode != 0:
+            click.secho(
+                f"Failed to retrieve WiFi address for device {location}: {result.stderr.strip()}",
+                fg="yellow",
+            )
+            return None
+
         mac_address = result.stdout.strip()
         stripped_mac_parts = [
             part.lstrip("0") or "0" for part in mac_address.split(":")
