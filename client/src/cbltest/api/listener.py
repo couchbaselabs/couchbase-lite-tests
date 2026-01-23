@@ -24,6 +24,7 @@ class Listener:
             port: int | None = None,
             disable_tls: bool = False,
             identity: CertKeyPair | None = None,
+            reuse_identity: bool = False,
     ):
         self.database = database
         """The database that the listener will be serving"""
@@ -48,7 +49,7 @@ class Listener:
             self.__identity = create_leaf_certificate(f"Test Server {self.__index}")
 
         self.__original_port = port
-
+        self.reuse_identity = reuse_identity
         self.__request_factory = database._request_factory
         self.__tracer = get_tracer(__name__, VERSION)
         self.__id: str = ""
@@ -66,7 +67,7 @@ class Listener:
         """Start listening for incoming connections"""
         with self.__tracer.start_as_current_span("start_listener"):
             payload = PostStartListenerRequestBody(
-                self.database.name, self.collections, self.port, self.disable_tls, self.__identity,
+                self.database.name, self.collections, self.port, self.disable_tls, self.__identity, self.reuse_identity
             )
             request = self.__request_factory.create_request(
                 TestServerRequestType.START_LISTENER, payload

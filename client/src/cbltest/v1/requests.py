@@ -723,6 +723,7 @@ class PostStartListenerRequestBody(TestServerRequestBody):
         port: int | None = None,
         disable_tls: bool = False,
         identity: CertKeyPair | None = None,
+        reuse_identity: bool =False,
     ):
         super().__init__(1)
         self.__database = db
@@ -730,6 +731,7 @@ class PostStartListenerRequestBody(TestServerRequestBody):
         self.__port = port
         self.__disable_tls = disable_tls
         self.__identity = identity
+        self.__reuse_identity = reuse_identity
 
 
     def to_json(self) -> Any:
@@ -743,6 +745,9 @@ class PostStartListenerRequestBody(TestServerRequestBody):
 
         if self.__disable_tls:
             json["disableTLS"] = self.__disable_tls
+
+        if self.__reuseIdenity:
+            json["reuseIdentity"] = self.__reuse_identity
 
         if self.__identity is not None:
             json["identity"]={

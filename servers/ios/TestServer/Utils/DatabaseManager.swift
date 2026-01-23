@@ -85,7 +85,7 @@ class DatabaseManager {
         }
     }
     
-    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false, identity:ContentTypes.MultipeerReplicatorIdentity) throws -> UUID {
+    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false, identity:ContentTypes.MultipeerReplicatorIdentity, reuseIdentity: Bool = false) throws -> UUID {
         var collectionsArr: [Collection] = []
         
         guard let database = databases[dbName]
@@ -111,15 +111,22 @@ class DatabaseManager {
         guard let data = Data(base64Encoded: identity.data) else {
             throw TestServerError.badRequest("Invalid replicator identity data")
         }
+        if !reuseIdentity {
         try TLSIdentity.deleteIdentity(withLabel: label)
-
+        }
         let importedIdentity: TLSIdentity
         do {
-            importedIdentity = try TLSIdentity.importIdentity(
-                withData: data,
-                password: identity.password,
-                label: label
-            )
+            if TLSIdentity.identity(withLabel: label) == nil {
+                importedIdentity = try TLSIdentity.importIdentity(
+                    withData: data,
+                    password: identity.password,
+                    label: label
+                )
+            }
+            else {
+                importedIdentity = TLSIdentity.identity(withLabel: label)!
+            }
+
         } catch {
             throw TestServerError.badRequest("Failed to import TLS identity")
         }
