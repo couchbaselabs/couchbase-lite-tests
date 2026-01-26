@@ -145,7 +145,7 @@ class EdgeServerInfo:
     def config_path(self):
         return self.__config_path
 
-    def _default_config_path(self):
+    def _get_repo_root(self):
         repo_root = next(
             p
             for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents)
@@ -164,7 +164,7 @@ class EdgeServerInfo:
         self.__config_path = _get_str_or_default(
             data,
             self.__config_path_key,
-            f"{self._default_config_path()}/environment/aws/es_setup/config/config.json",
+            f"{self._get_repo_root()}/environment/aws/es_setup/config/config.json",
         )
 
 
