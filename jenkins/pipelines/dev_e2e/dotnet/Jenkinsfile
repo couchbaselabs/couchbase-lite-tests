@@ -80,14 +80,12 @@ pipeline {
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
-                        DEVELOPER_DIR="/Applications/Xcode.app"
-                        MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
                         TS_ARTIFACTS_DIR = 'macos'
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} macos '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION} ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} macos '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
                         }
                     }
                     post { 
@@ -105,8 +103,6 @@ pipeline {
                     }
                     environment { 
                         KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
-                        DEVELOPER_DIR="/Applications/Xcode.app"
-                        MD_APPLE_SDK_ROOT="/Applications/Xcode.app"
                         TS_ARTIFACTS_DIR = 'ios'
                     }
                     agent { label 'mob-e2e-mac-01' }
@@ -135,7 +131,7 @@ pipeline {
                     }
                     steps {
                         timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} android '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                            sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} android '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
                         }
                     }
                     post {
