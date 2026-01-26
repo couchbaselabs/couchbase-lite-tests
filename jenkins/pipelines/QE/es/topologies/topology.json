@@ -1,0 +1,9 @@
+{
+    "$schema": "./../../../../../../../environment/aws/topology_setup/topology_schema.json",
+    "edge_servers": [
+        {
+            "version": "{{version}}"
+        }
+    ],
+    "logslurp": false
+}

@@ -239,12 +239,6 @@ def setup_server(
     )
     remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
 
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "cert" / "es_cert.pem", "/home/ec2-user/cert/es_cert.pem"
-    )
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "cert" / "es_key.pem", "/home/ec2-user/cert/es_key.pem"
-    )
     for file in (SCRIPT_DIR / "shell2http").iterdir():
         sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
 
@@ -274,6 +268,26 @@ def setup_server(
 
     sftp_progress_bar(sftp, Path("/tmp/es_cert.pem"), "/home/ec2-user/cert/es_cert.pem")
     sftp_progress_bar(sftp, Path("/tmp/es_key.pem"), "/home/ec2-user/cert/es_key.pem")
+    sftp_progress_bar(
+        sftp,
+        SCRIPT_DIR / "config" / "config.json",
+        "/tmp/config.json",
+    )
+    aws_dir = SCRIPT_DIR.parent
+    sftp_progress_bar(
+        sftp,
+        aws_dir / "sgw_setup" / "cert" / "sg_cert.pem",
+        "/home/ec2-user/cert/sg_cert.pem",
+    )
+    database_dir = "/home/ec2-user/database"
+    for file in (SCRIPT_DIR / "dataset").iterdir():
+        sftp_progress_bar(sftp, file, f"{database_dir}/{file.name}")
+        remote_exec(
+            ssh,
+            f"unzip -o {database_dir}/{file.name} -d {database_dir}",
+            f"Unzipping dataset {file.name}",
+            fail_on_error=False,
+        )
 
     Path("/tmp/es_key.pem").unlink()
     Path("/tmp/es_cert.pem").unlink()
@@ -285,7 +299,6 @@ def setup_server(
         "Uninstalling Couchbase Edge Server",
         fail_on_error=False,
     )
-
     remote_exec(
         ssh,
         f"sudo rpm -i /tmp/{es_info.local_filename}",
@@ -294,6 +307,25 @@ def setup_server(
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting ES log fileserver")
     remote_exec_bg(
         ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES management server"
+    )
+    remote_exec(
+        ssh,
+        'echo \'{"name":"admin_user","password":"password","role":"admin"}\' | bash /home/ec2-user/shell2http/add-user.sh',
+        "Adding user ",
+    )
+    remote_exec(
+        ssh, "bash /home/ec2-user/shell2http/kill-edgeserver.sh", "Stopping Edge Server"
+    )
+    remote_exec(
+        ssh,
+        "sudo mv /tmp/config.json /opt/couchbase-edge-server/etc/config.json",
+        "Moving Edge Server config",
+    )
+
+    remote_exec(
+        ssh,
+        "echo '{}' | bash /home/ec2-user/shell2http/start-edgeserver.sh",
+        "Starting ES",
     )
 
     ssh.close()

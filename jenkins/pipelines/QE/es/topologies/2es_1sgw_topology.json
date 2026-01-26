@@ -1,0 +1,22 @@
+{
+    "$schema": "./../../../../../environment/aws/topology_setup/topology_schema.json",
+    "edge_servers": [
+        {
+            "version": "{{version}}"
+        },
+        {
+            "version": "{{version}}"
+        }
+    ],
+    "clusters": [
+        {
+            "server_count": 1
+        }
+    ],
+    "sync_gateways": [
+        {
+            "cluster": 0
+        }
+    ],
+    "logslurp": false
+}

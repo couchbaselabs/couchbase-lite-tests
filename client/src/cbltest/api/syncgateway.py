@@ -268,12 +268,17 @@ class AllDocumentsResponse:
         """Gets the entries of the response"""
         return self.__rows
 
+    @property
+    def revmap(self):
+        return self.__revmap
+
     def __len__(self) -> int:
         return self.__len
 
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
         self.__rows: list[AllDocumentsResponseRow] = []
+        self.__revmap = dict()
         for row in cast(list[dict], input["rows"]):
             rev = cast(dict, row["value"])
             self.__rows.append(
@@ -284,6 +289,7 @@ class AllDocumentsResponse:
                     cast(str, rev["cv"]) if "cv" in rev else None,
                 )
             )
+            self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
 
 
 class ChangesResponseEntry:

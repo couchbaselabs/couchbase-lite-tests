@@ -1,0 +1,26 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
+    "interface": "0.0.0.0:59840",
+    "enable_anonymous_users": true,
+    "databases": {
+        "names":
+        {
+            "path": "/home/ec2-user/database/names.cblite2",
+            "enable_adhoc_queries": true,
+            "enable_client_writes": true,
+            "enable_client_sync": true,
+            "queries":{"user_by_email": "SELECT meta().id FROM _default WHERE ARRAY_CONTAINS(contact.email, $email)\n"}
+        }
+    },
+
+    "logging": {
+        "console": false,
+        "file": {
+            "dir": "/home/ec2-user/log",
+            "format": "text"
+        },
+        "domains": {
+            "Listener": "info"
+        }
+    }
+}
