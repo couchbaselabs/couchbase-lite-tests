@@ -306,7 +306,7 @@ def setup_server(
     )
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting ES log fileserver")
     remote_exec_bg(
-        ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES manasgement server"
+        ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES management server"
     )
     remote_exec(
         ssh,
