@@ -620,33 +620,6 @@ class _SyncGatewayBase:
             assert "/" in raw_version
             return SyncGatewayVersion(raw_version.split("/")[1])
 
-    # async def wait_for_sgw_ready(self, retries: int = 60) -> None:
-    #     for attempt in range(1, retries + 1):
-    #         scheme = "https://" if self.secure else "http://"
-    #         try:
-    #             async with self._create_session(
-    #                 self.secure, scheme, self.hostname, 4985, None
-    #             ) as s:
-    #                 resp = await self._send_request("get", "/_status", session=s)
-    #                 if isinstance(resp, dict):
-    #                     state = resp.get("state", "").lower()
-    #                     if state in ("online", "running"):
-    #                         return
-    #                     cbl_info(
-    #                         f"SGW not ready yet (attempt {attempt}/{retries}): state={state}",
-    #                     )
-    #         except Exception as e:
-    #             last_error = e
-    #             cbl_info(
-    #                 f"SGW readiness check failed (attempt {attempt}/{retries}): {repr(e)}",
-    #             )
-    #         await asyncio.sleep(1)
-
-    #     msg = "Sync Gateway admin API did not become ready"
-    #     if last_error:
-    #         msg += f"; last error: {last_error!r}"
-    #     raise TimeoutError(msg)
-
     def tls_cert(self) -> str | None:
         if not self.secure:
             cbl_warning(
@@ -1606,6 +1579,42 @@ class SyncGateway(_SyncGatewayBase):
                 "put", f"/{db_name}/_role/{role}", JSONDictionary(body)
             )
 
+    async def upload_certificate(self, cert_content: bytes, cert_name: str) -> str:
+        """
+        Upload a certificate file to SGW instance.
+
+        :param cert_content: Certificate content as bytes (PEM format)
+        :param cert_name: Name for the certificate file (e.g., 'ca.pem', 'server.crt')
+        :return: Path to uploaded certificate on SGW instance
+        :raises Exception: If upload fails
+        """
+        with self._tracer.start_as_current_span(
+            "upload_certificate",
+            attributes={"cbl.cert.name": cert_name},
+        ):
+            # Use simple line-based protocol: first line is name, rest is content
+            body = f"{cert_name}\n{cert_content.decode('utf-8')}"
+
+            async with ClientSession() as session:
+                async with session.post(
+                    f"http://{self.hostname}:20001/upload-cert",
+                    data=body,
+                    headers={"Content-Type": "text/plain"},
+                    timeout=ClientTimeout(total=30),
+                ) as resp:
+                    if resp.status != 200:
+                        resp_body = await resp.text()
+                        raise Exception(
+                            f"Failed to upload certificate: {resp.status} - {resp_body}"
+                        )
+
+                    # Return the path where certificate was stored
+                    cert_path = f"/home/ec2-user/cert/{cert_name}"
+                    print(
+                        f"Certificate '{cert_name}' uploaded successfully to {cert_path}"
+                    )
+                    return cert_path
+
     async def restart_with_config(self, config_name: str = "bootstrap") -> None:
         """
         Restart Sync Gateway with a specific bootstrap configuration.
@@ -1647,10 +1656,10 @@ class SyncGateway(_SyncGatewayBase):
         :raises Exception: If the stop fails
         """
         with self._tracer.start_as_current_span("stop_sgw"):
-            shell2http_url = f"http://{self.hostname}:20001/stop-sgw"
             async with ClientSession() as session:
                 async with session.get(
-                    shell2http_url, timeout=ClientTimeout(total=60)
+                    f"http://{self.hostname}:20001/stop-sgw",
+                    timeout=ClientTimeout(total=60),
                 ) as resp:
                     if resp.status != 200:
                         body = await resp.text()
@@ -1685,12 +1694,10 @@ class SyncGateway(_SyncGatewayBase):
             "start_sgw",
             attributes={"cbl.config.name": config_name},
         ):
-            shell2http_url = (
-                f"http://{self.hostname}:20001/start-sgw?config={config_name}"
-            )
             async with ClientSession() as session:
                 async with session.get(
-                    shell2http_url, timeout=ClientTimeout(total=120)
+                    f"http://{self.hostname}:20001/start-sgw?config={config_name}",
+                    timeout=ClientTimeout(total=120),
                 ) as resp:
                     if resp.status != 200:
                         body = await resp.text()

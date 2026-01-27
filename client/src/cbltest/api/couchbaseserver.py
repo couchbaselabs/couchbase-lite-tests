@@ -1308,3 +1308,21 @@ class CouchbaseServer:
             # Recreate HTTP session with updated connection details
             self.__http_session = requests.Session()
             self.__http_session.auth = (self.__username, self.__password)
+    async def get_root_ca_certificate(self) -> bytes:
+        """
+        Fetch the CBS root CA certificate via REST API.
+
+        :return: Root CA certificate in PEM format as bytes
+        :raises CblTestError: If unable to fetch the certificate
+        """
+        # Use CBS REST API directly - returns clean PEM certificate
+        url = f"http://{self.__hostname}:8091/pools/default/certificate"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                body = await resp.text()
+                if resp.status != 200:
+                    raise CblTestError(
+                        f"Failed to get CBS root CA: {resp.status} - {body}"
+                    )
+                return body.strip().encode("utf-8")
