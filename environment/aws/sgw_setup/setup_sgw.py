@@ -208,6 +208,15 @@ def setup_config(server_hostname: str) -> None:
     with open(SCRIPT_DIR / "bootstrap-x509-cacert-only.json", "w") as fout:
         json.dump(x509_config, fout, indent=4)
 
+    # Generate CBS alternate bootstrap config (with custom CBS ports for CBS testing)
+    with open(SCRIPT_DIR / "config" / "bootstrap-cbs-alternate.json") as fin:
+        with open(SCRIPT_DIR / "bootstrap-cbs-alternate.json", "w") as fout:
+            config_content = cast(dict, json.load(fin))
+            config_content["bootstrap"]["server"] = config_content["bootstrap"][
+                "server"
+            ].replace("{{server-ip}}", server_hostname)
+            json.dump(config_content, fout, indent=4)
+
     with open(SCRIPT_DIR / "start-sgw.sh.in") as file:
         start_sgw_content = file.read()
 
@@ -330,8 +339,8 @@ def setup_server(
     )
     sftp_progress_bar(
         sftp,
-        SCRIPT_DIR / "bootstrap-x509-cacert-only.json",
-        "/home/ec2-user/config/bootstrap-x509-cacert-only.json",
+        SCRIPT_DIR / "bootstrap-cbs-alternate.json",
+        "/home/ec2-user/config/bootstrap-cbs-alternate.json",
     )
     sftp_progress_bar(
         sftp, SCRIPT_DIR / "cert" / "sg_cert.pem", "/home/ec2-user/cert/sg_cert.pem"

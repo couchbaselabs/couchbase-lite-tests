@@ -1635,10 +1635,8 @@ class SyncGateway(_SyncGatewayBase):
             },
         ):
             async with ClientSession() as session:
-                async with session.post(
-                    f"http://{self.hostname}:20001/restart-sgw",
-                    data=config_name,
-                    headers={"Content-Type": "text/plain"},
+                async with session.get(
+                    f"http://{self.hostname}:20001/restart-sgw?config={config_name}",
                     timeout=ClientTimeout(total=120),
                 ) as resp:
                     if resp.status != 200:

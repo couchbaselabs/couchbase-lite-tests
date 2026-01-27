@@ -17,6 +17,7 @@ echo "DEBUG: Config name: ${CONFIG_VALUE}"
 bash "$SCRIPT_DIR/stop-sgw.sh"
 sleep 2
 
-# Export for start-sgw.sh
-export HTTP_config="$CONFIG_VALUE"
+# Parse config from QUERY_STRING (not HTTP_config)
+CONFIG_NAME=$(echo "$QUERY_STRING" | grep -oE 'config=[^&]+' | cut -d= -f2)
+export HTTP_config="${CONFIG_NAME:-bootstrap}"
 bash "$SCRIPT_DIR/start-sgw.sh"

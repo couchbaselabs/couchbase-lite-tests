@@ -13,6 +13,7 @@ from typing import TypeVar, cast
 import aiohttp
 
 T = TypeVar("T")
+import json
 from urllib.parse import quote_plus, urlparse
 
 import requests
@@ -108,9 +109,9 @@ class CouchbaseServer:
             if "://" not in url:
                 url = f"couchbase://{url}"
 
-            self.__hostname = (
-                urlparse(url).hostname or urlparse(url).netloc.split(":")[0]
-            )
+            # Parse URL to extract hostname and REST port
+            self._parse_connection_url(url)
+
             auth = PasswordAuthenticator(username, password)
             opts = ClusterOptions(auth)
             self.__username = username
@@ -121,6 +122,16 @@ class CouchbaseServer:
             # Create a reusable HTTP session for REST API calls
             self.__http_session = requests.Session()
             self.__http_session.auth = (username, password)
+
+    def _parse_connection_url(self, url: str) -> None:
+        """
+        Parse connection URL to extract hostname and REST port.
+
+        :param url: Connection URL (e.g., "couchbase://hostname:port")
+        """
+        parsed = urlparse(url)
+        self.__hostname = parsed.hostname or parsed.netloc.split(":")[0]
+        self.__rest_port = parsed.port or 8091
 
     @property
     def hostname(self) -> str:
@@ -1141,6 +1152,162 @@ class CouchbaseServer:
         raise CblTestError(
             f"Rebalance did not complete within {timeout_seconds} seconds"
         )
+
+    async def reconfigure_ports(
+        self,
+        rest_port: int = 8091,
+        ssl_port: int = 18091,
+        memcached_port: int = 11210,
+        memcached_ssl_port: int = 11207,
+    ) -> None:
+        """
+        Reconfigure CBS ports by calling shell2http endpoint on the CBS node.
+
+        :param hostname: The hostname of the CBS node
+        :param rest_port: New REST API port (default 8091)
+        :param ssl_port: New SSL REST port (default 18091)
+        :param memcached_port: New memcached port (default 11210)
+        :param memcached_ssl_port: New SSL memcached port (default 11207)
+        """
+        payload = {
+            "hostname": self.hostname,
+            "rest_port": rest_port,
+            "ssl_port": ssl_port,
+            "memcached_port": memcached_port,
+            "memcached_ssl_port": memcached_ssl_port,
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"http://{self.hostname}:20001/configure-cbs-ports",
+                data=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            ) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(
+                        f"Failed to reconfigure CBS ports: {resp.status} - {body}"
+                    )
+
+    async def stop_server(self) -> None:
+        """
+        Stop the Couchbase Server service via shell2http.
+        """
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"http://{self.hostname}:20001/stop-cbs") as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(f"Failed to stop CBS: {resp.status} - {body}")
+
+    async def start_server(self, port: int = 8091) -> None:
+        """
+        Start the Couchbase Server service via shell2http.
+
+        :param port: REST API port to wait for readiness (default 8091)
+        """
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"http://{self.hostname}:20001/start-cbs",
+                data=json.dumps({"port": port}),
+                headers={"Content-Type": "application/json"},
+            ) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(f"Failed to start CBS: {resp.status} - {body}")
+
+    async def create_bucket_via_rest(self, bucket: str, port: int = 8091) -> None:
+        """Create bucket via shell2http (useful when SDK can't connect)."""
+        payload = {
+            "bucket": bucket,
+            "port": port,
+            "username": self.__username,
+            "password": self.__password,
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"http://{self.hostname}:20001/create-bucket",
+                data=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            ) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(
+                        f"Failed to create bucket: {resp.status} - {body}"
+                    )
+
+    async def upsert_document_via_rest(
+        self, bucket: str, doc_id: str, doc_body: dict, port: int = 8091
+    ) -> None:
+        """Insert document via shell2http (useful when SDK can't connect)."""
+        payload = {
+            "bucket": bucket,
+            "doc_id": doc_id,
+            "doc_body": doc_body,
+            "port": port,
+            "username": self.__username,
+            "password": self.__password,
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"http://{self.hostname}:20001/upsert-doc",
+                data=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            ) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(
+                        f"Failed to upsert document: {resp.status} - {body}"
+                    )
+
+    async def wait_for_kv_ready(self, timeout: int = 60) -> None:
+        """
+        Wait for KV (data) service to be ready.
+
+        :param timeout: Maximum time to wait in seconds
+        """
+        for attempt in range(timeout):
+            try:
+                # Check if we can connect to the data service
+                resp = self.__http_session.get(
+                    f"http://{self.__hostname}:{self.__rest_port}/pools/default/buckets"
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    # Check if any node has KV service available
+                    nodes = data.get("nodes", [])
+                    if nodes:
+                        # If we can get pool info, KV service is likely ready
+                        return
+            except Exception:
+                pass
+
+            if attempt % 10 == 0:
+                print(f"Waiting for KV service... ({attempt}/{timeout})")
+            await asyncio.sleep(1)
+
+        raise CblTestError(f"KV service did not become ready within {timeout} seconds")
+
+    async def reconnect(self, new_url: str) -> None:
+        """
+        Reconnect to CBS with a new URL (useful after port changes).
+
+        :param new_url: New CBS URL (e.g., "couchbase://hostname:9000")
+        """
+        with self.__tracer.start_as_current_span("reconnect_to_couchbase_server"):
+            if "://" not in new_url:
+                new_url = f"couchbase://{new_url}"
+
+            # Parse new URL to extract hostname and REST port
+            self._parse_connection_url(new_url)
+
+            # Reconnect SDK cluster
+            auth = PasswordAuthenticator(self.__username, self.__password)
+            opts = ClusterOptions(auth)
+            self.__cluster = Cluster(new_url, opts)
+            self.__cluster.wait_until_ready(timedelta(seconds=10))
+
+            # Recreate HTTP session with updated connection details
+            self.__http_session = requests.Session()
+            self.__http_session.auth = (self.__username, self.__password)
 
     async def get_root_ca_certificate(self) -> bytes:
         """
