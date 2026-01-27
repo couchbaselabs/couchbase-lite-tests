@@ -1,7 +1,8 @@
 #!/bin/bash -e
 
+export PATH="/opt/homebrew/bin:/opt/homebrew/opt/util-linux/bin:$PATH"
 export DOTNET_ROOT=$HOME/.dotnet
-export DOTNET_VERSION="8.0"
+export DOTNET_VERSION="9.0"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 PREPARE_DOTNET_SCRIPT="$SCRIPT_DIR/prepare_dotnet.sh"
