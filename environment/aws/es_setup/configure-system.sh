@@ -3,8 +3,12 @@
 set -x
 
 mkdir -p $HOME/cert
+mkdir -p $HOME/database
 mkdir -p $HOME/log
 mkdir -p $HOME/shell2http
+mkdir -p $HOME/user
+
+sudo dnf install -y wget
 
 curl -LO https://github.com/caddyserver/caddy/releases/download/v2.10.2/caddy_2.10.2_linux_amd64.tar.gz
 tar xvf caddy_2.10.2_linux_amd64.tar.gz caddy
@@ -16,7 +20,11 @@ tar xvf shell2http_1.17.0_linux_amd64.tar.gz shell2http
 rm shell2http_1.17.0_linux_amd64.tar.gz
 
 if ! command -v iptables &> /dev/null; then
-  sudo yum install iptables-services -y
+  sudo dnf install iptables-services -y
   sudo systemctl enable iptables
   sudo systemctl start iptables
 fi
+if ! command -v unzip >/dev/null 2>&1; then
+  sudo dnf install unzip -y
+fi
+sudo iptables -F

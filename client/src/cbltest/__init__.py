@@ -157,7 +157,14 @@ class CBLPyTest:
         if not test_server_only:
             for es in self.__config.edge_servers:
                 es_info = EdgeServerInfo(es)
-                self.__edge_servers.append(EdgeServer(es_info.hostname))
+                self.__edge_servers.append(
+                    EdgeServer(
+                        es_info.hostname,
+                        es_info.admin_user,
+                        es_info.admin_password,
+                        es_info.config_path,
+                    )
+                )
 
     async def resolve_api_version(self) -> None:
         ts_index = 0

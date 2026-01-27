@@ -7,15 +7,17 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
-    echo "Usage: $0 <version> <platform> <sgw_version> [private_key_path]"
+    echo "Usage: $0 <version> <platform> <sgw_version> [dataset-version]"
     echo "version: CBL version (e.g. 3.2.1-2)"
     echo "platform: The .NET platform to build (e.g. ios)"
     echo "sgw_version: Version of Sync Gateway to download and use"
+    echo "dataset-version: Version of CBL dataset to use (default: 4.0)"
 }
 
 function prepare_dotnet() {
     source $SCRIPT_DIR/prepare_env.sh
-    install_dotnet "$DOTNET_VERSION"
+    install_dotnet "9.0"
+    install_dotnet_runtime "8.0"
     install_maui
     if [ "$platform" != "macos" ]; then
         install_xharness
@@ -25,12 +27,16 @@ function prepare_dotnet() {
 if [ $# -lt 3 ]; then
     usage
     exit 1
-field
+fi
 
 cbl_version=$1
 platform=$2
 sgw_version=$3
 dataset_version=${4:-"4.0"}
+
+if [[ "$(uname)" == "Darwin" ]]; then
+    export MD_APPLE_SDK_ROOT="/$(echo "$(xcode-select -p)" | cut -d'/' -f2-3)"
+fi
 
 prepare_dotnet
 

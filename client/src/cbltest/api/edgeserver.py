@@ -1,16 +1,22 @@
 import json
+import ssl
+import time
 import urllib.parse
 import uuid
 from json import dumps
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, cast
 from urllib.parse import urljoin
 
 import pyjson5 as json5  # type: ignore[import-not-found]
-from aiohttp import BasicAuth, ClientSession
+from aiohttp import BasicAuth, ClientSession, TCPConnector
 from opentelemetry.trace import get_tracer
 
-from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
+from cbltest.api.error import (
+    CblEdgeServerBadResponseError,
+    CblTestError,
+    CblTimeoutError,
+)
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.api.syncgateway import (
     AllDocumentsResponse,
@@ -28,7 +34,7 @@ class EdgeServerVersion(CouchbaseVersion):
     A class for parsing Edge Server Version
     """
 
-    def parse(self, input: str) -> Tuple[str, int]:
+    def parse(self, input: str) -> tuple[str, int]:
         first_lparen = input.find("(")
         first_semicol = input.find(";")
         if first_lparen == -1 or first_semicol == -1:
@@ -42,8 +48,8 @@ class BulkDocOperation(JSONSerializable):
     def __init__(
         self,
         body: dict,
-        _id: Optional[str] = None,
-        rev: Optional[str] = None,
+        _id: str | None = None,
+        rev: str | None = None,
         optype: str = "create",
     ):
         if _id is None:
@@ -82,44 +88,35 @@ class EdgeServer:
     def __init__(
         self,
         url: str,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
+        admin_user: str = "admin_user",
+        admin_password: str = "password",
         config_file=None,
     ):
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
-            repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
-            config_file = str(
-                repo_root / "environment" / "edge_server" / "config" / "config.json"
-            )
-        port, secure, mtls, certfile, keyfile, is_auth, databases, is_anonymous_auth = (
-            self._decode_config_file(config_file)
+            raise CblTestError("Config file cannot be None")
+        port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(
+            config_file
         )
         self.__secure: bool = secure
         self.__mtls: bool = mtls
         self.__hostname: str = url
         self.__port: int = port
-        self.__certfile: str = certfile
-        self.__keyfile: str = keyfile
-        self.__databases: dict = databases
         self.__anonymous_auth: bool = is_anonymous_auth
         self.__config_file: str = config_file
-        self.__auth_name = "admin_user"
-        self.__auth_password = "password"
+        self.__auth_name = admin_user
+        self.__auth_password = admin_password
         self.__auth = is_auth
         ws_scheme = "wss://" if secure else "ws://"
         self.__replication_url = f"{ws_scheme}{url}:{port}"
         self.scheme = "https://" if secure else "http://"
-        self.__session: ClientSession
-        if self.__anonymous_auth:
-            self.__session = self._create_session(self.scheme, url, port, None)
-        else:
-            self.__session = self._create_session(
-                self.scheme,
-                url,
-                port,
-                BasicAuth(self.__auth_name, self.__auth_password, "ascii"),
-            )
+        self.__anonymous_session = self._create_session(self.scheme, url, port, None)
+        self.__admin_session = self._create_session(
+            self.scheme,
+            url,
+            port,
+            BasicAuth(self.__auth_name, self.__auth_password, "ascii"),
+        )
         self.__shell_session: ClientSession = self._create_session(
             "http://", url, 20001, None
         )
@@ -129,63 +126,55 @@ class EdgeServer:
         return self.__hostname
 
     def _decode_config_file(self, config_file: str):
-        with open(config_file, "r", encoding="utf-8") as file:
+        with open(config_file, encoding="utf-8") as file:
             config_content = file.read()
         config = json5.loads(config_content)
-
-        # Validate and extract top-level keys
-        databases = config.get("databases")
-        if not databases or not isinstance(databases, dict):
-            raise ValueError("Missing or invalid 'databases' configuration.")
-
         https = config.get("https", False)
         interface = config.get("interface", "0.0.0.0:59840")
-        port = int(interface.split(":")[1])
+        port = interface.split(":")[1]
         enable_anonymous_users = config.get("enable_anonymous_users", False)
-        cert_path, key_path = "", ""
         mtls = False
         if https:
-            cert_path = https.get("tls_cert_path")
-            key_path = https.get("tls_key_path")
-            if not cert_path or not key_path:
-                raise ValueError(
-                    "HTTPS configuration must include 'tls_cert_path' and 'tls_key_path'."
-                )
             client_cert_path = https.get("client_cert_path", False)
             if client_cert_path:
                 mtls = True
             https = True
-        users = bool(config.get("users"))
-        # Return parsed configuration as a tuple
+        users = True if config.get("users", False) else False
         return (
             port,
             https,
             mtls,
-            cert_path,
-            key_path,
             users,
-            databases,
             enable_anonymous_users,
         )
 
     def _create_session(
-        self, scheme: str, url: str, port: int, auth: Optional[BasicAuth]
+        self, scheme: str, url: str, port: int, auth: BasicAuth | None
     ) -> ClientSession:
+        if self.__secure:
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            return ClientSession(
+                f"{scheme}{url}:{port}",
+                auth=auth,
+                connector=TCPConnector(ssl=ssl_context),
+            )
         return ClientSession(f"{scheme}{url}:{port}", auth=auth)
 
     async def _send_request(
         self,
         method: str,
         path: str,
-        payload: Optional[JSONSerializable] = None,
-        params: Optional[Dict[str, str]] = None,
-        session: Optional[ClientSession] = None,
-        shell: bool = False,
+        payload: JSONSerializable | None = None,
+        params: dict[str, str] | None = None,
+        session: ClientSession | None = None,
     ) -> Any:
-        if shell:
-            session = self.__shell_session
         if session is None:
-            session = self.__session
+            if self.__auth:
+                session = self.__admin_session
+            else:
+                session = self.__anonymous_session
 
         with self.__tracer.start_as_current_span(
             "send_request", attributes={"http.method": method, "http.path": path}
@@ -215,7 +204,8 @@ class EdgeServer:
 
             if not resp.ok:
                 raise CblEdgeServerBadResponseError(
-                    resp.status, f"{method} {path} returned {resp.status} for {payload}"
+                    resp.status,
+                    f"{method} {path} returned {resp.status} for payload {data}",
                 )
 
             return ret_val
@@ -223,7 +213,12 @@ class EdgeServer:
     def keyspace_builder(
         self, db_name: str = "", scope: str = "", collection: str = ""
     ):
-        return ".".join((db_name, scope, collection)).rstrip(".")
+        keyspace = db_name
+        if scope:
+            keyspace += f".{scope}"
+        if collection:
+            keyspace += f".{collection}"
+        return keyspace
 
     async def get_version(self) -> CouchbaseVersion:
         scheme = "https://" if self.__secure else "http://"
@@ -311,7 +306,7 @@ class EdgeServer:
         doc_id: str,
         scope: str = "",
         collection: str = "",
-        revid: Optional[str] = None,
+        revid: str | None = None,
     ):
         with self.__tracer.start_as_current_span(
             "get_document",
@@ -341,30 +336,36 @@ class EdgeServer:
 
             return RemoteDocument(cast_resp)
 
-    async def get_all_dbs(self) -> List[str]:
+    async def get_all_dbs(self) -> list:
         with self.__tracer.start_as_current_span("get all database"):
             response = await self._send_request("get", "/_all_dbs")
+            if isinstance(response, list):
+                return response
             if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get all database from edge server had error '{response.get('reason')}'",
+                    f"_all_dbs with Edge Server had error '{response.get('reason')}'",
                 )
-            return cast(List[str], response)
+            raise CblEdgeServerBadResponseError(
+                500,
+                f"Unexpected response type from adhoc query: {type(response)}",
+            )
 
     async def get_active_tasks(self):
         with self.__tracer.start_as_current_span("get all active tasks"):
             response = await self._send_request("get", "/_active_tasks")
-            if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server get /_active_tasks (not JSON)"
-                )
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
+            if isinstance(response, list):
+                return response
+
+            if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get all active tasks from edge server had error '{cast_resp['reason']}'",
+                    f"get_active_tasks with Edge Server had error '{response.get('reason')}'",
                 )
-            return cast_resp
+            raise CblEdgeServerBadResponseError(
+                500,
+                f"Unexpected response type from get_active_tasks: {type(response)}",
+            )
 
     async def get_db_info(self, db_name: str, scope: str = "", collection: str = ""):
         with self.__tracer.start_as_current_span(
@@ -385,7 +386,7 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get database info from edge server had error '{cast_resp['reason']}'",
+                    f"get database info  from edge server had error '{cast_resp['reason']}'",
                 )
             return cast_resp
 
@@ -397,16 +398,16 @@ class EdgeServer:
         password: str,
         bidirectional: bool,
         continuous: bool,
-        collections: Optional[List[str]] = None,
-        channels: Optional[List[str]] = None,
-        doc_ids: Optional[List[str]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        trusted_root_certs: Optional[str] = None,
-        pinned_cert: Optional[str] = None,
-        session_cookie: Optional[str] = None,
-        openid_token: Optional[str] = None,
-        tls_client_cert: Optional[str] = None,
-        tls_client_cert_key: Optional[str] = None,
+        collections: list[str] | None = None,
+        channels: list[str] | None = None,
+        doc_ids: list[str] | None = None,
+        headers: dict[str, str] | None = None,
+        trusted_root_certs: str | None = None,
+        pinned_cert: str | None = None,
+        session_cookie: str | None = None,
+        openid_token: str | None = None,
+        tls_client_cert: str | None = None,
+        tls_client_cert_key: str | None = None,
     ):
         with self.__tracer.start_as_current_span(
             "Start Replication with Edge Server",
@@ -416,7 +417,7 @@ class EdgeServer:
                 "cbl.collection.name": collections or [],
             },
         ):
-            payload: Dict[str, Any] = {
+            payload: dict[str, Any] = {
                 "source": source,
                 "target": target,
                 "bidirectional": bidirectional,
@@ -484,19 +485,17 @@ class EdgeServer:
             "All Replication status with Edge Server"
         ):
             response = await self._send_request("get", "/_replicate")
-
-            if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server get all status  /_replicate (not JSON)"
-                )
-
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
+            if isinstance(response, list):
+                return response
+            if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get all replication status with Edge Server had error '{cast_resp['reason']}'",
+                    f"all_replication_status with Edge Server had error '{response.get('reason')}'",
                 )
-            return cast_resp
+            raise CblEdgeServerBadResponseError(
+                500,
+                f"Unexpected response type from all_replication_status: {type(response)}",
+            )
 
     async def stop_replication(self, replicator_id: int):
         with self.__tracer.start_as_current_span(
@@ -528,16 +527,16 @@ class EdgeServer:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        since: Optional[int] = 0,
-        feed: Optional[str] = "normal",
-        limit: Optional[int] = None,
-        filter_type: Optional[str] = None,
-        doc_ids: Optional[List[str]] = None,
-        include_docs: Optional[bool] = False,
-        active_only: Optional[bool] = False,
-        descending: Optional[bool] = False,
-        heartbeat: Optional[int] = None,
-        timeout: Optional[int] = None,
+        since: int | None = 0,
+        feed: str | None = "normal",
+        limit: int | None = None,
+        filter_type: str | None = None,
+        doc_ids: list[str] | None = None,
+        include_docs: bool | None = False,
+        active_only: bool | None = False,
+        descending: bool | None = False,
+        heartbeat: int | None = None,
+        timeout: int | None = None,
     ):
         with self.__tracer.start_as_current_span(
             "Changes feed",
@@ -583,8 +582,8 @@ class EdgeServer:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        name: Optional[str] = None,
-        params: Optional[Dict] = None,
+        name: str | None = None,
+        params: dict | None = None,
     ):
         with self.__tracer.start_as_current_span(
             "Named query",
@@ -603,26 +602,26 @@ class EdgeServer:
                 "post", f"/{keyspace}/_query/{name}", payload=JSONDictionary(payload)
             )
 
-            if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server post   /_query (not JSON)"
-                )
+            if isinstance(response, list):
+                return response
 
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
+            if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"named query with Edge Server had error '{cast_resp['reason']}'",
+                    f"named query with Edge Server had error '{response.get('reason')}'",
                 )
-            return cast_resp
+            raise CblEdgeServerBadResponseError(
+                500,
+                f"Unexpected response type from named query: {type(response)}",
+            )
 
     async def adhoc_query(
         self,
         db_name: str,
         scope: str = "",
         collection: str = "",
-        query: Optional[str] = None,
-        params: Optional[Dict] = None,
+        query: str | None = None,
+        params: dict[str, Any] | None = None,
     ):
         with self.__tracer.start_as_current_span(
             "Adhoc query",
@@ -632,7 +631,7 @@ class EdgeServer:
                 "cbl.collection.name": collection,
             },
         ):
-            payload: Dict[str, Any] = {"query": query}
+            payload: dict[str, Any] = {"query": query}
             if params is not None:
                 payload["params"] = params
             keyspace = self.keyspace_builder(db_name, scope, collection)
@@ -640,17 +639,18 @@ class EdgeServer:
                 "post", f"/{keyspace}/_query", payload=JSONDictionary(payload)
             )
 
-            if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server adhoc query (not JSON)"
-                )
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
+            if isinstance(response, list):
+                return response
+
+            if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"adhoc query with Edge Server had error '{cast_resp.get('reason')}'",
+                    f"adhoc query with Edge Server had error '{response.get('reason')}'",
                 )
-            return cast_resp
+            raise CblEdgeServerBadResponseError(
+                500,
+                f"Unexpected response type from adhoc query: {type(response)}",
+            )
 
     async def add_document_auto_id(
         self,
@@ -701,7 +701,7 @@ class EdgeServer:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        rev: Optional[str] = None,
+        rev: str | None = None,
         expires: int = 0,
         ttl: int = 0,
     ) -> dict:
@@ -839,3 +839,142 @@ class EdgeServer:
                 return cast_resp
             else:
                 return resp
+
+    async def bulk_doc_op(
+        self,
+        docs: list[BulkDocOperation],
+        db_name: str,
+        scope: str = "",
+        collection: str = "",
+        new_edits: bool = True,
+    ):
+        with self.__tracer.start_as_current_span(
+            "bulk_documents_operation",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+            },
+        ):
+            keyspace = self.keyspace_builder(db_name, scope, collection)
+            body = {"docs": list(u.body for u in docs), "new_edits": new_edits}
+            resp = await self._send_request(
+                "post", f"/{keyspace}/_bulk_docs", JSONDictionary(body)
+            )
+
+            if isinstance(resp, dict):
+                cast_resp = cast(dict, resp)
+                if "error" in cast_resp:
+                    raise CblEdgeServerBadResponseError(
+                        500,
+                        f"bulk_documents_operation Edge Server had error '{cast_resp['reason']}'",
+                    )
+            if isinstance(resp, list):
+                return cast(list, resp)
+
+    async def set_auth(self, auth: bool = True, name="admin_user", password="password"):
+        if not auth:
+            self.__auth = False
+        else:
+            self.__auth_name = name
+            self.__auth_password = password
+            self.__admin_session = self._create_session(
+                self.scheme,
+                self.__hostname,
+                self.__port,
+                BasicAuth(self.__auth_name, self.__auth_password, "ascii"),
+            )
+
+    async def kill_server(self):
+        with self.__tracer.start_as_current_span("kill edge server"):
+            await self._send_request(
+                "post", "/kill-edgeserver", session=self.__shell_session
+            )
+
+    async def start_server(self, config: dict = {}):
+        with self.__tracer.start_as_current_span("start edge server"):
+            await self._send_request(
+                "post",
+                "/start-edgeserver",
+                JSONDictionary(config),
+                session=self.__shell_session,
+            )
+
+    async def configure_dataset(self, db_name="db", config_file: str | None = None):
+        if not config_file:
+            repo_root = next(
+                p
+                for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents)
+                if p.name == "couchbase-lite-tests"
+            )
+            config_file = f"{repo_root}/environment/aws/es_setup/config/config.json"
+        await self.kill_server()
+        await self._send_request(
+            "post",
+            "/reset-db",
+            JSONDictionary({"filename": f"{db_name}.cblite2"}),
+            session=self.__shell_session,
+        )
+        with open(config_file) as f:
+            cfg = json.load(f)
+        await self.start_server(config=cfg)
+        return EdgeServer(self.__hostname, config_file=config_file)
+
+    async def set_firewall_rules(
+        self,
+        allow: list[Any] | None = None,
+        deny: list[Any] | None = None,
+    ):
+        """
+        Add firewall rules to the edge server host. Can be used to block SGW connection to ES.
+
+        :param allow: The IPs allowed to access edge-server. Used to accept incoming SGW connection.
+        :param deny: The IPs denied from accessing edge-server. Used to deny incoming SGW connection.
+        """
+        with self.__tracer.start_as_current_span("go online offline"):
+            payload: dict[str, Any] = {}
+            if allow:
+                payload["allow"] = allow
+            if deny:
+                payload["deny"] = deny
+            await self._send_request(
+                "post",
+                "firewall",
+                JSONDictionary(payload),
+                session=self.__shell_session,
+            )
+
+    async def reset_firewall(self):
+        with self.__tracer.start_as_current_span("reset firewall"):
+            await self._send_request("post", "firewall", session=self.__shell_session)
+
+    async def add_user(self, name, password, role="admin"):
+        with self.__tracer.start_as_current_span("Add user"):
+            await self.kill_server()
+            payload = {"name": name, "password": password, "role": role}
+            await self._send_request(
+                "post",
+                "add-user",
+                JSONDictionary(payload),
+                session=self.__shell_session,
+            )
+            await self.start_server()
+
+    async def wait_for_idle(self, replicator_key=0, timeout=30):
+        is_idle = False
+        retry = 6
+        while not is_idle and retry > 0:
+            status = await self.all_replication_status()
+            if len(status) != 0:
+                assert "error" not in status[replicator_key].keys(), (
+                    f"Replication setup failure: {status}"
+                )
+                if status[replicator_key]["status"] == "Idle":
+                    is_idle = True
+                else:
+                    time.sleep(timeout)
+                    retry -= 1
+            else:
+                is_idle = True
+        if not is_idle and retry == 0:
+            raise CblTimeoutError("Timeout waiting for replicator status")
