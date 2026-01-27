@@ -1308,6 +1308,7 @@ class CouchbaseServer:
             # Recreate HTTP session with updated connection details
             self.__http_session = requests.Session()
             self.__http_session.auth = (self.__username, self.__password)
+
     async def get_root_ca_certificate(self) -> bytes:
         """
         Fetch the CBS root CA certificate via REST API.
