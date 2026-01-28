@@ -116,17 +116,20 @@ class DatabaseManager {
         }
         let importedIdentity: TLSIdentity
         do {
-            if TLSIdentity.identity(withLabel: label) == nil {
+                if reuseIdentity {
+                guard let existingIdentity = try TLSIdentity.identity(withLabel: label) else {
+                    throw TestServerError.badRequest(
+                        "reuseIdentity=true but no existing TLS identity found for label \(label)"
+                    )
+                }
+                importedIdentity = existingIdentity
+            } else {
                 importedIdentity = try TLSIdentity.importIdentity(
                     withData: data,
                     password: identity.password,
                     label: label
                 )
             }
-            else {
-                importedIdentity = TLSIdentity.identity(withLabel: label)!
-            }
-
         } catch {
             throw TestServerError.badRequest("Failed to import TLS identity")
         }

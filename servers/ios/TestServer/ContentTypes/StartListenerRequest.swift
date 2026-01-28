@@ -14,6 +14,7 @@ extension ContentTypes {
         let port: UInt16?
         let disableTLS: Bool?
         let identity: MultipeerReplicatorIdentity
+        let reuseIdentity: Bool?
         
         public var description: String {
             var result: String = "Endpoint Listener Configuration:\n"
@@ -21,6 +22,7 @@ extension ContentTypes {
             result += "\tcollection: \(collections.joined(separator: ", "))\n"
             result += "\tport: \(port ?? 0)\n"
             result += "\tdisableTLS: \(disableTLS ?? false)\n"
+            result += "\treuseIdentity: \(reuseIdentity ?? false)\n"
             return result
         }
     }

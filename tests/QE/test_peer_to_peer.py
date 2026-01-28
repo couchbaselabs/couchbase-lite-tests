@@ -527,13 +527,14 @@ class TestPeerToPeer(CBLTestClass):
         await replicator1.start()
         async def stop_restart_task():
             await listener1.stop()
-            listener2 = Listener(all_dbs[0], ["_default._default"], 59840,identity=listener1.identity)
+            listener2 = Listener(all_dbs[0], ["_default._default"], 59840,identity=listener1.identity, reuse_identity=True)
             await listener2.start()
             return listener2
 
         restarted_listener, _ = await asyncio.gather(
         stop_restart_task(),
         self._testserver_crud(all_dbs[1], num_of_docs, optype="update", documents=docs))
+        await replicator1.start()
         listener1=restarted_listener
         self.mark_test_step("Wait till replication is complete")
         status = None
