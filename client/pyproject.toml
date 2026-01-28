@@ -34,7 +34,7 @@ dependencies = [
     "colorama==0.4.6",
     "couchbase==4.3.4",
     "cryptography==44.0.0",
-    "deepdiff==8.6.1"
+    "deepdiff==8.6.1",
     "Deprecated==1.2.15",
     "exceptiongroup==1.2.2",
     "executing==2.1.0",
