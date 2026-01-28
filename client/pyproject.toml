@@ -34,6 +34,7 @@ dependencies = [
     "colorama==0.4.6",
     "couchbase==4.3.4",
     "cryptography==44.0.0",
+    "deepdiff==8.6.1"
     "Deprecated==1.2.15",
     "exceptiongroup==1.2.2",
     "executing==2.1.0",
@@ -58,7 +59,6 @@ dependencies = [
     "pyjson5==1.6.8",
     "protobuf==5.29.3",
     "pycparser==2.22",
-    "pyjson5==1.6.8",
     "PyNaCl==1.5.0",
     "pytest==8.3.4",
     "pytest-asyncio==0.25.2",
