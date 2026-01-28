@@ -80,7 +80,6 @@ class TestDbOnlineOffline(CBLTestClass):
 
         self.mark_test_step("Create bucket and default collection")
         cbs.create_bucket(bucket_name)
-        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_config = {
@@ -146,7 +145,6 @@ class TestDbOnlineOffline(CBLTestClass):
         self.mark_test_step("Create buckets and configure databases")
         for i, [db_name, bucket_name, channel, username, _] in enumerate(db_configs):
             cbs.create_bucket(bucket_name)
-            await cbs.wait_for_bucket_ready(bucket_name)
 
             db_config = {
                 "bucket": bucket_name,

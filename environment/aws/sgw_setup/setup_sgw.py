@@ -200,7 +200,7 @@ def setup_config(server_hostname: str) -> None:
     with open(SCRIPT_DIR / "bootstrap-alternate.json", "w") as fout:
         json.dump(alternate_config, fout, indent=4)
 
-    # 3. bootstrap-x509-cacert-only.json (for x509 CA cert testing)
+    # 3. bootstrap-x509-cacert-only.json (with x509 CA cert for CBS testing)
     x509_config = copy.deepcopy(base_config)
     x509_config["bootstrap"]["server"] = f"couchbases://{server_hostname}"
     x509_config["bootstrap"]["server_tls_skip_verify"] = False
@@ -208,14 +208,13 @@ def setup_config(server_hostname: str) -> None:
     with open(SCRIPT_DIR / "bootstrap-x509-cacert-only.json", "w") as fout:
         json.dump(x509_config, fout, indent=4)
 
-    # Generate CBS alternate bootstrap config (with custom CBS ports for CBS testing)
-    with open(SCRIPT_DIR / "config" / "bootstrap-cbs-alternate.json") as fin:
-        with open(SCRIPT_DIR / "bootstrap-cbs-alternate.json", "w") as fout:
-            config_content = cast(dict, json.load(fin))
-            config_content["bootstrap"]["server"] = config_content["bootstrap"][
-                "server"
-            ].replace("{{server-ip}}", server_hostname)
-            json.dump(config_content, fout, indent=4)
+    # 4. bootstrap-cbs-alternate.json (with custom CBS ports for CBS testing)
+    cbs_alternate_config = copy.deepcopy(base_config)
+    cbs_alternate_config["bootstrap"]["server"] = (
+        f"couchbases://{server_hostname}:11207"
+    )
+    with open(SCRIPT_DIR / "bootstrap-cbs-alternate.json", "w") as fout:
+        json.dump(cbs_alternate_config, fout, indent=4)
 
     with open(SCRIPT_DIR / "start-sgw.sh.in") as file:
         start_sgw_content = file.read()
@@ -339,6 +338,11 @@ def setup_server(
     )
     sftp_progress_bar(
         sftp,
+        SCRIPT_DIR / "bootstrap-x509-cacert-only.json",
+        "/home/ec2-user/config/bootstrap-x509-cacert-only.json",
+    )
+    sftp_progress_bar(
+        sftp,
         SCRIPT_DIR / "bootstrap-cbs-alternate.json",
         "/home/ec2-user/config/bootstrap-cbs-alternate.json",
     )
@@ -374,7 +378,7 @@ def setup_server(
     )
 
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting SGW log fileserver")
-    remote_exec(
+    remote_exec_bg(
         ssh,
         "bash /home/ec2-user/shell2http/start.sh",
         "Starting SGW management server",

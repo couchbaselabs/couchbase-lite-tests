@@ -100,7 +100,6 @@ class TestLogRedaction(CBLTestClass):
 
         self.mark_test_step("Create bucket and default collection")
         cbs.create_bucket(bucket_name)
-        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway with log redaction enabled")
         db_config = {
@@ -192,7 +191,6 @@ class TestLogRedaction(CBLTestClass):
 
         self.mark_test_step("Create bucket and default collection")
         cbs.create_bucket(bucket_name)
-        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway with log redaction enabled")
         db_config = {

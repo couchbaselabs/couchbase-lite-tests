@@ -30,7 +30,6 @@ class TestUsersChannels(CBLTestClass):
 
         self.mark_test_step("Create single shared bucket for all SGW nodes")
         cbs.create_bucket(bucket_name)
-        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step(
             f"Configure database '{sg_db}' on all {num_sgs} SGW nodes (pointing to shared bucket)"

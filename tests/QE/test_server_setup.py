@@ -23,7 +23,6 @@ class TestServerSetup(CBLTestClass):
         num_docs = 5
 
         cbs.create_bucket(bucket_name)
-        await cbs.wait_for_bucket_ready(bucket_name)
         db_config = {
             "bucket": bucket_name,
             "num_index_replicas": 0,
@@ -75,6 +74,54 @@ class TestServerSetup(CBLTestClass):
         assert import_count != 0, f"Expected import_count > 0, got {import_count}"
         await sg.restart_with_config("bootstrap")
         await sg.wait_for_db_up(sg_db)
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_remove_dcp_cacert_handling(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
+        sg = cblpytest.sync_gateways[0]
+        cbs = cblpytest.couchbase_servers[0]
+        bucket_name = "data-bucket"
+        sg_db = "db"
+
+        self.mark_test_step("Create bucket on CBS")
+        cbs.create_bucket(bucket_name)
+
+        self.mark_test_step("Fetch CBS root CA certificate and upload to SGW")
+        ca_cert_pem = await cbs.get_root_ca_certificate()
+        await sg.upload_certificate(
+            cert_content=ca_cert_pem, cert_name="cbs-ca-cert.pem"
+        )
+
+        self.mark_test_step("Restart SGW with x509 cacert config")
+        await sg.restart_with_config("bootstrap-x509-cacert-only")
+
+        self.mark_test_step("Verify SGW starts successfully")
+        sg_version = await sg.get_version()
+        assert sg_version is not None, "SGW should start with ca_cert_path x509 config"
+
+        self.mark_test_step("Verify SGW can connect to CBS via document sync")
+        await sg.put_database(
+            sg_db,
+            PutDatabasePayload(
+                {
+                    "bucket": bucket_name,
+                    "num_index_replicas": 0,
+                    "scopes": {"_default": {"collections": {"_default": {}}}},
+                }
+            ),
+        )
+        await sg.wait_for_db_up(sg_db)
+
+        doc_id = "test_cacert_auth"
+        doc_body = {"type": "test", "message": "x509 ca_cert_path auth works"}
+        cbs.upsert_document(bucket_name, doc_id, doc_body)
+        await asyncio.sleep(3)
+        sg_doc = await sg.get_document(sg_db, doc_id)
+        assert sg_doc is not None, "SGW should import document from CBS"
+        assert sg_doc.body["message"] == "x509 ca_cert_path auth works"
+
+        await sg.restart_with_config()
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sgw_server_custom_ports(

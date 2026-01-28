@@ -70,8 +70,6 @@ async def _setup_database_and_user(
 ):
     """Setup bucket, database, and user."""
     cbs.create_bucket(bucket_name, num_replicas=1)
-    await cbs.wait_for_bucket_ready(bucket_name)
-
     db_config = {
         "bucket": bucket_name,
         "index": {"num_replicas": 1},
@@ -350,7 +348,6 @@ class TestISGRCollectionMapping(CBLTestClass):
         ]:
             cbs.create_bucket(bucket)
             cbs.create_collections(bucket, "_default", collections)
-            await cbs.wait_for_bucket_ready(bucket)
 
         self.mark_test_step(
             "Configure all SGs with their respective buckets and collections"

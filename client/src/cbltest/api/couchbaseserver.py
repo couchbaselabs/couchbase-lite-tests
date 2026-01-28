@@ -197,12 +197,20 @@ class CouchbaseServer:
                         f"Unable to properly create {bucket}.{scope}.{name} in Couchbase Server"
                     )
 
-    def create_bucket(self, name: str, num_replicas: int = 0):
+    def create_bucket(
+        self,
+        name: str,
+        num_replicas: int = 0,
+        retries: int = 60,
+        interval: float = 2.0,
+    ):
         """
         Creates a bucket with a given name that Sync Gateway can use
 
         :param name: The name of the bucket to create
         :param num_replicas: The number of replicas for the bucket (default 0)
+        :param retries: Number of readiness checks to perform (default 60)
+        :param interval: Seconds to wait between checks (default 2.0)
         """
         with self.__tracer.start_as_current_span(
             "create_bucket", attributes={"cbl.bucket.name": name}
@@ -219,6 +227,18 @@ class CouchbaseServer:
             except BucketAlreadyExistsException:
                 pass
 
+            # Bucket creation is asynchronous in the cluster. Wait until it is healthy
+            # and responding before returning so callers can safely proceed.
+            for _ in range(retries):
+                if (
+                    self.bucket_healthy(name)
+                    and self.bucket_kv_responding(name)
+                    and self.collections_ready(name)
+                ):
+                    return
+                sleep(interval)
+            raise TimeoutError(f"Bucket {name} did not become ready")
+
     def drop_bucket(self, name: str):
         """
         Drops a bucket from the Couchbase cluster
@@ -233,22 +253,6 @@ class CouchbaseServer:
                 mgr.drop_bucket(name)
             except BucketDoesNotExistException:
                 pass
-
-    async def wait_for_bucket_ready(
-        self,
-        bucket_name: str,
-        retries: int = 60,
-        interval: float = 2.0,
-    ) -> None:
-        for _ in range(retries):
-            if (
-                self.bucket_healthy(bucket_name)
-                and self.bucket_kv_responding(bucket_name)
-                and self.collections_ready(bucket_name)
-            ):
-                return
-            await asyncio.sleep(interval)
-        raise TimeoutError(f"Bucket {bucket_name} did not become ready")
 
     def bucket_healthy(self, bucket_name: str) -> bool:
         """
@@ -1147,7 +1151,8 @@ class CouchbaseServer:
 
             if status.get("status") == "none":
                 return
-            time.sleep(10)
+            # wait for 5 seconds before calling the API again
+            time.sleep(5)
 
         raise CblTestError(
             f"Rebalance did not complete within {timeout_seconds} seconds"

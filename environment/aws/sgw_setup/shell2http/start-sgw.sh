@@ -26,7 +26,7 @@ for i in {1..30}; do
         echo "Sync Gateway started successfully"
         exit 0
     fi
-    sleep 2
+    sleep 0.5
 done
 
 echo "ERROR: Sync Gateway failed to start within 60 seconds"

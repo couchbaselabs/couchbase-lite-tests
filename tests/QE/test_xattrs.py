@@ -179,7 +179,6 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step("Create bucket and default collection")
         cbs.create_bucket(bucket_name)
-        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_config = {
@@ -370,7 +369,6 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step("Create bucket and default collection")
         cbs.create_bucket(bucket_name)
-        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway with default sync function")
         # Default sync function reads doc.channels from document body
@@ -533,7 +531,6 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step("Create bucket and default collection")
         cbs.create_bucket(bucket_name)
-        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway with default sync function")
         db_config = {
@@ -776,7 +773,6 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step("Create bucket and default collection")
         cbs.create_bucket(bucket_name)
-        await cbs.wait_for_bucket_ready(bucket_name)
 
         self.mark_test_step(
             "Configure Sync Gateway with custom sync function using xattrs"
