@@ -25,6 +25,7 @@ class DatabaseManager {
     
     private var multipeerReplicators : [ UUID : MultipeerReplicator ] = [:]
     private var peerReplicatorStatus : [ UUID : [ PeerID: Replicator.Status ] ] = [:]
+    private var peerReplicatorTransport : [ UUID : [ PeerID: MultipeerTransport ] ] = [:]
     private var peerReplicatorStatusToken : [ UUID : ListenerToken ] = [:]
     private var peerReplicatorDocuments : [ UUID : [ PeerID: [ ContentTypes.DocumentReplication ] ] ] = [:]
     private var peerReplicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
@@ -334,6 +335,11 @@ class DatabaseManager {
             authenticator: authenticator,
             collections: collectionConfigs)
         
+        // Set transports if provided, otherwise defaults to [.wifi]
+        if let transports = config.transports, !transports.isEmpty {
+            conf.transports = Set(transports.map { $0.toCBLTransport() })
+        }
+        
         let id = UUID()
         
         let multipeerReplicator = try MultipeerReplicator(config: conf)
@@ -551,6 +557,7 @@ class DatabaseManager {
         multipeerReplicators.removeAll()
         
         peerReplicatorStatus.removeAll()
+        peerReplicatorTransport.removeAll()
         peerReplicatorStatusToken.removeAll()
         
         peerReplicatorDocuments.removeAll()
