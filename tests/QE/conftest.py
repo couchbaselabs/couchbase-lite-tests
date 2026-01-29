@@ -1,14 +1,11 @@
 import asyncio
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 import pytest_asyncio
-
-if TYPE_CHECKING:
-    from cbltest.api.couchbaseserver import CouchbaseServer
-    from cbltest.api.syncgateway import SyncGateway
+from cbltest.api.couchbaseserver import CouchbaseServer
+from cbltest.api.syncgateway import SyncGateway
 
 
 # This is used to inject the full path to the dataset folder
@@ -48,8 +45,8 @@ async def cleanup_after_test(cblpytest, request):
 
 
 async def cleanup_all_test_resources(
-    sync_gateways: "list[SyncGateway] | SyncGateway",
-    couchbase_servers: "list[CouchbaseServer] | CouchbaseServer",
+    sync_gateways: list[SyncGateway] | SyncGateway,
+    couchbase_servers: list[CouchbaseServer] | CouchbaseServer,
 ) -> None:
     """
     Clean up ALL databases from ALL SGW instances and test buckets from ALL CBS instances.
