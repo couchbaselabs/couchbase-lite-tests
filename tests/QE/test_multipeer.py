@@ -9,6 +9,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.multipeer_replicator import MultipeerReplicator
+from cbltest.api.multipeer_replicator_types import MultipeerTransportType
 from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorConflictResolver,
@@ -58,6 +59,7 @@ class TestMultipeer(CBLTestClass):
                         ),
                     )
                 ],
+                transports=MultipeerTransportType.BLUETOOTH,
             )
             for db in all_dbs
         ]
@@ -140,7 +142,10 @@ class TestMultipeer(CBLTestClass):
         self.mark_test_step("Start multipeer replicator on all devices")
         multipeer_replicators = [
             MultipeerReplicator(
-                "mesh-test", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "mesh-test",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=MultipeerTransportType.BLUETOOTH,
             )
             for db in all_dbs
         ]
@@ -196,7 +201,10 @@ class TestMultipeer(CBLTestClass):
         self.mark_test_step("Start multipeer replicator on all devices")
         multipeer_replicators = [
             MultipeerReplicator(
-                "mesh-test", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "mesh-test",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=MultipeerTransportType.BLUETOOTH,
             )
             for db in all_dbs
         ]
@@ -302,19 +310,28 @@ class TestMultipeer(CBLTestClass):
         # Start replicators with different peer groups
         group1_replicators = [
             MultipeerReplicator(
-                "group1", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "group1",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=MultipeerTransportType.BLUETOOTH,
             )
             for db in group1_dbs
         ]
         group2_replicators = [
             MultipeerReplicator(
-                "group2", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "group2",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=MultipeerTransportType.BLUETOOTH,
             )
             for db in group2_dbs
         ]
         group3_replicators = [
             MultipeerReplicator(
-                "group3", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "group3",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=MultipeerTransportType.BLUETOOTH,
             )
             for db in group3_dbs
         ]
@@ -430,7 +447,10 @@ class TestMultipeer(CBLTestClass):
             # Restart group 2 with group 1's peer ID
             group2_replicators = [
                 MultipeerReplicator(
-                    "group1", db, [ReplicatorCollectionEntry(["_default._default"])]
+                    "group1",
+                    db,
+                    [ReplicatorCollectionEntry(["_default._default"])],
+                    transports=MultipeerTransportType.BLUETOOTH,
                 )
                 for db in group2_dbs
             ]
@@ -475,7 +495,10 @@ class TestMultipeer(CBLTestClass):
             # Restart group 3 with group 1's peer ID
             group3_replicators = [
                 MultipeerReplicator(
-                    "group1", db, [ReplicatorCollectionEntry(["_default._default"])]
+                    "group1",
+                    db,
+                    [ReplicatorCollectionEntry(["_default._default"])],
+                    transports=MultipeerTransportType.BLUETOOTH,
                 )
                 for db in group3_dbs
             ]
@@ -557,7 +580,10 @@ class TestMultipeer(CBLTestClass):
         # Start replicators on initial devices
         initial_replicators = [
             MultipeerReplicator(
-                "dynamic-mesh", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "dynamic-mesh",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=MultipeerTransportType.BLUETOOTH,
             )
             for db in initial_dbs
         ]
@@ -593,7 +619,10 @@ class TestMultipeer(CBLTestClass):
         # Start replicators on additional devices
         additional_replicators = [
             MultipeerReplicator(
-                "dynamic-mesh", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "dynamic-mesh",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=MultipeerTransportType.BLUETOOTH,
             )
             for db in additional_dbs
         ]
@@ -692,7 +721,10 @@ class TestMultipeer(CBLTestClass):
         self.mark_test_step("Start multipeer replicator on all devices")
         multipeer_replicators = [
             MultipeerReplicator(
-                "large-doc-mesh", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "large-doc-mesh",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=MultipeerTransportType.BLUETOOTH,
             )
             for db in all_dbs
         ]
