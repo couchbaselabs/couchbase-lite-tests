@@ -25,7 +25,7 @@ class DatabaseManager {
     
     private var multipeerReplicators : [ UUID : MultipeerReplicator ] = [:]
     private var peerReplicatorStatus : [ UUID : [ PeerID: Replicator.Status ] ] = [:]
-    private var peerReplicatorTransport : [ UUID : [ PeerID: MultipeerTransport ] ] = [:]
+    private var peerReplicatorTransport : [ UUID : [ PeerID: ContentTypes.MultipeerTransport ] ] = [:]
     private var peerReplicatorStatusToken : [ UUID : ListenerToken ] = [:]
     private var peerReplicatorDocuments : [ UUID : [ PeerID: [ ContentTypes.DocumentReplication ] ] ] = [:]
     private var peerReplicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
