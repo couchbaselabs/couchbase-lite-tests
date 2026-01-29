@@ -1,56 +1,84 @@
 import asyncio
-from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import PutDatabasePayload
-from packaging.version import Version
+from cbltest.api.syncgateway import (
+    DocumentUpdateEntry,
+    PutDatabasePayload,
+    SyncGatewayUserClient,
+)
 
 
 @pytest.mark.sgw
 @pytest.mark.min_sync_gateways(3)
 @pytest.mark.min_couchbase_servers(1)
+@pytest.mark.min_load_balancers(1)
 class TestHighAvailability(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sgw_high_availability(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+    async def test_sgw_high_availability_with_load_balancer(
+        self, cblpytest: CBLPyTest, cleanup_after_test
     ) -> None:
         sgs = cblpytest.sync_gateways
         cbs = cblpytest.couchbase_servers[0]
-        sg_db = "db"
-        bucket_name = "data-bucket"
+        lb_url = cblpytest.load_balancers[0]
+        sg_db = "db_ha"
+        bucket_name = "bucket-ha"
         num_docs = 100
-        sg1, sg2, sg3 = sgs[0], sgs[1], sgs[2]
+        channels = ["*"]
+        username = "vipul"
+        password = "pass"
+        sg1, sg2, _ = sgs[0], sgs[1], sgs[2]
+        await sg2.start()
 
         self.mark_test_step("Create shared bucket for all SGW nodes")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
 
-        self.mark_test_step(
-            f"Configure database '{sg_db}' on all {len(sgs)} SGW nodes (pointing to shared bucket)"
-        )
+        self.mark_test_step("Configure database on all SGW nodes")
         db_config = {
             "bucket": bucket_name,
             "index": {"num_replicas": 0},
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        for sg in sgs:
-            db_status = await sg.get_database_status(sg_db)
-            if db_status is not None:
-                await sg.delete_database(sg_db)
-            await sg.put_database(sg_db, db_payload)
-
-        self.mark_test_step("Wait for all SGW nodes to be ready")
-        await asyncio.sleep(5)
+        await sg1.put_database(sg_db, db_payload)
+        for sg in sgs[1:]:
+            await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(
-            f"Start concurrent SDK writes ({num_docs} docs) in background"
+            f"Create user '{username}' with access to channels {channels}"
+        )
+        await sgs[0].create_user_client(sg_db, username, password, channels)
+
+        self.mark_test_step(f"Create user client via load balancer ({lb_url})")
+        lb_user = SyncGatewayUserClient(
+            lb_url, username, password, port=4984, secure=False
         )
 
+        self.mark_test_step(f"Add initial {num_docs} documents via load balancer")
+        docs = [
+            DocumentUpdateEntry(
+                id=f"doc_{i}",
+                revid=None,
+                body={"type": "test_doc", "index": i, "content": f"Document {i}"},
+            )
+            for i in range(num_docs)
+        ]
+        await lb_user.update_documents(sg_db, docs)
+        all_doc_ids = [d.id for d in docs]
+
+        self.mark_test_step("Verify all documents are visible via load balancer")
+        lb_docs = await lb_user.get_all_documents(sg_db)
+        lb_doc_ids = {row.id for row in lb_docs.rows}
+        missing = set(all_doc_ids) - lb_doc_ids
+        assert len(missing) == 0, (
+            f"LB missing {len(missing)} docs: {list(missing)[:5]}..."
+        )
+
+        self.mark_test_step("Start concurrent SDK writes in background")
+
         async def write_docs_via_sdk() -> None:
-            for i in range(num_docs):
+            for i in range(num_docs, num_docs + 50):  # Add more docs
                 doc_id = f"sdk_doc_{i}"
                 doc_body = {
                     "type": "sdk_doc",
@@ -63,114 +91,57 @@ class TestHighAvailability(CBLTestClass):
 
         write_task = asyncio.create_task(write_docs_via_sdk())
 
-        self.mark_test_step("Wait for some docs to be written")
-        await asyncio.sleep(5)
+        self.mark_test_step("Take SG2 offline")
+        await sg2.stop()
 
-        self.mark_test_step("Delete database on sg2 to simulate node being offline")
-        await sg2.delete_database(sg_db)
+        self.mark_test_step("Verify load balancer still works with SG2 offline")
+        await asyncio.sleep(2)
+        lb_docs_after = await lb_user.get_all_documents(sg_db)
+        lb_doc_ids_after = {row.id for row in lb_docs_after.rows}
 
-        self.mark_test_step("Verify sg2 database is offline")
-        sg2_status = await sg2.get_database_status(sg_db)
-        assert sg2_status is None, (
-            f"sg2 database should be offline, but status is: {sg2_status}"
+        assert len(lb_doc_ids_after) >= len(all_doc_ids), (
+            f"LB should still see at least {len(all_doc_ids)} docs with SG2 offline, got {len(lb_doc_ids_after)}"
         )
 
-        self.mark_test_step("Get current doc count from sg1 and sg3 (sg2 offline)")
-        sg1_docs_during = await sg1.get_all_documents(sg_db)
-        sg1_count_during = len([r for r in sg1_docs_during.rows])
-        sg3_docs_during = await sg3.get_all_documents(sg_db)
-        sg3_count_during = len([r for r in sg3_docs_during.rows])
-        assert sg1_count_during == sg3_count_during == num_docs, (
-            f"sg1 has {sg1_count_during} docs, sg3 has {sg3_count_during} docs (while sg2 is offline)"
+        self.mark_test_step(
+            "Wait for SDK writes to complete and verify via load balancer"
         )
-
-        self.mark_test_step("Wait for all SDK writes to complete")
         await write_task
-        sgw_version_obj = await sg1.get_version()
-        sgw_version = Version(sgw_version_obj.version)
-        supports_version_vectors = sgw_version >= Version("4.0.0")
 
-        self.mark_test_step("Check if sg1 and sg3 database is still online")
-        sg1_status = await sg1.get_database_status(sg_db)
-        sg3_status = await sg3.get_database_status(sg_db)
-        if sg1_status is None or sg1_status.state != "Online":
-            await sg1.delete_database(sg_db)
-            await sg1.put_database(sg_db, db_payload)
-            await asyncio.sleep(5)
-        if sg3_status is None or sg3_status.state != "Online":
-            await sg3.delete_database(sg_db)
-            await sg3.put_database(sg_db, db_payload)
-            await asyncio.sleep(5)
-
-        self.mark_test_step(
-            "Wait for documents to be imported by sg1 and sg3 (with retry logic)"
-        )
-        max_retries = 20
+        max_retries = 30
         retry_delay = 2
-        sg1_doc_revs = {}
-        sg1_doc_vv = {}
-        sg3_doc_revs = {}
-        sg3_doc_vv = {}
-        for retry in range(max_retries):
-            sg1_all_docs = await sg1.get_all_documents(sg_db)
-            sg3_all_docs = await sg3.get_all_documents(sg_db)
-            sg1_doc_revs = {row.id: row.revision for row in sg1_all_docs.rows}
-            sg3_doc_revs = {row.id: row.revision for row in sg3_all_docs.rows}
-            if supports_version_vectors:
-                sg1_doc_vv = {row.id: row.cv for row in sg1_all_docs.rows}
-                sg3_doc_vv = {row.id: row.cv for row in sg3_all_docs.rows}
-            if len(sg1_doc_revs) == num_docs and len(sg3_doc_revs) == num_docs:
+        for _ in range(max_retries):
+            lb_docs_final = await lb_user.get_all_documents(sg_db)
+            if len(lb_docs_final.rows) >= num_docs + 50:
                 break
             await asyncio.sleep(retry_delay)
-        assert len(sg1_doc_revs) == len(sg3_doc_revs) == num_docs, (
-            f"Not all docs visible on sg1 and sg3. Expected: {num_docs}, Got: {len(sg1_doc_revs)} and {len(sg3_doc_revs)}"
-        )
-        if supports_version_vectors:
-            assert len(sg1_doc_vv) == len(sg3_doc_vv) == num_docs, (
-                f"Not all docs visible on sg1 and sg3. Expected: {num_docs}, Got: {len(sg1_doc_vv)} and {len(sg3_doc_vv)}"
-            )
 
-        self.mark_test_step(
-            "Bring sg2 back online and verify it catches up (with retry logic)"
+        lb_docs_final = await lb_user.get_all_documents(sg_db)
+        final_doc_count = len(lb_docs_final.rows)
+        assert final_doc_count >= num_docs + 50, (
+            f"Expected at least {num_docs + 50} docs via LB, got {final_doc_count}"
         )
-        # Check if database already exists (shared bucket might have recreated it)
-        sg2_status_before = await sg2.get_database_status(sg_db)
-        if sg2_status_before is not None:
-            await sg2.delete_database(sg_db)
-            await asyncio.sleep(2)
-        await sg2.put_database(sg_db, db_payload)
-        for retry in range(max_retries):
-            sg2_all_docs = await sg2.get_all_documents(sg_db)
-            sg2_doc_revs = {row.id: row.revision for row in sg2_all_docs.rows}
-            if supports_version_vectors:
-                sg2_doc_vv = {row.id: row.cv for row in sg2_all_docs.rows}
-            if len(sg2_doc_revs) == num_docs:
-                break
-            await asyncio.sleep(retry_delay)
-        assert len(sg2_doc_revs) == num_docs, (
-            f"sg2 did not catch up after coming back online. Expected: {num_docs}, Got: {len(sg2_doc_revs)}"
-        )
-        if supports_version_vectors:
-            assert len(sg2_doc_vv) == num_docs, (
-                f"Not all docs visible on sg2. Expected: {num_docs}, Got: {len(sg2_doc_vv)}"
-            )
 
-        self.mark_test_step("Verify revision ID consistency between all three nodes")
-        for doc_id, doc_rev in sg1_doc_revs.items():
-            assert doc_id in sg2_doc_revs, f"Document {doc_id} not found on sg2"
-            assert sg2_doc_revs[doc_id] == doc_rev == sg3_doc_revs[doc_id], (
-                f"Document {doc_id} revision mismatch: sg1={doc_rev}, sg2={sg2_doc_revs[doc_id]}, sg3={sg3_doc_revs[doc_id]}"
-            )
-        if supports_version_vectors:
-            self.mark_test_step(
-                "Verify version vector consistency between all three nodes (SGW 4.0+)"
-            )
-            for doc_id, doc_vv in sg1_doc_vv.items():
-                assert doc_id in sg2_doc_vv, f"Document {doc_id} not found on sg2"
-                assert sg2_doc_vv[doc_id] == doc_vv == sg3_doc_vv[doc_id], (
-                    f"Document {doc_id} version vector mismatch: sg1={doc_vv}, sg2={sg2_doc_vv[doc_id]}, sg3={sg3_doc_vv[doc_id]}"
-                )
+        self.mark_test_step("Bring SG2 back online")
+        await sg2.start(config_name="bootstrap")
+        await sg2.wait_for_db_up(sg_db)
 
-        for sg in sgs:
-            await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
+        self.mark_test_step("Verify load balancer now routes to all 3 nodes")
+        # Create some final test docs through LB to verify all nodes are working
+        final_docs = [
+            DocumentUpdateEntry(
+                id=f"final_doc_{i}",
+                revid=None,
+                body={"type": "final_test", "index": i},
+            )
+            for i in range(10)
+        ]
+        await lb_user.update_documents(sg_db, final_docs)
+        final_doc_ids = [d.id for d in final_docs]
+        await asyncio.sleep(2)
+        lb_final_check = await lb_user.get_all_documents(sg_db)
+        lb_final_ids = {row.id for row in lb_final_check.rows}
+        for doc_id in final_doc_ids:
+            assert doc_id in lb_final_ids, f"Final doc {doc_id} not accessible via LB"
+
+        await lb_user.close()

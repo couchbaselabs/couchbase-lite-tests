@@ -99,7 +99,6 @@ class TestLogRedaction(CBLTestClass):
         password = "pass"
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway with log redaction enabled")
@@ -109,9 +108,8 @@ class TestLogRedaction(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        if await sg.get_database_status(sg_db):
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create user '{username}' with access to channels")
         sg_user = await sg.create_user_client(sg_db, username, password, channels)
@@ -177,8 +175,6 @@ class TestLogRedaction(CBLTestClass):
         )
 
         await sg_user.close()
-        await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sgcollect_redacted_files_and_contents(
@@ -194,7 +190,6 @@ class TestLogRedaction(CBLTestClass):
         password = "password"
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway with log redaction enabled")
@@ -204,9 +199,8 @@ class TestLogRedaction(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        if await sg.get_database_status(sg_db):
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create user '{username}' with access to channels")
         sg_user = await sg.create_user_client(sg_db, username, password, channels)
@@ -312,5 +306,3 @@ class TestLogRedaction(CBLTestClass):
             )
 
         await sg_user.close()
-        await sg.delete_database(sg_db)
-        cbs.drop_bucket(bucket_name)

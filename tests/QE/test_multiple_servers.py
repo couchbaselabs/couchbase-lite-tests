@@ -38,19 +38,6 @@ def _recover_or_add_node(cbs_one, cbs_two):
     cbs_one.rebalance()
 
 
-async def _cleanup_test_resources(
-    sg, cbs, bucket_names: list[str] | None = None
-) -> None:
-    """Clean up all databases from SG and specified buckets from CBS."""
-    db_names = await sg.get_all_database_names()
-    for db_name in db_names:
-        await sg.delete_database(db_name)
-
-    if bucket_names:
-        for bucket_name in bucket_names:
-            cbs.drop_bucket(bucket_name)
-
-
 def _set_alternate_addresses(cbs_servers: list) -> None:
     """Set alternate addresses with all service ports for all CBS nodes."""
     session = requests.Session()
@@ -83,15 +70,13 @@ async def _setup_database_and_user(
 ):
     """Setup bucket, database, and user."""
     cbs.create_bucket(bucket_name, num_replicas=1)
-    await asyncio.sleep(5)
-
     db_config = {
         "bucket": bucket_name,
         "index": {"num_replicas": 1},
         "scopes": {"_default": {"collections": {"_default": {}}}},
     }
     await sg.put_database(sg_db, PutDatabasePayload(db_config))
-    await asyncio.sleep(3)
+    await sg.wait_for_db_up(sg_db)
 
     await sg.delete_user(sg_db, user_name)
     await sg.add_user(
@@ -122,7 +107,6 @@ class TestMultipleServers(CBLTestClass):
         channels = ["ABC", "CBS"]
 
         self.mark_test_step("Clean up and setup test environment")
-        await _cleanup_test_resources(sg, cbs_one, [bucket_name])
         sg_user = await _setup_database_and_user(
             sg, cbs_one, sg_db, bucket_name, sg_user_name, sg_user_password, channels
         )
@@ -152,12 +136,11 @@ class TestMultipleServers(CBLTestClass):
             f"Expected {num_docs} docs, got {len(all_docs.rows)}"
         )
         original_revs = {row.id: row.revision for row in all_docs.rows}
+        original_vvs = {}
 
         sgw_version_obj = await sg.get_version()
         sgw_version = Version(sgw_version_obj.version)
         supports_version_vectors = sgw_version >= Version("4.0.0")
-
-        original_vvs = {}
         if supports_version_vectors:
             changes_initial = await sg_user.get_changes(sg_db, version_type="cv")
             original_vvs = {
@@ -256,8 +239,6 @@ class TestMultipleServers(CBLTestClass):
                 )
 
         await sg_user.close()
-        await sg.delete_database(sg_db)
-        cbs_one.drop_bucket(bucket_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_server_goes_down_sanity(
@@ -272,9 +253,6 @@ class TestMultipleServers(CBLTestClass):
         num_docs = 50
         sg_user_name, sg_user_password = "vipul", "pass"
         channels = ["ABC", "CBS"]
-
-        self.mark_test_step("Clean up and setup test environment")
-        await _cleanup_test_resources(sg, cbs_one, [bucket_name])
         sg_user = await _setup_database_and_user(
             sg, cbs_one, sg_db, bucket_name, sg_user_name, sg_user_password, channels
         )
@@ -306,7 +284,6 @@ class TestMultipleServers(CBLTestClass):
             pytest.fail("Cluster did not become healthy after failover")
 
         self.mark_test_step("Verify original docs accessible with node 2 failed over")
-
         changes_after_failover = await sg.get_changes(sg_db, version_type="cv")
         assert len(changes_after_failover.results) == num_docs
 
@@ -339,8 +316,7 @@ class TestMultipleServers(CBLTestClass):
         changes_final = await sg.get_changes(sg_db, version_type="cv")
         assert len(changes_final.results) == num_docs * 2
 
-        await sg.delete_database(sg_db)
-        cbs_one.drop_bucket(bucket_name)
+        await sg_user.close()
 
 
 @pytest.mark.sgw
@@ -354,7 +330,7 @@ class TestISGRCollectionMapping(CBLTestClass):
         sgs = cblpytest.sync_gateways
         cbs = cblpytest.couchbase_servers[0]
         sg1, sg2, sg3 = sgs[0], sgs[1], sgs[2]
-        bucket1, bucket2, bucket3 = "isgr_bucket1", "isgr_bucket2", "isgr_bucket3"
+        bucket1, bucket2, bucket3 = "isgr-bucket1", "isgr-bucket2", "isgr-bucket3"
         sg_db1, sg_db2, sg_db3 = "db1", "db2", "db3"
         b1_collections = ["collection1", "collection2", "collection3"]
         b2_collections = ["collection4", "collection5"]
@@ -363,8 +339,6 @@ class TestISGRCollectionMapping(CBLTestClass):
 
         self.mark_test_step("Clean up and setup test environment")
         _set_alternate_addresses(cblpytest.couchbase_servers)
-        for sg in sgs:
-            await _cleanup_test_resources(sg, cbs, [bucket1, bucket2, bucket3])
 
         self.mark_test_step("Create collections in _default scope for each bucket")
         for bucket, collections in [
@@ -374,7 +348,6 @@ class TestISGRCollectionMapping(CBLTestClass):
         ]:
             cbs.create_bucket(bucket)
             cbs.create_collections(bucket, "_default", collections)
-        await asyncio.sleep(5)
 
         self.mark_test_step(
             "Configure all SGs with their respective buckets and collections"
@@ -394,10 +367,8 @@ class TestISGRCollectionMapping(CBLTestClass):
                 },
                 "unsupported": {"sgr_tls_skip_verify": True},
             }
-            db_status = await sg.get_database_status(sg_db)
-            if db_status is not None:
-                await sg.delete_database(sg_db)
             await sg.put_database(sg_db, PutDatabasePayload(config))
+            await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Upload {num_docs} docs to each collection in SG1")
         for collection in b1_collections:
@@ -518,8 +489,3 @@ class TestISGRCollectionMapping(CBLTestClass):
             assert f"collection3_doc_{i}" in sg3_collection8_ids, (
                 f"SG3 collection8 missing document: collection3_doc_{i}"
             )
-
-        for sg, sg_db in [(sg1, sg_db1), (sg2, sg_db2), (sg3, sg_db3)]:
-            await sg.delete_database(sg_db)
-        for bucket in [bucket1, bucket2, bucket3]:
-            cbs.drop_bucket(bucket)
