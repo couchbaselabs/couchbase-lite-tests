@@ -5,7 +5,10 @@ from uuid import UUID
 
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.jsonserializable import JSONSerializable
-from cbltest.api.multipeer_replicator_types import MultipeerReplicatorAuthenticator
+from cbltest.api.multipeer_replicator_types import (
+    MultipeerReplicatorAuthenticator,
+    MultipeerTransportType,
+)
 from cbltest.api.replicator_types import (
     ReplicatorAuthenticator,
     ReplicatorCollectionEntry,
@@ -811,6 +814,7 @@ class PostStartMultipeerReplicatorRequestBody(JSONSerializable):
         collections: list[ReplicatorCollectionEntry],
         identity: CertKeyPair,
         authenticator: MultipeerReplicatorAuthenticator | None = None,
+        transports: MultipeerTransportType,
     ):
         super().__init__()
         self.__peerGroupID = peerGroupID
@@ -818,6 +822,7 @@ class PostStartMultipeerReplicatorRequestBody(JSONSerializable):
         self.__collections = collections
         self.__identity = identity
         self.__authenticator = authenticator
+        self.__transports = transports
 
     def to_json(self) -> Any:
         json = {
@@ -829,6 +834,7 @@ class PostStartMultipeerReplicatorRequestBody(JSONSerializable):
                 "data": base64.b64encode(self.__identity.pfx_bytes()).decode("utf-8"),
                 "password": self.__identity.password,
             },
+            "transports": self.__transports,
         }
 
         if self.__authenticator is not None:
