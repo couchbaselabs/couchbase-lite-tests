@@ -28,14 +28,14 @@ pipeline {
         stage('Run Test') {
             agent { label 'mac-mini-new' }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                KEYCHAIN_PASSWORD = credentials('mac-mini-new-keychain-password')
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 AWS_PROFILE = "default"
                 TS_ARTIFACTS_DIR = 'sgw'
             }
             steps {
                 // Unlock keychain:
-                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
                 timeout(time: 90, unit: 'MINUTES') {
                     sh "jenkins/pipelines/QE/sgw/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
