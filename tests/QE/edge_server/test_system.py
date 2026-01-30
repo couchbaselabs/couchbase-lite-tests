@@ -39,12 +39,13 @@ class TestSystem(CBLTestClass):
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 11):
+            doc_id = f"doc_{i}"
             doc = {
-                "id": f"doc_{i}",
+                "id": doc_id,
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.upsert_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc_id, doc)
         logger.info("10 documents created in Couchbase Server.")
 
         self.mark_test_step(
@@ -149,43 +150,45 @@ class TestSystem(CBLTestClass):
                 logger.info(f"Starting Sync Gateway cycle for {doc_id}")
 
                 # Create on Sync Gateway and validate on Edge Server
-                response = await sync_gateway.create_document(sg_db_name, doc_id, doc)
-                assert response is not None, (
+                created_doc = await sync_gateway.create_document(
+                    sg_db_name, doc_id, doc
+                )
+                assert created_doc is not None, (
                     f"Failed to create document {doc_id} via Sync Gateway."
                 )
                 logger.info(f"Document {doc_id} created via Sync Gateway.")
 
                 time.sleep(random.uniform(1, 5))
 
-                document = await edge_server.get_document(es_db_name, doc_id)
-                assert document is not None, (
+                remote_doc = await edge_server.get_document(es_db_name, doc_id)
+                assert remote_doc is not None, (
                     f"Document {doc_id} does not exist on the edge server."
                 )
-                assert document.id == doc_id, (
-                    f"Document ID mismatch: expected {doc_id}, got {document.id}"
+                assert remote_doc.id == doc_id, (
+                    f"Document ID mismatch: expected {doc_id}, got {remote_doc.id}"
                 )
-                assert document.revid is not None, (
+                assert remote_doc.revid is not None, (
                     "Revision ID (_rev) missing in the document"
                 )
 
                 logger.info(
-                    f"Document {doc_id} fetched successfully from edge server with data: {document}"
+                    f"Document {doc_id} fetched successfully from edge server with data: {remote_doc}"
                 )
-                rev_id = document.revid
+                rev_id = remote_doc.revid
 
                 if "update" in operations:
                     # Update on sync gateway and validate on edge server
                     logger.info(f"Updating document {doc_id} via Sync Gateway")
-                    updated_doc = {
+                    updated_doc_body = {
                         "id": doc_id,
                         "channels": ["public"],
                         "timestamp": datetime.utcnow().isoformat(),
                         "changed": "yes",
                     }
-                    response = await sync_gateway.update_document(
-                        sg_db_name, doc_id, updated_doc, rev_id
+                    updated_doc = await sync_gateway.update_document(
+                        sg_db_name, doc_id, updated_doc_body, rev_id
                     )
-                    assert response is not None, (
+                    assert updated_doc is not None, (
                         f"Failed to update document {doc_id} via Sync Gateway"
                     )
 
@@ -194,44 +197,44 @@ class TestSystem(CBLTestClass):
                     # Validate update on Edge Server
                     logger.info(f"Validating update for {doc_id} on Edge Server")
 
-                    document = await edge_server.get_document(es_db_name, doc_id)
+                    remote_doc = await edge_server.get_document(es_db_name, doc_id)
 
-                    assert document is not None, (
+                    assert remote_doc is not None, (
                         f"Document {doc_id} does not exist on the edge server"
                     )
-                    assert document.id == doc_id, f"Document ID mismatch: {document.id}"
-                    assert document.revid != rev_id, (
+                    assert remote_doc.id == doc_id, (
+                        f"Document ID mismatch: {remote_doc.id}"
+                    )
+                    assert remote_doc.revid != rev_id, (
                         "Revision ID (_rev) missing in the document"
                     )
 
                     logger.info(
-                        f"Document {doc_id} fetched successfully from edge server with data: {document}"
+                        f"Document {doc_id} fetched successfully from edge server with data: {remote_doc}"
                     )
 
                     # Storing the revision ID
-                    rev_id = document.revid
+                    rev_id = remote_doc.revid
 
                 if "delete" in operations:
                     # Delete on edge server and validate on sync gateway
                     logger.info(f"Deleting document {doc_id} via Edge Server")
 
-                    response = await edge_server.delete_document(
+                    delete_resp = await edge_server.delete_document(
                         doc_id, rev_id, es_db_name
                     )
-                    assert response.get("ok") is True, (
-                        f"Failed to delete document {doc_id} via Edge Server"
-                    )
+                    assert (
+                        isinstance(delete_resp, dict) and delete_resp.get("ok") is True
+                    ), f"Failed to delete document {doc_id} via Edge Server"
 
                     logger.info(f"Document {doc_id} deleted via Edge Server")
 
                     # Validating on Edge Server
                     logger.info(f"Validating deletion of {doc_id} on Sync Gateway")
                     try:
-                        document = await edge_server.get_document(es_db_name, doc_id)
+                        await edge_server.get_document(es_db_name, doc_id)
                     except CblEdgeServerBadResponseError:
-                        assert CblEdgeServerBadResponseError, (
-                            f"Document {doc_id} not deleted from Edge Server"
-                        )
+                        pass  # expected, document not found (deleted)
 
                     logger.info(f"Document {doc_id} deleted from Edge Server")
 
@@ -240,11 +243,9 @@ class TestSystem(CBLTestClass):
                     time.sleep(2)
 
                     try:
-                        document = await sync_gateway.get_document(sg_db_name, doc_id)
+                        await sync_gateway.get_document(sg_db_name, doc_id)
                     except CblSyncGatewayBadResponseError:
-                        assert CblSyncGatewayBadResponseError, (
-                            f"Document {doc_id} not deleted from Sync Gateway"
-                        )
+                        pass  # expected, document not found (deleted)
 
                     logger.info(f"Document {doc_id} deleted from Sync Gateway")
 
@@ -258,10 +259,10 @@ class TestSystem(CBLTestClass):
                     "timestamp": datetime.utcnow().isoformat(),
                 }
 
-                response = await edge_server.put_document_with_id(
+                created_doc = await edge_server.put_document_with_id(
                     doc, doc_id, es_db_name
                 )
-                assert response is not None, (
+                assert created_doc is not None, (
                     f"Failed to create document {doc_id} via Edge Server"
                 )
 
@@ -270,20 +271,20 @@ class TestSystem(CBLTestClass):
                 time.sleep(5)
 
                 logger.info(f"Validating document {doc_id} on Sync Gateway")
-                response = await sync_gateway.get_document(sg_db_name, doc_id)
-                assert response is not None, (
+                sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
+                assert sg_doc is not None, (
                     f"Document {doc_id} does not exist on the sync gateway"
                 )
-                assert response.id == doc_id, f"Document ID mismatch: {response.id}"
-                assert response.revid is not None, (
+                assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
+                assert sg_doc.revid is not None, (
                     "Revision ID (_rev) missing in the document"
                 )
 
                 logger.info(
-                    f"Document {doc_id} fetched successfully from edge server with data: {response}"
+                    f"Document {doc_id} fetched successfully from edge server with data: {sg_doc}"
                 )
 
-                rev_id = response.revid
+                rev_id = sg_doc.revid
 
                 if "update" in operations:
                     # Create, update, delete and validate on Sync Gateway
@@ -292,18 +293,18 @@ class TestSystem(CBLTestClass):
                         f"Updating document by adding a 'changed' sub document in {doc_id} via Edge Server"
                     )
 
-                    updated_doc = {
+                    updated_doc_body = {
                         "id": doc_id,
                         "channels": ["public"],
                         "timestamp": datetime.utcnow().isoformat(),
                         "changed": "yes",
                     }
 
-                    response = await edge_server.put_document_with_id(
-                        updated_doc, doc_id, es_db_name, rev=rev_id
+                    updated_doc = await edge_server.put_document_with_id(
+                        updated_doc_body, doc_id, es_db_name, rev=rev_id
                     )
 
-                    assert response is not None, (
+                    assert updated_doc is not None, (
                         f"Failed to update document {doc_id} via Edge Server"
                     )
 
@@ -311,23 +312,24 @@ class TestSystem(CBLTestClass):
 
                     # Validate Update on Sync Gateway
                     logger.info(f"Validating update for {doc_id} on Sync Gateway")
-                    response = await sync_gateway.get_document(sg_db_name, doc_id)
-                    assert rev_id != response.revid, (
+                    sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
+                    assert sg_doc is not None
+                    assert rev_id != sg_doc.revid, (
                         f"Document {doc_id} update not reflected on Sync Gateway"
                     )
 
                     logger.info(f"Document {doc_id} update reflected on Sync Gateway")
 
                     # Storing the revision ID
-                    rev_id = response.revid
+                    rev_id = sg_doc.revid
 
                 if "delete" in operations:
                     # Delete on sync gateway and validate on edge server
                     logger.info(f"Deleting document {doc_id} via Sync Gateway")
-                    response = await sync_gateway.delete_document(
+                    del_result = await sync_gateway.delete_document(
                         doc_id, rev_id, sg_db_name
                     )
-                    assert response is None, (
+                    assert del_result is None, (
                         f"Failed to delete document {doc_id} via Sync Gateway"
                     )
 
@@ -337,11 +339,9 @@ class TestSystem(CBLTestClass):
                     time.sleep(2)
 
                     try:
-                        document = await edge_server.get_document(es_db_name, doc_id)
+                        await edge_server.get_document(es_db_name, doc_id)
                     except CblEdgeServerBadResponseError:
-                        assert CblEdgeServerBadResponseError, (
-                            f"Document {doc_id} not deleted from Edge Server"
-                        )
+                        pass  # expected, document not found (deleted)
 
                     logger.info(f"Document {doc_id} deleted from Edge Server")
 
@@ -369,12 +369,13 @@ class TestSystem(CBLTestClass):
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 11):
+            doc_id = f"doc_{i}"
             doc = {
-                "id": f"doc_{i}",
+                "id": doc_id,
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.upsert_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc_id, doc)
         logger.info("10 documents created in Couchbase Server.")
 
         self.mark_test_step(
@@ -516,8 +517,10 @@ class TestSystem(CBLTestClass):
                 logger.info(f"Starting Sync Gateway cycle for {doc_id}")
 
                 # Create on Sync Gateway and validate on Edge Server
-                response = await sync_gateway.create_document(sg_db_name, doc_id, doc)
-                assert response is not None, (
+                created_doc = await sync_gateway.create_document(
+                    sg_db_name, doc_id, doc
+                )
+                assert created_doc is not None, (
                     f"Failed to create document {doc_id} via Sync Gateway."
                 )
                 logger.info(f"Document {doc_id} created via Sync Gateway.")
@@ -525,35 +528,35 @@ class TestSystem(CBLTestClass):
                 time.sleep(random.uniform(1, 5))
 
                 if not edge_server_down:
-                    document = await edge_server.get_document(es_db_name, doc_id)
-                    assert document is not None, (
+                    remote_doc = await edge_server.get_document(es_db_name, doc_id)
+                    assert remote_doc is not None, (
                         f"Document {doc_id} does not exist on the edge server."
                     )
-                    assert document.id == doc_id, (
-                        f"Document ID mismatch: expected {doc_id}, got {document.id}"
+                    assert remote_doc.id == doc_id, (
+                        f"Document ID mismatch: expected {doc_id}, got {remote_doc.id}"
                     )
-                    assert document.revid is not None, (
+                    assert remote_doc.revid is not None, (
                         "Revision ID (_rev) missing in the document"
                     )
 
                     logger.info(
-                        f"Document {doc_id} fetched successfully from edge server with data: {document}"
+                        f"Document {doc_id} fetched successfully from edge server with data: {remote_doc}"
                     )
-                rev_id = response.revid
+                rev_id = created_doc.revid
 
                 if "update" in operations:
                     # Update on sync gateway and validate on edge server
                     logger.info(f"Updating document {doc_id} via Sync Gateway")
-                    updated_doc = {
+                    updated_doc_body = {
                         "id": doc_id,
                         "channels": ["public"],
                         "timestamp": datetime.utcnow().isoformat(),
                         "changed": "yes",
                     }
-                    response = await sync_gateway.update_document(
-                        sg_db_name, doc_id, updated_doc, rev_id
+                    updated_doc = await sync_gateway.update_document(
+                        sg_db_name, doc_id, updated_doc_body, rev_id
                     )
-                    assert response is not None, (
+                    assert updated_doc is not None, (
                         f"Failed to update document {doc_id} via Sync Gateway"
                     )
 
@@ -563,51 +566,46 @@ class TestSystem(CBLTestClass):
                     if not edge_server_down:
                         logger.info(f"Validating update for {doc_id} on Edge Server")
 
-                        document = await edge_server.get_document(es_db_name, doc_id)
+                        remote_doc = await edge_server.get_document(es_db_name, doc_id)
 
-                        assert document is not None, (
+                        assert remote_doc is not None, (
                             f"Document {doc_id} does not exist on the edge server"
                         )
-                        assert document.id == doc_id, (
-                            f"Document ID mismatch: {document.id}"
+                        assert remote_doc.id == doc_id, (
+                            f"Document ID mismatch: {remote_doc.id}"
                         )
-                        assert document.revid != rev_id, (
+                        assert remote_doc.revid != rev_id, (
                             "Revision ID (_rev) missing in the document"
                         )
 
                         logger.info(
-                            f"Document {doc_id} fetched successfully from edge server with data: {document}"
+                            f"Document {doc_id} fetched successfully from edge server with data: {remote_doc}"
                         )
 
                     # Storing the revision ID
-                    rev_id = response.revid
+                    rev_id = updated_doc.revid
 
                 if "delete" in operations:
                     if not edge_server_down:
                         # Delete on edge server and validate on sync gateway
                         logger.info(f"Deleting document {doc_id} via Edge Server")
 
-                        response = await edge_server.delete_document(
+                        delete_resp = await edge_server.delete_document(
                             doc_id, rev_id, es_db_name
                         )
-                        assert response.get("ok") is True, (
-                            f"Failed to delete document {doc_id} via Edge Server"
-                        )
-                        # assert response is None, f"Failed to delete document {doc_id} via Edge Server"
-                        # assert response, f"Failed to delete document {doc_id} via Edge Server"
+                        assert (
+                            isinstance(delete_resp, dict)
+                            and delete_resp.get("ok") is True
+                        ), f"Failed to delete document {doc_id} via Edge Server"
 
                         logger.info(f"Document {doc_id} deleted via Edge Server")
 
                         # Validating on Edge Server
                         logger.info(f"Validating deletion of {doc_id} on Sync Gateway")
                         try:
-                            document = await edge_server.get_document(
-                                es_db_name, doc_id
-                            )
+                            await edge_server.get_document(es_db_name, doc_id)
                         except CblEdgeServerBadResponseError:
-                            assert CblEdgeServerBadResponseError, (
-                                f"Document {doc_id} not deleted from Edge Server"
-                            )
+                            pass  # expected, document not found (deleted)
 
                         logger.info(f"Document {doc_id} deleted from Edge Server")
 
@@ -616,13 +614,9 @@ class TestSystem(CBLTestClass):
                         time.sleep(2)
 
                         try:
-                            document = await sync_gateway.get_document(
-                                sg_db_name, doc_id
-                            )
+                            await sync_gateway.get_document(sg_db_name, doc_id)
                         except CblSyncGatewayBadResponseError:
-                            assert CblSyncGatewayBadResponseError, (
-                                f"Document {doc_id} not deleted from Sync Gateway"
-                            )
+                            pass  # expected, document not found (deleted)
 
                         logger.info(f"Document {doc_id} deleted from Sync Gateway")
 
@@ -637,30 +631,30 @@ class TestSystem(CBLTestClass):
                         "timestamp": datetime.utcnow().isoformat(),
                     }
 
-                    response = await edge_server.put_document_with_id(
+                    created_doc = await edge_server.put_document_with_id(
                         doc, doc_id, es_db_name
                     )
-                    assert response is not None, (
+                    assert created_doc is not None, (
                         f"Failed to create document {doc_id} via Edge Server"
                     )
 
                     logger.info(f"Document {doc_id} created via Edge Server")
 
                     logger.info(f"Validating document {doc_id} on Sync Gateway")
-                    response = await sync_gateway.get_document(sg_db_name, doc_id)
-                    assert response is not None, (
+                    sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
+                    assert sg_doc is not None, (
                         f"Document {doc_id} does not exist on the sync gateway"
                     )
-                    assert response.id == doc_id, f"Document ID mismatch: {response.id}"
-                    assert response.revid is not None, (
+                    assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
+                    assert sg_doc.revid is not None, (
                         "Revision ID (_rev) missing in the document"
                     )
 
                     logger.info(
-                        f"Document {doc_id} fetched successfully from edge server with data: {response}"
+                        f"Document {doc_id} fetched successfully from edge server with data: {sg_doc}"
                     )
 
-                    rev_id = response.revid
+                    rev_id = sg_doc.revid
 
                     if "update" in operations:
                         # Create, update, delete and validate on Sync Gateway
@@ -669,18 +663,18 @@ class TestSystem(CBLTestClass):
                             f"Updating document by adding a 'changed' sub document in {doc_id} via Edge Server"
                         )
 
-                        updated_doc = {
+                        updated_doc_body = {
                             "id": doc_id,
                             "channels": ["public"],
                             "timestamp": datetime.utcnow().isoformat(),
                             "changed": "yes",
                         }
 
-                        response = await edge_server.put_document_with_id(
-                            updated_doc, doc_id, es_db_name, rev=rev_id
+                        updated_doc = await edge_server.put_document_with_id(
+                            updated_doc_body, doc_id, es_db_name, rev=rev_id
                         )
 
-                        assert response is not None, (
+                        assert updated_doc is not None, (
                             f"Failed to update document {doc_id} via Edge Server"
                         )
 
@@ -688,8 +682,9 @@ class TestSystem(CBLTestClass):
 
                         # Validate Update on Sync Gateway
                         logger.info(f"Validating update for {doc_id} on Sync Gateway")
-                        response = await sync_gateway.get_document(sg_db_name, doc_id)
-                        assert rev_id != response.revid, (
+                        sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
+                        assert sg_doc is not None
+                        assert rev_id != sg_doc.revid, (
                             f"Document {doc_id} update not reflected on Sync Gateway"
                         )
 
@@ -698,15 +693,15 @@ class TestSystem(CBLTestClass):
                         )
 
                         # Storing the revision ID
-                        rev_id = response.revid
+                        rev_id = sg_doc.revid
 
                     if "delete" in operations:
                         # Delete on sync gateway and validate on edge server
                         logger.info(f"Deleting document {doc_id} via Sync Gateway")
-                        response = await sync_gateway.delete_document(
+                        del_result = await sync_gateway.delete_document(
                             doc_id, rev_id, sg_db_name
                         )
-                        assert response is None, (
+                        assert del_result is None, (
                             f"Failed to delete document {doc_id} via Sync Gateway"
                         )
 
@@ -716,13 +711,9 @@ class TestSystem(CBLTestClass):
                         time.sleep(2)
 
                         try:
-                            document = await edge_server.get_document(
-                                es_db_name, doc_id
-                            )
+                            await edge_server.get_document(es_db_name, doc_id)
                         except CblEdgeServerBadResponseError:
-                            assert CblEdgeServerBadResponseError, (
-                                f"Document {doc_id} not deleted from Edge Server"
-                            )
+                            pass  # expected, document not found (deleted)
 
                         logger.info(f"Document {doc_id} deleted from Edge Server")
 

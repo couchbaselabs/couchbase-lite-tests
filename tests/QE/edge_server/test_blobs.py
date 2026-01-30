@@ -31,12 +31,13 @@ class TestBlobs(CBLTestClass):
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 3):
+            doc_id = f"doc_{i}"
             doc = {
-                "id": f"doc_{i}",
+                "id": doc_id,
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.upsert_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc_id, doc)
         logger.info("2 documents created in Couchbase Server.")
 
         self.mark_test_step(
@@ -122,7 +123,7 @@ class TestBlobs(CBLTestClass):
             f"Document {doc_id} does not exist on the edge server."
         )
 
-        rev_id = document.rev_id
+        rev_id = document.revid
 
         attachment_name = "test.png"
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
@@ -140,15 +141,16 @@ class TestBlobs(CBLTestClass):
         # Validate blob on Sync Gateway and Couchbase Server
         self.mark_test_step("Validating blob on Sync Gateway and Couchbase Server.")
         document = await sync_gateway.get_document(sg_db_name, doc_id)
-        print(document)
+        assert document is not None
+        doc_body = document.body
 
-        assert "_attachments" in document, (
+        assert "_attachments" in doc_body, (
             "'_attachments' field is missing in the document response"
         )
-        assert f"blob_/{attachment_name}" in document["_attachments"], (
+        assert f"blob_/{attachment_name}" in doc_body["_attachments"], (
             f"Attachment '{attachment_name}' not found in '_attachments'"
         )
-        blob_metadata = document["_attachments"][f"blob_/{attachment_name}"]
+        blob_metadata = doc_body["_attachments"][f"blob_/{attachment_name}"]
         assert blob_metadata["content_type"] == "image/png", (
             f"Expected content_type='image/png', got '{blob_metadata['content_type']}'"
         )
@@ -157,10 +159,10 @@ class TestBlobs(CBLTestClass):
         assert blob_metadata["length"] > 0, (
             f"Blob length is invalid ({blob_metadata['length']})"
         )
-        assert attachment_name in document, (
+        assert attachment_name in doc_body, (
             f"'{attachment_name}' not found in document body"
         )
-        blob_info = document[attachment_name]
+        blob_info = doc_body[attachment_name]
         assert blob_info["@type"] == "blob", (
             f"Expected '@type'='blob', got '{blob_info.get('@type')}'"
         )
@@ -177,11 +179,11 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Deleting the blob from the document in Edge Server.")
         logger.info(f"Deleting the blob from document {doc_id} in Edge Server.")
-        response = await edge_server.delete_sub_document(
+        delete_resp = await edge_server.delete_sub_document(
             doc_id, rev_id, attachment_name, es_db_name
         )
 
-        assert response.get("ok"), (
+        assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
             f"Failed to delete blob from document {doc_id} in Edge Server."
         )
         logger.info(f"Blob deleted from document {doc_id} in Edge Server.")
@@ -190,9 +192,10 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step(
             "Validating blob deletion on Sync Gateway and Couchbase Server."
         )
-        document = await sync_gateway.get_document(sg_db_name, doc_id)
+        sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
+        assert sg_doc is not None
 
-        assert "_attachments" not in document, (
+        assert "_attachments" not in sg_doc.body, (
             "'_attachments' field is present in the document response"
         )
         logger.info("Blob deleted even on Sync Gateway.")
@@ -226,7 +229,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, (
             f"Document {doc_id} does not exist on the edge server."
         )
-        rev_id = document.rev_id
+        rev_id = document.revid
 
         self.mark_test_step("Adding an empty blob to the document.")
         empty_blob = b""
@@ -258,12 +261,13 @@ class TestBlobs(CBLTestClass):
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 3):
+            doc_id = f"doc_{i}"
             doc = {
-                "id": f"doc_{i}",
+                "id": doc_id,
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.upsert_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc_id, doc)
         logger.info("2 documents created in Couchbase Server.")
 
         self.mark_test_step("Creating database and user in Sync Gateway.")
@@ -316,7 +320,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, (
             f"Document {doc_id} does not exist on the edge server."
         )
-        rev_id = document.rev_id
+        rev_id = document.revid
         attachment_name = "test.png"
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
         with open(blob_path, "rb") as img_file:
@@ -329,13 +333,16 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Validating updated blob replicated to Sync Gateway.")
         document = await sync_gateway.get_document(sg_db_name, doc_id)
-        assert "_attachments" in document, (
+        assert document is not None
+        doc_body = document.body
+
+        assert "_attachments" in doc_body, (
             "'_attachments' field is missing in the document response"
         )
-        assert f"blob_/{attachment_name}" in document["_attachments"], (
+        assert f"blob_/{attachment_name}" in doc_body["_attachments"], (
             f"Attachment '{attachment_name}' not found in '_attachments'"
         )
-        blob_metadata = document["_attachments"][f"blob_/{attachment_name}"]
+        blob_metadata = doc_body["_attachments"][f"blob_/{attachment_name}"]
         assert blob_metadata["content_type"] == "image/png", (
             f"Expected content_type='image/png', got '{blob_metadata.get('content_type')}'"
         )
@@ -344,10 +351,10 @@ class TestBlobs(CBLTestClass):
         assert blob_metadata["length"] > 0, (
             f"Blob length is invalid ({blob_metadata['length']})"
         )
-        assert attachment_name in document, (
+        assert attachment_name in doc_body, (
             f"'{attachment_name}' not found in document body"
         )
-        blob_info = document[attachment_name]
+        blob_info = doc_body[attachment_name]
         assert blob_info["@type"] == "blob", (
             f"Expected '@type'='blob', got '{blob_info.get('@type')}'"
         )
@@ -441,7 +448,7 @@ class TestBlobs(CBLTestClass):
             f"Document {doc_id} does not exist on the edge server."
         )
 
-        rev_id = document.rev_id
+        rev_id = document.revid
 
         attachment_name = "missing_blob.png"
 
@@ -498,7 +505,7 @@ class TestBlobs(CBLTestClass):
             f"Document {doc_id} does not exist on the edge server."
         )
 
-        rev_id = document.rev_id
+        rev_id = document.revid
 
         attachment_name = "test.png"
         response = await edge_server.put_sub_document(
@@ -603,7 +610,7 @@ class TestBlobs(CBLTestClass):
             f"Document {doc_id} does not exist on the edge server."
         )
 
-        rev_id = document.rev_id
+        rev_id = document.revid
 
         attachment_name = "test.png"
         response = await edge_server.put_sub_document(
@@ -625,7 +632,7 @@ class TestBlobs(CBLTestClass):
             f"Document {doc_id} does not exist on the edge server."
         )
 
-        rev_id = document.rev_id
+        rev_id = document.revid
 
         attachment_name = "test2.png"
 
@@ -685,7 +692,7 @@ class TestBlobs(CBLTestClass):
             f"Document {doc_id} does not exist on the edge server."
         )
 
-        rev_id = document.rev_id
+        rev_id = document.revid
 
         attachment_name = "20mb.jpg"
 
@@ -722,12 +729,13 @@ class TestBlobs(CBLTestClass):
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 3):
+            doc_id = f"doc_{i}"
             doc = {
-                "id": f"doc_{i}",
+                "id": doc_id,
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.upsert_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc_id, doc)
         logger.info("2 documents created in Couchbase Server.")
 
         self.mark_test_step(
@@ -788,7 +796,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, (
             f"Document {doc_id} does not exist on the edge server."
         )
-        rev_id = document.rev_id
+        rev_id = document.revid
 
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
         with open(blob_path, "rb") as img_file:
@@ -810,14 +818,16 @@ class TestBlobs(CBLTestClass):
         # unicoded_attachment_name = "blob_%2Fim%40g%23e%24%25%26%2A%28%29.png"
 
         document = await sync_gateway.get_document(sg_db_name, doc_id)
+        assert document is not None
+        doc_body = document.body
 
-        assert "_attachments" in document, (
+        assert "_attachments" in doc_body, (
             "'_attachments' field is missing in the document response"
         )
-        assert attachment_name in document["_attachments"], (
+        assert attachment_name in doc_body["_attachments"], (
             f"Attachment '{attachment_name}' not found in '_attachments'"
         )
-        blob_metadata = document["_attachments"][attachment_name]
+        blob_metadata = doc_body["_attachments"][attachment_name]
         assert blob_metadata["content_type"] == "image/png", (
             f"Expected content_type='image/png', got '{blob_metadata['content_type']}'"
         )
@@ -826,10 +836,10 @@ class TestBlobs(CBLTestClass):
         assert blob_metadata["length"] > 0, (
             f"Blob length is invalid ({blob_metadata['length']})"
         )
-        assert attachment_name in document, (
+        assert attachment_name in doc_body, (
             f"'{attachment_name}' not found in document body"
         )
-        blob_info = document[attachment_name]
+        blob_info = doc_body[attachment_name]
         assert blob_info["@type"] == "blob", (
             f"Expected '@type'='blob', got '{blob_info.get('@type')}'"
         )

@@ -30,12 +30,13 @@ class TestLogging(CBLTestClass):
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 6):
+            doc_id = f"doc_{i}"
             doc = {
-                "id": f"doc_{i}",
+                "id": doc_id,
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.upsert_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc_id, doc)
         logger.info("5 documents created in Couchbase Server.")
 
         self.mark_test_step(
@@ -170,12 +171,13 @@ class TestLogging(CBLTestClass):
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 6):
+            doc_id = f"doc_{i}"
             doc = {
-                "id": f"doc_{i}",
+                "id": doc_id,
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.upsert_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc_id, doc)
         logger.info("5 documents created in Couchbase Server.")
 
         self.mark_test_step(
@@ -291,12 +293,13 @@ class TestLogging(CBLTestClass):
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 6):
+            doc_id = f"doc_{i}"
             doc = {
-                "id": f"doc_{i}",
+                "id": doc_id,
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.upsert_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc_id, doc)
         logger.info("5 documents created in Couchbase Server.")
 
         self.mark_test_step(
@@ -430,43 +433,43 @@ class TestLogging(CBLTestClass):
 
         # Read document
         logger.info(f"Reading document {doc_id} via Edge Server")
-        response = await edge_server.get_document(es_db_name, doc_id)
-        assert response is not None, (
+        remote_doc = await edge_server.get_document(es_db_name, doc_id)
+        assert remote_doc is not None, (
             f"Failed to read document {doc_id} via Edge Server."
         )
 
         # Storing the revision ID
-        rev_id = response.revid
+        rev_id = remote_doc.revid
 
         logger.info(f"Document {doc_id} read via Edge Server")
 
         # Update document
         logger.info(f"Updating document {doc_id} via Sync Gateway")
-        updated_doc = {
+        updated_doc_body = {
             "id": doc_id,
             "channels": ["public"],
             "timestamp": datetime.utcnow().isoformat(),
             "changed": "yes",
         }
 
-        response = await edge_server.put_document_with_id(
-            updated_doc, doc_id, es_db_name, rev=rev_id
+        updated_doc = await edge_server.put_document_with_id(
+            updated_doc_body, doc_id, es_db_name, rev=rev_id
         )
 
-        assert response is not None, (
+        assert updated_doc is not None, (
             f"Failed to update document {doc_id} via Edge Server"
         )
 
         logger.info(f"Document {doc_id} updated via Edge Server")
 
-        rev_id = response.revid
+        rev_id = updated_doc.revid
 
         # Delete document
         logger.info(f"Deleting document {doc_id} via Edge Server.")
 
-        response = await edge_server.delete_document(doc_id, rev_id, es_db_name)
+        delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
 
-        assert response.get("ok"), (
+        assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
             f"Failed to delete document {doc_id} via Edge Server."
         )
 

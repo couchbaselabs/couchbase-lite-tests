@@ -30,12 +30,13 @@ class TestChangesFeed(CBLTestClass):
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 6):
+            doc_id = f"doc_{i}"
             doc = {
-                "id": f"doc_{i}",
+                "id": doc_id,
                 "channels": ["public"],
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            server.upsert_document(bucket_name, doc["id"], doc)
+            server.upsert_document(bucket_name, doc_id, doc)
         logger.info("5 documents created in Couchbase Server.")
 
         self.mark_test_step(
@@ -121,16 +122,19 @@ class TestChangesFeed(CBLTestClass):
 
         self.mark_test_step("Check that deletes reflected in changes feed")
 
-        rev_id = None
+        rev_id: str | None = None
         for item in changes["results"]:
             if item["id"] == "doc_5":
                 rev_id = item["changes"][0]["rev"]
                 break
 
-        doc = "doc_5"
-        response = await edge_server.delete_document(doc, rev_id, es_db_name)
-        assert response.get("ok"), f"Failed to delete document {doc} from Edge Server."
-        logger.info(f"Deleted document {doc} from Edge Server.")
+        doc_id = "doc_5"
+        assert rev_id is not None, "rev_id for doc_5 not found"
+        delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
+        assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
+            f"Failed to delete document {doc_id} from Edge Server."
+        )
+        logger.info(f"Deleted document {doc_id} from Edge Server.")
 
         self.mark_test_step(
             "Check that deleted documents are visible in changes feed with active_only=False"
