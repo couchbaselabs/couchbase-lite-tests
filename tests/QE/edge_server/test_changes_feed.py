@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from cbltest import CBLPyTest
@@ -69,7 +70,7 @@ class TestChangesFeed(CBLTestClass):
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         with open(config_path) as file:
-            config = json.load(file)
+            config = cast(dict[str, Any], json.load(file))
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)

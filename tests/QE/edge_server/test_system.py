@@ -4,6 +4,7 @@ import random
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from cbltest import CBLPyTest
@@ -78,7 +79,7 @@ class TestSystem(CBLTestClass):
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         with open(config_path) as file:
-            config = json.load(file)
+            config = cast(dict[str, Any], json.load(file))
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
@@ -185,6 +186,7 @@ class TestSystem(CBLTestClass):
                         "timestamp": datetime.utcnow().isoformat(),
                         "changed": "yes",
                     }
+                    assert rev_id is not None, "rev_id required for update"
                     updated_doc = await sync_gateway.update_document(
                         sg_db_name, doc_id, updated_doc_body, rev_id
                     )
@@ -326,6 +328,7 @@ class TestSystem(CBLTestClass):
                 if "delete" in operations:
                     # Delete on sync gateway and validate on edge server
                     logger.info(f"Deleting document {doc_id} via Sync Gateway")
+                    assert rev_id is not None, "rev_id required for delete"
                     del_result = await sync_gateway.delete_document(
                         doc_id, rev_id, sg_db_name
                     )
@@ -408,7 +411,7 @@ class TestSystem(CBLTestClass):
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         with open(config_path) as file:
-            config = json.load(file)
+            config = cast(dict[str, Any], json.load(file))
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
@@ -553,6 +556,7 @@ class TestSystem(CBLTestClass):
                         "timestamp": datetime.utcnow().isoformat(),
                         "changed": "yes",
                     }
+                    assert rev_id is not None, "rev_id required for update"
                     updated_doc = await sync_gateway.update_document(
                         sg_db_name, doc_id, updated_doc_body, rev_id
                     )
@@ -698,6 +702,7 @@ class TestSystem(CBLTestClass):
                     if "delete" in operations:
                         # Delete on sync gateway and validate on edge server
                         logger.info(f"Deleting document {doc_id} via Sync Gateway")
+                        assert rev_id is not None, "rev_id required for delete"
                         del_result = await sync_gateway.delete_document(
                             doc_id, rev_id, sg_db_name
                         )

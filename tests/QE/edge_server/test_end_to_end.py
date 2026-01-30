@@ -3,6 +3,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from cbltest import CBLPyTest
@@ -76,7 +77,7 @@ class TestEndtoEnd(CBLTestClass):
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         with open(config_path) as file:
-            config = json.load(file)
+            config = cast(dict[str, Any], json.load(file))
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
@@ -214,6 +215,7 @@ class TestEndtoEnd(CBLTestClass):
                 "Checking documents deleted at Sync Gateway get synced down to Edge Server"
             )
             logger.info(f"Step 5: Deleting document {doc_id} via Sync Gateway.")
+            assert rev_id is not None, "rev_id required for delete"
             del_result = await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
             assert del_result is None, (
                 f"Failed to delete document {doc_id} via Sync Gateway."
