@@ -1,9 +1,8 @@
 pipeline {
     agent none
     parameters {
-        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
-        string(name: 'CBL_VERSION', defaultValue: '3.2.3', description: 'Couchbase Lite Version (build number will be auto-fetched)')
-        string(name: 'SGW_VERSION', defaultValue: '3.2.3', description: "The version of Sync Gateway to download")
+        string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'Couchbase Lite Version to use')
+        string(name: 'SGW_VERSION', defaultValue: '4.0.0', description: 'Sync Gateway Version to use')
     }
     stages {
         stage('Init') {
@@ -11,8 +10,7 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "${params.CBL_VERSION}-${CBL_EDITION} (#${currentBuild.number})"
-                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
+                    currentBuild.displayName = "CBL:${params.CBL_VERSION} SGW:${params.SGW_VERSION} (#${currentBuild.number})"
                 }
             }
         }
@@ -30,26 +28,27 @@ pipeline {
         stage('Run Test') {
             agent { label 'mac-mini-new' }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-keychain')
+                KEYCHAIN_PASSWORD = credentials('mac-mini-new-keychain-password')
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                AWS_PROFILE = "mobile-for-now"
-                TS_ARTIFACTS_DIR = 'ios'
+                TS_ARTIFACTS_DIR = 'sgw'
             }
             steps {
                 // Unlock keychain:
-                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                echo "Run iOS Test"
-                timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_EDITION} ${params.CBL_VERSION} ${params.SGW_VERSION} ~/.ssh/jborden.pem"
+                sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
+                echo "=== Run SGW Tests"
+                timeout(time: 90, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/QE/sgw/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
                 }
+                echo "=== SGW Tests Complete"
             }
             post {
                 always {
-                    echo "Teardown iOS Test"
+                    echo "=== Teardown SGW Tests"
                     timeout(time: 5, unit: 'MINUTES') {
-                        sh "jenkins/pipelines/QE/ios/teardown.sh"
+                        sh "jenkins/pipelines/QE/sgw/teardown.sh"
                     }
-                    archiveArtifacts artifacts: 'tests/QE/ios/**/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/QE/sgw/**/*', fingerprint: true, allowEmptyArchive: true
+                    echo "=== SGW Test Teardown Complete"
                 }
             }
         }

@@ -1,6 +1,5 @@
 import asyncio
 import random
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -17,7 +16,7 @@ from packaging.version import Version
 class TestXattrs(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_offline_processing_of_external_updates(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cblpytest: CBLPyTest
     ) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
@@ -167,7 +166,7 @@ class TestXattrs(CBLTestClass):
         await sg_user.close()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_purge(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_purge(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 100
@@ -355,9 +354,7 @@ class TestXattrs(CBLTestClass):
         await sg_user.close()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sg_sdk_interop_unique_docs(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_sg_sdk_interop_unique_docs(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
@@ -517,9 +514,7 @@ class TestXattrs(CBLTestClass):
         await sg_user.close()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sg_sdk_interop_shared_docs(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_sg_sdk_interop_shared_docs(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
@@ -756,9 +751,7 @@ class TestXattrs(CBLTestClass):
         await sg_user.close()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sync_xattrs_update_concurrently(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_sync_xattrs_update_concurrently(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 20
@@ -842,7 +835,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Verify user '{username1}' can see all docs in channel '{sg_channel1}'"
         )
-
+        await asyncio.sleep(10)
         user1_changes = await sg_user1.get_changes(sg_db)
         unique_user1_docs = {e.id for e in user1_changes.results if e.id in sdk_doc_ids}
         user1_doc_count = len(unique_user1_docs)

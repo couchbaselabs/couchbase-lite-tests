@@ -1,5 +1,4 @@
 import asyncio
-from pathlib import Path
 from typing import cast
 
 import pytest
@@ -13,9 +12,7 @@ from cbltest.api.syncgateway import PutDatabasePayload
 @pytest.mark.min_couchbase_servers(1)
 class TestServerSetup(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sgw_server_alternative_address(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_sgw_server_alternative_address(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -51,7 +48,7 @@ class TestServerSetup(CBLTestClass):
             cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
 
         self.mark_test_step("Wait for SGW to import documents")
-        await asyncio.sleep(5)
+        await asyncio.sleep(10)
 
         self.mark_test_step("Verify documents were imported via SGW")
         all_docs = await sg.get_all_documents(sg_db)
@@ -76,9 +73,7 @@ class TestServerSetup(CBLTestClass):
         await sg.wait_for_db_up(sg_db)
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_remove_dcp_cacert_handling(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_remove_dcp_cacert_handling(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         bucket_name = "data-bucket"
