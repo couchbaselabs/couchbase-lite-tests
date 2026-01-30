@@ -152,7 +152,6 @@ class TestEndtoEnd(CBLTestClass):
             # Step 2: Validate Document on Edge Server
             logger.info(f"Step 2: Validating document {doc_id} on Edge Server.")
             document = await edge_server.get_document(es_db_name, doc_id)
-            # print(document)
 
             assert document is not None, (
                 f"Document {doc_id} does not exist on the edge server."
@@ -199,7 +198,6 @@ class TestEndtoEnd(CBLTestClass):
             # Step 4: Validate Update on Sync Gateway
             logger.info(f"Validating update for {doc_id} on Sync Gateway")
             response = await sync_gateway.get_document(sg_db_name, doc_id)
-            # print(response)
             assert rev_id != response.revid, (
                 f"Document {doc_id} update not reflected on Sync Gateway"
             )
@@ -263,7 +261,6 @@ class TestEndtoEnd(CBLTestClass):
             # Step 8: Validate Document on Sync Gateway
             logger.info(f"Step 8: Validating document {doc_id} on Sync Gateway.")
             response = await sync_gateway.get_document(sg_db_name, doc_id)
-            # print(response)
             assert response is not None, (
                 f"Document {doc_id} does not exist on the sync gateway."
             )
@@ -303,7 +300,6 @@ class TestEndtoEnd(CBLTestClass):
             logger.info(f"Step 10: Validating update for {doc_id} on Edge Server.")
 
             document = await edge_server.get_document(es_db_name, doc_id)
-            # print(document)
 
             assert document is not None, (
                 f"Document {doc_id} does not exist on the edge server."
@@ -317,7 +313,6 @@ class TestEndtoEnd(CBLTestClass):
 
             # Storing the revision ID
             rev_id = document.revid
-            # print(rev_id)
 
             # Step 11: Delete Document via Edge Server
             self.mark_test_step(
