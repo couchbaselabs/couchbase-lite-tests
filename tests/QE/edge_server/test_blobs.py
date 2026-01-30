@@ -2,7 +2,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
@@ -71,7 +71,9 @@ class TestBlobs(CBLTestClass):
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         with open(config_path) as file:
-            config = cast(dict[str, Any], json.load(file))
+            _config = json.load(file)
+        assert isinstance(_config, dict), "config must be a dict"
+        config: dict[str, Any] = _config
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
@@ -294,7 +296,9 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Configure Edge Server with replication to Sync Gateway.")
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         with open(config_path) as file:
-            config = cast(dict[str, Any], json.load(file))
+            _config = json.load(file)
+        assert isinstance(_config, dict), "config must be a dict"
+        config: dict[str, Any] = _config
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
@@ -768,7 +772,9 @@ class TestBlobs(CBLTestClass):
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         with open(config_path) as file:
-            config = cast(dict[str, Any], json.load(file))
+            _config = json.load(file)
+        assert isinstance(_config, dict), "config must be a dict"
+        config: dict[str, Any] = _config
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
