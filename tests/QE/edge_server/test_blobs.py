@@ -8,6 +8,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblEdgeServerBadResponseError
 
 logger = logging.getLogger(__name__)
+SCRIPT_DIR = str(Path(__file__).parent)
 
 
 class TestBlobs(CBLTestClass):
@@ -20,7 +21,9 @@ class TestBlobs(CBLTestClass):
         )
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         doc_id = "doc_updation"
 
@@ -62,7 +65,9 @@ class TestBlobs(CBLTestClass):
         )
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         doc_id = "doc_deletion"
 
@@ -111,7 +116,9 @@ class TestBlobs(CBLTestClass):
         )
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         doc_id = "doc_updation"
 
@@ -179,7 +186,9 @@ class TestBlobs(CBLTestClass):
         )
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         doc_id = "doc_blob"
 
@@ -212,7 +221,9 @@ class TestBlobs(CBLTestClass):
         )
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         doc_id = "doc_blob"
 
@@ -288,7 +299,9 @@ class TestBlobs(CBLTestClass):
         )
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         doc_id = "doc_blob"
 

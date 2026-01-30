@@ -10,6 +10,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblEdgeServerBadResponseError
 
 logger = logging.getLogger(__name__)
+SCRIPT_DIR = str(Path(__file__).parent)
 
 
 class TestTTLExpires(CBLTestClass):
@@ -18,7 +19,9 @@ class TestTTLExpires(CBLTestClass):
         self.mark_test_step("Starting test to verify TTL feature")
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         self.mark_test_step("Creating a document with TTL of 5 seconds")
         doc = {
@@ -52,7 +55,9 @@ class TestTTLExpires(CBLTestClass):
         self.mark_test_step("Starting test to verify Expires feature")
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         self.mark_test_step("Creating a document with Expires of 5 seconds")
         doc = {
@@ -91,7 +96,9 @@ class TestTTLExpires(CBLTestClass):
         self.mark_test_step("Starting test to verify Update TTL feature")
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         self.mark_test_step("Creating a document with TTL of 30 seconds")
         doc = {
@@ -144,7 +151,9 @@ class TestTTLExpires(CBLTestClass):
         )
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         self.mark_test_step(
             "Creating a document with TTL of 10 seconds and Expires of 30 seconds"
@@ -249,7 +258,9 @@ class TestTTLExpires(CBLTestClass):
         )
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         self.mark_test_step(
             "Checking if updating TTL of a non-existent document returns 404"
@@ -274,7 +285,9 @@ class TestTTLExpires(CBLTestClass):
         )
 
         es_db_name = "db"
-        edge_server = cblpytest.edge_servers[0]
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+        )
 
         # Document distribution:
         # - 50 docs with 10s TTL
