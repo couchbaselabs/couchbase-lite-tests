@@ -15,7 +15,9 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestBlobs(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blobs_create_delete(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blobs_create_delete(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         self.mark_test_step(
             "Starting Blobs CRUD test with Server, Sync Gateway, Edge Server and 1 client"
         )
@@ -23,7 +25,9 @@ class TestBlobs(CBLTestClass):
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
-        self.mark_test_step("Creating a bucket in Couchbase Server and adding 10 documents.")
+        self.mark_test_step(
+            "Creating a bucket in Couchbase Server and adding 10 documents."
+        )
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 3):
@@ -35,13 +39,17 @@ class TestBlobs(CBLTestClass):
             server.upsert_document(bucket_name, doc["id"], doc)
         logger.info("2 documents created in Couchbase Server.")
 
-        self.mark_test_step("Creating a database in Sync Gateway and adding a user and role.")
+        self.mark_test_step(
+            "Creating a database in Sync Gateway and adding a user and role."
+        )
         sg_db_name = "db-1"
         config = {
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
-                    "collections": {"_default": {"sync": "function(doc){channel(doc.channels);}"}}
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
                 }
             },
             "num_index_replicas": 0,
@@ -77,30 +85,42 @@ class TestBlobs(CBLTestClass):
             "Verifying initial synchronization from Couchbase Server to Edge Server."
         )
 
-        logger.info("Checking initial document sync from Couchbase Server to Sync Gateway...")
-        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        logger.info(
+            "Checking initial document sync from Couchbase Server to Sync Gateway..."
+        )
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
 
         self.mark_test_step("Check that Sync Gateway has 2 documents")
         assert len(response.rows) == 2, (
             f"Expected 2 documents, but got {len(response.rows)} documents."
         )
-        logger.info(f"Found {len(response.rows)} documents synced to Sync Gateway initially.")
+        logger.info(
+            f"Found {len(response.rows)} documents synced to Sync Gateway initially."
+        )
 
-        logger.info("Checking initial document sync from Sync Gateway to Edge Server...")
+        logger.info(
+            "Checking initial document sync from Sync Gateway to Edge Server..."
+        )
         response = await edge_server.get_all_documents(es_db_name)
 
         self.mark_test_step("Check that Edge Server has 2 documents")
         assert len(response.rows) == 2, (
             f"Expected 2 documents, but got {len(response.rows)} documents."
         )
-        logger.info(f"Found {len(response.rows)} documents synced to Edge Server initially.")
+        logger.info(
+            f"Found {len(response.rows)} documents synced to Edge Server initially."
+        )
 
         self.mark_test_step("Adding a blob to a document in Couchbase Server.")
         doc_id = "doc_2"
         logger.info(f"Adding a blob to document {doc_id} in Couchbase Server.")
         document = await edge_server.get_document(es_db_name, doc_id)
 
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
 
         rev_id = document.rev_id
 
@@ -134,8 +154,12 @@ class TestBlobs(CBLTestClass):
         )
         assert "digest" in blob_metadata, "'digest' field is missing in blob metadata"
         assert "length" in blob_metadata, "'length' field is missing in blob metadata"
-        assert blob_metadata["length"] > 0, f"Blob length is invalid ({blob_metadata['length']})"
-        assert attachment_name in document, f"'{attachment_name}' not found in document body"
+        assert blob_metadata["length"] > 0, (
+            f"Blob length is invalid ({blob_metadata['length']})"
+        )
+        assert attachment_name in document, (
+            f"'{attachment_name}' not found in document body"
+        )
         blob_info = document[attachment_name]
         assert blob_info["@type"] == "blob", (
             f"Expected '@type'='blob', got '{blob_info.get('@type')}'"
@@ -157,11 +181,15 @@ class TestBlobs(CBLTestClass):
             doc_id, rev_id, attachment_name, es_db_name
         )
 
-        assert response.get("ok"), f"Failed to delete blob from document {doc_id} in Edge Server."
+        assert response.get("ok"), (
+            f"Failed to delete blob from document {doc_id} in Edge Server."
+        )
         logger.info(f"Blob deleted from document {doc_id} in Edge Server.")
 
         # Validate blob deletion on Sync Gateway and Couchbase Server
-        self.mark_test_step("Validating blob deletion on Sync Gateway and Couchbase Server.")
+        self.mark_test_step(
+            "Validating blob deletion on Sync Gateway and Couchbase Server."
+        )
         document = await sync_gateway.get_document(sg_db_name, doc_id)
 
         assert "_attachments" not in document, (
@@ -174,7 +202,9 @@ class TestBlobs(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_empty_blob(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step("Starting test to add empty blob to a document in Edge Server")
+        self.mark_test_step(
+            "Starting test to add empty blob to a document in Edge Server"
+        )
 
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
@@ -193,7 +223,9 @@ class TestBlobs(CBLTestClass):
         logger.info(f"Document {doc_id} created on Edge Server.")
 
         document = await edge_server.get_document(es_db_name, doc_id)
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
         rev_id = document.rev_id
 
         self.mark_test_step("Adding an empty blob to the document.")
@@ -239,7 +271,9 @@ class TestBlobs(CBLTestClass):
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
-                    "collections": {"_default": {"sync": "function(doc){channel(doc.channels);}"}}
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
                 }
             },
             "num_index_replicas": 0,
@@ -264,7 +298,9 @@ class TestBlobs(CBLTestClass):
         )
         await edge_server.wait_for_idle()
 
-        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
         assert len(response.rows) == 2, (
             f"Expected 2 documents on Sync Gateway, got {len(response.rows)}."
         )
@@ -277,7 +313,9 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Adding a blob to a document on Edge Server.")
         doc_id = "doc_2"
         document = await edge_server.get_document(es_db_name, doc_id)
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
         rev_id = document.rev_id
         attachment_name = "test.png"
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
@@ -303,8 +341,12 @@ class TestBlobs(CBLTestClass):
         )
         assert "digest" in blob_metadata, "'digest' field is missing in blob metadata"
         assert "length" in blob_metadata, "'length' field is missing in blob metadata"
-        assert blob_metadata["length"] > 0, f"Blob length is invalid ({blob_metadata['length']})"
-        assert attachment_name in document, f"'{attachment_name}' not found in document body"
+        assert blob_metadata["length"] > 0, (
+            f"Blob length is invalid ({blob_metadata['length']})"
+        )
+        assert attachment_name in document, (
+            f"'{attachment_name}' not found in document body"
+        )
         blob_info = document[attachment_name]
         assert blob_info["@type"] == "blob", (
             f"Expected '@type'='blob', got '{blob_info.get('@type')}'"
@@ -662,7 +704,9 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Blob exceeding max size addition test passed.")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_special_characters(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blob_special_characters(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         self.mark_test_step(
             "Starting test to add blob with special characters to a document in Edge Server"
         )
@@ -672,7 +716,9 @@ class TestBlobs(CBLTestClass):
 
         sg_db_name = "db-1"
 
-        self.mark_test_step("Creating a bucket in Couchbase Server and adding 10 documents.")
+        self.mark_test_step(
+            "Creating a bucket in Couchbase Server and adding 10 documents."
+        )
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
         for i in range(1, 3):
@@ -684,12 +730,16 @@ class TestBlobs(CBLTestClass):
             server.upsert_document(bucket_name, doc["id"], doc)
         logger.info("2 documents created in Couchbase Server.")
 
-        self.mark_test_step("Creating a database in Sync Gateway and adding a user and role.")
+        self.mark_test_step(
+            "Creating a database in Sync Gateway and adding a user and role."
+        )
         config = {
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
-                    "collections": {"_default": {"sync": "function(doc){channel(doc.channels);}"}}
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
                 }
             },
             "num_index_replicas": 0,
@@ -718,7 +768,9 @@ class TestBlobs(CBLTestClass):
         )
         await edge_server.wait_for_idle()
 
-        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
         assert len(response.rows) == 2, (
             f"Expected 2 documents on Sync Gateway, got {len(response.rows)}."
         )
@@ -728,10 +780,14 @@ class TestBlobs(CBLTestClass):
         )
         logger.info("2 documents synced to Edge Server.")
 
-        self.mark_test_step("Adding a blob with special characters to a document in Edge Server.")
+        self.mark_test_step(
+            "Adding a blob with special characters to a document in Edge Server."
+        )
         doc_id = "doc_2"
         document = await edge_server.get_document(es_db_name, doc_id)
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
         rev_id = document.rev_id
 
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
@@ -746,7 +802,9 @@ class TestBlobs(CBLTestClass):
 
         assert response is not None, "Failed to add attachment to document."
 
-        logger.info(f"Blob with special characters added to document {doc_id} in Edge Server.")
+        logger.info(
+            f"Blob with special characters added to document {doc_id} in Edge Server."
+        )
 
         self.mark_test_step("Validating blob with special characters on Sync Gateway.")
         # unicoded_attachment_name = "blob_%2Fim%40g%23e%24%25%26%2A%28%29.png"
@@ -765,8 +823,12 @@ class TestBlobs(CBLTestClass):
         )
         assert "digest" in blob_metadata, "'digest' field is missing in blob metadata"
         assert "length" in blob_metadata, "'length' field is missing in blob metadata"
-        assert blob_metadata["length"] > 0, f"Blob length is invalid ({blob_metadata['length']})"
-        assert attachment_name in document, f"'{attachment_name}' not found in document body"
+        assert blob_metadata["length"] > 0, (
+            f"Blob length is invalid ({blob_metadata['length']})"
+        )
+        assert attachment_name in document, (
+            f"'{attachment_name}' not found in document body"
+        )
         blob_info = document[attachment_name]
         assert blob_info["@type"] == "blob", (
             f"Expected '@type'='blob', got '{blob_info.get('@type')}'"
@@ -780,6 +842,8 @@ class TestBlobs(CBLTestClass):
         assert blob_info["length"] == blob_metadata["length"], (
             f"Blob length mismatch, expected '{blob_metadata['length']}', got '{blob_info['length']}'"
         )
-        logger.info("Blob with special characters validated successfully on Sync Gateway.")
+        logger.info(
+            "Blob with special characters validated successfully on Sync Gateway."
+        )
 
         self.mark_test_step("Blob with special characters addition test passed.")

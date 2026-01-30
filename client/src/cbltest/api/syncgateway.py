@@ -1164,7 +1164,9 @@ class _SyncGatewayBase:
                     500, f"Failed to create document {doc_id}: unexpected response type"
                 )
             if "error" in response:
-                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}")
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to create document {doc_id}"
+                )
 
             # Convert response to match expected format
             cast_resp = cast(dict, response)

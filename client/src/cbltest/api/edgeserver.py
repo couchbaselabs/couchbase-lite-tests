@@ -914,7 +914,9 @@ class EdgeServer:
                 response = await self._send_request(
                     "post",
                     "/check-log",
-                    payload=JSONDictionary({"search_string": search_string, "log_file": log_file}),
+                    payload=JSONDictionary(
+                        {"search_string": search_string, "log_file": log_file}
+                    ),
                     session=self.__shell_session,
                 )
                 if isinstance(response, str):
