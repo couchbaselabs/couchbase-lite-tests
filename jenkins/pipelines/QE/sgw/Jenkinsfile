@@ -30,7 +30,6 @@ pipeline {
             environment {
                 KEYCHAIN_PASSWORD = credentials('mac-mini-new-keychain-password')
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                AWS_PROFILE = "default"
                 TS_ARTIFACTS_DIR = 'sgw'
             }
             steps {
