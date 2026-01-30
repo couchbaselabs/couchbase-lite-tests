@@ -2,7 +2,6 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
@@ -44,18 +43,16 @@ class TestChangesFeed(CBLTestClass):
             "Creating a database in Sync Gateway and adding a user and role."
         )
         sg_db_name = "db-1"
-        config = {
+        sg_config = {
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
-                    "collections": {
-                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
-                    }
+                    "collections": {"_default": {"sync": "function(doc){channel(doc.channels);}"}}
                 }
             },
             "num_index_replicas": 0,
         }
-        payload = PutDatabasePayload(config)
+        payload = PutDatabasePayload(sg_config)
         await sync_gateway.put_database(sg_db_name, payload)
         logger.info(f"Database created in Sync Gateway and linked to {bucket_name}.")
 
@@ -70,9 +67,7 @@ class TestChangesFeed(CBLTestClass):
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         with open(config_path) as file:
-            _config = json.load(file)
-        assert isinstance(_config, dict), "config must be a dict"
-        config: dict[str, Any] = _config
+            config = json.load(file)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
