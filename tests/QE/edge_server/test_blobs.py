@@ -48,7 +48,9 @@ class TestBlobs(CBLTestClass):
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
-                    "collections": {"_default": {"sync": "function(doc){channel(doc.channels);}"}}
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
                 }
             },
             "num_index_replicas": 0,
@@ -269,7 +271,7 @@ class TestBlobs(CBLTestClass):
         logger.info("2 documents created in Couchbase Server.")
 
         self.mark_test_step("Creating database and user in Sync Gateway.")
-        config = {
+        sg_config = {
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
@@ -280,7 +282,7 @@ class TestBlobs(CBLTestClass):
             },
             "num_index_replicas": 0,
         }
-        payload = PutDatabasePayload(config)
+        payload = PutDatabasePayload(sg_config)
         await sync_gateway.put_database(sg_db_name, payload)
         input_data = {"_default._default": ["public"]}
         access_dict = sync_gateway.create_collection_access_dict(input_data)
@@ -739,7 +741,7 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step(
             "Creating a database in Sync Gateway and adding a user and role."
         )
-        config = {
+        sg_config = {
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
@@ -750,7 +752,7 @@ class TestBlobs(CBLTestClass):
             },
             "num_index_replicas": 0,
         }
-        payload = PutDatabasePayload(config)
+        payload = PutDatabasePayload(sg_config)
         await sync_gateway.put_database(sg_db_name, payload)
         logger.info(f"Database created in Sync Gateway and linked to {bucket_name}.")
 
