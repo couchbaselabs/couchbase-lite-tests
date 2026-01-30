@@ -1123,6 +1123,127 @@ class _SyncGatewayBase:
 
             return RemoteDocument(cast_resp)
 
+    async def create_document(
+        self,
+        db_name: str,
+        doc_id: str,
+        document: dict,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> RemoteDocument:
+        """
+        Creates a document in Sync Gateway
+
+        :param db_name: The name of the DB endpoint where the document should be created
+        :param doc_id: The document ID to create
+        :param document: The document data to be created (as a dictionary)
+        :param scope: The scope where the document should be created (default '_default')
+        :param collection: The collection where the document should be created (default '_default')
+        :return: The response from the Sync Gateway as a RemoteDocument
+        """
+        with self._tracer.start_as_current_span(
+            "create_document",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            body = dict(document)
+            body["_id"] = doc_id  # Ensure document has _id before sending
+            response = await self._send_request(
+                "put",
+                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                payload=JSONDictionary(body),
+            )
+
+            # Check for response structure
+            if not isinstance(response, dict):
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to create document {doc_id}: unexpected response type"
+                )
+            if "error" in response:
+                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}")
+
+            # Convert response to match expected format
+            cast_resp = cast(dict, response)
+
+            # Ensure RemoteDocument fields exist
+            if "id" in cast_resp:
+                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
+            if "rev" in cast_resp:
+                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
+            if "cv" in cast_resp:
+                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
+
+            return RemoteDocument(cast_resp)
+
+    async def update_document(
+        self,
+        db_name: str,
+        doc_id: str,
+        document: dict,
+        rev: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> RemoteDocument:
+        """
+        Updates a document in Sync Gateway.
+
+        :param db_name: The name of the DB endpoint where the document exists
+        :param doc_id: The document ID to update
+        :param document: The updated document data (as a dictionary)
+        :param rev: The current revision ID of the document
+        :param scope: The scope where the document exists (default '_default')
+        :param collection: The collection where the document exists (default '_default')
+        :return: The updated document as a RemoteDocument object
+        """
+        with self._tracer.start_as_current_span(
+            "update_document",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            body = dict(document)
+            body["_id"] = doc_id
+            body["_rev"] = rev
+
+            params = {"new_edits": "true", "rev": rev}
+
+            response = await self._send_request(
+                "put",
+                f"/{db_name}.{scope}.{collection}/{doc_id}",
+                payload=JSONDictionary(body),
+                params=params,
+            )
+
+            if not isinstance(response, dict):
+                raise CblSyncGatewayBadResponseError(
+                    500,
+                    f"Failed to update document {doc_id} with rev {rev}: unexpected response type",
+                )
+            if "error" in response:
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to update document {doc_id} with rev {rev}"
+                )
+
+            # Convert response to match expected format
+            cast_resp = cast(dict, response)
+
+            # Ensure RemoteDocument fields exist
+            if "id" in cast_resp:
+                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
+            if "rev" in cast_resp:
+                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
+            if "cv" in cast_resp:
+                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
+
+            return RemoteDocument(cast_resp)
+
     async def close(self) -> None:
         """
         Closes the Sync Gateway session
