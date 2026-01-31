@@ -25,7 +25,7 @@ class TestChangesFeed(CBLTestClass):
         sync_gateway = cblpytest.sync_gateways[0]
 
         self.mark_test_step(
-            "Creating a bucket in Couchbase Server and adding 10 documents."
+            "Creating a bucket in Couchbase Server and adding 5 documents."
         )
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
