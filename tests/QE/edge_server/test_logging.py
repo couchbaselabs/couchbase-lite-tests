@@ -1,0 +1,394 @@
+import json
+from datetime import datetime
+from pathlib import Path
+
+import pytest
+from cbltest import CBLPyTest
+from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.syncgateway import PutDatabasePayload
+
+SCRIPT_DIR = str(Path(__file__).parent)
+
+
+class TestLogging(CBLTestClass):
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_audit_logging_default(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
+        server = cblpytest.couchbase_servers[0]
+        sync_gateway = cblpytest.sync_gateways[0]
+
+        self.mark_test_step("Creating a bucket on server.")
+        bucket_name = "bucket-1"
+        server.create_bucket(bucket_name)
+        self.mark_test_step("Adding 5 documents to bucket.")
+        for i in range(1, 6):
+            doc_id = f"doc_{i}"
+            doc = {
+                "id": doc_id,
+                "channels": ["public"],
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            server.upsert_document(bucket_name, doc_id, doc)
+
+        self.mark_test_step("Creating a database on Sync Gateway.")
+        sg_db_name = "db-1"
+        sg_config = {
+            "bucket": "bucket-1",
+            "scopes": {
+                "_default": {
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
+                }
+            },
+            "num_index_replicas": 0,
+        }
+        payload = PutDatabasePayload(sg_config)
+        await sync_gateway.put_database(sg_db_name, payload)
+
+        self.mark_test_step("Adding role and user to Sync Gateway.")
+        input_data = {"_default._default": ["public"]}
+        access_dict = sync_gateway.create_collection_access_dict(input_data)
+        await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
+        await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
+
+        self.mark_test_step(
+            "Creating a database on Edge Server with default audit config."
+        )
+        es_db_name = "db"
+        config_path = f"{SCRIPT_DIR}/config/test_e2e_audit.json"
+        with open(config_path) as file:
+            config = json.load(file)
+        config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        with open(config_path, "w") as file:
+            json.dump(config, file, indent=4)
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            db_name=es_db_name, config_file=config_path
+        )
+        await edge_server.wait_for_idle()
+
+        self.mark_test_step(
+            "Verifying initial synchronization from Couchbase Server to Edge Server."
+        )
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
+
+        self.mark_test_step("Checking that Sync Gateway has 5 documents.")
+        assert len(response.rows) == 5, (
+            f"Expected 5 documents, but got {len(response.rows)} documents."
+        )
+
+        response = await edge_server.get_all_documents(es_db_name)
+
+        self.mark_test_step("Checking that Edge Server has 5 documents.")
+        assert len(response.rows) == 5, (
+            f"Expected 5 documents, but got {len(response.rows)} documents."
+        )
+
+        self.mark_test_step("Checking audit logs for start.")
+        log = await edge_server.check_log("57344")
+        assert len(log) > 0, "Audit log for start event not found"
+        self.mark_test_step("Checking audit logs for stop.")
+        log = await edge_server.check_log("100002")
+        assert log == [], "Audit log for stop event not found"
+
+        self.mark_test_step("Checking audit logs for public HTTP requests.")
+        log = await edge_server.check_log("100003")
+        assert log == [], "Audit log for public HTTP request found"
+
+        self.mark_test_step("Checking audit logs for replication events.")
+        log = await edge_server.check_log("57355")
+        assert len(log) > 0, "Audit log for start of replication event not found"
+        log = await edge_server.check_log("100013")
+        assert log == [], "Audit log for stop of replication event not found"
+
+        self.mark_test_step(
+            "Checking no audit logs for document changes with default events enabled."
+        )
+        # Create
+        log = await edge_server.check_log("100015")
+        assert log == [], "Audit log for create event found"
+        # Read
+        log = await edge_server.check_log("100016")
+        assert log == [], "Audit log for read event found"
+        # Update
+        log = await edge_server.check_log("100017")
+        assert log == [], "Audit log for update event found"
+        # Delete
+        log = await edge_server.check_log("100018")
+        assert log == [], "Audit log for delete event found"
+
+        self.mark_test_step("Audit logging test completed.")
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_audit_logging_disabled(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
+        server = cblpytest.couchbase_servers[0]
+        sync_gateway = cblpytest.sync_gateways[0]
+
+        self.mark_test_step("Creating a bucket on server.")
+        bucket_name = "bucket-1"
+        server.create_bucket(bucket_name)
+        self.mark_test_step("Adding 5 documents to bucket.")
+        for i in range(1, 6):
+            doc_id = f"doc_{i}"
+            doc = {
+                "id": doc_id,
+                "channels": ["public"],
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            server.upsert_document(bucket_name, doc_id, doc)
+
+        self.mark_test_step("Creating a database on Sync Gateway.")
+        sg_db_name = "db-1"
+        sg_config = {
+            "bucket": "bucket-1",
+            "scopes": {
+                "_default": {
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
+                }
+            },
+            "num_index_replicas": 0,
+        }
+        payload = PutDatabasePayload(sg_config)
+        await sync_gateway.put_database(sg_db_name, payload)
+
+        self.mark_test_step("Adding role and user to Sync Gateway.")
+        input_data = {"_default._default": ["public"]}
+        access_dict = sync_gateway.create_collection_access_dict(input_data)
+        await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
+        await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
+
+        self.mark_test_step("Creating a database on Edge Server with audit disabled.")
+        es_db_name = "db"
+        config_path = f"{SCRIPT_DIR}/config/test_e2e_audit.json"
+        with open(config_path) as file:
+            config = json.load(file)
+        config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config["logging"]["audit"]["disable"] = "*"
+        config["logging"]["audit"].pop("enable", None)
+        with open(config_path, "w") as file:
+            json.dump(config, file, indent=4)
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            db_name=es_db_name, config_file=config_path
+        )
+        await edge_server.wait_for_idle()
+
+        self.mark_test_step(
+            "Verifying initial synchronization from Couchbase Server to Edge Server."
+        )
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
+
+        self.mark_test_step("Checking that Sync Gateway has 5 documents.")
+        assert len(response.rows) == 5, (
+            f"Expected 5 documents, but got {len(response.rows)} documents."
+        )
+
+        response = await edge_server.get_all_documents(es_db_name)
+
+        self.mark_test_step("Checking that Edge Server has 5 documents.")
+        assert len(response.rows) == 5, (
+            f"Expected 5 documents, but got {len(response.rows)} documents."
+        )
+
+        self.mark_test_step("Checking audit logs for start.")
+        log = await edge_server.check_log("100001")
+        assert log == [], "Audit log for start event found"
+        self.mark_test_step("Checking audit logs for stop.")
+        log = await edge_server.check_log("100002")
+        assert log == [], "Audit log for stop event found"
+
+        self.mark_test_step("Checking audit logs for public HTTP requests.")
+        log = await edge_server.check_log("100003")
+        assert log == [], "Audit log for public HTTP request found"
+
+        self.mark_test_step("Checking audit logs for replication events.")
+        log = await edge_server.check_log("100012")
+        assert log == [], "Audit log for start of replication event found"
+        log = await edge_server.check_log("100013")
+        assert log == [], "Audit log for stop of replication event found"
+
+        self.mark_test_step("Audit logging test completed.")
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_audit_logging_enabled(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
+        server = cblpytest.couchbase_servers[0]
+        sync_gateway = cblpytest.sync_gateways[0]
+
+        self.mark_test_step("Creating a bucket on server.")
+        bucket_name = "bucket-1"
+        server.create_bucket(bucket_name)
+        self.mark_test_step("Adding 5 documents to bucket.")
+        for i in range(1, 6):
+            doc_id = f"doc_{i}"
+            doc = {
+                "id": doc_id,
+                "channels": ["public"],
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            server.upsert_document(bucket_name, doc_id, doc)
+
+        self.mark_test_step("Creating a database on Sync Gateway.")
+        sg_db_name = "db-1"
+        sg_config = {
+            "bucket": "bucket-1",
+            "scopes": {
+                "_default": {
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
+                }
+            },
+            "num_index_replicas": 0,
+        }
+        payload = PutDatabasePayload(sg_config)
+        await sync_gateway.put_database(sg_db_name, payload)
+
+        self.mark_test_step("Adding role and user to Sync Gateway.")
+        input_data = {"_default._default": ["public"]}
+        access_dict = sync_gateway.create_collection_access_dict(input_data)
+        await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
+        await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
+
+        self.mark_test_step("Creating a database on Edge Server with audit enabled.")
+        es_db_name = "db"
+        config_path = f"{SCRIPT_DIR}/config/test_e2e_audit.json"
+        with open(config_path) as file:
+            config = json.load(file)
+        config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config["logging"]["audit"]["enable"] = "*"
+        config["logging"]["audit"].pop("disable", None)
+        with open(config_path, "w") as file:
+            json.dump(config, file, indent=4)
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            db_name=es_db_name, config_file=config_path
+        )
+        await edge_server.wait_for_idle()
+
+        self.mark_test_step(
+            "Verifying initial synchronization from Couchbase Server to Edge Server."
+        )
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
+
+        self.mark_test_step("Checking that Sync Gateway has 5 documents.")
+        assert len(response.rows) == 5, (
+            f"Expected 5 documents, but got {len(response.rows)} documents."
+        )
+
+        response = await edge_server.get_all_documents(es_db_name)
+
+        self.mark_test_step("Checking that Edge Server has 5 documents.")
+        assert len(response.rows) == 5, (
+            f"Expected 5 documents, but got {len(response.rows)} documents."
+        )
+
+        self.mark_test_step("Checking audit logs for start.")
+        log = await edge_server.check_log("100001")
+        assert len(log) > 0, "Audit log for start event not found"
+        self.mark_test_step("Checking audit logs for stop.")
+        log = await edge_server.check_log("100002")
+        assert log == [], "Audit log for stop event not found"
+
+        self.mark_test_step("Checking audit logs for public HTTP requests.")
+        log = await edge_server.check_log("100003")
+        assert len(log) > 0, "Audit log for public HTTP request not found"
+
+        self.mark_test_step("Checking audit logs for replication events.")
+        log = await edge_server.check_log("100012")
+        assert len(log) > 0, "Audit log for start of replication event not found"
+        log = await edge_server.check_log("100013")
+        assert log == [], "Audit log for stop of replication event found"
+
+        self.mark_test_step("Checking no audit logs for document changes initially.")
+        # Create
+        log = await edge_server.check_log("100015")
+        assert log == [], "Audit log for create event found"
+        # Read
+        log = await edge_server.check_log("100016")
+        assert log == [], "Audit log for read event found"
+        # Update
+        log = await edge_server.check_log("100017")
+        assert log == [], "Audit log for update event found"
+        # Delete
+        log = await edge_server.check_log("100018")
+        assert log == [], "Audit log for delete event found"
+
+        self.mark_test_step("Making CRUD requests.")
+        # --- Edge Server Cycle ---
+        doc_id = "doc_6"
+
+        # Create document
+        doc = {
+            "id": doc_id,
+            "channels": ["public"],
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
+        assert response is not None, (
+            f"Failed to create document {doc_id} via Edge Server."
+        )
+
+        # Read document
+        remote_doc = await edge_server.get_document(es_db_name, doc_id)
+        assert remote_doc is not None, (
+            f"Failed to read document {doc_id} via Edge Server."
+        )
+
+        # Storing the revision ID
+        rev_id = remote_doc.revid
+
+        # Update document
+        updated_doc_body = {
+            "id": doc_id,
+            "channels": ["public"],
+            "timestamp": datetime.utcnow().isoformat(),
+            "changed": "yes",
+        }
+
+        updated_doc = await edge_server.put_document_with_id(
+            updated_doc_body, doc_id, es_db_name, rev=rev_id
+        )
+
+        assert updated_doc is not None, (
+            f"Failed to update document {doc_id} via Edge Server"
+        )
+
+        rev_id = updated_doc.revid
+
+        # Delete document
+
+        delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
+
+        assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
+            f"Failed to delete document {doc_id} via Edge Server."
+        )
+
+        self.mark_test_step(
+            "Verifying that audit logs are generated for CRUD operations."
+        )
+        # Create
+        log = await edge_server.check_log("100015")
+        assert len(log) > 0, "Audit log for create event not found"
+        # Read
+        log = await edge_server.check_log("100016")
+        assert len(log) > 0, "Audit log for read event not found"
+        # Update
+        log = await edge_server.check_log("100017")
+        assert len(log) > 0, "Audit log for update event not found"
+        # Delete
+        log = await edge_server.check_log("100018")
+        assert len(log) > 0, "Audit log for delete event not found"
+
+        self.mark_test_step("Audit logging test completed.")

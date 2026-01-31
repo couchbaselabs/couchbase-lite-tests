@@ -5,7 +5,7 @@ import urllib.parse
 import uuid
 from json import dumps
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, List, cast
 from urllib.parse import urljoin
 
 import pyjson5 as json5  # type: ignore[import-not-found]
@@ -890,6 +890,56 @@ class EdgeServer:
             await self._send_request(
                 "post", "/kill-edgeserver", session=self.__shell_session
             )
+
+    async def get_log_content(
+        self,
+        log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
+    ) -> str:
+        """
+        Fetch raw log file content from the Edge Server host.
+
+        :param log_file: Path to the log file on the Edge Server host.
+        :return: Full log file content as string, or empty string on error.
+        """
+        with self.__tracer.start_as_current_span(
+            "get_log_content",
+            attributes={"cbl.log_file": log_file},
+        ):
+            try:
+                response = await self._send_request(
+                    "post",
+                    "/get-log",
+                    payload=JSONDictionary({"log_file": log_file}),
+                    session=self.__shell_session,
+                )
+                if isinstance(response, str):
+                    return response
+                return ""
+            except Exception:
+                return ""
+
+    async def check_log(
+        self,
+        search_string: str,
+        log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
+    ) -> List[str]:
+        """
+        Fetch log content from the server and return lines matching search_string.
+        Filtering is done in Python on the client.
+
+        :param search_string: String to search for (e.g. audit event id).
+        :param log_file: Path to the log file on the Edge Server host.
+        :return: List of matching lines, or empty list if none or on error.
+        """
+        with self.__tracer.start_as_current_span(
+            "check_log",
+            attributes={
+                "cbl.search_string": search_string,
+                "cbl.log_file": log_file,
+            },
+        ):
+            content = await self.get_log_content(log_file)
+            return [line for line in content.splitlines() if search_string in line]
 
     async def start_server(self, config: dict = {}):
         with self.__tracer.start_as_current_span("start edge server"):
