@@ -139,10 +139,9 @@ class TestEndtoEnd(CBLTestClass):
             self.mark_test_step(f"Step 5: Deleting document {doc_id} via Sync Gateway.")
             assert rev_id is not None, "rev_id required for delete"
             await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
-            time.sleep(5)
 
             self.mark_test_step(f"Step 6: Validating deletion of {doc_id} on Edge Server.")
-            time.sleep(2)  # Allow time for sync
+            time.sleep(5)  # Allow time for sync
 
             try:
                 await edge_server.get_document(es_db_name, doc_id)
