@@ -12,7 +12,9 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestChangesFeed(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_changes_feed_longpoll(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_changes_feed_longpoll(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -35,7 +37,9 @@ class TestChangesFeed(CBLTestClass):
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
-                    "collections": {"_default": {"sync": "function(doc){channel(doc.channels);}"}}
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
                 }
             },
             "num_index_replicas": 0,
@@ -49,7 +53,9 @@ class TestChangesFeed(CBLTestClass):
         await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
         await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
-        self.mark_test_step("Create database on Edge Server; replication to Sync Gateway.")
+        self.mark_test_step(
+            "Create database on Edge Server; replication to Sync Gateway."
+        )
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         with open(config_path) as file:
@@ -65,7 +71,9 @@ class TestChangesFeed(CBLTestClass):
         self.mark_test_step(
             "Verifying initial synchronization from Couchbase Server to Edge Server."
         )
-        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
 
         self.mark_test_step("Checking that Sync Gateway has 5 documents.")
         assert len(response.rows) == 5, (
@@ -108,8 +116,12 @@ class TestChangesFeed(CBLTestClass):
         self.mark_test_step(
             "Checking that deleted documents are not visible in changes feed with active_only=True."
         )
-        changes = await edge_server.changes_feed(es_db_name, feed="longpoll", active_only=True)
-        assert len(changes["results"]) < length, "Last sequence number did not decrement by 1."
+        changes = await edge_server.changes_feed(
+            es_db_name, feed="longpoll", active_only=True
+        )
+        assert len(changes["results"]) < length, (
+            "Last sequence number did not decrement by 1."
+        )
 
         last_seq = changes["last_seq"]
 
@@ -123,11 +135,15 @@ class TestChangesFeed(CBLTestClass):
                 "timestamp": datetime.utcnow().isoformat(),
             }
             response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
-            assert response is not None, f"Failed to create document {doc_id} via Edge Server"
+            assert response is not None, (
+                f"Failed to create document {doc_id} via Edge Server"
+            )
 
             doc_counter += 1
 
-        self.mark_test_step("Verifying that updated documents appear in changes feed with since.")
+        self.mark_test_step(
+            "Verifying that updated documents appear in changes feed with since."
+        )
         changes = await edge_server.changes_feed(
             es_db_name, feed="longpoll", active_only=True, since=last_seq
         )

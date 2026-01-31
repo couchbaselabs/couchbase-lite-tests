@@ -13,7 +13,9 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestBlobs(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blobs_create_delete(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blobs_create_delete(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -30,13 +32,17 @@ class TestBlobs(CBLTestClass):
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
-        self.mark_test_step("Creating a database in Sync Gateway and adding a user and role.")
+        self.mark_test_step(
+            "Creating a database in Sync Gateway and adding a user and role."
+        )
         sg_db_name = "db-1"
         sg_config = {
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
-                    "collections": {"_default": {"sync": "function(doc){channel(doc.channels);}"}}
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
                 }
             },
             "num_index_replicas": 0,
@@ -64,7 +70,9 @@ class TestBlobs(CBLTestClass):
         )
         await edge_server.wait_for_idle()
 
-        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
 
         self.mark_test_step("Verifying that Sync Gateway has 2 documents.")
         assert len(response.rows) == 2, (
@@ -82,7 +90,9 @@ class TestBlobs(CBLTestClass):
         doc_id = "doc_2"
         document = await edge_server.get_document(es_db_name, doc_id)
 
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
 
         rev_id = document.revid
 
@@ -114,8 +124,12 @@ class TestBlobs(CBLTestClass):
         )
         assert "digest" in blob_metadata, "'digest' field is missing in blob metadata"
         assert "length" in blob_metadata, "'length' field is missing in blob metadata"
-        assert blob_metadata["length"] > 0, f"Blob length is invalid ({blob_metadata['length']})"
-        assert attachment_name in doc_body, f"'{attachment_name}' not found in document body"
+        assert blob_metadata["length"] > 0, (
+            f"Blob length is invalid ({blob_metadata['length']})"
+        )
+        assert attachment_name in doc_body, (
+            f"'{attachment_name}' not found in document body"
+        )
         blob_info = doc_body[attachment_name]
         assert blob_info["@type"] == "blob", (
             f"Expected '@type'='blob', got '{blob_info.get('@type')}'"
@@ -166,7 +180,9 @@ class TestBlobs(CBLTestClass):
         assert response is not None, f"Failed to create document {doc_id}."
 
         document = await edge_server.get_document(es_db_name, doc_id)
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
         rev_id = document.revid
 
         self.mark_test_step("Adding an empty blob to the document.")
@@ -207,7 +223,9 @@ class TestBlobs(CBLTestClass):
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
-                    "collections": {"_default": {"sync": "function(doc){channel(doc.channels);}"}}
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
                 }
             },
             "num_index_replicas": 0,
@@ -227,7 +245,9 @@ class TestBlobs(CBLTestClass):
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
-        self.mark_test_step("Creating a database on Edge Server with replication to Sync Gateway.")
+        self.mark_test_step(
+            "Creating a database on Edge Server with replication to Sync Gateway."
+        )
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             db_name=es_db_name, config_file=config_path
         )
@@ -235,7 +255,9 @@ class TestBlobs(CBLTestClass):
         await edge_server.wait_for_idle()
 
         self.mark_test_step("Verifying that Sync Gateway has 2 documents.")
-        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
         assert len(response.rows) == 2, (
             f"Expected 2 documents on Sync Gateway, got {len(response.rows)}."
         )
@@ -248,7 +270,9 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Adding a blob to document on Edge Server.")
         doc_id = "doc_2"
         document = await edge_server.get_document(es_db_name, doc_id)
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
         rev_id = document.revid
         attachment_name = "test.png"
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
@@ -276,8 +300,12 @@ class TestBlobs(CBLTestClass):
         )
         assert "digest" in blob_metadata, "'digest' field is missing in blob metadata"
         assert "length" in blob_metadata, "'length' field is missing in blob metadata"
-        assert blob_metadata["length"] > 0, f"Blob length is invalid ({blob_metadata['length']})"
-        assert attachment_name in doc_body, f"'{attachment_name}' not found in document body"
+        assert blob_metadata["length"] > 0, (
+            f"Blob length is invalid ({blob_metadata['length']})"
+        )
+        assert attachment_name in doc_body, (
+            f"'{attachment_name}' not found in document body"
+        )
         blob_info = doc_body[attachment_name]
         assert blob_info["@type"] == "blob", (
             f"Expected '@type'='blob', got '{blob_info.get('@type')}'"
@@ -289,7 +317,9 @@ class TestBlobs(CBLTestClass):
         assert blob_info["length"] == blob_metadata["length"], "Blob length mismatch"
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_get_nonexistent(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blob_get_nonexistent(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         self.mark_test_step("Creating a database on Edge Server.")
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
@@ -305,19 +335,25 @@ class TestBlobs(CBLTestClass):
             "timestamp": datetime.utcnow().isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
-        assert response is not None, f"Failed to create document {doc_id} via Edge Server."
+        assert response is not None, (
+            f"Failed to create document {doc_id} via Edge Server."
+        )
 
         self.mark_test_step("Verifying that get nonexistent blob fails.")
         attachment_name = "missing_blob.png"
 
         try:
             await edge_server.get_sub_document(doc_id, attachment_name, es_db_name)
-            assert False, "Should not be able to retrieve nonexistent blob from document."
-        except CblEdgeServerBadResponseError as e:
+            assert False, (
+                "Should not be able to retrieve nonexistent blob from document."
+            )
+        except CblEdgeServerBadResponseError:
             pass
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_delete_nonexistent(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blob_delete_nonexistent(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
@@ -332,12 +368,16 @@ class TestBlobs(CBLTestClass):
             "timestamp": datetime.utcnow().isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
-        assert response is not None, f"Failed to create document {doc_id} via Edge Server."
+        assert response is not None, (
+            f"Failed to create document {doc_id} via Edge Server."
+        )
 
         self.mark_test_step("Deleting nonexistent blob from a document in Edge Server.")
 
         document = await edge_server.get_document(es_db_name, doc_id)
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
 
         rev_id = document.revid
 
@@ -349,7 +389,7 @@ class TestBlobs(CBLTestClass):
                 doc_id, rev_id, attachment_name, es_db_name
             )
             assert False, "Should not be able to delete nonexistent blob from document."
-        except CblEdgeServerBadResponseError as e:
+        except CblEdgeServerBadResponseError:
             pass
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -370,7 +410,9 @@ class TestBlobs(CBLTestClass):
             "timestamp": datetime.utcnow().isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
-        assert response is not None, f"Failed to create document {doc_id} via Edge Server."
+        assert response is not None, (
+            f"Failed to create document {doc_id} via Edge Server."
+        )
 
         self.mark_test_step("Add a blob to the document in Edge Server.")
 
@@ -381,7 +423,9 @@ class TestBlobs(CBLTestClass):
 
         # Add the image as an attachment to the document
         document = await edge_server.get_document(es_db_name, doc_id)
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
 
         rev_id = document.revid
 
@@ -400,11 +444,13 @@ class TestBlobs(CBLTestClass):
                 doc_id, "incorrect rev", attachment_name, es_db_name, value=updated_data
             )
             assert False, "Should not be able to update blob with incorrect revision."
-        except CblEdgeServerBadResponseError as e:
+        except CblEdgeServerBadResponseError:
             pass
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_put_nonexistent_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blob_put_nonexistent_doc(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         self.mark_test_step("Verifying that put blob on nonexistent document fails.")
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
@@ -426,11 +472,13 @@ class TestBlobs(CBLTestClass):
                 doc_id, "1-abcdef", attachment_name, es_db_name, value=image_data
             )
             assert False, "Should not be able to add blob to nonexistent document."
-        except CblEdgeServerBadResponseError as e:
+        except CblEdgeServerBadResponseError:
             pass
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_multiple_blobs_same_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_multiple_blobs_same_doc(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         self.mark_test_step("Creating a database on Edge Server.")
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
@@ -446,7 +494,9 @@ class TestBlobs(CBLTestClass):
             "timestamp": datetime.utcnow().isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
-        assert response is not None, f"Failed to create document {doc_id} via Edge Server."
+        assert response is not None, (
+            f"Failed to create document {doc_id} via Edge Server."
+        )
 
         self.mark_test_step("Add first blob to document.")
         # Read test image as binary data
@@ -456,7 +506,9 @@ class TestBlobs(CBLTestClass):
 
         # Add the image as an attachment to the document
         document = await edge_server.get_document(es_db_name, doc_id)
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
 
         rev_id = document.revid
 
@@ -475,7 +527,9 @@ class TestBlobs(CBLTestClass):
 
         # Add the image as an attachment to the document
         document = await edge_server.get_document(es_db_name, doc_id)
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
 
         rev_id = document.revid
 
@@ -487,7 +541,9 @@ class TestBlobs(CBLTestClass):
         assert response is not None, "Failed to add attachment to document."
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_exceeding_maxsize(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blob_exceeding_maxsize(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         self.mark_test_step("Creating a database on Edge Server.")
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
@@ -503,7 +559,9 @@ class TestBlobs(CBLTestClass):
             "timestamp": datetime.utcnow().isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
-        assert response is not None, f"Failed to create document {doc_id} via Edge Server."
+        assert response is not None, (
+            f"Failed to create document {doc_id} via Edge Server."
+        )
 
         self.mark_test_step("Verify blob over max size returns 413.")
         # Read test image as binary data
@@ -513,7 +571,9 @@ class TestBlobs(CBLTestClass):
 
         # Add the image as an attachment to the document
         document = await edge_server.get_document(es_db_name, doc_id)
-        assert document is not None, f"Document {doc_id} does not exist on the edge server."
+        assert document is not None, (
+            f"Document {doc_id} does not exist on the edge server."
+        )
 
         rev_id = document.revid
 
@@ -530,7 +590,9 @@ class TestBlobs(CBLTestClass):
             )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_special_characters(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blob_special_characters(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         self.mark_test_step("Creating a bucket on server.")
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
@@ -569,7 +631,9 @@ class TestBlobs(CBLTestClass):
         await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
         await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
-        self.mark_test_step("Creating a database on Edge Server with replication to Sync Gateway.")
+        self.mark_test_step(
+            "Creating a database on Edge Server with replication to Sync Gateway."
+        )
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         with open(config_path) as file:

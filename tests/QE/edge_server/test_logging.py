@@ -12,7 +12,9 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestLogging(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_audit_logging_default(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_audit_logging_default(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -35,7 +37,9 @@ class TestLogging(CBLTestClass):
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
-                    "collections": {"_default": {"sync": "function(doc){channel(doc.channels);}"}}
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
                 }
             },
             "num_index_replicas": 0,
@@ -49,7 +53,9 @@ class TestLogging(CBLTestClass):
         await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
         await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
-        self.mark_test_step("Creating a database on Edge Server with default audit config.")
+        self.mark_test_step(
+            "Creating a database on Edge Server with default audit config."
+        )
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_audit.json"
         with open(config_path) as file:
@@ -62,8 +68,12 @@ class TestLogging(CBLTestClass):
         )
         await edge_server.wait_for_idle()
 
-        self.mark_test_step("Verifying initial synchronization from Couchbase Server to Edge Server.")
-        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        self.mark_test_step(
+            "Verifying initial synchronization from Couchbase Server to Edge Server."
+        )
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
 
         self.mark_test_step("Checking that Sync Gateway has 5 documents.")
         assert len(response.rows) == 5, (
@@ -94,7 +104,9 @@ class TestLogging(CBLTestClass):
         log = await edge_server.check_log("100013")
         assert log == [], "Audit log for stop of replication event not found"
 
-        self.mark_test_step("Checking no audit logs for document changes with default events enabled.")
+        self.mark_test_step(
+            "Checking no audit logs for document changes with default events enabled."
+        )
         # Create
         log = await edge_server.check_log("100015")
         assert log == [], "Audit log for create event found"
@@ -111,7 +123,9 @@ class TestLogging(CBLTestClass):
         self.mark_test_step("Audit logging test completed.")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_audit_logging_disabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_audit_logging_disabled(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -134,7 +148,9 @@ class TestLogging(CBLTestClass):
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
-                    "collections": {"_default": {"sync": "function(doc){channel(doc.channels);}"}}
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
                 }
             },
             "num_index_replicas": 0,
@@ -163,8 +179,12 @@ class TestLogging(CBLTestClass):
         )
         await edge_server.wait_for_idle()
 
-        self.mark_test_step("Verifying initial synchronization from Couchbase Server to Edge Server.")
-        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        self.mark_test_step(
+            "Verifying initial synchronization from Couchbase Server to Edge Server."
+        )
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
 
         self.mark_test_step("Checking that Sync Gateway has 5 documents.")
         assert len(response.rows) == 5, (
@@ -198,7 +218,9 @@ class TestLogging(CBLTestClass):
         self.mark_test_step("Audit logging test completed.")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_audit_logging_enabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_audit_logging_enabled(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -221,7 +243,9 @@ class TestLogging(CBLTestClass):
             "bucket": "bucket-1",
             "scopes": {
                 "_default": {
-                    "collections": {"_default": {"sync": "function(doc){channel(doc.channels);}"}}
+                    "collections": {
+                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
                 }
             },
             "num_index_replicas": 0,
@@ -250,8 +274,12 @@ class TestLogging(CBLTestClass):
         )
         await edge_server.wait_for_idle()
 
-        self.mark_test_step("Verifying initial synchronization from Couchbase Server to Edge Server.")
-        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        self.mark_test_step(
+            "Verifying initial synchronization from Couchbase Server to Edge Server."
+        )
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
 
         self.mark_test_step("Checking that Sync Gateway has 5 documents.")
         assert len(response.rows) == 5, (
@@ -308,11 +336,15 @@ class TestLogging(CBLTestClass):
         }
 
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
-        assert response is not None, f"Failed to create document {doc_id} via Edge Server."
+        assert response is not None, (
+            f"Failed to create document {doc_id} via Edge Server."
+        )
 
         # Read document
         remote_doc = await edge_server.get_document(es_db_name, doc_id)
-        assert remote_doc is not None, f"Failed to read document {doc_id} via Edge Server."
+        assert remote_doc is not None, (
+            f"Failed to read document {doc_id} via Edge Server."
+        )
 
         # Storing the revision ID
         rev_id = remote_doc.revid
@@ -329,7 +361,9 @@ class TestLogging(CBLTestClass):
             updated_doc_body, doc_id, es_db_name, rev=rev_id
         )
 
-        assert updated_doc is not None, f"Failed to update document {doc_id} via Edge Server"
+        assert updated_doc is not None, (
+            f"Failed to update document {doc_id} via Edge Server"
+        )
 
         rev_id = updated_doc.revid
 
@@ -341,7 +375,9 @@ class TestLogging(CBLTestClass):
             f"Failed to delete document {doc_id} via Edge Server."
         )
 
-        self.mark_test_step("Verifying that audit logs are generated for CRUD operations.")
+        self.mark_test_step(
+            "Verifying that audit logs are generated for CRUD operations."
+        )
         # Create
         log = await edge_server.check_log("100015")
         assert len(log) > 0, "Audit log for create event not found"
