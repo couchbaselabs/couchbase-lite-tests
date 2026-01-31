@@ -208,10 +208,12 @@ class TestLogging(CBLTestClass):
 
         self.mark_test_step("Configure Edge Server with audit disabled config.")
         es_db_name = "db"
-        config_path = f"{SCRIPT_DIR}/config/test_e2e_audit_disabled.json"
+        config_path = f"{SCRIPT_DIR}/config/test_e2e_audit.json"
         with open(config_path) as file:
             config = json.load(file)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config["logging"]["audit"]["disable"] = "*"
+        config["logging"]["audit"].pop("enable", None)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
@@ -330,10 +332,12 @@ class TestLogging(CBLTestClass):
 
         self.mark_test_step("Configure Edge Server with audit enabled config.")
         es_db_name = "db"
-        config_path = f"{SCRIPT_DIR}/config/test_e2e_audit_enabled.json"
+        config_path = f"{SCRIPT_DIR}/config/test_e2e_audit.json"
         with open(config_path) as file:
             config = json.load(file)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config["logging"]["audit"]["enable"] = "*"
+        config["logging"]["audit"].pop("disable", None)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
