@@ -329,7 +329,7 @@ class DatabaseManager {
             }
         }
         
-        let conf = MultipeerReplicatorConfiguration(
+        var conf = MultipeerReplicatorConfiguration(
             peerGroupID: config.peerGroupID,
             identity: identity,
             authenticator: authenticator,
