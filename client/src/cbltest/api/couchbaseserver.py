@@ -1,3 +1,4 @@
+import asyncio
 import platform
 import subprocess
 import tempfile
@@ -9,7 +10,10 @@ from pathlib import Path
 from time import sleep
 from typing import TypeVar, cast
 
+import aiohttp
+
 T = TypeVar("T")
+import json
 from urllib.parse import quote_plus, urlparse
 
 import requests
@@ -105,9 +109,9 @@ class CouchbaseServer:
             if "://" not in url:
                 url = f"couchbase://{url}"
 
-            self.__hostname = (
-                urlparse(url).hostname or urlparse(url).netloc.split(":")[0]
-            )
+            # Parse URL to extract hostname and REST port
+            self._parse_connection_url(url)
+
             auth = PasswordAuthenticator(username, password)
             opts = ClusterOptions(auth)
             self.__username = username
@@ -118,6 +122,16 @@ class CouchbaseServer:
             # Create a reusable HTTP session for REST API calls
             self.__http_session = requests.Session()
             self.__http_session.auth = (username, password)
+
+    def _parse_connection_url(self, url: str) -> None:
+        """
+        Parse connection URL to extract hostname and REST port.
+
+        :param url: Connection URL (e.g., "couchbase://hostname:port")
+        """
+        parsed = urlparse(url)
+        self.__hostname = parsed.hostname or parsed.netloc.split(":")[0]
+        self.__rest_port = parsed.port or 8091
 
     @property
     def hostname(self) -> str:
@@ -183,12 +197,20 @@ class CouchbaseServer:
                         f"Unable to properly create {bucket}.{scope}.{name} in Couchbase Server"
                     )
 
-    def create_bucket(self, name: str, num_replicas: int = 0):
+    def create_bucket(
+        self,
+        name: str,
+        num_replicas: int = 0,
+        retries: int = 60,
+        interval: float = 2.0,
+    ):
         """
         Creates a bucket with a given name that Sync Gateway can use
 
         :param name: The name of the bucket to create
         :param num_replicas: The number of replicas for the bucket (default 0)
+        :param retries: Number of readiness checks to perform (default 60)
+        :param interval: Seconds to wait between checks (default 2.0)
         """
         with self.__tracer.start_as_current_span(
             "create_bucket", attributes={"cbl.bucket.name": name}
@@ -205,6 +227,18 @@ class CouchbaseServer:
             except BucketAlreadyExistsException:
                 pass
 
+            # Bucket creation is asynchronous in the cluster. Wait until it is healthy
+            # and responding before returning so callers can safely proceed.
+            for _ in range(retries):
+                if (
+                    self.bucket_healthy(name)
+                    and self.bucket_kv_responding(name)
+                    and self.collections_ready(name)
+                ):
+                    return
+                sleep(interval)
+            raise TimeoutError(f"Bucket {name} did not become ready")
+
     def drop_bucket(self, name: str):
         """
         Drops a bucket from the Couchbase cluster
@@ -219,6 +253,88 @@ class CouchbaseServer:
                 mgr.drop_bucket(name)
             except BucketDoesNotExistException:
                 pass
+
+    def bucket_healthy(self, bucket_name: str) -> bool:
+        """
+        Returns True only if the bucket is healthy on all nodes.
+        """
+        resp = self.__http_session.get(
+            f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}"
+        )
+        if resp.status_code != 200:
+            return False
+
+        bucket = resp.json()
+        nodes = bucket.get("nodes", [])
+        if not nodes:
+            return False
+
+        for node in nodes:
+            if node.get("status") != "healthy":
+                return False
+        return True
+
+    def bucket_kv_responding(self, bucket_name: str) -> bool:
+        """
+        Returns True if KV stats endpoint responds successfully.
+        This is a practical readiness signal for DCP / SDK / SG.
+        """
+        resp = self.__http_session.get(
+            f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}/stats",
+            timeout=5,
+        )
+        return resp.status_code == 200
+
+    def collections_ready(self, bucket_name: str) -> bool:
+        """
+        Checks if the collections manifest is available.
+        """
+        resp = self.__http_session.get(
+            f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}/scopes"
+        )
+        return resp.status_code == 200
+
+    def get_bucket_names(self) -> list[str]:
+        """
+        Gets the names of all buckets in the Couchbase cluster
+
+        :return: A list of bucket names
+        """
+        with self.__tracer.start_as_current_span("get_bucket_names"):
+            buckets_resp = self.__http_session.get(
+                f"http://{self.__hostname}:8091/pools/default/buckets"
+            )
+            buckets_resp.raise_for_status()
+            buckets_data = buckets_resp.json()
+            return [bucket["name"] for bucket in buckets_data]
+
+    async def wait_for_bucket_deleted(
+        self,
+        bucket_name: str,
+        max_retries: int = 30,
+        retry_delay: float = 2.0,
+    ) -> None:
+        """
+        Waits for a bucket to be fully deleted from the Couchbase cluster.
+        Async because deletion is eventual and requires polling remote state.
+        """
+        with self.__tracer.start_as_current_span(
+            "wait_for_bucket_deleted", attributes={"cbl.bucket.name": bucket_name}
+        ):
+            for _ in range(max_retries):
+                try:
+                    # If bucket no longer exists, deletion is complete
+                    if not self.bucket_healthy(bucket_name):
+                        return
+                except Exception:
+                    # Treat errors as "bucket gone"
+                    return
+                await asyncio.sleep(retry_delay)
+
+            raise CblTestError(
+                f"Bucket '{bucket_name}' was not deleted after "
+                f"{max_retries * retry_delay} seconds"
+            )
 
     def restore_bucket(
         self,
@@ -1033,11 +1149,55 @@ class CouchbaseServer:
             status = resp.json()
 
             if status.get("status") == "none":
-                # Rebalance completed
                 return
-
-            sleep(2)
+            # wait for 5 seconds before calling the API again
+            time.sleep(5)
 
         raise CblTestError(
             f"Rebalance did not complete within {timeout_seconds} seconds"
         )
+
+    async def stop_server(self) -> None:
+        """
+        Stop the Couchbase Server service via shell2http.
+        """
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"http://{self.hostname}:20001/stop-cbs") as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(f"Failed to stop CBS: {resp.status} - {body}")
+
+    async def start_server(self, port: int = 8091) -> None:
+        """
+        Start the Couchbase Server service via shell2http.
+
+        :param port: REST API port to wait for readiness (default 8091)
+        """
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"http://{self.hostname}:20001/start-cbs",
+                data=json.dumps({"port": port}),
+                headers={"Content-Type": "application/json"},
+            ) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise CblTestError(f"Failed to start CBS: {resp.status} - {body}")
+
+    async def get_root_ca_certificate(self) -> bytes:
+        """
+        Fetch the CBS root CA certificate via REST API.
+
+        :return: Root CA certificate in PEM format as bytes
+        :raises CblTestError: If unable to fetch the certificate
+        """
+        # Use CBS REST API directly - returns clean PEM certificate
+        url = f"http://{self.__hostname}:8091/pools/default/certificate"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                body = await resp.text()
+                if resp.status != 200:
+                    raise CblTestError(
+                        f"Failed to get CBS root CA: {resp.status} - {body}"
+                    )
+                return body.strip().encode("utf-8")

@@ -25,6 +25,7 @@ Functions:
         Main function to set up the Sync Gateway topology.
 """
 
+import copy
 import json
 import os
 import sys
@@ -176,17 +177,44 @@ def download_sgw_package(download_info: SgwDownloadInfo) -> None:
 
 def setup_config(server_hostname: str) -> None:
     """
-    Write the server hostname to the bootstrap configuration file.
+    Write the server hostname to the bootstrap configuration files.
 
     Args:
         server_hostname (str): The hostname of the Couchbase Server.
     """
-    header(f"Writing {server_hostname} to bootstrap.json as CBS IP")
+    header(f"Writing {server_hostname} to bootstrap configs as CBS IP")
+
+    # Load base template
     with open(SCRIPT_DIR / "config" / "bootstrap.json") as fin:
-        with open(SCRIPT_DIR / "bootstrap.json", "w") as fout:
-            config_content = cast(dict, json.load(fin))
-            config_content["bootstrap"]["server"] = f"couchbases://{server_hostname}"
-            json.dump(config_content, fout, indent=4)
+        base_config = cast(dict, json.load(fin))
+
+    # 1. Default bootstrap.json
+    default_config = copy.deepcopy(base_config)
+    default_config["bootstrap"]["server"] = f"couchbases://{server_hostname}"
+    with open(SCRIPT_DIR / "bootstrap.json", "w") as fout:
+        json.dump(default_config, fout, indent=4)
+
+    # 2. bootstrap-alternate.json (with explicit port for alternate address testing)
+    alternate_config = copy.deepcopy(base_config)
+    alternate_config["bootstrap"]["server"] = f"couchbases://{server_hostname}:11207"
+    with open(SCRIPT_DIR / "bootstrap-alternate.json", "w") as fout:
+        json.dump(alternate_config, fout, indent=4)
+
+    # 3. bootstrap-x509-cacert-only.json (with x509 CA cert for CBS testing)
+    x509_config = copy.deepcopy(base_config)
+    x509_config["bootstrap"]["server"] = f"couchbases://{server_hostname}"
+    x509_config["bootstrap"]["server_tls_skip_verify"] = False
+    x509_config["bootstrap"]["ca_cert_path"] = "/home/ec2-user/cert/cbs-ca-cert.pem"
+    with open(SCRIPT_DIR / "bootstrap-x509-cacert-only.json", "w") as fout:
+        json.dump(x509_config, fout, indent=4)
+
+    # 4. bootstrap-cbs-alternate.json (with custom CBS ports for CBS testing)
+    cbs_alternate_config = copy.deepcopy(base_config)
+    cbs_alternate_config["bootstrap"]["server"] = (
+        f"couchbases://{server_hostname}:11207"
+    )
+    with open(SCRIPT_DIR / "bootstrap-cbs-alternate.json", "w") as fout:
+        json.dump(cbs_alternate_config, fout, indent=4)
 
     with open(SCRIPT_DIR / "start-sgw.sh.in") as file:
         start_sgw_content = file.read()
@@ -225,6 +253,21 @@ def remote_exec(
         click.secho(stderr.read().decode(), fg="red")
         raise Exception(f"Command '{command}' failed with exit status {exit_status}")
 
+    header("Done!")
+    click.echo()
+
+
+def remote_exec_bg(ssh: paramiko.SSHClient, command: str, desc: str) -> None:
+    """
+    Execute a remote command in background via SSH.
+
+    Args:
+        ssh (paramiko.SSHClient): The SSH client.
+        command (str): The command to execute.
+        desc (str): A description of the command.
+    """
+    header(desc)
+    ssh.exec_command(command, get_pty=False)
     header("Done!")
     click.echo()
 
@@ -289,13 +332,37 @@ def setup_server(
         sftp, SCRIPT_DIR / "bootstrap.json", "/home/ec2-user/config/bootstrap.json"
     )
     sftp_progress_bar(
+        sftp,
+        SCRIPT_DIR / "bootstrap-alternate.json",
+        "/home/ec2-user/config/bootstrap-alternate.json",
+    )
+    sftp_progress_bar(
+        sftp,
+        SCRIPT_DIR / "bootstrap-x509-cacert-only.json",
+        "/home/ec2-user/config/bootstrap-x509-cacert-only.json",
+    )
+    sftp_progress_bar(
+        sftp,
+        SCRIPT_DIR / "bootstrap-cbs-alternate.json",
+        "/home/ec2-user/config/bootstrap-cbs-alternate.json",
+    )
+    sftp_progress_bar(
         sftp, SCRIPT_DIR / "cert" / "sg_cert.pem", "/home/ec2-user/cert/sg_cert.pem"
     )
     sftp_progress_bar(
         sftp, SCRIPT_DIR / "cert" / "sg_key.pem", "/home/ec2-user/cert/sg_key.pem"
     )
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
+    for file in (SCRIPT_DIR / "shell2http").iterdir():
+        sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
     sftp.close()
+
+    # Make shell2http scripts executable
+    remote_exec(
+        ssh,
+        "chmod +x /home/ec2-user/shell2http/*.sh",
+        "Making shell2http scripts executable",
+    )
 
     remote_exec(
         ssh,
@@ -311,6 +378,11 @@ def setup_server(
     )
 
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting SGW log fileserver")
+    remote_exec_bg(
+        ssh,
+        "bash /home/ec2-user/shell2http/start.sh",
+        "Starting SGW management server",
+    )
     remote_exec(ssh, "bash /home/ec2-user/start-sgw.sh", "Starting SGW")
 
     ssh.close()

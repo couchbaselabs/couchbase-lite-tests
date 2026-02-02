@@ -51,7 +51,7 @@ class TestDbOnlineOffline(CBLTestClass):
             ),
         ]
 
-        for endpoint_name, test_func in test_operations:
+        for _, test_func in test_operations:
             try:
                 await test_func()
                 endpoints_tested += 1
@@ -77,11 +77,8 @@ class TestDbOnlineOffline(CBLTestClass):
         sg_db = "db"
         bucket_name = "data-bucket"
         channels = ["ABC"]
-        username = "vipul"
-        password = "pass"
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
@@ -91,13 +88,8 @@ class TestDbOnlineOffline(CBLTestClass):
             "scopes": {"_default": {"collections": {"_default": {}}}},
         }
         db_payload = PutDatabasePayload(db_config)
-        db_status = await sg.get_database_status(sg_db)
-        if db_status is not None:
-            await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
-
-        self.mark_test_step(f"Create user '{username}' with access to {channels}")
-        sg_user = await sg.create_user_client(sg_db, username, password, channels)
+        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
         sg_docs: list[DocumentUpdateEntry] = []
@@ -109,7 +101,7 @@ class TestDbOnlineOffline(CBLTestClass):
                     body={"type": "test_doc", "index": i, "channels": channels},
                 )
             )
-        await sg.update_documents(sg_db, sg_docs, "_default", "_default")
+        await sg.update_documents(sg_db, sg_docs)
 
         self.mark_test_step("Verify database is online - REST endpoints work")
         endpoints_tested, errors_403 = await self.scan_rest_endpoints(
@@ -135,8 +127,6 @@ class TestDbOnlineOffline(CBLTestClass):
             f"DB is offline but only {errors_403}/{endpoints_tested} endpoints returned 403"
         )
 
-        await sg_user.close()
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_dbs_bucket_deletion(
         self, cblpytest: CBLPyTest, dataset_path: Path
@@ -154,7 +144,6 @@ class TestDbOnlineOffline(CBLTestClass):
 
         self.mark_test_step("Create buckets and configure databases")
         for i, [db_name, bucket_name, channel, username, _] in enumerate(db_configs):
-            cbs.drop_bucket(bucket_name)
             cbs.create_bucket(bucket_name)
 
             db_config = {
@@ -163,10 +152,8 @@ class TestDbOnlineOffline(CBLTestClass):
                 "scopes": {"_default": {"collections": {"_default": {}}}},
             }
             db_payload = PutDatabasePayload(db_config)
-            db_status = await sg.get_database_status(db_name)
-            if db_status is not None:
-                await sg.delete_database(db_name)
             await sg.put_database(db_name, db_payload)
+            await sg.wait_for_db_up(db_name)
             db_configs[i][4] = await sg.create_user_client(
                 db_name, username, "pass", [channel]
             )
@@ -196,6 +183,8 @@ class TestDbOnlineOffline(CBLTestClass):
         )
         cbs.drop_bucket("data-bucket-1")
         cbs.drop_bucket("data-bucket-3")
+        await cbs.wait_for_bucket_deleted("data-bucket-1")
+        await cbs.wait_for_bucket_deleted("data-bucket-3")
         for db_name in ["db1", "db3"]:
             db_status = await sg.get_database_status(db_name)
             while db_status is not None and db_status.state == "Online":
@@ -220,7 +209,6 @@ class TestDbOnlineOffline(CBLTestClass):
                 f"{db_name}: Expected all {endpoints_tested} endpoints to return 403, got {errors_403}"
             )
 
-        for [db_name, bucket_name, _, _, user_client] in db_configs:
-            await user_client.close()
-            await sg.delete_database(db_name)
-            cbs.drop_bucket(bucket_name)
+        for [_, _, _, _, user_client] in db_configs:
+            if user_client is not None:
+                await user_client.close()
