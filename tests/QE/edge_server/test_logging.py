@@ -140,7 +140,9 @@ class TestLogging(CBLTestClass):
         self.mark_test_step(
             "Verifying initial synchronization from Couchbase Server to Edge Server."
         )
-        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        response = await sync_gateway.get_all_documents(
+            sg_db_name, "_default", "_default"
+        )
         self.mark_test_step("Checking that Sync Gateway has 5 documents.")
         assert len(response.rows) == 5, (
             f"Expected 5 documents, but got {len(response.rows)} documents."
@@ -169,9 +171,13 @@ class TestLogging(CBLTestClass):
                 "timestamp": datetime.utcnow().isoformat(),
             }
             response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
-            assert response is not None, f"Failed to create document {doc_id} via Edge Server."
+            assert response is not None, (
+                f"Failed to create document {doc_id} via Edge Server."
+            )
             remote_doc = await edge_server.get_document(es_db_name, doc_id)
-            assert remote_doc is not None, f"Failed to read document {doc_id} via Edge Server."
+            assert remote_doc is not None, (
+                f"Failed to read document {doc_id} via Edge Server."
+            )
             rev_id = remote_doc.revid
             updated_doc_body = {
                 "id": doc_id,
@@ -182,14 +188,18 @@ class TestLogging(CBLTestClass):
             updated_doc = await edge_server.put_document_with_id(
                 updated_doc_body, doc_id, es_db_name, rev=rev_id
             )
-            assert updated_doc is not None, f"Failed to update document {doc_id} via Edge Server"
+            assert updated_doc is not None, (
+                f"Failed to update document {doc_id} via Edge Server"
+            )
             rev_id = updated_doc.revid
             delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
             assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
                 f"Failed to delete document {doc_id} via Edge Server."
             )
 
-            self.mark_test_step("Verifying that audit logs are generated for CRUD operations.")
+            self.mark_test_step(
+                "Verifying that audit logs are generated for CRUD operations."
+            )
             for event_id, expected_non_empty, step_name in AUDIT_CRUD_ASSERTIONS:
                 self.mark_test_step(f"Checking audit log for {step_name} after CRUD.")
                 log = await edge_server.check_log(event_id)
