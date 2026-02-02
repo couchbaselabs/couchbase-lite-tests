@@ -14,7 +14,7 @@ pushd $AWS_ENVIRONMENT_DIR
 create_venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python3 ./stop_backend.py --topology topology_setup/topology.json
+python3 ./stop_backend.py
 deactivate
 popd
 

@@ -8,7 +8,7 @@ import CouchbaseLiteSwift
 
 extension ContentTypes {
     enum MultipeerTransport: String, Content {
-        case wifi = "wifi"
-        case bluetooth = "bluetooth"
+        case wifi = "WIFI"
+        case bluetooth = "BLUETOOTH"
     }
 }
