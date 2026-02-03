@@ -15,9 +15,9 @@ from cbltest.api.syncgateway import PutDatabasePayload
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
-class TestEndtoEnd(CBLTestClass):
+class TestReplicationSanity(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_end_to_end_sanity(
+    async def test_replication_sanity(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         # Calculate end time for 15 minutes from now
