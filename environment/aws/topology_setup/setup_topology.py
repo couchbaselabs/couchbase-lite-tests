@@ -779,6 +779,18 @@ class TopologyConfig:
                     pass
 
             if not success:
+                log_path = getattr(bridge, "get_log_path", lambda _: None)(
+                    test_server_input.location
+                )
+                if log_path is not None and log_path.exists():
+                    click.secho(
+                        f"Test server log ({log_path}):",
+                        fg="red",
+                    )
+                    try:
+                        click.echo(log_path.read_text(encoding="utf-8", errors="replace"))
+                    except OSError as e:
+                        click.secho(f"Could not read log: {e}", fg="red")
                 raise RuntimeError(
                     f"Test server failed to start at {test_server_input.location}"
                 )

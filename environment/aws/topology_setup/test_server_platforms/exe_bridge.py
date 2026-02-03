@@ -104,10 +104,15 @@ class ExeBridge(PlatformBridge):
 
         args = [self.__exe_path]
         args.extend(self.__extra_args)
-        log_file = Path(self.__exe_path).parent / "server.log"
+        exe_dir = Path(self.__exe_path).parent
+        log_file = exe_dir / "server.log"
         log_fd = open(log_file, "w")
         process = subprocess.Popen(
-            args, start_new_session=True, stdout=log_fd, stderr=log_fd
+            args,
+            start_new_session=True,
+            stdout=log_fd,
+            stderr=log_fd,
+            cwd=str(exe_dir),
         )
         click.echo(f"Started {self.__exe_name} with PID {process.pid}")
 
@@ -135,6 +140,20 @@ class ExeBridge(PlatformBridge):
             location (str): The location of the executable (e.g., "localhost").
         """
         click.echo("No action needed for uninstalling executable")
+
+    def get_log_path(self, location: str) -> Path | None:
+        """
+        Return path to the server log file when running locally, for diagnostics.
+
+        Args:
+            location (str): The location of the executable (e.g., "localhost").
+
+        Returns:
+            Path | None: Path to server.log, or None if not applicable.
+        """
+        if location != "localhost":
+            return None
+        return Path(self.__exe_path).parent / "server.log"
 
     def _get_ip(self, location: str) -> str | None:
         """
