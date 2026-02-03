@@ -100,7 +100,7 @@ class TestReplicationSanity(CBLTestClass):
             doc_id = f"doc_{doc_counter}"
 
             # --- Sync Gateway Cycle ---
-            self.mark_test_step(f"Step 1: Creating document {doc_id} via Sync Gateway.")
+            self.mark_test_step(f"Creating document {doc_id} via Sync Gateway.")
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
@@ -112,7 +112,7 @@ class TestReplicationSanity(CBLTestClass):
             )
             time.sleep(5)
 
-            self.mark_test_step(f"Step 2: Validating document {doc_id} on Edge Server.")
+            self.mark_test_step(f"Validating document {doc_id} on Edge Server.")
             remote_doc = await edge_server.get_document(es_db_name, doc_id)
 
             assert remote_doc is not None, (
@@ -126,7 +126,7 @@ class TestReplicationSanity(CBLTestClass):
             # Storing the revision ID
             rev_id = remote_doc.revid
 
-            self.mark_test_step(f"Step 3: Updating document {doc_id} via Edge Server.")
+            self.mark_test_step(f"Updating document {doc_id} via Edge Server.")
             updated_doc_body = {
                 "id": doc_id,
                 "channels": ["public"],
@@ -143,9 +143,7 @@ class TestReplicationSanity(CBLTestClass):
             )
             time.sleep(5)
 
-            self.mark_test_step(
-                f"Step 4: Validating update for {doc_id} on Sync Gateway."
-            )
+            self.mark_test_step(f"Validating update for {doc_id} on Sync Gateway.")
             sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
             assert sg_doc is not None
             assert rev_id != sg_doc.revid, (
@@ -154,13 +152,11 @@ class TestReplicationSanity(CBLTestClass):
             # Storing the revision ID
             rev_id = sg_doc.revid
 
-            self.mark_test_step(f"Step 5: Deleting document {doc_id} via Sync Gateway.")
+            self.mark_test_step(f"Deleting document {doc_id} via Sync Gateway.")
             assert rev_id is not None, "rev_id required for delete"
             await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
 
-            self.mark_test_step(
-                f"Step 6: Validating deletion of {doc_id} on Edge Server."
-            )
+            self.mark_test_step(f"Validating deletion of {doc_id} on Edge Server.")
             time.sleep(5)  # Allow time for sync
 
             try:
@@ -169,7 +165,7 @@ class TestReplicationSanity(CBLTestClass):
                 pass  # expected, document not found (deleted)
 
             # --- Edge Server Cycle ---
-            self.mark_test_step(f"Step 7: Creating document {doc_id} via Edge Server.")
+            self.mark_test_step(f"Creating document {doc_id} via Edge Server.")
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
@@ -184,9 +180,7 @@ class TestReplicationSanity(CBLTestClass):
             )
             time.sleep(5)
 
-            self.mark_test_step(
-                f"Step 8: Validating document {doc_id} on Sync Gateway."
-            )
+            self.mark_test_step(f"Validating document {doc_id} on Sync Gateway.")
             sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
             assert sg_doc is not None, (
                 f"Document {doc_id} does not exist on the sync gateway."
@@ -197,7 +191,7 @@ class TestReplicationSanity(CBLTestClass):
             # Storing the revision ID
             rev_id = sg_doc.revid
 
-            self.mark_test_step(f"Step 9: Updating document {doc_id} via Sync Gateway.")
+            self.mark_test_step(f"Updating document {doc_id} via Sync Gateway.")
             updated_doc_body = {
                 "id": doc_id,
                 "channels": ["public"],
@@ -212,9 +206,7 @@ class TestReplicationSanity(CBLTestClass):
             )
             time.sleep(5)
 
-            self.mark_test_step(
-                f"Step 10: Validating update for {doc_id} on Edge Server."
-            )
+            self.mark_test_step(f"Validating update for {doc_id} on Edge Server.")
             remote_doc = await edge_server.get_document(es_db_name, doc_id)
 
             assert remote_doc is not None, (
@@ -226,7 +218,7 @@ class TestReplicationSanity(CBLTestClass):
             # Storing the revision ID
             rev_id = remote_doc.revid
 
-            self.mark_test_step(f"Step 11: Deleting document {doc_id} via Edge Server.")
+            self.mark_test_step(f"Deleting document {doc_id} via Edge Server.")
             delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
 
             assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
@@ -234,9 +226,7 @@ class TestReplicationSanity(CBLTestClass):
             )
             time.sleep(5)
 
-            self.mark_test_step(
-                f"Step 12: Validating deletion of {doc_id} on Sync Gateway."
-            )
+            self.mark_test_step(f"Validating deletion of {doc_id} on Sync Gateway.")
             time.sleep(2)  # Allow time for sync
 
             try:
