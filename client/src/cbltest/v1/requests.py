@@ -814,7 +814,7 @@ class PostStartMultipeerReplicatorRequestBody(JSONSerializable):
         collections: list[ReplicatorCollectionEntry],
         identity: CertKeyPair,
         authenticator: MultipeerReplicatorAuthenticator | None = None,
-        transports: MultipeerTransportType,
+        transports: MultipeerTransportType = MultipeerTransportType.WIFI,
     ):
         super().__init__()
         self.__peerGroupID = peerGroupID
