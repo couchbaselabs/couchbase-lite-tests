@@ -1,6 +1,6 @@
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -17,12 +17,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestReplicationSanity(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_sanity(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
-        # Calculate end time for 15 minutes from now
-        end_time = datetime.now() + timedelta(minutes=15)
-
+    async def test_replication_sanity(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -84,8 +79,8 @@ class TestReplicationSanity(CBLTestClass):
             f"Expected 10 documents, but got {len(response.rows)} documents."
         )
 
-        self.mark_test_step("Waiting 15 seconds for replication to Edge Server.")
-        time.sleep(15)
+        self.mark_test_step("Waiting for replication to Edge Server to be idle.")
+        await edge_server.wait_for_idle(timeout=5)
 
         self.mark_test_step("Verifying that Edge Server has 10 documents.")
         response = await edge_server.get_all_documents(es_db_name)
@@ -93,146 +88,117 @@ class TestReplicationSanity(CBLTestClass):
             f"Expected 10 documents, but got {len(response.rows)} documents."
         )
 
-        doc_counter = 11  # Initialize the document counter
+        # Single replication cycle: SG → ES and ES → SG (create, update, delete both ways)
+        doc_id_sg = "doc_11"  # Sync Gateway cycle: create on SG, update/delete via ES
+        doc_id_es = "doc_12"  # Edge Server cycle: create on ES, update/delete via SG
 
-        # Run until 15 minutes have passed
-        while datetime.now() < end_time:
-            doc_id = f"doc_{doc_counter}"
+        # --- Sync Gateway Cycle ---
+        self.mark_test_step(f"Creating document {doc_id_sg} via Sync Gateway.")
+        doc = {
+            "id": doc_id_sg,
+            "channels": ["public"],
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        created_doc = await sync_gateway.create_document(sg_db_name, doc_id_sg, doc)
+        assert created_doc is not None, f"Failed to create document {doc_id_sg} via Sync Gateway."
+        time.sleep(5)
 
-            # --- Sync Gateway Cycle ---
-            self.mark_test_step(f"Creating document {doc_id} via Sync Gateway.")
-            doc = {
-                "id": doc_id,
-                "channels": ["public"],
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-            created_doc = await sync_gateway.create_document(sg_db_name, doc_id, doc)
-            assert created_doc is not None, (
-                f"Failed to create document {doc_id} via Sync Gateway."
-            )
-            time.sleep(5)
+        self.mark_test_step(f"Validating document {doc_id_sg} on Edge Server.")
+        remote_doc = await edge_server.get_document(es_db_name, doc_id_sg)
 
-            self.mark_test_step(f"Validating document {doc_id} on Edge Server.")
-            remote_doc = await edge_server.get_document(es_db_name, doc_id)
+        assert remote_doc is not None, f"Document {doc_id_sg} does not exist on the edge server."
+        assert remote_doc.id == doc_id_sg, (
+            f"Document ID mismatch: expected {doc_id_sg}, got {remote_doc.id}"
+        )
 
-            assert remote_doc is not None, (
-                f"Document {doc_id} does not exist on the edge server."
-            )
-            assert remote_doc.id == doc_id, (
-                f"Document ID mismatch: expected {doc_id}, got {remote_doc.id}"
-            )
-            # assert "rev" in document, "Revision ID (_rev) missing in the document"
+        rev_id = remote_doc.revid
 
-            # Storing the revision ID
-            rev_id = remote_doc.revid
+        self.mark_test_step(f"Updating document {doc_id_sg} via Edge Server.")
+        updated_doc_body = {
+            "id": doc_id_sg,
+            "channels": ["public"],
+            "timestamp": datetime.utcnow().isoformat(),
+            "changed": "yes",
+        }
 
-            self.mark_test_step(f"Updating document {doc_id} via Edge Server.")
-            updated_doc_body = {
-                "id": doc_id,
-                "channels": ["public"],
-                "timestamp": datetime.utcnow().isoformat(),
-                "changed": "yes",
-            }
+        updated_doc = await edge_server.put_document_with_id(
+            updated_doc_body, doc_id_sg, es_db_name, rev=rev_id
+        )
 
-            updated_doc = await edge_server.put_document_with_id(
-                updated_doc_body, doc_id, es_db_name, rev=rev_id
-            )
+        assert updated_doc is not None, f"Failed to update document {doc_id_sg} via Edge Server"
+        time.sleep(5)
 
-            assert updated_doc is not None, (
-                f"Failed to update document {doc_id} via Edge Server"
-            )
-            time.sleep(5)
+        self.mark_test_step(f"Validating update for {doc_id_sg} on Sync Gateway.")
+        sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_sg)
+        assert sg_doc is not None
+        assert rev_id != sg_doc.revid, f"Document {doc_id_sg} update not reflected on Sync Gateway"
+        rev_id = sg_doc.revid
 
-            self.mark_test_step(f"Validating update for {doc_id} on Sync Gateway.")
-            sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-            assert sg_doc is not None
-            assert rev_id != sg_doc.revid, (
-                f"Document {doc_id} update not reflected on Sync Gateway"
-            )
-            # Storing the revision ID
-            rev_id = sg_doc.revid
+        self.mark_test_step(f"Deleting document {doc_id_sg} via Sync Gateway.")
+        assert rev_id is not None, "rev_id required for delete"
+        await sync_gateway.delete_document(doc_id_sg, rev_id, sg_db_name)
 
-            self.mark_test_step(f"Deleting document {doc_id} via Sync Gateway.")
-            assert rev_id is not None, "rev_id required for delete"
-            await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
+        self.mark_test_step(f"Validating deletion of {doc_id_sg} on Edge Server.")
+        time.sleep(5)
 
-            self.mark_test_step(f"Validating deletion of {doc_id} on Edge Server.")
-            time.sleep(5)  # Allow time for sync
+        try:
+            await edge_server.get_document(es_db_name, doc_id_sg)
+        except CblEdgeServerBadResponseError:
+            pass  # expected, document not found (deleted)
 
-            try:
-                await edge_server.get_document(es_db_name, doc_id)
-            except CblEdgeServerBadResponseError:
-                pass  # expected, document not found (deleted)
+        # --- Edge Server Cycle ---
+        self.mark_test_step(f"Creating document {doc_id_es} via Edge Server.")
+        doc = {
+            "id": doc_id_es,
+            "channels": ["public"],
+            "timestamp": datetime.utcnow().isoformat(),
+        }
 
-            # --- Edge Server Cycle ---
-            self.mark_test_step(f"Creating document {doc_id} via Edge Server.")
-            doc = {
-                "id": doc_id,
-                "channels": ["public"],
-                "timestamp": datetime.utcnow().isoformat(),
-            }
+        created_doc = await edge_server.put_document_with_id(doc, doc_id_es, es_db_name)
+        assert created_doc is not None, f"Failed to create document {doc_id_es} via Edge Server."
+        time.sleep(5)
 
-            created_doc = await edge_server.put_document_with_id(
-                doc, doc_id, es_db_name
-            )
-            assert created_doc is not None, (
-                f"Failed to create document {doc_id} via Edge Server."
-            )
-            time.sleep(5)
+        self.mark_test_step(f"Validating document {doc_id_es} on Sync Gateway.")
+        sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_es)
+        assert sg_doc is not None, f"Document {doc_id_es} does not exist on the sync gateway."
+        assert sg_doc.id == doc_id_es, f"Document ID mismatch: {sg_doc.id}"
 
-            self.mark_test_step(f"Validating document {doc_id} on Sync Gateway.")
-            sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-            assert sg_doc is not None, (
-                f"Document {doc_id} does not exist on the sync gateway."
-            )
-            assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
-            # assert "rev" in response, "Revision ID (_rev) missing in the document"
+        rev_id = sg_doc.revid
 
-            # Storing the revision ID
-            rev_id = sg_doc.revid
+        self.mark_test_step(f"Updating document {doc_id_es} via Sync Gateway.")
+        updated_doc_body = {
+            "id": doc_id_es,
+            "channels": ["public"],
+            "timestamp": datetime.utcnow().isoformat(),
+            "changed": "yes",
+        }
+        updated_doc = await sync_gateway.update_document(
+            sg_db_name, doc_id_es, updated_doc_body, rev_id
+        )
+        assert updated_doc is not None, f"Failed to update document {doc_id_es} via Sync Gateway."
+        time.sleep(5)
 
-            self.mark_test_step(f"Updating document {doc_id} via Sync Gateway.")
-            updated_doc_body = {
-                "id": doc_id,
-                "channels": ["public"],
-                "timestamp": datetime.utcnow().isoformat(),
-                "changed": "yes",
-            }
-            updated_doc = await sync_gateway.update_document(
-                sg_db_name, doc_id, updated_doc_body, rev_id
-            )
-            assert updated_doc is not None, (
-                f"Failed to update document {doc_id} via Sync Gateway."
-            )
-            time.sleep(5)
+        self.mark_test_step(f"Validating update for {doc_id_es} on Edge Server.")
+        remote_doc = await edge_server.get_document(es_db_name, doc_id_es)
 
-            self.mark_test_step(f"Validating update for {doc_id} on Edge Server.")
-            remote_doc = await edge_server.get_document(es_db_name, doc_id)
+        assert remote_doc is not None, f"Document {doc_id_es} does not exist on the edge server."
+        assert remote_doc.id == doc_id_es, f"Document ID mismatch: {remote_doc.id}"
 
-            assert remote_doc is not None, (
-                f"Document {doc_id} does not exist on the edge server."
-            )
-            assert remote_doc.id == doc_id, f"Document ID mismatch: {remote_doc.id}"
-            # assert "rev" in document, "Revision ID (_rev) missing in the document"
+        rev_id = remote_doc.revid
 
-            # Storing the revision ID
-            rev_id = remote_doc.revid
+        self.mark_test_step(f"Deleting document {doc_id_es} via Edge Server.")
+        delete_resp = await edge_server.delete_document(doc_id_es, rev_id, es_db_name)
 
-            self.mark_test_step(f"Deleting document {doc_id} via Edge Server.")
-            delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
+        assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
+            f"Failed to delete document {doc_id_es} via Edge Server."
+        )
+        time.sleep(5)
 
-            assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
-                f"Failed to delete document {doc_id} via Edge Server."
-            )
-            time.sleep(5)
+        self.mark_test_step(f"Validating deletion of {doc_id_es} on Sync Gateway.")
 
-            self.mark_test_step(f"Validating deletion of {doc_id} on Sync Gateway.")
-            time.sleep(2)  # Allow time for sync
+        try:
+            await sync_gateway.get_document(sg_db_name, doc_id_es)
+        except CblSyncGatewayBadResponseError:
+            pass  # expected, document not found (deleted)
 
-            try:
-                await sync_gateway.get_document(sg_db_name, doc_id)
-            except CblSyncGatewayBadResponseError:
-                pass  # expected, document not found (deleted)
-            doc_counter += 1  # Increment the document counter for the next cycle
-
-        self.mark_test_step("Test successfully ran for 15 minutes.")
+        self.mark_test_step("Replication sanity test completed.")

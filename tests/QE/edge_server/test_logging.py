@@ -118,6 +118,7 @@ class TestLogging(CBLTestClass):
         await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
         await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
+        self.mark_test_step("Creating a database on Edge Server with audit config.")
         step_descriptions = {
             "default": "Creating a database on Edge Server with default audit config.",
             "disabled": "Creating a database on Edge Server with audit disabled.",
@@ -137,9 +138,6 @@ class TestLogging(CBLTestClass):
         )
         await edge_server.wait_for_idle()
 
-        self.mark_test_step(
-            "Verifying initial synchronization from Couchbase Server to Edge Server."
-        )
         response = await sync_gateway.get_all_documents(
             sg_db_name, "_default", "_default"
         )
@@ -163,7 +161,9 @@ class TestLogging(CBLTestClass):
                 assert log == [], f"Audit log for {step_name} event found"
 
         if audit_mode == "enabled":
-            self.mark_test_step("Making CRUD requests.")
+            self.mark_test_step(
+                "Making CRUD requests to verify audit logs are generated for CRUD operations."
+            )
             doc_id = "doc_6"
             doc = {
                 "id": doc_id,
