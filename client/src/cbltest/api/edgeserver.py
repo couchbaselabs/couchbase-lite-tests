@@ -9,7 +9,7 @@ from typing import Any, List, cast
 from urllib.parse import urljoin
 
 import pyjson5 as json5  # type: ignore[import-not-found]
-from aiohttp import BasicAuth, ClientSession, TCPConnector
+from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import (
@@ -891,14 +891,40 @@ class EdgeServer:
                 "post", "/kill-edgeserver", session=self.__shell_session
             )
 
+    async def _caddy_http_request(
+        self,
+        url: str,
+        operation: str,
+        timeout: int = 30,
+    ) -> bytes:
+        with self.__tracer.start_as_current_span(
+            "caddy_http_request",
+            attributes={"cbl.caddy.url": url},
+        ):
+            try:
+                async with ClientSession() as session:
+                    async with session.get(
+                        url, timeout=ClientTimeout(total=timeout)
+                    ) as response:
+                        if response.status == 404:
+                            raise FileNotFoundError(f"{operation} not found at {url}")
+                        if response.status != 200:
+                            error_text = await response.text()
+                            raise Exception(
+                                f"{operation} failed: HTTP {response.status} - {error_text}"
+                            )
+                        return await response.read()
+            except ClientError as e:
+                raise Exception(f"Network error during {operation}: {e}") from e
+
     async def get_log_content(
         self,
         log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
     ) -> str:
         """
-        Fetch raw log file content from the Edge Server host.
+        Fetch raw log file content from the Edge Server host via Caddy (port 20000).
 
-        :param log_file: Path to the log file on the Edge Server host.
+        :param log_file: Path to the log file on the Edge Server host (under /home/ec2-user).
         :return: Full log file content as string, or empty string on error.
         """
         with self.__tracer.start_as_current_span(
@@ -906,15 +932,17 @@ class EdgeServer:
             attributes={"cbl.log_file": log_file},
         ):
             try:
-                response = await self._send_request(
-                    "post",
-                    "/get-log",
-                    payload=JSONDictionary({"log_file": log_file}),
-                    session=self.__shell_session,
+                prefix = "/home/ec2-user/"
+                path = (
+                    log_file[len(prefix) :].lstrip("/")
+                    if log_file.startswith(prefix)
+                    else log_file.lstrip("/")
                 )
-                if isinstance(response, str):
-                    return response
-                return ""
+                caddy_url = f"http://{self.hostname}:20000/{path}"
+                content = await self._caddy_http_request(
+                    caddy_url, f"Fetch {path}", timeout=30
+                )
+                return content.decode("utf-8")
             except Exception:
                 return ""
 
