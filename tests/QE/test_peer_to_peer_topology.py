@@ -136,8 +136,6 @@ class TestPeerToPeerTopology(CBLTestClass):
             for _, listener in listeners:
                 await listener.stop()
 
-        self.mark_test_step("Test completed successfully.")
-
     @pytest.mark.parametrize(
         "num_of_docs, continuous, replicator_type",
         [
@@ -156,9 +154,7 @@ class TestPeerToPeerTopology(CBLTestClass):
         }
         replicator_type = replicator_type_map[replicator_type]
 
-        self.mark_test_step(
-            "Reset local database and load `empty` dataset on all devices"
-        )
+        self.mark_test_step("Reset local database and load `empty` dataset on all devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
@@ -170,13 +166,9 @@ class TestPeerToPeerTopology(CBLTestClass):
             source_peer_idx = phase - 1  # 0, 1, 2 for peers 1, 2, 3
             target_peer_idx = phase % 3  # 1, 2, 0 (wraps around)
 
-            self.mark_test_step(
-                f"PHASE {phase}: Peer {phase} -> Peer {target_peer_idx + 1}"
-            )
+            self.mark_test_step(f"PHASE {phase}: Peer {phase} -> Peer {target_peer_idx + 1}")
 
-            self.mark_test_step(
-                f"Add {num_of_docs} documents to the database on peer {phase}"
-            )
+            self.mark_test_step(f"Add {num_of_docs} documents to the database on peer {phase}")
             source_db = all_dbs[source_peer_idx]
 
             batch_size = 10
@@ -196,9 +188,7 @@ class TestPeerToPeerTopology(CBLTestClass):
             )
             await listener.start()
 
-            self.mark_test_step(
-                f"Setup replicator from peer {phase} to peer {target_peer_idx + 1}"
-            )
+            self.mark_test_step(f"Setup replicator from peer {phase} to peer {target_peer_idx + 1}")
             listener_port = 59840 if listener.port is None else listener.port
             replicator = Replicator(
                 source_db,
@@ -219,9 +209,7 @@ class TestPeerToPeerTopology(CBLTestClass):
                 f"Wait for replication from peer {phase} to peer {target_peer_idx + 1} to complete"
             )
             target_activity = (
-                ReplicatorActivityLevel.IDLE
-                if continuous
-                else ReplicatorActivityLevel.STOPPED
+                ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED
             )
             status = await replicator.wait_for(
                 target_activity,
@@ -238,9 +226,7 @@ class TestPeerToPeerTopology(CBLTestClass):
                 f"Verify that peer {phase} and peer {target_peer_idx + 1} have the same content after phase {phase}"
             )
             source_docs = await source_db.get_all_documents("_default._default")
-            target_docs = await all_dbs[target_peer_idx].get_all_documents(
-                "_default._default"
-            )
+            target_docs = await all_dbs[target_peer_idx].get_all_documents("_default._default")
             assert compare_doc_results_p2p(
                 source_docs["_default._default"], target_docs["_default._default"]
             ), (
@@ -254,13 +240,9 @@ class TestPeerToPeerTopology(CBLTestClass):
         self.mark_test_step(
             "Verify all device databases have converged to the same content after all phases"
         )
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
             assert compare_doc_results_p2p(
                 all_docs_results[0]["_default._default"], all_docs["_default._default"]
             ), "All databases should have the same content after all phases complete"
-
-        self.mark_test_step("Test completed successfully.")

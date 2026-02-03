@@ -200,5 +200,3 @@ class TestReplicationSanity(CBLTestClass):
             await sync_gateway.get_document(sg_db_name, doc_id_es)
         except CblSyncGatewayBadResponseError:
             pass  # expected, document not found (deleted)
-
-        self.mark_test_step("Replication sanity test completed.")

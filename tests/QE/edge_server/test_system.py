@@ -240,12 +240,8 @@ class TestSystem(CBLTestClass):
                         pass  # expected, document not found (deleted)
             doc_counter += 1
 
-        self.mark_test_step("Test completed successfully after 6 hours.")
-
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_system_one_client_chaos(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_system_one_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         end_time = datetime.now() + timedelta(minutes=360)
         (
             sync_gateway,
@@ -275,12 +271,8 @@ class TestSystem(CBLTestClass):
 
             # Randomize whether the operation happens in the Sync Gateway cycle or Edge Server cycle
             cycle = random.choice(["sync_gateway", "edge_server"])
-            operations = random.choice(
-                ["create", "create_update_delete", "create_delete"]
-            )
-            self.mark_test_step(
-                f"Cycle: doc {doc_id} via {cycle}, operations: {operations}"
-            )
+            operations = random.choice(["create", "create_update_delete", "create_delete"])
+            self.mark_test_step(f"Cycle: doc {doc_id} via {cycle}, operations: {operations}")
             doc = _doc_body(doc_id)
 
             if not edge_server_down and random.random() <= 0.4:  # 40% chance of chaos
@@ -291,9 +283,7 @@ class TestSystem(CBLTestClass):
 
             if cycle == "sync_gateway":
                 # Create on Sync Gateway and validate on Edge Server
-                created_doc = await sync_gateway.create_document(
-                    sg_db_name, doc_id, doc
-                )
+                created_doc = await sync_gateway.create_document(sg_db_name, doc_id, doc)
                 assert created_doc is not None, (
                     f"Failed to create document {doc_id} via Sync Gateway."
                 )
@@ -328,9 +318,7 @@ class TestSystem(CBLTestClass):
                         assert remote_doc is not None, (
                             f"Document {doc_id} does not exist on the edge server"
                         )
-                        assert remote_doc.id == doc_id, (
-                            f"Document ID mismatch: {remote_doc.id}"
-                        )
+                        assert remote_doc.id == doc_id, f"Document ID mismatch: {remote_doc.id}"
                         assert remote_doc.revid != rev_id, (
                             "Revision ID (_rev) missing in the document"
                         )
@@ -341,13 +329,10 @@ class TestSystem(CBLTestClass):
                 if "delete" in operations:
                     if not edge_server_down:
                         # Delete on edge server and validate on sync gateway
-                        delete_resp = await edge_server.delete_document(
-                            doc_id, rev_id, es_db_name
+                        delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
+                        assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
+                            f"Failed to delete document {doc_id} via Edge Server"
                         )
-                        assert (
-                            isinstance(delete_resp, dict)
-                            and delete_resp.get("ok") is True
-                        ), f"Failed to delete document {doc_id} via Edge Server"
                         # Validating on Edge Server
                         try:
                             await edge_server.get_document(es_db_name, doc_id)
@@ -362,9 +347,7 @@ class TestSystem(CBLTestClass):
                             pass  # expected, document not found (deleted)
             elif cycle == "edge_server":
                 if not edge_server_down:
-                    created_doc = await edge_server.put_document_with_id(
-                        doc, doc_id, es_db_name
-                    )
+                    created_doc = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
                     assert created_doc is not None, (
                         f"Failed to create document {doc_id} via Edge Server"
                     )
@@ -373,9 +356,7 @@ class TestSystem(CBLTestClass):
                         f"Document {doc_id} does not exist on the sync gateway"
                     )
                     assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
-                    assert sg_doc.revid is not None, (
-                        "Revision ID (_rev) missing in the document"
-                    )
+                    assert sg_doc.revid is not None, "Revision ID (_rev) missing in the document"
 
                     rev_id = sg_doc.revid
 
@@ -408,5 +389,3 @@ class TestSystem(CBLTestClass):
                         except CblEdgeServerBadResponseError:
                             pass  # expected, document not found (deleted)
             doc_counter += 1
-
-        self.mark_test_step("Test completed successfully after 6 hours.")

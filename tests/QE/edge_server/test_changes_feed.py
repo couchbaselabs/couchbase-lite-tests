@@ -161,5 +161,3 @@ class TestChangesFeed(CBLTestClass):
         assert len(changes["results"]) == 2, (
             f"Expected 2 changes, but got {len(changes['results'])} changes."
         )
-
-        self.mark_test_step("Test for longpoll changes feed completed successfully.")

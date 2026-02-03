@@ -206,5 +206,3 @@ class TestLogging(CBLTestClass):
                 assert expected_non_empty and len(log) > 0, (
                     f"Audit log for {step_name} event not found"
                 )
-
-        self.mark_test_step("Audit logging test completed.")
