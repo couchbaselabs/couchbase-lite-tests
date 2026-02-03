@@ -61,7 +61,9 @@ class TestTTLExpires(CBLTestClass):
         response = await edge_server.put_document_with_id(
             doc, "ttl_doc", es_db_name, expires=int(expires.timestamp())
         )
-        assert response is not None, "Failed to create document with Expires of 5 seconds"
+        assert response is not None, (
+            "Failed to create document with Expires of 5 seconds"
+        )
 
         self.mark_test_step("Check if the document is present in the database")
         response = await edge_server.get_document(es_db_name, "ttl_doc")
@@ -129,7 +131,9 @@ class TestTTLExpires(CBLTestClass):
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
-        self.mark_test_step("Creating a document with TTL of 10 seconds and Expires of 30 seconds")
+        self.mark_test_step(
+            "Creating a document with TTL of 10 seconds and Expires of 30 seconds"
+        )
 
         doc = {
             "id": "ttl_expires_doc1",
@@ -162,7 +166,9 @@ class TestTTLExpires(CBLTestClass):
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(es_db_name, "ttl_expires_doc")
 
-        self.mark_test_step("Creating a document with TTL of 60 seconds and Expires of 10 seconds")
+        self.mark_test_step(
+            "Creating a document with TTL of 60 seconds and Expires of 10 seconds"
+        )
 
         doc2 = {
             "id": "ttl_expires_doc2",
@@ -218,7 +224,9 @@ class TestTTLExpires(CBLTestClass):
             )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_bulk_documents_ttl(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_bulk_documents_ttl(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         self.mark_test_step(
             "Starting test to see if bulk documents with TTL are deleted after the TTL expires"
         )
@@ -249,7 +257,9 @@ class TestTTLExpires(CBLTestClass):
                 "ttl": 10,
                 "doc_num": doc_num,
             }
-            tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=10))
+            tasks.append(
+                edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=10)
+            )
             task_ttl_map.append(10)
 
         # 25 docs with 30s TTL
@@ -262,7 +272,9 @@ class TestTTLExpires(CBLTestClass):
                 "ttl": 30,
                 "doc_num": doc_num,
             }
-            tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=30))
+            tasks.append(
+                edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=30)
+            )
             task_ttl_map.append(30)
 
         # 25 docs with 60s TTL
@@ -275,7 +287,9 @@ class TestTTLExpires(CBLTestClass):
                 "ttl": 60,
                 "doc_num": doc_num,
             }
-            tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=60))
+            tasks.append(
+                edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=60)
+            )
             task_ttl_map.append(60)
 
         # Execute all document creations concurrently

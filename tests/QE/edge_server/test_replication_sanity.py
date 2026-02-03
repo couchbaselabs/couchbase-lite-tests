@@ -17,7 +17,9 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestReplicationSanity(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_sanity(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_replication_sanity(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -100,13 +102,17 @@ class TestReplicationSanity(CBLTestClass):
             "timestamp": datetime.utcnow().isoformat(),
         }
         created_doc = await sync_gateway.create_document(sg_db_name, doc_id_sg, doc)
-        assert created_doc is not None, f"Failed to create document {doc_id_sg} via Sync Gateway."
+        assert created_doc is not None, (
+            f"Failed to create document {doc_id_sg} via Sync Gateway."
+        )
         time.sleep(5)
 
         self.mark_test_step(f"Validating document {doc_id_sg} on Edge Server.")
         remote_doc = await edge_server.get_document(es_db_name, doc_id_sg)
 
-        assert remote_doc is not None, f"Document {doc_id_sg} does not exist on the edge server."
+        assert remote_doc is not None, (
+            f"Document {doc_id_sg} does not exist on the edge server."
+        )
         assert remote_doc.id == doc_id_sg, (
             f"Document ID mismatch: expected {doc_id_sg}, got {remote_doc.id}"
         )
@@ -125,13 +131,17 @@ class TestReplicationSanity(CBLTestClass):
             updated_doc_body, doc_id_sg, es_db_name, rev=rev_id
         )
 
-        assert updated_doc is not None, f"Failed to update document {doc_id_sg} via Edge Server"
+        assert updated_doc is not None, (
+            f"Failed to update document {doc_id_sg} via Edge Server"
+        )
         time.sleep(5)
 
         self.mark_test_step(f"Validating update for {doc_id_sg} on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_sg)
         assert sg_doc is not None
-        assert rev_id != sg_doc.revid, f"Document {doc_id_sg} update not reflected on Sync Gateway"
+        assert rev_id != sg_doc.revid, (
+            f"Document {doc_id_sg} update not reflected on Sync Gateway"
+        )
         rev_id = sg_doc.revid
 
         self.mark_test_step(f"Deleting document {doc_id_sg} via Sync Gateway.")
@@ -153,12 +163,16 @@ class TestReplicationSanity(CBLTestClass):
         }
 
         created_doc = await edge_server.put_document_with_id(doc, doc_id_es, es_db_name)
-        assert created_doc is not None, f"Failed to create document {doc_id_es} via Edge Server."
+        assert created_doc is not None, (
+            f"Failed to create document {doc_id_es} via Edge Server."
+        )
         time.sleep(5)
 
         self.mark_test_step(f"Validating document {doc_id_es} on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_es)
-        assert sg_doc is not None, f"Document {doc_id_es} does not exist on the sync gateway."
+        assert sg_doc is not None, (
+            f"Document {doc_id_es} does not exist on the sync gateway."
+        )
         assert sg_doc.id == doc_id_es, f"Document ID mismatch: {sg_doc.id}"
 
         rev_id = sg_doc.revid
@@ -173,13 +187,17 @@ class TestReplicationSanity(CBLTestClass):
         updated_doc = await sync_gateway.update_document(
             sg_db_name, doc_id_es, updated_doc_body, rev_id
         )
-        assert updated_doc is not None, f"Failed to update document {doc_id_es} via Sync Gateway."
+        assert updated_doc is not None, (
+            f"Failed to update document {doc_id_es} via Sync Gateway."
+        )
         time.sleep(5)
 
         self.mark_test_step(f"Validating update for {doc_id_es} on Edge Server.")
         remote_doc = await edge_server.get_document(es_db_name, doc_id_es)
 
-        assert remote_doc is not None, f"Document {doc_id_es} does not exist on the edge server."
+        assert remote_doc is not None, (
+            f"Document {doc_id_es} does not exist on the edge server."
+        )
         assert remote_doc.id == doc_id_es, f"Document ID mismatch: {remote_doc.id}"
 
         rev_id = remote_doc.revid
