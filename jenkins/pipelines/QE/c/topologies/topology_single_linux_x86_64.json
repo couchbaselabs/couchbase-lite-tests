@@ -4,7 +4,8 @@
         {
             "platform": "c_linux_x86_64",
             "cbl_version": "{{version}}",
-            "location": "localhost"
+            "location": "localhost",
+            "download": true
         }
     ],
     "include": "../../../../../environment/aws/topology_setup/default_topology.json"
