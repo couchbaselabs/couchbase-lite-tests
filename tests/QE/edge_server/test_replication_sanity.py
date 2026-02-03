@@ -141,10 +141,8 @@ class TestReplicationSanity(CBLTestClass):
         self.mark_test_step(f"Validating deletion of {doc_id_sg} on Edge Server.")
         time.sleep(5)
 
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(es_db_name, doc_id_sg)
-        except CblEdgeServerBadResponseError:
-            pass  # expected, document not found (deleted)
 
         # --- Edge Server Cycle ---
         self.mark_test_step(f"Creating document {doc_id_es} via Edge Server.")
@@ -196,7 +194,5 @@ class TestReplicationSanity(CBLTestClass):
 
         self.mark_test_step(f"Validating deletion of {doc_id_es} on Sync Gateway.")
 
-        try:
+        with pytest.raises(CblSyncGatewayBadResponseError):
             await sync_gateway.get_document(sg_db_name, doc_id_es)
-        except CblSyncGatewayBadResponseError:
-            pass  # expected, document not found (deleted)

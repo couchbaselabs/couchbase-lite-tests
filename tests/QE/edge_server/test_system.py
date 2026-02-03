@@ -181,17 +181,13 @@ class TestSystem(CBLTestClass):
                         isinstance(delete_resp, dict) and delete_resp.get("ok") is True
                     ), f"Failed to delete document {doc_id} via Edge Server"
                     # Validating on Edge Server
-                    try:
+                    with pytest.raises(CblEdgeServerBadResponseError):
                         await edge_server.get_document(es_db_name, doc_id)
-                    except CblEdgeServerBadResponseError:
-                        pass  # expected, document not found (deleted)
                     # Validating on Sync Gateway
                     time.sleep(2)
 
-                    try:
+                    with pytest.raises(CblSyncGatewayBadResponseError):
                         await sync_gateway.get_document(sg_db_name, doc_id)
-                    except CblSyncGatewayBadResponseError:
-                        pass  # expected, document not found (deleted)
             elif cycle == "edge_server":
                 created_doc = await edge_server.put_document_with_id(
                     doc, doc_id, es_db_name
@@ -234,10 +230,8 @@ class TestSystem(CBLTestClass):
                     await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
                     time.sleep(2)
 
-                    try:
+                    with pytest.raises(CblEdgeServerBadResponseError):
                         await edge_server.get_document(es_db_name, doc_id)
-                    except CblEdgeServerBadResponseError:
-                        pass  # expected, document not found (deleted)
             doc_counter += 1
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -334,17 +328,13 @@ class TestSystem(CBLTestClass):
                             f"Failed to delete document {doc_id} via Edge Server"
                         )
                         # Validating on Edge Server
-                        try:
+                        with pytest.raises(CblEdgeServerBadResponseError):
                             await edge_server.get_document(es_db_name, doc_id)
-                        except CblEdgeServerBadResponseError:
-                            pass  # expected, document not found (deleted)
                         # Validating on Sync Gateway
                         time.sleep(2)
 
-                        try:
+                        with pytest.raises(CblSyncGatewayBadResponseError):
                             await sync_gateway.get_document(sg_db_name, doc_id)
-                        except CblSyncGatewayBadResponseError:
-                            pass  # expected, document not found (deleted)
             elif cycle == "edge_server":
                 if not edge_server_down:
                     created_doc = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
@@ -384,8 +374,6 @@ class TestSystem(CBLTestClass):
                         await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
                         time.sleep(2)
 
-                        try:
+                        with pytest.raises(CblEdgeServerBadResponseError):
                             await edge_server.get_document(es_db_name, doc_id)
-                        except CblEdgeServerBadResponseError:
-                            pass  # expected, document not found (deleted)
             doc_counter += 1

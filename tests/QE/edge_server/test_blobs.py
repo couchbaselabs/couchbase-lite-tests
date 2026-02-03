@@ -342,13 +342,8 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Verifying that get nonexistent blob fails.")
         attachment_name = "missing_blob.png"
 
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_sub_document(doc_id, attachment_name, es_db_name)
-            assert False, (
-                "Should not be able to retrieve nonexistent blob from document."
-            )
-        except CblEdgeServerBadResponseError:
-            pass
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_delete_nonexistent(
@@ -384,13 +379,10 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Verify delete nonexistent blob fails.")
         attachment_name = "missing_blob.png"
 
-        try:
-            response = await edge_server.delete_sub_document(
+        with pytest.raises(CblEdgeServerBadResponseError):
+            await edge_server.delete_sub_document(
                 doc_id, rev_id, attachment_name, es_db_name
             )
-            assert False, "Should not be able to delete nonexistent blob from document."
-        except CblEdgeServerBadResponseError:
-            pass
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_update_incorrect_rev(
@@ -439,13 +431,10 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Verifying that update blob with wrong rev fails.")
         updated_data = b"updated blob data"
 
-        try:
-            response = await edge_server.put_sub_document(
+        with pytest.raises(CblEdgeServerBadResponseError):
+            await edge_server.put_sub_document(
                 doc_id, "incorrect rev", attachment_name, es_db_name, value=updated_data
             )
-            assert False, "Should not be able to update blob with incorrect revision."
-        except CblEdgeServerBadResponseError:
-            pass
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_put_nonexistent_doc(
@@ -467,13 +456,10 @@ class TestBlobs(CBLTestClass):
         with open(blob_path, "rb") as img_file:
             image_data = img_file.read()
 
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.put_sub_document(
                 doc_id, "1-abcdef", attachment_name, es_db_name, value=image_data
             )
-            assert False, "Should not be able to add blob to nonexistent document."
-        except CblEdgeServerBadResponseError:
-            pass
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_blobs_same_doc(
@@ -579,15 +565,13 @@ class TestBlobs(CBLTestClass):
 
         attachment_name = "20mb.jpg"
 
-        try:
-            response = await edge_server.put_sub_document(
+        with pytest.raises(CblEdgeServerBadResponseError) as excinfo:
+            await edge_server.put_sub_document(
                 doc_id, rev_id, attachment_name, es_db_name, value=image_data
             )
-            assert False, "Should not be able to add blob exceeding max size."
-        except CblEdgeServerBadResponseError as e:
-            assert "413" in str(e), (
-                f"Expected HTTP 413 status code in error message but got '{str(e)}'"
-            )
+        assert "413" in str(excinfo.value), (
+            f"Expected HTTP 413 status code in error message but got '{str(excinfo.value)}'"
+        )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_special_characters(

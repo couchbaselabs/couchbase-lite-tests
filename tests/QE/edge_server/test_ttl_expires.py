@@ -38,11 +38,8 @@ class TestTTLExpires(CBLTestClass):
 
         self.mark_test_step("Checking if the document is expired after 5 seconds")
         time.sleep(5)
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(es_db_name, "ttl_doc")
-            assert False, "Document should have expired after 5 seconds"
-        except CblEdgeServerBadResponseError:
-            pass
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_expires_5s(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -73,11 +70,8 @@ class TestTTLExpires(CBLTestClass):
         self.mark_test_step("Checking if the document is expired after 5 seconds")
 
         time.sleep(5)
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(es_db_name, "ttl_doc")
-            assert False, "Document should have expired after 5 seconds"
-        except CblEdgeServerBadResponseError:
-            pass
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_update_ttl(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -121,11 +115,8 @@ class TestTTLExpires(CBLTestClass):
         self.mark_test_step("Check if the document is expired after 5 seconds")
 
         time.sleep(5)
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(es_db_name, "ttl")
-            assert False, "Document should have expired after 5 seconds"
-        except CblEdgeServerBadResponseError:
-            pass
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_ttl_expires(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -165,13 +156,11 @@ class TestTTLExpires(CBLTestClass):
         )
         time.sleep(10)
 
-        try:
-            response = await edge_server.get_document(es_db_name, "ttl_expires_doc")
-            assert False, "Document should have expired after 10 seconds (TTL takes precedence)"
-        except CblEdgeServerBadResponseError:
-            self.mark_test_step(
-                "Document expired after 10 seconds - TTL took precedence over expires"
-            )
+        self.mark_test_step(
+            "Document expired after 10 seconds - TTL took precedence over expires"
+        )
+        with pytest.raises(CblEdgeServerBadResponseError):
+            await edge_server.get_document(es_db_name, "ttl_expires_doc")
 
         self.mark_test_step("Creating a document with TTL of 60 seconds and Expires of 10 seconds")
 
@@ -200,13 +189,11 @@ class TestTTLExpires(CBLTestClass):
         )
         time.sleep(10)
 
-        try:
-            response2 = await edge_server.get_document(es_db_name, "ttl_expires_doc2")
-            assert False, "Document should have expired after 10 seconds (expires takes precedence)"
-        except CblEdgeServerBadResponseError:
-            self.mark_test_step(
-                "Document expired after 10 seconds - expires took precedence over TTL"
-            )
+        self.mark_test_step(
+            "Document expired after 10 seconds - expires took precedence over TTL"
+        )
+        with pytest.raises(CblEdgeServerBadResponseError):
+            await edge_server.get_document(es_db_name, "ttl_expires_doc2")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_ttl_non_existent_document(
@@ -225,13 +212,10 @@ class TestTTLExpires(CBLTestClass):
             "Checking if updating TTL of a non-existent document returns 404"
         )
 
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.put_document_with_id(
                 {"id": "ttl_doc"}, "ttl_doc", es_db_name, rev="1-1234567890", ttl=5
             )
-            assert False, "Should not be able to update TTL of a non-existent document"
-        except CblEdgeServerBadResponseError:
-            pass
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_bulk_documents_ttl(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
