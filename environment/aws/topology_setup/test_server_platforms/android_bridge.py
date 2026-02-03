@@ -49,7 +49,13 @@ class AndroidBridge(PlatformBridge):
         "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools",
     ]
 
-    def __init__(self, app_path: str, app_id: str, activity: str = "MainActivity"):
+    def __init__(
+        self,
+        app_path: str,
+        app_id: str,
+        activity: str = "MainActivity",
+        port: int = 8080,
+    ):
         """
         Initialize the AndroidBridge with the application path, application ID, and activity name.
 
@@ -57,6 +63,8 @@ class AndroidBridge(PlatformBridge):
             app_path (str): The path to the application APK file.
             app_id (str): The application ID.
             activity (str): The activity name to launch.
+            port (int): The port the test server listens on; used for adb reverse so the host
+                can connect via localhost. Default 8080 (C/Java); use 5555 for .NET.
 
         Raises:
             RuntimeError: If the ADB executable is not found.
@@ -64,6 +72,7 @@ class AndroidBridge(PlatformBridge):
         self.__app_path = app_path
         self.__app_id = app_id
         self.__activity = activity
+        self.__port = port
         self.__adb_location = None
 
         find_command = "where" if platform.system() == "Windows" else "which"
@@ -122,6 +131,9 @@ class AndroidBridge(PlatformBridge):
         """
         Run the application on the specified device.
 
+        Starts the app, then sets up adb reverse so the host can reach the test server
+        at localhost:<port> (forwarded to the device's port).
+
         Args:
             location (str): The device location (e.g., device serial number).
         """
@@ -135,6 +147,19 @@ class AndroidBridge(PlatformBridge):
                 "am",
                 "start",
                 f"{self.__app_id}/.{self.__activity}",
+            ],
+            check=True,
+            capture_output=False,
+        )
+        header(f"Forwarding host localhost:{self.__port} to device port {self.__port}")
+        subprocess.run(
+            [
+                str(self.__adb_location),
+                "-s",
+                location,
+                "reverse",
+                f"tcp:{self.__port}",
+                f"tcp:{self.__port}",
             ],
             check=True,
             capture_output=False,
@@ -178,37 +203,15 @@ class AndroidBridge(PlatformBridge):
 
     def _get_ip(self, location: str) -> str | None:
         """
-        Retrieve the IP address of the specified device.
+        Return the address the host should use to reach the test server.
+
+        Uses 127.0.0.1 because run() sets up adb reverse: host localhost:<port> is
+        forwarded to the device's port, so the host must connect to 127.0.0.1.
 
         Args:
             location (str): The device location (e.g., device serial number).
 
         Returns:
-            str: The IP address of the device.
-
-        Raises:
-            RuntimeError: If the IP address cannot be determined.
+            str: "127.0.0.1" so the host connects via the adb reverse tunnel.
         """
-        result = subprocess.run(
-            [
-                str(self.__adb_location),
-                "-s",
-                location,
-                "shell",
-                "ip",
-                "-f",
-                "inet",
-                "addr",
-                "show",
-                "wlan0",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        for line in result.stdout.split("\n"):
-            click.echo(line)
-            if "inet" in line:
-                return line.lstrip().split(" ")[1].split("/")[0]
-
-        return None
+        return "127.0.0.1"
