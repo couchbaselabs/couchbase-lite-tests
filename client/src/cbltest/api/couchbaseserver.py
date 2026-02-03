@@ -147,7 +147,7 @@ class CouchbaseServer:
         dataset_path: Path,
         dataset_name: str,
         *,
-        tools_version: str = "7.6.7",
+        tools_version: str = "7.6.8",
         repo_name: str | None = None,
     ) -> None:
         """
