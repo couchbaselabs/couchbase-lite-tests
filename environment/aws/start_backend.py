@@ -349,6 +349,7 @@ def main(
 
     if steps & BackendSteps.TS_RUN:
         topology_main(topology)
+        click.echo("done with TS")
     else:
         click.secho("Skipping test server install and run...", fg="yellow")
 

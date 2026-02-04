@@ -764,6 +764,7 @@ class TopologyConfig:
             ip = bridge.get_ip(
                 test_server_input.location, fallback=test_server_input.ip_hint
             )
+            click.echo(f"IP: {ip}")
 
             success = False
             for _ in range(0, 30):
@@ -777,11 +778,12 @@ class TopologyConfig:
                     )
                     sleep(1)
                     pass
-
+            click.echo("Tried request")
             if not success:
                 raise RuntimeError(
                     f"Test server failed to start at {test_server_input.location}"
                 )
+            click.echo(f"Test server started at {test_server_input.location}")
 
     def stop_test_servers(self):
         """

@@ -444,11 +444,11 @@ class iOSBridge(PlatformBridge):
         self.__broadcast_ping_request()
 
         result = subprocess.run(
-            ["arp", "-an"], check=True, capture_output=True, text=True, timeout=10
+            ["arp", "-an"], check=True, capture_output=True, text=True
         )
-        click.echo(f"Ran arp -an output :{result}")
         for line in result.stdout.split("\n"):
             if mac_address in line:
+                click.echo(f"Found MAC address {line.split(" ")[1].strip("()")} ")
                 return line.split(" ")[1].strip("()")
-
+        click.echo(f"Could not find MAC address {mac_address}")
         return None
