@@ -448,7 +448,8 @@ class iOSBridge(PlatformBridge):
         )
         for line in result.stdout.split("\n"):
             if mac_address in line:
-                click.echo(f"Found MAC address {line.split(" ")[1].strip("()")} ")
-                return line.split(" ")[1].strip("()")
+                var=line.split(" ")[1].strip("()")
+                click.echo(f"Found MAC address {var} ")
+                return var
         click.echo(f"Could not find MAC address {mac_address}")
         return None
