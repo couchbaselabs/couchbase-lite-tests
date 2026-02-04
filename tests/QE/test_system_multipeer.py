@@ -9,6 +9,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.json_generator import JSONGenerator
 from cbltest.api.multipeer_replicator import MultipeerReplicator
+from cbltest.api.multipeer_replicator_types import MultipeerTransportType
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -25,7 +26,14 @@ from cbltest.responses import ServerVariant
 @pytest.mark.min_test_servers(2)
 class TestSystemMultipeer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_system(self, cblpytest: CBLPyTest):
+    @pytest.mark.parametrize(
+        "transport",
+        [
+            MultipeerTransportType.BLUETOOTH,
+            MultipeerTransportType.WIFI,
+        ],
+    )
+    async def test_system(self, cblpytest: CBLPyTest, transport):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
             await self.skip_if_not_platform(
@@ -39,7 +47,7 @@ class TestSystemMultipeer(CBLTestClass):
         MAX_STOP_TESTSERVERS = int(0.5 * NUM_DEVICES)
         docgen = JSONGenerator(1, NO_OF_DOCS, format="key-value")
 
-        self.mark_test_step("Reset local databases on 10 devices")
+        self.mark_test_step(f"Reset local databases on {NUM_DEVICES} devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
         all_dbs = [dbs[0] for dbs in all_devices_dbs]
@@ -69,7 +77,10 @@ class TestSystemMultipeer(CBLTestClass):
                         """)
         multipeer_replicators = [
             MultipeerReplicator(
-                "couchtest", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "couchtest",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=transport,
             )
             for db in all_dbs
         ]
@@ -188,7 +199,14 @@ class TestSystemMultipeer(CBLTestClass):
 
     # simultaneously inserting 10000 documents and blobs different docs to each CBL and starting replication
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_volume_with_blobs(self, cblpytest: CBLPyTest):
+    @pytest.mark.parametrize(
+        "transport",
+        [
+            MultipeerTransportType.BLUETOOTH,
+            MultipeerTransportType.WIFI,
+        ],
+    )
+    async def test_volume_with_blobs(self, cblpytest: CBLPyTest, transport):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
             await self.skip_if_not_platform(
@@ -247,7 +265,10 @@ class TestSystemMultipeer(CBLTestClass):
                         """)
         multipeer_replicators = [
             MultipeerReplicator(
-                "couchtest", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "couchtest",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=transport,
             )
             for db in all_dbs
         ]
@@ -278,7 +299,16 @@ class TestSystemMultipeer(CBLTestClass):
     @pytest.mark.min_test_servers(5)
     @pytest.mark.min_sync_gateways(2)
     @pytest.mark.min_couchbase_servers(2)
-    async def test_multipeer_end_to_end(self, cblpytest: CBLPyTest, dataset_path: Path):
+    @pytest.mark.parametrize(
+        "transport",
+        [
+            MultipeerTransportType.BLUETOOTH,
+            MultipeerTransportType.WIFI,
+        ],
+    )
+    async def test_multipeer_end_to_end(
+        self, cblpytest: CBLPyTest, dataset_path: Path, transport
+    ):
         #  CB-server1           CB-server2
         #   SGW1                    SGW2 ----  CBL5
         #    /                       \
@@ -381,6 +411,7 @@ class TestSystemMultipeer(CBLTestClass):
                 "couchtest",
                 db,
                 [ReplicatorCollectionEntry(["_default._default"])],
+                transports=transport,
             )
             for db in all_dbs[:-1]
         ]

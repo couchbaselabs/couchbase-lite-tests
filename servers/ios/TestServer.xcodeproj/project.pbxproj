@@ -82,6 +82,7 @@
 		40C7A5632CA4AF5C0053ADCB /* RunQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A5622CA4AF5C0053ADCB /* RunQuery.swift */; };
 		40C7A5652CA4AFB40053ADCB /* RunQueryConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A5642CA4AFB40053ADCB /* RunQueryConfiguration.swift */; };
 		40C7A5672CA4B15B0053ADCB /* QueryResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A5662CA4B15B0053ADCB /* QueryResults.swift */; };
+		4F0E10A52F30FCD900025FB2 /* MultipeerTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0E10A42F30FCD900025FB2 /* MultipeerTransport.swift */; };
 		AED567692E01BBBE00007993 /* StartListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED567682E01BBBE00007993 /* StartListener.swift */; };
 		AED5676B2E01BBD100007993 /* StopListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED5676A2E01BBD100007993 /* StopListener.swift */; };
 		AED5676D2E01BC1100007993 /* Listener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED5676C2E01BC1100007993 /* Listener.swift */; };
@@ -178,6 +179,7 @@
 		40C7A5622CA4AF5C0053ADCB /* RunQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunQuery.swift; sourceTree = "<group>"; };
 		40C7A5642CA4AFB40053ADCB /* RunQueryConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunQueryConfiguration.swift; sourceTree = "<group>"; };
 		40C7A5662CA4B15B0053ADCB /* QueryResults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryResults.swift; sourceTree = "<group>"; };
+		4F0E10A42F30FCD900025FB2 /* MultipeerTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerTransport.swift; sourceTree = "<group>"; };
 		AED567682E01BBBE00007993 /* StartListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartListener.swift; sourceTree = "<group>"; };
 		AED5676A2E01BBD100007993 /* StopListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopListener.swift; sourceTree = "<group>"; };
 		AED5676C2E01BC1100007993 /* Listener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Listener.swift; sourceTree = "<group>"; };
@@ -318,6 +320,7 @@
 		40BDA8C92AF20AAB008DB256 /* ContentTypes */ = {
 			isa = PBXGroup;
 			children = (
+				4F0E10A42F30FCD900025FB2 /* MultipeerTransport.swift */,
 				40BDA8D12AF20AAB008DB256 /* CollectionDocuments.swift */,
 				40BDA8D02AF20AAB008DB256 /* Collections.swift */,
 				40BDA8CE2AF20AAB008DB256 /* ContentTypes.swift */,
@@ -506,6 +509,7 @@
 				40BDA8022AF1C13B008DB256 /* PerformMaintenance.swift in Sources */,
 				40BDA8032AF1C13B008DB256 /* GetReplicatorStatus.swift in Sources */,
 				40BDA8012AF1C13B008DB256 /* SnapshotDocuments.swift in Sources */,
+				4F0E10A52F30FCD900025FB2 /* MultipeerTransport.swift in Sources */,
 				409F443F2DF1016C00BB7851 /* MultipeerReplicatorIdentity.swift in Sources */,
 				40BDA8E42AF20AAB008DB256 /* ContentTypes.swift in Sources */,
 				40BDA8152AF1C15C008DB256 /* AnyCodable.swift in Sources */,
