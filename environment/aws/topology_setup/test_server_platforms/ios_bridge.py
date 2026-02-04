@@ -444,8 +444,9 @@ class iOSBridge(PlatformBridge):
         self.__broadcast_ping_request()
 
         result = subprocess.run(
-            ["arp", "-an"], check=True, capture_output=True, text=True
+            ["arp", "-an"], check=True, capture_output=True, text=True, timeout=10
         )
+        click.echo(f"Ran arp -an output :{result}")
         for line in result.stdout.split("\n"):
             if mac_address in line:
                 return line.split(" ")[1].strip("()")
