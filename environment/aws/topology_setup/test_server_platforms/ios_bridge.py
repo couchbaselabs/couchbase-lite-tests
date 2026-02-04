@@ -397,7 +397,7 @@ class iOSBridge(PlatformBridge):
 
                 click.echo(f"Broadcasting ping request on {interface} ({ip})")
                 result = subprocess.run(
-                    ["ping", ip, "-c", "3"], check=False, capture_output=True, text=True
+                    ["ping", ip, "-c", "3"], check=False, capture_output=True, text=True,timeout=10
                 )
 
                 if result.returncode != 0:
