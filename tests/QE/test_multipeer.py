@@ -9,6 +9,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.multipeer_replicator import MultipeerReplicator
+from cbltest.api.multipeer_replicator_types import MultipeerTransportType
 from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorConflictResolver,
@@ -20,7 +21,14 @@ from cbltest.api.test_functions import compare_doc_results_p2p
 @pytest.mark.min_test_servers(2)
 class TestMultipeer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_scalable_conflict_resolution(self, cblpytest: CBLPyTest):
+    @pytest.mark.parametrize(
+        "transport",
+        [
+            MultipeerTransportType.BLUETOOTH,
+            MultipeerTransportType.WIFI,
+        ],
+    )
+    async def test_scalable_conflict_resolution(self, cblpytest: CBLPyTest, transport):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
         self.mark_test_step(
@@ -58,6 +66,7 @@ class TestMultipeer(CBLTestClass):
                         ),
                     )
                 ],
+                transports=transport,
             )
             for db in all_dbs
         ]
@@ -116,7 +125,14 @@ class TestMultipeer(CBLTestClass):
         await asyncio.gather(*[mp.stop() for mp in multipeer_replicators])
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_large_mesh_sanity(self, cblpytest: CBLPyTest):
+    @pytest.mark.parametrize(
+        "transport",
+        [
+            MultipeerTransportType.BLUETOOTH,
+            MultipeerTransportType.WIFI,
+        ],
+    )
+    async def test_large_mesh_sanity(self, cblpytest: CBLPyTest, transport):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
         self.mark_test_step(
@@ -140,7 +156,10 @@ class TestMultipeer(CBLTestClass):
         self.mark_test_step("Start multipeer replicator on all devices")
         multipeer_replicators = [
             MultipeerReplicator(
-                "mesh-test", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "mesh-test",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=transport,
             )
             for db in all_dbs
         ]
@@ -168,7 +187,14 @@ class TestMultipeer(CBLTestClass):
         await asyncio.gather(*[multipeer.stop() for multipeer in multipeer_replicators])
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_large_mesh_consistency(self, cblpytest: CBLPyTest):
+    @pytest.mark.parametrize(
+        "transport",
+        [
+            MultipeerTransportType.BLUETOOTH,
+            MultipeerTransportType.WIFI,
+        ],
+    )
+    async def test_large_mesh_consistency(self, cblpytest: CBLPyTest, transport):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
         self.mark_test_step(
@@ -196,7 +222,10 @@ class TestMultipeer(CBLTestClass):
         self.mark_test_step("Start multipeer replicator on all devices")
         multipeer_replicators = [
             MultipeerReplicator(
-                "mesh-test", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "mesh-test",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=transport,
             )
             for db in all_dbs
         ]
@@ -224,7 +253,14 @@ class TestMultipeer(CBLTestClass):
 
     @pytest.mark.min_test_servers(6)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_network_partition(self, cblpytest: CBLPyTest):
+    @pytest.mark.parametrize(
+        "transport",
+        [
+            MultipeerTransportType.BLUETOOTH,
+            MultipeerTransportType.WIFI,
+        ],
+    )
+    async def test_network_partition(self, cblpytest: CBLPyTest, transport):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
         self.mark_test_step(
@@ -302,19 +338,28 @@ class TestMultipeer(CBLTestClass):
         # Start replicators with different peer groups
         group1_replicators = [
             MultipeerReplicator(
-                "group1", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "group1",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=transport,
             )
             for db in group1_dbs
         ]
         group2_replicators = [
             MultipeerReplicator(
-                "group2", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "group2",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=transport,
             )
             for db in group2_dbs
         ]
         group3_replicators = [
             MultipeerReplicator(
-                "group3", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "group3",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=transport,
             )
             for db in group3_dbs
         ]
@@ -430,7 +475,10 @@ class TestMultipeer(CBLTestClass):
             # Restart group 2 with group 1's peer ID
             group2_replicators = [
                 MultipeerReplicator(
-                    "group1", db, [ReplicatorCollectionEntry(["_default._default"])]
+                    "group1",
+                    db,
+                    [ReplicatorCollectionEntry(["_default._default"])],
+                    transports=transport,
                 )
                 for db in group2_dbs
             ]
@@ -475,7 +523,10 @@ class TestMultipeer(CBLTestClass):
             # Restart group 3 with group 1's peer ID
             group3_replicators = [
                 MultipeerReplicator(
-                    "group1", db, [ReplicatorCollectionEntry(["_default._default"])]
+                    "group1",
+                    db,
+                    [ReplicatorCollectionEntry(["_default._default"])],
+                    transports=transport,
                 )
                 for db in group3_dbs
             ]
@@ -511,7 +562,14 @@ class TestMultipeer(CBLTestClass):
 
     @pytest.mark.min_test_servers(6)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_dynamic_peer_addition_removal(self, cblpytest: CBLPyTest):
+    @pytest.mark.parametrize(
+        "transport",
+        [
+            MultipeerTransportType.BLUETOOTH,
+            MultipeerTransportType.WIFI,
+        ],
+    )
+    async def test_dynamic_peer_addition_removal(self, cblpytest: CBLPyTest, transport):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
         self.mark_test_step(
@@ -557,7 +615,10 @@ class TestMultipeer(CBLTestClass):
         # Start replicators on initial devices
         initial_replicators = [
             MultipeerReplicator(
-                "dynamic-mesh", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "dynamic-mesh",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=transport,
             )
             for db in initial_dbs
         ]
@@ -593,7 +654,10 @@ class TestMultipeer(CBLTestClass):
         # Start replicators on additional devices
         additional_replicators = [
             MultipeerReplicator(
-                "dynamic-mesh", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "dynamic-mesh",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=transport,
             )
             for db in additional_dbs
         ]
@@ -667,7 +731,14 @@ class TestMultipeer(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_large_document_replication(self, cblpytest: CBLPyTest):
+    @pytest.mark.parametrize(
+        "transport",
+        [
+            MultipeerTransportType.BLUETOOTH,
+            MultipeerTransportType.WIFI,
+        ],
+    )
+    async def test_large_document_replication(self, cblpytest: CBLPyTest, transport):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
         self.mark_test_step(
@@ -692,7 +763,10 @@ class TestMultipeer(CBLTestClass):
         self.mark_test_step("Start multipeer replicator on all devices")
         multipeer_replicators = [
             MultipeerReplicator(
-                "large-doc-mesh", db, [ReplicatorCollectionEntry(["_default._default"])]
+                "large-doc-mesh",
+                db,
+                [ReplicatorCollectionEntry(["_default._default"])],
+                transports=transport,
             )
             for db in all_dbs
         ]

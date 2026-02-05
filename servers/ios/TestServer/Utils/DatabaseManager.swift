@@ -25,6 +25,7 @@ class DatabaseManager {
     
     private var multipeerReplicators : [ UUID : MultipeerReplicator ] = [:]
     private var peerReplicatorStatus : [ UUID : [ PeerID: Replicator.Status ] ] = [:]
+    private var peerReplicatorTransport : [ UUID : [ PeerID: ContentTypes.MultipeerTransport ] ] = [:]
     private var peerReplicatorStatusToken : [ UUID : ListenerToken ] = [:]
     private var peerReplicatorDocuments : [ UUID : [ PeerID: [ ContentTypes.DocumentReplication ] ] ] = [:]
     private var peerReplicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
@@ -328,11 +329,23 @@ class DatabaseManager {
             }
         }
         
-        let conf = MultipeerReplicatorConfiguration(
+        var conf = MultipeerReplicatorConfiguration(
             peerGroupID: config.peerGroupID,
             identity: identity,
             authenticator: authenticator,
             collections: collectionConfigs)
+        
+        if let transports = config.transports, !transports.isEmpty {
+            let transportMap = transports.map { tr in
+                switch tr {
+                case ContentTypes.MultipeerTransport.wifi:
+                    return CouchbaseLiteSwift.MultipeerTransport.wifi
+                case ContentTypes.MultipeerTransport.bluetooth:
+                    return CouchbaseLiteSwift.MultipeerTransport.bluetooth
+                }
+            }
+            conf.transports = Set(transportMap)
+        }
         
         let id = UUID()
         
@@ -551,6 +564,7 @@ class DatabaseManager {
         multipeerReplicators.removeAll()
         
         peerReplicatorStatus.removeAll()
+        peerReplicatorTransport.removeAll()
         peerReplicatorStatusToken.removeAll()
         
         peerReplicatorDocuments.removeAll()

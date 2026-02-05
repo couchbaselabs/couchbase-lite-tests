@@ -20,7 +20,8 @@ extension Handlers {
             database: request.database,
             collections: request.collections,
             identity: request.identity,
-            authenticator: request.authenticator)
+            authenticator: request.authenticator,
+            transports: request.transports)
         
         let id = try dbManager.startMultipeerReplicator(config: config)
         

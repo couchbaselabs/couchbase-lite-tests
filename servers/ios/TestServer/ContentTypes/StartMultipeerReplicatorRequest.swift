@@ -14,5 +14,6 @@ extension ContentTypes {
         let collections: [ReplicationCollection]
         let identity: MultipeerReplicatorIdentity
         let authenticator: MultipeerReplicatorCAAuthenticator?
+        let transports: [MultipeerTransport]?
     }
 }

@@ -57,7 +57,7 @@ pipeline {
                     echo "Platform Versions: ${params.PLATFORM_VERSIONS}"
                     echo "SGW Version: ${params.SGW_VERSION}"
                     echo "Auto-fetch builds: ${!params.DISABLE_AUTO_FETCH}"
-                    
+
                     // Validate platform versions format
                     def platformSpecs = params.PLATFORM_VERSIONS.split(' ')
                     platformSpecs.each { spec ->
@@ -86,7 +86,7 @@ pipeline {
                     // Parse platform versions to determine which test servers to prebuild
                     def platformSpecs = params.PLATFORM_VERSIONS.split(' ')
                     def platformsToBuild = []
-                    
+
                     // Map platform names to their test server platforms
                     def platformMapping = [
                         'ios': ['swift_ios'],
@@ -95,15 +95,15 @@ pipeline {
                         'java': ['jak_desktop', 'jak_webservice'],
                         'c': ['c_ios', 'c_android', 'c_linux_x86_64', 'c_windows', 'c_macos']
                     ]
-                    
+
                     platformSpecs.each { spec ->
                         def parts = spec.split(':')
                         def platform = parts[0]
                         def versionPart = parts[1]
-                        
+
                         // Extract version (with or without build number)
                         def cblVersion = versionPart
-                        
+
                         // Add all test server platforms for this platform
                         if (platformMapping.containsKey(platform)) {
                             platformMapping[platform].each { serverPlatform ->
@@ -113,9 +113,9 @@ pipeline {
                             }
                         }
                     }
-                    
+
                     echo "Will prebuild test servers for platforms: ${platformsToBuild.join(', ')}"
-                    
+
                     // Build all required test server platforms in parallel
                     def parallelBuilds = [:]
                     platformsToBuild.each { platform ->
@@ -133,7 +133,7 @@ pipeline {
                             propagate: true
                         }
                     }
-                    
+
                     if (parallelBuilds.size() > 0 && !params.DISABLE_PREBUILD) {
                         parallel parallelBuilds
                     } else {
@@ -143,9 +143,9 @@ pipeline {
             }
         }
         stage('Setup and Run Tests') {
-            agent { label 'mob-e2e-mac-01' }
+            agent { label 'qe-mac-india' }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
+                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
                 DOTNET_ROOT = "/opt/homebrew/opt/dotnet/libexec"
                 PATH = "/Users/qe_mobile_india/.local/bin:/Library/Java/JavaVirtualMachines/temurin-11.jdk/Contents/Home/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Users/qe_mobile_india/.dotnet/tools:/opt/homebrew/opt/dotnet:${DOTNET_ROOT}:/Users/qe_mobile_india/Library/Android/sdk/cmdline-tools/latest/bin:/Users/qe_mobile_india/Library/Android/sdk/platform-tools:/Users/qe_mobile_india/Library/Android/sdk/emulator:${PATH}"
                 AWS_PROFILE = "default"
@@ -168,6 +168,7 @@ pipeline {
                     archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
                     archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
                 }
+            }
         }
     }
-} 
+}

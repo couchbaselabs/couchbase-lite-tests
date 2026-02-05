@@ -4,6 +4,8 @@
 <dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>For Advertising Service</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+    <string>For Multipeer Replicator</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_testserver._tcp</string>
