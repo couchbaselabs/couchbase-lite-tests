@@ -6,8 +6,8 @@ setsid /home/ec2-user/shell2http/shell2http -no-index -cgi -500 -port 20001 \
 /add-user $SCRIPT_DIR/add-user.sh \
 /firewall $SCRIPT_DIR/firewall.sh \
 /kill-edgeserver $SCRIPT_DIR/kill-edgeserver.sh \
-/reset-db $SCRIPT_DIR/reset-db.sh /start-edgeserver \
-$SCRIPT_DIR/start-edgeserver.sh > /dev/null 2>&1 &
+/reset-db $SCRIPT_DIR/reset-db.sh \
+/start-edgeserver $SCRIPT_DIR/start-edgeserver.sh > /dev/null 2>&1 &
 
 chmod +x /home/ec2-user/shell2http/add-user.sh
 chmod +x /home/ec2-user/shell2http/start-edgeserver.sh
