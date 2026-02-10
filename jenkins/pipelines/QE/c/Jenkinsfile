@@ -24,7 +24,7 @@ pipeline {
             steps {
                 script {
                     def platforms = [
-                        'c_windows', 'c_ios', 'c_android', 'c_macos', 'c_linux_x86_64'
+                        'c_windows', 'c_ios', 'c_android', 'c_macos'
                     ]
                     def parallelBuilds = [:]
                     for(p in platforms) {
