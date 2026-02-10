@@ -397,7 +397,11 @@ class iOSBridge(PlatformBridge):
 
                 click.echo(f"Broadcasting ping request on {interface} ({ip})")
                 result = subprocess.run(
-                    ["ping", ip, "-c", "3"], check=False, capture_output=True, text=True,timeout=10
+                    ["ping", ip, "-c", "3"],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
                 )
 
                 if result.returncode != 0:
@@ -448,7 +452,7 @@ class iOSBridge(PlatformBridge):
         )
         for line in result.stdout.split("\n"):
             if mac_address in line:
-                var=line.split(" ")[1].strip("()")
+                var = line.split(" ")[1].strip("()")
                 click.echo(f"Found MAC address {var} ")
                 return var
         click.echo(f"Could not find MAC address {mac_address}")
