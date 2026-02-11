@@ -21,7 +21,7 @@ function create_venv() {
         fi
     fi
 
-    uv venv ---clear -python $REQUIRED_VERSION $1
+    uv venv --clear -python $REQUIRED_VERSION $1
 
     source "$1/bin/activate"
     python -m ensurepip --upgrade
