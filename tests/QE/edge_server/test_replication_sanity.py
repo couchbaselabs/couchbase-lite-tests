@@ -105,6 +105,7 @@ class TestReplicationSanity(CBLTestClass):
         assert created_doc is not None, (
             f"Failed to create document {doc_id_sg} via Sync Gateway."
         )
+        # Allow replication to propagate before validating (eventual consistency).
         time.sleep(5)
 
         self.mark_test_step(f"Validating document {doc_id_sg} on Edge Server.")
@@ -134,6 +135,7 @@ class TestReplicationSanity(CBLTestClass):
         assert updated_doc is not None, (
             f"Failed to update document {doc_id_sg} via Edge Server"
         )
+        # Allow replication to propagate before validating (eventual consistency).
         time.sleep(5)
 
         self.mark_test_step(f"Validating update for {doc_id_sg} on Sync Gateway.")
@@ -149,6 +151,7 @@ class TestReplicationSanity(CBLTestClass):
         await sync_gateway.delete_document(doc_id_sg, rev_id, sg_db_name)
 
         self.mark_test_step(f"Validating deletion of {doc_id_sg} on Edge Server.")
+        # Allow replication to propagate before validating (eventual consistency).
         time.sleep(5)
 
         with pytest.raises(CblEdgeServerBadResponseError):
@@ -166,6 +169,7 @@ class TestReplicationSanity(CBLTestClass):
         assert created_doc is not None, (
             f"Failed to create document {doc_id_es} via Edge Server."
         )
+        # Allow replication to propagate before validating (eventual consistency).
         time.sleep(5)
 
         self.mark_test_step(f"Validating document {doc_id_es} on Sync Gateway.")
@@ -190,6 +194,7 @@ class TestReplicationSanity(CBLTestClass):
         assert updated_doc is not None, (
             f"Failed to update document {doc_id_es} via Sync Gateway."
         )
+        # Allow replication to propagate before validating (eventual consistency).
         time.sleep(5)
 
         self.mark_test_step(f"Validating update for {doc_id_es} on Edge Server.")
@@ -208,6 +213,7 @@ class TestReplicationSanity(CBLTestClass):
         assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
             f"Failed to delete document {doc_id_es} via Edge Server."
         )
+        # Allow replication to propagate before validating (eventual consistency).
         time.sleep(5)
 
         self.mark_test_step(f"Validating deletion of {doc_id_es} on Sync Gateway.")

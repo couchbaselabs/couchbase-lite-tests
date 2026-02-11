@@ -134,6 +134,7 @@ class TestSystem(CBLTestClass):
                 assert created_doc is not None, (
                     f"Failed to create document {doc_id} via Sync Gateway."
                 )
+                # Allow replication to propagate before validating (eventual consistency).
                 time.sleep(random.uniform(1, 5))
 
                 remote_doc = await edge_server.get_document(es_db_name, doc_id)
@@ -183,7 +184,7 @@ class TestSystem(CBLTestClass):
                     # Validating on Edge Server
                     with pytest.raises(CblEdgeServerBadResponseError):
                         await edge_server.get_document(es_db_name, doc_id)
-                    # Validating on Sync Gateway
+                    # Allow replication to propagate before validating (eventual consistency).
                     time.sleep(2)
 
                     with pytest.raises(CblSyncGatewayBadResponseError):
@@ -195,6 +196,7 @@ class TestSystem(CBLTestClass):
                 assert created_doc is not None, (
                     f"Failed to create document {doc_id} via Edge Server"
                 )
+                # Allow replication to propagate before validating (eventual consistency).
                 time.sleep(5)
                 sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
                 assert sg_doc is not None, (
@@ -228,6 +230,7 @@ class TestSystem(CBLTestClass):
                     # Delete on sync gateway and validate on edge server
                     assert rev_id is not None, "rev_id required for delete"
                     await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
+                    # Allow replication to propagate before validating (eventual consistency).
                     time.sleep(2)
 
                     with pytest.raises(CblEdgeServerBadResponseError):
@@ -252,6 +255,7 @@ class TestSystem(CBLTestClass):
         while datetime.now() < end_time:
             if datetime.now() > end:
                 await edge_server.start_server()
+                # Allow edge server to stabilize after restart.
                 time.sleep(10)
                 edge_server_down = False
 
@@ -278,6 +282,7 @@ class TestSystem(CBLTestClass):
             if not edge_server_down and random.random() <= 0.4:  # 40% chance of chaos
                 await edge_server.kill_server()
                 end = datetime.now() + timedelta(minutes=1)
+                # Allow time after stopping edge server before next operations.
                 time.sleep(10)
                 edge_server_down = True
 
@@ -289,6 +294,7 @@ class TestSystem(CBLTestClass):
                 assert created_doc is not None, (
                     f"Failed to create document {doc_id} via Sync Gateway."
                 )
+                # Allow replication to propagate before validating (eventual consistency).
                 time.sleep(random.uniform(1, 5))
 
                 if not edge_server_down:
@@ -343,7 +349,7 @@ class TestSystem(CBLTestClass):
                         # Validating on Edge Server
                         with pytest.raises(CblEdgeServerBadResponseError):
                             await edge_server.get_document(es_db_name, doc_id)
-                        # Validating on Sync Gateway
+                        # Allow replication to propagate before validating (eventual consistency).
                         time.sleep(2)
 
                         with pytest.raises(CblSyncGatewayBadResponseError):
@@ -389,6 +395,7 @@ class TestSystem(CBLTestClass):
                         # Delete on sync gateway and validate on edge server
                         assert rev_id is not None, "rev_id required for delete"
                         await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
+                        # Allow replication to propagate before validating (eventual consistency).
                         time.sleep(2)
 
                         with pytest.raises(CblEdgeServerBadResponseError):
