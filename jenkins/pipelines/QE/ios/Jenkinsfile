@@ -54,7 +54,8 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/ios/teardown.sh"
                     }
-                    archiveArtifacts artifacts: 'tests/QE/ios/**/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
                     echo "=== iOS Test Teardown Complete"
                 }
             }
