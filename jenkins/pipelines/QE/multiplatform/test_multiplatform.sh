@@ -81,7 +81,7 @@ PLATFORM_CONFIGS="$1"
 SG_VERSION="$2"
 TEST_NAME="${3:-test_delta_sync.py::TestDeltaSync::test_delta_sync_replication}"
 TOPOLOGY_FILE="$SCRIPT_DIR/${4:-topology.json}"
-
+export UV_VENV_CLEAR=1
 # Validate inputs
 if [ -z "$PLATFORM_CONFIGS" ]; then
     echo "❌ Error: Platform configurations cannot be empty"

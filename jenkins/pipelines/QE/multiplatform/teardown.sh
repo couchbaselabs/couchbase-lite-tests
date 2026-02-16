@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
-
+export UV_VENV_CLEAR=1
 echo "Tearing down multiplatform test environment..."
 
 # Teardown AWS backend resources (SGW and CBS)
