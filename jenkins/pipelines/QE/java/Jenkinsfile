@@ -20,17 +20,17 @@ pipeline {
                 }
             }
         }
-        stage('Prebuild Servers') {
-            steps {
-                build job: 'prebuild-test-server',
-                parameters: [
-                    string(name: 'TS_PLATFORM', value: 'jak_desktop'),
-                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                ],
-                wait: true,
-                propagate: true
-            }
-        }
+//         stage('Prebuild Servers') {
+//             steps {
+//                 build job: 'prebuild-test-server',
+//                 parameters: [
+//                     string(name: 'TS_PLATFORM', value: 'jak_desktop'),
+//                     string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+//                 ],
+//                 wait: true,
+//                 propagate: true
+//             }
+//         }
         stage('Run Tests') {
             parallel {
                 stage('macOS Desktop') {
@@ -75,15 +75,26 @@ pipeline {
                     steps {
                         echo "=== Run Windows Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            powershell "jenkins\\pipelines\\QE\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION}"
-                        }
+                            bat '''
+                            "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
+                            -NoProfile ^
+                            -ExecutionPolicy Bypass ^
+                            -File jenkins\\pipelines\\QE\\java\\desktop\\run_test.ps1 ^
+                            -Version %CBL_VERSION% ^
+                            -SgwVersion %SGW_VERSION%
+                            '''                        }
                         echo "=== Windows Desktop Tests Complete"
                     }
                     post {
                         always {
                             echo "=== Teardown Windows Desktop Tests"
                             timeout(time: 5, unit: 'MINUTES') {
-                                powershell 'jenkins\\pipelines\\QE\\java\\desktop\\teardown.ps1'
+                                bat '''
+                                "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
+                                -NoProfile ^
+                                -ExecutionPolicy Bypass ^
+                                -File jenkins\\pipelines\\QE\\java\\desktop\\teardown.ps1
+                                '''
                             }
                             archiveArtifacts artifacts: 'tests\\QE\\java_windows_desktop\\**\\*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Windows Desktop Test Teardown Complete"
