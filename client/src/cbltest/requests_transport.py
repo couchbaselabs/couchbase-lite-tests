@@ -57,7 +57,7 @@ class _RequestHttpTransport(RequestTransport):
         resp_version_header = resp.headers.get("CBLTest-API-Version")
         uuid = resp.headers.get("CBLTest-Server-ID")
         if uuid is None:
-            raise CblTestError("Missing CBLTest-Server-ID header from response")
+            raise CblTestError(f"Missing CBLTest-Server-ID header from response {str(resp)}")
 
         resp_version = (
             int(resp_version_header) if resp_version_header is not None else 0
