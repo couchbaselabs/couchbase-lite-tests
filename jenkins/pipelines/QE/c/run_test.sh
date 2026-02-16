@@ -30,7 +30,7 @@ for arg in "$@"; do
         SETUP_ONLY=true
     fi
 done
-
+stop_venv
 create_venv venv
 source venv/bin/activate
 pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
