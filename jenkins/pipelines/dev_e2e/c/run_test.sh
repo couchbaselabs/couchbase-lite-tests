@@ -22,7 +22,7 @@ cbl_version=$1
 platform=$2
 sgw_version=$3
 dataset_version=${4:-"4.0"}
-export UV_VENV_CLEAR=1
+
 stop_venv
 create_venv venv
 source venv/bin/activate
