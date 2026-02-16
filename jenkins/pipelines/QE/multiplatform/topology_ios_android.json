@@ -81,36 +81,8 @@
         {
             "platform": "jak_android",
             "cbl_version": "{{jak_android}}",
-            "location": "35101FDH20004D",
-            "ip_hint": "172.16.150.164",
-            "download": true
-        },
-        {
-            "platform": "jak_android",
-            "cbl_version": "{{jak_android}}",
-            "location": "RZCWC0DAYLW",
-            "ip_hint": "172.16.150.160",
-            "download": true
-        },
-        {
-            "platform": "jak_android",
-            "cbl_version": "{{jak_android}}",
-            "location": "RZCY60E6SCF",
-            "ip_hint": "172.16.150.166",
-            "download": true
-        },
-        {
-            "platform": "jak_android",
-            "cbl_version": "{{jak_android}}",
             "location": "RZCT31DWZEV",
             "ip_hint": "172.16.150.161",
-            "download": true
-        },
-        {
-            "platform": "jak_android",
-            "cbl_version": "{{jak_android}}",
-            "location": "R58M87C818K",
-            "ip_hint": "172.16.150.163",
             "download": true
         }
     ],
