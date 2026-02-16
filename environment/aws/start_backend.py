@@ -190,7 +190,7 @@ def write_config(
                     else 5173
                     if ts.platform == "js"
                     else 8081
-                    if ts.platform == "c_windows"
+                    if ts.platform.endswith("windows" )
                     else 8080
                 )
                 ts_definition = {

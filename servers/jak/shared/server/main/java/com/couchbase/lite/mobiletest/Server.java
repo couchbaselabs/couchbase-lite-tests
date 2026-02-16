@@ -25,7 +25,7 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 public class Server extends NanoHTTPD {
     private static final String TAG = "SERVER";
 
-    private static final int PORT = 8080;
+    private static final int PORT = 8081;
 
     private static class SafeResponse extends Response {
         private final Status status;
