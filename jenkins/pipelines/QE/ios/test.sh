@@ -28,7 +28,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
 
 echo "Setup backend..."
-
+export UV_VENV_CLEAR=1
 create_venv venv
 source venv/bin/activate
 
