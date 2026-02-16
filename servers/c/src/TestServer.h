@@ -15,7 +15,7 @@ namespace ts {
     public:
         static constexpr const char *CBL_PLATFORM_NAME = "couchbase-lite-c";
         static constexpr unsigned short API_VERSION = 1;
-        static constexpr unsigned short PORT = 8081;
+        static constexpr unsigned short PORT = 8080;
 
         struct Context {
             std::string filesDir;
