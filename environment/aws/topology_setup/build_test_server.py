@@ -87,21 +87,21 @@ def main() -> None:
     args = parser.parse_args()
     server = TestServer.create(args.platform, args.version)
 
-    if args.ci and upload_exists(server):
-        click.secho("Server already exists on latestbuilds, skipping build", fg="green")
-        exit(0)
+    # if args.ci and upload_exists(server):
+    #     click.secho("Server already exists on latestbuilds, skipping build", fg="green")
+    #     exit(0)
 
     server.build()
 
-    if not args.ci and not args.upload:
-        click.secho("Upload not requested, skipping", fg="yellow")
-        exit(0)
-
-    if upload_exists(server):
-        click.secho(
-            "Server already exists on latestbuilds, skipping upload", fg="yellow"
-        )
-        exit(0)
+    # if not args.ci and not args.upload:
+    #     click.secho("Upload not requested, skipping", fg="yellow")
+    #     exit(0)
+    #
+    # if upload_exists(server):
+    #     click.secho(
+    #         "Server already exists on latestbuilds, skipping upload", fg="yellow"
+    #     )
+    #     exit(0)
 
     if "LATESTBUILDS_PASSWORD" not in os.environ:
         click.secho("LATESTBUILDS_PASSWORD env var is not set", fg="red")
