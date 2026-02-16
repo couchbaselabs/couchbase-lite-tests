@@ -189,6 +189,8 @@ def write_config(
                     if ts.platform.startswith("dotnet")
                     else 5173
                     if ts.platform == "js"
+                    else 8081
+                    if ts.platform == "c_windows"
                     else 8080
                 )
                 ts_definition = {
