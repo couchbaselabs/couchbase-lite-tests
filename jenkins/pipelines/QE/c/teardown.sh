@@ -8,7 +8,7 @@ source $SCRIPT_DIR/../../shared/config.sh
 export PYTHONPATH=$SCRIPT_DIR/../../../
 pushd $AWS_ENVIRONMENT_DIR
 move_artifacts
-
+export UV_VENV_CLEAR=1
 create_venv venv
 source venv/bin/activate
 pip install -r requirements.txt
