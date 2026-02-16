@@ -34,7 +34,14 @@ pipeline {
                     steps {
                         echo "=== Run C Windows Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            powershell "jenkins\\pipelines\\QE\\c\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION}"
+                            bat '''
+                            "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
+                            -NoProfile ^
+                            -ExecutionPolicy Bypass ^
+                            -File jenkins\\pipelines\\QE\\c\\run_test.ps1 ^
+                            -Version %CBL_VERSION% ^
+                            -SgwVersion %SGW_VERSION%
+                            '''
                         }
                         echo "=== C Windows Tests Complete"
                     }
@@ -42,7 +49,12 @@ pipeline {
                         always {
                             echo "=== Teardown C Windows Tests"
                             timeout(time: 5, unit: 'MINUTES') {
-                                powershell 'jenkins\\pipelines\\QE\\c\\teardown.ps1'
+                                bat '''
+                                "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
+                                -NoProfile ^
+                                -ExecutionPolicy Bypass ^
+                                -File jenkins\\pipelines\\QE\\c\\teardown.ps1
+                                '''
                             }
                             archiveArtifacts artifacts: 'tests\\QE\\c_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
                             echo "=== C Windows Test Teardown Complete"
