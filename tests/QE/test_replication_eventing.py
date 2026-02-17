@@ -1,4 +1,5 @@
 from datetime import timedelta
+import time
 from pathlib import Path
 
 import pytest
@@ -93,6 +94,7 @@ class TestReplicationEventing(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
+        time.sleep(10)
         status = await replicator.wait_for(
             ReplicatorActivityLevel.STOPPED,
             timedelta(seconds=5),
