@@ -65,7 +65,7 @@ pipeline {
                 label getNodeForPlatform(params.TS_PLATFORM)
             }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
+                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
             }
             steps {
                 checkout([
@@ -99,6 +99,7 @@ pipeline {
                             sh """#!/bin/bash -e
 
                                 source jenkins/pipelines/shared/config.sh
+                                export UV_VENV_CLEAR=1
                                 create_venv venv
                                 source venv/bin/activate
                                 pip install uv
