@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.io.OutputStream;
+import java.util.Locale;
 import java.util.Map;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -25,7 +26,20 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 public class Server extends NanoHTTPD {
     private static final String TAG = "SERVER";
 
-    private static final int PORT = 8080;
+    // Use 8081 on Windows to avoid clashes with other services; 8080 elsewhere.
+    // Can be overridden with -Dcbl.testserver.port=<port>.
+    private static final int PORT = initPort();
+
+    private static int initPort() {
+        final String override = System.getProperty("cbl.testserver.port");
+        if ((override != null) && !override.isEmpty()) {
+            try { return Integer.parseInt(override); }
+            catch (NumberFormatException ignore) { /* fall through to defaults */ }
+        }
+
+        final String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        return osName.contains("win") ? 8081 : 8080;
+    }
 
     private static class SafeResponse extends Response {
         private final Status status;
