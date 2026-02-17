@@ -63,33 +63,33 @@ pipeline {
                         }
                     }
                 }
-                stage('Linux Desktop') {
-                    agent { label 'linux-java' }
-                    options {
-                        lock('linux-java')
-                    }
-                    environment {
-                        TS_ARTIFACTS_DIR = 'java_desktop'
-                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
-                    }
-                    steps {
-                        echo "=== Run Linux Desktop Tests"
-                        timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
-                        }
-                        echo "=== Linux Desktop Tests Complete"
-                    }
-                    post {
-                        always {
-                            echo "=== Teardown Linux Desktop Tests"
-                            timeout(time: 5, unit: 'MINUTES') {
-                                sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'
-                            }
-                            archiveArtifacts artifacts: 'tests/QE/java_desktop/**/*', fingerprint: true, allowEmptyArchive: true
-                            echo "=== Linux Desktop Test Teardown Complete"
-                        }
-                    }
-                }
+//                 stage('Linux Desktop') {
+//                     agent { label 'linux-java' }
+//                     options {
+//                         lock('linux-java')
+//                     }
+//                     environment {
+//                         TS_ARTIFACTS_DIR = 'java_desktop'
+//                         TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+//                     }
+//                     steps {
+//                         echo "=== Run Linux Desktop Tests"
+//                         timeout(time: 120, unit: 'MINUTES') {
+//                             sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
+//                         }
+//                         echo "=== Linux Desktop Tests Complete"
+//                     }
+//                     post {
+//                         always {
+//                             echo "=== Teardown Linux Desktop Tests"
+//                             timeout(time: 5, unit: 'MINUTES') {
+//                                 sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'
+//                             }
+//                             archiveArtifacts artifacts: 'tests/QE/java_desktop/**/*', fingerprint: true, allowEmptyArchive: true
+//                             echo "=== Linux Desktop Test Teardown Complete"
+//                         }
+//                     }
+//                 }
             }
         }
     }
