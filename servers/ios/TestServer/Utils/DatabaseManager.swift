@@ -335,17 +335,17 @@ class DatabaseManager {
             authenticator: authenticator,
             collections: collectionConfigs)
         
-        if let transports = config.transports, !transports.isEmpty {
-            let transportMap = transports.map { tr in
-                switch tr {
-                case ContentTypes.MultipeerTransport.wifi:
-                    return CouchbaseLiteSwift.MultipeerTransport.wifi
-                case ContentTypes.MultipeerTransport.bluetooth:
-                    return CouchbaseLiteSwift.MultipeerTransport.bluetooth
-                }
-            }
-            conf.transports = Set(transportMap)
-        }
+//         if let transports = config.transports, !transports.isEmpty {
+//             let transportMap = transports.map { tr in
+//                 switch tr {
+//                 case ContentTypes.MultipeerTransport.wifi:
+//                     return CouchbaseLiteSwift.MultipeerTransport.wifi
+//                 case ContentTypes.MultipeerTransport.bluetooth:
+//                     return CouchbaseLiteSwift.MultipeerTransport.bluetooth
+//                 }
+//             }
+//             conf.transports = Set(transportMap)
+//         }
         
         let id = UUID()
         
