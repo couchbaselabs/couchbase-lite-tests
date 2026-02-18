@@ -203,7 +203,7 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
             final Dictionary localDict = localDoc.getDictionary(docProp);
             final Dictionary remoteDict = remoteDoc.getDictionary(docProp);
             if(localDict == null || remoteDict == null) {
-                return doc.setString(docProp, "Both values are not dictionary");
+                return doc.setString("bad", "really bad");
             }
 
             final MutableDictionary mergedDict = localDict.toMutable();
