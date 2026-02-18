@@ -62,10 +62,15 @@ pipeline {
         }
         stage('Build') {
             agent {
-                label getNodeForPlatform(params.TS_PLATFORM)
+                // label getNodeForPlatform(params.TS_PLATFORM)
+                label 'qe-mac-india'
+            options {
+                lock('qe-mac-india')
+            }
             }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
+                // KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
+                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
             }
             steps {
                 cleanWs()
