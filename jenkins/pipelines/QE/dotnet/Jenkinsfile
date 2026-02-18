@@ -57,7 +57,15 @@ pipeline {
                     steps {
                         echo "=== Run Dotnet Windows Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION}"
+                            bat '''
+                            "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
+                            -NoProfile ^
+                            -ExecutionPolicy Bypass ^
+                            -File jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 ^
+                            -Version %CBL_VERSION% ^
+                            -SgwVersion %SGW_VERSION% ^
+                            -OutputDir QE\\%TS_ARTIFACTS_DIR%
+                            '''
                         }
                         echo "=== Dotnet Windows Tests Complete"
                     }
@@ -65,7 +73,12 @@ pipeline {
                         always {
                             echo "=== Teardown Dotnet Windows Tests"
                             timeout(time: 5, unit: 'MINUTES') {
-                                powershell 'jenkins\\pipelines\\QE\\dotnet\\teardown.ps1'
+                                bat '''
+                                "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
+                                -NoProfile ^
+                                -ExecutionPolicy Bypass ^
+                                -File jenkins\\pipelines\\QE\\dotnet\\teardown.ps1
+                                '''
                             }
                             archiveArtifacts artifacts: 'tests\\QE\\dotnet_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Dotnet Windows Test Teardown Complete"
