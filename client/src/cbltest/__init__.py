@@ -106,7 +106,7 @@ class CBLPyTest:
         log_level: LogLevel = LogLevel.VERBOSE,
         extra_props_path: str | None = None,
         test_server_only: bool = False,
-        dataset_version: str = "4.0",
+        dataset_version: str = "3.2",
     ):
         _assert_not_null(config_path, "config_path")
         self.__config = _parse_config(config_path)
