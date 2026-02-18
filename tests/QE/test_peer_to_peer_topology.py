@@ -136,8 +136,6 @@ class TestPeerToPeerTopology(CBLTestClass):
             for _, listener in listeners:
                 await listener.stop()
 
-        self.mark_test_step("Test completed successfully.")
-
     @pytest.mark.parametrize(
         "num_of_docs, continuous, replicator_type",
         [
@@ -262,5 +260,3 @@ class TestPeerToPeerTopology(CBLTestClass):
             assert compare_doc_results_p2p(
                 all_docs_results[0]["_default._default"], all_docs["_default._default"]
             ), "All databases should have the same content after all phases complete"
-
-        self.mark_test_step("Test completed successfully.")

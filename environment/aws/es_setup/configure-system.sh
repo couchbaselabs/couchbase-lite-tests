@@ -2,6 +2,7 @@
 
 set -x
 
+mkdir -p $HOME/audit
 mkdir -p $HOME/cert
 mkdir -p $HOME/database
 mkdir -p $HOME/log
