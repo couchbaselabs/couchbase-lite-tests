@@ -34,6 +34,7 @@ pytest==8.3.4
 pytest-asyncio==0.25.2
 requests==2.32.3
 ruff==0.9.2
+pyjson5==1.6.8
 tomli==2.2.1
 types-Deprecated==1.2.15.20241117
 types-requests==2.32.0.20241016
