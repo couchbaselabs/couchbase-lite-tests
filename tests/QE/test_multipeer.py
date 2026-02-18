@@ -94,7 +94,7 @@ class TestMultipeer(CBLTestClass):
         expected_keys = {f"device{i + 1}" for i in range(len(all_dbs))}
         retry = 5
         for i, doc in enumerate(results, 1):
-            print(f"device_{i}: {doc}")
+            print(f"device_{i}: {doc.body}")
         for doc in results:
             counter = doc.body["counter"]
             assert set(counter.keys()) == expected_keys, (

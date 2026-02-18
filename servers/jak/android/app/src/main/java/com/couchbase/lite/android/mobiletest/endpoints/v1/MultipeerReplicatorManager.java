@@ -202,6 +202,19 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
 
             final Dictionary localDict = localDoc.getDictionary(docProp);
             final Dictionary remoteDict = remoteDoc.getDictionary(docProp);
+
+            if (localDict != null) {
+                Log.p(TAG, ">>>>>> localDict : " + localDict.toString());
+            } else {
+                Log.p(TAG, ">>>>>> localDict : NULL");
+            }
+
+            if (remoteDict != null) {
+                Log.p(TAG, ">>>>>> remoteDict : " + localDict.toString());
+            } else {
+                Log.p(TAG, ">>>>>> remoteDict : NULL");
+            }
+
             if(localDict == null || remoteDict == null) {
                 doc.setString("foo", "bar");
                 return doc.setString(docProp, "Both values are not dictionary");
