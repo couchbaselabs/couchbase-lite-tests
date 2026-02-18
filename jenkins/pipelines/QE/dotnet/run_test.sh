@@ -42,6 +42,11 @@ done
 
 prepare_dotnet
 
+if [ -d "venv" ]; then
+    echo "Clearing existing virtual environment"
+    rm -rf venv
+fi
+
 create_venv venv
 source venv/bin/activate
 pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
