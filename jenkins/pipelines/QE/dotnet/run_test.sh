@@ -60,6 +60,8 @@ if [ "$SETUP_ONLY" = true ]; then
 fi
 
 pushd $QE_TESTS_DIR
+if [ -d "venv" ]; then echo "Clearing existing virtual environment" rm -rf venv fi
+
 create_venv venv
 source venv/bin/activate
 pip install -r requirements.txt
