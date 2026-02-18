@@ -14,6 +14,7 @@ if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then usage; fi
 
 CBL_VERSION=${1}
 SGW_VERSION=${2}
+DATASET_VERSION=${3:-"4.0"}
 SETUP_ONLY=false
 
 # Check for --setup-only flag
@@ -28,14 +29,14 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
 
 echo "Setup backend..."
-
+export UV_VENV_CLEAR=1
 create_venv venv
 source venv/bin/activate
 
 export PATH="/opt/homebrew/bin:$PATH"
 
 pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
+python $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
 deactivate
 
 # Exit early if setup-only mode
@@ -51,6 +52,6 @@ pushd "${QE_TESTS_DIR}" > /dev/null
 create_venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl
+pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl --dataset-version $DATASET_VERSION
 deactivate
 popd > /dev/null
