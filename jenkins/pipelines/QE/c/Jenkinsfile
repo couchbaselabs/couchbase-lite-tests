@@ -58,7 +58,6 @@ pipeline {
                     -File jenkins\\pipelines\\QE\\c\\run_test.ps1 ^
                     -Version %CBL_VERSION% ^
                     -SgwVersion %SGW_VERSION% ^
-                    -OutputDir tests/%TS_ARTIFACTS_DIR%
                     '''
                 }
                 echo "=== C Windows Tests Complete"
@@ -74,7 +73,7 @@ pipeline {
                         -File jenkins\\pipelines\\QE\\c\\teardown.ps1
                         '''
                     }
-                    archiveArtifacts artifacts: "tests/%TS_ARTIFACTS_DIR%/**/*", fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: "tests\\QE\\${env.TS_ARTIFACTS_DIR}\\**\\*", fingerprint: true, allowEmptyArchive: true
                     echo "=== C Windows Test Teardown Complete"
                 }
             }
