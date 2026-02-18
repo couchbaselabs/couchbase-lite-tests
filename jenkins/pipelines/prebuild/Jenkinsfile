@@ -62,7 +62,7 @@ pipeline {
         }
         stage('Build') {
             agent {
-                label.getNodeForPlatform(params.TS_PLATFORM)
+                label getNodeForPlatform(params.TS_PLATFORM)
             }
             environment {
                 KEYCHAIN_PASSWORD = getKeychainPasswordForPlatform(params.TS_PLATFORM)
