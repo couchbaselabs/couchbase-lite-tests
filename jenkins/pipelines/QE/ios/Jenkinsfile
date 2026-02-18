@@ -44,7 +44,7 @@ pipeline {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "=== Run iOS Tests"
                 timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
+                    sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ${TS_DATASET_VERSION}"
                 }
                 echo "=== iOS Tests Complete"
             }
