@@ -149,12 +149,12 @@ pipeline {
                     }
                 }
                 stage('Android') {
-                    agent { label 'mac-mini-CBL-Android1' }
+                    agent { label 'qe-mac-india' }
                     options {
-                        lock('mac-mini-CBL-Android1,R5CT20FYA7R')
+                        lock('qe-mac-india,56141JEBF18456')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
                         ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
                         JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
                         PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"

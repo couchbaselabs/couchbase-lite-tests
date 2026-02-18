@@ -4,7 +4,8 @@
         {
             "platform": "jak_android",
             "cbl_version": "{{version}}",
-            "location": "R5CT20FYA7R",
+            "location": "56141JEBF18456",
+            "ip_hint": "172.16.150.165",
             "download": true
         }
     ],
