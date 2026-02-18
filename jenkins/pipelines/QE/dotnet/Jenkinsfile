@@ -63,8 +63,7 @@ pipeline {
                             -ExecutionPolicy Bypass ^
                             -File jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 ^
                             -Version %CBL_VERSION% ^
-                            -SgwVersion %SGW_VERSION% ^
-                            -OutputDir QE\\%TS_ARTIFACTS_DIR%
+                            -SgwVersion %SGW_VERSION%
                             '''
                         }
                         echo "=== Dotnet Windows Tests Complete"
