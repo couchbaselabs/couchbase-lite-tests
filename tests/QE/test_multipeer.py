@@ -49,7 +49,7 @@ class TestMultipeer(CBLTestClass):
                 await b.upsert_document(
                     "_default._default",
                     "conflict1",
-                    [{"counter": {device_key: idx + 1}}],
+                    [{"counter": {device_key: idx + 1}, "hi": "there"}],
                 )
 
         self.mark_test_step("Start multipeer replication with merge conflict resolver")
