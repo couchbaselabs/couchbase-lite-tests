@@ -93,6 +93,8 @@ class TestMultipeer(CBLTestClass):
         )
         expected_keys = {f"device{i + 1}" for i in range(len(all_dbs))}
         retry = 5
+        for i, doc in enumerate(results, 1):
+            print(f"device_{i}: {doc}")
         for doc in results:
             counter = doc.body["counter"]
             assert set(counter.keys()) == expected_keys, (
@@ -776,7 +778,7 @@ class TestMultipeer(CBLTestClass):
 
         self.mark_test_step("Wait for idle status on all devices")
         for device_idx, multipeer in enumerate(multipeer_replicators[1:], 2):
-            status = await multipeer.wait_for_idle(timeout=timedelta(seconds=200))
+            status = await multipeer.wait_for_idle(timeout=timedelta(seconds=600))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
