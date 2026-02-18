@@ -27,34 +27,19 @@ function Move-Artifacts {
         return
     }
 
-    # Determine if we're in dev_e2e or QE.
-    # Teardown scripts run from environment/aws, so relying on current directory is unreliable.
-    # Instead, inspect the call stack to find the invoking pipeline script path.
-    $invokingScript = $null
-    try {
-        $stack = Get-PSCallStack
-        foreach ($frame in $stack) {
-            if ($null -ne $frame.ScriptName -and $frame.ScriptName -ne "" -and $frame.ScriptName -ne $MyInvocation.PSCommandPath) {
-                $invokingScript = $frame.ScriptName
-                break
-            }
-        }
-    } catch {
-        $invokingScript = $null
-    }
-
-    if ($null -ne $invokingScript -and $invokingScript -like "*\pipelines\QE\*") {
-        $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\QE).Path
-    } elseif ($null -ne $invokingScript -and $invokingScript -like "*\pipelines\dev_e2e\*") {
+    # Determine if we're in dev_e2e or QE based on current directory
+    $currentDir = (Get-Location).Path
+    if ($currentDir -like "*\dev_e2e*") {
         $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\dev_e2e).Path
+    } elseif ($currentDir -like "*\QE*") {
+        $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\QE).Path
     } else {
-        # Final fallback: choose based on what exists (prefer QE if present)
-        $qe = (Resolve-Path $PSScriptRoot\..\..\..\tests\QE -ErrorAction SilentlyContinue)
-        $dev = (Resolve-Path $PSScriptRoot\..\..\..\tests\dev_e2e -ErrorAction SilentlyContinue)
-        if ($null -ne $qe) {
-            $SRC_DIR = $qe.Path
+        # Fallback: try to detect from the script directory structure
+        $scriptDir = $PSScriptRoot
+        if ($scriptDir -like "*\QE\*") {
+            $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\QE).Path
         } else {
-            $SRC_DIR = $dev.Path
+            $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\dev_e2e).Path
         }
     }
     
