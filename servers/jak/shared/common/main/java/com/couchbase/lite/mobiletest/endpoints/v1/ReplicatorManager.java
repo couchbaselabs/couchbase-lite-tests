@@ -201,6 +201,7 @@ public class ReplicatorManager extends BaseReplicatorManager {
             final Dictionary localDict = localDoc.getDictionary(docProp);
             final Dictionary remoteDict = remoteDoc.getDictionary(docProp);
             if (localDict == null || remoteDict == null) {
+                doc.setString("bad", "really bad");
                 return doc.setString(docProp, "Both values are not dictionary");
             }
 
@@ -217,6 +218,8 @@ public class ReplicatorManager extends BaseReplicatorManager {
 
                 mergedDict.setValue(key, remoteValue);
             }
+
+            mergedDict.setString("foo", "bar");
 
             return doc.setDictionary(docProp, mergedDict);
         }
