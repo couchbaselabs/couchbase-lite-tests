@@ -30,6 +30,9 @@ pipeline {
         }
         stage('Android') {
             agent { label 'mac-mini-CBL-Android1' }
+            options {
+                lock('mac-mini-CBL-Android1,R5CT20FYA7R')
+            }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe')
                 ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
