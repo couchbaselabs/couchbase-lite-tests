@@ -65,7 +65,7 @@ pipeline {
                 label getNodeForPlatform(params.TS_PLATFORM)
             }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                KEYCHAIN_PASSWORD = credentials('mobile-qe'))
             }
             steps {
                 checkout([
@@ -121,6 +121,6 @@ def getNodeForPlatform(platform) {
     } else if (platform.contains("linux")) {
         return 'mob-e2e-deb-02'
     } else {
-        return 'qe-mac-india'
+        return 'mac-mini-new'
     }
 }
