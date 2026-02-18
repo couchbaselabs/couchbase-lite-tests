@@ -36,6 +36,7 @@ pipeline {
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
                 ANDROID_HOME = "${env.HOME}/Library/Android/sdk"
+                ANDROID_SERIAL = "56141JEBF18456"
                 JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
                 PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 TS_ARTIFACTS_DIR = 'android'
