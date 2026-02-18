@@ -62,14 +62,11 @@ pipeline {
         }
         stage('Build') {
             agent {
-                label 'qe-mac-india'
-            }
-            options {
-                lock('qe-mac-india')
+                label.getNodeForPlatform(params.TS_PLATFORM)
             }
             }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                KEYCHAIN_PASSWORD = getKeychainPasswordForPlatform(params.TS_PLATFORM)
             }
             steps {
                 cleanWs()
@@ -126,6 +123,14 @@ def getNodeForPlatform(platform) {
     } else if (platform.contains("linux")) {
         return 'mob-e2e-deb-02'
     } else {
-        return 'mob-e2e-mac-01'
+        return 'qe-mac-india'
+    }
+}
+
+def getKeychainPasswordForPlatform(platform) {
+    if (platform.contains("linux") or platform.contains("windows")) {
+        return credentials('mobile-qe-india')
+    } else {
+        return credentials('mobile-qe-india')
     }
 }
