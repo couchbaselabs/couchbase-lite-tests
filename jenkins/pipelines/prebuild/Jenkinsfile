@@ -64,7 +64,6 @@ pipeline {
             agent {
                 label.getNodeForPlatform(params.TS_PLATFORM)
             }
-            }
             environment {
                 KEYCHAIN_PASSWORD = getKeychainPasswordForPlatform(params.TS_PLATFORM)
             }
@@ -128,7 +127,7 @@ def getNodeForPlatform(platform) {
 }
 
 def getKeychainPasswordForPlatform(platform) {
-    if (platform.contains("linux") or platform.contains("windows")) {
+    if (platform.contains("linux") || platform.contains("windows")) {
         return credentials('mobile-qe-india')
     } else {
         return credentials('mobile-qe-india')
