@@ -65,7 +65,7 @@ pipeline {
                 label getNodeForPlatform(params.TS_PLATFORM)
             }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe'))
+                KEYCHAIN_PASSWORD = credentials('mobile-qe')
             }
             steps {
                 checkout([
