@@ -208,7 +208,7 @@ pip install -r requirements.txt
 # Set environment variables to prevent output truncation
 export COLUMNS=200
 
-if pytest -v --no-header -W ignore::DeprecationWarning --config config.json "$TEST_NAME"; then
+if pytest -v --no-header -W ignore::DeprecationWarning --config config.json $TEST_NAME; then
     echo "========== PYTEST OUTPUT END =========="
     echo ""
     echo "🎉 COORDINATED TEST PASSED!"
