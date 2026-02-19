@@ -105,6 +105,7 @@ class TestMultipeer(CBLTestClass):
                 and value == int(match.group())
                 for key, value in counter.items()
             ), "Each key's value must be device_id"
+            retry = 5
             while results[0].revs != doc.revs and retry > 0:
                 self.mark_test_step("Rev IDs don't match, wait for 30 seconds")
                 await asyncio.sleep(30)
