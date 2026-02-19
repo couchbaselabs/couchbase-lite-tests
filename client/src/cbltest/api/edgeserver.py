@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, List, cast
 from urllib.parse import urljoin
 
-import pyjson5 as json5  # type: ignore[import-not-found]
+import pyjson5 as json5
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from opentelemetry.trace import get_tracer
 
