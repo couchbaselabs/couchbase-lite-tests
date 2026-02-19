@@ -53,9 +53,9 @@ pipeline {
                     )
 
                     if (response.status != 200) {
-                        env.BUILD_BRANCH = 'bluetooth-multipeer-tests'
+                        env.BUILD_BRANCH = 'main'
                     }
-                    env.BUILD_BRANCH = 'bluetooth-multipeer-tests'
+                    env.BUILD_BRANCH = "bluetooth-multipeer-tests"
                     echo "Build will come from branch ${env.BUILD_BRANCH}"
                 }
             }
@@ -65,7 +65,7 @@ pipeline {
                 label getNodeForPlatform(params.TS_PLATFORM)
             }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
             }
             steps {
                 checkout([
@@ -99,7 +99,6 @@ pipeline {
                             sh """#!/bin/bash -e
 
                                 source jenkins/pipelines/shared/config.sh
-                                export UV_VENV_CLEAR=1
                                 create_venv venv
                                 source venv/bin/activate
                                 pip install uv
@@ -121,6 +120,6 @@ def getNodeForPlatform(platform) {
     } else if (platform.contains("linux")) {
         return 'mob-e2e-deb-02'
     } else {
-        return 'mac-mini-new'
+        return 'mob-e2e-mac-01'
     }
 }
