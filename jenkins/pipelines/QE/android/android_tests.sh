@@ -63,7 +63,8 @@ function bootstrap_cmdline_tools() {
 }
 
 function usage() {
-    echo "Usage: $0 <cbl_version> <sg version> [private key path] [--setup-only]"
+    echo "Usage: $0 <cbl_version> <sg version> [dataset_version] [--setup-only]"
+    echo "  dataset_version: Optional, defaults to 3.2"
     echo "  --setup-only: Only build test server and setup backend, skip test execution"
     exit 1
 }
@@ -75,6 +76,8 @@ if [ -z "$CBL_VERSION" ]; then usage; fi
 
 SG_VERSION="$2"
 if [ -z "$SG_VERSION" ]; then usage; fi
+
+DATASET_VERSION=${3:-"4.0"}
 
 SETUP_ONLY=false
 
@@ -125,6 +128,9 @@ create_venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 adb shell input keyevent KEYCODE_WAKEUP
-pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version 3.2 -m cbl
+pytest --maxfail=7 -W ignore::DeprecationWarning \
+       --config config.json \
+       --dataset-version $DATASET_VERSION \
+       -m cbl
 deactivate
 popd > /dev/null
