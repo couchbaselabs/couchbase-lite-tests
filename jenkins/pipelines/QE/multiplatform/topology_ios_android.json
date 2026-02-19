@@ -61,7 +61,8 @@
             "platform": "jak_android",
             "cbl_version": "{{jak_android}}",
             "location": "RZCT31DWZEV",
-            "ip_hint": "172.16.150.161"
+            "ip_hint": "172.16.150.161",
+            "download": true
         }
     ],
     "logslurp": true
