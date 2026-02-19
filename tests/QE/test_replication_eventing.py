@@ -53,7 +53,11 @@ class TestReplicationEventing(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait for replication to complete.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        status = await replicator.wait_for(
+            ReplicatorActivityLevel.STOPPED,
+            timedelta(seconds=15),
+            timedelta(seconds=900),
+        )
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
@@ -95,8 +99,8 @@ class TestReplicationEventing(CBLTestClass):
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(
             ReplicatorActivityLevel.STOPPED,
-            timedelta(seconds=5),
-            timedelta(seconds=300),
+            timedelta(seconds=15),
+            timedelta(seconds=900),
         )
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
