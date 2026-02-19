@@ -664,7 +664,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "testserver.app"
         )
         zip_path = publish_dir.parents[5] / "testserver_macos.zip"
-        zip_directory(publish_dir, zip_path)
+        zip_directory(publish_dir.parent, zip_path)
         return str(zip_path)
 
     def uncompress_package(self, path: Path) -> None:
