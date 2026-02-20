@@ -4,8 +4,7 @@
         {
             "platform": "dotnet_macos",
             "cbl_version": "{{version}}",
-            "location": "localhost",
-            "download": true
+            "location": "localhost"
         }
     ],
     "include": "../../../../../environment/aws/topology_setup/default_topology.json"
