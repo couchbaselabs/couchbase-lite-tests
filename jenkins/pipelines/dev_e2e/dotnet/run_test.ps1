@@ -24,7 +24,7 @@ if($LASTEXITCODE -ne 0) {
 Push-Location $DEV_E2E_TESTS_DIR
 try {
     uv pip install -r requirements.txt
-    pytest -v --no-header --config config.json
+    pytest -v --no-header --config config.json --dataset-version $DatasetVersion
     $saved_exit = $LASTEXITCODE
     deactivate
 } finally {

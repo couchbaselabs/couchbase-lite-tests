@@ -677,3 +677,6 @@ class DotnetTestServer_macOS(DotnetTestServer):
         """
         unzip_directory(path, path.parent / "testserver.app")
         path.unlink()
+
+        # Shut up, Gatekeeper!
+        subprocess.check_call(["xattr", "-cr", str(path.parent / "testserver.app")])
