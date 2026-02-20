@@ -1,3 +1,11 @@
+[project]
+name = "couchbase-lite-tests"
+requires-python = ">=3.13"
+version = "0.1.0"
+dependencies = [
+  "cbltest",
+]
+
 [tool.ruff]
 lint.extend-select = ["I"]
 lint.ignore = ["E402"]
@@ -9,3 +17,9 @@ exclude = "conftest.py" # Exclude conftest.py, since these are duplicated across
 [[tool.mypy.overrides]]
 module = "couchbase.*"
 ignore_missing_imports = true
+
+[tool.uv.sources]
+cbltest = { workspace = true }
+
+[tool.uv.workspace]
+members = [ "client" ]
