@@ -607,7 +607,9 @@ class DotnetTestServer_macOS(DotnetTestServer):
         Returns:
             Optional[str]: The extra arguments for the build command.
         """
-        return f"-p:RuntimeIdentifier=maccatalyst-{self._mac_arch}"
+
+        # https://github.com/dotnet/macios/issues/21594
+        return "-p:RuntimeIdentifier=maccatalyst-x64"
 
     @property
     def latestbuilds_path(self) -> str:
@@ -622,11 +624,6 @@ class DotnetTestServer_macOS(DotnetTestServer):
             f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
         )
 
-    @property
-    def _mac_arch(self) -> str:
-        """Get the Mac architecture (arm64 for Apple Silicon, x64 for Intel)."""
-        return "arm64" if platform.machine() == "arm64" else "x64"
-
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
         Create a bridge for the .NET test server to be able to install, run, etc.
@@ -634,6 +631,8 @@ class DotnetTestServer_macOS(DotnetTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
+
+        # https://github.com/dotnet/macios/issues/21594
         prefix = (
             TEST_SERVER_DIR / "downloaded" / self.platform / self.version
             if self._downloaded
@@ -642,7 +641,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "bin"
             / "Release"
             / "net9.0-maccatalyst"
-            / f"maccatalyst-{self._mac_arch}"
+            / "maccatalyst-x64"
         )
         return macOSBridge(str(prefix / "testserver.app"))
 
@@ -653,6 +652,8 @@ class DotnetTestServer_macOS(DotnetTestServer):
         Returns:
             str: The path to the compressed package.
         """
+
+        # https://github.com/dotnet/macios/issues/21594
         header(f"Compressing .NET test server for {self.platform}")
         publish_dir = (
             DOTNET_TEST_SERVER_DIR
@@ -660,7 +661,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "bin"
             / "Release"
             / "net9.0-maccatalyst"
-            / f"maccatalyst-{self._mac_arch}"
+            / "maccatalyst-x64"
             / "testserver.app"
         )
         zip_path = publish_dir.parents[5] / "testserver_macos.zip"
