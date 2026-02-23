@@ -10,7 +10,8 @@ authors = [
 ]
 description = "A client for consuming the Couchbase Lite functional testing REST API"
 readme = "README.md"
-requires-python = ">=3.10"
+# couchbase SDK only has wheels for < 3.14
+requires-python = ">=3.10,<3.14"
 license = {text ="Apache-2.0"}
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",

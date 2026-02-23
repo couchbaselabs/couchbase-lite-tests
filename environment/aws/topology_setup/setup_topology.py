@@ -505,7 +505,7 @@ class TopologyConfig:
 
     def __init__(
         self,
-        config_file: str | None = None,
+        config_file: Path | str | None = None,
         parent_defaults: ConfigDefaults | None = None,
     ):
         if config_file is None:

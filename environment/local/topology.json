@@ -1,0 +1,21 @@
+{
+  "$schema": "../aws/topology_setup/topology_schema.json",
+  "test_servers": [
+    {
+      "platform": "c_macos",
+      "cbl_version": "4.0.3",
+      "location": "localhost",
+      "download": true
+    }
+  ],
+  "clusters": [
+    {
+      "server_count": 1
+    }
+  ],
+  "sync_gateways": [
+    {
+      "cluster": 0
+    }
+  ]
+}
