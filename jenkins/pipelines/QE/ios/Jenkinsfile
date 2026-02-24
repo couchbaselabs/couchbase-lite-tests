@@ -29,9 +29,12 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'qe-mac-india' }
+            agent { label 'mac-mini-new' }
+            options {
+                lock('mac-mini-new')
+            }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                KEYCHAIN_PASSWORD = credentials('mobile-qe')
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 TS_ARTIFACTS_DIR = 'ios'
                 TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
@@ -41,7 +44,7 @@ pipeline {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "=== Run iOS Tests"
                 timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
+                    sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ${TS_DATASET_VERSION}"
                 }
                 echo "=== iOS Tests Complete"
             }
@@ -51,7 +54,8 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/ios/teardown.sh"
                     }
-                    archiveArtifacts artifacts: 'tests/QE/ios/**/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/QE/ios/session.log', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/QE/ios/http_log/*', fingerprint: true, allowEmptyArchive: true
                     echo "=== iOS Test Teardown Complete"
                 }
             }

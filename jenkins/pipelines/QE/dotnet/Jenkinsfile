@@ -72,12 +72,12 @@ pipeline {
                     }
                 }
                 stage('macOS') {
-                    agent { label 'qe-mac-india' }
+                    agent { label 'mac-mini-new' }
                     options {
-                        lock('qe-mac-india')
+                        lock('mac-mini-new')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
                         DEVELOPER_DIR = "/Applications/Xcode.app"
                         MD_APPLE_SDK_ROOT = "/Applications/Xcode.app"
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"

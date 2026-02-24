@@ -14,6 +14,7 @@ if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then usage; fi
 
 CBL_VERSION=${1}
 SGW_VERSION=${2}
+DATASET_VERSION=${3:-"4.0"}
 SETUP_ONLY=false
 
 # Check for --setup-only flag
@@ -51,6 +52,6 @@ pushd "${QE_TESTS_DIR}" > /dev/null
 create_venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl
+pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl --dataset-version $DATASET_VERSION
 deactivate
 popd > /dev/null
