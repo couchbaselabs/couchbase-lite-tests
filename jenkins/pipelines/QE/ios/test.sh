@@ -36,7 +36,7 @@ source venv/bin/activate
 export PATH="/opt/homebrew/bin:$PATH"
 
 pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
+python $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
 deactivate
 
 # Exit early if setup-only mode
