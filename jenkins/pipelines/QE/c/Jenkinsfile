@@ -124,6 +124,7 @@ pipeline {
                         }
                         archiveArtifacts artifacts: 'tests/QE/c_ios/**/*', fingerprint: true, allowEmptyArchive: true
                         echo "=== C iOS Test Teardown Complete"
+            }
             agent { label 'linux-c' }
             environment {
                 TS_ARTIFACTS_DIR = 'c'
