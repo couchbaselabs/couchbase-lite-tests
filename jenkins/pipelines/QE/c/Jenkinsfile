@@ -29,101 +29,102 @@ pipeline {
             }
         }
         stage('Tests') {
-        parallel {
-            stage('Windows') {
-                agent { label 'net-windows' }
-                options {
-                    lock('net-windows')
-                }
-                environment {
-                    TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
-                }
-                steps {
-                    echo "=== Run C Windows Tests"
-                    timeout(time: 120, unit: 'MINUTES') {
-                        bat '''
-                        "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
-                        -NoProfile ^
-                        -ExecutionPolicy Bypass ^
-                        -File jenkins\\pipelines\\QE\\c\\run_test.ps1 ^
-                        -Version %CBL_VERSION% ^
-                        -SgwVersion %SGW_VERSION%
-                        '''
+            parallel {
+                stage('Windows') {
+                    agent { label 'net-windows' }
+                    options {
+                        lock('net-windows')
                     }
-                    echo "=== C Windows Tests Complete"
-                }
-                post {
-                    always {
-                        echo "=== Teardown C Windows Tests"
-                        timeout(time: 5, unit: 'MINUTES') {
+                    environment {
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                    }
+                    steps {
+                        echo "=== Run C Windows Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
                             bat '''
                             "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
                             -NoProfile ^
                             -ExecutionPolicy Bypass ^
-                            -File jenkins\\pipelines\\QE\\c\\teardown.ps1
+                            -File jenkins\\pipelines\\QE\\c\\run_test.ps1 ^
+                            -Version %CBL_VERSION% ^
+                            -SgwVersion %SGW_VERSION%
                             '''
                         }
-                        archiveArtifacts artifacts: 'tests\\QE\\c_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
-                        echo "=== C Windows Test Teardown Complete"
+                        echo "=== C Windows Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown C Windows Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                bat '''
+                                "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
+                                -NoProfile ^
+                                -ExecutionPolicy Bypass ^
+                                -File jenkins\\pipelines\\QE\\c\\teardown.ps1
+                                '''
+                            }
+                            archiveArtifacts artifacts: 'tests\\QE\\c_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== C Windows Test Teardown Complete"
+                        }
                     }
                 }
-            }
-            stage('Android') {
-                agent { label 'qe-mac-india' }
-                environment {
-                    KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                    DOTNET_ROOT = "/opt/homebrew/opt/dotnet/libexec"
-                    PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}:/Users/qe_mobile_india/Library/Android/sdk/cmdline-tools/latest/bin:/Users/qe_mobile_india/Library/Android/sdk/platform-tools:/Users/qe_mobile_india/Library/Android/sdk/emulator:${PATH}"
-                    AWS_PROFILE = "default"
-                    ANDROID_HOME = "/Users/qe_mobile_india/Library/Android/sdk"
+                stage('Android') {
+                    agent { label 'qe-mac-india' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                        DOTNET_ROOT = "/opt/homebrew/opt/dotnet/libexec"
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}:/Users/qe_mobile_india/Library/Android/sdk/cmdline-tools/latest/bin:/Users/qe_mobile_india/Library/Android/sdk/platform-tools:/Users/qe_mobile_india/Library/Android/sdk/emulator:${PATH}"
+                        AWS_PROFILE = "default"
+                        ANDROID_HOME = "/Users/qe_mobile_india/Library/Android/sdk"
+                    }
+                    steps {
+                        // Unlock keychain:
+                        withCredentials([string(credentialsId: 'mobile-qe', variable: 'KEYCHAIN_PASSWORD')]) {
+                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        }
+                        echo "=== Run C Android Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION}"
+                        }
+                        echo "=== C Android Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown C Android Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/c/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/c_android/**/*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== C Android Test Teardown Complete"
+                        }
+                    }
                 }
-                steps {
-                    // Unlock keychain:
-                    withCredentials([string(credentialsId: 'mobile-qe', variable: 'KEYCHAIN_PASSWORD')]) {
+                stage('iOS') {
+                    agent { label 'qe-mac-india' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        TS_ARTIFACTS_DIR = 'ios'
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                    }
+                    steps {
+                        // Unlock keychain:
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                    }
-                    echo "=== Run C Android Tests"
-                    timeout(time: 120, unit: 'MINUTES') {
-                        sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION}"
-                    }
-                    echo "=== C Android Tests Complete"
-                }
-                post {
-                    always {
-                        echo "=== Teardown C Android Tests"
-                        timeout(time: 5, unit: 'MINUTES') {
-                            sh 'jenkins/pipelines/QE/c/teardown.sh'
+                        echo "=== Run C iOS Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION}"
                         }
-                        archiveArtifacts artifacts: 'tests/QE/c_android/**/*', fingerprint: true, allowEmptyArchive: true
-                        echo "=== C Android Test Teardown Complete"
+                        echo "=== C iOS Tests Complete"
                     }
-                }
-            }
-            stage('iOS') {
-                agent { label 'qe-mac-india' }
-                environment {
-                    KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                    PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                    TS_ARTIFACTS_DIR = 'ios'
-                    TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
-                }
-                steps {
-                    // Unlock keychain:
-                    sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                    echo "=== Run C iOS Tests"
-                    timeout(time: 120, unit: 'MINUTES') {
-                        sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION}"
-                    }
-                    echo "=== C iOS Tests Complete"
-                }
-                post {
-                    always {
-                        echo "=== Teardown C iOS Tests"
-                        timeout(time: 5, unit: 'MINUTES') {
-                            sh 'jenkins/pipelines/QE/c/teardown.sh'
+                    post {
+                        always {
+                            echo "=== Teardown C iOS Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/c/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/c_ios/**/*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== C iOS Test Teardown Complete"
                         }
-                        archiveArtifacts artifacts: 'tests/QE/c_ios/**/*', fingerprint: true, allowEmptyArchive: true
-                        echo "=== C iOS Test Teardown Complete"
                     }
                 }
             }
