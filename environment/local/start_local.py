@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.13"
+# requires-python = ">=3.10,<3.14"
 # dependencies = [
 #     "click>=8.3.1",
 #     "paramiko>=4.0.0",
