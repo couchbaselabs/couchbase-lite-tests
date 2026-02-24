@@ -23,14 +23,8 @@ platform=$2
 sgw_version=$3
 dataset_version=${4:-"4.0"}
 
-stop_venv
-create_venv venv
-source venv/bin/activate
-trap stop_venv EXIT
-uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
+uv run $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
 
 pushd $DEV_E2E_TESTS_DIR
-uv pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version $dataset_version
+uvx pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version $dataset_version
 deactivate

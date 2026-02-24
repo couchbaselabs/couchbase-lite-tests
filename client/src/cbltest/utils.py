@@ -1,3 +1,4 @@
+from types import FunctionType
 import time
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
@@ -11,7 +12,7 @@ def _try_n_times(
     num_times: int,
     seconds_between: int | float,
     wait_before_first_try: bool,
-    func: Callable[..., T],
+    func: FunctionType[..., T],
     *args: Any,
     **kwargs: dict[str, Any],
 ) -> T:

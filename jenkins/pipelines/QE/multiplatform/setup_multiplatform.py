@@ -19,7 +19,7 @@ from jenkins.pipelines.shared.setup_test import TopologyConfig
 
 if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
-        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8")
 
 # Configuration for supported platforms
 SUPPORTED_PLATFORMS = {

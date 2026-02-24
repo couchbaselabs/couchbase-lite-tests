@@ -5,7 +5,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblEdgeServerBadResponseError
-from deepdiff import DeepDiff  # type: ignore[import-not-found]
+from deepdiff import DeepDiff
 
 SCRIPT_DIR = str(Path(__file__).parent)
 

@@ -74,7 +74,7 @@ class _RequestHttpTransport(RequestTransport):
                 )
 
         if isinstance(request, GetRootRequest):
-            ret_val = await cast(GetRootRequest, request)._create_response(
+            ret_val = await request._create_response(
                 cast(str, uuid), http=resp
             )
         else:
@@ -159,7 +159,7 @@ class _RequestWebSocketTransport(RequestTransport):
                 )
 
         if isinstance(request, GetRootRequest):
-            ret_val = await cast(GetRootRequest, request)._create_response(
+            ret_val = await request._create_response(
                 cast(str, uuid), ws_payload=resp
             )
         else:

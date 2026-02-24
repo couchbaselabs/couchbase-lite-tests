@@ -23,3 +23,7 @@ cbltest = { workspace = true }
 
 [tool.uv.workspace]
 members = [ "client" ]
+
+[tool.ty.environment]
+root = [".", "client/src"]
+

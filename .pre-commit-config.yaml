@@ -8,9 +8,22 @@ repos:
     rev: v0.14.1
     hooks:
     -   id: ruff
+        types_or: [ python, pyi ]
     -   id: ruff-format
+        types_or: [ python, pyi ]
+-   repo: https://github.com/allganize/ty-pre-commit
+    rev: v0.0.18
+    hooks:
+    -   id: ty-check
+        additional_dependencies:
+            - requests
+            - paramiko
+            - click
+            - tqdm
+        types_or: [ python, pyi ]
 -   repo: https://github.com/asottile/pyupgrade
     rev: v3.21.0
     hooks:
     -   id: pyupgrade
         args: [--py310-plus]
+        types_or: [ python, pyi ]

@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -27,7 +27,7 @@ class TestChangesFeed(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -132,7 +132,7 @@ class TestChangesFeed(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
             assert response is not None, (
