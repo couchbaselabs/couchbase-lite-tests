@@ -17,7 +17,7 @@
 #
 #   uv run environment/local/start_local.py
 #   cd tests/dev_e2e
-#   uv run pytest --config ../../environment/local/config.json5
+#   uv run pytest --config ../../environment/local/config.json
 #
 import pathlib
 import sys
