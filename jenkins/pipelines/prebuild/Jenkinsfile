@@ -90,23 +90,14 @@ pipeline {
 
                         if (params.TS_PLATFORM.contains("windows")) {
                             pwsh """
-                                python -m venv venv
-                                .\\venv\\Scripts\\activate
-                                pip install uv
-                                uv pip install -r environment/aws/requirements.txt
-                                python environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
-                                deactivate
+                                Import-Module jenkins/pipelines/shared/config.psm1 -Force
+                                uv run environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
                             """
                         } else {
                             sh """#!/bin/bash -e
 
                                 source jenkins/pipelines/shared/config.sh
-                                create_venv venv
-                                source venv/bin/activate
-                                pip install uv
-                                uv pip install -r "environment/aws/requirements.txt"
-                                python "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci
-                                deactivate
+                                uv run "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci
                             """
                         }
                     }

@@ -26,5 +26,5 @@ dataset_version=${4:-"4.0"}
 uv run $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
 
 pushd $DEV_E2E_TESTS_DIR
-uvx pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version $dataset_version
+uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version $dataset_version
 deactivate

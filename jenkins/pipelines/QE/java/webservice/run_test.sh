@@ -20,14 +20,7 @@ fi
 cbl_version=$1
 sgw_version=$2
 
-stop_venv
-create_venv venv
-source venv/bin/activate
-trap stop_venv EXIT
-uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-python3 $SCRIPT_DIR/setup_test.py $cbl_version $sgw_version
+uv run $SCRIPT_DIR/setup_test.py $cbl_version $sgw_version
 
 pushd $QE_TESTS_DIR
-uv pip install -r requirements.txt
-pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json -m cbl
-deactivate
+uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json -m cbl

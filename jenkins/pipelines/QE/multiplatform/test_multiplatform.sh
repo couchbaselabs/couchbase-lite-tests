@@ -168,17 +168,10 @@ echo "org.gradle.java.home=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Cont
 echo "🏗️ Using centralized multiplatform setup..."
 cd "$SCRIPT_DIR"
 
-# Create virtual environment for setup
-create_venv venv
-source venv/bin/activate
-pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-
 # Use the centralized multiplatform setup script
 echo "🚀 Running multiplatform setup..."
-python3 setup_multiplatform.py "$PLATFORM_CONFIGS" "$SG_VERSION" "$TOPOLOGY_FILE" --setup-only
+uv run setup_multiplatform.py "$PLATFORM_CONFIGS" "$SG_VERSION" "$TOPOLOGY_FILE" --setup-only
 SETUP_SUCCESS=$?
-
-deactivate
 
 if [ $SETUP_SUCCESS -ne 0 ]; then
     echo "💥 SETUP PHASE FAILED!"
@@ -201,14 +194,11 @@ echo "🏃 Running coordinated test across all platforms..."
 echo "========== PYTEST OUTPUT START =========="
 
 pushd "${QE_TESTS_DIR}" > /dev/null
-create_venv venv
-source venv/bin/activate
-pip install -r requirements.txt
 
 # Set environment variables to prevent output truncation
 export COLUMNS=200
 
-if pytest -v --no-header -W ignore::DeprecationWarning --config config.json "$TEST_NAME"; then
+if uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json "$TEST_NAME"; then
     echo "========== PYTEST OUTPUT END =========="
     echo ""
     echo "🎉 COORDINATED TEST PASSED!"
@@ -220,7 +210,6 @@ else
     TEST_RESULT=1
 fi
 
-deactivate
 popd > /dev/null
 
 # Final results

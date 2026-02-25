@@ -42,4 +42,3 @@ fi
 echo "Run tests..."
 pushd $QE_TESTS_DIR > /dev/null
 uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m sgw
-popd > /dev/null

@@ -31,11 +31,7 @@ for arg in "$@"; do
     fi
 done
 
-create_venv venv
-source venv/bin/activate
-pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
-deactivate
+uv run $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
 
 # Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then
@@ -44,8 +40,4 @@ if [ "$SETUP_ONLY" = true ]; then
 fi
 
 pushd $QE_TESTS_DIR
-create_venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl
-deactivate
+uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl

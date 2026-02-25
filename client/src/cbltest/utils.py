@@ -12,7 +12,7 @@ def _try_n_times(
     num_times: int,
     seconds_between: int | float,
     wait_before_first_try: bool,
-    func: FunctionType[..., T],
+    func: FunctionType,
     *args: Any,
     **kwargs: dict[str, Any],
 ) -> T:

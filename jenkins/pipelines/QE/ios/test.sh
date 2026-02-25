@@ -29,13 +29,9 @@ source $SCRIPT_DIR/../../shared/config.sh
 
 echo "Setup backend..."
 
-create_venv venv
-source venv/bin/activate
-
 export PATH="/opt/homebrew/bin:$PATH"
 
-pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
+uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
 deactivate
 
 # Exit early if setup-only mode
@@ -48,9 +44,4 @@ fi
 echo "Run tests..."
 
 pushd "${QE_TESTS_DIR}" > /dev/null
-create_venv venv
-. venv/bin/activate
-pip install -r requirements.txt
-pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl
-deactivate
-popd > /dev/null
+uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl
