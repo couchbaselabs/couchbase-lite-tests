@@ -223,6 +223,7 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "ty" },
+    { name = "types-netifaces" },
 ]
 
 [package.metadata]
@@ -270,6 +271,7 @@ requires-dist = [
     { name = "requests", specifier = "==2.32.3" },
     { name = "tomli", specifier = "==2.2.1" },
     { name = "ty", marker = "extra == 'dev'", specifier = "==0.0.18" },
+    { name = "types-netifaces", marker = "extra == 'dev'", specifier = "==0.11.0.20241025" },
     { name = "typing-extensions", specifier = "==4.12.2" },
     { name = "urllib3", specifier = "==2.3.0" },
     { name = "websocket-client", specifier = "==1.8.0" },
@@ -1206,6 +1208,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/0d/da/f4ada0fd08a9e4138fe3fd2bcd3797753593f423f19b1634a814b9b2a401/ty-0.0.18-py3-none-win32.whl", hash = "sha256:c5768607c94977dacddc2f459ace6a11a408a0f57888dd59abb62d28d4fee4f7", size = 9677964, upload-time = "2026-02-20T21:51:42.039Z" },
     { url = "https://files.pythonhosted.org/packages/5e/fa/090ed9746e5c59fc26d8f5f96dc8441825171f1f47752f1778dad690b08b/ty-0.0.18-py3-none-win_amd64.whl", hash = "sha256:b78d0fa1103d36fc2fce92f2092adace52a74654ab7884d54cdaec8eb5016a4d", size = 10636576, upload-time = "2026-02-20T21:51:29.159Z" },
     { url = "https://files.pythonhosted.org/packages/92/4f/5dd60904c8105cda4d0be34d3a446c180933c76b84ae0742e58f02133713/ty-0.0.18-py3-none-win_arm64.whl", hash = "sha256:01770c3c82137c6b216aa3251478f0b197e181054ee92243772de553d3586398", size = 10095449, upload-time = "2026-02-20T21:51:34.914Z" },
+]
+
+[[package]]
+name = "types-netifaces"
+version = "0.11.0.20241025"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/72/6b9d2bc6a0709c071687bd29afdf9069db64c751df647475c761cfca6841/types-netifaces-0.11.0.20241025.tar.gz", hash = "sha256:0877b98a80e53e08dcb0e2d562772f6d0c4eee8bd0e1101a1ee78d17a88c3c8d", size = 2688, upload-time = "2024-10-25T02:45:03.523Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b0/ea/503f8bc06ab9903e0302d9b94f10d3fb8f599353874cb7e8b6d2fd453079/types_netifaces-0.11.0.20241025-py3-none-any.whl", hash = "sha256:b760315d043acbb1f96232094ab05751f1cec9863df09cd95f533bd1aaee6da8", size = 3023, upload-time = "2024-10-25T02:45:02.462Z" },
 ]
 
 [[package]]

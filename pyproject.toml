@@ -10,14 +10,6 @@ dependencies = [
 lint.extend-select = ["I"]
 lint.ignore = ["E402"]
 
-[tool.mypy]
-check_untyped_defs = true
-exclude = "conftest.py" # Exclude conftest.py, since these are duplicated across several test files
-
-[[tool.mypy.overrides]]
-module = "couchbase.*"
-ignore_missing_imports = true
-
 [tool.uv.sources]
 cbltest = { workspace = true }
 
@@ -26,4 +18,3 @@ members = [ "client" ]
 
 [tool.ty.environment]
 root = [".", "client/src"]
-
