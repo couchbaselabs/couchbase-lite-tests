@@ -29,8 +29,8 @@ The system consists of 4 components:
 
 1. [Python 3.10+](https://www.python.org/downloads) (via uv is ok)
 2. [uv](https://docs.astral.sh/uv/getting-started/installation/)
-2. [OpenSSL 1.1 for CBS Python SDK](https://docs.couchbase.com/python-sdk/current/hello-world/start-using-sdk.html)
-3. [Git LFS](https://git-lfs.com)
+3. [Git LFS](https://git-lfs.com) (install _before_ cloning to avoid confusion)
+
 
 ### Environment Configuration
 

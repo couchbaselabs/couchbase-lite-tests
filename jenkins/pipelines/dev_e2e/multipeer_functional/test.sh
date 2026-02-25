@@ -35,7 +35,6 @@ cd "$SCRIPT_DIR"
 echo "🚀 Running setup..."
 uv run --group orchestrator setup_test.py "${setup_args[@]}"
 SETUP_SUCCESS=$?
-deactivate
 
 if [ $SETUP_SUCCESS -ne 0 ]; then
     echo "💥 SETUP PHASE FAILED!"
@@ -65,7 +64,6 @@ else
     TEST_RESULT=1
 fi
 
-deactivate
 popd > /dev/null
 
 # Final results

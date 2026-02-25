@@ -27,4 +27,3 @@ uv run --group orchestrator $SCRIPT_DIR/setup_test.py $platform $cbl_version $sg
 
 pushd $DEV_E2E_TESTS_DIR
 uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version $dataset_version
-deactivate
