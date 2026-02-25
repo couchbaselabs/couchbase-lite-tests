@@ -36,16 +36,6 @@ You need to configure the aws CLI to login with Okta.  You can do so by followin
 1. Choose "default" as the profile name, and then you are done (this will have an effect on any existing AWS config you have so be careful)
 2. Choose any other profile name, including the default provided one, and set it in the environment variable `AWS_PROFILE` before running the orchestrator
 
-### Python dependencies
-
-First of all you need to be using Python 3.10 or higher, but less than 3.13 (it might work but it's been known to cause issues sometimes).  You also need to make sure that the [python dependencies](./requirements.txt) are installed in whatever environment you are using.  If you know nothing about python that means that when you use this orchestration you need to run `pip install -r requirements.txt` before trying to do anything, so that its dependencies are installed.  The most sane way to do this is to install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then run the following:
-
-```
-uv venv --python 3.10
-source .venv/bin/activate
-uv pip install -r requirements.txt
-```
-
 ### SSH configuration
 
 You will need to add a section to your machine SSH config (`$HOME/.ssh/config`) to ensure that public keys from AWS are automatically added to the system known hosts.  This is because the hostname will be changing every time and docker remote deploy requires an unmolested SSH connection in order to function (without adding to known_hosts you will get an interactive prompt to add the remote host to the known hosts).  To accomplish this add the following section to your SSH config:
@@ -65,7 +55,7 @@ Host *.amazonaws.com
 
 ### Git LFS
 
-As stated in the top level README of this repo, Git LFS must be installed so that the datasets and blobs are properly pulled for building test servers.  
+As stated in the top level README of this repo, Git LFS must be installed so that the datasets and blobs are properly pulled for building test servers.
 
 ### Terraform
 
@@ -89,7 +79,7 @@ If you are working with devices that are iOS 16.x or lower you will need to inst
 
 ## Infrastructure Deep Dive
 
-Skip to [Putting it all together](#putting-it-all-together) if you are just after how to run the orchestrator.  
+Skip to [Putting it all together](#putting-it-all-together) if you are just after how to run the orchestrator.
 
 It's not enough to simply spin up virtual machines.  The creator (i.e. the person modifying the [config file](./main.tf)) is responsible for basically defining the entire virtual network that the machines are located in it, including any LAN subnets and external Internet access.  The tool being used here is [Terraform](https://developer.hashicorp.com/terraform/docs), and the [config file](./main.tf) defines what resources are created when the terraform command is run.  Here is a list of what is created or read in this config file:
 
@@ -137,7 +127,9 @@ This scripted backend also builds / downloads test servers for deployment to var
 
 ## Putting it all together
 
-Starting and stopping the system has dedicated python scripts.  These scripts are designed to be run either directly, or imported and called from another python script if desired.  If you skipped here from the beginning, be sure to review the [Prerequisites](#step-0-prerequisites).
+Starting and stopping the system has dedicated python scripts.
+
+These scripts are designed to be run either via `uv run`, or imported and called from another python script if desired.  If you skipped here from the beginning, be sure to review the [Prerequisites](#step-0-prerequisites).
 
 ### Starting
 
@@ -172,7 +164,7 @@ required arguments:
 
 The Sync Gateway URL and Couchbase Server version properties should be self explanatory but the others are as follows:
 
-- TDK config in: A template TDK compatible config file.  
+- TDK config in: A template TDK compatible config file.
 - TDK config out: An optional file to write the resulting TDK config file to (otherwise it will go to stdout)
 - Topology is the toplogy JSON file that will describe how to set up AWS instances (see the [topology README](./topology_setup/README.md) for more information.)
 

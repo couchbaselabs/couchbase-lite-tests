@@ -5,7 +5,7 @@ import urllib.parse
 import uuid
 from json import dumps
 from pathlib import Path
-from typing import Any, List, cast
+from typing import Any, cast
 from urllib.parse import urljoin
 
 import pyjson5 as json5
@@ -950,7 +950,7 @@ class EdgeServer:
         self,
         search_string: str,
         log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Fetch log content from the server and return lines matching search_string.
         Filtering is done in Python on the client.

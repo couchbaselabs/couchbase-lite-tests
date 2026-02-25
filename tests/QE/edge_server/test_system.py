@@ -1,7 +1,7 @@
 import json
 import random
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +21,7 @@ def _doc_body(doc_id: str) -> dict[str, Any]:
     return {
         "id": doc_id,
         "channels": ["public"],
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 

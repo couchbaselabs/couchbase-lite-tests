@@ -29,7 +29,7 @@ source $SCRIPT_DIR/../../shared/config.sh
 
 echo "Setup backend..."
 pushd $AWS_ENVIRONMENT_DIR > /dev/null
-uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
+uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
 popd > /dev/null
 
 # Exit early if setup-only mode
@@ -42,4 +42,3 @@ fi
 echo "Run tests..."
 pushd $QE_TESTS_DIR > /dev/null
 uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m sgw
-popd > /dev/null

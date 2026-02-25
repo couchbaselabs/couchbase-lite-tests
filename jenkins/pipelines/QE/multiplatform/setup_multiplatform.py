@@ -6,7 +6,7 @@ import subprocess
 import sys
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(str(SCRIPT_DIR.parents[3]))
@@ -19,7 +19,7 @@ from jenkins.pipelines.shared.setup_test import TopologyConfig
 
 if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
-        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8")
 
 # Configuration for supported platforms
 SUPPORTED_PLATFORMS = {

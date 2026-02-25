@@ -27,9 +27,10 @@ The system consists of 4 components:
 
 ### Requirements
 
-1. [Python 3.10+](https://www.python.org/downloads)
-2. [OpenSSL 1.1 for CBS Python SDK](https://docs.couchbase.com/python-sdk/current/hello-world/start-using-sdk.html)
-3. [Git LFS](https://git-lfs.com)
+1. [Python 3.10+](https://www.python.org/downloads) (via uv is ok)
+2. [uv](https://docs.astral.sh/uv/getting-started/installation/)
+3. [Git LFS](https://git-lfs.com) (install _before_ cloning to avoid confusion)
+
 
 ### Environment Configuration
 
@@ -76,11 +77,11 @@ This particular example indicates that there are two test servers running, along
 
 ### Contributing
 
-Notice that this repo has a .pre-commit-config.yaml file, which means it is ready to use with the [pre-commit](https://pre-commit.com/#intro) python tool.  Essentially, after you clone this repo you should run 
+Notice that this repo has a .pre-commit-config.yaml file, which means it is ready to use with the [pre-commit](https://pre-commit.com/#intro) python tool.  Essentially, after you clone this repo you should run
 
 ```
-pip install pre-commit
-pre-commit install
+uv pip install pre-commit
+uv run pre-commit install
 ```
 
 After that git pre-commit validation will check various things for you to ensure adherence to best practices and standards.

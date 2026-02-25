@@ -43,11 +43,7 @@ PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
 echo "Setup backend..."
 
-create_venv venv
-source venv/bin/activate
-pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-python3 $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
-deactivate
+uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 
 # Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then
@@ -63,10 +59,5 @@ echo $! > logcat.pid
 # Run Tests
 echo "Run tests..."
 pushd $QE_TESTS_DIR > /dev/null
-create_venv venv
-source venv/bin/activate
-pip install -r requirements.txt
 adb shell input keyevent KEYCODE_WAKEUP
-pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json -m cbl
-deactivate
-popd > /dev/null
+uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json -m cbl

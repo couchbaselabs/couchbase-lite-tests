@@ -12,22 +12,24 @@ Functions:
         Main function to build and optionally upload the Couchbase Lite test server.
 """
 
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+
+    SCRIPT_DIR = Path(__file__).resolve().parent
+    sys.path.append(str(SCRIPT_DIR.parents[2]))
+
+    from environment.aws.common.io import configure_terminal_encoding
+
+    configure_terminal_encoding()
+
 import os
-import sys
 from argparse import ArgumentParser
-from io import TextIOWrapper
 from pathlib import Path
-from typing import cast
 
 import click
 import paramiko
 import requests
-
-if __name__ == "__main__":
-    SCRIPT_DIR = Path(__file__).resolve().parent
-    sys.path.append(str(SCRIPT_DIR.parents[2]))
-    if isinstance(sys.stdout, TextIOWrapper):
-        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
 
 from environment.aws.common.io import sftp_progress_bar
 from environment.aws.common.output import header
