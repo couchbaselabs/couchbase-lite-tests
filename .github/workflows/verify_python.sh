@@ -2,4 +2,4 @@
 set -eu -o pipefail
 
 echo "Checking..."
-uvx ty check
+uv run --group orchestrator-lint ty check
