@@ -11,32 +11,13 @@ repos:
         types_or: [python, pyi]
       - id: ruff-format
         types_or: [python, pyi]
-  - repo: https://github.com/allganize/ty-pre-commit
-    rev: v0.0.18
+  - repo: local
     hooks:
       - id: ty-check
-        additional_dependencies:
-          - requests
-          - paramiko
-          - click
-          - tqdm
-          - aiohttp
-          - pytest==9.0.2
-          - pytest-asyncio
-          - couchbase
-          - opentelemetry-api
-          - opentelemetry-sdk
-          - opentelemetry-exporter-otlp-proto-grpc
-          - packaging
-          - deepdiff
-          - pyjson5
-          - Deprecated
-          - netifaces
-          - types-netifaces
-          - psutil
-          - pyyaml
-          - websocket-client
+        name: ty check
+        language: unsupported
         types_or: [python, pyi]
+        entry: uv run ty check
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.0
     hooks:
