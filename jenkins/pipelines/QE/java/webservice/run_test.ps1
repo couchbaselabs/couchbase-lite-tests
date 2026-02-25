@@ -2,10 +2,10 @@ param (
     [Parameter(Mandatory=$true)][string]$Version,
     [Parameter(Mandatory=$true)][string]$SgwVersion
 )
-$ErrorActionPreference = "Stop"  
+$ErrorActionPreference = "Stop"
 Import-Module $PSScriptRoot\..\..\..\shared\config.psm1 -Force
 
-uv run $PSScriptRoot\setup_test.py $Version $SgwVersion
+uv run --group orchestrator $PSScriptRoot\setup_test.py $Version $SgwVersion
 
 Push-Location $QE_TESTS_DIR
 try {

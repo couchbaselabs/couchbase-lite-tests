@@ -43,7 +43,7 @@ PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
 echo "Setup backend..."
 
-uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
+uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 
 # Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then

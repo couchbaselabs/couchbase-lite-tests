@@ -6,12 +6,12 @@ param (
 
 Import-Module $PSScriptRoot/../../shared/config.psm1 -Force
 Import-Module $PSScriptRoot/prepare_env.psm1 -Force
-$ErrorActionPreference = "Stop" 
+$ErrorActionPreference = "Stop"
 
 Install-DotNet -Version "9.0"
 Install-DotNetRuntime -Version "8.0"
 
-uv run $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
+uv run --group orchestrator $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
 if($LASTEXITCODE -ne 0) {
     throw "Setup failed!"
 }

@@ -21,7 +21,7 @@ cbl_version=$1
 sgw_version=$2
 dataset_version=${3:-"4.0"}
 
-uv run $SCRIPT_DIR/setup_test.py $cbl_version $sgw_version
+uv run --group orchestrator $SCRIPT_DIR/setup_test.py $cbl_version $sgw_version
 
 pushd $DEV_E2E_TESTS_DIR
 uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version $dataset_version

@@ -3,10 +3,10 @@ param (
     [Parameter(Mandatory=$true)][string]$SgwVersion,
     [Parameter][string]$DatasetVersion = "4.0"
 )
-$ErrorActionPreference = "Stop"  
+$ErrorActionPreference = "Stop"
 Import-Module $PSScriptRoot\..\..\..\shared\config.psm1 -Force
 
-uv run $PSScriptRoot\setup_test.py $Version $SgwVersion
+uv run --group orchestrator $PSScriptRoot\setup_test.py $Version $SgwVersion
 
 Push-Location $DEV_E2E_TESTS_DIR
 try {

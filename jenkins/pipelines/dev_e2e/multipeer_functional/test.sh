@@ -33,7 +33,7 @@ cd "$SCRIPT_DIR"
 
 # Use the centralized multiplatform setup script
 echo "🚀 Running setup..."
-uv run setup_test.py "${setup_args[@]}"
+uv run --group orchestrator setup_test.py "${setup_args[@]}"
 SETUP_SUCCESS=$?
 deactivate
 
@@ -90,4 +90,4 @@ echo ""
 echo "💡 Tip: All CBL test servers are still running for debugging if needed."
 echo "💡 Check http_log/ and testserver.log for detailed test execution logs."
 
-exit $TEST_RESULT 
+exit $TEST_RESULT

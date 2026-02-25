@@ -4,10 +4,10 @@ param (
     [Parameter][string]$DatasetVersion = "4.0"
 )
 
-$ErrorActionPreference = "Stop" 
+$ErrorActionPreference = "Stop"
 
 Import-Module $PSScriptRoot\..\..\shared\config.psm1 -Force
-uv run $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
+uv run --group orchestrator $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
 if($LASTEXITCODE -ne 0) {
     throw "Setup failed!"
 }

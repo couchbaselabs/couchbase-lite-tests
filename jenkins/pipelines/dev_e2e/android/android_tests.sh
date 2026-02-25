@@ -30,7 +30,7 @@ yes | ${SDK_MGR} --channel=1 --licenses > /dev/null 2>&1
 ${SDK_MGR} --channel=1 --install "build-tools;${BUILD_TOOLS_VERSION}"
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
-uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
+uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 
 echo "Start logcat"
 pushd $SCRIPT_DIR
@@ -41,7 +41,7 @@ pushd $DEV_E2E_TESTS_DIR > /dev/null
 rm -rf http_log testserver.log
 
 echo "Run the tests"
-# To re-enable this, this script needs to become aware of the 
+# To re-enable this, this script needs to become aware of the
 # serial number of the device, which is not currently passed
 #adb shell input keyevent KEYCODE_WAKEUP
 uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version $DATASET_VERSION || STATUS=$?
