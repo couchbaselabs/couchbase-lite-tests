@@ -5,7 +5,6 @@ import os
 import sys
 from io import TextIOWrapper
 from pathlib import Path
-from typing import cast
 
 import click
 

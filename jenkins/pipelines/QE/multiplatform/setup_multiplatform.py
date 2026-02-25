@@ -6,7 +6,7 @@ import subprocess
 import sys
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(str(SCRIPT_DIR.parents[3]))

@@ -20,6 +20,7 @@ repos:
             - paramiko
             - click
             - tqdm
+            - aiohttp
         types_or: [ python, pyi ]
 -   repo: https://github.com/asottile/pyupgrade
     rev: v3.21.0
