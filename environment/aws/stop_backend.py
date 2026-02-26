@@ -11,17 +11,16 @@ Functions:
 
 import subprocess
 import sys
-from io import TextIOWrapper
 from pathlib import Path
-from typing import cast
 
 import click
 
 SCRIPT_DIR = Path(__file__).parent
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parents[1]))
-    if isinstance(sys.stdout, TextIOWrapper):
-        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
+    from environment.aws.common.io import configure_terminal_encoding
+
+    configure_terminal_encoding()
 
 from environment.aws.common.output import header
 from environment.aws.start_backend import check_sts_status

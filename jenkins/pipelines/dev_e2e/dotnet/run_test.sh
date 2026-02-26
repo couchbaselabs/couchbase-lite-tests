@@ -40,13 +40,7 @@ fi
 
 prepare_dotnet
 
-stop_venv
-create_venv venv
-source venv/bin/activate
-trap stop_venv EXIT
-uv pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-python3 $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
+uv run --group orchestrator $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
 
 pushd $DEV_E2E_TESTS_DIR
-uv pip install -r requirements.txt
-pytest -v --no-header --config config.json --dataset-version $dataset_version
+uv run pytest -v --no-header --config config.json --dataset-version $dataset_version

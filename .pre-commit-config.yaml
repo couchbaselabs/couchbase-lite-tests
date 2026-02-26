@@ -1,16 +1,26 @@
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
-    -   id: check-executables-have-shebangs
-    -   id: check-shebang-scripts-are-executable
--   repo: https://github.com/astral-sh/ruff-pre-commit
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+  - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.1
     hooks:
-    -   id: ruff
-    -   id: ruff-format
--   repo: https://github.com/asottile/pyupgrade
+      - id: ruff
+        types_or: [python, pyi]
+      - id: ruff-format
+        types_or: [python, pyi]
+  - repo: local
+    hooks:
+      - id: ty-check
+        name: ty check
+        language: unsupported
+        types_or: [python, pyi]
+        entry: uv run ty check
+  - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.0
     hooks:
-    -   id: pyupgrade
+      - id: pyupgrade
         args: [--py310-plus]
+        types_or: [python, pyi]

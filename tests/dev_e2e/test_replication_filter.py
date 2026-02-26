@@ -17,7 +17,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.utils import assert_not_null
-from test_replication_filter_data import uk_and_france_doc_ids  # type: ignore
+from test_replication_filter_data import uk_and_france_doc_ids
 
 
 @pytest.mark.min_test_servers(1)

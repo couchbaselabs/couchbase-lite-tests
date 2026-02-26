@@ -47,7 +47,7 @@ def remote_exec(
 
     _, stdout, stderr = ssh.exec_command(command, get_pty=True)
     for line in iter(stdout.readline, ""):
-        click.secho(f"[{current_ssh}] {line}", fg=LIGHT_GRAY, nl=False)  # type: ignore
+        click.secho(f"[{current_ssh}] {line}", fg=LIGHT_GRAY, nl=False)
 
     exit_status = stdout.channel.recv_exit_status()
     if fail_on_error and exit_status != 0:

@@ -14,10 +14,10 @@ source $SCRIPT_DIR/../../shared/config.sh
 
 function list_available_tests() {
     echo "📋 Available tests (found in $QE_TESTS_DIR):"
-    
+
     if [ -d "$QE_TESTS_DIR" ]; then
         cd "$QE_TESTS_DIR"
-        
+
         # Find all test files and extract test methods
         for test_file in test_*.py; do
             if [ -f "$test_file" ]; then
@@ -113,15 +113,15 @@ PLATFORM_BUILDS=()
 
 for config in "${PLATFORM_ARRAY[@]}"; do
     IFS=':' read -ra CONFIG_PARTS <<< "$config"
-    
+
     if [ ${#CONFIG_PARTS[@]} -lt 2 ]; then
         echo "❌ Error: Invalid platform configuration: $config"
         echo "   Expected format: platform:version[-build] or platform:os:version[-build]"
         exit 1
     fi
-    
+
     platform="${CONFIG_PARTS[0]}"
-    
+
     # Handle multi-OS platforms (dotnet, c) that can have format: platform:os:version[-build]
     if [ ${#CONFIG_PARTS[@]} -eq 3 ] && [[ "$platform" == "dotnet" || "$platform" == "c" ]]; then
         # Format: platform:os:version[-build]
@@ -132,7 +132,7 @@ for config in "${PLATFORM_ARRAY[@]}"; do
         target_os=""
         version_with_build="${CONFIG_PARTS[1]}"
     fi
-    
+
     # Parse version and build from version_with_build (format: version-build or just version)
     if [[ "$version_with_build" == *"-"* ]]; then
         version="${version_with_build%-*}"  # Extract version part (everything before last dash)
@@ -141,7 +141,7 @@ for config in "${PLATFORM_ARRAY[@]}"; do
         version="$version_with_build"
         build=""
     fi
-    
+
     # Validate platform
     case "$platform" in
         android|ios|dotnet|c|java)
@@ -152,7 +152,7 @@ for config in "${PLATFORM_ARRAY[@]}"; do
             exit 1
             ;;
     esac
-    
+
     UNIQUE_PLATFORMS+=("$platform")
     PLATFORM_VERSIONS+=("$version")
     PLATFORM_BUILDS+=("$build")
@@ -168,17 +168,10 @@ echo "org.gradle.java.home=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Cont
 echo "🏗️ Using centralized multiplatform setup..."
 cd "$SCRIPT_DIR"
 
-# Create virtual environment for setup
-create_venv venv
-source venv/bin/activate
-pip install -r $AWS_ENVIRONMENT_DIR/requirements.txt
-
 # Use the centralized multiplatform setup script
 echo "🚀 Running multiplatform setup..."
-python3 setup_multiplatform.py "$PLATFORM_CONFIGS" "$SG_VERSION" "$TOPOLOGY_FILE" --setup-only
+uv run --group orchestrator setup_multiplatform.py "$PLATFORM_CONFIGS" "$SG_VERSION" "$TOPOLOGY_FILE" --setup-only
 SETUP_SUCCESS=$?
-
-deactivate
 
 if [ $SETUP_SUCCESS -ne 0 ]; then
     echo "💥 SETUP PHASE FAILED!"
@@ -201,14 +194,11 @@ echo "🏃 Running coordinated test across all platforms..."
 echo "========== PYTEST OUTPUT START =========="
 
 pushd "${QE_TESTS_DIR}" > /dev/null
-create_venv venv
-source venv/bin/activate
-pip install -r requirements.txt
 
 # Set environment variables to prevent output truncation
 export COLUMNS=200
 
-if pytest -v --no-header -W ignore::DeprecationWarning --config config.json "$TEST_NAME"; then
+if uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json "$TEST_NAME"; then
     echo "========== PYTEST OUTPUT END =========="
     echo ""
     echo "🎉 COORDINATED TEST PASSED!"
@@ -220,7 +210,6 @@ else
     TEST_RESULT=1
 fi
 
-deactivate
 popd > /dev/null
 
 # Final results
@@ -257,4 +246,4 @@ echo ""
 echo "💡 Tip: All CBL test servers are still running for debugging if needed."
 echo "💡 Check http_log/ and testserver.log for detailed test execution logs."
 
-exit $TEST_RESULT 
+exit $TEST_RESULT

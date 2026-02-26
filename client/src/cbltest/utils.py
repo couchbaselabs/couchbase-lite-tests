@@ -15,6 +15,7 @@ def _try_n_times(
     *args: Any,
     **kwargs: dict[str, Any],
 ) -> T:
+    function_name = getattr(func, "__name__", "<unknown function>")
     for i in range(num_times):
         try:
             if i == 0 and wait_before_first_try:
@@ -24,13 +25,13 @@ def _try_n_times(
         except Exception as e:
             if i < num_times - 1:
                 print(
-                    f"Trying {func.__name__} failed (reason='{e}'), retry in {seconds_between} seconds ..."
+                    f"Trying {function_name} failed (reason='{e}'), retry in {seconds_between} seconds ..."
                 )
                 time.sleep(seconds_between)
             else:
-                print(f"Trying {func.__name__} failed (reason='{e}')")
+                print(f"Trying {function_name} failed (reason='{e}')")
 
-    raise CblTimeoutError(f"Failed to call {func.__name__} after {num_times} attempts!")
+    raise CblTimeoutError(f"Failed to call {function_name} after {num_times} attempts!")
 
 
 def assert_not_null(input: T | None, msg: str) -> T:

@@ -1,23 +1,10 @@
 # This script should be imported at the beginning of testing and teardown scripts
 
-function New-Venv {
-    param(
-        [string]$Directory,
-        [string]$PythonVersion = "3.10"
-    )
-
-    python -m pip install uv --user
-    python -m uv venv --python $PythonVersion $Directory
-    . "$Directory\Scripts\activate.ps1"
-    python -m ensurepip --upgrade
-    python -m pip install --upgrade pip uv
-    deactivate
-}
-
-function Stop-Venv {
-    if ($env:VIRTUAL_ENV) {
-        Write-Host "Deactivating virtual environment..."
-        deactivate
+function Install-Uv {
+    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+        Write-Host "Installing uv..."
+        powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+        $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
     }
 }
 
@@ -89,6 +76,12 @@ function Write-Box {
         Write-Host ("| {0,-$maxLength} |" -f $line)
     }
     Write-Host $border
+}
+
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    Write-Host "Installing uv..."
+    irm https://astral.sh/uv/install.ps1 | iex
+    $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
 }
 
 Set-Variable -Name PIPELINES_DIR -Value (Find-Dir -TargetDir "pipelines") -Option ReadOnly

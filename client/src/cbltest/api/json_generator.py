@@ -2,8 +2,9 @@ import random
 import sys
 import time
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 
 class JSONGenerator:
@@ -33,7 +34,7 @@ class JSONGenerator:
         self.size = size
         self.format = format
 
-    def generate_document(self, doc_id: str) -> Dict[str, Any]:
+    def generate_document(self, doc_id: str) -> dict[str, Any]:
         """Generate a single JSON document with reproducible random data"""
         random.seed(self.seed + int(doc_id.split("-")[0], 16))
         if self.format == "json":
@@ -73,7 +74,7 @@ class JSONGenerator:
                 ]
             }
 
-    def update_document(self, doc: Any, doc_id: str) -> Dict[str, Any]:
+    def update_document(self, doc: Any, doc_id: str) -> dict[str, Any]:
         """Update a document with reproducible modifications"""
         offset = int(doc_id.split("-")[0], 16)
         random.seed(self.seed + offset)
@@ -99,10 +100,10 @@ class JSONGenerator:
     def batch_process(
         self,
         process_fn: Callable,
-        items_ids: List[Any],
-        items_doc: Optional[Dict[str, Any]] = None,
+        items_ids: list[Any],
+        items_doc: dict[str, Any] | None = None,
         batch_size: int = 1000,
-    ) -> Dict[Any, Any]:
+    ) -> dict[Any, Any]:
         """Generic batch processing function with threading"""
         results = {}
 
@@ -127,7 +128,7 @@ class JSONGenerator:
 
         return results
 
-    def generate_all_documents(self, size=None) -> Dict[str, Any]:
+    def generate_all_documents(self, size=None) -> dict[str, Any]:
         """Generate all documents using parallel processing"""
         if size is None:
             size = self.size
@@ -137,8 +138,8 @@ class JSONGenerator:
         return documents
 
     def update_all_documents(
-        self, documents: Dict[str, Any]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, documents: dict[str, Any]
+    ) -> dict[str, dict[str, Any]]:
         """Update all documents with consistent modifications"""
 
         doc_ids = list(documents.keys())
