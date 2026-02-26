@@ -22,6 +22,8 @@
 import pathlib
 import sys
 
+import requests
+
 SCRIPT_DIR = pathlib.Path(__file__).parent
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parent.parent))
@@ -39,8 +41,7 @@ def main():
                 "location": "localhost",
                 "download": True,
                 "platform": get_cbl_platform(),
-                # TODO: make this dynamic based on the latest released version of CBL
-                "cbl_version": "4.0.2",
+                "cbl_version": get_latest_released_cbl_c_version(),
             }
         ],
     }
@@ -63,6 +64,14 @@ def get_cbl_platform() -> str:
     elif sys.platform.startswith("linux"):
         return "c_linux_x86_64"
     raise Exception(f"Unsupported platform: {sys.platform}")
+
+
+def get_latest_released_cbl_c_version() -> str:
+    r = requests.get(
+        "http://proget.build.couchbase.com:8080/api/latest_release?product=couchbase-lite-c"
+    )
+    r.raise_for_status()
+    return r.json()["version"]
 
 
 if __name__ == "__main__":
