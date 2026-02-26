@@ -31,7 +31,7 @@ echo "Setup backend..."
 
 export PATH="/opt/homebrew/bin:$PATH"
 
-uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
+uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
 
 # Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then

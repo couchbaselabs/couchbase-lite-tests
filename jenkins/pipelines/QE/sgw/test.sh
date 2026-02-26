@@ -29,7 +29,7 @@ source $SCRIPT_DIR/../../shared/config.sh
 
 echo "Setup backend..."
 pushd $AWS_ENVIRONMENT_DIR > /dev/null
-uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
+uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
 popd > /dev/null
 
 # Exit early if setup-only mode

@@ -3,45 +3,29 @@ name = "couchbase-lite-tests"
 requires-python = ">=3.10"
 version = "0.1.0"
 dependencies = [
-  "cbltest",
+    "cbltest",
+    "click==8.1.8",
+    "paramiko==3.5.0",
+    "psutil==7.0.0",
+    "pyyaml==6.0.2",
+    "tqdm==4.67.1",
 ]
 
 [tool.ruff]
 lint.extend-select = ["I"]
 lint.ignore = ["E402"]
+target-version = "py310"
+exclude = [".venv", ".vscode", ".idea", ".github", ".git"]
+
 
 [tool.uv.sources]
 cbltest = { workspace = true }
 
 [dependency-groups]
-orchestrator = [
-    "PyNaCl==1.5.0",
-    "bcrypt==4.2.1",
-    "certifi==2024.12.14",
-    "cffi==1.17.1",
-    "charset-normalizer==3.4.1",
-    "click==8.1.8",
-    "colorama==0.4.6",
-    "cryptography==44.0.0",
-    "idna==3.10",
-    "netifaces==0.11.0",
-    "paramiko==3.5.0",
-    "psutil==7.0.0",
-    "pycparser==2.22",
-    "pyyaml==6.0.2",
-    "requests==2.32.3",
-    "tqdm==4.67.1",
-    "urllib3==2.3.0",
-]
-orchestrator-lint = [
-    {include-group = "orchestrator"},
-    "ty==0.0.18",
-    "ruff==0.15.2",
+lint = [
+    "ty==0.0.19",
+    "ruff==0.15.4",
     "types-netifaces==0.11.0.20241025",
-    "types-paramiko==3.5.0.20250516",
-    "types-psutil==7.0.0.20250516",
-    "types-tqdm==4.67.0.20250516",
-    "types-pyyaml==6.0.12.20250915",
 ]
 
 [tool.uv.workspace]

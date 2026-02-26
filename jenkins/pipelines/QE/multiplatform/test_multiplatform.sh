@@ -170,7 +170,7 @@ cd "$SCRIPT_DIR"
 
 # Use the centralized multiplatform setup script
 echo "🚀 Running multiplatform setup..."
-uv run --group orchestrator setup_multiplatform.py "$PLATFORM_CONFIGS" "$SG_VERSION" "$TOPOLOGY_FILE" --setup-only
+uv run setup_multiplatform.py "$PLATFORM_CONFIGS" "$SG_VERSION" "$TOPOLOGY_FILE" --setup-only
 SETUP_SUCCESS=$?
 
 if [ $SETUP_SUCCESS -ne 0 ]; then

@@ -17,7 +17,7 @@ fi
 source $SCRIPT_DIR/../../shared/config.sh
 #
 echo "Setup backend..."
-uv run --group orchestrator $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}"
+uv run $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}"
 
 # Run Tests :
 echo "RUNNING COORDINATED TEST"
