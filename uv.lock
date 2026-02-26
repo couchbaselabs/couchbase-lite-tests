@@ -422,8 +422,8 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 lint = [
-    { name = "ruff", specifier = "==0.15.4" },
-    { name = "ty", specifier = "==0.0.19" },
+    { name = "ruff", specifier = ">=0.15.4" },
+    { name = "ty", specifier = ">=0.0.19" },
     { name = "types-netifaces", specifier = "==0.11.0.20241025" },
 ]
 

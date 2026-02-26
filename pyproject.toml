@@ -23,8 +23,8 @@ cbltest = { workspace = true }
 
 [dependency-groups]
 lint = [
-    "ty==0.0.19",
-    "ruff==0.15.4",
+    "ty>=0.0.19",
+    "ruff>=0.15.4",
     "types-netifaces==0.11.0.20241025",
 ]
 
