@@ -1,7 +1,7 @@
 import json
-from datetime import datetime
+from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
 
 import pytest
 from cbltest import CBLPyTest
@@ -92,7 +92,7 @@ class TestLogging(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -168,7 +168,7 @@ class TestLogging(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
             assert response is not None, (
@@ -182,7 +182,7 @@ class TestLogging(CBLTestClass):
             updated_doc_body = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "changed": "yes",
             }
             updated_doc = await edge_server.put_document_with_id(

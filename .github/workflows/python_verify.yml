@@ -24,7 +24,7 @@ on:
       - '.github/workflows/*py*'
 
 jobs:
-  mypy:
+  ty:
     strategy:
       fail-fast: false
     runs-on: ubuntu-latest
@@ -33,7 +33,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           version: "latest"
-      - name: mypy validation
+      - name: ty validation
         working-directory: ${{github.workspace}}
         shell: bash
         run: .github/workflows/verify_python.sh

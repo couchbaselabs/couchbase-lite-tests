@@ -4,7 +4,6 @@ import os
 import sys
 from io import TextIOWrapper
 from pathlib import Path
-from typing import cast
 
 import click
 
@@ -13,7 +12,7 @@ SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parents[3]))
     if isinstance(sys.stdout, TextIOWrapper):
-        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8")
 
 from jenkins.pipelines.shared.setup_test import setup_test
 

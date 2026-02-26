@@ -5,9 +5,8 @@ import shutil
 import stat
 import sys
 from enum import Enum
-from io import TextIOWrapper
 from pathlib import Path
-from typing import Final, cast
+from typing import Final
 
 import click
 import requests
@@ -16,8 +15,9 @@ SCRIPT_DIR: Final[Path] = Path(__file__).parent.resolve()
 
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parents[1]))
-    if isinstance(sys.stdout, TextIOWrapper):
-        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
+    from environment.aws.common.io import configure_terminal_encoding
+
+    configure_terminal_encoding()
 
 from environment.aws.common.io import (
     download_progress_bar,

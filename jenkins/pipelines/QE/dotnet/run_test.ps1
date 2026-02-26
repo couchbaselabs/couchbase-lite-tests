@@ -5,23 +5,18 @@ param (
 
 Import-Module $PSScriptRoot/../../shared/config.psm1 -Force
 Import-Module $PSScriptRoot/prepare_env.psm1 -Force
-$ErrorActionPreference = "Stop" 
+$ErrorActionPreference = "Stop"
 
 Install-DotNet
 
-python -m venv venv
-.\venv\Scripts\activate
-pip install -r $AWS_ENVIRONMENT_DIR\requirements.txt
-python $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
+uv run --group orchestrator $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
 if($LASTEXITCODE -ne 0) {
     throw "Setup failed!"
 }
 
 Push-Location $QE_TESTS_DIR
-pip install -r requirements.txt
-pytest -v --no-header --config config.json -m cbl
+uv run pytest -v --no-header --config config.json -m cbl
 $saved_exit = $LASTEXITCODE
-deactivate
 Pop-Location
 
 # FIXME: Find another way to do this so this is not hardcoded here

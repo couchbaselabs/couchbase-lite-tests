@@ -17,6 +17,7 @@ Functions:
 """
 
 import os
+import sys
 import tarfile
 import time
 import zipfile
@@ -36,7 +37,7 @@ LIGHT_GRAY = (128, 128, 128)
 def write_chunk(channel: Channel) -> None:
     chunk = channel.recv(1024).decode(errors="ignore")
     if chunk:
-        click.secho(chunk, fg=LIGHT_GRAY, nl=False)  # type: ignore
+        click.secho(chunk, fg=LIGHT_GRAY, nl=False)
 
 
 def realtime_output(stdout: ChannelFile) -> None:
@@ -263,6 +264,23 @@ def get_ec2_hostname(hostname: str) -> str:
         raise ValueError(f"Invalid hostname {hostname}")
 
     return f"ec2-{hostname.replace('.', '-')}.compute-1.amazonaws.com"
+
+
+def configure_terminal_encoding() -> None:
+    """
+    Configure stdout and stderr to use UTF-8 encoding.
+
+    This is useful when running scripts in environments with non-UTF-8
+    terminal encoding (e.g., Windows cmd, certain Unix locales).
+
+    Uses reconfigure() method if available (Python 3.7+ TextIOWrapper).
+    """
+    stdout_reconfigure = getattr(sys.stdout, "reconfigure", None)
+    stderr_reconfigure = getattr(sys.stderr, "reconfigure", None)
+    if callable(stdout_reconfigure):
+        stdout_reconfigure(encoding="utf-8")
+    if callable(stderr_reconfigure):
+        stderr_reconfigure(encoding="utf-8")
 
 
 @contextmanager

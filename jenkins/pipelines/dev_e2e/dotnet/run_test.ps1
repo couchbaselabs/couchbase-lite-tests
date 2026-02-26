@@ -6,27 +6,20 @@ param (
 
 Import-Module $PSScriptRoot/../../shared/config.psm1 -Force
 Import-Module $PSScriptRoot/prepare_env.psm1 -Force
-$ErrorActionPreference = "Stop" 
+$ErrorActionPreference = "Stop"
 
 Install-DotNet -Version "9.0"
 Install-DotNetRuntime -Version "8.0"
 
-Stop-Venv
-New-Venv venv
-. venv\Scripts\activate.ps1
-trap { Stop-Venv; break }
-uv pip install -r $AWS_ENVIRONMENT_DIR\requirements.txt
-python $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
+uv run --group orchestrator $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
 if($LASTEXITCODE -ne 0) {
     throw "Setup failed!"
 }
 
 Push-Location $DEV_E2E_TESTS_DIR
 try {
-    uv pip install -r requirements.txt
-    pytest -v --no-header --config config.json --dataset-version $DatasetVersion
+    uv run pytest -v --no-header --config config.json --dataset-version $DatasetVersion
     $saved_exit = $LASTEXITCODE
-    deactivate
 } finally {
     Pop-Location
 }

@@ -9,5 +9,5 @@ export PYTHONPATH=$SCRIPT_DIR/../../../
 pushd $AWS_ENVIRONMENT_DIR
 move_artifacts
 
-uv run ./stop_backend.py --topology topology_setup/topology.json
+uv run --group orchestrator ./stop_backend.py --topology topology_setup/topology.json
 popd

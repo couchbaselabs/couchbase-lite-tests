@@ -19,7 +19,6 @@ import json
 import subprocess
 import sys
 from enum import Flag, auto
-from io import TextIOWrapper
 from pathlib import Path
 from time import sleep
 from typing import IO, Any, cast
@@ -29,8 +28,9 @@ import click
 SCRIPT_DIR = Path(__file__).parent
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parents[1]))
-    if isinstance(sys.stdout, TextIOWrapper):
-        cast(TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8")
+    from environment.aws.common.io import configure_terminal_encoding
+
+    configure_terminal_encoding()
 
 from environment.aws.common.output import header
 from environment.aws.es_setup.setup_edge_servers import main as es_main

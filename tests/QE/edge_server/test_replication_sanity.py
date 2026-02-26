@@ -1,6 +1,6 @@
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -32,7 +32,7 @@ class TestReplicationSanity(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -99,7 +99,7 @@ class TestReplicationSanity(CBLTestClass):
         doc = {
             "id": doc_id_sg,
             "channels": ["public"],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         created_doc = await sync_gateway.create_document(sg_db_name, doc_id_sg, doc)
         assert created_doc is not None, (
@@ -124,7 +124,7 @@ class TestReplicationSanity(CBLTestClass):
         updated_doc_body = {
             "id": doc_id_sg,
             "channels": ["public"],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "changed": "yes",
         }
 
@@ -162,7 +162,7 @@ class TestReplicationSanity(CBLTestClass):
         doc = {
             "id": doc_id_es,
             "channels": ["public"],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         created_doc = await edge_server.put_document_with_id(doc, doc_id_es, es_db_name)
@@ -180,12 +180,13 @@ class TestReplicationSanity(CBLTestClass):
         assert sg_doc.id == doc_id_es, f"Document ID mismatch: {sg_doc.id}"
 
         rev_id = sg_doc.revid
+        assert rev_id is not None, "Failed to retrieve rev_id"
 
         self.mark_test_step(f"Updating document {doc_id_es} via Sync Gateway.")
         updated_doc_body = {
             "id": doc_id_es,
             "channels": ["public"],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "changed": "yes",
         }
         updated_doc = await sync_gateway.update_document(

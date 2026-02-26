@@ -3,22 +3,8 @@
 Alright!  If you want to start playing around with running the python tests
 here is some info for you:
 
-Standard python stuff:
-
-* python -m venv venv
-* source venv/bin/activate
-* pip install -r requirements.txt
-
-Make sure to use python either 3.9 or 3.10.  NOT 3.11
-
-After that there are two ways you can install the test framework into the tests
-folder for consumption.  Either:
-
-`pip install ../client`
-
-which builds it from "source", or installing it from proget
-
-`pip install cbltest --extra-index-url https://proget.sc.couchbase.com/pypi/mobile-python/simple`
+You don't need to worry about installing dependencies, uv will do that
+for you as part of its run command.
 
 If you want to run the tests in this folder you will need
 to make sure that there is at least 1 GiB of RAM available for the server
@@ -29,7 +15,7 @@ for our tests.  It is called `config.example.json`.
 
 The command, once you've started the environment from the tests folder is:
 
-`pytest --config config.example.json test_basic_replication.py -k <test_name>`
+`uv run pytest --config config.example.json test_basic_replication.py -k <test_name>`
 
 Or leave off the -k to run all tests in that file.  For every http request that
 the framework directly issues, it will log the request and the response in a
