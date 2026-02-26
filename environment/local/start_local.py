@@ -33,11 +33,36 @@ TOPOLOGY_CONFIG = SCRIPT_DIR / "topology.json"
 
 
 def main():
-    topology_config = setup_topology.TopologyConfig(TOPOLOGY_CONFIG)
+    config = {
+        "test_servers": [
+            {
+                "location": "localhost",
+                "download": True,
+                "platform": get_cbl_platform(),
+                # TODO: make this dynamic based on the latest released version of CBL
+                "cbl_version": "4.0.2",
+            }
+        ],
+    }
+    topology_config = setup_topology.TopologyConfig(config_input=config)
+
     setup_topology.main(topology_config)
 
     # hard code cbbackupmgr 8.0.0 for ease of use
     download_tool.download_tool(download_tool.ToolName.BackupManager, version="8.0.0")
+
+
+def get_cbl_platform() -> str:
+    """
+    Return the name of the CBL platform to use.
+    """
+    if sys.platform == "win32":
+        return "c_windows"
+    elif sys.platform == "darwin":
+        return "c_macos"
+    elif sys.platform.startswith("linux"):
+        return "c_linux_x86_64"
+    raise Exception(f"Unsupported platform: {sys.platform}")
 
 
 if __name__ == "__main__":
