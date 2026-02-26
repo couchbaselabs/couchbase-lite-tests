@@ -6,4 +6,4 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source $SCRIPT_DIR/../../shared/config.sh
 
 pushd $AWS_ENVIRONMENT_DIR
-uv run --group orchestrator ./stop_backend.py
+uv run ./stop_backend.py

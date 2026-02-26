@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 Install-DotNet -Version "9.0"
 Install-DotNetRuntime -Version "8.0"
 
-uv run --group orchestrator $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
+uv run $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
 if($LASTEXITCODE -ne 0) {
     throw "Setup failed!"
 }

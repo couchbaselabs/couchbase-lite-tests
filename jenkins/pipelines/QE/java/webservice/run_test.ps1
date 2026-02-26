@@ -5,7 +5,7 @@ param (
 $ErrorActionPreference = "Stop"
 Import-Module $PSScriptRoot\..\..\..\shared\config.psm1 -Force
 
-uv run --group orchestrator $PSScriptRoot\setup_test.py $Version $SgwVersion
+uv run $PSScriptRoot\setup_test.py $Version $SgwVersion
 
 Push-Location $QE_TESTS_DIR
 try {

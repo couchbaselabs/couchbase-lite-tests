@@ -33,7 +33,7 @@ cd "$SCRIPT_DIR"
 
 # Use the centralized multiplatform setup script
 echo "🚀 Running setup..."
-uv run --group orchestrator setup_test.py "${setup_args[@]}"
+uv run setup_test.py "${setup_args[@]}"
 SETUP_SUCCESS=$?
 
 if [ $SETUP_SUCCESS -ne 0 ]; then

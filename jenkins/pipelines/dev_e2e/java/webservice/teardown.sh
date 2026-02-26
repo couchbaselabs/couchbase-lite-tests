@@ -8,4 +8,4 @@ source $SCRIPT_DIR/../../../shared/config.sh
 move_artifacts
 
 pushd $AWS_ENVIRONMENT_DIR
-uv run --group orchestrator ./stop_backend.py --topology topology_setup/topology.json
+uv run ./stop_backend.py --topology topology_setup/topology.json

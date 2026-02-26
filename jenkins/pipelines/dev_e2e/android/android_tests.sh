@@ -30,7 +30,7 @@ yes | ${SDK_MGR} --channel=1 --licenses > /dev/null 2>&1
 ${SDK_MGR} --channel=1 --install "build-tools;${BUILD_TOOLS_VERSION}"
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
-uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
+uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 
 echo "Start logcat"
 pushd $SCRIPT_DIR

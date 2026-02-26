@@ -42,7 +42,7 @@ done
 
 prepare_dotnet
 
-uv run --group orchestrator $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
+uv run $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
 
 # Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then
