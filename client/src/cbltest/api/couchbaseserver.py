@@ -35,7 +35,6 @@ from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblTestError
 from cbltest.logging import cbl_warning
-from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
 
 
@@ -156,7 +155,7 @@ class CouchbaseServer:
             "Create Scope",
             attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket},
         ):
-            bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
+            bucket_obj = self.__cluster.bucket(bucket)
             c = bucket_obj.collections()
             try:
                 if scope != "_default":
@@ -479,7 +478,7 @@ class CouchbaseServer:
             },
         ):
             try:
-                bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
+                bucket_obj = self.__cluster.bucket(bucket)
                 coll = bucket_obj.scope(scope).collection(collection)
                 coll.upsert(doc_id, document)
             except Exception as e:
@@ -507,7 +506,7 @@ class CouchbaseServer:
             },
         ):
             try:
-                bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
+                bucket_obj = self.__cluster.bucket(bucket)
                 coll = bucket_obj.scope(scope).collection(collection)
                 coll.remove(doc_id)
             except DocumentNotFoundException:
@@ -543,7 +542,7 @@ class CouchbaseServer:
             },
         ):
             try:
-                bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
+                bucket_obj = self.__cluster.bucket(bucket)
                 coll = bucket_obj.scope(scope).collection(collection)
                 result = coll.get(doc_id)
                 return result.content_as[dict] if result else None

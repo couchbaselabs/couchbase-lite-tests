@@ -2,6 +2,7 @@ from json import dumps, load
 from pathlib import Path
 from typing import cast
 
+import tenacity
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.couchbaseserver import CouchbaseServer
@@ -9,7 +10,6 @@ from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.syncgateway import PutDatabasePayload, SyncGateway
 from cbltest.assertions import _assert_not_null
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
 
 
@@ -29,13 +29,16 @@ class CouchbaseCloud:
                 db_payload.bucket, scope, db_payload.collections(scope)
             )
 
-    def _check_all_indexes_removed(self, bucket: str) -> None:
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(10),
+        wait=tenacity.wait_fixed(2),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type(Exception),
+    )
+    def _wait_for_all_indexes_removed(self, bucket: str) -> None:
         count = self.__couchbase_server.indexes_count(bucket)
         if count > 0:
             raise ValueError(f"{count} indexes remain in '{bucket}' bucket")
-
-    def _wait_for_all_indexed_removed(self, bucket: str) -> None:
-        _try_n_times(10, 2, True, self._check_all_indexes_removed, bucket)
 
     async def configure_dataset(
         self,
@@ -121,7 +124,7 @@ class CouchbaseCloud:
                 # Wait until all indexes are removed will help prevent that problem. It's important
                 # to wait after the bucket and its collections are created, otherwise, QueryIndexManager
                 # will not be able to return the pending-to-removed indexes created for the collections.
-                self._wait_for_all_indexed_removed(db_payload.bucket)
+                self._wait_for_all_indexes_removed(db_payload.bucket)
 
                 await self.__sync_gateway.put_database(dataset_name, db_payload)
 
