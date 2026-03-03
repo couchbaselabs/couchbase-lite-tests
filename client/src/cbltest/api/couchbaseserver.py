@@ -23,13 +23,14 @@ from couchbase.exceptions import (
     BucketAlreadyExistsException,
     BucketDoesNotExistException,
     CollectionAlreadyExistsException,
+    CouchbaseException,
     DocumentNotFoundException,
     QueryIndexAlreadyExistsException,
     ScopeAlreadyExistsException,
 )
 from couchbase.management.buckets import CreateBucketSettings
 from couchbase.management.options import CreatePrimaryQueryIndexOptions
-from couchbase.options import ClusterOptions
+from couchbase.options import ClusterOptions, ClusterTimeoutOptions
 from couchbase.subdocument import upsert
 from opentelemetry.trace import get_tracer
 
@@ -113,10 +114,22 @@ class CouchbaseServer:
             self._parse_connection_url(url)
 
             auth = PasswordAuthenticator(username, password)
-            opts = ClusterOptions(auth)
+            opts = ClusterOptions(
+                auth,
+                timeout_options=ClusterTimeoutOptions(
+                    # mac dns resolution can be very slow, default timeout is 250ms
+                    dns_srv_timeout=timedelta(seconds=10)
+                ),
+            )
             self.__username = username
             self.__password = password
-            self.__cluster = Cluster(url, opts)
+            try:
+                self.__cluster = Cluster(url, opts)
+            except CouchbaseException:
+                cbl_warning(
+                    f"Initial connection to Couchbase Server {url} with {username=} {password=} failed"
+                )
+                raise
             self.__cluster.wait_until_ready(timedelta(seconds=10))
 
             # Create a reusable HTTP session for REST API calls

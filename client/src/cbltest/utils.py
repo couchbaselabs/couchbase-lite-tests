@@ -1,3 +1,4 @@
+import subprocess
 import time
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
@@ -37,3 +38,26 @@ def _try_n_times(
 def assert_not_null(input: T | None, msg: str) -> T:
     assert input is not None, msg
     return cast(T, input)
+
+
+def verify_lfs_checkout() -> None:
+    """
+    This function is used to verify that the LFS files are being properly checked out.
+    """
+    process_output = subprocess.run(
+        ["git", "lfs", "ls-files", "--json"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    lfs = json.loads(process_output.stdout)
+    if not lfs["files"]:
+        return
+    for f in lfs["files"]:
+        if f["checkout"] is False:
+            raise RuntimeError(
+                "git lfs is not configured. Please run 'git lfs install and git lfs pull'"
+            )
+
+
+import json
