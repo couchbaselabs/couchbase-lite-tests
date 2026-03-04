@@ -86,6 +86,7 @@ public class MultipeerReplicatorService {
             }
 
             myStatusMap.put(status.getPeerId(), status);
+            statusMap.put(replId, myStatusMap);
         }));
 
         ctxt.addMultipeerRepl(replId, repl);
