@@ -13,14 +13,11 @@ SCRIPT_DIR = str(Path(__file__).parent)
 class TestEdgeServerSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_to_sgw_replication(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cblpytest: CBLPyTest, dataset_path: Path, cloud: CouchbaseCloud
     ):
         self.mark_test_step("test_edge_to_sgw_replication")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "travel")
-        sgw = cblpytest.sync_gateways[0]
+        sgw = cloud.sync_gateway
         source_db = sgw.replication_url("travel")
 
         self.mark_test_step("Configure Edge Server with travel dataset")
@@ -50,7 +47,7 @@ class TestEdgeServerSync(CBLTestClass):
             )
 
             # Get from SGW
-            sgw_docs = await sgw.get_all_documents(
+            sgw_docs = await cloud.sync_gateway.get_all_documents(
                 "travel", scope="travel", collection=collection.split(".")[1]
             )
 
@@ -73,7 +70,7 @@ class TestEdgeServerSync(CBLTestClass):
             update_doc, "airline_10000", "travel", collection="travel.airlines", ttl=30
         )
 
-        sgw_doc_new = await sgw.get_document(
+        sgw_doc_new = await cloud.sync_gateway.get_document(
             db_name="travel",
             scope="travel",
             collection="airlines",
@@ -87,7 +84,7 @@ class TestEdgeServerSync(CBLTestClass):
         self.mark_test_step(
             "Verify TTL document purged on Edge server and not Sync Gateway"
         )
-        sgw_doc_new = await sgw.get_document(
+        sgw_doc_new = await cloud.sync_gateway.get_document(
             db_name="travel",
             scope="travel",
             collection="airlines",

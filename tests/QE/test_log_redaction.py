@@ -4,8 +4,8 @@ import zipfile
 from pathlib import Path
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 
 
@@ -87,10 +87,10 @@ def scan_logs_for_untagged_sensitive_data(
 class TestLogRedaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_log_redaction_partial(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cloud: CouchbaseCloud, dataset_path: Path
     ) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         num_docs = 10
         sg_db = "db"
         bucket_name = "data-bucket"
@@ -178,10 +178,10 @@ class TestLogRedaction(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sgcollect_redacted_files_and_contents(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cloud: CouchbaseCloud, dataset_path: Path
     ) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         num_docs = 10
         sg_db = "db"
         bucket_name = "data-bucket"

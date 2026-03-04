@@ -2,8 +2,8 @@ import asyncio
 from typing import cast
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.syncgateway import PutDatabasePayload
 
 
@@ -12,9 +12,9 @@ from cbltest.api.syncgateway import PutDatabasePayload
 @pytest.mark.min_couchbase_servers(1)
 class TestServerSetup(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sgw_server_alternative_address(self, cblpytest: CBLPyTest) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+    async def test_sgw_server_alternative_address(self, cloud: CouchbaseCloud) -> None:
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         sg_db = "db"
         bucket_name = "alternate-addr-bucket"
         num_docs = 5
@@ -73,9 +73,9 @@ class TestServerSetup(CBLTestClass):
         await sg.wait_for_db_up(sg_db)
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_remove_dcp_cacert_handling(self, cblpytest: CBLPyTest) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+    async def test_remove_dcp_cacert_handling(self, cloud: CouchbaseCloud) -> None:
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         bucket_name = "data-bucket"
         sg_db = "db"
 

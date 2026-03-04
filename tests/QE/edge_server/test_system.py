@@ -6,8 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cloud import CouchbaseCloud
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblSyncGatewayBadResponseError,
@@ -33,12 +34,12 @@ def _updated_doc_body(doc_id: str) -> dict[str, Any]:
 
 
 class TestSystem(CBLTestClass):
-    async def _setup_system_test(self, cblpytest: CBLPyTest):
+    async def _setup_system_test(self, cloud: CouchbaseCloud, edgeserver: EdgeServer):
         """Create bucket, 10 docs, Sync Gateway db, Edge Server db; verify 10 docs on both.
         Returns (sync_gateway, edge_server, sg_db_name, es_db_name).
         """
-        server = cblpytest.couchbase_servers[0]
-        sync_gateway = cblpytest.sync_gateways[0]
+        server = cloud.couchbase_server
+        sync_gateway = cloud.sync_gateway
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
@@ -80,7 +81,7 @@ class TestSystem(CBLTestClass):
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name=es_db_name, config_file=config_path
         )
         await edge_server.wait_for_idle()
@@ -102,7 +103,10 @@ class TestSystem(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_one_client_l(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        dataset_path: Path,
+        cloud: CouchbaseCloud,
+        edgeserver: EdgeServer,
     ) -> None:
         end_time = datetime.now() + timedelta(minutes=360)
         (
@@ -110,7 +114,7 @@ class TestSystem(CBLTestClass):
             edge_server,
             sg_db_name,
             es_db_name,
-        ) = await self._setup_system_test(cblpytest)
+        ) = await self._setup_system_test(cloud, edgeserver)
         doc_counter = 11
 
         while datetime.now() < end_time:
@@ -239,7 +243,10 @@ class TestSystem(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_one_client_chaos(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        dataset_path: Path,
+        cloud: CouchbaseCloud,
+        edgeserver: EdgeServer,
     ) -> None:
         end_time = datetime.now() + timedelta(minutes=360)
         (
@@ -247,7 +254,7 @@ class TestSystem(CBLTestClass):
             edge_server,
             sg_db_name,
             es_db_name,
-        ) = await self._setup_system_test(cblpytest)
+        ) = await self._setup_system_test(cloud, edgeserver)
         edge_server_down = False
         end = datetime.now() + timedelta(minutes=2400)
         doc_counter = 11

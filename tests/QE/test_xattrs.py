@@ -3,8 +3,8 @@ import random
 from typing import Any
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 from packaging.version import Version
@@ -16,10 +16,10 @@ from packaging.version import Version
 class TestXattrs(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_offline_processing_of_external_updates(
-        self, cblpytest: CBLPyTest
+        self, cloud: CouchbaseCloud
     ) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         num_docs = 100
         username = "vipul"
         password = "pass"
@@ -166,9 +166,9 @@ class TestXattrs(CBLTestClass):
         await sg_user.close()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_purge(self, cblpytest: CBLPyTest) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+    async def test_purge(self, cloud: CouchbaseCloud) -> None:
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         num_docs = 100
         username = "vipul"
         password = "pass"
@@ -354,9 +354,9 @@ class TestXattrs(CBLTestClass):
         await sg_user.close()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sg_sdk_interop_unique_docs(self, cblpytest: CBLPyTest) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+    async def test_sg_sdk_interop_unique_docs(self, cloud: CouchbaseCloud) -> None:
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         num_docs = 10
         num_updates = 10
         username = "vipul"
@@ -514,9 +514,9 @@ class TestXattrs(CBLTestClass):
         await sg_user.close()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sg_sdk_interop_shared_docs(self, cblpytest: CBLPyTest) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+    async def test_sg_sdk_interop_shared_docs(self, cloud: CouchbaseCloud) -> None:
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         num_docs = 10
         num_updates = 10
         username = "vipul"
@@ -751,9 +751,9 @@ class TestXattrs(CBLTestClass):
         await sg_user.close()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sync_xattrs_update_concurrently(self, cblpytest: CBLPyTest) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+    async def test_sync_xattrs_update_concurrently(self, cloud: CouchbaseCloud) -> None:
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         num_docs = 20
         sg_db = "db"
         bucket_name = "data-bucket"

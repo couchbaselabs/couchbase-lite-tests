@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 from aiohttp import BasicAuth
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database_types import DocumentEntry
@@ -19,24 +18,22 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import TestServer
 
 
 @pytest.mark.cbl
 class TestDeltaSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_replication(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, cloud: CouchbaseCloud, testserver: TestServer
     ):
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+        dbs = await testserver.create_and_reset_db(
             ["db1"], dataset="travel"
         )
         db = dbs[0]
@@ -51,11 +48,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("travel"),
+            cloud.sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -69,7 +66,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cblpytest.sync_gateways[0],
+            cloud.sync_gateway,
             ReplicatorType.PULL,
             "travel",
             ["travel.hotels"],
@@ -80,12 +77,12 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record baseline bytes before update")
-        read_pull_bytes_before, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        read_pull_bytes_before, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await cblpytest.sync_gateways[0].get_document(
+        original_doc = await cloud.sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document hotel_400 should exist"
@@ -102,7 +99,7 @@ class TestDeltaSync(CBLTestClass):
                 {"name": "Updated Hotel"},
             )
         ]
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "travel", updates, "travel", "hotels"
         )
 
@@ -127,7 +124,7 @@ class TestDeltaSync(CBLTestClass):
         assert events, "Expected documents to be processed"
 
         self.mark_test_step("Record bytes transferred after delta sync")
-        read_pull_bytes_after, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        read_pull_bytes_after, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
@@ -148,22 +145,17 @@ class TestDeltaSync(CBLTestClass):
             f"Expected delta to be less than the full doc size, but got {delta_bytes} bytes (original doc size: {original_doc_size})"
         )
 
-        await cblpytest.test_servers[0].cleanup()
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_nested_doc(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, cloud: CouchbaseCloud, testserver: TestServer
     ):
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+        dbs = await testserver.create_and_reset_db(
             ["db1"], dataset="travel"
         )
         db = dbs[0]
@@ -178,11 +170,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("travel"),
+            cloud.sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -196,7 +188,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cblpytest.sync_gateways[0],
+            cloud.sync_gateway,
             ReplicatorType.PULL,
             "travel",
             ["travel.hotels"],
@@ -207,12 +199,12 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Get baseline bytes before update")
-        read_pull_bytes_before, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        read_pull_bytes_before, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await cblpytest.sync_gateways[0].get_document(
+        original_doc = await cloud.sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document hotel_400 should exist"
@@ -229,7 +221,7 @@ class TestDeltaSync(CBLTestClass):
                 {"name": "SGW", "nested": {"name": "I am a nested field"}},
             )
         ]
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "travel", updates, "travel", "hotels"
         )
 
@@ -269,7 +261,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        read_pull_bytes_after, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        read_pull_bytes_after, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
@@ -281,22 +273,17 @@ class TestDeltaSync(CBLTestClass):
             f"Expected delta to be less than the full doc size, but got {delta_bytes} bytes (original doc size: {original_doc_size})"
         )
 
-        await cblpytest.test_servers[0].cleanup()
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_utf8_strings(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, cloud: CouchbaseCloud, testserver: TestServer
     ):
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+        dbs = await testserver.create_and_reset_db(
             ["db1"], dataset="travel"
         )
         db = dbs[0]
@@ -311,11 +298,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("travel"),
+            cloud.sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -329,7 +316,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cblpytest.sync_gateways[0],
+            cloud.sync_gateway,
             ReplicatorType.PULL,
             "travel",
             ["travel.hotels"],
@@ -340,12 +327,12 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Get baseline bytes before update")
-        bytes_pull_before, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        bytes_pull_before, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await cblpytest.sync_gateways[0].get_document(
+        original_doc = await cloud.sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document hotel_400 should exist"
@@ -363,7 +350,7 @@ class TestDeltaSync(CBLTestClass):
                 {"utf8": utf8_body},
             )
         ]
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "travel", updates, "travel", "hotels"
         )
 
@@ -397,7 +384,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred again this time.")
-        bytes_pull_after, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        bytes_pull_after, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
@@ -409,22 +396,17 @@ class TestDeltaSync(CBLTestClass):
             f"Expected delta to be less than the full doc size, but got {delta_bytes_transferred} bytes (original doc size: {original_doc_size})"
         )
 
-        await cblpytest.test_servers[0].cleanup()
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_enabled_disabled(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, cloud: CouchbaseCloud, testserver: TestServer
     ):
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+        dbs = await testserver.create_and_reset_db(
             ["db1"], dataset="travel"
         )
         db = dbs[0]
@@ -439,11 +421,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("travel"),
+            cloud.sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -457,7 +439,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Verify docs are replicated correctly")
         await compare_local_and_remote(
             db,
-            cblpytest.sync_gateways[0],
+            cloud.sync_gateway,
             ReplicatorType.PULL,
             "travel",
             ["travel.hotels"],
@@ -468,12 +450,12 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        bytes_read_before, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await cblpytest.sync_gateways[0].get_document(
+        original_doc = await cloud.sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document hotel_400 should exist"
@@ -486,7 +468,7 @@ class TestDeltaSync(CBLTestClass):
         updates = [
             DocumentUpdateEntry("hotel_400", original_doc.revid, {"name": "SGW"})
         ]
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "travel", updates, "travel", "hotels"
         )
 
@@ -520,7 +502,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        bytes_read_after, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
@@ -538,7 +520,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step(
             "Reset local database, and load `posts` dataset without delta sync."
         )
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+        dbs = await testserver.create_and_reset_db(
             ["db1"], dataset="posts"
         )
         db = dbs[0]
@@ -553,11 +535,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("posts"),
+            cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -571,19 +553,19 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Verify docs are replicated correctly")
         await compare_local_and_remote(
             db,
-            cblpytest.sync_gateways[0],
+            cloud.sync_gateway,
             ReplicatorType.PULL,
             "posts",
             ["_default.posts"],
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        bytes_read_before, _ = await cloud.sync_gateway.bytes_transferred(
             "posts"
         )
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await cblpytest.sync_gateways[0].get_document(
+        original_doc = await cloud.sync_gateway.get_document(
             "posts", "post_1", collection="posts"
         )
         assert original_doc is not None, "Document should exist in SGW"
@@ -592,7 +574,7 @@ class TestDeltaSync(CBLTestClass):
             Update docs in SGW:
                 * Modify the `name` field of the doc (small change).
         """)
-        await cblpytest.sync_gateways[0].upsert_documents(
+        await cloud.sync_gateway.upsert_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -634,7 +616,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        bytes_read_after, _ = await cloud.sync_gateway.bytes_transferred(
             "posts"
         )
 
@@ -647,24 +629,19 @@ class TestDeltaSync(CBLTestClass):
             f"Expected a full doc transfer, but only {delta_bytes_transferred} bytes read (doc size: {updated_doc_size})"
         )
 
-        await cblpytest.test_servers[0].cleanup()
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_within_expiry(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, cloud: CouchbaseCloud, testserver: TestServer
     ):
         self.mark_test_step("""
             Reset SG and load `short_expiry` dataset with delta sync enabled.
                 * has a `old_rev_expiry_seconds` of 10 seconds.
                 * has a rev_cache size of 1.
         """)
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "short_expiry", ["delta_sync"])
 
         self.mark_test_step("Verify SGW config has correct revision expiry settings")
-        db_config = await cblpytest.sync_gateways[0].get_database_config("short_expiry")
+        db_config = await cloud.sync_gateway.get_database_config("short_expiry")
 
         assert db_config.get("old_rev_expiry_seconds") == 10, (
             f"Expected old_rev_expiry_seconds to be 10, got {db_config.get('old_rev_expiry_seconds')}"
@@ -678,7 +655,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Reset local database.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
+        dbs = await testserver.create_and_reset_db(["db1"])
         db = dbs[0]
 
         self.mark_test_step("""
@@ -691,11 +668,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("short_expiry"),
+            cloud.sync_gateway.replication_url("short_expiry"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -718,14 +695,14 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred.")
-        read_pull_bytes_before, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        read_pull_bytes_before, _ = await cloud.sync_gateway.bytes_transferred(
             "short_expiry"
         )
 
         self.mark_test_step(
             "Get the current document state and revision before update."
         )
-        sgw_doc_before_update = await cblpytest.sync_gateways[0].get_document(
+        sgw_doc_before_update = await cloud.sync_gateway.get_document(
             "short_expiry", "doc1"
         )
         assert sgw_doc_before_update is not None, "Document should exist in SGW"
@@ -738,7 +715,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step(
             "Verify old revision body is accessible before expiry through public API."
         )
-        sg = cblpytest.sync_gateways[0]
+        sg = cloud.sync_gateway
         old_rev_doc = await sg.get_document_revision_public(
             "short_expiry", "doc1", old_revision, BasicAuth("user1", "pass", "ascii")
         )
@@ -754,7 +731,7 @@ class TestDeltaSync(CBLTestClass):
             Update docs in SGW:
                 * Modify content in document "doc1": `"name": "SGW"` (small change)
         """)
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "short_expiry",
             [
                 DocumentUpdateEntry(
@@ -794,7 +771,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred post expiry.")
-        read_pull_bytes_after, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        read_pull_bytes_after, _ = await cloud.sync_gateway.bytes_transferred(
             "short_expiry"
         )
         delta_bytes_read = read_pull_bytes_after - read_pull_bytes_before
@@ -812,22 +789,17 @@ class TestDeltaSync(CBLTestClass):
             f"Expected a full doc transfer since old revision expired, but only {delta_bytes_read} bytes read (doc size: {updated_doc_size})"
         )
 
-        await cblpytest.test_servers[0].cleanup()
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_with_no_deltas(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, cloud: CouchbaseCloud, testserver: TestServer
     ):
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled."
         )
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+        dbs = await testserver.create_and_reset_db(
             ["db1"], dataset="travel"
         )
         db = dbs[0]
@@ -842,11 +814,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("travel"),
+            cloud.sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -857,7 +829,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        bytes_read_before, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
@@ -871,11 +843,11 @@ class TestDeltaSync(CBLTestClass):
             Update docs in SGW:
                 * Update the same hotel document with identical content (no real change)
         """)
-        original_doc = await cblpytest.sync_gateways[0].get_document(
+        original_doc = await cloud.sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document hotel_400 should exist"
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "travel",
             [DocumentUpdateEntry("hotel_400", original_doc.revid, {})],
             "travel",
@@ -892,7 +864,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        bytes_read_after, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
@@ -905,22 +877,17 @@ class TestDeltaSync(CBLTestClass):
             f"Expected no bytes transferred, but got {delta_bytes_read} bytes"
         )
 
-        await cblpytest.test_servers[0].cleanup()
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_larger_than_doc(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, cloud: CouchbaseCloud, testserver: TestServer
     ):
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled."
         )
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+        dbs = await testserver.create_and_reset_db(
             ["db1"], dataset="travel"
         )
         db = dbs[0]
@@ -935,11 +902,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("travel"),
+            cloud.sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -955,13 +922,13 @@ class TestDeltaSync(CBLTestClass):
         assert len(lite_all_docs["travel.hotels"]) == 700, (
             f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
         )
-        original_doc = await cblpytest.sync_gateways[0].get_document(
+        original_doc = await cloud.sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document should exist in SGW"
 
         self.mark_test_step("Get delta stats.")
-        bytes_read_before, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        bytes_read_before, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
@@ -970,7 +937,7 @@ class TestDeltaSync(CBLTestClass):
                 * Update the same hotel document with much larger content (>2x original size)
         """)
         large_doc_body = "X" * 2_000_000
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "travel",
             [
                 DocumentUpdateEntry(
@@ -1002,7 +969,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Get delta stats.")
-        bytes_read_after, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+        bytes_read_after, _ = await cloud.sync_gateway.bytes_transferred(
             "travel"
         )
 
@@ -1020,5 +987,3 @@ class TestDeltaSync(CBLTestClass):
         assert delta_bytes_read > 0.8 * large_doc_size, (
             f"Expected a full doc transfer, but only {delta_bytes_read} bytes read (doc size: {large_doc_size})"
         )
-
-        await cblpytest.test_servers[0].cleanup()

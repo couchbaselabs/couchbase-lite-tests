@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database_types import EncryptedValue
@@ -12,6 +11,7 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
+from cbltest.api.testserver import TestServer
 from cbltest.responses import ServerVariant
 
 
@@ -21,18 +21,15 @@ from cbltest.responses import ServerVariant
 class TestEncryptedProperties(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_encrypted_push(
-        self, dataset_path: Path, cblpytest: CBLPyTest
+        self, dataset_path: Path, cloud: CouchbaseCloud, testserver: TestServer
     ) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
+        await self.skip_if_not_platform(testserver, ServerVariant.C)
 
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset empty local database")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
+        dbs = await testserver.create_and_reset_db(["db1"])
         db = dbs[0]
 
         async with db.batch_updater() as b:
@@ -52,7 +49,7 @@ class TestEncryptedProperties(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("names"),
+            cloud.sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PUSH,
             collections=[
                 ReplicatorCollectionEntry(
@@ -60,7 +57,7 @@ class TestEncryptedProperties(CBLTestClass):
                 )
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -71,7 +68,7 @@ class TestEncryptedProperties(CBLTestClass):
         )
 
         self.mark_test_step("Check that the document in SG is not in plaintext")
-        pushed_doc = await cblpytest.sync_gateways[0].get_document("names", "secret")
+        pushed_doc = await cloud.sync_gateway.get_document("names", "secret")
         assert pushed_doc is not None, "Document not found in SG"
         assert "password" not in pushed_doc.body, (
             "The document was pushed without encryption"

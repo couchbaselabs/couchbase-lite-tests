@@ -1,6 +1,11 @@
+from typing import Iterator
+
 import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
+from cbltest.api.cloud import CouchbaseCloud
+from cbltest.api.edgeserver import EdgeServer
+from cbltest.api.testserver import TestServer
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
@@ -73,3 +78,48 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="The default dataset version to use for test servers",
         default="4.0",
     )
+
+
+@pytest.fixture
+def cloud(cblpytest: CBLPyTest) -> CouchbaseCloud:
+    """
+    Provide a single CouchbaseCloud instance when there is at least one Sync Gateway and Couchbase Server.
+
+    This is convenience fixture to avoid cblpytest for simple topologies.
+    """
+    assert len(cblpytest.sync_gateways) == 1, (
+        "There must be at least one Sync Gateway in the configured to use this fixture. If this is not true, use cblpytest directly"
+    )
+    assert len(cblpytest.couchbase_servers) == 1, (
+        "There at must be least one Couchbase Server must be configured to use this fixture. If this is not true, use cblpytest directly"
+    )
+    return CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
+
+
+@pytest_asyncio.fixture
+def testserver(cblpytest: CBLPyTest) -> Iterator[TestServer]:
+    """
+    Provide a single TestServer instance. Cleans up the test server after the test finishes if it finishes
+    successfully.
+
+    This is convenience fixture to avoid cblpytest for simple topologies.
+    """
+    assert len(cblpytest.test_servers) > 1, (
+        "To use testserver pytest fixture at least one test server must be configured. If this is not true, use cblpytest fixture directly"
+    )
+    yield cblpytest.test_servers[0]
+    # if the test passes, clean up the test server
+    await cblpytest.test_servers[0].cleanup()
+
+
+@pytest.fixture
+def edgeserver(cblpytest: CBLPyTest) -> Iterator[EdgeServer]:
+    """
+    Provide a single Edge Server instance.
+
+    This is convenience fixture to avoid cblpytest for simple topologies.
+    """
+    assert len(cblpytest.edge_servers) > 1, (
+        "To use testserver pytest fixture at least one test server must be configured. If this is not true, use cblpytest fixture directly"
+    )
+    yield cblpytest.edge_servers[0]

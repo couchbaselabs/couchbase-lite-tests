@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database import SnapshotUpdater
@@ -16,6 +15,7 @@ from cbltest.api.replicator import (
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import TestServer
 from cbltest.responses import ServerVariant
 from cbltest.utils import assert_not_null
 
@@ -27,22 +27,19 @@ class TestReplicationBlob(CBLTestClass):
     @pytest.mark.cbse(14861)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_non_blob_changes_with_delta_sync_and_compact(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, cloud: CouchbaseCloud, testserver: TestServer
     ):
         await self.skip_if_not_platform(
-            cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS
+            testserver, ServerVariant.ALL & ~ServerVariant.JS
         )
 
         self.mark_test_step(
             "Reset SG and load `travel` dataset with delta sync enabled."
         )
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+        dbs = await testserver.create_and_reset_db(
             ["db1"], dataset="travel"
         )
         db = dbs[0]
@@ -59,11 +56,11 @@ class TestReplicationBlob(CBLTestClass):
         )
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("travel"),
+            cloud.sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -76,7 +73,7 @@ class TestReplicationBlob(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cblpytest.sync_gateways[0],
+            cloud.sync_gateway,
             ReplicatorType.PUSH_AND_PULL,
             "travel",
             ["travel.hotels"],
@@ -84,7 +81,7 @@ class TestReplicationBlob(CBLTestClass):
 
         self.mark_test_step("Update hotel_1 on SG without changing the image key.")
         hotel_1 = assert_not_null(
-            await cblpytest.sync_gateways[0].get_document(
+            await cloud.sync_gateway.get_document(
                 "travel", "hotel_1", "travel", "hotels"
             ),
             "hotel_1 vanished from SGW",
@@ -116,7 +113,7 @@ class TestReplicationBlob(CBLTestClass):
                 },
             )
         )
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "travel", hotels_updates, "travel", "hotels"
         )
 
@@ -132,7 +129,7 @@ class TestReplicationBlob(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cblpytest.sync_gateways[0],
+            cloud.sync_gateway,
             ReplicatorType.PUSH_AND_PULL,
             "travel",
             ["travel.hotels"],
@@ -142,7 +139,7 @@ class TestReplicationBlob(CBLTestClass):
             "Update hotel_1 on SG again without changing the image key."
         )
         hotel_1 = assert_not_null(
-            await cblpytest.sync_gateways[0].get_document(
+            await cloud.sync_gateway.get_document(
                 "travel", "hotel_1", "travel", "hotels"
             ),
             "hotel_1 vanished from SGW",
@@ -173,7 +170,7 @@ class TestReplicationBlob(CBLTestClass):
                 },
             )
         )
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "travel", hotels_updates, "travel", "hotels"
         )
 
@@ -194,7 +191,7 @@ class TestReplicationBlob(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cblpytest.sync_gateways[0],
+            cloud.sync_gateway,
             ReplicatorType.PUSH_AND_PULL,
             "travel",
             ["travel.hotels"],
@@ -213,18 +210,13 @@ class TestReplicationBlob(CBLTestClass):
             f"The verification failed: {verify_result.description}"
         )
 
-        await cblpytest.test_servers[0].cleanup()
-
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_blob_replication(self, dataset_path: Path, cloud: CouchbaseCloud, testserver: TestServer):
         self.mark_test_step("Reset SG and load `names` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset empty local database")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
+        dbs = await testserver.create_and_reset_db(["db1"])
         db = dbs[0]
 
         self.mark_test_step(
@@ -245,11 +237,11 @@ class TestReplicationBlob(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("names"),
+            cloud.sync_gateway.replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PUSH,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -262,7 +254,7 @@ class TestReplicationBlob(CBLTestClass):
         self.mark_test_step(
             "Check that the document with the ID from step 3 contains a valid `watermelon` property"
         )
-        remote_doc = await cblpytest.sync_gateways[0].get_document("names", "fruits")
+        remote_doc = await cloud.sync_gateway.get_document("names", "fruits")
         assert remote_doc is not None, "Document `fruits` not found in SGW"
 
         def check_blob_prop(d: dict, prop: str, expected_value: Any):

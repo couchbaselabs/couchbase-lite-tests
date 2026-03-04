@@ -14,13 +14,12 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestEdgeServerChaos(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_kill_sgw_mid_replication(self, cblpytest, dataset_path) -> None:
+    async def test_kill_sgw_mid_replication(
+        self, cblpytest, dataset_path, cloud: CouchbaseCloud
+    ) -> None:
         self.mark_test_step("test_edge_to_sgw_replication")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
         await cloud.configure_dataset(dataset_path, "travel")
-        sgw = cblpytest.sync_gateways[0]
+        sgw = cloud.sync_gateway
         source_db = sgw.replication_url("travel")
 
         self.mark_test_step("Configure Edge Server with travel dataset")
@@ -51,7 +50,7 @@ class TestEdgeServerChaos(CBLTestClass):
         edge_docs = await edge_server.get_all_documents(
             "travel", collection="travel.hotels"
         )
-        sgw_docs = await sgw.get_all_documents(
+        sgw_docs = await cloud.sync_gateway.get_all_documents(
             "travel", scope="travel", collection="hotels"
         )
         assert len(edge_docs.rows) == len(sgw_docs.rows) == 0, (
@@ -75,7 +74,7 @@ class TestEdgeServerChaos(CBLTestClass):
         edge_docs = await edge_server.get_all_documents(
             "travel", collection="travel.hotels"
         )
-        sgw_docs = await sgw.get_all_documents(
+        sgw_docs = await cloud.sync_gateway.get_all_documents(
             "travel", scope="travel", collection="hotels"
         )
         assert len(edge_docs.rows) == len(sgw_docs.rows) == 10000, (
@@ -109,7 +108,7 @@ class TestEdgeServerChaos(CBLTestClass):
         edge_docs = await edge_server.get_all_documents(
             "travel", collection="travel.hotels"
         )
-        sgw_docs = await sgw.get_all_documents(
+        sgw_docs = await cloud.sync_gateway.get_all_documents(
             "travel", scope="travel", collection="hotels"
         )
         assert len(edge_docs.rows) == len(sgw_docs.rows) == docgen.size, (

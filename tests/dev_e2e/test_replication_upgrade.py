@@ -3,8 +3,9 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from cbltest import CBLPyTest, CouchbaseServer
+from cbltest import CouchbaseServer
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database import Database, GetDocumentResult
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.error import CblSyncGatewayBadResponseError
@@ -17,8 +18,9 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
     WaitForDocumentEventEntry,
 )
-from cbltest.api.syncgateway import RemoteDocument
+from cbltest.api.syncgateway import RemoteDocument, SyncGateway
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import TestServer
 from cbltest.logging import cbl_info
 
 
@@ -30,25 +32,29 @@ class TestReplicationUpgrade(CBLTestClass):
     def tools_path() -> Path:
         return Path(__file__).resolve().parent.parent / ".tools"
 
-    async def setup_env(self, cblpytest: CBLPyTest, dataset_path: Path) -> Database:
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
+    async def setup_env(
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
+    ) -> Database:
+        await self.skip_if_cbl_not(testserver, ">= 4.0.0")
 
-        dataset_ver = cblpytest.test_servers[0].dataset_version
+        dataset_ver = testserver.dataset_version
         self.skip_if_not(
             dataset_ver == "4.0", f"Requires dataset v4.0 (current: {dataset_ver})."
         )
 
         # Delete SG database first to avoid reset error after backup is restored
         self.mark_test_step("Delete Sync Gateway 'upgrade' database if exists")
-        sg = cblpytest.sync_gateways[0]
         try:
-            await sg.delete_database("upgrade")
+            await cloud.sync_gateway.delete_database("upgrade")
         except CblSyncGatewayBadResponseError as e:
             if e.code != 403:
                 raise
 
         self.mark_test_step("Restore Couchbase Server Bucket using `upgrade` dataset")
-        cbs: CouchbaseServer = cblpytest.couchbase_servers[0]
+        cbs: CouchbaseServer = cloud.couchbase_server
         cbs.drop_bucket("upgrade")
         cbs.restore_bucket("upgrade", self.tools_path(), dataset_path, "upgrade")
 
@@ -56,9 +62,7 @@ class TestReplicationUpgrade(CBLTestClass):
         time.sleep(2)
 
         self.mark_test_step("Reset local database, and load `upgrade` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="upgrade"
-        )
+        dbs = await testserver.create_and_reset_db(["db1"], dataset="upgrade")
         return dbs[0]
 
     # A simple snapshot class to hold local and remote documents
@@ -72,7 +76,7 @@ class TestReplicationUpgrade(CBLTestClass):
 
     async def do_replication_test(
         self,
-        cblpytest: CBLPyTest,
+        sync_gateway: SyncGateway,
         db: Database,
         doc_id: str,
         replicator_type: ReplicatorType,
@@ -81,12 +85,10 @@ class TestReplicationUpgrade(CBLTestClass):
         compare_docs: bool | None = True,
         validator: DocValidator | None = None,
     ):
-        sg = cblpytest.sync_gateways[0]
-
         pre_local_doc = await db.get_document(
             DocumentEntry("_default._default", doc_id)
         )
-        pre_remote_doc = await sg.get_document("upgrade", doc_id)
+        pre_remote_doc = await sync_gateway.get_document("upgrade", doc_id)
 
         assert pre_local_doc is not None
         assert pre_remote_doc is not None
@@ -111,7 +113,7 @@ class TestReplicationUpgrade(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("upgrade"),
+            sync_gateway.replication_url("upgrade"),
             collections=[
                 ReplicatorCollectionEntry(
                     names=["_default._default"],
@@ -122,7 +124,7 @@ class TestReplicationUpgrade(CBLTestClass):
             replicator_type=replicator_type,
             continuous=wait_for_doc_events,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
             enable_document_listener=wait_for_doc_events,
         )
 
@@ -144,11 +146,16 @@ class TestReplicationUpgrade(CBLTestClass):
         if compare_docs:
             self.mark_test_step("Check that the doc is replicated correctly.")
             await compare_local_and_remote(
-                db, sg, replicator_type, "upgrade", ["_default._default"], [doc_id]
+                db,
+                sync_gateway,
+                replicator_type,
+                "upgrade",
+                ["_default._default"],
+                [doc_id],
             )
 
         local_doc = await db.get_document(DocumentEntry("_default._default", doc_id))
-        remote_doc = await sg.get_document("upgrade", doc_id)
+        remote_doc = await sync_gateway.get_document("upgrade", doc_id)
 
         assert local_doc is not None
         assert remote_doc is not None
@@ -165,7 +172,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_nonconflict_case_1(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         Bidirectional replication where CBL has a pre-upgrade mutation that hasn’t been
@@ -179,7 +189,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |  2-def, 1-abc |      none     |  2-def, 1-abc | Encoded 2-def |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -214,7 +224,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="nonconflict_1",
             replicator_type=ReplicatorType.PUSH_AND_PULL,
@@ -223,7 +233,7 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_nonconflict_case_2(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cloud: CouchbaseCloud, testserver: TestServer, dataset_path: Path
     ) -> None:
         """
         Bidirectional replication where SGW has a pre-upgrade mutation that hasn’t been
@@ -237,7 +247,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |  2-def,1-abc  | Encoded 2-def |     2-def     |      none     |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -270,7 +280,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="nonconflict_2",
             replicator_type=ReplicatorType.PUSH_AND_PULL,
@@ -279,7 +289,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_nonconflict_case_3(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         Bidirectional replication where CBL has a pre-upgrade mutation that SGW
@@ -294,7 +307,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |     2-abc     |      none     |     2-abc     |      none     |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -327,7 +340,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="nonconflict_3",
             replicator_type=ReplicatorType.PUSH_AND_PULL,
@@ -336,7 +349,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_nonconflict_case_4(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         Bidirectional replication where CBL has a pre-upgrade mutation that is already in
@@ -352,7 +368,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |      none     |  [100@SGW1]   |  3-ghi 2-def  |   [100@SGW1]  |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -383,7 +399,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="nonconflict_4",
             replicator_type=ReplicatorType.PUSH_AND_PULL,
@@ -392,7 +408,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_nonconflict_case_5(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         CBL pull of a post-upgrade mutation that shares a common ancestor with the
@@ -407,7 +426,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |      none     |   [100@SGW1]  |  3-ghi 2-def  |   [100@SGW1]  |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -438,7 +457,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="nonconflict_5",
             replicator_type=ReplicatorType.PULL,
@@ -447,7 +466,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_nonconflict_case_6(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         CBL push of a post-upgrade mutation that shares a common ancestor with the
@@ -463,7 +485,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |         none           | [100@CBL1]             |     3-def     |   [100@CBL1]  |
         +------------------+------------------------+------------------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -492,7 +514,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="nonconflict_6",
             replicator_type=ReplicatorType.PUSH,
@@ -501,7 +523,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_conflict_case_1(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         Push replication with a conflict between pre-upgrade CBL and SGW mutations —
@@ -515,7 +540,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |     3-abc     |      none     |     3-def     |      none     |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         doc_events = {
             WaitForDocumentEventEntry(
@@ -557,7 +582,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_1",
             replicator_type=ReplicatorType.PUSH,
@@ -568,7 +593,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_conflict_case_2(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         Bidirectional replication conflict between pre-upgrade CBL and SGW mutations,
@@ -584,7 +612,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |     3-def     |      none     |     3-def     |      none     |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def pull_validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -617,7 +645,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_2",
             replicator_type=ReplicatorType.PULL,
@@ -639,7 +667,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_2",
             replicator_type=ReplicatorType.PUSH,
@@ -648,7 +676,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_conflict_case_3(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         Bidirectional replication conflict between a pre-upgrade CBL mutation and a post-upgrade
@@ -664,7 +695,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |      none     |  [100@SGW1]   |     3-def     |  [100@SGW1]   |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def pull_validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -693,7 +724,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_3",
             replicator_type=ReplicatorType.PULL,
@@ -716,7 +747,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_3",
             replicator_type=ReplicatorType.PUSH,
@@ -725,7 +756,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_conflict_case_4(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         Bidirectional replication conflict between pre-upgrade CBL and SGW mutations,
@@ -742,7 +776,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |      none     | [100@CBL1, 3abc@RTE] |     4-def     | [100@CBL1, 3abc@RTE] |
         +------------------+---------------+----------------------+---------------+----------------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def pull_validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -771,7 +805,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_4",
             replicator_type=ReplicatorType.PULL,
@@ -795,7 +829,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_4",
             replicator_type=ReplicatorType.PUSH,
@@ -804,7 +838,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_conflict_case_5(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         Bidirectional replication conflict between a pre-upgrade CBL mutation and
@@ -821,7 +858,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |             | [3def@RTE, 100@SGW1] |    4-def    | [3def@RTE, 100@SGW1] |
         +------------------+-------------+----------------------+-------------+----------------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def pull_validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -851,7 +888,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_5",
             replicator_type=ReplicatorType.PULL,
@@ -880,7 +917,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_5",
             replicator_type=ReplicatorType.PUSH,
@@ -890,7 +927,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_conflict_case_6(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         Bidirectional replication conflict between a post-upgrade CBL mutation and
@@ -907,7 +947,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |              | [100@CBL1, 3abc@RTE] |   4-abc      | [100@CBL1, 3abc@RTE] |
         +------------------+--------------+----------------------+--------------+----------------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def pull_validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -933,7 +973,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_6",
             replicator_type=ReplicatorType.PULL,
@@ -957,7 +997,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_6",
             replicator_type=ReplicatorType.PUSH,
@@ -967,7 +1007,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_conflict_case_7(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        cloud: CouchbaseCloud,
+        testserver: TestServer,
+        dataset_path: Path,
     ) -> None:
         """
         Bidirectional replication conflict between a post-upgrade CBL mutation and
@@ -985,7 +1028,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |             |   3abc@RTE  |    3-abc    |     none    |
         +------------------+-------------+-------------+-------------+-------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await self.setup_env(cloud, testserver, dataset_path)
 
         def pull_validator(
             pre: TestReplicationUpgrade.DocSnapshot,
@@ -1016,7 +1059,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_7",
             replicator_type=ReplicatorType.PULL,
@@ -1040,7 +1083,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
         await self.do_replication_test(
-            cblpytest,
+            cloud.sync_gateway,
             db,
             doc_id="conflict_7",
             replicator_type=ReplicatorType.PUSH,

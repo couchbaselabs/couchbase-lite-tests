@@ -2,8 +2,8 @@ import asyncio
 from pathlib import Path
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.edgeserver import EdgeServer
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -11,10 +11,10 @@ SCRIPT_DIR = str(Path(__file__).parent)
 class TestCrud(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_basic_information_retrieval(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("test_basic_information_retrieval")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
         )
         self.mark_test_step("get server information")
@@ -23,10 +23,10 @@ class TestCrud(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_database_config(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("test_database_config")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
         )
         self.mark_test_step("fetch all databases")
@@ -40,11 +40,11 @@ class TestCrud(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_single_doc_crud(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("test_single_doc_crud")
         db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
         )
         self.mark_test_step("create single document with Auto ID")
@@ -80,9 +80,11 @@ class TestCrud(CBLTestClass):
             )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sub_doc_crud(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_sub_doc_crud(
+        self, dataset_path: Path, edgeserver: EdgeServer
+    ) -> None:
         self.mark_test_step("test_sub_doc_crud")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
         )
         db_name = "db"
@@ -115,11 +117,11 @@ class TestCrud(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_single_doc_crud_ttl(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("test_single_doc_crud_tll")
         db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
         )
         self.mark_test_step("create single document with Auto ID")

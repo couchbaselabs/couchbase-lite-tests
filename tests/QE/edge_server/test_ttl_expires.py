@@ -4,8 +4,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import CblEdgeServerBadResponseError
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -13,11 +13,11 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestTTLExpires(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_ttl_5s(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_ttl_5s(self, dataset_path: Path, edgeserver: EdgeServer) -> None:
         self.mark_test_step("Starting test to verify TTL feature")
 
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -42,11 +42,11 @@ class TestTTLExpires(CBLTestClass):
             await edge_server.get_document(es_db_name, "ttl_doc")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_expires_5s(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_expires_5s(self, dataset_path: Path, edgeserver: EdgeServer) -> None:
         self.mark_test_step("Starting test to verify Expires feature")
 
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -76,11 +76,11 @@ class TestTTLExpires(CBLTestClass):
             await edge_server.get_document(es_db_name, "ttl_doc")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_update_ttl(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_update_ttl(self, dataset_path: Path, edgeserver: EdgeServer) -> None:
         self.mark_test_step("Starting test to verify Update TTL feature")
 
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -121,13 +121,15 @@ class TestTTLExpires(CBLTestClass):
             await edge_server.get_document(es_db_name, "ttl")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_ttl_expires(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_ttl_expires(
+        self, dataset_path: Path, edgeserver: EdgeServer
+    ) -> None:
         self.mark_test_step(
             "Starting test to verify that with both ttl and expires provided, the lower value is used"
         )
 
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -203,14 +205,14 @@ class TestTTLExpires(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_ttl_non_existent_document(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step(
             "Starting test to verify TTL feature for non-existent document"
         )
 
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -225,14 +227,14 @@ class TestTTLExpires(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_bulk_documents_ttl(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step(
             "Starting test to see if bulk documents with TTL are deleted after the TTL expires"
         )
 
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
