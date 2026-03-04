@@ -1,3 +1,4 @@
+import json
 import subprocess
 import time
 from collections.abc import Callable
@@ -64,6 +65,3 @@ def verify_lfs_checkout() -> None:
             raise RuntimeError(
                 "git lfs is not configured. Please run 'git lfs install and git lfs pull'"
             )
-
-
-import json
