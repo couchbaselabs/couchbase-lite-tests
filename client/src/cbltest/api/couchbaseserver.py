@@ -125,9 +125,9 @@ class CouchbaseServer:
             self.__password = password
             try:
                 self.__cluster = Cluster(url, opts)
-            except CouchbaseException:
+            except CouchbaseException as e:
                 cbl_warning(
-                    f"Initial connection to Couchbase Server {url} with {username=} {password=} failed"
+                    f"Initial connection to Couchbase Server {url} with {username=} password=<redacted> failed with: {e}"
                 )
                 raise
             self.__cluster.wait_until_ready(timedelta(seconds=10))

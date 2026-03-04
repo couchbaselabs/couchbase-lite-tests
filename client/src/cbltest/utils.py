@@ -44,13 +44,19 @@ def verify_lfs_checkout() -> None:
     """
     This function is used to verify that the LFS files are being properly checked out.
     """
-    process_output = subprocess.run(
-        ["git", "lfs", "ls-files", "--json"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    lfs = json.loads(process_output.stdout)
+    try:
+        process_output = subprocess.run(
+            ["git", "lfs", "ls-files", "--json"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Failed to run {e.cmd}. Output: {e.output}") from e
+    try:
+        lfs = json.loads(process_output.stdout)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Failed to parse git lfs output: {e}.") from e
     if not lfs["files"]:
         return
     for f in lfs["files"]:
