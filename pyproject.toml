@@ -57,5 +57,6 @@ filterwarnings = [
 ]
 markers = [
   "sgw: tests that focus on Sync Gateway functionality",
+  "upg_sgw: tests that focus on Sync Gateway upgrade scenario",
   "cbl: tests that focus on Couchbase Lite functionality",
 ]
