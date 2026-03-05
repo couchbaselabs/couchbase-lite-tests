@@ -1,17 +1,17 @@
 from pathlib import Path
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.edgeserver import EdgeServer
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
 class TestAuthentication(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_basic_auth(self, cblpytest: CBLPyTest) -> None:
+    async def test_basic_auth(self, edgeserver: EdgeServer) -> None:
         self.mark_test_step("test_basic_auth")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name="names", config_file=f"{SCRIPT_DIR}/config/test_basic_auth.json"
         )
         valid_auth = ("username8", "password8")
@@ -44,9 +44,9 @@ class TestAuthentication(CBLTestClass):
         assert failed, "No auth did not fail as expected"
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_valid_tls(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_valid_tls(self, dataset_path: Path, edgeserver: EdgeServer) -> None:
         self.mark_test_step("test_valid_tls")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name="names", config_file=f"{SCRIPT_DIR}/config/test_tls_config.json"
         )
         self.mark_test_step("get server information")

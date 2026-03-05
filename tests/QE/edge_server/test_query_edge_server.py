@@ -2,8 +2,8 @@ import asyncio
 from pathlib import Path
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import CblEdgeServerBadResponseError
 from deepdiff import DeepDiff
 
@@ -13,10 +13,10 @@ SCRIPT_DIR = str(Path(__file__).parent)
 class TestQueryEdgeServer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_named_queries(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("Configuring named queries")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
         )
 
@@ -36,10 +36,10 @@ class TestQueryEdgeServer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_adhoc_queries(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("Enabling ad-hoc queries")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
         )
         query = {
@@ -74,10 +74,10 @@ class TestQueryEdgeServer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_negative_scenarios(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("Testing negative scenarios")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name="names",
             config_file=f"{SCRIPT_DIR}/config/adhoc_disabled_config.json",
         )
@@ -110,10 +110,10 @@ class TestQueryEdgeServer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_query_on_expired_doc(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("Configuring named queries")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
         )
 
@@ -154,10 +154,10 @@ class TestQueryEdgeServer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_adhoc_queries_incorrect_field(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("Enabling ad-hoc queries")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
         )
 

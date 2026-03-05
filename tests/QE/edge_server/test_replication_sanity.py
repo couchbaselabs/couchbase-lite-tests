@@ -4,8 +4,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cloud import CouchbaseCloud
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblSyncGatewayBadResponseError,
@@ -18,10 +19,10 @@ SCRIPT_DIR = str(Path(__file__).parent)
 class TestReplicationSanity(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replication_sanity(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, cloud: CouchbaseCloud, edgeserver: EdgeServer
     ) -> None:
-        server = cblpytest.couchbase_servers[0]
-        sync_gateway = cblpytest.sync_gateways[0]
+        server = cloud.couchbase_server
+        sync_gateway = cloud.sync_gateway
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
@@ -68,7 +69,7 @@ class TestReplicationSanity(CBLTestClass):
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name=es_db_name, config_file=config_path
         )
         await edge_server.wait_for_idle()

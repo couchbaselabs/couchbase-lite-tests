@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
 
@@ -69,10 +69,10 @@ class TestDbOnlineOffline(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_db_offline_on_bucket_deletion(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cloud: CouchbaseCloud, dataset_path: Path
     ) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         num_docs = 10
         sg_db = "db"
         bucket_name = "data-bucket"
@@ -129,10 +129,10 @@ class TestDbOnlineOffline(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_dbs_bucket_deletion(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cloud: CouchbaseCloud, dataset_path: Path
     ) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         num_docs = 10
 
         db_configs: list[list[Any]] = [

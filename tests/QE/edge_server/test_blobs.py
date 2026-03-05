@@ -3,8 +3,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cloud import CouchbaseCloud
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import CblEdgeServerBadResponseError
 from cbltest.api.syncgateway import PutDatabasePayload
 
@@ -14,10 +15,10 @@ SCRIPT_DIR = str(Path(__file__).parent)
 class TestBlobs(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blobs_create_delete(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, cloud: CouchbaseCloud, edgeserver: EdgeServer
     ) -> None:
-        server = cblpytest.couchbase_servers[0]
-        sync_gateway = cblpytest.sync_gateways[0]
+        server = cloud.couchbase_server
+        sync_gateway = cloud.sync_gateway
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
@@ -65,7 +66,7 @@ class TestBlobs(CBLTestClass):
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name=es_db_name, config_file=config_path
         )
         await edge_server.wait_for_idle()
@@ -162,10 +163,10 @@ class TestBlobs(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_empty_blob(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_empty_blob(self, dataset_path: Path, edgeserver: EdgeServer) -> None:
         self.mark_test_step("Creating a database on Edge Server.")
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -199,10 +200,15 @@ class TestBlobs(CBLTestClass):
         assert blob.body == empty_blob, "Empty blob data mismatch."
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_update(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blob_update(
+        self,
+        dataset_path: Path,
+        cloud: CouchbaseCloud,
+        edgeserver: EdgeServer,
+    ) -> None:
         self.mark_test_step("Creating a bucket on server.")
-        server = cblpytest.couchbase_servers[0]
-        sync_gateway = cblpytest.sync_gateways[0]
+        server = cloud.couchbase_server
+        sync_gateway = cloud.sync_gateway
         sg_db_name = "db-1"
         es_db_name = "db"
 
@@ -248,7 +254,7 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step(
             "Creating a database on Edge Server with replication to Sync Gateway."
         )
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name=es_db_name, config_file=config_path
         )
         self.mark_test_step("Waiting for idle.")
@@ -318,11 +324,11 @@ class TestBlobs(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_get_nonexistent(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("Creating a database on Edge Server.")
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -347,10 +353,10 @@ class TestBlobs(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_delete_nonexistent(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -386,10 +392,10 @@ class TestBlobs(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_update_incorrect_rev(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -438,11 +444,11 @@ class TestBlobs(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_put_nonexistent_doc(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("Verifying that put blob on nonexistent document fails.")
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -463,11 +469,11 @@ class TestBlobs(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_blobs_same_doc(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("Creating a database on Edge Server.")
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -528,11 +534,11 @@ class TestBlobs(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_exceeding_maxsize(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, dataset_path: Path, edgeserver: EdgeServer
     ) -> None:
         self.mark_test_step("Creating a database on Edge Server.")
         es_db_name = "db"
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
@@ -575,11 +581,14 @@ class TestBlobs(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_special_characters(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self,
+        dataset_path: Path,
+        cloud: CouchbaseCloud,
+        edgeserver: EdgeServer,
     ) -> None:
         self.mark_test_step("Creating a bucket on server.")
-        server = cblpytest.couchbase_servers[0]
-        sync_gateway = cblpytest.sync_gateways[0]
+        server = cloud.couchbase_server
+        sync_gateway = cloud.sync_gateway
 
         sg_db_name = "db-1"
 
@@ -625,7 +634,7 @@ class TestBlobs(CBLTestClass):
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         with open(config_path, "w") as file:
             json.dump(config, file, indent=4)
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        edge_server = await edgeserver.configure_dataset(
             db_name=es_db_name, config_file=config_path
         )
         self.mark_test_step("Waiting for idle.")

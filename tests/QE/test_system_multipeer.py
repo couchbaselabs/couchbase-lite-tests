@@ -516,6 +516,3 @@ class TestSystemMultipeer(CBLTestClass):
 
         self.mark_test_step("Stopping all multipeer replicators")
         await asyncio.gather(*[r.stop() for r in multipeer_replicators])
-
-        for testserver in cblpytest.test_servers:
-            await testserver.cleanup()

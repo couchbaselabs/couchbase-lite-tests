@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
-from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 
@@ -15,10 +15,10 @@ from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 class TestTTL(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_document_expiry_unix_timestamp(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cloud: CouchbaseCloud, dataset_path: Path
     ) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         sg_db = "db"
         bucket_name = "data-bucket"
         channels = ["NBC", "ABC"]
@@ -114,10 +114,10 @@ class TestTTL(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_string_expiry_as_iso_8601_date(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cloud: CouchbaseCloud, dataset_path: Path
     ) -> None:
-        sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
+        sg = cloud.sync_gateway
+        cbs = cloud.couchbase_server
         sg_db = "db"
         bucket_name = "data-bucket"
         channels = ["NBC", "ABC"]

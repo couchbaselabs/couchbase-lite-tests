@@ -135,3 +135,11 @@ class CouchbaseCloud:
                 )
 
             await self.__sync_gateway.load_dataset(dataset_name, data_filepath)
+
+    @property
+    def sync_gateway(self) -> SyncGateway:
+        return self.__sync_gateway
+
+    @property
+    def couchbase_server(self) -> CouchbaseServer:
+        return self.__couchbase_server
