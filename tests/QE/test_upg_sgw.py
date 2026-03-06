@@ -42,26 +42,8 @@ class TestSgwUpgrade(CBLTestClass):
         if bucket not in cbs.get_bucket_names():
             print(f"Bucket '{bucket}' not found on CBS. Creating it for the test...")
             cbs.create_bucket(bucket)
-            # cbs.create_collections(bucket, "_sync", ["_default"])
 
         self.mark_test_step("Configure Sync Gateway database and wait for it to be up")
-        # db_config_map = {
-        #     "3.2.7": {
-        #         "bucket": bucket,
-        #         # "enable_shared_bucket_access": True,
-        #         "scopes": {"_default": {"collections": {"_default": {}}}},
-        #     },
-        #     "3.3.3": {
-        #         "bucket": bucket,
-        #         # "enable_shared_bucket_access": True,
-        #         "scopes": {"_default": {"collections": {"_default": {}}}},
-        #     },
-        #     "4.0.0": {
-        #         "bucket": bucket,
-        #         "index": {"num_replicas": 0},
-        #         "scopes": {"_default": {"collections": {"_default": {}}}},
-        #     },
-        # }
         stable_upgrade_config = {
             "bucket": bucket,
             "num_index_replicas": 0,
@@ -111,9 +93,8 @@ class TestSgwUpgrade(CBLTestClass):
         self.mark_test_step("Verify data persistence on CBS for all docs")
         all_docs_to_verify = await sg.get_all_documents(sg_db, scope, collection)
         for row in all_docs_to_verify.rows:
-            print(f"Verifying doc {row.id} on CBS...")  # Debug print
             doc = cbs.get_document(bucket, row.id, scope, collection)
-            print(f"Retrieved doc {row.id} from CBS: {doc}")  # Debug print
+            print(f"Retrieved doc {row.id} from CBS: {doc}")
             assert doc is not None, f"Doc {row.id} not found on CBS"
             assert "version" in doc, f"Doc {row.id} missing 'version' field!"
             assert doc.get("type") == "upgrade_test_doc", (

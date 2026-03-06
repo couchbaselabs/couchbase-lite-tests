@@ -51,7 +51,6 @@ fi
 echo ">>> Running tests for initial setup with SGW: $CURRENT_SGW_VERSION ..."
 export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
 pushd $QE_TESTS_DIR > /dev/null
-# export UPGRADE_ITERATION=0
 uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw
 popd > /dev/null
 
@@ -61,8 +60,7 @@ for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
     CURRENT_SGW_VERSION="${SGW_VERSIONS[i]}"
     echo ">>> Upgrading SGW from $PREVIOUS_SGW_VERSION to $CURRENT_SGW_VERSION ..."
 
-    # 1. Destroy the old Sync Gateway instances ONLY.
-    #    --no-ts-stop is used to keep the test servers running during the upgrade.
+    # 1. Destroy the old Sync Gateway instances ONLY, keep test servers. 
     echo "--> Destroying old Sync Gateway instances..."
     pushd $AWS_ENVIRONMENT_DIR > /dev/null
     uv run --group orchestrator ./stop_backend.py \
@@ -71,8 +69,7 @@ for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
         --no-ts-stop
     popd > /dev/null
 
-    # 2. Re-run start_backend. This will apply terraform to create the new SGW
-    #    instances and then provision them with the new software version.
+    # 2. Re-run start_backend. Apply terraform to create the new SGW instances.
     echo "--> Provisioning new Sync Gateway instances with version $CURRENT_SGW_VERSION..."
     pushd $AWS_ENVIRONMENT_DIR > /dev/null
     uv run --group orchestrator ./start_backend.py \
@@ -84,15 +81,13 @@ for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
         --no-lb-provision \
         --no-ls-provision \
         --no-ts-run
-    # uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $CURRENT_SGW_VERSION
     popd > /dev/null
 
     echo ">>> Running tests after upgrading to SGW: $CURRENT_SGW_VERSION ..."
     export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
     pushd $QE_TESTS_DIR > /dev/null
-    # export UPGRADE_ITERATION=$i
     uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw
     popd > /dev/null
 done
 
-echo ">>> Upgrade test completed successfully."
+echo ">>> SGW Upgrade test completed successfully."
