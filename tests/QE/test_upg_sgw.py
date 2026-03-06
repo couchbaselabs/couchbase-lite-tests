@@ -7,36 +7,6 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 
-# --- Fixtures ---
-# NOTE: These are example fixtures. Your project likely has centralized
-#       fixtures for these clients that correctly parse the generated config file.
-
-# @pytest.fixture(scope="module")
-# def test_config(request):
-#     # Path to your generated config file
-#     with open("config.json", "r") as f:
-#         config = json.load(f)
-
-#     sgw_host = config["sync-gateways"][0]["hostname"]
-#     cbs_host = config["couchbase-servers"][0]["hostname"]
-#     return {
-#         "sgw_admin_url": f"https://{sgw_host}:4985",
-#         "sgw_public_url": f"https://{sgw_host}:4984",
-#         "cbs_host": cbs_host,
-#         "cbs_user": "Administrator",
-#         "cbs_pass": "password",
-#     }
-
-# @pytest.fixture(scope="module")
-# def cbs_cluster(test_config):
-#     """Fixture to get a connected Couchbase Server cluster object."""
-#     auth = PasswordAuthenticator(test_config["cbs_user"], test_config["cbs_pass"])
-#     timeout_options = ClusterTimeoutOptions(kv_timeout=timedelta(seconds=10))
-#     cluster = Cluster(f'couchbase://{test_config["cbs_host"]}', ClusterOptions(auth, timeout_options=timeout_options))
-#     cluster.wait_until_ready(timedelta(seconds=120))
-#     yield cluster
-#     cluster.disconnect()
-
 
 @pytest.mark.upg_sgw
 @pytest.mark.min_sync_gateways(1)
@@ -149,51 +119,3 @@ class TestSgwUpgrade(CBLTestClass):
             assert doc.get("type") == "upgrade_test_doc", (
                 f"Doc {row.id} has wrong type! Expected 'upgrade_test_doc', got {doc.get('type')}"
             )
-
-        # for i in range(current_upgrade_iteration + 1):
-        #     print(f"--> Verifying data for iteration {i}")
-        #     iteration_doc_id_prefix = f"upg_test_{sg_db}_{i}"
-        #     doc_ids_to_verify = [f"{iteration_doc_id_prefix}_{j}" for j in range(num_docs_per_iteration)]
-
-        #     # Wait for replication to Couchbase Server
-        #     self._wait_for_docs_on_cbs(cbs_cluster, bucket, scope, collection, doc_ids_to_verify, timeout_secs=120)
-
-        #     # Verification on CBS
-        #     for doc_id in doc_ids_to_verify:
-        #         try:
-        #             cbs_doc_result = cbs_collection.get(doc_id)
-        #             cbs_doc = cbs_doc_result.content_as[dict]
-        #             assert cbs_doc["iteration"] == i, f"Doc {doc_id} has wrong iteration! Expected {i}, got {cbs_doc.get('iteration')}"
-        #             assert cbs_doc["type"] == "upgrade_test_doc"
-        #         except DocumentNotFoundException:
-        #             pytest.fail(f"Document '{doc_id}' from iteration {i} did not replicate or persist to CBS collection '{collection}' after upgrade to iteration {current_upgrade_iteration}.")
-        #         except Exception as e:
-        #             pytest.fail(f"Verification failed for doc '{doc_id}' on CBS. Error: {e}")
-
-        #     print(f"Iteration {i} data successfully verified.")
-
-        # print(f"\nSuccessfully verified data for iterations 0 through {current_upgrade_iteration}.")
-
-    # def _create_sgw_session(self, config, db, username, password):
-    #     """Creates an SGW user and returns an authenticated requests.Session."""
-    #     user_url = f"{config['sgw_admin_url']}/{db}/_user/{username}"
-    #     requests.put(user_url, json={"password": password, "admin_channels": ["*"]}, verify=False)
-    #     session = requests.Session()
-    #     session.auth = (username, password)
-    #     return session
-
-    # def _wait_for_docs_on_cbs(self, cbs_cluster, bucket, scope, collection, doc_ids, timeout_secs):
-    #     """Polls CBS until all expected documents are found."""
-    #     start_time = time.time()
-    #     cbs_collection = cbs_cluster.bucket(bucket).scope(scope).collection(collection)
-
-    #     for doc_id in doc_ids:
-    #         while time.time() - start_time < timeout_secs:
-    #             try:
-    #                 cbs_collection.get(doc_id)
-    #                 print(f"Found doc {doc_id} on CBS.")
-    #                 break
-    #             except DocumentNotFoundException:
-    #                 time.sleep(1)
-    #         else:
-    #             pytest.fail(f"Timeout: Document '{doc_id}' not found on CBS within {timeout_secs}s.")

@@ -30,8 +30,9 @@ done
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
 
-# TOPOLOGY_FILE="$SCRIPT_DIR/topology.json"
-# CONFIG_FILE="$SCRIPT_DIR/config.json"
+TOPOLOGY_FILE="$SCRIPT_DIR/topology.json"
+CONFIG_TEMPLATE="$SCRIPT_DIR/config.json"
+CONFIG_FILE="$QE_TESTS_DIR/config.json"
 
 # Initial full setup with the first SGW version
 CURRENT_SGW_VERSION="${SGW_VERSIONS[0]}"
@@ -74,17 +75,16 @@ for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
     #    instances and then provision them with the new software version.
     echo "--> Provisioning new Sync Gateway instances with version $CURRENT_SGW_VERSION..."
     pushd $AWS_ENVIRONMENT_DIR > /dev/null
-    # uv run --group orchestrator ./start_backend.py \
-    #     --topology topology_setup/topology.json \
-    #     --tdk-config-in ../../tests/QE/config.json \
-    #     --tdk-config-out ../../tests/QE/config.json \
-    #     --no-cbs-provision \
-    #     --no-es-provision \
-    #     --no-lb-provision \
-    #     --no-ls-provision \
-    #     --no-ts-run \
-    #     --no-terraform-apply
-    uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $CURRENT_SGW_VERSION
+    uv run --group orchestrator ./start_backend.py \
+        --topology $TOPOLOGY_FILE \
+        --tdk-config-in $CONFIG_TEMPLATE \
+        --tdk-config-out $CONFIG_FILE \
+        --no-cbs-provision \
+        --no-es-provision \
+        --no-lb-provision \
+        --no-ls-provision \
+        --no-ts-run
+    # uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $CURRENT_SGW_VERSION
     popd > /dev/null
 
     echo ">>> Running tests after upgrading to SGW: $CURRENT_SGW_VERSION ..."
