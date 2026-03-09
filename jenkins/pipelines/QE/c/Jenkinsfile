@@ -37,7 +37,7 @@ pipeline {
             steps {
                 echo "=== Run C Linux Tests"
                 timeout(time: 120, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} linux_x86_64 ${params.SGW_VERSION}"
+                    sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} linux_x86_64 ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
                 }
                 echo "=== C Linux Tests Complete"
             }
