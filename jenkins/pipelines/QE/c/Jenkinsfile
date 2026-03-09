@@ -32,7 +32,6 @@ pipeline {
             agent { label 'linux-c' }
             environment {
                 TS_ARTIFACTS_DIR = 'c'
-                TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
             }
             steps {
                 echo "=== Run C Linux Tests"
