@@ -12,7 +12,7 @@ source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
     echo "Usage: $0 <cbl_version> <sg_version> [dataset_version] [--setup-only]"
-    echo "  dataset_version: Optional, defaults to 4.0"
+    echo "  dataset_version: Version of CBL dataset to use (default: 4.0)"
     echo "  --setup-only: Only build test server and setup backend, skip test execution"
     exit 1
 }

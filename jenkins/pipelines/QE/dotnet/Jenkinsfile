@@ -51,12 +51,11 @@ pipeline {
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'dotnet_windows'
-                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
                     }
                     steps {
                         echo "=== Run Dotnet Windows Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION}"
+                            powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION}"
                         }
                         echo "=== Dotnet Windows Tests Complete"
                     }
@@ -82,13 +81,12 @@ pipeline {
                         MD_APPLE_SDK_ROOT = "/Applications/Xcode.app"
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         TS_ARTIFACTS_DIR = 'dotnet_macos'
-                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "=== Run Dotnet macOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION}"
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
                         }
                         echo "=== Dotnet macOS Tests Complete"
                     }
@@ -114,13 +112,12 @@ pipeline {
                         MD_APPLE_SDK_ROOT = "/Applications/Xcode.app"
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         TS_ARTIFACTS_DIR = 'dotnet_ios'
-                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "=== Run Dotnet iOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION}"
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
                         }
                         echo "=== Dotnet iOS Tests Complete"
                     }
@@ -146,13 +143,12 @@ pipeline {
                         JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
                         PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         TS_ARTIFACTS_DIR = 'dotnet_android'
-                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "=== Run Dotnet Android Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION}"
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
                         }
                         echo "=== Dotnet Android Tests Complete"
                     }
