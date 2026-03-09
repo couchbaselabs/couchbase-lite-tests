@@ -43,7 +43,7 @@ pipeline {
                 echo "=== Run Android Tests"
                 timeout(time: 120, unit: 'MINUTES') {
                     sh """
-                        jenkins/pipelines/QE/android/android_tests.sh "${params.CBL_VERSION}" "${params.SGW_VERSION}"
+                        jenkins/pipelines/QE/android/android_tests.sh "${params.CBL_VERSION}" "${params.SGW_VERSION}" ${params.TS_DATASET_VERSION}
                     """
                 }
                 echo "=== Android Tests Complete"

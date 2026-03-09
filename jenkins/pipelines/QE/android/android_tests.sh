@@ -11,12 +11,14 @@ export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:/opt/homebrew/bin:$PATH"
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
-    echo "Usage: $0 <cbl_version> <sg version> [private key path] [--setup-only]"
+    echo "Usage: $0 <cbl_version> <sg_version> [dataset_version] [--setup-only]"
+    echo "  dataset_version: Optional, defaults to 4.0"
     echo "  --setup-only: Only build test server and setup backend, skip test execution"
     exit 1
 }
 
-if [ "$#" -lt 2 ] || [ "$#" -gt 3 ] ; then usage; fi
+# Allow up to 4 args now (2 required + dataset + flag)
+if [ "$#" -lt 2 ] || [ "$#" -gt 4 ] ; then usage; fi
 
 CBL_VERSION="$1"
 if [ -z "$CBL_VERSION" ]; then usage; fi
@@ -24,28 +26,29 @@ if [ -z "$CBL_VERSION" ]; then usage; fi
 SG_VERSION="$2"
 if [ -z "$SG_VERSION" ]; then usage; fi
 
+DATASET_VERSION="4.0"
 SETUP_ONLY=false
 
-# Check for --setup-only flag
-for arg in "$@"; do
-    if [ "$arg" = "--setup-only" ]; then
-        SETUP_ONLY=true
-        break
-    fi
+# Parse optional args (starting from 3rd)
+for arg in "${@:3}"; do
+    case "$arg" in
+        --setup-only)
+            SETUP_ONLY=true
+            ;;
+        *)
+            DATASET_VERSION="$arg"
+            ;;
+    esac
 done
 
-STATUS=0
-
 echo "Install Android SDK"
-yes | ${SDK_MGR} --channel=1 --licenses
-${SDK_MGR} --channel=1 --install "build-tools;${BUILD_TOOLS_VERSION}"
+yes | "$SDK_MGR" --channel=1 --licenses
+"$SDK_MGR" --channel=1 --install "build-tools;${BUILD_TOOLS_VERSION}"
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
 echo "Setup backend..."
+uv run $SCRIPT_DIR/setup_test.py "$CBL_VERSION" "$SG_VERSION"
 
-uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
-
-# Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then
     echo "Setup completed. Exiting due to --setup-only flag."
     exit 0
@@ -56,8 +59,10 @@ pushd $SCRIPT_DIR
 python3 logcat.py &
 echo $! > logcat.pid
 
-# Run Tests
 echo "Run tests..."
 pushd $QE_TESTS_DIR > /dev/null
 adb shell input keyevent KEYCODE_WAKEUP
-uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json -m cbl
+uv run pytest --maxfail=7 -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version "$DATASET_VERSION" \
+    -m cbl
