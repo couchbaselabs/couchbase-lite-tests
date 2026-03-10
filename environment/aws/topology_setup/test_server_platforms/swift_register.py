@@ -159,12 +159,16 @@ class SwiftTestServer_iOS(SwiftTestServer):
             with subprocess.Popen(
                 ["xcpretty"], stdin=xcodebuild_proc.stdout, env=env
             ) as xcpretty_proc:
-                # Close the stdout of the first process to allow it to receive a SIGPIPE if the second process exits
                 cast(BytesIO, xcodebuild_proc.stdout).close()
 
                 xcpretty_proc.wait()
+                xcodebuild_proc.wait()
+
+                if xcodebuild_proc.returncode != 0:
+                    raise RuntimeError("xcodebuild failed")
+
                 if xcpretty_proc.returncode != 0:
-                    raise RuntimeError("Build failed")
+                    raise RuntimeError("xcpretty failed")
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
