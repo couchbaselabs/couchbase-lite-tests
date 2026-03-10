@@ -155,11 +155,11 @@ class SwiftTestServer_iOS(SwiftTestServer):
         # Run xcodebuild and show all output directly
         try:
             subprocess.run(
-                xcodebuild_cmd,
-                cwd=SWIFT_TEST_SERVER_DIR,
-                env=env,
-                check=True,  # Raise exception if Xcode fails
-            )
+            xcodebuild_cmd,
+            cwd=SWIFT_TEST_SERVER_DIR,
+            env=env,
+            check=True
+        )
         except subprocess.CalledProcessError as e:
             # This prints full stdout + stderr for debugging
             raise RuntimeError(f"Xcode build failed with exit code {e.returncode}") from e
