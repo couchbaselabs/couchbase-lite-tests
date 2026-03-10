@@ -23,6 +23,7 @@ pipeline {
                 parameters: [
                     string(name: 'TS_PLATFORM', value: 'swift_ios'),
                     string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                    string(name: 'BRANCH', value: 'ios_bt'),
                 ],
                 wait: true,
                 propagate: true
