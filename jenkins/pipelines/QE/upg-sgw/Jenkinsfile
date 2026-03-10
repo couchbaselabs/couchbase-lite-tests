@@ -1,15 +1,15 @@
 pipeline {
     agent none
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'Couchbase Lite Version to use')
-        string(name: 'SGW_VERSION', defaultValue: '3.1.0 3.3.0 4.0.0', description: 'Sync Gateway Versions to upgrade across')
+        string(name: 'CBL_VERSION', defaultValue: '3.3.2', description: 'Couchbase Lite Version to use')
+        string(name: 'SGW_VERSIONS', defaultValue: '3.2.7 3.3.3 4.0.0', description: 'Sync Gateway Versions to upgrade across')
     }
     stages {
         stage('Init') {
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    if (params.SGW_VERSIONS == '') { error "SGW_VERSIONS are required (atleast one)" }
                     currentBuild.displayName = "CBL:${params.CBL_VERSION} SGW:${params.SGW_VERSION} (#${currentBuild.number})"
                 }
             }
@@ -35,20 +35,20 @@ pipeline {
             steps {
                 // Unlock keychain:
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
-                echo "=== Run SGW Tests"
+                echo "=== Run SGW Upgrades"
                 timeout(time: 90, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/upg-sgw/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
+                    sh "jenkins/pipelines/QE/upg-sgw/test.sh ${params.CBL_VERSION} ${params.SGW_VERSIONS}"
                 }
-                echo "=== SGW Tests Complete"
+                echo "=== SGW Upgrades Complete"
             }
             post {
                 always {
-                    echo "=== Teardown SGW Tests"
+                    echo "=== Teardown SGW Upgrades"
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/upg-sgw/teardown.sh"
                     }
                     archiveArtifacts artifacts: 'tests/QE/upg-sgw/**/*', fingerprint: true, allowEmptyArchive: true
-                    echo "=== SGW Test Teardown Complete"
+                    echo "=== SGW Upgrades Teardown Complete"
                 }
             }
         }
