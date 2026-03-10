@@ -53,7 +53,10 @@ def verify_lfs_checkout() -> None:
             text=True,
         )
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Failed to run {e.cmd}. Output: {e.output}") from e
+        raise RuntimeError(
+            f"Failed to run {e.cmd!r} (return code {e.returncode}). "
+            f"stdout: {e.stdout!r} stderr: {e.stderr!r}"
+        ) from e
     try:
         lfs = json.loads(process_output.stdout)
     except json.JSONDecodeError as e:
@@ -63,5 +66,5 @@ def verify_lfs_checkout() -> None:
     for f in lfs["files"]:
         if f["checkout"] is False:
             raise RuntimeError(
-                "git lfs is not configured. Please run 'git lfs install and git lfs pull'"
+                "git lfs is not configured. Please run 'git lfs install' and then 'git lfs pull'."
             )
