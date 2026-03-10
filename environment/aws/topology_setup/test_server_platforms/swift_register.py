@@ -131,7 +131,8 @@ class SwiftTestServer_iOS(SwiftTestServer):
 
     def build(self) -> None:
         self._download_cbl()
-        header("Building")
+        header("Building Swift iOS Test Server")
+
         env = os.environ.copy()
         env["LANG"] = "en_US.UTF-8"
         env["LC_ALL"] = "en_US.UTF-8"
@@ -139,36 +140,39 @@ class SwiftTestServer_iOS(SwiftTestServer):
         xcodebuild_cmd = [
             "xcodebuild",
             "-scheme",
-            "TestServer",
+            "TestServer",  # Make sure the scheme is shared
             "-sdk",
-            "iphoneos",
+            "iphoneos",  # Build for device, not simulator
             "-configuration",
             "Release",
             "-derivedDataPath",
             str(BUILD_DEVICE_DIR),
-            "-allowProvisioningUpdates",
+            "-allowProvisioningUpdates",  # Let Xcode manage signing
+            "-destination",
+            "generic/platform=iOS",  # CI-friendly
         ]
 
-        with subprocess.Popen(
-            xcodebuild_cmd,
-            env=env,
-            cwd=SWIFT_TEST_SERVER_DIR,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        ) as xcodebuild_proc:
-            with subprocess.Popen(
-                ["xcpretty"], stdin=xcodebuild_proc.stdout, env=env
-            ) as xcpretty_proc:
-                cast(BytesIO, xcodebuild_proc.stdout).close()
+        # Run xcodebuild and show all output directly
+        try:
+            subprocess.run(
+                xcodebuild_cmd,
+                cwd=SWIFT_TEST_SERVER_DIR,
+                env=env,
+                check=True,  # Raise exception if Xcode fails
+            )
+        except subprocess.CalledProcessError as e:
+            # This prints full stdout + stderr for debugging
+            raise RuntimeError(f"Xcode build failed with exit code {e.returncode}") from e
 
-                xcpretty_proc.wait()
-                xcodebuild_proc.wait()
-
-                if xcodebuild_proc.returncode != 0:
-                    raise RuntimeError("xcodebuild failed")
-
-                if xcpretty_proc.returncode != 0:
-                    raise RuntimeError("xcpretty failed")
+        # Sanity check: make sure the .app exists
+        app_path = (
+            BUILD_DEVICE_DIR / "Build" / "Products" / "Release-iphoneos" / "TestServer-iOS.app"
+        )
+        if not app_path.exists():
+            raise RuntimeError(
+                f"Expected build output not found: {app_path}\n"
+                f"Check the Xcode build logs above for signing, scheme, or SDK errors."
+            )
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
