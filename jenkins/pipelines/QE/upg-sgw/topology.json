@@ -1,6 +1,13 @@
 {
     "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
-    "test_servers": [],
+    "test_servers": [
+        {
+            "platform": "jak_android",
+            "cbl_version": "{{version}}",
+            "location": "ZD222TBNTC",
+            "download": true
+        }
+    ],
     "clusters": [
         {
             "server_count": 1
