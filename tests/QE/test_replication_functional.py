@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator, ReplicatorCollectionEntry, ReplicatorType
 from cbltest.api.replicator_types import (
@@ -22,9 +21,7 @@ class TestReplicationFunctional(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_roles_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `posts` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset.")
@@ -35,7 +32,7 @@ class TestReplicationFunctional(CBLTestClass):
         )[0]
 
         self.mark_test_step("Create test user 'testuser' with no initial roles.")
-        await cblpytest.sync_gateways[0].add_user(
+        await cloud.sync_gateway.add_user(
             "posts",
             "testuser",
             password="testpass",
@@ -49,17 +46,17 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Create role1 with access to group1 channel.")
-        await cblpytest.sync_gateways[0].add_role(
+        await cloud.sync_gateway.add_role(
             "posts", "role1", {"_default": {"posts": {"admin_channels": ["group1"]}}}
         )
 
         self.mark_test_step("Create role2 with access to group2 channel.")
-        await cblpytest.sync_gateways[0].add_role(
+        await cloud.sync_gateway.add_role(
             "posts", "role2", {"_default": {"posts": {"admin_channels": ["group2"]}}}
         )
 
         self.mark_test_step("Assign only role1 to testuser initially.")
-        await cblpytest.sync_gateways[0].add_user(
+        await cloud.sync_gateway.add_user(
             "posts",
             "testuser",
             password="testpass",
@@ -75,7 +72,7 @@ class TestReplicationFunctional(CBLTestClass):
 
         self.mark_test_step("Create initial documents in both channels on SGW.")
         # Documents in group1 channel (should be accessible)
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -102,7 +99,7 @@ class TestReplicationFunctional(CBLTestClass):
             collection="posts",
         )
         # Documents in group2 channel (should NOT be accessible initially)
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -139,11 +136,11 @@ class TestReplicationFunctional(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("posts"),
+            cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("testuser", "testpass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -186,7 +183,7 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Add role2 to testuser to grant access to group2 channel.")
-        await cblpytest.sync_gateways[0].add_user(
+        await cloud.sync_gateway.add_user(
             "posts",
             "testuser",
             password="testpass",
@@ -202,7 +199,7 @@ class TestReplicationFunctional(CBLTestClass):
 
         self.mark_test_step("Add new documents to SGW in both channels.")
         # New documents in group1 channel
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -229,7 +226,7 @@ class TestReplicationFunctional(CBLTestClass):
             collection="posts",
         )
         # New documents in group2 channel
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -329,9 +326,7 @@ class TestReplicationFunctional(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         self.mark_test_step("Reset SG and load `short_expiry` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "short_expiry")
 
         self.mark_test_step("Reset local database")
@@ -362,12 +357,12 @@ class TestReplicationFunctional(CBLTestClass):
         """)
         push_replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("short_expiry"),
+            cloud.sync_gateway.replication_url("short_expiry"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PUSH,
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await push_replicator.start()
 
@@ -378,19 +373,19 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Verify doc_1 exists in SGW.")
-        sgw_doc = await cblpytest.sync_gateways[0].get_document(
+        sgw_doc = await cloud.sync_gateway.get_document(
             "short_expiry", "doc_1", "_default", "_default"
         )
         assert sgw_doc is not None, "doc_1 should exist in SGW after push replication"
         assert sgw_doc.body["type"] == "test_doc", "doc_1 should have correct content"
 
         self.mark_test_step("Purge doc_1 from SGW.")
-        await cblpytest.sync_gateways[0].purge_document(
+        await cloud.sync_gateway.purge_document(
             "doc_1", "short_expiry", "_default", "_default"
         )
 
         self.mark_test_step("Verify doc_1 is purged from SGW")
-        all_docs = await cblpytest.sync_gateways[0].get_all_documents("short_expiry")
+        all_docs = await cloud.sync_gateway.get_all_documents("short_expiry")
         sgw_doc_ids = {row.id for row in all_docs.rows}
         assert "doc_1" not in sgw_doc_ids, (
             f"doc_1 should be purged from SGW, but found in: {sgw_doc_ids}"
@@ -440,9 +435,7 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Verify documents exist in SGW.")
-        all_docs_after = await cblpytest.sync_gateways[0].get_all_documents(
-            "short_expiry"
-        )
+        all_docs_after = await cloud.sync_gateway.get_all_documents("short_expiry")
         sgw_doc_ids_after = {row.id for row in all_docs_after.rows}
         assert "doc_2" in sgw_doc_ids_after, (
             f"doc_2 should exist in SGW, found: {sgw_doc_ids_after}"
@@ -470,11 +463,11 @@ class TestReplicationFunctional(CBLTestClass):
         """)
         pull_replicator = Replicator(
             db_recreated,
-            cblpytest.sync_gateways[0].replication_url("short_expiry"),
+            cloud.sync_gateway.replication_url("short_expiry"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await pull_replicator.start()
 
@@ -531,9 +524,7 @@ class TestReplicationFunctional(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         self.mark_test_step("Reset SG and load `posts` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset.")
@@ -544,7 +535,7 @@ class TestReplicationFunctional(CBLTestClass):
         )[0]
 
         self.mark_test_step("Create test user 'testuser' with no initial access.")
-        await cblpytest.sync_gateways[0].add_user(
+        await cloud.sync_gateway.add_user(
             "posts",
             "testuser",
             password="testpass",
@@ -552,12 +543,12 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Create role 'testrole' with access to group1 channel.")
-        await cblpytest.sync_gateways[0].add_role(
+        await cloud.sync_gateway.add_role(
             "posts", "testrole", {"_default": {"posts": {"admin_channels": ["group1"]}}}
         )
 
         self.mark_test_step("Assign testrole to testuser.")
-        await cblpytest.sync_gateways[0].add_user(
+        await cloud.sync_gateway.add_user(
             "posts",
             "testuser",
             password="testpass",
@@ -566,7 +557,7 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Create initial documents in group1 channel on SGW")
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -603,12 +594,12 @@ class TestReplicationFunctional(CBLTestClass):
         """)
         pull_replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("posts"),
+            cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("testuser", "testpass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await pull_replicator.start()
 
@@ -646,14 +637,14 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Change testrole's channel access from group1 to group2.")
-        await cblpytest.sync_gateways[0].add_role(
+        await cloud.sync_gateway.add_role(
             "posts", "testrole", {"_default": {"posts": {"admin_channels": ["group2"]}}}
         )
 
         self.mark_test_step(
             "Add new documents to SGW in group1 channel (should NOT be accessible)."
         )
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -683,7 +674,7 @@ class TestReplicationFunctional(CBLTestClass):
         self.mark_test_step(
             "Add new documents to SGW in group2 channel (should be accessible)."
         )
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -765,19 +756,17 @@ class TestReplicationFunctional(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         self.mark_test_step("Reset SG and load `posts` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Create two users with access to different channels.")
-        await cblpytest.sync_gateways[0].add_user(
+        await cloud.sync_gateway.add_user(
             "posts",
             "user1",
             password="pass1",
             collection_access={"_default": {"posts": {"admin_channels": ["channel1"]}}},
         )
-        await cblpytest.sync_gateways[0].add_user(
+        await cloud.sync_gateway.add_user(
             "posts",
             "user2",
             password="pass2",
@@ -785,7 +774,7 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Create initial documents in both channels.")
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -819,10 +808,10 @@ class TestReplicationFunctional(CBLTestClass):
         self.mark_test_step(
             "Create conflicts by having both users update the same documents."
         )
-        doc1 = await cblpytest.sync_gateways[0].get_document(
+        doc1 = await cloud.sync_gateway.get_document(
             "posts", "shared_doc1", "_default", "posts"
         )
-        doc2 = await cblpytest.sync_gateways[0].get_document(
+        doc2 = await cloud.sync_gateway.get_document(
             "posts", "shared_doc2", "_default", "posts"
         )
         assert doc1 is not None, "Document shared_doc1 not found in SGW"
@@ -830,7 +819,7 @@ class TestReplicationFunctional(CBLTestClass):
         assert doc1.revid is not None, "Document shared_doc1 has no revision ID"
         assert doc2.revid is not None, "Document shared_doc2 has no revision ID"
 
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -861,7 +850,7 @@ class TestReplicationFunctional(CBLTestClass):
             collection="posts",
         )
 
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -902,23 +891,23 @@ class TestReplicationFunctional(CBLTestClass):
         self.mark_test_step("Start push-pull replication for both users.")
         replicator1 = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("posts"),
+            cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass1"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator1.start()
 
         replicator2 = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("posts"),
+            cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user2", "pass2"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator2.start()
 
@@ -982,10 +971,10 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Verify documents in Sync Gateway have the latest updates.")
-        sgw_doc1 = await cblpytest.sync_gateways[0].get_document(
+        sgw_doc1 = await cloud.sync_gateway.get_document(
             "posts", "shared_doc1", "_default", "posts"
         )
-        sgw_doc2 = await cblpytest.sync_gateways[0].get_document(
+        sgw_doc2 = await cloud.sync_gateway.get_document(
             "posts", "shared_doc2", "_default", "posts"
         )
         assert sgw_doc1 is not None, "Document shared_doc1 not found in SGW"

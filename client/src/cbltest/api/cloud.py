@@ -23,6 +23,14 @@ class CouchbaseCloud:
         self.__couchbase_server = server
         self.__tracer = get_tracer(__name__, VERSION)
 
+    @property
+    def sync_gateway(self) -> SyncGateway:
+        return self.__sync_gateway
+
+    @property
+    def couchbase_server(self) -> CouchbaseServer:
+        return self.__couchbase_server
+
     def _create_collections(self, db_payload: PutDatabasePayload) -> None:
         for scope in db_payload.scopes():
             self.__couchbase_server.create_collections(

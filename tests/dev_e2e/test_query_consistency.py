@@ -7,7 +7,6 @@ import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database import Database
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
@@ -32,9 +31,7 @@ class TestQueryConsistency(CBLTestClass):
 
         # These tests do not modify the data in the bucket, so set it up here to avoid
         # needless teardown and re-setup
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "travel")
 
         dbs = await cblpytest.test_servers[0].create_and_reset_db(
@@ -42,7 +39,7 @@ class TestQueryConsistency(CBLTestClass):
         )
         replicator = Replicator(
             dbs[0],
-            cblpytest.sync_gateways[0].replication_url("travel"),
+            cloud.sync_gateway.replication_url("travel"),
             collections=[
                 ReplicatorCollectionEntry(
                     [
@@ -56,7 +53,7 @@ class TestQueryConsistency(CBLTestClass):
             ],
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
