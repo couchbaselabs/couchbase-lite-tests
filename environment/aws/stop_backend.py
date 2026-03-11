@@ -112,12 +112,6 @@ def main(topology: str | None, steps: BackendStopSteps) -> None:
     if not (steps & BackendStopSteps.FULL_DESTROY):
         topology_obj.read_from_terraform(str(SCRIPT_DIR))
 
-    # header("Starting terraform destroy")
-    # command = [
-    #     "terraform",
-    #     "destroy",
-    #     "-auto-approve",
-    # ]
     terraform_command = ["terraform", "destroy", "-auto-approve"]
     targets = []
     if steps & BackendStopSteps.DESTROY_SGW:
