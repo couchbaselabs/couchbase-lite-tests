@@ -1,6 +1,7 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
-    [Parameter(Mandatory=$true)][string]$SgwVersion
+    [Parameter(Mandatory=$true)][string]$SgwVersion,
+    [Parameter][string]$DatasetVersion = "4.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,9 +13,12 @@ if($LASTEXITCODE -ne 0) {
 }
 
 Push-Location $QE_TESTS_DIR
-uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl
-$saved_exit = $LASTEXITCODE
-Pop-Location
+try {
+    uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version $DatasetVersion -m cbl
+    $saved_exit = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
 
 if($saved_exit -ne 0) {
     throw "Testing failed!"

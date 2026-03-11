@@ -1,13 +1,15 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
-    [Parameter(Mandatory=$true)][string]$SgwVersion
+    [Parameter(Mandatory=$true)][string]$SgwVersion,
+    [Parameter()][string]$DatasetVersion = "4.0"
 )
 
 Import-Module $PSScriptRoot/../../shared/config.psm1 -Force
 Import-Module $PSScriptRoot/prepare_env.psm1 -Force
 $ErrorActionPreference = "Stop"
 
-Install-DotNet
+Install-DotNet -Version "9.0"
+Install-DotNetRuntime -Version "8.0"
 
 uv run $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
 if($LASTEXITCODE -ne 0) {
@@ -15,9 +17,12 @@ if($LASTEXITCODE -ne 0) {
 }
 
 Push-Location $QE_TESTS_DIR
-uv run pytest -v --no-header --config config.json -m cbl
-$saved_exit = $LASTEXITCODE
-Pop-Location
+try {
+    uv run pytest -v --no-header --config config.json --dataset-version $DatasetVersion -m cbl
+    $saved_exit = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
 
 # FIXME: Find another way to do this so this is not hardcoded here
 taskkill /F /IM "testserver.cli.exe"

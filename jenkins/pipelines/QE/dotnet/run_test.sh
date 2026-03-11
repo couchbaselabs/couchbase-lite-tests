@@ -4,19 +4,21 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-source $SCRIPT_DIR/../../shared/config.sh
+source "$SCRIPT_DIR/../../shared/config.sh"
 
 function usage() {
-    echo "Usage: $0 <version> <platform> <sgw_version> [private_key_path] [--setup-only]"
+    echo "Usage: $0 <version> <platform> <sgw_version> [dataset-version] [--setup-only]"
     echo "version: CBL version (e.g. 3.2.1-2)"
     echo "platform: The .NET platform to build (e.g. ios)"
     echo "sgw_version: Version of Sync Gateway to download and use"
+    echo "dataset-version: Version of CBL dataset to use (default: 4.0)"
     echo "  --setup-only: Only build test server and setup backend, skip test execution"
 }
 
 function prepare_dotnet() {
-    source $SCRIPT_DIR/prepare_env.sh
+    source "$SCRIPT_DIR/prepare_env.sh"
     install_dotnet "$DOTNET_VERSION"
+    install_dotnet_runtime "8.0"
     install_maui
     if [ "$platform" != "macos" ]; then
         install_xharness
@@ -31,18 +33,25 @@ fi
 cbl_version=$1
 platform=$2
 sgw_version=$3
+
 SETUP_ONLY=false
+DATASET_VERSION="4.0"
 
 # Parse optional arguments
-for arg in "$@"; do
-    if [ "$arg" = "--setup-only" ]; then
-        SETUP_ONLY=true
-    fi
+for arg in "${@:4}"; do
+    case "$arg" in
+        --setup-only)
+            SETUP_ONLY=true
+            ;;
+        *)
+            DATASET_VERSION="$arg"
+            ;;
+    esac
 done
 
 prepare_dotnet
 
-uv run $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
+uv run "$SCRIPT_DIR/setup_test.py" "$platform" "$cbl_version" "$sgw_version"
 
 # Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then
@@ -50,5 +59,9 @@ if [ "$SETUP_ONLY" = true ]; then
     exit 0
 fi
 
-pushd $QE_TESTS_DIR
-uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m cbl
+pushd "$QE_TESTS_DIR"
+
+uv run pytest -v --no-header -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version "$DATASET_VERSION" \
+    -m cbl

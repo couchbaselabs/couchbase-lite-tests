@@ -35,12 +35,11 @@ pipeline {
             agent { label 'linux-java' }
             environment {
                 TS_ARTIFACTS_DIR = 'java_desktop'
-                TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
             }
             steps {
                 echo "=== Run Desktop Tests"
                 timeout(time: 120, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
+                    sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
                 }
                 echo "=== Desktop Tests Complete"
             }
