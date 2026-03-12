@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
+import requests
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
@@ -540,6 +541,11 @@ class _SyncGatewayBase:
             port,
             BasicAuth(username, password, "ascii"),
         )
+        r = requests.get(
+            f"{scheme}{url}:{port}/_config", auth=(username, password), verify=False
+        )
+        r.raise_for_status()
+        self.using_rosmar = r.json()["bootstrap"]["server"].startswith("rosmar")
 
     @property
     def hostname(self) -> str:

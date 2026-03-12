@@ -24,7 +24,6 @@ async def update_cbl(cbl_db, doc_id, data):
 @pytest.mark.cbl
 @pytest.mark.min_test_servers(3)
 @pytest.mark.min_sync_gateways(1)
-@pytest.mark.min_couchbase_servers(1)
 class TestNoConflicts(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sg_cbl_updates_concurrently_with_push_pull(

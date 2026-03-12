@@ -16,7 +16,6 @@ from cbltest.api.syncgateway import DocumentUpdateEntry
 @pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
-@pytest.mark.min_couchbase_servers(1)
 class TestReplicationFunctional(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_roles_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
