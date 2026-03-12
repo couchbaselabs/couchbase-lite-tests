@@ -12,7 +12,7 @@ from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPCon
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
 
-from cbltest.api.error import CblSyncGatewayBadResponseError
+from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
@@ -542,10 +542,20 @@ class _SyncGatewayBase:
             BasicAuth(username, password, "ascii"),
         )
         r = requests.get(
-            f"{scheme}{url}:{port}/_config", auth=(username, password), verify=False
+            f"{scheme}{url}:{port}/_config",
+            auth=(username, password),
+            # disable hostname verification as we do in _create_session
+            verify=False,
+            timeout=10,
         )
         r.raise_for_status()
-        self.using_rosmar = r.json()["bootstrap"]["server"].startswith("rosmar")
+        try:
+            self.using_rosmar = r.json()["bootstrap"]["server"].startswith("rosmar")
+        except AttributeError:
+            raise CblTestError(
+                "Unexpected response {r.json()} from Sync Gateway /_config endpoint, cannot determine if using Rosmar"
+            ) from None
+            self.using_rosmar = False
 
     @property
     def hostname(self) -> str:
