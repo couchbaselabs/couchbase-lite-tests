@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -16,11 +15,9 @@ class TestEdgeServerSync(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         self.mark_test_step("test_edge_to_sgw_replication")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "travel")
-        sgw = cblpytest.sync_gateways[0]
+        sgw = cloud.sync_gateway
         source_db = sgw.replication_url("travel")
 
         self.mark_test_step("Configure Edge Server with travel dataset")

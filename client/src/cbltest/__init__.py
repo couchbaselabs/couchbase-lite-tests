@@ -1,5 +1,6 @@
 from json import dumps
 
+from .api.cloud import CouchbaseCloud
 from .api.couchbaseserver import CouchbaseServer
 from .api.edgeserver import EdgeServer
 from .api.syncgateway import SyncGateway
@@ -205,3 +206,15 @@ class CBLPyTest:
             ret_val += "\n" + "Extra Properties:" + "\n" + dumps(self.__extra_props)
 
         return ret_val
+
+    def simple_cloud(self) -> CouchbaseCloud:
+        """
+        Creates a Couchbase Cloud configuration with the first Sync Gateway and Couchbase Server in the config. This is meant to be used for simple tests that only require a single Sync Gateway and Couchase Server instance.
+        """
+        if len(self.sync_gateways) == 0:
+            raise ValueError("No Sync Gateways available in config")
+
+        if len(self.couchbase_servers) == 0:
+            raise ValueError("No Couchbase Servers available in config")
+
+        return CouchbaseCloud(self.sync_gateways[0], self.couchbase_servers[0])

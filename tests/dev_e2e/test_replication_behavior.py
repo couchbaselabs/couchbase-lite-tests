@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -23,18 +22,16 @@ class TestReplicationBehavior(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Delete name_101 through name_150 on sync gateway")
-        all_docs = await cblpytest.sync_gateways[0].get_all_documents("names")
+        all_docs = await cloud.sync_gateway.get_all_documents("names")
         for row in all_docs.rows:
             name_number = int(row.id[-3:])
             if name_number <= 150:
                 revid = assert_not_null(row.revid, f"Missing revid on {row.id}")
-                await cblpytest.sync_gateways[0].delete_document(row.id, revid, "names")
+                await cloud.sync_gateway.delete_document(row.id, revid, "names")
 
         self.mark_test_step("Reset local database, and load `empty` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
@@ -51,12 +48,12 @@ class TestReplicationBehavior(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("names"),
+            cloud.sync_gateway.replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 

@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database import SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
@@ -42,9 +41,7 @@ class TestReplicationFilter(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
@@ -69,7 +66,7 @@ class TestReplicationFilter(CBLTestClass):
         )
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("travel"),
+            cloud.sync_gateway.replication_url("travel"),
             replicator_type=ReplicatorType.PUSH,
             collections=[
                 ReplicatorCollectionEntry(
@@ -82,7 +79,7 @@ class TestReplicationFilter(CBLTestClass):
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -132,9 +129,7 @@ class TestReplicationFilter(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
@@ -159,7 +154,7 @@ class TestReplicationFilter(CBLTestClass):
         )
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("travel"),
+            cloud.sync_gateway.replication_url("travel"),
             replicator_type=ReplicatorType.PULL,
             collections=[
                 ReplicatorCollectionEntry(
@@ -172,7 +167,7 @@ class TestReplicationFilter(CBLTestClass):
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -196,12 +191,12 @@ class TestReplicationFilter(CBLTestClass):
                 * Remove `landmark_10`, in `travel.landmarks`
         """
         )
-        remote_airport_10 = await cblpytest.sync_gateways[0].get_document(
+        remote_airport_10 = await cloud.sync_gateway.get_document(
             "travel", "airport_10", "travel", "airports"
         )
         assert remote_airport_10 is not None, "Missing airport_10 from sync gateway"
 
-        remote_landmark_10 = await cblpytest.sync_gateways[0].get_document(
+        remote_landmark_10 = await cloud.sync_gateway.get_document(
             "travel", "landmark_10", "travel", "landmarks"
         )
         assert remote_landmark_10 is not None, "Missing landmark_10 from sync gateway"
@@ -213,10 +208,10 @@ class TestReplicationFilter(CBLTestClass):
             DocumentUpdateEntry("airport_1000", None, {"answer": 42}),
             DocumentUpdateEntry("airport_10", remote_airport_10.revid, {"answer": 42}),
         ]
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "travel", updates, "travel", "airports"
         )
-        await cblpytest.sync_gateways[0].delete_document(
+        await cloud.sync_gateway.delete_document(
             "landmark_10", landmark_10_revid, "travel", "travel", "landmarks"
         )
 
@@ -241,9 +236,7 @@ class TestReplicationFilter(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
@@ -268,7 +261,7 @@ class TestReplicationFilter(CBLTestClass):
         )
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("travel"),
+            cloud.sync_gateway.replication_url("travel"),
             replicator_type=ReplicatorType.PULL,
             collections=[
                 ReplicatorCollectionEntry(
@@ -278,7 +271,7 @@ class TestReplicationFilter(CBLTestClass):
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -302,22 +295,22 @@ class TestReplicationFilter(CBLTestClass):
                 * Remove `landmark_1` channels = ["United Kingdom"], `landmark_2001` channels = ["France"] in `travel.landmarks`
         """
         )
-        remote_airport_11 = await cblpytest.sync_gateways[0].get_document(
+        remote_airport_11 = await cloud.sync_gateway.get_document(
             "travel", "airport_11", "travel", "airports"
         )
         assert remote_airport_11 is not None, "Missing airport_11 from sync gateway"
 
-        remote_airport_1 = await cblpytest.sync_gateways[0].get_document(
+        remote_airport_1 = await cloud.sync_gateway.get_document(
             "travel", "airport_1", "travel", "airports"
         )
         assert remote_airport_1 is not None, "Missing airport_1 from sync gateway"
 
-        remote_airport_17 = await cblpytest.sync_gateways[0].get_document(
+        remote_airport_17 = await cloud.sync_gateway.get_document(
             "travel", "airport_17", "travel", "airports"
         )
         assert remote_airport_17 is not None, "Missing airport_17 from sync gateway"
 
-        remote_landmark_1 = await cblpytest.sync_gateways[0].get_document(
+        remote_landmark_1 = await cloud.sync_gateway.get_document(
             "travel", "landmark_1", "travel", "landmarks"
         )
         assert remote_landmark_1 is not None, "Missing landmark_1 from sync gateway"
@@ -325,7 +318,7 @@ class TestReplicationFilter(CBLTestClass):
             remote_landmark_1.revid, "Missing landmark_1 revid"
         )
 
-        remote_landmark_601 = await cblpytest.sync_gateways[0].get_document(
+        remote_landmark_601 = await cloud.sync_gateway.get_document(
             "travel", "landmark_601", "travel", "landmarks"
         )
         assert remote_landmark_601 is not None, "Missing landmark_601 from sync gateway"
@@ -360,13 +353,13 @@ class TestReplicationFilter(CBLTestClass):
             ),
         ]
 
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "travel", updates, "travel", "airports"
         )
-        await cblpytest.sync_gateways[0].delete_document(
+        await cloud.sync_gateway.delete_document(
             "landmark_1", landmark_1_revid, "travel", "travel", "landmarks"
         )
-        await cblpytest.sync_gateways[0].delete_document(
+        await cloud.sync_gateway.delete_document(
             "landmark_601", landmark_601_revid, "travel", "travel", "landmarks"
         )
 
@@ -397,9 +390,7 @@ class TestReplicationFilter(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `empty` dataset.")
@@ -418,7 +409,7 @@ class TestReplicationFilter(CBLTestClass):
                 * content: `{"hello": "world"}`
         """
         )
-        sgw = cblpytest.sync_gateways[0]
+        sgw = cloud.sync_gateway
         await sgw.update_documents(
             "names",
             [
@@ -518,9 +509,7 @@ class TestReplicationFilter(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
@@ -545,7 +534,7 @@ class TestReplicationFilter(CBLTestClass):
         )
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("names"),
+            cloud.sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PUSH,
             collections=[
                 ReplicatorCollectionEntry(
@@ -555,7 +544,7 @@ class TestReplicationFilter(CBLTestClass):
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -607,9 +596,7 @@ class TestReplicationFilter(CBLTestClass):
             )
 
         self.mark_test_step("Reset SG and load `names` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
@@ -634,7 +621,7 @@ class TestReplicationFilter(CBLTestClass):
         )
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("names"),
+            cloud.sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PULL,
             collections=[
                 ReplicatorCollectionEntry(
@@ -644,7 +631,7 @@ class TestReplicationFilter(CBLTestClass):
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -671,25 +658,17 @@ class TestReplicationFilter(CBLTestClass):
         )
         updates = [DocumentUpdateEntry("name_1000", None, {"answer": 42})]
 
-        remote_name_10 = await cblpytest.sync_gateways[0].get_document(
-            "names", "name_105"
-        )
+        remote_name_10 = await cloud.sync_gateway.get_document("names", "name_105")
         assert remote_name_10 is not None, "Missing name_105 from sync gateway"
         name_10_revid = assert_not_null(remote_name_10.revid, "Missing name_105 revid")
 
-        remote_name_20 = await cblpytest.sync_gateways[0].get_document(
-            "names", "name_193"
-        )
+        remote_name_20 = await cloud.sync_gateway.get_document("names", "name_193")
         assert remote_name_20 is not None, "Missing name_193 from sync gateway"
         name_20_revid = assert_not_null(remote_name_20.revid, "Missing name_193 revid")
 
-        await cblpytest.sync_gateways[0].update_documents("names", updates)
-        await cblpytest.sync_gateways[0].delete_document(
-            "name_105", name_10_revid, "names"
-        )
-        await cblpytest.sync_gateways[0].delete_document(
-            "name_193", name_20_revid, "names"
-        )
+        await cloud.sync_gateway.update_documents("names", updates)
+        await cloud.sync_gateway.delete_document("name_105", name_10_revid, "names")
+        await cloud.sync_gateway.delete_document("name_193", name_20_revid, "names")
 
         self.mark_test_step("Start a replicator with the same config as in step 3.")
         await replicator.start()

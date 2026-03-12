@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.listener import Listener
 from cbltest.api.replicator import Replicator
@@ -32,9 +31,7 @@ class TestNoConflicts(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
@@ -54,12 +51,12 @@ class TestNoConflicts(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("posts"),
+            cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -75,7 +72,7 @@ class TestNoConflicts(CBLTestClass):
         )
 
         self.mark_test_step("Create docs in SG")
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [DocumentUpdateEntry("post_1000", None, {"channels": ["group1"]})],
             collection="posts",
@@ -87,7 +84,7 @@ class TestNoConflicts(CBLTestClass):
                 * In CBL: `"title"`: `"CBL Update"`
         """)
         await asyncio.gather(
-            cblpytest.sync_gateways[0].update_documents(
+            cloud.sync_gateway.update_documents(
                 "posts",
                 [
                     DocumentUpdateEntry(
@@ -112,12 +109,12 @@ class TestNoConflicts(CBLTestClass):
                 * credentials: user1/pass""")
         replicator2 = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("posts"),
+            cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PUSH,
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator2.start()
 
@@ -143,7 +140,7 @@ class TestNoConflicts(CBLTestClass):
         assert cbl_doc.id == "post_1000", (
             f"Incorrect document ID (expected post_1000; got {cbl_doc.id})"
         )
-        sg_doc = await cblpytest.sync_gateways[0].get_document(
+        sg_doc = await cloud.sync_gateway.get_document(
             "posts", "post_1000", collection="posts"
         )
         assert sg_doc is not None, "Document not found"
@@ -173,7 +170,7 @@ class TestNoConflicts(CBLTestClass):
         )
 
         self.mark_test_step("Verify docs got replicated to SGW with CBL updates.")
-        sg_doc = await cblpytest.sync_gateways[0].get_document(
+        sg_doc = await cloud.sync_gateway.get_document(
             "posts", "post_1000", collection="posts"
         )
         assert sg_doc is not None, "Document not found"
@@ -188,9 +185,7 @@ class TestNoConflicts(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step(
@@ -313,11 +308,11 @@ class TestNoConflicts(CBLTestClass):
         """)
         replicator = Replicator(
             db3,
-            cblpytest.sync_gateways[0].replication_url("posts"),
+            cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -330,7 +325,7 @@ class TestNoConflicts(CBLTestClass):
         self.mark_test_step(
             "Verify replication was successful and document content in SGW."
         )
-        sg_doc = await cblpytest.sync_gateways[0].get_document(
+        sg_doc = await cloud.sync_gateway.get_document(
             "posts", "post_1000", collection="posts"
         )
         assert sg_doc is not None, "Document should exist in SGW"
@@ -357,9 +352,7 @@ class TestNoConflicts(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step(
@@ -382,7 +375,7 @@ class TestNoConflicts(CBLTestClass):
         )[0]
 
         self.mark_test_step("Create a new doc in SG: `post_1000`.")
-        await cblpytest.sync_gateways[0].update_documents(
+        await cloud.sync_gateway.update_documents(
             "posts",
             [DocumentUpdateEntry("post_1000", None, {"channels": ["group1"]})],
             collection="posts",
@@ -399,29 +392,29 @@ class TestNoConflicts(CBLTestClass):
         """)
         repl1 = Replicator(
             db1,
-            cblpytest.sync_gateways[0].replication_url("posts"),
+            cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await repl1.start()
         repl2 = Replicator(
             db2,
-            cblpytest.sync_gateways[0].replication_url("posts"),
+            cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await repl2.start()
         repl3 = Replicator(
             db3,
-            cblpytest.sync_gateways[0].replication_url("posts"),
+            cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             continuous=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await repl3.start()
 
@@ -456,7 +449,7 @@ class TestNoConflicts(CBLTestClass):
                 * In DB3: `"title": "CBL3 Update 1"`
         """)
         await asyncio.gather(
-            cblpytest.sync_gateways[0].update_documents(
+            cloud.sync_gateway.update_documents(
                 "posts",
                 [
                     DocumentUpdateEntry(
@@ -499,7 +492,7 @@ class TestNoConflicts(CBLTestClass):
         cbl1_doc = await db1.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
-        sg_doc = await cblpytest.sync_gateways[0].get_document(
+        sg_doc = await cloud.sync_gateway.get_document(
             "posts", "post_1000", collection="posts"
         )
         assert sg_doc is not None, "Document should exist in SGW"
@@ -553,7 +546,7 @@ class TestNoConflicts(CBLTestClass):
         cbl1_doc = await db1.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
-        sg_doc = await cblpytest.sync_gateways[0].get_document(
+        sg_doc = await cloud.sync_gateway.get_document(
             "posts", "post_1000", collection="posts"
         )
         assert sg_doc is not None, "Document should exist in SGW"

@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
@@ -24,9 +23,7 @@ class TestReplicationEventing(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
         self.mark_test_step("Reset SG and load `names` dataset.")
-        cloud = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
@@ -45,10 +42,10 @@ class TestReplicationEventing(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cblpytest.sync_gateways[0].replication_url("names"),
+            cloud.sync_gateway.replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -104,7 +101,7 @@ class TestReplicationEventing(CBLTestClass):
 
         self.mark_test_step("Verify document was not replicated.")
         docs_after = await db.get_all_documents("_default._default")
-        sgw_docs_after = await cblpytest.sync_gateways[0].get_all_documents("names")
+        sgw_docs_after = await cloud.sync_gateway.get_all_documents("names")
         assert len(sgw_docs_after.rows) < len(docs_after["_default._default"]), (
             f"Expected no successful document updates but found {len(sgw_docs_after.rows)}"
         )
@@ -114,7 +111,7 @@ class TestReplicationEventing(CBLTestClass):
         assert large_doc is None, "Large document should not be replicated"
         try:
             with pytest.raises(Exception) as excinfo:
-                await cblpytest.sync_gateways[0].get_document("names", "large_doc")
+                await cloud.sync_gateway.get_document("names", "large_doc")
             assert "404" in str(excinfo.value) or "returned 404" in str(excinfo.value)
         except Exception as e:
             print(e)
