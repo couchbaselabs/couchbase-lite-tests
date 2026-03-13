@@ -1,0 +1,16 @@
+{
+  "bootstrap": {
+    "server": "rosmar:/?mode=memory",
+    "server_tls_skip_verify": true,
+    "use_tls_server": false,
+    "username": "Administrator",
+    "password": "password"
+  },
+  "logging": {
+    "console": {
+      "enabled": true,
+      "log_level": "debug",
+      "log_keys": ["*"]
+    }
+  }
+}

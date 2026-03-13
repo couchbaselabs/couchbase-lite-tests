@@ -1,5 +1,7 @@
 from json import dumps
 
+from cbltest.api.error import CblTestError
+
 from .api.cloud import CouchbaseCloud
 from .api.couchbaseserver import CouchbaseServer
 from .api.edgeserver import EdgeServer
@@ -212,9 +214,12 @@ class CBLPyTest:
         Creates a Couchbase Cloud configuration with the first Sync Gateway and Couchbase Server in the config. This is meant to be used for simple tests that only require a single Sync Gateway and Couchase Server instance.
         """
         if len(self.sync_gateways) == 0:
-            raise ValueError("No Sync Gateways available in config")
+            raise CblTestError("No Sync Gateways available in config")
 
         if len(self.couchbase_servers) == 0:
-            raise ValueError("No Couchbase Servers available in config")
+            if self.sync_gateways[0].using_rosmar:
+                return CouchbaseCloud(self.sync_gateways[0], None)
+
+            raise CblTestError("No Couchbase Servers available in config")
 
         return CouchbaseCloud(self.sync_gateways[0], self.couchbase_servers[0])

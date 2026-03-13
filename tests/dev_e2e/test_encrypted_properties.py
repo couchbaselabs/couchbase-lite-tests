@@ -16,7 +16,6 @@ from cbltest.responses import ServerVariant
 
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
-@pytest.mark.min_couchbase_servers(1)
 class TestEncryptedProperties(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_encrypted_push(

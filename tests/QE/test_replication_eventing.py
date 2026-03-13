@@ -16,7 +16,6 @@ from cbltest.api.replicator_types import (
 @pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
-@pytest.mark.min_couchbase_servers(1)
 class TestReplicationEventing(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_replication_for_20mb_doc(

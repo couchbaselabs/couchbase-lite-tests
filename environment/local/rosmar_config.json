@@ -1,0 +1,16 @@
+{
+  "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
+  "sync-gateways": [
+    {
+      "hostname": "localhost",
+      "rbac_user": "",
+      "rbac_password": "",
+      "tls": false
+    }
+  ],
+  "test-servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ]
+}

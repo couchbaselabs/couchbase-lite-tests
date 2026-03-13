@@ -18,9 +18,14 @@ class CouchbaseCloud:
     A class that performs operations that require coordination between both Sync Gateway and Couchbase Server
     """
 
-    def __init__(self, sync_gateway: SyncGateway, server: CouchbaseServer):
+    def __init__(self, sync_gateway: SyncGateway, server: CouchbaseServer | None):
         self.__sync_gateway = sync_gateway
-        self.__couchbase_server = server
+        if server:
+            self.__couchbase_server: CouchbaseServer = server
+        elif not sync_gateway.using_rosmar:
+            raise CblTestError(
+                "Couchbase Server must be provided if Sync Gateway is not using Rosmar"
+            )
         self.__tracer = get_tracer(__name__, VERSION)
 
     @property
@@ -29,9 +34,15 @@ class CouchbaseCloud:
 
     @property
     def couchbase_server(self) -> CouchbaseServer:
+        if not hasattr(self, "__couchbase_server"):
+            raise CblTestError(
+                "Couchbase Server is not available for this Couchbase Cloud instance, configured using rosmar"
+            )
         return self.__couchbase_server
 
     def _create_collections(self, db_payload: PutDatabasePayload) -> None:
+        if self.sync_gateway.using_rosmar:
+            return
         for scope in db_payload.scopes():
             self.__couchbase_server.create_collections(
                 db_payload.bucket, scope, db_payload.collections(scope)
@@ -107,8 +118,10 @@ class CouchbaseCloud:
 
             db_payload: PutDatabasePayload = PutDatabasePayload(dataset_config)
             try:
-                self.__couchbase_server.create_bucket(db_payload.bucket)
-                self._create_collections(db_payload)
+                # buckets and collections are implicitly created when using Rosmar
+                if not self.sync_gateway.using_rosmar:
+                    self.couchbase_server.create_bucket(db_payload.bucket)
+                    self._create_collections(db_payload)
                 await self.__sync_gateway.put_database(dataset_name, db_payload)
             except CblSyncGatewayBadResponseError as e:
                 if e.code != 412:
@@ -116,20 +129,27 @@ class CouchbaseCloud:
 
                 current_span.add_event("Handle HTTP 412")
                 await self.__sync_gateway.delete_database(dataset_name)
-                self.__couchbase_server.drop_bucket(db_payload.bucket)
-                self.__couchbase_server.create_bucket(db_payload.bucket)
-                self._create_collections(db_payload)
+                if self.sync_gateway.using_rosmar:
+                    raise CblTestError(
+                        f"Database {dataset_name} already exists on Sync Gateway and cannot be deleted when "
+                        "using rosmar until CBG-5213 is implemented. To work around, restart a Sync Gateway to "
+                        "delete the rosmar buckets."
+                    )
+                else:
+                    self.__couchbase_server.drop_bucket(db_payload.bucket)
+                    self.__couchbase_server.create_bucket(db_payload.bucket)
+                    self._create_collections(db_payload)
 
-                # CBL-4977 :
-                # The bucket's indexes will be deleted asynchronously after the bucket is dropped.
-                # When recreating the sg database, sg may wrongly detect that the indexes already exist,
-                # but later when trying to use the indexes for querying, the index-not-available error occurs
-                # as the index has already been deleted by that time.
-                #
-                # Wait until all indexes are removed will help prevent that problem. It's important
-                # to wait after the bucket and its collections are created, otherwise, QueryIndexManager
-                # will not be able to return the pending-to-removed indexes created for the collections.
-                self._wait_for_all_indexed_removed(db_payload.bucket)
+                    # CBL-4977 :
+                    # The bucket's indexes will be deleted asynchronously after the bucket is dropped.
+                    # When recreating the sg database, sg may wrongly detect that the indexes already exist,
+                    # but later when trying to use the indexes for querying, the index-not-available error occurs
+                    # as the index has already been deleted by that time.
+                    #
+                    # Wait until all indexes are removed will help prevent that problem. It's important
+                    # to wait after the bucket and its collections are created, otherwise, QueryIndexManager
+                    # will not be able to return the pending-to-removed indexes created for the collections.
+                    self._wait_for_all_indexed_removed(db_payload.bucket)
 
                 await self.__sync_gateway.put_database(dataset_name, db_payload)
 
