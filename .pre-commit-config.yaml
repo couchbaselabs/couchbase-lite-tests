@@ -4,6 +4,7 @@ repos:
     hooks:
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
+      - id: check-merge-conflict
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.1
     hooks:
@@ -18,9 +19,20 @@ repos:
         language: unsupported
         types_or: [python, pyi]
         entry: uv run ty check
+      - id: conventional-commits
+        name: Conventional Commits
+        language: script
+        entry: scripts/hooks/check-commit-msg.sh
+        stages: [commit-msg]
+        always_run: true
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.0
     hooks:
       - id: pyupgrade
         args: [--py310-plus]
         types_or: [python, pyi]
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']

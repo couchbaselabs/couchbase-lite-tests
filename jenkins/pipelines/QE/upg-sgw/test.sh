@@ -51,7 +51,7 @@ fi
 echo ">>> Running tests for initial setup with SGW: $CURRENT_SGW_VERSION ..."
 export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
 pushd $QE_TESTS_DIR > /dev/null
-uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw
+uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_upg_sgw.py::TestSgwUpgradeMultiNode
 popd > /dev/null
 
 # Loop through the remaining SGW versions and perform upgrades
@@ -60,16 +60,22 @@ for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
     CURRENT_SGW_VERSION="${SGW_VERSIONS[i]}"
     echo ">>> Upgrading SGW from $PREVIOUS_SGW_VERSION to $CURRENT_SGW_VERSION ..."
 
-    # 1. Destroy the old Sync Gateway instances ONLY, keep test servers. 
-    echo "--> Destroying old Sync Gateway instances..."
+#    # 1. Destroy the old Sync Gateway instances ONLY, keep test servers.
+#    echo "--> Destroying old Sync Gateway instances..."
+#    pushd $AWS_ENVIRONMENT_DIR > /dev/null
+#    uv run --group orchestrator ./stop_backend.py \
+#        --topology topology_setup/topology.json \
+#        --destroy-sgw \
+#        --no-ts-stop
+#    popd > /dev/null
+
+    # 2. Update topology with new SGW version (without resetting CBS/CBL)
+    echo "--> Updating topology with SGW version $CURRENT_SGW_VERSION..."
     pushd $AWS_ENVIRONMENT_DIR > /dev/null
-    uv run --group orchestrator ./stop_backend.py \
-        --topology topology_setup/topology.json \
-        --destroy-sgw \
-        --no-ts-stop
+    uv run $SCRIPT_DIR/update_sgw_version.py topology_setup/topology.json $CURRENT_SGW_VERSION
     popd > /dev/null
 
-    # 2. Re-run start_backend. Apply terraform to create the new SGW instances.
+    # 3. Provision new Sync Gateway instances with the updated version.
     echo "--> Provisioning new Sync Gateway instances with version $CURRENT_SGW_VERSION..."
     pushd $AWS_ENVIRONMENT_DIR > /dev/null
     uv run --group orchestrator ./start_backend.py \
@@ -86,7 +92,7 @@ for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
     echo ">>> Running tests after upgrading to SGW: $CURRENT_SGW_VERSION ..."
     export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
     pushd $QE_TESTS_DIR > /dev/null
-    uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw
+    uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_upg_sgw.py::TestSgwUpgradeMultiNode
     popd > /dev/null
 done
 
