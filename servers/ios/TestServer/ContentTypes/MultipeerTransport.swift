@@ -12,3 +12,18 @@ extension ContentTypes {
         case bluetooth = "BLUETOOTH"
     }
 }
+extension ContentTypes.MultipeerTransport {
+    init(transportType: CouchbaseLiteSwift.MultipeerTransport) {
+        switch transportType {
+        case .wifi:
+            return ContentTypes.MultipeerTransport.wifi
+        case .bluetooth:
+            return ContentTypes.MultipeerTransport.bluetooth
+        @unknown default:
+            fatalError("Encountered unknown enum value from CouchbaseLiteSwift.MultipeerTransport")
+        }
+    }
+}
+
+
+

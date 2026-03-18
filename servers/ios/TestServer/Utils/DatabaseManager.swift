@@ -24,7 +24,7 @@ class DatabaseManager {
     private var replicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
     
     private var multipeerReplicators : [ UUID : MultipeerReplicator ] = [:]
-    private var peerReplicatorStatus : [ UUID : [ PeerID: Replicator.Status ] ] = [:]
+    private var peerReplicatorStatus : [ UUID : [ PeerID: (status: Replicator.Status, transport: MultipeerTransport) ] ] = [:]
     private var peerReplicatorTransport : [ UUID : [ PeerID: ContentTypes.MultipeerTransport ] ] = [:]
     private var peerReplicatorStatusToken : [ UUID : ListenerToken ] = [:]
     private var peerReplicatorDocuments : [ UUID : [ PeerID: [ ContentTypes.DocumentReplication ] ] ] = [:]
@@ -353,7 +353,7 @@ class DatabaseManager {
         
         let listenerToken = multipeerReplicator.addPeerReplicatorStatusListener(on: listenerQueue) { [weak self] status in
             guard let strongSelf = self else { return }
-            strongSelf.peerReplicatorStatus[id, default: [:]][status.peerID] = status.status
+            strongSelf.peerReplicatorStatus[id, default: [:]][status.peerID] = (status.status,status.transport)
         }
         
         let docReplToken = multipeerReplicator.addPeerDocumentReplicationListener(on: listenerQueue) { [weak self] docRepl in
@@ -397,14 +397,17 @@ class DatabaseManager {
             var replicators: [ContentTypes.PeerReplicatorStatus] = []
             
             if let statuses = peerReplicatorStatus[id] {
-                for (peerID, status) in statuses {
+                for (peerID, tuple) in statuses {
+                    let status = tuple.status
+                    let transport = tuple.transport
                     let docs = peerReplicatorDocuments[id]?[peerID] ?? []
                     let replStatus = ContentTypes.ReplicatorStatus.init(status: status, docs: docs)
-                    replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus))
+                    let transport_type= ContentTypes.MultipeerTransport.init(transportType: transport)
+                    replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus, transport:transport_type ))
                     peerReplicatorDocuments[id]?[peerID] = [] // Reset after return per spec
                 }
                 // Remove disconected peers with stopped replicators so their statuses are not included next time.
-                peerReplicatorStatus[id] = statuses.filter { $0.value.activity != .stopped }
+                peerReplicatorStatus[id] = statuses.filter { $0.value.status.activity != .stopped }
             }
             
             status = ContentTypes.MultipeerReplicatorStatus.init(replicators: replicators)
