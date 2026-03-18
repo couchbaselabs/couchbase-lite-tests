@@ -48,6 +48,12 @@ class BackendStopSteps(Flag):
 )
 @click.option("--destroy-sgw", is_flag=True, help="Destroy only Sync Gateway instances")
 @click.option(
+    "--sgw-index",
+    type=int,
+    default=None,
+    help="Specific SGW instance index to destroy (0-based, only with --destroy-sgw)",
+)
+@click.option(
     "--destroy-cbs", is_flag=True, help="Destroy only Couchbase Server instances"
 )
 @click.option("--destroy-es", is_flag=True, help="Destroy only Edge Server instances")
@@ -62,6 +68,7 @@ class BackendStopSteps(Flag):
 def cli_entry(
     topology: str | None,
     destroy_sgw: bool,
+    sgw_index: int | None,
     destroy_cbs: bool,
     destroy_es: bool,
     destroy_lb: bool,
@@ -69,6 +76,13 @@ def cli_entry(
     no_ts_stop: bool,
     no_full_destroy: bool,
 ) -> None:
+    if sgw_index is not None and not destroy_sgw:
+        click.secho(
+            "Error: --sgw-index can only be used with --destroy-sgw",
+            fg="red",
+        )
+        sys.exit(1)
+
     steps = BackendStopSteps.NONE
     has_specific_destroy = False
     if destroy_sgw:
@@ -93,17 +107,19 @@ def cli_entry(
     if not no_ts_stop:
         steps |= BackendStopSteps.STOP_TS
 
-    main(topology, steps)
+    main(topology, steps, sgw_index)
 
 
-def main(topology: str | None, steps: BackendStopSteps) -> None:
+def main(
+    topology: str | None, steps: BackendStopSteps, sgw_index: int | None = None
+) -> None:
     """
     Main function to tear down the AWS environment and stop the test servers.
 
     Args:
-        topology_file (Optional[str]): The topology file that was used to start the environment.
-        topology (Optional[TopologyConfig]): The topology file that was used to start the environment.
+        topology (Optional[str]): The topology file that was used to start the environment.
         steps (BackendStopSteps): The teardown steps to execute.
+        sgw_index (Optional[int]): Specific SGW instance index to destroy (0-based, only with DESTROY_SGW).
     """
     check_sts_status()
     topology_obj = TopologyConfig(topology) if topology else TopologyConfig()
@@ -115,12 +131,15 @@ def main(topology: str | None, steps: BackendStopSteps) -> None:
     terraform_command = ["terraform", "destroy", "-auto-approve"]
     targets = []
     if steps & BackendStopSteps.DESTROY_SGW:
-        targets.extend(
-            [
-                f"-target=aws_instance.sync_gateway[{i}]"
-                for i in range(topology_obj.total_sgw_count)
-            ]
-        )
+        if sgw_index is not None:
+            targets.append(f"-target=aws_instance.sync_gateway[{sgw_index}]")
+        else:
+            targets.extend(
+                [
+                    f"-target=aws_instance.sync_gateway[{i}]"
+                    for i in range(topology_obj.total_sgw_count)
+                ]
+            )
     if steps & BackendStopSteps.DESTROY_CBS:
         targets.extend(
             [

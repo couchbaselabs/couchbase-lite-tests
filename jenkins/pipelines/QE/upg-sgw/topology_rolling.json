@@ -20,6 +20,18 @@
     },
     {
       "cluster": 0
+    },
+    {
+      "cluster": 0
+    }
+  ],
+  "load_balancers": [
+    {
+      "sync_gateways": [
+        0,
+        1,
+        2
+      ]
     }
   ],
   "logslurp": true
