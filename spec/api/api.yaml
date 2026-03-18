@@ -1328,7 +1328,7 @@ components:
                 $ref: '#/components/schemas/ReplicatorStatus'
               transport:
                 type: string
-                enum: [ 'WIFI', 'BLUETOOTH' ]
+                enum: ['WIFI', 'BLUETOOTH']
     MultipeerReplicatorIdentity:
       description: |-
         MultipeerReplicatorIdentity is used to specify a TLS certificate and key particular
