@@ -419,25 +419,25 @@ class DatabaseManager {
                 // Remove disconected peers with stopped replicators so their statuses are not included next time.
                 peerReplicatorStatus[id] = statuses.filter { $0.value.status.activity != .stopped }
             }
-            
+
             status = ContentTypes.MultipeerReplicatorStatus.init(replicators: replicators)
         }
-        
+
         return status
     }
-    
+
     public func collection(_ name: String, inDB dbName: String) throws -> Collection? {
         Log.log(level: .debug, message: "Fetching collecting '\(name)' in database '\(dbName)'")
-        
+
         guard let database = databases[dbName]
         else {
             Log.log(level: .error, message: "Failed to fetch collection, database '\(dbName)' not open.")
             throw TestServerError.cblDBNotOpen
         }
-        
+
         return try collection(name, inDB: database)
     }
-    
+
     public func collection(_ name: String, inDB database: Database) throws -> Collection? {
         Log.log(level: .debug, message: "Fetching collection with DB: \(database.name), collection: \(name)")
         do {
@@ -450,27 +450,27 @@ class DatabaseManager {
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
-    
+
     public func getDocument(_ id: String, fromCollection collName: String, inDB dbName: String) throws -> Document? {
         Log.log(level: .debug, message: "Getting document '\(id)' from collection '\(collName)' in database '\(dbName)'")
-        
+
         guard let collection = try collection(collName, inDB: dbName) else {
             throw TestServerError.badRequest("Cannot find collection '\(collName)' in db '\(dbName)'")
         }
-        
+
         return try collection.document(id: id)
     }
-    
+
     // Returns [scope_name.collection_name]
     public func getQualifiedCollections(fromDB dbName: String) throws -> Array<String> {
         Log.log(level: .debug, message: "Fetching all collection names from DB '\(dbName)'")
-        
+
         guard let database = databases[dbName]
         else {
             Log.log(level: .error, message: "Failed to fetch collections, DB \(dbName) not open")
             throw TestServerError.cblDBNotOpen
         }
-        
+
         do {
             var result: [String] = []
             for scope in try database.scopes() {
@@ -480,24 +480,24 @@ class DatabaseManager {
             }
             Log.log(level: .debug, message: "Fetched all collections: \(result)")
             return result
-            
+
         } catch(let error as NSError) {
             Log.log(level: .error, message: "Failed to fetch collections due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
-    
+
     public func performMaintenance(type: MaintenanceType, onDB dbName: String) throws {
         guard let db = databases[dbName]
         else { throw TestServerError.cblDBNotOpen }
-        
+
         do {
             try db.performMaintenance(type: type)
         } catch(let error as NSError) {
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
-    
+
     public func closeDatabase(withName dbName: String) throws {
         Log.log(level: .debug, message: "Closing database '\(dbName)'")
         guard let database = databases[dbName]
@@ -505,7 +505,7 @@ class DatabaseManager {
             Log.log(level: .debug, message: "Database \(dbName) was already closed.")
             return
         }
-        
+
         do {
             try database.close()
             databases.removeValue(forKey: dbName)
@@ -513,16 +513,16 @@ class DatabaseManager {
             Log.log(level: .error, message: "Failed to close database due to CBL error: \(error)")
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
-        
+
         Log.log(level: .debug, message: "Database '\(dbName)' closed successfully.")
     }
-    
+
     public func createDatabase(dbName: String, dataset: String) throws {
         Log.log(level: .debug, message: "Create Database \(dbName) with dataset \(dataset)")
-        
+
         // Load database with the dataset
         try loadDataset(withName: dataset, dbName: dbName)
-        
+
         // Open database
         do {
             databases[dbName] = try Database(name: dbName)
@@ -532,15 +532,15 @@ class DatabaseManager {
         }
         Log.log(level: .debug, message: "Database '\(dbName)' has been created with the dataset \(dataset).")
     }
-    
+
     public func createDatabase(dbName: String, collections: [String] = []) throws {
         Log.log(level: .debug, message: "Create Database \(dbName) with collections \(collections)")
-        
+
         // For any reasons if the database exists, delete it.
         if Database.exists(withName: dbName) {
             try Database.delete(withName: dbName)
         }
-        
+
         // Open database
         do {
             let db = try Database(name: dbName)
@@ -555,7 +555,7 @@ class DatabaseManager {
         }
         Log.log(level: .debug, message: "Database '\(dbName)' has been created with the collections \(collections).")
     }
-    
+
     public func reset() throws {
         Log.log(level: .debug, message: "Resetting all databases")
         for dbName in databases.keys {
@@ -563,27 +563,27 @@ class DatabaseManager {
             try? Database.delete(withName: dbName)
         }
         databases.removeAll()
-        
+
         // Reset all replicators:
         replicators.removeAll()
         replicatorDocuments.removeAll()
         replicatorDocumentsToken.removeAll()
-        
+
         // Reset all listeners:
         listeners.removeAll()
-        
+
         // Reset all multipeer replicators:
         multipeerReplicators.values.forEach { $0.stop() } // Temporary until all close database also stops multipeer replicator
         multipeerReplicators.removeAll()
-        
+
         peerReplicatorStatus.removeAll()
         peerReplicatorTransport.removeAll()
         peerReplicatorStatusToken.removeAll()
-        
+
         peerReplicatorDocuments.removeAll()
         peerReplicatorDocumentsToken.removeAll()
     }
-    
+
     private static func getCBLAuthenticator(from auth: ReplicatorAuthenticator) throws -> Authenticator {
         switch auth {
         case let auth as ContentTypes.ReplicatorBasicAuthenticator:
@@ -594,35 +594,35 @@ class DatabaseManager {
             throw TestServerError.badRequest("'authenticator' parameter did not match a valid authenticator.")
         }
     }
-    
+
     private static func getCBLReplicationFilter(from filter: ContentTypes.ReplicationFilter) throws -> AnyReplicationFilter {
         return try ReplicationFilterFactory.getFilter(withName: filter.name, params: filter.params)
     }
-    
+
     private static func getCBLReplicationConflictResolver(from resolver: ContentTypes.ReplicationConflictResolver) throws -> ConflictResolver {
         return try ReplicationConflictResolverFactory.getResolver(withName: resolver.name, params: resolver.params)
     }
-    
+
     private func loadDataset(withName name: String, dbName: String) throws {
         Log.log(level: .debug, message: "Loading dataset '\(name)' into DB '\(dbName)'")
-        
+
         let datasetRelativePath = URL(fileURLWithPath: "dbs")
             .appendingPathComponent(datasetVersion)
             .appendingPathComponent("\(name).cblite2.zip")
             .relativePath
-            
+
         let datasetZipURL = try downloadDatasetFileIfNecessary(relativePath: datasetRelativePath)
         Log.log(level: .debug, message: "Load dataset at \(datasetZipURL.path)")
-        
+
         let fm = FileManager()
-        
+
         let extractedDatasetDir = URL(fileURLWithPath: databaseDirectory)
             .appendingPathComponent(kDatasetExtractedDirectory)
-        
+
         let extractedDatasetPath = extractedDatasetDir
             .appendingPathComponent(datasetZipURL.deletingPathExtension().lastPathComponent)
             .path
-        
+
         if(!fm.fileExists(atPath: extractedDatasetPath)) {
             Log.log(level: .debug, message: "Unzipping dataset \(datasetZipURL.lastPathComponent)")
             guard SSZipArchive.unzipFile(atPath: datasetZipURL.path, toDestination: extractedDatasetDir.path) else {
@@ -630,12 +630,12 @@ class DatabaseManager {
                 throw TestServerError(domain: .CBL, code: CBLError.cantOpenFile, message: "Couldn't unzip dataset archive.")
             }
         }
-        
+
         // For any reasons if the database exists, delete it.
         if Database.exists(withName: dbName) {
             try Database.delete(withName: dbName)
         }
-        
+
         do {
             Log.log(level: .debug, message: "Attempting to copy dataset from \(extractedDatasetPath)")
             try Database.copy(fromPath: extractedDatasetPath, toDatabase: dbName, withConfig: nil)
@@ -645,105 +645,105 @@ class DatabaseManager {
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
-    
+
     private func datasetRelativePath(for name: String, version: String) -> String {
         return "dbs/\(version)/\(name).cblite2.zip"
     }
-    
+
     private func downloadDatasetFileIfNecessary(relativePath: String) throws -> URL {
         let datasetPath = URL(fileURLWithPath: databaseDirectory)
             .appendingPathComponent(kDatasetDownloadDirectory)
             .appendingPathComponent(relativePath)
-        
+
         let fm = FileManager.default
-        
+
         if (fm.fileExists(atPath: datasetPath.path)) {
             Log.log(level: .debug, message: "Skipping download, dataset already exists at pat \(datasetPath.path)")
             return datasetPath
         }
-        
+
         let parentDir = datasetPath.deletingLastPathComponent()
         if (!fm.fileExists(atPath: parentDir.path)) {
             try fm.createDirectory(at: parentDir, withIntermediateDirectories: true)
         }
-        
+
         guard let url = URL(string: relativePath, relativeTo: URL(string: kDatasetBaseURL)) else {
             throw TestServerError.badRequest("Invalid dataset path : \(relativePath)")
         }
-        
+
         Log.log(level: .info, message: "Downloading dataset from \(url.absoluteString)")
         try FileDownloader.download(url: url, to: datasetPath.path)
-        
+
         return datasetPath
     }
-    
+
     public func loadBlob(filename: String) throws -> Blob {
         let blobRelativePath = URL(fileURLWithPath: "blobs")
             .appendingPathComponent(filename)
             .relativePath
-        
+
         let blobFileURL = try downloadDatasetFileIfNecessary(relativePath: blobRelativePath)
         Log.log(level: .debug, message: "Load blob from \(blobFileURL.path)")
-        
+
         let contentType: String = {
             switch blobFileURL.pathExtension {
             case "jpeg", "jpg": return "image/jpeg"
             default: return "application/octet-stream"
             }
         }()
-        
+
         do {
             return try Blob(contentType: contentType, fileURL: blobFileURL)
         } catch(let error as NSError) {
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
-    
+
     public func blobFileExists(forBlob blob: Blob, inDB dbName: String) throws -> Bool {
         guard let db = databases[dbName]
         else { throw TestServerError.cblDBNotOpen }
-        
+
         do {
             return try db.getBlob(properties: blob.properties) != nil
         } catch(let error as NSError) {
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
-    
+
     private static func multipeerReplicatorIdentity(for config: ContentTypes.MultipeerReplicatorConfiguration) throws -> TLSIdentity {
         let label = "ios-multipeer-\(config.peerGroupID)"
-        
+
         guard let data = Data(base64Encoded: config.identity.data) else {
             throw TestServerError.badRequest("Invalid multipeer replictor's identity data")
         }
-        
+
         try TLSIdentity.deleteIdentity(withLabel: label)
         return try TLSIdentity.importIdentity(withData: data, password: config.identity.password, label: label)
     }
-    
+
     private static func multipeerAuthenticator(for config: ContentTypes.MultipeerReplicatorCAAuthenticator?) throws -> MultipeerCertificateAuthenticator {
         guard let auth = config else {
             return MultipeerCertificateAuthenticator { peer, certs in
                 return true
             }
         }
-        
+
         let lines = auth.certificate
             .components(separatedBy: .newlines)
             .filter { !$0.contains("-----BEGIN CERTIFICATE-----") &&
                       !$0.contains("-----END CERTIFICATE-----") &&
                       !$0.isEmpty }
-        
+
         let certData = lines.joined()
 
         guard let derData = Data(base64Encoded: certData) else {
             throw TestServerError.badRequest("Failed to convert multipeer authenticator's root certificate from PEM to DER")
         }
-        
+
         guard let rootCert = SecCertificateCreateWithData(nil, derData as CFData) else {
             throw TestServerError.badRequest("Invalid multipeer authenticator's root certificate")
         }
-        
+
         return MultipeerCertificateAuthenticator(rootCerts: [rootCert])
     }
 }

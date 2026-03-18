@@ -12,5 +12,3 @@ extension ContentTypes {
         case bluetooth = "BLUETOOTH"
     }
 }
-
-
