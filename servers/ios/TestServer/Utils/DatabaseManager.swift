@@ -24,7 +24,7 @@ class DatabaseManager {
     private var replicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
     
     private var multipeerReplicators : [ UUID : MultipeerReplicator ] = [:]
-    private var peerReplicatorStatus : [ UUID : [ PeerID: Replicator.Status ] ] = [:]
+    private var peerReplicatorStatus : [ UUID : [ PeerID: PeerReplicatorStatus] ] = [:]
     private var peerReplicatorTransport : [ UUID : [ PeerID: ContentTypes.MultipeerTransport ] ] = [:]
     private var peerReplicatorStatusToken : [ UUID : ListenerToken ] = [:]
     private var peerReplicatorDocuments : [ UUID : [ PeerID: [ ContentTypes.DocumentReplication ] ] ] = [:]
@@ -353,7 +353,7 @@ class DatabaseManager {
         
         let listenerToken = multipeerReplicator.addPeerReplicatorStatusListener(on: listenerQueue) { [weak self] status in
             guard let strongSelf = self else { return }
-            strongSelf.peerReplicatorStatus[id, default: [:]][status.peerID] = status.status
+            strongSelf.peerReplicatorStatus[id, default: [:]][status.peerID] = status
         }
         
         let docReplToken = multipeerReplicator.addPeerDocumentReplicationListener(on: listenerQueue) { [weak self] docRepl in
@@ -397,14 +397,27 @@ class DatabaseManager {
             var replicators: [ContentTypes.PeerReplicatorStatus] = []
             
             if let statuses = peerReplicatorStatus[id] {
-                for (peerID, status) in statuses {
+                for (peerID, peerStatus) in statuses {
+                    let status = peerStatus.status
+                    let transport = peerStatus.transport
                     let docs = peerReplicatorDocuments[id]?[peerID] ?? []
                     let replStatus = ContentTypes.ReplicatorStatus.init(status: status, docs: docs)
-                    replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus))
+                    let transportType: ContentTypes.MultipeerTransport = {
+                        switch transport {
+                        case .wifi:
+                            return .wifi
+                        case .bluetooth:
+                            return .bluetooth
+                        @unknown default:
+                            fatalError("Unknown transport")
+                        }
+                    }()
+                    
+                    replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus, transport:transportType ))
                     peerReplicatorDocuments[id]?[peerID] = [] // Reset after return per spec
                 }
                 // Remove disconected peers with stopped replicators so their statuses are not included next time.
-                peerReplicatorStatus[id] = statuses.filter { $0.value.activity != .stopped }
+                peerReplicatorStatus[id] = statuses.filter { $0.value.status.activity != .stopped }
             }
             
             status = ContentTypes.MultipeerReplicatorStatus.init(replicators: replicators)
@@ -597,7 +610,7 @@ class DatabaseManager {
             .appendingPathComponent(datasetVersion)
             .appendingPathComponent("\(name).cblite2.zip")
             .relativePath
-            
+        
         let datasetZipURL = try downloadDatasetFileIfNecessary(relativePath: datasetRelativePath)
         Log.log(level: .debug, message: "Load dataset at \(datasetZipURL.path)")
         
@@ -718,11 +731,11 @@ class DatabaseManager {
         let lines = auth.certificate
             .components(separatedBy: .newlines)
             .filter { !$0.contains("-----BEGIN CERTIFICATE-----") &&
-                      !$0.contains("-----END CERTIFICATE-----") &&
-                      !$0.isEmpty }
+                !$0.contains("-----END CERTIFICATE-----") &&
+                !$0.isEmpty }
         
         let certData = lines.joined()
-
+        
         guard let derData = Data(base64Encoded: certData) else {
             throw TestServerError.badRequest("Failed to convert multipeer authenticator's root certificate from PEM to DER")
         }

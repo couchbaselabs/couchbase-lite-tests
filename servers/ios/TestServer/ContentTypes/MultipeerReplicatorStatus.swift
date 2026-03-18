@@ -11,6 +11,7 @@ extension ContentTypes {
     struct PeerReplicatorStatus : Content {
         let peerID: String
         let status: ReplicatorStatus
+        let transport: MultipeerTransport
     }
     
     struct MultipeerReplicatorStatus : Content {

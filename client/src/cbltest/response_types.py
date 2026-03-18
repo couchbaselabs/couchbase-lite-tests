@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Final, cast
 
 from cbltest.api.error_types import ErrorResponseBody
+from cbltest.api.multipeer_replicator_types import (
+    MultipeerTransportType,
+)
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorDocumentEntry,
@@ -224,6 +227,7 @@ class MultipeerReplicatorStatusEntry:
 
     __peer_id_key: Final[str] = "peerID"
     __status_key: Final[str] = "status"
+    __transport_key: Final[str] = "transport"
 
     @property
     def peer_id(self) -> str:
@@ -235,6 +239,11 @@ class MultipeerReplicatorStatusEntry:
         """Gets the status of the replicator"""
         return self.__status
 
+    @property
+    def transport(self) -> MultipeerTransportType:
+        """Gets the transport type of the replicator"""
+        return self.__transport
+
     def __init__(self, body: dict):
         assert isinstance(body, dict), (
             "Invalid MultipeerReplicatorStatusEntry received (not an object)"
@@ -242,6 +251,8 @@ class MultipeerReplicatorStatusEntry:
 
         self.__peer_id = _assert_string_entry(body, self.__peer_id_key)
         self.__status = ReplicatorStatusBody(body.get(self.__status_key, {}))
+        transport_str = _assert_string_entry(body, self.__transport_key)
+        self.__transport = MultipeerTransportType.from_string(transport_str)
 
 
 class PostGetMultipeerReplicatorStatusResponseMethods(ABC):
