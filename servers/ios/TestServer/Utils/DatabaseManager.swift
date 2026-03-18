@@ -24,22 +24,22 @@ class DatabaseManager {
     private var replicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
     
     private var multipeerReplicators : [ UUID : MultipeerReplicator ] = [:]
-    private var peerReplicatorStatus : [ UUID : [ PeerID: (status: Replicator.Status, transport: MultipeerTransport) ] ] = [:]
+    private var peerReplicatorStatus : [ UUID : [ PeerID: PeerReplicatorStatus] ] = [:]
     private var peerReplicatorTransport : [ UUID : [ PeerID: ContentTypes.MultipeerTransport ] ] = [:]
     private var peerReplicatorStatusToken : [ UUID : ListenerToken ] = [:]
     private var peerReplicatorDocuments : [ UUID : [ PeerID: [ ContentTypes.DocumentReplication ] ] ] = [:]
     private var peerReplicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
-    
+
     private var listeners: [ UUID : URLEndpointListener ] = [:]
-    
+
     private let listenerQueue = DispatchQueue(label: "DatabaseManagerListenerQueue")
-    
-    
+
+
     public init(directory: String, datasetVersion: String) {
         self.databaseDirectory = directory
         self.datasetVersion = datasetVersion
     }
-    
+
     deinit {
         do {
             try reset()
@@ -47,7 +47,7 @@ class DatabaseManager {
             Log.log(level: .error, message: "Failed to reset database manager : \(error)")
         }
     }
-    
+
     @discardableResult
     public func addCollection(dbName: String, scope: String, name: String) throws -> Collection {
         Log.log(level: .debug, message: "Creating collection: \(scope).\(name) in database: \(dbName)")
@@ -56,7 +56,7 @@ class DatabaseManager {
             Log.log(level: .error, message: "Failed to create collection, database '\(dbName)' does not exist")
             throw TestServerError.cblDBNotOpen
         }
-        
+
         do {
             let coll = try database.createCollection(name: name, scope: scope)
             Log.log(level: .debug, message: "Collection \(scope).\(name) successfully created in database \(dbName)")
@@ -66,7 +66,7 @@ class DatabaseManager {
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
-    
+
     public func runQuery(dbName: String, queryString: String) throws -> ResultSet {
         Log.log(level: .debug, message: "Running query: `\(queryString)` in database: \(dbName)")
         guard let database = databases[dbName]
@@ -74,7 +74,7 @@ class DatabaseManager {
             Log.log(level: .error, message: "Failed to run query, database '\(dbName)' does not exist")
             throw TestServerError.cblDBNotOpen
         }
-        
+
         do {
             let query = try database.createQuery(queryString)
             let result = try query.execute()
@@ -85,16 +85,16 @@ class DatabaseManager {
             throw TestServerError(domain: .CBL, code: error.code, message: error.localizedDescription)
         }
     }
-    
+
     public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false) throws -> UUID {
         var collectionsArr: [Collection] = []
-        
+
         guard let database = databases[dbName]
         else {
             Log.log(level: .error, message: "Failed to start Listener, database '\(dbName)' does not exist")
             throw TestServerError.cblDBNotOpen
         }
-        
+
         for collName in collections {
             guard let coll = try collection(collName, inDB: database)
             else {
@@ -103,22 +103,22 @@ class DatabaseManager {
             }
             collectionsArr.append(coll)
         }
-        
+
         var listenerConfig = URLEndpointListenerConfiguration(collections: collectionsArr)
         listenerConfig.port = port
         listenerConfig.disableTLS = disableTLS
-        
+
         let listener = URLEndpointListener(config: listenerConfig)
-        
+
         let listenerID = UUID()
         listeners[listenerID] = listener
-        
+
         try listener.start()
         Log.log(level: .debug, message: "EndpointListener started successfully with ID \(listenerID)")
-        
+
         return listenerID
     }
-    
+
     public func stopListener(forID listenerID: UUID) throws {
         Log.log(level: .debug, message: "Stop EndpointListener for ID \(listenerID) is requested.")
         guard let listener = listeners[listenerID] else {
@@ -127,22 +127,22 @@ class DatabaseManager {
         listener.stop()
         Log.log(level: .debug, message: "Stop EndpointListener for ID \(listenerID) is successfully requested.")
     }
-    
+
     public func startReplicator(config: ContentTypes.ReplicatorConfiguration, reset: Bool) throws -> UUID {
         Log.log(level: .debug, message: "Starting Replicator with config: \(config.description)")
-        
+
         guard let database = databases[config.database]
         else {
             Log.log(level: .error, message: "Failed to start Replicator, database '\(config.database)' does not exist")
             throw TestServerError.cblDBNotOpen
         }
-        
+
         guard let endpointURL = URL(string: config.endpoint)
         else {
             Log.log(level: .error, message: "Failed to start Replicator, invalid endpoint URL.")
             throw TestServerError.badRequest("Endpoint URL is not a valid URL.")
         }
-        
+
         var replConfig: ReplicatorConfiguration
         var collectionsConfig: [CollectionConfiguration] = []
         if config.collections.count > 0 {
@@ -174,7 +174,7 @@ class DatabaseManager {
             let defaultColConfig = CollectionConfiguration(collection: try database.defaultCollection())
             replConfig = ReplicatorConfiguration(collections: [defaultColConfig], target: URLEndpoint(url: endpointURL))
         }
-        
+
         switch(config.replicatorType) {
         case .push:
             replConfig.replicatorType = .push
@@ -183,15 +183,15 @@ class DatabaseManager {
         case .pushpull:
             replConfig.replicatorType = .pushAndPull
         }
-        
+
         replConfig.continuous = config.continuous
-        
+
         replConfig.enableAutoPurge = config.enableAutoPurge
-        
+
         if let auth = config.authenticator {
             replConfig.authenticator = try DatabaseManager.getCBLAuthenticator(from: auth)
         }
-        
+
         if let headersString = config.headers {
             // Decode as [String: String] as per CBL type
             if let data = headersString.data(using: .utf8) {
@@ -205,30 +205,30 @@ class DatabaseManager {
                 replConfig.headers = nil
             }
         }
-        
+
         if let pinnedCert = config.pinnedServerCert {
             guard let cert = CertUtil.certificate(from: pinnedCert) else {
                 throw TestServerError.badRequest("Pinned server cert has invalid format.")
             }
             replConfig.pinnedServerCertificate = cert
         }
-        
+
         let replicatorID = UUID()
-        
+
         let replicator = Replicator(config: replConfig)
-        
+
         replicators[replicatorID] = replicator
-        
+
         // Whenever a document is replicated, add it to the replicatorDocuments dict
         if(config.enableDocumentListener) {
             replicatorDocuments[replicatorID] = []
-            
+
             let listenerToken = replicator.addDocumentReplicationListener(withQueue: listenerQueue) { [weak self] docChange in
                 guard let strongSelf = self else { return }
-                
+
                 for doc in docChange.documents {
                     var docFlags: [ContentTypes.DocumentReplicationFlags] = []
-                    
+
                     switch doc.flags {
                     case .accessRemoved:
                         docFlags.append(.accessRemoved)
@@ -237,13 +237,13 @@ class DatabaseManager {
                     default:
                         break
                     }
-                    
+
                     var error: TestServerError? = nil
-                    
+
                     if let docError = doc.error as NSError? {
                         error = TestServerError(domain: .CBL, code: docError.code, message: docError.localizedDescription)
                     }
-                    
+
                     strongSelf.replicatorDocuments[replicatorID]?.append(
                         ContentTypes.DocumentReplication(
                             collection: "\(doc.scope).\(doc.collection)",
@@ -254,17 +254,17 @@ class DatabaseManager {
                     )
                 }
             }
-            
+
             replicatorDocumentsToken[replicatorID] = listenerToken
         }
-        
+
         replicator.start(reset: reset)
-        
+
         Log.log(level: .debug, message: "Replicator started successfully with ID \(replicatorID)")
-        
+
         return replicatorID
     }
-    
+
     public func stopReplicator(forID replID: UUID) throws {
         Log.log(level: .debug, message: "Stop Replicator for ID \(replID) is requested.")
         guard let replicator = replicators[replID] else {
@@ -273,36 +273,36 @@ class DatabaseManager {
         replicator.stop()
         Log.log(level: .debug, message: "Stop Replicator for ID \(replID) is successfully requested.")
     }
-    
+
     public func replicatorStatus(forID replID: UUID) -> ContentTypes.ReplicatorStatus? {
         Log.log(level: .debug, message: "Fetching Replicator status for ID \(replID)")
-        
+
         var status: ContentTypes.ReplicatorStatus?
-        
+
         listenerQueue.sync {
             guard let replicator = replicators[replID] else {
                 Log.log(level: .debug, message: "Failed to fetch Replicator status, Replicator with ID \(replID) not found.")
                 return
             }
-            
+
             let docs: [ContentTypes.DocumentReplication] = replicatorDocuments[replID] ?? []
-            
+
             replicatorDocuments[replID] = [] // Reset after return per spec
-            
+
             status = ContentTypes.ReplicatorStatus(status: replicator.status, docs: docs)
             Log.log(level: .debug, message: "Succeessfully fetched Replicator status for ID \(replID): \(status!.description)")
         }
-        
+
         return status
     }
-    
+
     public func startMultipeerReplicator(config: ContentTypes.MultipeerReplicatorConfiguration) throws -> UUID {
         Log.log(level: .debug, message: "Starting Multipeer Replicator")
-        
+
         let identity = try DatabaseManager.multipeerReplicatorIdentity(for: config)
-        
+
         let authenticator = try DatabaseManager.multipeerAuthenticator(for: config.authenticator)
-        
+
         var collectionConfigs: [MultipeerCollectionConfiguration] = []
         for replColl in config.collections {
             for name in replColl.names {
@@ -310,11 +310,11 @@ class DatabaseManager {
                     Log.log(level: .error, message: "Failed to start Multipeer Replicator as collection '\(name)' does not exist in \(config.database).")
                     throw TestServerError.badRequest("Collection '\(name)' does not exist in \(config.database).")
                 }
-                
+
                 var collConfig = MultipeerCollectionConfiguration(collection: collection)
-                
+
                 collConfig.documentIDs = replColl.documentIDs
-                
+
                 if let pullFilter = replColl.pullFilter {
                     collConfig.pullFilter = try DatabaseManager.getCBLReplicationFilter(from: pullFilter).toMultipeerReplicationFilter()
                 }
@@ -324,17 +324,17 @@ class DatabaseManager {
                 if let resolver = replColl.conflictResolver {
                     collConfig.conflictResolver = try DatabaseManager.getCBLReplicationConflictResolver(from: resolver)
                 }
-                
+
                 collectionConfigs.append(collConfig)
             }
         }
-        
+
         var conf = MultipeerReplicatorConfiguration(
             peerGroupID: config.peerGroupID,
             identity: identity,
             authenticator: authenticator,
             collections: collectionConfigs)
-        
+
         if let transports = config.transports, !transports.isEmpty {
             let transportMap = transports.map { tr in
                 switch tr {
@@ -346,16 +346,16 @@ class DatabaseManager {
             }
             conf.transports = Set(transportMap)
         }
-        
+
         let id = UUID()
-        
+
         let multipeerReplicator = try MultipeerReplicator(config: conf)
-        
+
         let listenerToken = multipeerReplicator.addPeerReplicatorStatusListener(on: listenerQueue) { [weak self] status in
             guard let strongSelf = self else { return }
-            strongSelf.peerReplicatorStatus[id, default: [:]][status.peerID] = (status.status,status.transport)
+            strongSelf.peerReplicatorStatus[id, default: [:]][status.peerID] = status
         }
-        
+
         let docReplToken = multipeerReplicator.addPeerDocumentReplicationListener(on: listenerQueue) { [weak self] docRepl in
             guard let strongSelf = self else { return }
             var docs: [ContentTypes.DocumentReplication] = []
@@ -364,16 +364,16 @@ class DatabaseManager {
             }
             strongSelf.peerReplicatorDocuments[id, default: [:]][docRepl.peerID, default: []] += docs
         }
-        
+
         multipeerReplicator.start()
-        
+
         multipeerReplicators[id] = multipeerReplicator
         peerReplicatorStatusToken[id] = listenerToken
         peerReplicatorDocumentsToken[id] = docReplToken
-        
+
         return id
     }
-    
+
     public func stopMultipeerReplicator(forID id: UUID) throws {
         Log.log(level: .debug, message: "Stop Multipeer Replicator for ID \(id) is requested.")
         guard let replicator = multipeerReplicators[id] else {
@@ -382,28 +382,38 @@ class DatabaseManager {
         replicator.stop()
         Log.log(level: .debug, message: "Stop Multipeer Replicator for ID \(id) is successfully requested.")
     }
-    
+
     public func multipeerReplicatorStatus(forID id: UUID) -> ContentTypes.MultipeerReplicatorStatus? {
         Log.log(level: .debug, message: "Getting MultipeerReplicator Status for ID \(id)")
-        
+
         var status: ContentTypes.MultipeerReplicatorStatus?
-        
+
         listenerQueue.sync {
             if multipeerReplicators[id] == nil {
                 Log.log(level: .debug, message: "Failed to get MultipeerReplicator Status, MultipeerReplicator with ID \(id) not found.")
                 return
             }
-            
+
             var replicators: [ContentTypes.PeerReplicatorStatus] = []
-            
+
             if let statuses = peerReplicatorStatus[id] {
                 for (peerID, tuple) in statuses {
                     let status = tuple.status
                     let transport = tuple.transport
                     let docs = peerReplicatorDocuments[id]?[peerID] ?? []
                     let replStatus = ContentTypes.ReplicatorStatus.init(status: status, docs: docs)
-                    let transport_type = ContentTypes.MultipeerTransport.init(transportType: transport)
-                    replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus, transport:transport_type ))
+                    let transportType: ContentTypes.MultipeerTransport = {
+                                switch transport {
+                                case .wifi:
+                                    return .wifi
+                                case .bluetooth:
+                                    return .bluetooth
+                                @unknown default:
+                                    fatalError("Unknown transport")
+                                }
+                            }()
+
+                    replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus, transport:transportType ))
                     peerReplicatorDocuments[id]?[peerID] = [] // Reset after return per spec
                 }
                 // Remove disconected peers with stopped replicators so their statuses are not included next time.
