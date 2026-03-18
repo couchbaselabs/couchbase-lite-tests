@@ -402,7 +402,7 @@ class DatabaseManager {
                     let transport = tuple.transport
                     let docs = peerReplicatorDocuments[id]?[peerID] ?? []
                     let replStatus = ContentTypes.ReplicatorStatus.init(status: status, docs: docs)
-                    let transport_type= ContentTypes.MultipeerTransport.init(transportType: transport)
+                    let transport_type = ContentTypes.MultipeerTransport.init(transportType: transport)
                     replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus, transport:transport_type ))
                     peerReplicatorDocuments[id]?[peerID] = [] // Reset after return per spec
                 }

@@ -1319,13 +1319,16 @@ components:
           type: array
           items:
             type: object
-            required: ['peerID', 'status']
+            required: ['peerID', 'status', 'transport']
             properties:
               peerID:
                 type: string
                 example: '1234567890abcdef'
               status:
                 $ref: '#/components/schemas/ReplicatorStatus'
+              transport:
+                type: string
+                enum: [ 'WIFI', 'BLUETOOTH' ]
     MultipeerReplicatorIdentity:
       description: |-
         MultipeerReplicatorIdentity is used to specify a TLS certificate and key particular

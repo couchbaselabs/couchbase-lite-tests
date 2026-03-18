@@ -13,6 +13,17 @@ class MultipeerTransportType(Flag):
     BLUETOOTH = auto()
     ALL = WIFI | BLUETOOTH
 
+    @classmethod
+    def from_string(cls, value: str) -> "MultipeerTransportType":
+        value = value.upper()
+
+        if value == "WIFI":
+            return cls.WIFI
+        elif value == "BLUETOOTH":
+            return cls.BLUETOOTH
+        else:
+            raise ValueError(f"Unknown MultipeerTransportType: {value}")
+
     def to_json(self) -> list[str]:
         cls = type(self)
         # only single-bit members, and only those present in self
