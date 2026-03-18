@@ -397,9 +397,9 @@ class DatabaseManager {
             var replicators: [ContentTypes.PeerReplicatorStatus] = []
             
             if let statuses = peerReplicatorStatus[id] {
-                for (peerID, tuple) in statuses {
-                    let status = tuple.status
-                    let transport = tuple.transport
+                for (peerID, peerStatus) in statuses {
+                    let status = peerStatus.status
+                    let transport = peerStatus.transport
                     let docs = peerReplicatorDocuments[id]?[peerID] ?? []
                     let replStatus = ContentTypes.ReplicatorStatus.init(status: status, docs: docs)
                     let transportType: ContentTypes.MultipeerTransport = {
