@@ -18,7 +18,10 @@ class CBLLibraryDownloader:
         Download the CBL library from the latest builds server.
         """
         if self.__build == 0:
-            download_url = f"https://releases.service.couchbase.com/builds/releases/mobile/{self.__project}/{self.__version}/{self.__file}"
+            if self.__project == "couchbase-lite-c":
+                download_url = f"https://packages.couchbase.com/releases/{self.__project}/{self.__version}/{self.__file}"
+            else:
+                download_url = f"https://releases.service.couchbase.com/builds/releases/mobile/{self.__project}/{self.__version}/{self.__file}"
         else:
             download_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.__project}/{self.__version}/{self.__build}/{self.__file}"
 

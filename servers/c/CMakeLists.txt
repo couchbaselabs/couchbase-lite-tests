@@ -33,7 +33,7 @@ else()
             CouchbaseLite
             REQUIRED
             VERSION EXACT ${CBL_VERSION}
-            PATHS lib/libcblite-${CBL_VERSION} lib/libcblite
+            PATHS lib/libcblite-${CBL_VERSION} lib/libcblite lib/libcblite-${CBL_VERSION}/lib/x86_64-linux-gnu/cmake
             NO_DEFAULT_PATH
     )
     set(CBL_FROM_SOURCE OFF)

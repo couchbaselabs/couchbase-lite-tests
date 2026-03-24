@@ -191,7 +191,9 @@ class TestServer(ABC):
         cls.initialize()
 
         if name not in cls.__registry:
-            raise ValueError(f"Unknown test server type: {name}")
+            raise ValueError(
+                f"Unknown test server type: {name}. Valid names {cls.__registry.keys()}"
+            )
 
         return cls.__registry[name](version)
 
