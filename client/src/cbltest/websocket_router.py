@@ -3,7 +3,7 @@ import socket
 import webbrowser
 from asyncio import Future, Semaphore, wait_for
 from typing import cast
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import netifaces
 from aiohttp import web
@@ -31,13 +31,24 @@ class WebSocketRouter:
         self.__stopping = False
         await self.__runner.setup()
 
-        # Create a socket so that I can use an OS provided port
+        # For ws:// URLs, bind to the port from the first URL so that
+        # native apps (e.g. React Native) can connect to a known port.
+        # For browser-based servers the random port is communicated via
+        # the tdkURL query parameter, so a random port works fine.
+        bind_port = 0
+        first_url = self.__server_urls[0]
+        parsed = urlparse(first_url)
+        if parsed.scheme == "ws" and parsed.port:
+            bind_port = parsed.port
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(("", 0))
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("", bind_port))
         sock.listen(128)
         site = web.SockSite(self.__runner, sock)
         chosen_port = sock.getsockname()[1]
         await site.start()
+        cbl_info(f"WebSocket router listening on port {chosen_port}")
 
         ws_index = 0
         for url in self.__server_urls:
@@ -49,8 +60,10 @@ class WebSocketRouter:
                 "device": f"ws{ws_index}",
             }
             query = urlencode(params)
+            parsed_url = urlparse(url)
+            is_native_ws = parsed_url.scheme == "ws"
             timeout = 30
-            if CBLPyTestGlobal.auto_start_tdk_page:
+            if not is_native_ws and CBLPyTestGlobal.auto_start_tdk_page:
                 webbrowser.open_new_tab(f"{url}/tdk.html?{query}")
                 timeout = 10
 

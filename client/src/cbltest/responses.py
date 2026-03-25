@@ -29,7 +29,8 @@ class ServerVariant(Flag):
     IOS = auto()
     JVM = auto()
     JS = auto()
-    ALL = ANDROID | C | DOTNET | IOS | JVM | JS
+    REACTNATIVE = auto()
+    ALL = ANDROID | C | DOTNET | IOS | JVM | JS | REACTNATIVE
 
     def __str__(self) -> str:
         return "|".join(
@@ -127,6 +128,8 @@ class GetRootResponse(TestServerResponse):
                 return ServerVariant.IOS
             elif self.__cbl == "couchbase-lite-js":
                 return ServerVariant.JS
+            elif self.__cbl == "cbl-reactnative":
+                return ServerVariant.REACTNATIVE
             else:
                 raise ValueError(f"Unknown test server variant: {self.__cbl}")
 

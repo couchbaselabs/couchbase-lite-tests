@@ -1,0 +1,13 @@
+{
+    "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
+    "test_servers": [
+        {
+            "platform": "reactnative_ios",
+            "cbl_version": "{{version}}",
+            "location": "PLACEHOLDER_DEVICE_UDID",
+            "ip_hint": "PLACEHOLDER_DEVICE_IP",
+            "download": true
+        }
+    ],
+    "include": "../../../../environment/aws/topology_setup/default_topology.json"
+}

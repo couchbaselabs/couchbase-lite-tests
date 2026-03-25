@@ -754,6 +754,14 @@ class TopologyConfig:
             bridge.validate(test_server_input.location)
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
+
+            if test_server_input.platform.startswith("reactnative"):
+                click.echo(
+                    f"WebSocket test server launched on {test_server_input.location} "
+                    "(health check deferred to pytest WS handshake)"
+                )
+                continue
+
             port = (
                 5555
                 if test_server_input.platform.startswith("dotnet")

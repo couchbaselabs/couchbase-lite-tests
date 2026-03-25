@@ -129,7 +129,10 @@
                             "c_ios",
                             "c_android",
                             "swift_ios",
-                            "js"
+                            "js",
+                            "reactnative",
+                            "reactnative_android",
+                            "reactnative_ios"
                         ]
                     },
                     "download": {
