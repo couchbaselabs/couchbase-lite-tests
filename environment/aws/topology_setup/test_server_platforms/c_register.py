@@ -628,8 +628,6 @@ class CTestServer_Linux(CTestServer_Desktop):
         return f"c_linux_{self.__arch}"
 
     def cbl_filename(self, version: str) -> str:
-        if version.endswith("-0"):
-            version = version[:-2]
         return f"{self.product}-enterprise-{version}-linux-{self.__arch}.tar.gz"
 
     @property
