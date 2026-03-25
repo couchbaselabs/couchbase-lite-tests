@@ -127,7 +127,9 @@ class TestServer(ABC):
         if version in self.__build_no_cache[self.product]:
             build_no = self.__build_no_cache[self.product][version]
             if build_no == "0":
-                click.secho(f"Version {version} is a release version [CACHED]", fg="blue")
+                click.secho(
+                    f"Version {version} is a release version [CACHED]", fg="blue"
+                )
                 return version
 
             click.secho(f"Found latest good build: {build_no} [CACHED]", fg="blue")
@@ -139,10 +141,13 @@ class TestServer(ABC):
         resp.raise_for_status()
         resp_body = resp.json()
         if resp_body["IsRelease"] is True:
-            click.secho(f"Version {version} is a release version, no build number needed", fg="green")
+            click.secho(
+                f"Version {version} is a release version, no build number needed",
+                fg="green",
+            )
             self.__build_no_cache[self.product][version] = "0"
             return version
-        
+
         build_no = resp_body["BuildNumber"]
         click.secho(f"Found latest good build: {build_no}", fg="green")
         self.__build_no_cache[self.product][version] = build_no
