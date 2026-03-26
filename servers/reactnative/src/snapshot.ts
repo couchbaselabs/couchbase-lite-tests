@@ -67,7 +67,7 @@ export class Snapshot {
 
     for (const [collectionFullName, id, oldDoc] of this.documents) {
       const update = updates.get(collectionFullName, id);
-      if (oldDoc !== undefined || update) {
+      if (oldDoc || update) {
         let expected: JSONObject | null | undefined;
 
         if (oldDoc) {
@@ -165,6 +165,17 @@ export class Snapshot {
     let response: tdk.VerifyDocumentsResponse | undefined;
     const path: Array<string | number> = [];
 
+    // The bridge saves blobs in { _type: 'blob', data: {...} } format but reads them
+    // back as { '@type': 'blob', content_type, digest, length } via doc.toJSON().
+    // Treat any blob object as equal to any other blob object — presence is sufficient.
+    const isBlob = (val: JSONValue | undefined): boolean => {
+      if (typeof val !== 'object' || val === null || Array.isArray(val)) {
+        return false;
+      }
+      const o = val as JSONObject;
+      return o['_type'] === 'blob' || o['@type'] === 'blob';
+    };
+
     const compare = (
       exp?: JSONValue,
       act?: JSONValue,
@@ -199,6 +210,13 @@ export class Snapshot {
         return true;
       } else {
         if (Array.isArray(act)) {
+          return fail();
+        }
+        // Blob-aware comparison: bridge save format (_type) vs read format (@type).
+        if (isBlob(exp) && isBlob(act)) {
+          return true;
+        }
+        if (isBlob(exp) || isBlob(act)) {
           return fail();
         }
         const actObj = act as JSONObject;

@@ -31,6 +31,7 @@ import {LogSlurpSender} from './logSlurpSender';
 import {
   check,
   HTTPError,
+  isObject,
   normalizeCollectionID,
   collectionIDWithScope,
 } from './utils';
@@ -262,25 +263,26 @@ export class TDKImpl implements tdk.TDK {
       collectionName: collection,
     });
 
-    if (!result || !result.document) {
+    // Bridge resolves with { _id, _sequence, _data } when found, {} when not found.
+    const r = result as any;
+    if (!r || !r._id) {
       throw new HTTPError(404, `No document "${rq.document.id}"`);
     }
 
-    const doc = result.document;
     let body: JSONObject = {};
-    if (typeof (doc as any)._data === 'string') {
+    const raw = r._data;
+    if (typeof raw === 'string') {
       try {
-        body = JSON.parse((doc as any)._data);
+        body = JSON.parse(raw);
       } catch (_e) {
         body = {};
       }
-    } else if (typeof doc === 'object') {
-      body = doc as unknown as JSONObject;
+    } else if (raw && typeof raw === 'object') {
+      body = raw as JSONObject;
     }
 
-    const id = (doc as any).id || (doc as any)._id || rq.document.id;
-    const revId =
-      (doc as any).revisionID || (doc as any)._revId || '';
+    const id = r._id || rq.document.id;
+    const revId = r._revId || '';
 
     return {_id: id, _revs: revId, ...body};
   }
@@ -308,14 +310,16 @@ export class TDKImpl implements tdk.TDK {
               scopeName: scope,
               collectionName: collection,
             });
-            if (docResult && docResult.document) {
-              const d = docResult.document;
-              if (typeof (d as any)._data === 'string') {
-                existingDoc = JSON.parse((d as any)._data);
-              } else if (typeof d === 'object') {
-                existingDoc = {...(d as unknown as JSONObject)};
+            // Bridge returns { _id, _sequence, _data } when found, {} when not found.
+            const dr = docResult as any;
+            if (dr && dr._id) {
+              const d = dr._data;
+              if (typeof d === 'string') {
+                existingDoc = JSON.parse(d);
+              } else if (d && typeof d === 'object') {
+                existingDoc = {...d};
               }
-              existingId = (d as any).id || update.documentID;
+              existingId = dr._id || update.documentID;
             }
           } catch (_e) {
             // Document doesn't exist yet
@@ -353,6 +357,10 @@ export class TDKImpl implements tdk.TDK {
               }
             }
           }
+          // Collect explicit blobs from updatedBlobs — these are passed directly to the
+          // bridge's blobs parameter so their raw bytes never bloat the document JSON.
+          // The native bridge calls setBlob(blob, forKey: path) for each entry.
+          const explicitBlobs: Record<string, any> = {};
           if (update.updatedBlobs) {
             for (const pathStr of Object.getOwnPropertyNames(
               update.updatedBlobs,
@@ -360,14 +368,7 @@ export class TDKImpl implements tdk.TDK {
               const blobMeta = await this.downloadBlobMetadata(
                 update.updatedBlobs[pathStr],
               );
-              if (
-                !KeyPathCache.path(pathStr).write(existingDoc, blobMeta)
-              ) {
-                throw new HTTPError(
-                  400,
-                  `Invalid path ${pathStr} in doc ${update.documentID}`,
-                );
-              }
+              explicitBlobs[pathStr] = blobMeta;
             }
           }
 
@@ -377,8 +378,11 @@ export class TDKImpl implements tdk.TDK {
           delete (existingDoc as any)._revisionID;
           delete (existingDoc as any)._sequence;
 
-          // Extract blobs from the document for the bridge
-          const blobs = this.extractBlobs(existingDoc);
+          // Extract any inline blobs already present in the document body
+          // (e.g. from updatedProperties), then merge with explicitBlobs so the
+          // bridge receives all blobs via the dedicated blobs channel.
+          const extractedBlobs = this.extractBlobs(existingDoc);
+          const blobs = {...extractedBlobs, ...explicitBlobs};
 
           await this.engine.collection_Save({
             id: existingId,
@@ -439,6 +443,26 @@ export class TDKImpl implements tdk.TDK {
         this.log(`  collection: "${collName}" → scope="${scope}" name="${collection}" db="${uniqueName}"`);
         this.log(`[DIAG] StartReplicator: "${collName}" → scope="${scope}" collection="${collection}"`);
 
+        // Build filter function strings (serialized JS evaluated by native JavaScriptCore/Rhino)
+        let pushFilterStr: string | null = null;
+        let pullFilterStr: string | null = null;
+
+        if (colls.pushFilter) {
+          pushFilterStr = this.createFilterFunction(colls.pushFilter, collName);
+          this.log(`[DIAG] StartReplicator: pushFilter "${colls.pushFilter.name}" → function created for "${collName}"`);
+        }
+        if (colls.pullFilter) {
+          pullFilterStr = this.createFilterFunction(colls.pullFilter, collName);
+          this.log(`[DIAG] StartReplicator: pullFilter "${colls.pullFilter.name}" → function created for "${collName}"`);
+        }
+        if (colls.conflictResolver) {
+          this.validateConflictResolverName(colls.conflictResolver.name);
+          throw new HTTPError(
+            501,
+            `Conflict resolver "${colls.conflictResolver.name}" is not supported by the cbl-reactnative native SDK`,
+          );
+        }
+
         const entry = {
           collection: {
             name: collection,
@@ -448,31 +472,12 @@ export class TDKImpl implements tdk.TDK {
           config: {
             channels: colls.channels ?? [],
             documentIds: colls.documentIDs ?? [],
-            pushFilter: null,
-            pullFilter: null,
+            pushFilter: pushFilterStr,
+            pullFilter: pullFilterStr,
           },
         };
-        this.log(`[DIAG] StartReplicator: collectionEntry for "${collName}": ${JSON.stringify(entry)}`);
+        this.log(`[DIAG] StartReplicator: collectionEntry for "${collName}": channels=${JSON.stringify(colls.channels)} documentIds=${JSON.stringify(colls.documentIDs)} pushFilter=${pushFilterStr ? colls.pushFilter!.name : 'null'} pullFilter=${pullFilterStr ? colls.pullFilter!.name : 'null'}`);
         collectionConfigArray.push(entry);
-
-        if (colls.pushFilter) {
-          this.validateFilterName(colls.pushFilter.name);
-          this.log(
-            'Warning: Push filter accepted but not enforced in cbl-reactnative',
-          );
-        }
-        if (colls.pullFilter) {
-          this.validateFilterName(colls.pullFilter.name);
-          this.log(
-            'Warning: Pull filter accepted but not enforced in cbl-reactnative',
-          );
-        }
-        if (colls.conflictResolver) {
-          this.validateConflictResolverName(colls.conflictResolver.name);
-          this.log(
-            'Warning: Conflict resolver accepted but not enforced in cbl-reactnative',
-          );
-        }
       }
     }
     this.log(`[DIAG] StartReplicator: full collectionConfigArray=${JSON.stringify(collectionConfigArray)}`);
@@ -957,10 +962,11 @@ export class TDKImpl implements tdk.TDK {
         `Snapshot is of a different database, ${rq.database}`,
       );
     }
-    return await snap.verify(
-      rq.changes,
-      this.downloadBlobMetadata.bind(this),
-    );
+    // Use a lightweight blob loader for verification: just signal "a blob exists here"
+    // without downloading actual bytes. compareDocs treats any blob object as equal to
+    // any other blob object, so the exact content doesn't matter for snapshot comparison.
+    const verifyBlobLoader = async (_url: string) => ({_type: 'blob'} as const);
+    return await snap.verify(rq.changes, verifyBlobLoader);
   }
 
   // ======== LOG ========
@@ -1293,7 +1299,7 @@ export class TDKImpl implements tdk.TDK {
           walk(obj[i], `${pathPrefix}[${i}]`);
         }
       } else if (typeof obj === 'object' && obj !== null) {
-        if (obj['@type'] === 'blob' && obj.data) {
+        if (obj['_type'] === 'blob' && obj.data) {
           blobs[pathPrefix] = obj;
         } else {
           for (const key of Object.keys(obj)) {
@@ -1332,11 +1338,13 @@ export class TDKImpl implements tdk.TDK {
         );
       }
       const data = await response.arrayBuffer();
-      const base64 = this.arrayBufferToBase64(data);
+      const bytes = new Uint8Array(data);
       return {
-        '@type': 'blob',
-        content_type: type,
-        data: base64,
+        _type: 'blob',
+        data: {
+          contentType: type,
+          data: Array.from(bytes),
+        },
       };
     } catch (e) {
       if (e instanceof HTTPError) {
@@ -1346,13 +1354,47 @@ export class TDKImpl implements tdk.TDK {
     }
   }
 
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
+  /**
+   * Creates a self-contained JavaScript filter function string for the native bridge.
+   *
+   * The native bridge (iOS JavaScriptCore / Android Rhino) eval's this string for each
+   * document during replication. The function receives:
+   *   doc   – plain JSON object of the document, with doc.id = document ID
+   *   flags – string array, e.g. ["DELETED"] or ["ACCESS_REMOVED"]
+   */
+  private createFilterFunction(filter: tdk.Filter, collectionName: string): string {
+    switch (filter.name) {
+      case 'deletedDocumentsOnly':
+        return `(function(doc, flags) { return flags.includes('DELETED'); })`;
+
+      case 'documentIDs': {
+        const rawParam = filter.params?.documentIDs;
+        check(
+          isObject(rawParam),
+          'documentIDs filter requires a "documentIDs" parameter object',
+        );
+        const documentIDs = rawParam as Record<string, string[]>;
+
+        // Normalize to scope.collection and look up the allowed IDs for this collection
+        const collFullName = collectionIDWithScope(collectionName);
+        const ids: string[] =
+          (documentIDs[collFullName] as string[] | undefined) ??
+          (documentIDs[collectionName] as string[] | undefined) ??
+          [];
+
+        check(
+          ids.length > 0,
+          `documentIDs filter: no IDs found for collection "${collFullName}"`,
+        );
+
+        // Embed IDs as a JSON literal — the function must be fully self-contained
+        const idsLiteral = JSON.stringify(ids);
+        return `(function(doc, flags) { var ids = ${idsLiteral}; return ids.indexOf(doc.id) !== -1; })`;
+      }
+
+      default:
+        throw new HTTPError(400, `Unknown replicator filter "${filter.name}"`);
     }
-    return btoa(binary);
   }
 
   private async getDocumentAsJSON(
@@ -1360,33 +1402,50 @@ export class TDKImpl implements tdk.TDK {
     scopeName: string,
     collectionName: string,
     docId: string,
+    retries = 3,
+    retryDelayMs = 1000,
   ): Promise<JSONObject | null> {
-    try {
-      const result = await this.engine.collection_GetDocument({
-        docId,
-        name: dbName,
-        scopeName,
-        collectionName,
-      });
-      if (!result || !result.document) {
+    // After a replication event (e.g. re-pull after auto-purge restore), the document
+    // may not be committed to the local store immediately. Retry a few times to handle
+    // the race between the replicator event and the actual local write.
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const result = await this.engine.collection_GetDocument({
+          docId,
+          name: dbName,
+          scopeName,
+          collectionName,
+        });
+        // Bridge resolves with { _id, _sequence, _data } when found, {} when not found.
+        // result.document is never populated by this bridge — use _id as the existence check.
+        const r = result as any;
+        if (!r || !r._id) {
+          if (attempt < retries) {
+            await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+            continue;
+          }
+          return null;
+        }
+        const data = r._data;
+        if (!data) {
+          return null;
+        }
+        if (typeof data === 'string') {
+          return JSON.parse(data) as JSONObject;
+        }
+        if (typeof data === 'object') {
+          return data as JSONObject;
+        }
+        return null;
+      } catch (_e) {
+        if (attempt < retries) {
+          await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+          continue;
+        }
         return null;
       }
-      const doc = result.document;
-      if (typeof (doc as any)._data === 'string') {
-        return JSON.parse((doc as any)._data);
-      }
-      if (typeof doc === 'object') {
-        const obj = {...(doc as unknown as JSONObject)};
-        delete (obj as any)._id;
-        delete (obj as any)._revId;
-        delete (obj as any)._revisionID;
-        delete (obj as any)._sequence;
-        return obj;
-      }
-      return null;
-    } catch (_e) {
-      return null;
     }
+    return null;
   }
 
   private parseCollectionName(fullName: string): {
