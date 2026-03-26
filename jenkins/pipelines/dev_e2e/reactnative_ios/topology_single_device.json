@@ -4,9 +4,9 @@
         {
             "platform": "reactnative_ios",
             "cbl_version": "{{version}}",
-            "location": "PLACEHOLDER_DEVICE_UDID",
-            "ip_hint": "PLACEHOLDER_DEVICE_IP",
-            "download": true
+            "location": "00008110-000A48A63E10401E",
+            "ip_hint": "10.100.150.63",
+            "download": false
         }
     ],
     "include": "../../../../environment/aws/topology_setup/default_topology.json"
