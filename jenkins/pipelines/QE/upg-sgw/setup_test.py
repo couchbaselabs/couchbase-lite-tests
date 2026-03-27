@@ -20,14 +20,22 @@ from jenkins.pipelines.shared.setup_test import setup_test
 @click.command()
 @click.argument("cbl_version")
 @click.argument("sgw_version")
+@click.option(
+    "--topology-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Override the default topology file (defaults to topology.json in this directory)",
+)
 def cli_entry(
     cbl_version: str,
     sgw_version: str,
+    topology_file: str | None,
 ) -> None:
+    topo = Path(topology_file) if topology_file else SCRIPT_DIR / "topology.json"
     setup_test(
         cbl_version,
         sgw_version,
-        SCRIPT_DIR / "topology.json",
+        topo,
         SCRIPT_DIR / "config.json",
         "upg-sgw",
         setup_dir="QE",

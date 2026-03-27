@@ -53,7 +53,7 @@ class TestSgwUpgrade(CBLTestClass):
         self.mark_test_step("Load dataset on CBL")
         if not hasattr(self, "db"):
             print(f"Resetting CBL database '{cbl_db}' for the test...")
-            self.db = (await cblpytest.test_servers[0].create_and_reset_db([cbl_db]))[0]
+        self.db = (await cblpytest.test_servers[0].create_and_reset_db([cbl_db]))[0]
         db = self.db
 
         self.mark_test_step("Configure Sync Gateway database and wait for it to be up")
@@ -162,9 +162,12 @@ class TestSgwUpgrade(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Get the new revisions after update")
-        docs_after = await sg.get_all_documents(sg_db, scope, collection, True)
-        revs_after = {row.id: row.revid for row in docs_after.rows}
+        self.mark_test_step("Get the new revisions after update via changes feed")
+        changes = await sg.get_changes(sg_db, scope, collection)
+        revs_after: dict[str, str] = {}
+        for entry in changes.results:
+            if not entry.deleted and entry.changes:
+                revs_after[entry.id] = entry.changes[-1]
         print(f"Documents in SGW after update: {revs_after}")
 
         self.mark_test_step("Verify that revisions have progressed on SGW")
@@ -182,11 +185,10 @@ class TestSgwUpgrade(CBLTestClass):
             print(f"✓ Doc {doc_id}: {before_num} → {after_num}")
 
         self.mark_test_step("Verify data persistence on CBS and CBL for all docs")
-        all_docs_to_verify = await sg.get_all_documents(sg_db, scope, collection, True)
-        for row in all_docs_to_verify.rows:
+        for row in docs_before.rows:
             cbs_doc = cbs.get_document(bucket, row.id)
-            assert cbs_doc is not None, f"Doc {cbs_doc} not found on CBS"
-            assert "version" in cbs_doc, f"Doc {cbs_doc} missing 'version' field!"
+            assert cbs_doc is not None, f"Doc {row.id} not found on CBS"
+            assert "version" in cbs_doc, f"Doc {row.id} missing 'version' field!"
             assert cbs_doc["type"] == "upgrade_test_doc", (
                 f"Doc {row.id} has wrong type! Expected 'upgrade_test_doc', got {cbs_doc['type']}"
             )

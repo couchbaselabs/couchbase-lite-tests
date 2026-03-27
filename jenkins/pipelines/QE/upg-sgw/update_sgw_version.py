@@ -12,7 +12,6 @@ SCRIPT_DIR = Path(__file__).parent
 
 
 def resolved_version(product: str, version: str) -> str:
-    """Resolve a version to full semantic version format."""
     if len(version.split(".")) >= 3:
         return version
 
@@ -23,43 +22,52 @@ def resolved_version(product: str, version: str) -> str:
         raise RuntimeError(
             f"Failed to get latest version for {product} {version}: {r.text}"
         )
-
     return cast(str, r.json()["version"])
 
 
-def update_sgw_version(topology_file: Path, sgw_version: str) -> None:
-    """Update only the SGW version in the topology file."""
+def update_sgw_version(
+    topology_file: Path, sgw_version: str, sgw_index: int | None = None
+) -> None:
+    """Update the SGW version in the topology file.
+
+    If sgw_index is provided, only that specific node's version is updated
+    (per-node override). Otherwise, the global default is updated for all nodes.
+    """
     if not topology_file.exists():
         raise FileNotFoundError(f"Topology file not found: {topology_file}")
 
-    # Load topology
     with open(topology_file) as f:
         topology = json.load(f)
 
-    # Resolve the full SGW version
     sgw_version_resolved = resolved_version("sync-gateway", sgw_version)
 
-    # Update only the SGW version in defaults (preserve everything else)
-    if "defaults" not in topology:
-        topology["defaults"] = {}
-    if "sgw" not in topology["defaults"]:
-        topology["defaults"]["sgw"] = {}
+    if sgw_index is not None:
+        sgw_list = topology.get("sync_gateways", [])
+        if sgw_index < 0 or sgw_index >= len(sgw_list):
+            raise ValueError(
+                f"SGW index {sgw_index} out of range (topology has {len(sgw_list)} nodes)"
+            )
+        sgw_list[sgw_index]["version"] = sgw_version_resolved
+        print(f"Updated SGW node {sgw_index} version to: {sgw_version_resolved}")
+    else:
+        if "defaults" not in topology:
+            topology["defaults"] = {}
+        if "sgw" not in topology["defaults"]:
+            topology["defaults"]["sgw"] = {}
+        topology["defaults"]["sgw"]["version"] = sgw_version_resolved
+        print(f"Updated topology default SGW version to: {sgw_version_resolved}")
 
-    topology["defaults"]["sgw"]["version"] = sgw_version_resolved
-
-    # Write back
     with open(topology_file, "w") as f:
         json.dump(topology, f, indent=4)
 
-    print(f"Updated topology SGW version to: {sgw_version_resolved}")
-
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <topology_file> <sgw_version>")
+    if len(sys.argv) < 3 or len(sys.argv) > 4:
+        print(f"Usage: {sys.argv[0]} <topology_file> <sgw_version> [sgw_index]")
         sys.exit(1)
 
     topology_file = Path(sys.argv[1])
     sgw_version = sys.argv[2]
+    sgw_index = int(sys.argv[3]) if len(sys.argv) == 4 else None
 
-    update_sgw_version(topology_file, sgw_version)
+    update_sgw_version(topology_file, sgw_version, sgw_index)

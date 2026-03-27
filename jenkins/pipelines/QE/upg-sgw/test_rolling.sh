@@ -71,24 +71,32 @@ function rolling_upgrade_to_version() {
                 --no-ts-stop
             popd > /dev/null
 
-            # 2. Update topology with new SGW version
-            echo "--> Updating topology with SGW version $target_version..."
+            # 2. Update topology with new SGW version for this specific node only
+            echo "--> Updating topology SGW node $node_index to version $target_version..."
             pushd $AWS_ENVIRONMENT_DIR > /dev/null
-            uv run $SCRIPT_DIR/update_sgw_version.py topology_setup/topology.json $target_version
+            uv run $SCRIPT_DIR/update_sgw_version.py topology_setup/topology.json $target_version $node_index
             popd > /dev/null
 
-            # 3. Reprovision single SGW node
-            echo "--> Provisioning SGW node $node_index with version $target_version..."
+            # 3. Recreate the destroyed instance via terraform (skip all provisioning)
+            echo "--> Recreating SGW node $node_index instance via terraform..."
             pushd $AWS_ENVIRONMENT_DIR > /dev/null
             uv run --group orchestrator ./start_backend.py \
                 --topology $TOPOLOGY_FILE \
                 --tdk-config-in $CONFIG_TEMPLATE \
                 --tdk-config-out $CONFIG_FILE \
                 --no-cbs-provision \
+                --no-sgw-provision \
                 --no-es-provision \
                 --no-lb-provision \
                 --no-ls-provision \
                 --no-ts-run
+            popd > /dev/null
+
+            # 4. Provision only the single upgraded SGW node
+            echo "--> Provisioning only SGW node $node_index with version $target_version..."
+            pushd $AWS_ENVIRONMENT_DIR > /dev/null
+            uv run --group orchestrator $SCRIPT_DIR/provision_single_sgw.py $node_index \
+                --topology topology_setup/topology.json
             popd > /dev/null
 
             # 4. Run rolling upgrade test for this node
@@ -126,7 +134,7 @@ PREVIOUS_VERSION="initial"
 for SGW_VERSION in "${SGW_VERSIONS[@]}"; do
     if [ "$FIRST_VERSION" = "true" ]; then
         # Full setup with the first SGW version (all 3 nodes provisioned at once)
-        echo ">>> Initial full setup with SGW version $SGW_VERSION..."
+        echo ">>> Initial full setup with SGW version $SGW_VERSION using rolling topology (3 SGW nodes)..."
         pushd $AWS_ENVIRONMENT_DIR > /dev/null
         uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION --topology-file $TOPOLOGY_ROLLING_TEMPLATE
         popd > /dev/null
