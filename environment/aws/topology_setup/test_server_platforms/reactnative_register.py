@@ -25,6 +25,24 @@ APP_BUNDLE_ID = "com.cbltestserver"
 DEVICE_ID = "ws0"
 
 
+def _find_pod() -> Path:
+    """Locate the CocoaPods pod binary."""
+    pod = shutil.which("pod")
+    if pod:
+        return Path(pod)
+
+    potential_locations = [
+        "/opt/homebrew/bin/pod",
+        "/usr/local/bin/pod",
+    ]
+    for loc in potential_locations:
+        p = Path(loc)
+        if p.exists():
+            return p
+
+    raise RuntimeError("pod not found; ensure CocoaPods is installed and on PATH")
+
+
 def _find_adb() -> Path:
     """Locate the adb binary."""
     find_command = "where" if platform.system() == "Windows" else "which"
@@ -392,7 +410,7 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
         header(f"Building React Native iOS test server {self.version}")
         working = self._working_dir()
         subprocess.run(["npm", "install"], check=True, cwd=working)
-        subprocess.run(["pod", "install"], check=True, cwd=working / "ios")
+        subprocess.run([str(_find_pod()), "install"], check=True, cwd=working / "ios")
         subprocess.run(
             [
                 "xcodebuild",
