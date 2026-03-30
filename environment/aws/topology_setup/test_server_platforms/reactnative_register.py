@@ -390,13 +390,30 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
         version_parts = self.version.split("-")
         return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
 
-    def build(self) -> None:
-        header(f"Building React Native iOS test server {self.version}")
-        working = self._working_dir()
-        subprocess.run(["npm", "install"], check=True, cwd=working)
-        # Install CocoaPods into a user-writable GEM_HOME so no root/sudo is
-        # needed (system Ruby's gem dir at /Library/Ruby/Gems is root-only).
-        # The same env is passed to `pod install` so it finds its own libs.
+    @staticmethod
+    def _ensure_cocoapods() -> str:
+        """Return a path to the `pod` executable, installing CocoaPods if needed.
+
+        Strategy (in order):
+        1. Already on PATH — nothing to do.
+        2. Homebrew is available — `brew install cocoapods` (pre-built bottle,
+           fast, no permission issues).
+        3. Fall back to `gem install` with a user-writable GEM_HOME so the
+           system Ruby gem directory (/Library/Ruby/Gems) is never touched.
+        """
+        pod = shutil.which("pod")
+        if pod:
+            return pod
+
+        # Homebrew (standard on Apple Silicon Macs, lives at /opt/homebrew)
+        brew = shutil.which("brew") or "/opt/homebrew/bin/brew"
+        if Path(brew).exists():
+            subprocess.run([brew, "install", "cocoapods"], check=True)
+            pod = shutil.which("pod") or "/opt/homebrew/bin/pod"
+            if Path(pod).exists():
+                return pod
+
+        # Last resort: install into a user-writable GEM_HOME so no sudo is needed
         gem_home = Path.home() / ".local" / "share" / "gem"
         gem_bin = gem_home / "bin"
         gem_home.mkdir(parents=True, exist_ok=True)
@@ -410,12 +427,14 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
             check=True,
             env=gem_env,
         )
-        subprocess.run(
-            [str(gem_bin / "pod"), "install"],
-            check=True,
-            cwd=working / "ios",
-            env=gem_env,
-        )
+        return str(gem_bin / "pod")
+
+    def build(self) -> None:
+        header(f"Building React Native iOS test server {self.version}")
+        working = self._working_dir()
+        subprocess.run(["npm", "install"], check=True, cwd=working)
+        pod_cmd = self._ensure_cocoapods()
+        subprocess.run([pod_cmd, "install"], check=True, cwd=working / "ios")
         subprocess.run(
             [
                 "xcodebuild",
