@@ -444,6 +444,7 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
                 "-configuration", "Release",
                 "-derivedDataPath", str(working / "ios" / "build"),
                 "-allowProvisioningUpdates",
+                "DEVELOPMENT_TEAM=N2Q372V7W2",
             ],
             check=True,
             cwd=working / "ios",
