@@ -25,53 +25,6 @@ APP_BUNDLE_ID = "com.cbltestserver"
 DEVICE_ID = "ws0"
 
 
-def _find_pod() -> Path:
-    """Locate the CocoaPods pod binary."""
-    pod = shutil.which("pod")
-    if pod:
-        return Path(pod)
-
-    home = Path.home()
-
-    # Fixed well-known locations (Homebrew wrapper scripts, rbenv shim)
-    for fixed in [
-        Path("/opt/homebrew/bin/pod"),       # Homebrew Apple Silicon
-        Path("/usr/local/bin/pod"),           # Homebrew Intel
-        home / ".rbenv" / "shims" / "pod",   # rbenv shim
-    ]:
-        if fixed.exists():
-            return fixed
-
-    # pod is a gem executable - search versioned gem trees via glob so we
-    # don't need to hard-code the Ruby version number.
-    gem_roots = [
-        home / ".gem" / "ruby",                       # user gem install
-        home / ".rbenv" / "versions",                  # rbenv managed rubies
-        home / ".rvm" / "gems",                        # rvm managed gems
-        Path("/opt/homebrew/lib/ruby/gems"),            # Homebrew Ruby (Apple Silicon)
-        Path("/usr/local/lib/ruby/gems"),               # Homebrew Ruby (Intel)
-    ]
-    for root in gem_roots:
-        if root.is_dir():
-            matches = sorted(root.glob("*/bin/pod"))
-            if matches:
-                return matches[-1]  # pick the highest version
-
-    # Last resort: ask Ruby itself where it would look for gem executables
-    result = subprocess.run(
-        ["ruby", "-e", "require 'rubygems'; puts Gem.bindir"],
-        check=False, capture_output=True, text=True,
-    )
-    if result.returncode == 0:
-        p = Path(result.stdout.strip()) / "pod"
-        if p.exists():
-            return p
-
-    raise RuntimeError(
-        "pod not found. Ensure CocoaPods is installed ('gem install cocoapods' "
-        "or 'brew install cocoapods') and its bin directory is on PATH."
-    )
-
 
 def _find_adb() -> Path:
     """Locate the adb binary."""
@@ -440,7 +393,14 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
         header(f"Building React Native iOS test server {self.version}")
         working = self._working_dir()
         subprocess.run(["npm", "install"], check=True, cwd=working)
-        subprocess.run([str(_find_pod()), "install"], check=True, cwd=working / "ios")
+        # Run pod install via a login shell so macOS profile scripts (Homebrew,
+        # rbenv, rvm, etc.) are sourced and the pod binary is on PATH regardless
+        # of how CocoaPods was installed or what PATH Jenkins inherited.
+        subprocess.run(
+            ["bash", "-lc", "pod install"],
+            check=True,
+            cwd=working / "ios",
+        )
         subprocess.run(
             [
                 "xcodebuild",
