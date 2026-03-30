@@ -32,20 +32,44 @@ def _find_pod() -> Path:
         return Path(pod)
 
     home = Path.home()
-    potential_locations = [
-        "/opt/homebrew/bin/pod",           # Homebrew on Apple Silicon
-        "/usr/local/bin/pod",              # Homebrew on Intel
-        home / ".rbenv" / "shims" / "pod", # rbenv
-        home / ".rvm" / "bin" / "pod",     # rvm
+
+    # Fixed well-known locations (Homebrew wrapper scripts, rbenv shim)
+    for fixed in [
+        Path("/opt/homebrew/bin/pod"),       # Homebrew Apple Silicon
+        Path("/usr/local/bin/pod"),           # Homebrew Intel
+        home / ".rbenv" / "shims" / "pod",   # rbenv shim
+    ]:
+        if fixed.exists():
+            return fixed
+
+    # pod is a gem executable - search versioned gem trees via glob so we
+    # don't need to hard-code the Ruby version number.
+    gem_roots = [
+        home / ".gem" / "ruby",                       # user gem install
+        home / ".rbenv" / "versions",                  # rbenv managed rubies
+        home / ".rvm" / "gems",                        # rvm managed gems
+        Path("/opt/homebrew/lib/ruby/gems"),            # Homebrew Ruby (Apple Silicon)
+        Path("/usr/local/lib/ruby/gems"),               # Homebrew Ruby (Intel)
     ]
-    for loc in potential_locations:
-        p = Path(loc)
+    for root in gem_roots:
+        if root.is_dir():
+            matches = sorted(root.glob("*/bin/pod"))
+            if matches:
+                return matches[-1]  # pick the highest version
+
+    # Last resort: ask Ruby itself where it would look for gem executables
+    result = subprocess.run(
+        ["ruby", "-e", "require 'rubygems'; puts Gem.bindir"],
+        check=False, capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        p = Path(result.stdout.strip()) / "pod"
         if p.exists():
             return p
 
     raise RuntimeError(
-        "pod not found; ensure CocoaPods is installed and '/opt/homebrew/bin' "
-        "(or the relevant Ruby shims directory) is on PATH"
+        "pod not found. Ensure CocoaPods is installed ('gem install cocoapods' "
+        "or 'brew install cocoapods') and its bin directory is on PATH."
     )
 
 
