@@ -435,6 +435,17 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
         subprocess.run(["npm", "install"], check=True, cwd=working)
         pod_cmd = self._ensure_cocoapods()
         subprocess.run([pod_cmd, "install"], check=True, cwd=working / "ios")
+        # React Native's Hermes build-phase scripts call `node` internally.
+        # xcodebuild strips the environment, so we must explicitly put the
+        # node binary directory on PATH or those scripts fail with exit 127.
+        node = shutil.which("node") or ""
+        xcode_env = os.environ.copy()
+        xcode_env["LANG"] = "en_US.UTF-8"
+        xcode_env["LC_ALL"] = "en_US.UTF-8"
+        if node:
+            xcode_env["PATH"] = (
+                f"{Path(node).parent}{os.pathsep}{xcode_env.get('PATH', '')}"
+            )
         subprocess.run(
             [
                 "xcodebuild",
@@ -448,6 +459,7 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
             ],
             check=True,
             cwd=working / "ios",
+            env=xcode_env,
         )
 
     def compress_package(self):
