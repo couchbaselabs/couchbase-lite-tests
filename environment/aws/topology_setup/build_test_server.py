@@ -119,12 +119,12 @@ def main() -> None:
     )
 
     header("Uploading compressed server")
+    remote_path = f"/data/builds/latestbuilds/{server.latestbuilds_path}"
+    remote_dir = str(Path(remote_path).parent)
+    ssh.exec_command(f"mkdir -p {remote_dir}")
+
     sftp = ssh.open_sftp()
-    sftp_progress_bar(
-        sftp,
-        package_path,
-        f"/data/builds/latestbuilds/{server.latestbuilds_path}",
-    )
+    sftp_progress_bar(sftp, package_path, remote_path)
     sftp.close()
 
 
