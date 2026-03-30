@@ -396,8 +396,11 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
         # Run pod install via a login shell so macOS profile scripts (Homebrew,
         # rbenv, rvm, etc.) are sourced and the pod binary is on PATH regardless
         # of how CocoaPods was installed or what PATH Jenkins inherited.
+        # Use zsh (macOS default since Catalina); fall back to bash so the
+        # PATH setup in ~/.zprofile / ~/.zshrc is respected.
+        zsh = shutil.which("zsh") or "/bin/zsh"
         subprocess.run(
-            ["bash", "-lc", "pod install"],
+            [zsh, "-lc", "pod install"],
             check=True,
             cwd=working / "ios",
         )
