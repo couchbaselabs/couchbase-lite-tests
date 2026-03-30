@@ -482,6 +482,23 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
         pod_cmd = self._ensure_cocoapods()
         subprocess.run([pod_cmd, "install"], check=True, cwd=working / "ios")
 
+        # The Xcode "Bundle React Native code and images" phase expects a
+        # pre-built ios/main.jsbundle. Generate it now before xcodebuild runs.
+        rn_cli = working / "node_modules" / ".bin" / "react-native"
+        subprocess.run(
+            [
+                node_binary, str(rn_cli),
+                "bundle",
+                "--platform", "ios",
+                "--dev", "false",
+                "--entry-file", "index.js",
+                "--bundle-output", "ios/main.jsbundle",
+                "--assets-dest", "ios",
+            ],
+            check=True,
+            cwd=working,
+        )
+
         xcode_env = os.environ.copy()
         xcode_env["LANG"] = "en_US.UTF-8"
         xcode_env["LC_ALL"] = "en_US.UTF-8"
