@@ -1,3 +1,4 @@
+import os
 import platform
 import shutil
 import subprocess
@@ -393,22 +394,27 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
         header(f"Building React Native iOS test server {self.version}")
         working = self._working_dir()
         subprocess.run(["npm", "install"], check=True, cwd=working)
-        # Use Bundler to install CocoaPods at the pinned version from the
-        # ios/Gemfile and run pod install. This avoids depending on CocoaPods
-        # being pre-installed globally on the machine.
+        # Install CocoaPods into a user-writable GEM_HOME so no root/sudo is
+        # needed (system Ruby's gem dir at /Library/Ruby/Gems is root-only).
+        # The same env is passed to `pod install` so it finds its own libs.
+        gem_home = Path.home() / ".local" / "share" / "gem"
+        gem_bin = gem_home / "bin"
+        gem_home.mkdir(parents=True, exist_ok=True)
+        gem_env = {
+            **os.environ,
+            "GEM_HOME": str(gem_home),
+            "PATH": f"{gem_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+        }
         subprocess.run(
-            ["gem", "install", "bundler", "--no-document"],
+            ["gem", "install", "cocoapods", "--version", "~> 1.16.2", "--no-document"],
             check=True,
+            env=gem_env,
         )
         subprocess.run(
-            ["bundle", "install"],
+            [str(gem_bin / "pod"), "install"],
             check=True,
             cwd=working / "ios",
-        )
-        subprocess.run(
-            ["bundle", "exec", "pod", "install"],
-            check=True,
-            cwd=working / "ios",
+            env=gem_env,
         )
         subprocess.run(
             [
