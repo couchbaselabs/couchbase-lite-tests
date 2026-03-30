@@ -24,7 +24,7 @@ from cbltest.version import VERSION
 # environment/aws/sgw_setup/cert/ca_cert.pem when running against AWS).
 # If the cert file changes, update this too.  The CA must include the
 # keyUsage extension (keyCertSign) or Python 3.13+ will reject it.
-SGW_CA_CERT: str = """-----BEGIN CERTIFICATE-----
+_SGW_CA_CERT: str = """-----BEGIN CERTIFICATE-----
 MIIFWTCCA0GgAwIBAgIUBdrc0OhquX8RnXtZ6AiOY+57C18wDQYJKoZIhvcNAQEL
 BQAwPDEZMBcGA1UEAwwQSW50ZXJuYWwgVGVzdCBDQTESMBAGA1UECgwJQ291Y2hi
 YXNlMQswCQYDVQQGEwJVUzAeFw0yNTEwMjkwMTAzMDBaFw0yNzEwMjkwMTAzMDBa
