@@ -165,6 +165,15 @@ class TestBasicReplication(CBLTestClass):
         )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
+        # Debug: Check document counts in each collection before comparison
+        debug_docs = await db.get_all_documents("travel.routes", "travel.landmarks", "travel.hotels")
+        for coll, docs in debug_docs.items():
+            import logging
+            logging.getLogger("CBL").info(f"DEBUG: Collection '{coll}' has {len(docs)} docs after pull")
+            if docs:
+                sample_ids = [d.id for d in docs[:3]]
+                logging.getLogger("CBL").info(f"DEBUG:   Sample doc IDs: {sample_ids}")
+
         await compare_local_and_remote(
             db,
             cloud.sync_gateway,
