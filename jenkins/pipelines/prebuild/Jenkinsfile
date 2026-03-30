@@ -94,7 +94,10 @@ pipeline {
                                 uv run environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
                             """
                         } else {
-                            sh """#!/bin/bash -e
+                            sh """#!/bin/bash -le
+
+                                # Ensure Homebrew and rbenv shims are on PATH for non-login shells (e.g. Jenkins)
+                                export PATH="/opt/homebrew/bin:/usr/local/bin:\$HOME/.rbenv/shims:\$HOME/.rbenv/bin:\$PATH"
 
                                 source jenkins/pipelines/shared/config.sh
                                 uv run "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci

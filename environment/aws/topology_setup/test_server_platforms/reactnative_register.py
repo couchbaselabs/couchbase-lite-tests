@@ -31,16 +31,22 @@ def _find_pod() -> Path:
     if pod:
         return Path(pod)
 
+    home = Path.home()
     potential_locations = [
-        "/opt/homebrew/bin/pod",
-        "/usr/local/bin/pod",
+        "/opt/homebrew/bin/pod",           # Homebrew on Apple Silicon
+        "/usr/local/bin/pod",              # Homebrew on Intel
+        home / ".rbenv" / "shims" / "pod", # rbenv
+        home / ".rvm" / "bin" / "pod",     # rvm
     ]
     for loc in potential_locations:
         p = Path(loc)
         if p.exists():
             return p
 
-    raise RuntimeError("pod not found; ensure CocoaPods is installed and on PATH")
+    raise RuntimeError(
+        "pod not found; ensure CocoaPods is installed and '/opt/homebrew/bin' "
+        "(or the relevant Ruby shims directory) is on PATH"
+    )
 
 
 def _find_adb() -> Path:
