@@ -393,14 +393,20 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
         header(f"Building React Native iOS test server {self.version}")
         working = self._working_dir()
         subprocess.run(["npm", "install"], check=True, cwd=working)
-        # Run pod install via a login shell so macOS profile scripts (Homebrew,
-        # rbenv, rvm, etc.) are sourced and the pod binary is on PATH regardless
-        # of how CocoaPods was installed or what PATH Jenkins inherited.
-        # Use zsh (macOS default since Catalina); fall back to bash so the
-        # PATH setup in ~/.zprofile / ~/.zshrc is respected.
-        zsh = shutil.which("zsh") or "/bin/zsh"
+        # Use Bundler to install CocoaPods at the pinned version from the
+        # ios/Gemfile and run pod install. This avoids depending on CocoaPods
+        # being pre-installed globally on the machine.
         subprocess.run(
-            [zsh, "-lc", "pod install"],
+            ["gem", "install", "bundler", "--no-document"],
+            check=True,
+        )
+        subprocess.run(
+            ["bundle", "install"],
+            check=True,
+            cwd=working / "ios",
+        )
+        subprocess.run(
+            ["bundle", "exec", "pod", "install"],
             check=True,
             cwd=working / "ios",
         )
