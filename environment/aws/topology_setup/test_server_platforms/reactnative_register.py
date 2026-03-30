@@ -429,23 +429,68 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
         )
         return str(gem_bin / "pod")
 
+    @staticmethod
+    def _resolve_node_binary() -> str:
+        """Find the node binary, using npm's location as a reliable fallback.
+
+        On CI machines node is often installed via nvm or Homebrew and is not
+        on the default PATH. npm and node always live in the same bin directory,
+        so if npm was found (npm install succeeded) node is there too.
+        """
+        node = shutil.which("node")
+        if node:
+            return node
+
+        # npm and node share the same bin dir (nvm, Homebrew, etc.)
+        npm = shutil.which("npm")
+        if npm:
+            candidate = Path(npm).parent / "node"
+            if candidate.exists():
+                return str(candidate)
+
+        # nvm-managed installations
+        nvm_dir = Path.home() / ".nvm" / "versions" / "node"
+        if nvm_dir.is_dir():
+            matches = sorted(nvm_dir.glob("*/bin/node"), reverse=True)
+            if matches:
+                return str(matches[0])
+
+        # Homebrew fixed locations
+        for fixed in [Path("/opt/homebrew/bin/node"), Path("/usr/local/bin/node")]:
+            if fixed.exists():
+                return str(fixed)
+
+        raise RuntimeError(
+            "node binary not found; ensure Node.js >= 18 is installed"
+        )
+
     def build(self) -> None:
         header(f"Building React Native iOS test server {self.version}")
         working = self._working_dir()
         subprocess.run(["npm", "install"], check=True, cwd=working)
+
+        # React Native's Xcode build phases (including the Hermes Replace
+        # script) all resolve node via NODE_BINARY, which .xcode.env sets to
+        # `$(command -v node)`. That fails in non-login CI shells where node
+        # is not on PATH. Writing .xcode.env.local before pod install ensures
+        # every subsequent phase — including pod install's node invocations —
+        # uses the correct binary.
+        node_binary = self._resolve_node_binary()
+        xcode_env_local = working / "ios" / ".xcode.env.local"
+        xcode_env_local.write_text(f"export NODE_BINARY={node_binary}\n")
+
         pod_cmd = self._ensure_cocoapods()
         subprocess.run([pod_cmd, "install"], check=True, cwd=working / "ios")
-        # React Native's Hermes build-phase scripts call `node` internally.
-        # xcodebuild strips the environment, so we must explicitly put the
-        # node binary directory on PATH or those scripts fail with exit 127.
-        node = shutil.which("node") or ""
+
         xcode_env = os.environ.copy()
         xcode_env["LANG"] = "en_US.UTF-8"
         xcode_env["LC_ALL"] = "en_US.UTF-8"
-        if node:
-            xcode_env["PATH"] = (
-                f"{Path(node).parent}{os.pathsep}{xcode_env.get('PATH', '')}"
-            )
+        # Set NODE_BINARY explicitly so any build phase that reads it directly
+        # (rather than via .xcode.env.local) also gets the right value.
+        xcode_env["NODE_BINARY"] = node_binary
+        xcode_env["PATH"] = (
+            f"{Path(node_binary).parent}{os.pathsep}{xcode_env.get('PATH', '')}"
+        )
         subprocess.run(
             [
                 "xcodebuild",
