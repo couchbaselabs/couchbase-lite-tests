@@ -90,8 +90,8 @@ pipeline {
 
                         if (params.TS_PLATFORM.contains("windows")) {
                             pwsh """
-                                Import-Module jenkins/pipelines/shared/config.psm1 -Force
-                                uv run environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
+                                Import-Module ./jenkins/pipelines/shared/config.psm1 -Force
+                                uv run ./environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
                             """
                         } else {
                             sh """#!/bin/bash -e
