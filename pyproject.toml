@@ -9,6 +9,7 @@ dependencies = [
     "psutil==7.0.0",
     "pyyaml==6.0.2",
     "tqdm==4.67.1",
+    "netifaces==0.11.0"
 ]
 
 [tool.ruff]
