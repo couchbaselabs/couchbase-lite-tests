@@ -161,6 +161,10 @@ class DotnetTestServerCli(TestServer):
         super().__init__(version)
 
     @property
+    def product(self) -> str:
+        return "couchbase-lite-net"
+
+    @property
     @abstractmethod
     def rid(self) -> str:
         """
