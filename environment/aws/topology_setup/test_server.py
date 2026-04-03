@@ -114,6 +114,9 @@ class TestServer(ABC):
 
     def __normalize_version(self, version: str) -> str:
         if "-" in version:
+            if version.split("-")[1] == "0":
+                return version.split("-")[0]
+
             return version
 
         click.secho(
@@ -123,6 +126,12 @@ class TestServer(ABC):
 
         if version in self.__build_no_cache[self.product]:
             build_no = self.__build_no_cache[self.product][version]
+            if build_no == "0":
+                click.secho(
+                    f"Version {version} is a release version [CACHED]", fg="blue"
+                )
+                return version
+
             click.secho(f"Found latest good build: {build_no} [CACHED]", fg="blue")
             return f"{version}-{build_no}"
 
@@ -130,7 +139,16 @@ class TestServer(ABC):
             f"http://proget.build.couchbase.com:8080/api/get_version?product={self.product}&version={version}"
         )
         resp.raise_for_status()
-        build_no = resp.json()["BuildNumber"]
+        resp_body = resp.json()
+        if resp_body["IsRelease"] is True:
+            click.secho(
+                f"Version {version} is a release version, no build number needed",
+                fg="green",
+            )
+            self.__build_no_cache[self.product][version] = "0"
+            return version
+
+        build_no = resp_body["BuildNumber"]
         click.secho(f"Found latest good build: {build_no}", fg="green")
         self.__build_no_cache[self.product][version] = build_no
         return f"{version}-{build_no}"
@@ -191,7 +209,9 @@ class TestServer(ABC):
         cls.initialize()
 
         if name not in cls.__registry:
-            raise ValueError(f"Unknown test server type: {name}")
+            raise ValueError(
+                f"Unknown test server type: {name}. Valid names {cls.__registry.keys()}"
+            )
 
         return cls.__registry[name](version)
 
