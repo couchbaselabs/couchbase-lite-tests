@@ -66,5 +66,5 @@ def verify_lfs_checkout() -> None:
     for f in lfs["files"]:
         if f["checkout"] is False:
             raise RuntimeError(
-                "git lfs is not configured. Please run 'git lfs install' and then 'git lfs pull'."
+                f"git lfs is not configured. Please run 'git lfs install' and then 'git lfs pull'.\nFull output of git ls list-files:\n{lfs}"
             )
