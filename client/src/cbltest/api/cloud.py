@@ -34,10 +34,10 @@ class CouchbaseCloud:
 
     @property
     def couchbase_server(self) -> CouchbaseServer:
-        # if not hasattr(self, "__couchbase_server"):
-        #     raise CblTestError(
-        #         "Couchbase Server is not available for this Couchbase Cloud instance, configured using rosmar"
-        #     )
+        if not hasattr(self, "_CouchbaseCloud__couchbase_server"):
+            raise CblTestError(
+                "Couchbase Server is not available for this Couchbase Cloud instance, configured using rosmar"
+            )
         return self.__couchbase_server
 
     def _create_collections(self, db_payload: PutDatabasePayload) -> None:
