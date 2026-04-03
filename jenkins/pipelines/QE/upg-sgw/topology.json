@@ -1,0 +1,26 @@
+{
+  "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
+  "test_servers": [
+    {
+      "platform": "jak_android",
+      "cbl_version": "{{version}}",
+      "location": "00008101-000E0519020A001E",
+      "ip_hint": "10.100.150.115",
+      "download": true
+    }
+  ],
+  "clusters": [
+    {
+      "server_count": 1
+    }
+  ],
+  "sync_gateways": [
+    {
+      "cluster": 0
+    },
+    {
+      "cluster": 0
+    }
+  ],
+  "logslurp": true
+}

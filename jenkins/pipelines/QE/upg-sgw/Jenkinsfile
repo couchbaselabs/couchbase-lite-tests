@@ -1,0 +1,61 @@
+pipeline {
+    agent none
+    parameters {
+        string(name: 'CBL_VERSION', defaultValue: '3.3.2', description: 'Couchbase Lite Version to use')
+        string(name: 'SGW_VERSIONS', defaultValue: '3.2.7 3.3.3 4.0.0', description: 'Sync Gateway Versions to upgrade across')
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.SGW_VERSIONS == '') { error "SGW_VERSIONS are required (atleast one)" }
+                    currentBuild.displayName = "CBL:${params.CBL_VERSION} SGW:${params.SGW_VERSION} (#${currentBuild.number})"
+                }
+            }
+        }
+        stage('Prebuild Servers') {
+            steps {
+                build job: 'prebuild-test-server',
+                parameters: [
+                    string(name: 'TS_PLATFORM', value: 'swift_ios'),
+                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                ],
+                wait: true,
+                propagate: true
+            }
+        }
+        stage('Run Test') {
+            agent { label 'mac-mini-new' }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mac-mini-new-keychain-password')
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                TS_ARTIFACTS_DIR = 'sgw'
+            }
+            steps {
+                // Unlock keychain:
+                sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
+                echo "=== Run SGW Upgrades"
+                timeout(time: 90, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/QE/upg-sgw/test.sh ${params.CBL_VERSION} ${params.SGW_VERSIONS}"
+                }
+                echo "=== SGW Upgrades Complete"
+            }
+            post {
+                always {
+                    echo "=== Teardown SGW Upgrades"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/QE/upg-sgw/teardown.sh"
+                    }
+                    archiveArtifacts artifacts: 'tests/QE/upg-sgw/**/*', fingerprint: true, allowEmptyArchive: true
+                    echo "=== SGW Upgrades Teardown Complete"
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+        }
+    }
+}
