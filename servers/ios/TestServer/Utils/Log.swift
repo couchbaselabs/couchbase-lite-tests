@@ -83,7 +83,7 @@ private class ConsoleLogger : LoggerProtocol {
         if (Log.shouldFilter(level: level, message: message)) {
             return
         }
-        logger.log(level: level.osLogType, "[\(domain)] \(message)")
+        logger.log(level: level.osLogType, "\(domain, privacy: .public) \(message, privacy: .public)")
     }
     
     func close() { }
@@ -164,7 +164,7 @@ public class RemoteLogger: LoggerProtocol {
                 return
             }
             
-            let msg = "[\(level.name)] \(domain): \(message)"
+            let msg = "\(domain) \(level.name) \(message)"
             self.webSocketTask?.send(URLSessionWebSocketTask.Message.string(msg)) { error in
                 if let error = error {
                     Log.logToConsole(level: .error, message: "RemoteLogger: Cannot Send Log Message: \(error)")
@@ -224,6 +224,7 @@ extension LogDomain {
         case .listener: return "listener"
         case .peerDiscovery: return "discovery"
         case .multipeer: return "multipeer"
+        case .mdns: return "mdns"
         @unknown default:
             fatalError("Unknown LogDomain case : \(self). Please add explicit handling for this case.")
         }
