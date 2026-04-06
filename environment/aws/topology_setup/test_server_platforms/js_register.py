@@ -151,6 +151,12 @@ class JavascriptTestServer(TestServer):
     def build(self) -> None:
         header(f"Installing CBL JS and dependencies for version {self.version}")
         click.echo("Installing CBL")
+        working_dir = (
+            DOWNLOADED_TEST_SERVER_DIR / "js" / self.version
+            if self._downloaded
+            else JS_TEST_SERVER_DIR
+        )
+
         subprocess.run(
             [
                 "bun",
@@ -160,11 +166,10 @@ class JavascriptTestServer(TestServer):
                 "https://proget.sc.couchbase.com/npm/cbl-npm/",
             ],
             check=True,
-            cwd=JS_TEST_SERVER_DIR,
+            cwd=working_dir,
         )
         click.echo("Installing dependencies")
-        subprocess.run(["bun", "install"], check=True, cwd=JS_TEST_SERVER_DIR)
-        pass
+        subprocess.run(["bun", "install"], check=True, cwd=working_dir)
 
     def compress_package(self):
         header(f"Compressing JS test server for {self.platform}")
@@ -187,5 +192,9 @@ class JavascriptTestServer(TestServer):
             if self._downloaded
             else JS_TEST_SERVER_DIR
         )
+
+        if self._downloaded:
+            # Downloaded server needs to be setup like the built one
+            self.build()
 
         return JavascriptBridge(str(working_dir))

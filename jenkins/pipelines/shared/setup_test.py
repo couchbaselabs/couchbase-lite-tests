@@ -41,6 +41,9 @@ def ts_to_topology(ts_platform: str) -> str:
     if ts_platform.startswith("c_"):
         return "c"
 
+    if ts_platform == "js":
+        return "js"
+
     raise ValueError(f"Unknown test server platform: {ts_platform}")
 
 
@@ -183,6 +186,7 @@ def setup_test(
         "java": cbl_version,
         "dotnet": cbl_version,
         "c": cbl_version,
+        "js": cbl_version,
     }
 
     setup_test_multi(

@@ -754,13 +754,15 @@ class TopologyConfig:
             bridge.validate(test_server_input.location)
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
-            port = (
-                5555
-                if test_server_input.platform.startswith("dotnet")
-                else 5173
-                if test_server_input.platform == "js"
-                else 8080
-            )
+            port = 5555 if test_server_input.platform.startswith("dotnet") else 8080
+
+            if test_server_input.platform == "js":
+                """Javascript is not just a simple launch, it involves a reverse connection
+                initiation which is too complicated to set up here just to test.  So skip
+                the connection check"""
+                click.secho("Skipping connection check for js...", fg="yellow")
+                return
+
             ip = bridge.get_ip(
                 test_server_input.location, fallback=test_server_input.ip_hint
             )
