@@ -48,6 +48,7 @@ interface ReplicatorInfo {
   docListenerToken?: string;
   finished: boolean;
   error?: Error;
+  cbError?: {domain: string; code: number; message: string};
 }
 
 export const APIVersion = 1;
@@ -699,12 +700,22 @@ export class TDKImpl implements tdk.TDK {
               this.log(`Replicator ${id} STOPPED — final progress: completed=${completed}, total=${total}`);
               this.log(`[DIAG] StatusListener ${id}: STOPPED — full final data=${JSON.stringify(data)}`);
               info.finished = true;
+              if (cbError && (cbError.code != null || cbError.message)) {
+                const errDomain = typeof cbError.domain === 'string' ? cbError.domain : 'CBL';
+                const errCode = cbError.code != null && !isNaN(Number(cbError.code)) ? Number(cbError.code) : -1;
+                const errMsg = String(cbError.message ?? cbError);
+                info.cbError = {domain: errDomain, code: errCode, message: errMsg};
+                this.log(`[DIAG] StatusListener ${id}: captured cbError — domain="${errDomain}" code=${errCode} msg="${errMsg}"`);
+              }
             }
           }
           if (error) {
             this.log(`Replicator ${id} listener error: ${error.message || String(error)}`);
             this.log(`[DIAG] StatusListener ${id}: listener-level error=${JSON.stringify(error)}`);
-            info.error = new Error(error.message || String(error));
+            const wrappedErr: any = new Error(error.message || String(error));
+            if (error.domain != null) { wrappedErr.domain = error.domain; }
+            if (error.code != null) { wrappedErr.code = Number(error.code); }
+            info.error = wrappedErr;
           }
         },
       );
@@ -815,7 +826,7 @@ export class TDKImpl implements tdk.TDK {
       this.log(`[DIAG] GetReplicatorStatus: mapped activity="${activity}" progress=${rawCompleted}/${rawTotal} rawProgress=${JSON.stringify(rawProgress)}`);
 
       const nativeError = (status as any).error;
-      if (nativeError) {
+      if (nativeError && nativeError.code != null && !isNaN(Number(nativeError.code))) {
         const msg = nativeError.message ?? String(nativeError);
         let domain = 'CBL';
         if (typeof nativeError.domain === 'string') {
@@ -827,7 +838,7 @@ export class TDKImpl implements tdk.TDK {
         }
         statusError = {
           domain,
-          code: typeof nativeError.code === 'number' ? nativeError.code : -1,
+          code: Number(nativeError.code),
           message: msg,
         };
         this.log(`GetStatus ${rq.id}: native error — domain=${domain}, code=${statusError.code}, message=${msg}`);
@@ -844,13 +855,15 @@ export class TDKImpl implements tdk.TDK {
     info.documents = info.documents !== undefined ? [] : undefined;
     this.log(`[DIAG] GetReplicatorStatus: flushing ${documents?.length ?? 0} buffered doc events`);
 
-    const errorResult = info.error
-      ? {
-          domain: (info.error as any).domain ?? 'CBL',
-          code: (info.error as any).code ?? -1,
-          message: info.error.message,
-        }
-      : statusError;
+    const errorResult = statusError
+      || info.cbError
+      || (info.error
+        ? {
+            domain: (info.error as any).domain ?? 'CBL',
+            code: (info.error as any).code != null && !isNaN(Number((info.error as any).code)) ? Number((info.error as any).code) : -1,
+            message: info.error.message,
+          }
+        : null);
 
     if (errorResult) {
       this.log(`GetStatus ${rq.id}: returning error to Python — ${errorResult.domain}/${errorResult.code}: ${errorResult.message}`);
