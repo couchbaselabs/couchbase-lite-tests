@@ -108,7 +108,7 @@ function rolling_upgrade_to_version() {
             export SGW_PREVIOUS_VERSION="$previous_version"
 
             pushd $QE_TESTS_DIR > /dev/null
-            uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py::TestSgwRollingUpgrade::test_rolling_upgrade_sgw_cluster
+            uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
             popd > /dev/null
         done
 
@@ -121,7 +121,7 @@ function rolling_upgrade_to_version() {
         export SGW_PREVIOUS_VERSION="$previous_version"
 
         pushd $QE_TESTS_DIR > /dev/null
-        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py::TestSgwRollingUpgrade::test_rolling_upgrade_sgw_cluster
+        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
         popd > /dev/null
     fi
 }

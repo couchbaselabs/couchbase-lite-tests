@@ -51,7 +51,7 @@ fi
 echo ">>> Running tests for initial setup with SGW: $CURRENT_SGW_VERSION ..."
 export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
 pushd $QE_TESTS_DIR > /dev/null
-uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_upg_sgw.py::TestSgwUpgradeMultiNode
+uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_upg_sgw.py
 popd > /dev/null
 
 # Loop through the remaining SGW versions and perform upgrades
@@ -92,7 +92,7 @@ for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
     echo ">>> Running tests after upgrading to SGW: $CURRENT_SGW_VERSION ..."
     export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
     pushd $QE_TESTS_DIR > /dev/null
-    uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_upg_sgw.py::TestSgwUpgradeMultiNode
+    uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_upg_sgw.py
     popd > /dev/null
 done
 
