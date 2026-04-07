@@ -77,11 +77,18 @@ This particular example indicates that there are two test servers running, along
 
 ### Contributing
 
-Notice that this repo has a .pre-commit-config.yaml file, which means it is ready to use with the [pre-commit](https://pre-commit.com/#intro) python tool.  Essentially, after you clone this repo you should run
+This repo uses [pre-commit](https://pre-commit.com/#intro) hooks to enforce code quality and security standards. The hooks are **automatically installed** when you run `bash scripts/setup-hooks.sh` after cloning.
 
-```
-uv pip install pre-commit
-uv run pre-commit install
-```
+**Hooks enforced on each commit:**
 
-After that git pre-commit validation will check various things for you to ensure adherence to best practices and standards.
+| Hook | What it checks |
+|---|---|
+| **ruff** | Lint + import sorting (Python 3.10+ style) |
+| **ruff-format** | Code formatting |
+| **ty check** | Type checking |
+| **pyupgrade** | Python 3.10+ syntax upgrades |
+| **check-merge-conflict** | Detects unresolved merge markers |
+| **detect-secrets** | Scans for API keys, passwords, tokens |
+| **conventional-commits** | Enforces commit message format (`feat:`, `fix(scope):`, etc.) |
+
+If a hook fails, it will block your commit with a clear error message. Fix the issues and try again. For details on each hook, see `.pre-commit-config.yaml` and `scripts/hooks/` directory.

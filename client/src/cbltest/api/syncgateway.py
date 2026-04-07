@@ -253,11 +253,24 @@ class AllDocumentsResponseRow:
         """Gets the either revid or cv, whichever is populated (at least one must be)"""
         return cast(str, self.__revid if self.__revid is not None else self.__cv)
 
-    def __init__(self, key: str, id: str, revid: str | None, cv: str | None) -> None:
+    @property
+    def doc(self) -> dict | None:
+        """Gets the document body (only available if include_docs=True was used)"""
+        return self.__doc
+
+    def __init__(
+        self,
+        key: str,
+        id: str,
+        revid: str | None,
+        cv: str | None,
+        doc: dict | None = None,
+    ) -> None:
         self.__key = key
         self.__id = id
         self.__revid = revid
         self.__cv = cv
+        self.__doc = doc
 
 
 class AllDocumentsResponse:
@@ -283,12 +296,14 @@ class AllDocumentsResponse:
         self.__revmap = dict()
         for row in cast(list[dict], input["rows"]):
             rev = cast(dict, row["value"])
+            doc = cast(dict, row["doc"]) if "doc" in row else None
             self.__rows.append(
                 AllDocumentsResponseRow(
                     row["key"],
                     row["id"],
                     cast(str, rev["rev"]) if "rev" in rev else None,
                     cast(str, rev["cv"]) if "cv" in rev else None,
+                    doc,
                 )
             )
             self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
@@ -837,6 +852,7 @@ class _SyncGatewayBase:
         db_name: str,
         scope: str = "_default",
         collection: str = "_default",
+        include_docs: bool = False,
     ) -> AllDocumentsResponse:
         """
         Gets all the documents in the given collection from Sync Gateway (id and revid)
@@ -844,6 +860,7 @@ class _SyncGatewayBase:
         :param db_name: The name of the Sync Gateway database to query
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
+        :param include_docs: If True, include full document bodies in the response (efficient bulk fetching)
         """
         with self._tracer.start_as_current_span(
             "get_all_documents",
@@ -851,10 +868,15 @@ class _SyncGatewayBase:
                 "cbl.database.name": db_name,
                 "cbl.scope.name": scope,
                 "cbl.collection.name": collection,
+                "cbl.include_docs": include_docs,
             },
         ):
+            params = {}
+            if include_docs:
+                params["include_docs"] = "true"
+
             resp = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/_all_docs"
+                "get", f"/{db_name}.{scope}.{collection}/_all_docs", params=params
             )
 
             assert isinstance(resp, dict)
