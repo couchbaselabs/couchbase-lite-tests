@@ -24,6 +24,9 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
         cbl_info("Greenboard uploading disabled by flag")
         yield
         return
+    if len(cblpytest.test_servers) == 0 and len(cblpytest.sync_gateways) == 0:
+        yield
+        return
 
     if len(cblpytest.test_servers) == 0:
         cbl_info("No test servers available, skipping greenboard upload")
