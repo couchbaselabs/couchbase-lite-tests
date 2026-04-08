@@ -25,6 +25,7 @@ class GreenboardUploader:
         self.__fail_count = 0
         self.__pass_count = 0
         self.__overall_fail = False
+        self.__has_sgw_marker = False
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]):
@@ -38,10 +39,20 @@ class GreenboardUploader:
         if self.__overall_fail:
             return
 
+        # Track if any test has SGW-focused markers
+        if item.get_closest_marker("sgw") or item.get_closest_marker("upg_sgw"):
+            self.__has_sgw_marker = True
+
         if report.passed:
             self.__pass_count += 1
         elif report.failed:
             self.__fail_count += 1
+
+    def has_sgw_marker(self) -> bool:
+        """
+        Returns True if any test in the session has @pytest.mark.sgw or @pytest.mark.upg_sgw marker
+        """
+        return self.__has_sgw_marker
 
     def upload(self, platform: str, os_name: str, version: str, sgw_version: str):
         """
