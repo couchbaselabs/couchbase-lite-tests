@@ -26,7 +26,8 @@ pipeline {
                     parameters: [
                         string(name: 'TS_PLATFORM', value: 'reactnative_android'),
                         string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                        string(name: 'CBL_BUILD', value: params.CBL_BUILD)
+                        string(name: 'CBL_BUILD', value: params.CBL_BUILD),
+                        string(name: 'BRANCH', value: "tdk_reactnative")
                     ],
                     wait: true,
                     propagate: true

@@ -52,10 +52,13 @@ pipeline {
                         validResponseCodes: '200,404'
                     )
 
-                    // if (response.status != 200) {
-                    //     env.BUILD_BRANCH = 'main'
-                    // }
-                    env.BUILD_BRANCH = 'tdk_reactnative'
+                    if (response.status != 200) {
+                        if (params.TS_PLATFORM.startsWith("reactnative")) {
+                            env.BUILD_BRANCH = 'tdk_reactnative'
+                        } else {
+                            env.BUILD_BRANCH = 'main'
+                        }
+                    }
                     echo "Build will come from branch ${env.BUILD_BRANCH}"
                 }
             }
