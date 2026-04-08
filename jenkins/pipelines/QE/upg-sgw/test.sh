@@ -38,7 +38,7 @@ CONFIG_FILE="$QE_TESTS_DIR/config.json"
 CURRENT_SGW_VERSION="${SGW_VERSIONS[0]}"
 echo "Setup backend..."
 pushd $AWS_ENVIRONMENT_DIR > /dev/null
-uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $CURRENT_SGW_VERSION
+uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $CURRENT_SGW_VERSION
 popd > /dev/null
 
 # Exit early if setup-only mode
@@ -56,29 +56,19 @@ popd > /dev/null
 
 # Loop through the remaining SGW versions and perform upgrades
 for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
+
+    # Update topology with new SGW version (without resetting CBS/CBL)
     PREVIOUS_SGW_VERSION="$CURRENT_SGW_VERSION"
     CURRENT_SGW_VERSION="${SGW_VERSIONS[i]}"
     echo ">>> Upgrading SGW from $PREVIOUS_SGW_VERSION to $CURRENT_SGW_VERSION ..."
-
-#    # 1. Destroy the old Sync Gateway instances ONLY, keep test servers.
-#    echo "--> Destroying old Sync Gateway instances..."
-#    pushd $AWS_ENVIRONMENT_DIR > /dev/null
-#    uv run --group orchestrator ./stop_backend.py \
-#        --topology topology_setup/topology.json \
-#        --destroy-sgw \
-#        --no-ts-stop
-#    popd > /dev/null
-
-    # 2. Update topology with new SGW version (without resetting CBS/CBL)
-    echo "--> Updating topology with SGW version $CURRENT_SGW_VERSION..."
     pushd $AWS_ENVIRONMENT_DIR > /dev/null
     uv run $SCRIPT_DIR/update_sgw_version.py topology_setup/topology.json $CURRENT_SGW_VERSION
     popd > /dev/null
 
-    # 3. Provision new Sync Gateway instances with the updated version.
+    # Provision new Sync Gateway instances with the updated version.
     echo "--> Provisioning new Sync Gateway instances with version $CURRENT_SGW_VERSION..."
     pushd $AWS_ENVIRONMENT_DIR > /dev/null
-    uv run --group orchestrator ./start_backend.py \
+    uv run ./start_backend.py \
         --topology $TOPOLOGY_FILE \
         --tdk-config-in $CONFIG_TEMPLATE \
         --tdk-config-out $CONFIG_FILE \
