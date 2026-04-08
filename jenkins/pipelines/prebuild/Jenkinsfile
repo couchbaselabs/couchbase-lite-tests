@@ -55,7 +55,7 @@ pipeline {
                     if (response.status != 200) {
                         env.BUILD_BRANCH = 'main'
                     }
-                    env.BUILD_BRANCH = 'ios_p2p_tls'
+                    env.BUILD_BRANCH = 'ios-p2p-tls'
                     echo "Build will come from branch ${env.BUILD_BRANCH}"
                 }
             }
