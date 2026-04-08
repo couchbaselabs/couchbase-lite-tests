@@ -4,7 +4,7 @@
         {
             "platform": "reactnative_android",
             "cbl_version": "{{version}}",
-            "location": "PLACEHOLDER_DEVICE_SERIAL",
+            "location": "R5CT20FYA7R",
             "download": true
         }
     ],
