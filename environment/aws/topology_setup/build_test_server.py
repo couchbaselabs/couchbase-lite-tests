@@ -93,7 +93,7 @@ def main() -> None:
     #     click.secho("Server already exists on latestbuilds, skipping build", fg="green")
     #     exit(0)
 
-    # server.build()
+    server.build()
 
     # if not args.ci and not args.upload:
     #     click.secho("Upload not requested, skipping", fg="yellow")
