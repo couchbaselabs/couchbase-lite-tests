@@ -24,9 +24,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
         cbl_info("Greenboard uploading disabled by flag")
         yield
         return
-
-    if len(cblpytest.test_servers) == 0:
-        cbl_info("No test servers available, skipping greenboard upload")
+    if len(cblpytest.test_servers) == 0 and len(cblpytest.sync_gateways) == 0:
         yield
         return
 
@@ -45,21 +43,26 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     yield
 
     try:
-        test_server_info = await cblpytest.test_servers[0].get_info()
         sgw_version: str = "n/a"
+        test_platform: str = "sync-gateway"
+        os_name: str = "n/a"
+        library_version: str = "n/a"
+        if len(cblpytest.test_servers) > 0:
+            test_server_info = await cblpytest.test_servers[0].get_info()
+            # Keep the platform as SGW if it has one of the sgw markers, since
+            # the test might still use test server with it, but still belong
+            # to SGW and not CBL test platform.
+            library_version = test_server_info.library_version
+            if not uploader.has_sgw_marker():
+                test_platform = test_server_info.cbl
+            if "systemName" in test_server_info.device:
+                os_name = test_server_info.device["systemName"]
         if len(cblpytest.sync_gateways) > 0:
             sgw_version_parts = await cblpytest.sync_gateways[0].get_version()
             sgw_version = (
                 f"{sgw_version_parts.version}-{sgw_version_parts.build_number}"
             )
-        os_name = (
-            test_server_info.device["systemName"]
-            if "systemName" in test_server_info.device
-            else ""
-        )
-        uploader.upload(
-            test_server_info.cbl, os_name, test_server_info.library_version, sgw_version
-        )
+        uploader.upload(test_platform, os_name, library_version, sgw_version)
     except Exception as e:
         cbl_warning(f"Failed to upload results to Greenboard: {e}")
     finally:
