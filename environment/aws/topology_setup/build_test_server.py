@@ -85,30 +85,25 @@ def main() -> None:
         action="store_true",
         help="Enable CI mode (only build if necessary to upload)",
     )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force rebuild and re-upload even if the server already exists on latestbuilds",
-    )
 
     args = parser.parse_args()
     server = TestServer.create(args.platform, args.version)
 
-    if args.ci and not args.force and upload_exists(server):
-        click.secho("Server already exists on latestbuilds, skipping build", fg="green")
-        exit(0)
+    # if args.ci and upload_exists(server):
+    #     click.secho("Server already exists on latestbuilds, skipping build", fg="green")
+    #     exit(0)
 
-    server.build()
+    # server.build()
 
-    if not args.ci and not args.upload:
-        click.secho("Upload not requested, skipping", fg="yellow")
-        exit(0)
+    # if not args.ci and not args.upload:
+    #     click.secho("Upload not requested, skipping", fg="yellow")
+    #     exit(0)
 
-    if not args.force and upload_exists(server):
-        click.secho(
-            "Server already exists on latestbuilds, skipping upload", fg="yellow"
-        )
-        exit(0)
+    # if upload_exists(server):
+    #     click.secho(
+    #         "Server already exists on latestbuilds, skipping upload", fg="yellow"
+    #     )
+    #     exit(0)
 
     if "LATESTBUILDS_PASSWORD" not in os.environ:
         click.secho("LATESTBUILDS_PASSWORD env var is not set", fg="red")
