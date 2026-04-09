@@ -10,7 +10,8 @@
     "build:android": "cd android && ./gradlew assembleDebug",
     "build:ios": "cd ios && xcodebuild -workspace CblTestServer.xcworkspace -scheme CblTestServer -configuration Debug -sdk iphoneos build",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/patch-android-cert-pinning.js"
   },
   "dependencies": {
     "cbl-reactnative": "^1.0.1",
