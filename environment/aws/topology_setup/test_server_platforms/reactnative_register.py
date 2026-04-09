@@ -134,8 +134,15 @@ class ReactNativeAndroidBridge(PlatformBridge):
             capture_output=True,
         )
 
-        host_ip = _get_host_ip_for_android(self.__adb, location)
-        ws_url = f"ws://{host_ip}:{WS_PORT}"
+        # Tunnel the WebSocket port through the adb USB connection so the app
+        # can reach pytest on the host via 127.0.0.1 regardless of WiFi/network
+        # topology — and without Android cleartext-traffic policy issues.
+        subprocess.run(
+            [str(self.__adb), "-s", location, "reverse", f"tcp:{WS_PORT}", f"tcp:{WS_PORT}"],
+            check=True,
+            capture_output=True,
+        )
+        ws_url = f"ws://127.0.0.1:{WS_PORT}"
         click.echo(f"Auto-connect URL: {ws_url}  deviceID: {DEVICE_ID}")
 
         subprocess.run(
@@ -155,6 +162,11 @@ class ReactNativeAndroidBridge(PlatformBridge):
             [str(self.__adb), "-s", location, "shell", "am", "force-stop", APP_BUNDLE_ID],
             check=True,
             capture_output=False,
+        )
+        subprocess.run(
+            [str(self.__adb), "-s", location, "reverse", "--remove", f"tcp:{WS_PORT}"],
+            check=False,
+            capture_output=True,
         )
 
     def uninstall(self, location: str) -> None:
