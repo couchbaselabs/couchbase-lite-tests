@@ -65,7 +65,7 @@ function rolling_upgrade_to_version() {
             # 1. Destroy single SGW node
             echo "--> Destroying SGW node $node_index..."
             pushd $AWS_ENVIRONMENT_DIR > /dev/null
-            uv run --group orchestrator ./stop_backend.py \
+            uv run ./stop_backend.py \
                 --topology topology_setup/topology.json \
                 --destroy-sgw --sgw-index $node_index \
                 --no-ts-stop
@@ -80,7 +80,7 @@ function rolling_upgrade_to_version() {
             # 3. Recreate the destroyed instance via terraform (skip all provisioning)
             echo "--> Recreating SGW node $node_index instance via terraform..."
             pushd $AWS_ENVIRONMENT_DIR > /dev/null
-            uv run --group orchestrator ./start_backend.py \
+            uv run ./start_backend.py \
                 --topology $TOPOLOGY_FILE \
                 --tdk-config-in $CONFIG_TEMPLATE \
                 --tdk-config-out $CONFIG_FILE \
@@ -95,7 +95,7 @@ function rolling_upgrade_to_version() {
             # 4. Provision only the single upgraded SGW node
             echo "--> Provisioning only SGW node $node_index with version $target_version..."
             pushd $AWS_ENVIRONMENT_DIR > /dev/null
-            uv run --group orchestrator $SCRIPT_DIR/provision_single_sgw.py $node_index \
+            uv run $SCRIPT_DIR/provision_single_sgw.py $node_index \
                 --topology topology_setup/topology.json
             popd > /dev/null
 
@@ -136,7 +136,7 @@ for SGW_VERSION in "${SGW_VERSIONS[@]}"; do
         # Full setup with the first SGW version (all 3 nodes provisioned at once)
         echo ">>> Initial full setup with SGW version $SGW_VERSION using rolling topology (3 SGW nodes)..."
         pushd $AWS_ENVIRONMENT_DIR > /dev/null
-        uv run --group orchestrator $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION --topology-file $TOPOLOGY_ROLLING_TEMPLATE
+        uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION --topology-file $TOPOLOGY_ROLLING_TEMPLATE
         popd > /dev/null
 
         FIRST_VERSION="false"
