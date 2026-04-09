@@ -119,7 +119,7 @@ def download_cbbackupmgr(version: str):
     location.unlink(missing_ok=True)
 
     dest_dir.mkdir(parents=True, exist_ok=True)
-    url = f"https://latestbuilds.service.couchbase.com/builds/releases/{version}/couchbase-server-admin-tools-{version}-{os}_{arch}.{ext}"
+    url = f"https://packages.couchbase.com/releases/{version}/couchbase-server-dev-tools-{version}-{os}_{arch}.{ext}"
     download = requests.get(url, stream=True)
     download.raise_for_status()
     tmp_file = TMP_LOCATION / f"download.{ext}"

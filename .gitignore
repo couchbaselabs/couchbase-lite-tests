@@ -20,5 +20,9 @@ http_log
 servers/downloaded
 .version
 
+servers/*/CMakeFiles
+servers/*/_deps
+servers/*/download
+
 # Temp files
 .tmp
