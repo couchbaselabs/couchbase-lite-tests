@@ -17,6 +17,11 @@ pipeline {
             name: 'CBL_BUILD',
             description: 'The build of CBL to use'
         )
+        booleanParam(
+            name: 'FORCE_REBUILD',
+            defaultValue: false,
+            description: 'Force rebuild and re-upload even if this version already exists on latestbuilds'
+        )
     }
 
     stages {
@@ -91,16 +96,17 @@ pipeline {
                             sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         }
 
+                        def forceFlag = params.FORCE_REBUILD ? '--force' : ''
                         if (params.TS_PLATFORM.contains("windows")) {
                             pwsh """
                                 Import-Module jenkins/pipelines/shared/config.psm1 -Force
-                                uv run environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
+                                uv run environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci ${forceFlag}
                             """
                         } else {
                             sh """#!/bin/bash -e
 
                                 source jenkins/pipelines/shared/config.sh
-                                uv run "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci
+                                uv run "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci ${forceFlag}
                             """
                         }
                     }
