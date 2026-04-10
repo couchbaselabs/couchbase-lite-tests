@@ -62,7 +62,10 @@ class WebSocketRouter:
             query = urlencode(params)
             parsed_url = urlparse(url)
             is_native_ws = parsed_url.scheme == "ws"
-            timeout = 30
+            # Native WS apps (React Native) are launched before pytest starts, so they
+            # must survive ART optimization + app startup before connecting.  90 s gives
+            # roughly 3x margin over the typical worst-case first-boot on a physical device.
+            timeout = 90 if is_native_ws else 30
             if not is_native_ws and CBLPyTestGlobal.auto_start_tdk_page:
                 webbrowser.open_new_tab(f"{url}/tdk.html?{query}")
                 timeout = 10
