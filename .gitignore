@@ -26,3 +26,11 @@ servers/*/download
 
 # Temp files
 .tmp
+
+# Build artifacts for windows
+*.exe
+
+# Sync Gateway local builds
+environment/local/sync_gateway
+environment/local/sync_gateway_clone/
+environment/local/*.log
