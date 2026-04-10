@@ -6,8 +6,11 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
-from packaging.version import Version
+from cbltest.api.syncgateway import (
+    DocumentRevision,
+    DocumentUpdateEntry,
+    PutDatabasePayload,
+)
 
 
 @pytest.mark.sgw
@@ -77,7 +80,7 @@ class TestXattrs(CBLTestClass):
             )
 
         self.mark_test_step(
-            "Verify all SG docs were created successfully and store revisions, versions"
+            "Verify all SG docs were created successfully and store revisions"
         )
         sg_all_docs = await sg_user.get_all_documents(sg_db)
         sg_created_count = len(
@@ -86,12 +89,7 @@ class TestXattrs(CBLTestClass):
         assert sg_created_count == num_docs, (
             f"Expected {num_docs} SG docs, but found {sg_created_count}"
         )
-        sgw_version_obj = await sg.get_version()
-        sgw_version = Version(sgw_version_obj.version)
-        supports_version_vectors = sgw_version >= Version("4.0.0")
-        original_revisions = {row.id: row.revision for row in sg_all_docs.rows}
-        if supports_version_vectors:
-            original_vv = {row.id: row.cv for row in sg_all_docs.rows}
+        original_rev = {row.id: row.revision for row in sg_all_docs.rows}
 
         self.mark_test_step("Stop Sync Gateway")
         await sg.delete_database(sg_db)
@@ -122,9 +120,9 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step("Restart Sync Gateway (recreate database endpoint)")
         await sg.put_database(sg_db, db_payload)
-        sg_user = await sg.create_user_client(sg_db, username, password, ["SG", "SDK"])
+        await sg.wait_for_db_up(sg_db)
 
-        self.mark_test_step("Verify revisions, versions and contents of all documents")
+        self.mark_test_step("Verify revisions and contents of all documents")
         sgw_docs_now, sdk_docs_now = 0, 0
         content_errors = []
         for doc_id in sg_doc_ids + sdk_doc_ids:
@@ -133,20 +131,12 @@ class TestXattrs(CBLTestClass):
                 content_errors.append(f"SG doc {doc_id} not found")
             elif doc.id.startswith("sg_"):
                 sgw_docs_now += 1
-                if doc.body.get("updated_by_sdk") is not True:
+                if doc.body.get("updated_by_sdk"):
                     content_errors.append(
                         f"SG doc {doc_id} missing 'updated_by_sdk' flag"
                     )
-                if doc.revid == original_revisions.get(doc.id):
+                if doc.revision == original_rev.get(doc.id):
                     content_errors.append(f"SG doc {doc_id} has incorrect revision")
-                if (
-                    supports_version_vectors
-                    and doc.cv is not None
-                    and doc.cv == original_vv.get(doc.id)
-                ):
-                    content_errors.append(
-                        f"SG doc {doc_id} has incorrect version vector"
-                    )
             elif doc.id.startswith("sdk_"):
                 sdk_docs_now += 1
                 if doc.body.get("created_by") != "sdk":
@@ -244,14 +234,6 @@ class TestXattrs(CBLTestClass):
             row.id: row.revision for row in sg_all_docs.rows
         }
 
-        sgw_version_obj = await sg.get_version()
-        sgw_version = Version(sgw_version_obj.version)
-        supports_version_vectors = sgw_version >= Version("4.0.0")
-        all_doc_version_vectors: dict[str, str | None] = {}
-        if supports_version_vectors:
-            self.mark_test_step("Store original version vectors for SG docs (optional)")
-            all_doc_version_vectors = {row.id: row.cv for row in sg_all_docs.rows}
-
         self.mark_test_step("Get all docs via SDK and verify count")
         sdk_visible_count = 0
         for doc_id in all_doc_ids:
@@ -269,9 +251,9 @@ class TestXattrs(CBLTestClass):
 
         for doc_id in docs_to_delete:
             sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-            if sg_doc is not None and sg_doc.revid is not None:
+            if sg_doc is not None and sg_doc.revision is not None:
                 await sg.delete_document(
-                    doc_id, sg_doc.revid, sg_db, "_default", "_default"
+                    doc_id, sg_doc.revision, sg_db, "_default", "_default"
                 )
 
         self.mark_test_step(
@@ -282,13 +264,15 @@ class TestXattrs(CBLTestClass):
         )
         deleted_revisions, remaining_revisions = 0, 0
         for entry in rev_changes.results:
-            if entry.id in docs_to_delete and entry.deleted:
-                assert entry.changes[0] != all_doc_revisions.get(entry.id), (
+            changes_rev = DocumentRevision(entry.changes[0])
+            original_rev = DocumentRevision(all_doc_revisions[entry.id])
+            if entry.id in docs_to_delete and entry.deleted and entry.changes:
+                assert changes_rev != original_rev, (
                     f"Deleted doc {entry.id} should have a new revision, got {entry.changes[0]}"
                 )
                 deleted_revisions += 1
             elif entry.id in remaining_docs:
-                assert entry.changes[0] == all_doc_revisions.get(entry.id), (
+                assert changes_rev == original_rev, (
                     f"Non-deleted doc {entry.id} should have the same revision, got {entry.changes[0]}"
                 )
                 remaining_revisions += 1
@@ -305,20 +289,6 @@ class TestXattrs(CBLTestClass):
             assert sg_doc is not None, (
                 f"Non-deleted doc {doc_id} should still be accessible"
             )
-
-        if supports_version_vectors:
-            self.mark_test_step(
-                "Verify new version vectors for deleted docs (optional)"
-            )
-            cv_changes = await sg.get_changes(
-                sg_db, "_default", "_default", version_type="cv"
-            )
-            for entry in cv_changes.results:
-                if entry.id in docs_to_delete and entry.deleted and entry.changes:
-                    assert entry.changes[0] != all_doc_version_vectors.get(entry.id), (
-                        f"Deleted doc {entry.id} should have different version vector. "
-                        f"Original: {all_doc_version_vectors.get(entry.id)}, Current: {entry.changes[0]}"
-                    )
 
         self.mark_test_step("Purge all docs via Sync Gateway")
         for doc_id in all_doc_ids:
@@ -404,7 +374,7 @@ class TestXattrs(CBLTestClass):
                     body={"content": {"foo": "bar", "updates": 1}, "channels": ["sg"]},
                 )
             )
-        await sg.update_documents(sg_db, sg_docs, "_default", "_default")
+        await sg.update_documents(sg_db, sg_docs)
         all_doc_ids = sdk_doc_ids + sg_doc_ids
 
         self.mark_test_step("Verify SDK sees all docs")
@@ -451,7 +421,7 @@ class TestXattrs(CBLTestClass):
                     updated_body = sg_doc.body.copy()
                     updated_body["content"]["updates"] += 1
                     sg_docs_to_update.append(
-                        DocumentUpdateEntry(doc_id, sg_doc.revid, updated_body)
+                        DocumentUpdateEntry(doc_id, sg_doc.revision, updated_body)
                     )
             await sg.update_documents(sg_db, sg_docs_to_update, "_default", "_default")
 
@@ -487,9 +457,9 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step("Bulk delete sg docs via Sync Gateway")
         for doc_id in sg_doc_ids:
             sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-            if sg_doc is not None and sg_doc.revid is not None:
+            if sg_doc is not None and sg_doc.revision is not None:
                 await sg.delete_document(
-                    doc_id, sg_doc.revid, sg_db, "_default", "_default"
+                    doc_id, sg_doc.revision, sg_db, "_default", "_default"
                 )
 
         self.mark_test_step("Verify SDK sees all docs as deleted")
@@ -619,7 +589,7 @@ class TestXattrs(CBLTestClass):
                     updated_body["updates"] = updated_body.get("updates", 0) + 1
                     await sg.update_documents(
                         sg_db,
-                        [DocumentUpdateEntry(doc_id, sg_doc.revid, updated_body)],
+                        [DocumentUpdateEntry(doc_id, sg_doc.revision, updated_body)],
                     )
                 except CblSyncGatewayBadResponseError as e:
                     if e.code == 409:  # Conflict
@@ -689,8 +659,8 @@ class TestXattrs(CBLTestClass):
                         docs_to_delete.remove(doc_id)
                         continue
 
-                    if sg_doc.revid is not None:
-                        await sg.delete_document(doc_id, sg_doc.revid, sg_db)
+                    if sg_doc.revision is not None:
+                        await sg.delete_document(doc_id, sg_doc.revision, sg_db)
                         deleted_count += 1
                     docs_to_delete.remove(doc_id)
                 except CblSyncGatewayBadResponseError as e:

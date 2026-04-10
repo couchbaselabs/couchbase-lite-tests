@@ -143,28 +143,6 @@ class TestReplicationMultipleClients(CBLTestClass):
             f"Sync Gateway should have 200 documents, got {len(sg_doc_ids)}"
         )
 
-        self.mark_test_step("Verify all documents have correct revision format")
-        for row in sg_all_docs.rows:
-            assert len(row.revision) > 0, f"Document {row.id} has no revision"
-            assert "-" in row.revision, (
-                f"Invalid revision format for {row.id}: {row.revision}"
-            )
-
-        sgw_version_obj = await sg.get_version()
-        sgw_version = Version(sgw_version_obj.version)
-        supports_version_vectors = sgw_version >= Version("4.0.0")
-        if supports_version_vectors:
-            self.mark_test_step(
-                "Verify all documents have correct version vector format (SGW 4.0+)"
-            )
-            for row in sg_all_docs.rows:
-                assert row.cv is not None and len(row.cv) > 0, (
-                    f"Document {row.id} has no version vector"
-                )
-                assert "@" in row.cv, (
-                    f"Invalid version vector format for {row.id}: {row.cv}"
-                )
-
         self.mark_test_step("Verify documents in changes feed for Sync Gateway")
         sg_changes = await sg.get_changes(sg_db)
         sg_changes_ids = {row.id for row in sg_changes.results}

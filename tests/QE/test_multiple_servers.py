@@ -5,8 +5,12 @@ import pytest
 import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import DocumentUpdateEntry, ISGRPayload, PutDatabasePayload
-from packaging.version import Version
+from cbltest.api.syncgateway import (
+    DocumentRevision,
+    DocumentUpdateEntry,
+    ISGRPayload,
+    PutDatabasePayload,
+)
 
 
 def _check_node_in_cluster(cbs_hostname: str, cluster_nodes: list) -> tuple[bool, bool]:
@@ -135,18 +139,7 @@ class TestMultipleServers(CBLTestClass):
         assert len(all_docs.rows) == num_docs, (
             f"Expected {num_docs} docs, got {len(all_docs.rows)}"
         )
-        original_revs = {row.id: row.revision for row in all_docs.rows}
-        original_vvs = {}
-
-        sgw_version_obj = await sg.get_version()
-        sgw_version = Version(sgw_version_obj.version)
-        supports_version_vectors = sgw_version >= Version("4.0.0")
-        if supports_version_vectors:
-            changes_initial = await sg_user.get_changes(sg_db, version_type="cv")
-            original_vvs = {
-                entry.id: entry.changes[0] if entry.changes else None
-                for entry in changes_initial.results
-            }
+        original_revs: dict[str, str] = {row.id: row.revision for row in all_docs.rows}
 
         self.mark_test_step(
             f"Start concurrent updates ({num_updates} updates per doc) and rebalance CBS cluster"
@@ -220,23 +213,17 @@ class TestMultipleServers(CBLTestClass):
         )
 
         for row in all_docs_final.rows:
-            original_rev = original_revs.get(row.id)
+            assert row is not None, (
+                f"Row turned out to be none for {all_docs_final.rows}"
+            )
+            original_rev = DocumentRevision(original_revs[row.id])
             assert original_rev is not None, (
                 f"Document {row.id} not found in original revisions"
             )
-            assert row.revision != original_rev, (
+            assert DocumentRevision(row.revision).is_newer_than(original_rev), (
                 f"Document {row.id} revision should have changed after {num_updates} "
                 f"updates. Original: {original_rev}, Current: {row.revision}"
             )
-            if supports_version_vectors:
-                original_vv = original_vvs.get(row.id)
-                assert original_vv is not None, (
-                    f"Document {row.id} not found in original version vectors"
-                )
-                assert row.cv != original_vv, (
-                    f"Document {row.id} version vector should have changed after "
-                    f"{num_updates} updates. Original: {original_vv}, Current: {row.cv}"
-                )
 
         await sg_user.close()
 

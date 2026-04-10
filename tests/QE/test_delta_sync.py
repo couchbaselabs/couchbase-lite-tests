@@ -16,7 +16,7 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
     WaitForDocumentEventEntry,
 )
-from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.api.syncgateway import DocumentRevision, DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
 
 
@@ -73,7 +73,8 @@ class TestDeltaSync(CBLTestClass):
         )
         lite_all_docs = await db.get_all_documents("travel.hotels")
         assert len(lite_all_docs["travel.hotels"]) == 700, (
-            f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
+            f"Incorrect number of initial documents replicated (expected 700; "
+            f"got {len(lite_all_docs['travel.hotels'])})"
         )
 
         self.mark_test_step("Record baseline bytes before update")
@@ -85,6 +86,12 @@ class TestDeltaSync(CBLTestClass):
         )
         assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
+
+        self.mark_test_step("Note the current version of the document")
+        assert original_doc.revision is not None, (
+            "Revision couldn't be fetched for SGW version"
+        )
+        original_cv = DocumentRevision(original_doc.revision)
 
         self.mark_test_step("""
             Update existing document in SGW:
@@ -136,7 +143,20 @@ class TestDeltaSync(CBLTestClass):
         )
         delta_bytes = read_pull_bytes_after - read_pull_bytes_before
         assert delta_bytes < original_doc_size, (
-            f"Expected delta to be less than the full doc size, but got {delta_bytes} bytes (original doc size: {original_doc_size})"
+            f"Expected delta to be less than the full doc size, but got {delta_bytes} bytes "
+            f"(original doc size: {original_doc_size})"
+        )
+
+        self.mark_test_step("Verify doc version has changed post update.")
+        updated_sgw_doc = await cloud.sync_gateway.get_document(
+            "travel", "hotel_400", "travel", "hotels"
+        )
+        assert updated_sgw_doc is not None, (
+            "Hotel_400 couldn't be fetched after update in SGW"
+        )
+        new_cv = DocumentRevision(updated_sgw_doc.revision)
+        assert new_cv.is_newer_than(original_cv), (
+            f"Version vector failed to progress. Original: {original_cv}, New: {new_cv}"
         )
 
         await cblpytest.test_servers[0].cleanup()
@@ -703,7 +723,6 @@ class TestDeltaSync(CBLTestClass):
         old_rev_doc = await sg.get_document_revision_public(
             "short_expiry", "doc1", old_revision, BasicAuth("user1", "pass", "ascii")
         )
-
         assert old_rev_doc is not None, (
             "Should be able to fetch old revision before expiry"
         )

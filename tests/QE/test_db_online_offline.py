@@ -15,11 +15,7 @@ from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, Syn
 @pytest.mark.min_couchbase_servers(1)
 class TestDbOnlineOffline(CBLTestClass):
     async def scan_rest_endpoints(
-        self,
-        sg: SyncGateway,
-        db_name: str,
-        expected_online: bool,
-        num_docs: int = 10,
+        self, sg: SyncGateway, db_name: str
     ) -> tuple[int, int]:
         """
         Scans multiple REST endpoints to verify database online/offline state.
@@ -50,7 +46,6 @@ class TestDbOnlineOffline(CBLTestClass):
                 ),
             ),
         ]
-
         for _, test_func in test_operations:
             try:
                 await test_func()
@@ -64,7 +59,6 @@ class TestDbOnlineOffline(CBLTestClass):
                         raise e
                 elif isinstance(e, JSONDecodeError):
                     errors_403 += 1
-
         return (endpoints_tested, errors_403)
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -104,9 +98,7 @@ class TestDbOnlineOffline(CBLTestClass):
         await sg.update_documents(sg_db, sg_docs)
 
         self.mark_test_step("Verify database is online - REST endpoints work")
-        endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-            sg, sg_db, expected_online=True
-        )
+        endpoints_tested, errors_403 = await self.scan_rest_endpoints(sg, sg_db)
         assert errors_403 == 0, (
             f"DB is online but {errors_403}/{endpoints_tested} endpoints returned 403"
         )
@@ -119,9 +111,7 @@ class TestDbOnlineOffline(CBLTestClass):
             await asyncio.sleep(10)
 
         self.mark_test_step("Verify database is offline - REST endpoints return 403")
-        endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-            sg, sg_db, expected_online=False
-        )
+        endpoints_tested, errors_403 = await self.scan_rest_endpoints(sg, sg_db)
         assert endpoints_tested > 0, "No endpoints were tested"
         assert errors_403 == endpoints_tested, (
             f"DB is offline but only {errors_403}/{endpoints_tested} endpoints returned 403"
@@ -134,18 +124,16 @@ class TestDbOnlineOffline(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
-
         db_configs: list[list[Any]] = [
-            ["db1", "data-bucket-1", "ABC", "vipul", None],
-            ["db2", "data-bucket-2", "CBS", "lupiv", None],
-            ["db3", "data-bucket-3", "ABC", "vipul", None],
-            ["db4", "data-bucket-4", "CBS", "lupiv", None],
+            ["db1", "data-bucket-1", "ABC"],
+            ["db2", "data-bucket-2", "CBS"],
+            ["db3", "data-bucket-3", "ABC"],
+            ["db4", "data-bucket-4", "CBS"],
         ]
 
         self.mark_test_step("Create buckets and configure databases")
-        for i, [db_name, bucket_name, channel, username, _] in enumerate(db_configs):
+        for i, [db_name, bucket_name, channel] in enumerate(db_configs):
             cbs.create_bucket(bucket_name)
-
             db_config = {
                 "bucket": bucket_name,
                 "index": {"num_replicas": 0},
@@ -154,9 +142,6 @@ class TestDbOnlineOffline(CBLTestClass):
             db_payload = PutDatabasePayload(db_config)
             await sg.put_database(db_name, db_payload)
             await sg.wait_for_db_up(db_name)
-            db_configs[i][4] = await sg.create_user_client(
-                db_name, username, "pass", [channel]
-            )
 
             self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
             sg_docs: list[DocumentUpdateEntry] = []
@@ -171,7 +156,7 @@ class TestDbOnlineOffline(CBLTestClass):
             await sg.update_documents(db_name, sg_docs, "_default", "_default")
 
         self.mark_test_step("Verify all databases are online")
-        for [db_name, _, _, _, _] in db_configs:
+        for [db_name, _, _] in db_configs:
             status = await sg.get_database_status(db_name)
             assert status is not None, f"{db_name} database doesn't exist"
             assert status.state == "Online", (
@@ -193,22 +178,14 @@ class TestDbOnlineOffline(CBLTestClass):
 
         self.mark_test_step("Verify db2 and db4 remain online")
         for db_name in ["db2", "db4"]:
-            endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-                sg, db_name, expected_online=True
-            )
+            endpoints_tested, errors_403 = await self.scan_rest_endpoints(sg, db_name)
             assert errors_403 == 0, (
                 f"{db_name} should be online but got {errors_403} 403 errors"
             )
 
         self.mark_test_step("Verify db1 and db3 are offline (return 403)")
         for db_name in ["db1", "db3"]:
-            endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-                sg, db_name, expected_online=False
-            )
+            endpoints_tested, errors_403 = await self.scan_rest_endpoints(sg, db_name)
             assert errors_403 == endpoints_tested, (
                 f"{db_name}: Expected all {endpoints_tested} endpoints to return 403, got {errors_403}"
             )
-
-        for [_, _, _, _, user_client] in db_configs:
-            if user_client is not None:
-                await user_client.close()
