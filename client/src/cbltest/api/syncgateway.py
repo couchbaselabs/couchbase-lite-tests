@@ -147,6 +147,50 @@ class PutDatabasePayload(JSONSerializable):
         return self.__config
 
 
+class DocumentRevision:
+    """
+    A unified parser that handles both SGW 3.x Revision IDs and SGW 4.0 Version Vectors.
+    """
+
+    def __init__(self, revision_string: str):
+        self.raw_value = revision_string
+        self.is_version_vector = "@" in revision_string
+
+        if self.is_version_vector:
+            # SGW 4.0+ Version Vector Parsing (<timestamp>@<source-id>)
+            parts = revision_string.split("@")
+            if len(parts) != 2:
+                raise ValueError(f"Invalid Version Vector format: {revision_string}")
+            self.timestamp_int = int(parts[0], 16)
+            self.source_id = parts[1]
+        else:
+            # SGW 3.x Revision ID Parsing (<generation>-<hash>)
+            parts = revision_string.split("-", 1)
+            if len(parts) != 2 or not parts[0].isdigit():
+                raise ValueError(f"Invalid Revision ID format: {revision_string}")
+            self.generation = int(parts[0])
+            self.hash = parts[1]
+
+    def is_newer_than(self, other: "DocumentRevision") -> bool:
+        """
+        Compares two revisions, automatically using the correct mathematical logic
+        based on the detected format.
+        """
+        if self.is_version_vector != other.is_version_vector:
+            raise ValueError(
+                f"Cannot compare mixed revision formats: {self.raw_value} vs {other.raw_value}"
+            )
+
+        if self.is_version_vector:
+            # SGW 4.0 LWW Logic: Compare timestamps, fallback to source ID
+            if self.timestamp_int == other.timestamp_int:
+                return self.source_id > other.source_id
+            return self.timestamp_int > other.timestamp_int
+        else:
+            # SGW 3.x Logic: Compare generation integers
+            return self.generation > other.generation
+
+
 class ISGRPayload(JSONSerializable):
     """
     A class containing configuration options for Inter-Sync Gateway Replication (ISGR)
@@ -556,20 +600,25 @@ class _SyncGatewayBase:
             port,
             BasicAuth(username, password, "ascii"),
         )
-        r = requests.get(
-            f"{scheme}{url}:{port}/_config",
-            auth=(username, password),
-            # disable hostname verification as we do in _create_session
-            verify=False,
-            timeout=10,
-        )
-        r.raise_for_status()
-        try:
-            self.using_rosmar = r.json()["bootstrap"]["server"].startswith("rosmar")
-        except AttributeError:
-            raise CblTestError(
-                "Unexpected response {r.json()} from Sync Gateway /_config endpoint, cannot determine if using Rosmar"
-            ) from None
+        # Only check /_config on admin port (4985), not public port (4984)
+        # SyncGatewayUserClient uses public port and doesn't have access to admin endpoints
+        if port == 4985:
+            r = requests.get(
+                f"{scheme}{url}:{port}/_config",
+                auth=(username, password),
+                # disable hostname verification as we do in _create_session
+                verify=False,
+                timeout=10,
+            )
+            r.raise_for_status()
+            try:
+                self.using_rosmar = r.json()["bootstrap"]["server"].startswith("rosmar")
+            except AttributeError:
+                raise CblTestError(
+                    "Unexpected response {r.json()} from Sync Gateway /_config endpoint, cannot determine if using Rosmar"
+                ) from None
+        else:
+            # For public port clients, default to not using rosmar
             self.using_rosmar = False
 
     @property
