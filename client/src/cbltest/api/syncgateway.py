@@ -175,6 +175,16 @@ class DocumentRevision:
         """
         Compares two revisions, automatically using the correct mathematical logic
         based on the detected format.
+
+        For SGW 3.x: Compares generation numbers (higher generation = newer).
+        For SGW 4.x: Only meaningful comparison is when both vectors originate
+        from the same source ID. Within the same source, timestamps are monotonically
+        increasing. Cross-source comparisons are not meaningful since:
+        - Each src has its own logical clock (not synced with others)
+        - SrcIDs are MD5 hashes per device/db with no meaningful ordering
+
+        :raises ValueError: If comparing version vectors from different sources or
+                          mixed revision formats
         """
         if self.is_version_vector != other.is_version_vector:
             raise ValueError(
@@ -182,12 +192,17 @@ class DocumentRevision:
             )
 
         if self.is_version_vector:
-            # SGW 4.0 LWW Logic: Compare timestamps, fallback to source ID
-            if self.timestamp_int == other.timestamp_int:
-                return self.source_id > other.source_id
+            # SGW 4.0 Version Vector comparison
+            # Only meaningful when both vectors are from the same source ID
+            if self.source_id != other.source_id:
+                raise ValueError(
+                    f"Cannot compare version vectors from different sources: "
+                    f"{self.raw_value} (source={self.source_id}) vs "
+                    f"{other.raw_value} (source={other.source_id}). "
+                    f"Each source has its own logical clock."
+                )
             return self.timestamp_int > other.timestamp_int
         else:
-            # SGW 3.x Logic: Compare generation integers
             return self.generation > other.generation
 
 
@@ -600,26 +615,6 @@ class _SyncGatewayBase:
             port,
             BasicAuth(username, password, "ascii"),
         )
-        # Only check /_config on admin port (4985), not public port (4984)
-        # SyncGatewayUserClient uses public port and doesn't have access to admin endpoints
-        if port == 4985:
-            r = requests.get(
-                f"{scheme}{url}:{port}/_config",
-                auth=(username, password),
-                # disable hostname verification as we do in _create_session
-                verify=False,
-                timeout=10,
-            )
-            r.raise_for_status()
-            try:
-                self.using_rosmar = r.json()["bootstrap"]["server"].startswith("rosmar")
-            except AttributeError:
-                raise CblTestError(
-                    "Unexpected response {r.json()} from Sync Gateway /_config endpoint, cannot determine if using Rosmar"
-                ) from None
-        else:
-            # For public port clients, default to not using rosmar
-            self.using_rosmar = False
 
     @property
     def hostname(self) -> str:
@@ -1664,6 +1659,23 @@ class SyncGateway(_SyncGatewayBase):
         """
         super().__init__(url, username, password, port, secure)
         self.__public_port = public_port
+
+        # Check Rosmar via admin API (/_config endpoint)
+        scheme = "https://" if secure else "http://"
+        r = requests.get(
+            f"{scheme}{url}:{port}/_config",
+            auth=(username, password),
+            # disable hostname verification as we do in _create_session
+            verify=False,
+            timeout=10,
+        )
+        r.raise_for_status()
+        try:
+            self.using_rosmar = r.json()["bootstrap"]["server"].startswith("rosmar")
+        except AttributeError:
+            raise CblTestError(
+                f"Unexpected response {r.json()} from Sync Gateway /_config endpoint, cannot determine if using Rosmar"
+            ) from None
 
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
