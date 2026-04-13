@@ -33,8 +33,11 @@ TOPOLOGY_FILE = (
 
 
 def main() -> None:
+    print(f"[relaunch_app] Reading topology from {TOPOLOGY_FILE}", flush=True)
     topology = TopologyConfig(TOPOLOGY_FILE)
+    print("[relaunch_app] Relaunching test servers…", flush=True)
     topology.relaunch_test_servers()
+    print("[relaunch_app] Done", flush=True)
 
 
 if __name__ == "__main__":

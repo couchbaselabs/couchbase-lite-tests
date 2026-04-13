@@ -802,19 +802,26 @@ class TopologyConfig:
         attempt exactly when the pytest WebSocket router binds its port.
         """
         TestServer.initialize()
+        click.echo(f"[relaunch] Total test server entries in topology: {len(self.__test_server_inputs)}")
         for ts_input in self.__test_server_inputs:
+            click.echo(f"[relaunch] Found test server: platform={ts_input.platform!r} location={ts_input.location!r}")
             if not ts_input.platform.startswith("reactnative"):
+                click.echo(f"[relaunch] Skipping non-reactnative platform: {ts_input.platform!r}")
                 continue
+            click.echo(f"[relaunch] Processing {ts_input.platform} on {ts_input.location}")
             test_server = TestServer.create(ts_input.platform, ts_input.cbl_version)
             if ts_input.download:
                 # Fast-path: marks _downloaded=True using the cached marker file;
                 # no network download occurs if the APK is already present.
+                click.echo("[relaunch] Checking for cached APK download…")
                 test_server.download()
             bridge = test_server.create_bridge()
+            click.echo(f"[relaunch] Validating device {ts_input.location!r}…")
             bridge.validate(ts_input.location)
+            click.echo(f"[relaunch] Running bridge.run() for {ts_input.location!r}…")
             bridge.run(ts_input.location)
             click.echo(
-                f"Re-launched {ts_input.platform} on {ts_input.location} "
+                f"[relaunch] Re-launched {ts_input.platform} on {ts_input.location} "
                 "(native WS app ready for pytest WebSocket handshake)"
             )
 

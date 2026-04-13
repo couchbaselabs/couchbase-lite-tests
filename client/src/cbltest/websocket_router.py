@@ -1,8 +1,9 @@
+import asyncio
 import json
 import os
 import socket
-import subprocess
 import sys
+import time
 import webbrowser
 from asyncio import Future, Semaphore, wait_for
 from typing import cast
@@ -12,7 +13,7 @@ import netifaces
 from aiohttp import web
 
 from cbltest.globals import CBLPyTestGlobal
-from cbltest.logging import cbl_error, cbl_info
+from cbltest.logging import cbl_error, cbl_info, cbl_warning
 
 
 class WebSocketRouter:
@@ -51,6 +52,9 @@ class WebSocketRouter:
         site = web.SockSite(self.__runner, sock)
         chosen_port = sock.getsockname()[1]
         await site.start()
+        print(
+            f"[cbltest] WebSocket router listening on port {chosen_port}", flush=True
+        )
         cbl_info(f"WebSocket router listening on port {chosen_port}")
 
         # If a relaunch script is configured, run it now — the port is bound
@@ -59,14 +63,55 @@ class WebSocketRouter:
         # attempt hits a listening port, instead of getting ECONNREFUSED and
         # relying on a retry window that may expire before pytest starts.
         relaunch_script = os.environ.get("CBL_NATIVE_WS_RELAUNCH_SCRIPT")
+        has_native_ws = any(urlparse(u).scheme == "ws" for u in self.__server_urls)
+        if has_native_ws and not relaunch_script:
+            print(
+                "[cbltest] WARNING: native WS test server detected but "
+                "CBL_NATIVE_WS_RELAUNCH_SCRIPT is not set; "
+                "relying on the app's built-in reconnect logic",
+                flush=True,
+            )
+            cbl_warning(
+                "Native WS test server detected but CBL_NATIVE_WS_RELAUNCH_SCRIPT "
+                "is not set; relying on the app's built-in reconnect logic"
+            )
         if relaunch_script:
+            print(
+                f"[cbltest] Relaunching native WS app via: {relaunch_script}",
+                flush=True,
+            )
             cbl_info(f"Relaunching native WS app via: {relaunch_script}")
-            subprocess.run([sys.executable, relaunch_script], check=True)
+            # Use asyncio subprocess so the event loop stays responsive while
+            # the relaunch script runs (captures stdout/stderr for diagnostics).
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable,
+                relaunch_script,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout_bytes, stderr_bytes = await proc.communicate()
+            if stdout_bytes:
+                print(
+                    f"[cbltest] relaunch stdout:\n{stdout_bytes.decode(errors='replace')}",
+                    flush=True,
+                )
+            if proc.returncode != 0:
+                err_text = stderr_bytes.decode(errors="replace")
+                print(
+                    f"[cbltest] ERROR: relaunch script failed (exit {proc.returncode}):\n{err_text}",
+                    flush=True,
+                )
+                raise RuntimeError(
+                    f"Native WS relaunch script exited with code {proc.returncode}:\n{err_text}"
+                )
+            print("[cbltest] Native WS app relaunch complete", flush=True)
+            cbl_info("Native WS app relaunch complete")
 
         ws_index = 0
         for url in self.__server_urls:
             local_ip = self._lookup_ip(url)
             cbl_info(f"Connecting to test server at {url}...")
+            print(f"[cbltest] Waiting for test server to connect at {url}…", flush=True)
             params = {
                 "tdkURL": f"ws://{local_ip}:{chosen_port}/",
                 "autostart": "true",
@@ -83,8 +128,39 @@ class WebSocketRouter:
                 webbrowser.open_new_tab(f"{url}/tdk.html?{query}")
                 timeout = 10
 
-            await wait_for(self.__conn_sem.acquire(), timeout=timeout)
+            t0 = time.monotonic()
+            try:
+                await self._wait_for_connection(timeout)
+            except TimeoutError:
+                elapsed = time.monotonic() - t0
+                print(
+                    f"[cbltest] TIMEOUT: no connection from {url} after {elapsed:.1f}s "
+                    f"(limit={timeout}s)",
+                    flush=True,
+                )
+                raise
+            elapsed = time.monotonic() - t0
+            print(f"[cbltest] Test server connected at {url} (took {elapsed:.1f}s)", flush=True)
             cbl_info(f"Connected to test server at {url}!")
+
+    async def _wait_for_connection(self, timeout: float) -> None:
+        """Acquire the connection semaphore, printing a heartbeat every 10 s."""
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError
+            chunk = min(10.0, remaining)
+            try:
+                await wait_for(self.__conn_sem.acquire(), timeout=chunk)
+                return
+            except TimeoutError:
+                elapsed = timeout - (deadline - time.monotonic())
+                print(
+                    f"[cbltest] … still waiting for app to connect "
+                    f"({elapsed:.0f}s elapsed, {timeout - elapsed:.0f}s remaining)",
+                    flush=True,
+                )
 
     async def stop(self) -> None:
         self.__stopping = True

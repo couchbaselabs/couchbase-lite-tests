@@ -128,33 +128,59 @@ class ReactNativeAndroidBridge(PlatformBridge):
 
     def run(self, location: str) -> None:
         header(f"Launching React Native app on {location}")
-        subprocess.run(
+
+        click.echo(f"[bridge] adb -s {location}: am force-stop {APP_BUNDLE_ID}")
+        result = subprocess.run(
             [str(self.__adb), "-s", location, "shell", "am", "force-stop", APP_BUNDLE_ID],
             check=False,
             capture_output=True,
+            text=True,
         )
+        click.echo(f"[bridge] force-stop exit={result.returncode}"
+                   + (f"  stderr: {result.stderr.strip()}" if result.stderr.strip() else ""))
+
+        # Ensure the device screen is on — Jenkins devices are often idle and
+        # locked; am start can silently fail or put the activity in the background
+        # on some Android versions when the screen is off.
+        click.echo(f"[bridge] adb -s {location}: input keyevent KEYCODE_WAKEUP")
+        result = subprocess.run(
+            [str(self.__adb), "-s", location, "shell", "input", "keyevent", "KEYCODE_WAKEUP"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        click.echo(f"[bridge] wakeup exit={result.returncode}"
+                   + (f"  stderr: {result.stderr.strip()}" if result.stderr.strip() else ""))
 
         # Tunnel the WebSocket port through the adb USB connection so the app
         # can reach pytest on the host via 127.0.0.1 regardless of WiFi/network
         # topology — and without Android cleartext-traffic policy issues.
-        subprocess.run(
+        click.echo(f"[bridge] adb -s {location}: reverse tcp:{WS_PORT} tcp:{WS_PORT}")
+        result = subprocess.run(
             [str(self.__adb), "-s", location, "reverse", f"tcp:{WS_PORT}", f"tcp:{WS_PORT}"],
             check=True,
             capture_output=True,
+            text=True,
         )
-        ws_url = f"ws://127.0.0.1:{WS_PORT}"
-        click.echo(f"Auto-connect URL: {ws_url}  deviceID: {DEVICE_ID}")
+        click.echo(f"[bridge] adb reverse exit={result.returncode}"
+                   + (f"  stderr: {result.stderr.strip()}" if result.stderr.strip() else ""))
 
-        subprocess.run(
-            [
-                str(self.__adb), "-s", location, "shell", "am", "start",
-                "-n", f"{APP_BUNDLE_ID}/.MainActivity",
-                "--es", "deviceID", DEVICE_ID,
-                "--es", "wsURL", ws_url,
-            ],
-            check=True,
-            capture_output=False,
-        )
+        ws_url = f"ws://127.0.0.1:{WS_PORT}"
+        click.echo(f"[bridge] Auto-connect URL: {ws_url}  deviceID: {DEVICE_ID}")
+
+        am_start_cmd = [
+            str(self.__adb), "-s", location, "shell", "am", "start",
+            "-n", f"{APP_BUNDLE_ID}/.MainActivity",
+            "--es", "deviceID", DEVICE_ID,
+            "--es", "wsURL", ws_url,
+        ]
+        click.echo(f"[bridge] Running: {' '.join(am_start_cmd)}")
+        result = subprocess.run(am_start_cmd, check=True, capture_output=True, text=True)
+        click.echo(f"[bridge] am start exit={result.returncode}")
+        if result.stdout.strip():
+            click.echo(f"[bridge] am start stdout: {result.stdout.strip()}")
+        if result.stderr.strip():
+            click.echo(f"[bridge] am start stderr: {result.stderr.strip()}")
 
     def stop(self, location: str) -> None:
         header(f"Stopping React Native app on {location}")

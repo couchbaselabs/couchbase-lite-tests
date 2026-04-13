@@ -47,6 +47,9 @@ rm -rf http_log testserver.log
 # JS-bundle compilation on the device, so the relaunch done by the router is
 # fast (a few seconds).
 export CBL_NATIVE_WS_RELAUNCH_SCRIPT="$SCRIPT_DIR/relaunch_app.py"
+echo "CBL_NATIVE_WS_RELAUNCH_SCRIPT=$CBL_NATIVE_WS_RELAUNCH_SCRIPT"
+echo "Relaunch script exists: $(test -f "$CBL_NATIVE_WS_RELAUNCH_SCRIPT" && echo yes || echo NO - FILE MISSING)"
+echo "Python executable used by uv: $(uv run python -c 'import sys; print(sys.executable)')"
 
 echo "Run the React Native Android tests"
 uv run pytest \
