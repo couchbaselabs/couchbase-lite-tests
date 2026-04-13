@@ -703,7 +703,7 @@ class PostStartListenerRequestBody(JSONSerializable):
         if self.__disable_tls:
             json["disableTLS"] = self.__disable_tls
 
-        if self.__reuseIdenity:
+        if self.__reuse_identity:
             json["reuseIdentity"] = self.__reuse_identity
 
         if self.__identity is not None:

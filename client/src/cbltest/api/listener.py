@@ -41,9 +41,9 @@ class Listener:
 
         self.__original_port = port
         self.__identity = identity
+        self.__index = database._index
         if not disable_tls and not identity:
             self.__identity = create_leaf_certificate(f"Test Server {self.__index}")
-        self.__index = database._index
         self.reuse_identity = reuse_identity
         self.__request_factory = database._request_factory
         self.__tracer = get_tracer(__name__, VERSION)

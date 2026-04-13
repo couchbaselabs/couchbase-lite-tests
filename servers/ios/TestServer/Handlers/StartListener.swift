@@ -18,7 +18,7 @@ extension Handlers {
         let dbManager = req.databaseManager
         let disableTLS = listenerStartRq.disableTLS ?? false
         let reuseIdentity = listenerStartRq.reuseIdentity ?? false
-        let id = try dbManager.startListener(dbName: listenerStartRq.database, collections: listenerStartRq.collections, port: listenerStartRq.port, disableTLS: disableTLS,identity: listenerStartRq.identity,reuseIdentity: reuseIdentity))
+        let id = try dbManager.startListener(dbName: listenerStartRq.database, collections: listenerStartRq.collections, port: listenerStartRq.port, disableTLS: disableTLS,identity: listenerStartRq.identity,reuseIdentity: reuseIdentity)
         
         return ContentTypes.Listener(id: id, port: listenerStartRq.port)
     }
