@@ -16,7 +16,7 @@ from cbltest.api.replicator_types import (
 from cbltest.api.test_functions import compare_doc_results_p2p
 
 
-@pytest.mark.min_test_servers(2)
+@pytest.mark.min_test_servers(3)
 class TestPeerToPeer(CBLTestClass):
     def setup_method(self, method):
         super().setup_method(method)
