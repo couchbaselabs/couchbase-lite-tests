@@ -7,7 +7,7 @@ from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import TestServerRequestType
 from cbltest.response_types import PostStartListenerResponseMethods
 from cbltest.version import VERSION
-
+from cbltest.api.x509_certificate import CertKeyPair, create_leaf_certificate
 
 class Listener:
     """A class representing the passive side of a replication inside of a test server"""
@@ -18,6 +18,8 @@ class Listener:
         collections: list[str],
         port: int | None = None,
         disable_tls: bool = False,
+        identity: CertKeyPair | None = None,
+        reuse_identity: bool = False,
     ):
         self.database = database
         """The database that the listener will be serving"""
@@ -38,10 +40,19 @@ class Listener:
         """If True, TLS will be disabled for the listener"""
 
         self.__original_port = port
+        self.__identity = identity
+        if not disable_tls and not identity:
+            self.__identity = create_leaf_certificate(f"Test Server {self.__index}")
         self.__index = database._index
+        self.reuse_identity = reuse_identity
         self.__request_factory = database._request_factory
         self.__tracer = get_tracer(__name__, VERSION)
         self.__id: str = ""
+
+    @property
+    def identity(self) -> CertKeyPair:
+        """Gets the identity used by the replicator"""
+        return self.__identity
 
     async def start(self) -> None:
         """Start listening for incoming connections"""
@@ -52,6 +63,8 @@ class Listener:
                 collections=self.collections,
                 port=self.port,
                 disable_tls=self.disable_tls,
+                identity=self.__identity,
+                reuse_identity=self.reuse_identity
             )
             resp = await self.__request_factory.send_request(self.__index, request)
             if resp.error is not None:

@@ -680,12 +680,16 @@ class PostStartListenerRequestBody(JSONSerializable):
         collections: list[str],
         port: int | None = None,
         disable_tls: bool = False,
+        identity: CertKeyPair | None = None,
+        reuse_identity: bool = False,
     ):
         super().__init__()
         self.__database = db
         self.__collections = collections
         self.__port = port
         self.__disable_tls = disable_tls
+        self.__identity = identity
+        self.__reuse_identity = reuse_identity
 
     def to_json(self) -> Any:
         json: dict[str, Any] = {
@@ -698,6 +702,16 @@ class PostStartListenerRequestBody(JSONSerializable):
 
         if self.__disable_tls:
             json["disableTLS"] = self.__disable_tls
+
+        if self.__reuseIdenity:
+            json["reuseIdentity"] = self.__reuse_identity
+
+        if self.__identity is not None:
+            json["identity"] = {
+                "encoding": "PKCS12",
+                "data": base64.b64encode(self.__identity.pfx_bytes()).decode("utf-8"),
+                "password": self.__identity.password,
+            }
 
         return json
 

@@ -86,7 +86,7 @@ class DatabaseManager {
         }
     }
     
-    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false) throws -> UUID {
+    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false, identity:ContentTypes.MultipeerReplicatorIdentity, reuseIdentity: Bool = false) throws -> UUID {
         var collectionsArr: [Collection] = []
         
         guard let database = databases[dbName]
@@ -107,7 +107,36 @@ class DatabaseManager {
         var listenerConfig = URLEndpointListenerConfiguration(collections: collectionsArr)
         listenerConfig.port = port
         listenerConfig.disableTLS = disableTLS
-        
+        if !listenerConfig.disableTLS {
+        let label = "ios-p2p-\(dbName)"
+        guard let data = Data(base64Encoded: identity.data) else {
+            throw TestServerError.badRequest("Invalid replicator identity data")
+        }
+        if !reuseIdentity {
+        try TLSIdentity.deleteIdentity(withLabel: label)
+        }
+        let importedIdentity: TLSIdentity
+        do {
+                if reuseIdentity {
+                guard let existingIdentity = try TLSIdentity.identity(withLabel: label) else {
+                    throw TestServerError.badRequest(
+                        "reuseIdentity=true but no existing TLS identity found for label \(label)"
+                    )
+                }
+                importedIdentity = existingIdentity
+            } else {
+                importedIdentity = try TLSIdentity.importIdentity(
+                    withData: data,
+                    password: identity.password,
+                    label: label
+                )
+            }
+        } catch {
+            throw TestServerError.badRequest("Failed to import TLS identity")
+        }
+
+        listenerConfig.tlsIdentity = importedIdentity
+    }
         let listener = URLEndpointListener(config: listenerConfig)
         
         let listenerID = UUID()
