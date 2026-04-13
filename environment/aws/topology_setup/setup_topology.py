@@ -791,6 +791,33 @@ class TopologyConfig:
                     f"Test server failed to start at {test_server_input.location}"
                 )
 
+    def relaunch_test_servers(self) -> None:
+        """Re-launch native WS test servers (e.g. React Native) without reinstalling.
+
+        setup_test.py installs the APK and does an initial launch which warms up
+        ART optimisation and JS-bundle compilation on the device.  By the time
+        pytest starts, the app may have exhausted its built-in reconnect attempts
+        against the not-yet-bound port 8765.  Calling this method right before
+        pytest force-stops and re-launches the app so it makes a fresh connection
+        attempt exactly when the pytest WebSocket router binds its port.
+        """
+        TestServer.initialize()
+        for ts_input in self.__test_server_inputs:
+            if not ts_input.platform.startswith("reactnative"):
+                continue
+            test_server = TestServer.create(ts_input.platform, ts_input.cbl_version)
+            if ts_input.download:
+                # Fast-path: marks _downloaded=True using the cached marker file;
+                # no network download occurs if the APK is already present.
+                test_server.download()
+            bridge = test_server.create_bridge()
+            bridge.validate(ts_input.location)
+            bridge.run(ts_input.location)
+            click.echo(
+                f"Re-launched {ts_input.platform} on {ts_input.location} "
+                "(native WS app ready for pytest WebSocket handshake)"
+            )
+
     def stop_test_servers(self):
         """
         Stop the running test servers.

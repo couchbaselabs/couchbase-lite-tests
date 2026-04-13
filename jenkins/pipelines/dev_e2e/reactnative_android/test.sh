@@ -38,6 +38,14 @@ uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 pushd $DEV_E2E_TESTS_DIR > /dev/null
 rm -rf http_log testserver.log
 
+# Re-launch the app right before pytest so that its first fresh connection
+# attempt coincides with the pytest WebSocket router binding port 8765.
+# setup_test.py already did an initial launch to warm up ART optimisation and
+# JS-bundle compilation; by the time pytest starts that first launch may have
+# exhausted its reconnect window.  A second launch here removes the race.
+echo "Re-launching React Native app before pytest..."
+uv run $SCRIPT_DIR/relaunch_app.py
+
 echo "Run the React Native Android tests"
 uv run pytest \
     --maxfail=7 \
