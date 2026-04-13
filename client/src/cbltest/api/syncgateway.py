@@ -635,20 +635,24 @@ class _SyncGatewayBase:
             )
             return None
 
-        # Fetch from the PUBLIC port (4984) — the same port CBL connects to for
-        # replication.  self.port is the *admin* port (4985) which may have
-        # different TLS settings (or no TLS) depending on the SG configuration.
-        public_port = 4984
+        # CBL Android (3.x) passes pinnedServerX509Certificate to LiteCore as a
+        # *trust anchor* for PKIX chain validation, not as an exact leaf-cert match.
+        # A leaf certificate (like sg_cert.pem) cannot serve as a PKIX trust anchor
+        # because it lacks the CA:true BasicConstraints extension; passing one causes
+        # "Trust anchor for certification path not found" (CertPathValidatorException).
+        #
+        # The correct value is the CA certificate that *signed* the server's leaf
+        # cert.  That is _SGW_CA_CERT, which is already in use as the trusted CA for
+        # the Python admin-API SSL context.  We return it here so CBL will accept the
+        # server's leaf cert as validly signed by that CA.
         cbl_info(
-            f"Fetching TLS certificate from {self.hostname}:{public_port} "
-            f"(admin port {self.port} is not used for replication)"
+            f"Returning CA certificate as pinnedServerCert for {self.hostname} "
+            f"(CBL Android uses it as a trust anchor for chain validation)"
         )
-        cert = ssl.get_server_certificate((self.hostname, public_port))
         cbl_info(
-            f"TLS certificate fetched ({len(cert)} bytes); "
-            "first 60 chars: " + cert[:60].replace("\n", "\\n")
+            "CA cert first 60 chars: " + _SGW_CA_CERT.strip()[:60].replace("\n", "\\n")
         )
-        return cert
+        return _SGW_CA_CERT.strip()
 
     def replication_url(self, db_name: str, load_balancer: str | None = None) -> str:
         """
