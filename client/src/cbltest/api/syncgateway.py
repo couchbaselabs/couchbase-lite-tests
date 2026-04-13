@@ -635,7 +635,20 @@ class _SyncGatewayBase:
             )
             return None
 
-        return ssl.get_server_certificate((self.hostname, self.port))
+        # Fetch from the PUBLIC port (4984) — the same port CBL connects to for
+        # replication.  self.port is the *admin* port (4985) which may have
+        # different TLS settings (or no TLS) depending on the SG configuration.
+        public_port = 4984
+        cbl_info(
+            f"Fetching TLS certificate from {self.hostname}:{public_port} "
+            f"(admin port {self.port} is not used for replication)"
+        )
+        cert = ssl.get_server_certificate((self.hostname, public_port))
+        cbl_info(
+            f"TLS certificate fetched ({len(cert)} bytes); "
+            "first 60 chars: " + cert[:60].replace("\n", "\\n")
+        )
+        return cert
 
     def replication_url(self, db_name: str, load_balancer: str | None = None) -> str:
         """
