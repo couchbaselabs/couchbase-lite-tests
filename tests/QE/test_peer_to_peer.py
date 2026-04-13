@@ -25,7 +25,8 @@ class TestPeerToPeer(CBLTestClass):
 
     async def _testserver_crud(self, db, num_of_docs, optype="insert", documents=None):
         assert db is not None, "db cannot be None"
-        async def insert_each_batch(start:int, value:int=10):
+
+        async def insert_each_batch(start: int, value: int = 10):
             async with db.batch_updater() as b:
                 assert self.doc_ids is not None, "doc_ids not initialized"
                 for i in self.doc_ids[start : start + value]:
