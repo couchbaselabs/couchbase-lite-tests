@@ -24,26 +24,29 @@ class TestPeerToPeer(CBLTestClass):
         self.docgen = None
 
     async def _testserver_crud(self, db, num_of_docs, optype="insert", documents=None):
-        async def insert_each_batch(start, value=10, documents=None, db=None):
+        assert db is not None, "db cannot be None"
+        async def insert_each_batch(start:int, value:int=10):
             async with db.batch_updater() as b:
+                assert self.doc_ids is not None, "doc_ids not initialized"
                 for i in self.doc_ids[start : start + value]:
-                    # print(f"upserting: ")
+                    assert documents is not None, "documents cannot be None"
                     b.upsert_document("_default._default", i, documents[i])
 
         if optype == "insert":
             self.docgen = JSONGenerator(size=num_of_docs, format="key-value")
             documents = self.docgen.generate_all_documents()
-            print(f"documents:{documents}")
             self.doc_ids = list(documents.keys())
-            print(f"ids:{self.doc_ids}")
             for start in range(0, len(self.doc_ids), 10):
-                await insert_each_batch(start, documents=documents, db=db)
+                await insert_each_batch(start)
 
         elif optype == "update":
+            assert self.docgen is not None, "docgen not initialized"
+            assert documents is not None, "documents cannot be None"
+            assert self.doc_ids is not None, "doc_ids not initialized"
             updated_docs = self.docgen.update_all_documents(documents)
             documents.update(updated_docs)
             for start in range(0, len(self.doc_ids), 10):
-                await insert_each_batch(start, documents=documents, db=db)
+                await insert_each_batch(start)
         else:
             raise ValueError(f"Invalid optype: {optype}")
         return documents
