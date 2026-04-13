@@ -13,6 +13,8 @@ web-build/
 # macOS
 .DS_Store
 *.pem
+# Allow CA certificates bundled as Android raw resources (public certs, not private keys)
+!android/app/src/main/res/raw/*.pem
 
 # Xcode
 build/

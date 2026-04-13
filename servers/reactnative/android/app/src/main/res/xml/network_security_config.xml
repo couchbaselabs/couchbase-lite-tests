@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Config for the Couchbase Lite React Native test server.
+
+    Trusts both internal CA certificates used by the Sync Gateway test
+    environments:
+      - aws_ca_cert  : AWS/Jenkins EC2 environment
+                       (CN=Internal Test CA, valid Oct 2025 – Oct 2027)
+      - docker_ca_cert : local Docker environment
+                         (CN=Internal Test CA, valid Mar 2026 – Mar 2028)
+
+    These CA certificates are not in Android's system trust store, so they
+    must be added here.  Certificate pinning via pinnedServerX509Certificate
+    in ReplicatorConfiguration would be the alternative, but it relies on
+    the Kotlin catch block not swallowing a silent DER-parsing exception.
+    Trusting the CA at the NSC level is simpler and more reliable.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <!-- Android system CAs (keep the defaults) -->
+            <certificates src="system"/>
+            <!-- AWS / Jenkins Sync Gateway CA -->
+            <certificates src="@raw/aws_ca_cert"/>
+            <!-- Local Docker Sync Gateway CA -->
+            <certificates src="@raw/docker_ca_cert"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>
