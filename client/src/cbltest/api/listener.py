@@ -3,11 +3,12 @@ from typing import cast
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.database import Database
+from cbltest.api.x509_certificate import CertKeyPair, create_leaf_certificate
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import TestServerRequestType
 from cbltest.response_types import PostStartListenerResponseMethods
 from cbltest.version import VERSION
-from cbltest.api.x509_certificate import CertKeyPair, create_leaf_certificate
+
 
 class Listener:
     """A class representing the passive side of a replication inside of a test server"""
@@ -64,7 +65,7 @@ class Listener:
                 port=self.port,
                 disable_tls=self.disable_tls,
                 identity=self.__identity,
-                reuse_identity=self.reuse_identity
+                reuse_identity=self.reuse_identity,
             )
             resp = await self.__request_factory.send_request(self.__index, request)
             if resp.error is not None:

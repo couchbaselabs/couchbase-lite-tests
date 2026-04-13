@@ -143,7 +143,7 @@ class TestServer:
         )
         await self.__request_factory.send_request(self.__index, request)
 
-    def replication_url(self, db_name: str, port: int,tls: bool=False):
+    def replication_url(self, db_name: str, port: int, tls: bool = False):
         """
         Returns the URL of the replication endpoint for this test server
         """
