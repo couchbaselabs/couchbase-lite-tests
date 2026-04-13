@@ -1,5 +1,8 @@
 import json
+import os
 import socket
+import subprocess
+import sys
 import webbrowser
 from asyncio import Future, Semaphore, wait_for
 from typing import cast
@@ -50,6 +53,16 @@ class WebSocketRouter:
         await site.start()
         cbl_info(f"WebSocket router listening on port {chosen_port}")
 
+        # If a relaunch script is configured, run it now — the port is bound
+        # and the server is ready to accept connections.  Launching native WS
+        # apps (e.g. React Native) here guarantees their very first connection
+        # attempt hits a listening port, instead of getting ECONNREFUSED and
+        # relying on a retry window that may expire before pytest starts.
+        relaunch_script = os.environ.get("CBL_NATIVE_WS_RELAUNCH_SCRIPT")
+        if relaunch_script:
+            cbl_info(f"Relaunching native WS app via: {relaunch_script}")
+            subprocess.run([sys.executable, relaunch_script], check=True)
+
         ws_index = 0
         for url in self.__server_urls:
             local_ip = self._lookup_ip(url)
@@ -62,9 +75,9 @@ class WebSocketRouter:
             query = urlencode(params)
             parsed_url = urlparse(url)
             is_native_ws = parsed_url.scheme == "ws"
-            # Native WS apps (React Native) are launched before pytest starts, so they
-            # must survive ART optimization + app startup before connecting.  90 s gives
-            # roughly 3x margin over the typical worst-case first-boot on a physical device.
+            # Native WS apps (React Native) are (re)launched by the relaunch
+            # hook above, right after this port was bound, so they should
+            # connect quickly.  90 s gives ample margin for app startup.
             timeout = 90 if is_native_ws else 30
             if not is_native_ws and CBLPyTestGlobal.auto_start_tdk_page:
                 webbrowser.open_new_tab(f"{url}/tdk.html?{query}")
