@@ -21,7 +21,7 @@ import paramiko
 from environment.aws.common.docker import (
     start_container,
 )
-from environment.aws.common.io import LIGHT_GRAY, get_ec2_hostname, sftp_progress_bar
+from environment.aws.common.io import LIGHT_GRAY, get_ec2_hostname, sftp_progress_bar, ssh_connect_with_retry
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
@@ -75,7 +75,7 @@ def main(topology: TopologyConfig) -> None:
     ec2_hostname = get_ec2_hostname(topology.logslurp)
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(ec2_hostname, username="ec2-user", pkey=topology.ssh_key)
+    ssh_connect_with_retry(ssh, ec2_hostname, "ec2-user", topology.ssh_key)
 
     global current_ssh
     current_ssh = topology.logslurp

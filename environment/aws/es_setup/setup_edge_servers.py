@@ -33,7 +33,7 @@ import paramiko
 import requests
 from tqdm import tqdm
 
-from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
+from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar, ssh_connect_with_retry
 from environment.aws.common.output import header
 from environment.aws.common.x509_certificate import create_self_signed_certificate
 from environment.aws.topology_setup.setup_topology import TopologyConfig
@@ -229,7 +229,7 @@ def setup_server(
 
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(hostname, username="ec2-user", pkey=pkey)
+    ssh_connect_with_retry(ssh, hostname, "ec2-user", pkey)
 
     global current_ssh
     current_ssh = hostname

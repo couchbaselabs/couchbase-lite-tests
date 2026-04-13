@@ -17,6 +17,7 @@ Functions:
 """
 
 import os
+import socket
 import sys
 import tarfile
 import time
@@ -32,6 +33,44 @@ from requests import Response
 from tqdm import tqdm
 
 LIGHT_GRAY = (128, 128, 128)
+
+
+def ssh_connect_with_retry(
+    ssh: paramiko.SSHClient,
+    hostname: str,
+    username: str,
+    pkey: paramiko.Ed25519Key,
+    retries: int = 18,
+    delay: float = 10.0,
+) -> None:
+    """Connect an SSHClient with automatic retries for freshly booted EC2 instances.
+
+    EC2 instances are not immediately accessible after terraform apply.  This
+    helper retries the connection up to ``retries`` times with ``delay`` seconds
+    between attempts before propagating the final exception.
+
+    Args:
+        ssh: A configured (but not yet connected) SSHClient.
+        hostname: The host to connect to.
+        username: SSH username.
+        pkey: Private key for authentication.
+        retries: Maximum number of attempts (default 18 × 10 s = ~3 minutes).
+        delay: Seconds to wait between failed attempts.
+    """
+    for attempt in range(1, retries + 1):
+        try:
+            ssh.connect(hostname, username=username, pkey=pkey)
+            return
+        except (paramiko.ssh_exception.NoValidConnectionsError, OSError, socket.error) as exc:
+            if attempt == retries:
+                raise
+            click.secho(
+                f"SSH to {hostname} not yet available "
+                f"(attempt {attempt}/{retries}): {exc}. "
+                f"Retrying in {int(delay)}s...",
+                fg="yellow",
+            )
+            time.sleep(delay)
 
 
 def write_chunk(channel: Channel) -> None:

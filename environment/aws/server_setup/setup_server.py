@@ -23,6 +23,7 @@ from environment.aws.common.io import (
     get_ec2_hostname,
     realtime_output,
     sftp_progress_bar,
+    ssh_connect_with_retry,
 )
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
@@ -93,7 +94,7 @@ def setup_node(
     header(f"Setting up server {hostname} with version {version}")
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(hostname, username="ec2-user", pkey=pkey)
+    ssh_connect_with_retry(ssh, hostname, "ec2-user", pkey)
 
     sftp = ssh.open_sftp()
     sftp_progress_bar(sftp, SCRIPT_DIR / "configure-node.sh", "/tmp/configure-node.sh")
