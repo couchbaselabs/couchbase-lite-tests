@@ -505,7 +505,7 @@ export class TDKImpl implements tdk.TDK {
             : 'PUSH_AND_PULL',
       continuous: rq.config.continuous ?? false,
       acceptParentDomainCookies: false,
-      acceptSelfSignedCerts: false,
+      acceptSelfSignedCerts: true,
       allowReplicationInBackground: false,
       autoPurgeEnabled: rq.config.enableAutoPurge ?? true,
       heartbeat: 300,

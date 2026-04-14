@@ -20,40 +20,45 @@ from cbltest.logging import cbl_error, cbl_info, cbl_warning
 from cbltest.utils import assert_not_null
 from cbltest.version import VERSION
 
-# This is copied from environment/docker/sg/cert/ca_cert.pem (or
-# environment/aws/sgw_setup/cert/ca_cert.pem when running against AWS).
-# If the cert file changes, update this too.  The CA must include the
-# keyUsage extension (keyCertSign) or Python 3.13+ will reject it.
+# Self-signed server certificate used by Sync Gateway on AWS.
+# Subject/Issuer: CN=*.compute-1.amazonaws.com
+# SANs: compute-1.amazonaws.com, *.compute-1.amazonaws.com
+# Valid: Apr 2026 - Apr 2028
+# This is a self-signed cert (issuer == subject), which allows CBL Android
+# to accept it via acceptOnlySelfSignedServerCertificate=true without relying
+# on certificate pinning.  It is also used as the trust anchor for the Python
+# admin-API SSL context (cadata) and for cert-pinning on platforms that do
+# support the mechanism.
 _SGW_CA_CERT: str = """-----BEGIN CERTIFICATE-----
-MIIFWTCCA0GgAwIBAgIUBdrc0OhquX8RnXtZ6AiOY+57C18wDQYJKoZIhvcNAQEL
-BQAwPDEZMBcGA1UEAwwQSW50ZXJuYWwgVGVzdCBDQTESMBAGA1UECgwJQ291Y2hi
-YXNlMQswCQYDVQQGEwJVUzAeFw0yNTEwMjkwMTAzMDBaFw0yNzEwMjkwMTAzMDBa
-MDwxGTAXBgNVBAMMEEludGVybmFsIFRlc3QgQ0ExEjAQBgNVBAoMCUNvdWNoYmFz
-ZTELMAkGA1UEBhMCVVMwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCl
-vMLIQDFfEcttEUSzBKkzoRSSLJ3Z/73xmJxBenCtZ9HasLhF3iJxwyQK09nD7sLv
-RRwLeRfY8QObr/F/qJAa1cQtVA/5UxIiKsjDk+TrUibg4p6NFSgKUEg+08D0tRHG
-CF3CF/3qcM/10A+Pg2K1COaAtPrYjslOv8DoDBzwOBxibaheDZmtBdPEeHghDXZr
-DWYDe2770XGzKYqINCEDxNdyDUBdiNSzuX2h/YeZi6vGTtpAt3Iti2SIerRrCiah
-UOlykQoqiDVh4JPXts79Xhszw0oDK6YWHEBBfXmYDUdYAyF97XC6hZc+6HxiCVTB
-887mkyLCuKMGfB3dabyCqJ31fXm7gmufOs8voCfi/sKjLgcdZQUY4Gw345oYI3Yw
-O41ig/uR04KW2xASba38vXt0fEl9/50+AO3xAy9oaY36nLSnBwTV72VbvTlvevGf
-zSHbVIbtzcuovpudghYizmIqMEFguc8VsGgmwZb8mkypzB80SOoED3nJRziIK1ym
-e+NuO0DIG6xMPUhputNhwqaeYXuSmcUH5YcmLN//ewMIjzxoH33H1cwcADHFioR/
-YfIraSgVZCUhrN9aJlXdDOzDuhbVpXYJMbh5PfAiNLHPCXmo685Utf3ID+nFW1wd
-WOIyuE3aJ5KVtG8hjlgKARV7eEqtxHjIl41QtsxalwIDAQABo1MwUTAdBgNVHQ4E
-FgQUs2WdMu1wh9pJ5dPN80yN1NPAkSswHwYDVR0jBBgwFoAUs2WdMu1wh9pJ5dPN
-80yN1NPAkSswDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAgEAhiYP
-a9dvAv/33u9vBKzUo045RRrfEpv80DSZQb4ttyulrIfbaLFHxaDcf2+S+mywAgoW
-tf9SAwWO41qU7sfIBnFdCh982nP1dD707GDAZIe8ZNpl/Vu3hWY3TRQAp9ufA51w
-wxn0m2tOS18UXpv5BNX1kVaLlAiOzRzmP1ghx08v9yd8eBgnjJ89D2m1U+qFS1Xk
-egiyw66HHc3bG+eo523/l4RDqTx6KkhYnD3Bz89IxMaeK7CuynCY3VyVWPeIUfBr
-clkDBqZa4o7fD3xV6Wiu/NHZsWJx3wog1wwelvlsyOVM+mfd4IOsPGVCCdDGtpoq
-sT+f9mPDXXHKuDER8a7HiCgGK8rAQtCm/P5UFp2HUEIru/psWCXc3vh9HYVX9W79
-TwS+AVAlkeVogs1ugqAXOuGmstnevj6XzA8PszCKDSIV+t1PJSSOtypUyN4gbGGx
-sk1s9bwqy7bw2cMh3tt7HromGOoLnPxnsbQCs5HsqNdiEsPABWnI6m7epm0tFjCe
-gHDyw1LdmZlZ3R7DT+CwfyhxL6hktfs8h7goR1vkmS2q0Alxmw9faKVVpDyWnsZC
-qv6PMC0fI7jhvrr2Uf2Hhw9SQlBFwZ7LjjLqjuuJkclM4VooDElsLbPjSUbA+c5h
-WCKJ0c94mrl9GwwBmcSIKJBvd6u7uAta2fREJeE=
+MIIFZTCCA02gAwIBAgIUYlBS54n87r1aNEuz4A6ig5Z5xb8wDQYJKoZIhvcNAQEL
+BQAwJDEiMCAGA1UEAwwZKi5jb21wdXRlLTEuYW1hem9uYXdzLmNvbTAeFw0yNjA0
+MTMxODMzNDVaFw0yODA0MTIxODMzNDVaMCQxIjAgBgNVBAMMGSouY29tcHV0ZS0x
+LmFtYXpvbmF3cy5jb20wggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDq
+JOzKI7n3YfcFIUT7leM7S0ohKTmPfw21YdVV6ZQRqBbr5qktPF3sV6KtggDa18um
+XLS1Wb4wfGVpc+j58CqXhq7HiCDB7af8FhAusNSbld+twgS3vd80viGyYW8kfj8K
+q1HJU0+N3hgw6idSG5bBI29vEOFf0+8HIwOTdM7pcXmDnRTJr4wyISVWp9cRsESL
+02AkW3Egx93QnKrU8Mx6Hkz81vAtMY9vwXID9dKOmZv/XJXYt/AIn/F6eNZylI6G
+rhIGDbxSKEso13+18+4N6R/CbmldprsQW7A6qOukAo6xDuqV2TW5R6IC6wYBfwQ7
++sFpQWW2sd/IBkvyad87kNGRwhJwR4tVtt2atT3uA2Oi1BV8TCxNH6ZW4bJORMPu
+OH239xVnJBv1Ev1EMlU7hFEtRAOpoIlfxOQAB2zreqF9KMSxQqVpeHE4qRmjzQ69
+eX+ETnEl/NmDhE81NyS1WV5XOdpBjlws1njdD5IUK6sTd76VZvtU/V9rAs20oIfL
+Wya+88n6TwDpzg7RAxwKQOm3vq6iW36uiU79bg4irqNzK9tnf2+lWzZ0spB8jKQe
+BCQnaxWq7A2gu24z/S/0KEA4/R3L2VKn0kgQgtOzsqnhTDMFOiCfXqZKlTonuKgJ
+Jeb58j9StONoXgpqZx+SBBw9syt24q7Cg2LLmmblawIDAQABo4GOMIGLMD0GA1Ud
+EQQ2MDSCF2NvbXB1dGUtMS5hbWF6b25hd3MuY29tghkqLmNvbXB1dGUtMS5hbWF6
+b25hd3MuY29tMAkGA1UdEwQCMAAwCwYDVR0PBAQDAgWgMBMGA1UdJQQMMAoGCCsG
+AQUFBwMBMB0GA1UdDgQWBBR6puERoDJGEN7AfAhiyTIymNTV1zANBgkqhkiG9w0B
+AQsFAAOCAgEApqHbWQ3dmsnFt0zydOunWzJTULa4EGd6Ut3Qx2mBq/rzXuDsMXei
+JNRl9Hc2kcjVQjVoExquXDem1mF6xFusdz8nng8drWF0PMj7b2CehWeihJh55n2d
+h71ivG25h3P3fBlvG2EuWEwtvb0aLihIxC7bdkkxZBiUsHmm1eg9WxzRTughy8zm
+X6lg9Bbx88uHXaGgsEZIp/4R1rK0UeP6I5v9GU9g+f4wKBpbDypyWZ+CNG8c7guh
+Y9KTwVBPIa4j9/VEuSSrnDF0UqdBObezAsew/RfrpOY0z/PQDLqWdxAq1Z1c2LQY
+JIaOT9GZEtaLUmcT3GEy9zXf8ggzDP/aGfhBtPlB3PsWeU/9zn6pguOei4pVrBL4
+Uuh/BXk8eJblXTmdE+8okDnbaa5uIpFADhXHE7LbnQm+TDuZnLoaO32Xi9WQ4K4Y
+asvePnEB/BK58kl1WPIK8skYLA4VdwGln1oT7oeSeoRO5x+cKL31sc5jTxcIDVtE
+32vcRnzN+S9gjKda3Jfk4mGIDK76ofGSacrII+8lfOQXppJlyIpnW9n7nItvEWSF
+EaEsXF2YeFbu98aVmeH7ntUGUgdX4gFlqzImH5zKTJH5FAY8jaPBu0Lq0B2e1+sv
+jcT/ziqxtvaId27M+uvVmwTBJ20xNMs8yWizDXK1lpVFtR16/UMlR0k=
 -----END CERTIFICATE-----
 """
 
@@ -635,22 +640,16 @@ class _SyncGatewayBase:
             )
             return None
 
-        # CBL Android (3.x) passes pinnedServerX509Certificate to LiteCore as a
-        # *trust anchor* for PKIX chain validation, not as an exact leaf-cert match.
-        # A leaf certificate (like sg_cert.pem) cannot serve as a PKIX trust anchor
-        # because it lacks the CA:true BasicConstraints extension; passing one causes
-        # "Trust anchor for certification path not found" (CertPathValidatorException).
+        # Return the self-signed server certificate.  This cert is used in two ways:
+        # 1. As the trust anchor for the Python admin-API SSL context (cadata).
+        # 2. As the pinnedServerCert for CBL replicators (cert pinning as extra security).
         #
-        # The correct value is the CA certificate that *signed* the server's leaf
-        # cert.  That is _SGW_CA_CERT, which is already in use as the trusted CA for
-        # the Python admin-API SSL context.  We return it here so CBL will accept the
-        # server's leaf cert as validly signed by that CA.
+        # The Sync Gateway on AWS is configured with this self-signed cert, and the
+        # mobile client (tdk.ts) sets acceptSelfSignedCerts=true so that CBL Android
+        # accepts it via its built-in self-signed cert acceptance path, even if cert
+        # pinning does not propagate correctly through CBL's internal layers.
         cbl_info(
-            f"Returning CA certificate as pinnedServerCert for {self.hostname} "
-            f"(CBL Android uses it as a trust anchor for chain validation)"
-        )
-        cbl_info(
-            "CA cert first 60 chars: " + _SGW_CA_CERT.strip()[:60].replace("\n", "\\n")
+            f"Returning self-signed server certificate as pinnedServerCert for {self.hostname}"
         )
         return _SGW_CA_CERT.strip()
 
