@@ -33,6 +33,15 @@ source $SCRIPT_DIR/../../shared/config.sh
 # The Android app is the WebSocket *client* and is already launched by step 4 above.
 # If the app starts before pytest binds port 8765, it will retry until the
 # server becomes available (built-in TDK reconnect logic).
+
+# Clear the APK download cache so every build installs the freshly uploaded APK
+# from latestbuilds rather than a stale copy left over from a previous run.
+APK_DOWNLOAD_MARKER="${TEST_SERVER_DIR}/downloaded/reactnative_android/${CBL_VERSION}/.downloaded"
+if [ -f "${APK_DOWNLOAD_MARKER}" ]; then
+    echo "Removing stale APK download marker: ${APK_DOWNLOAD_MARKER}"
+    rm -f "${APK_DOWNLOAD_MARKER}"
+fi
+
 uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 
 pushd $DEV_E2E_TESTS_DIR > /dev/null
