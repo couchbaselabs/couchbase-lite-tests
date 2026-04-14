@@ -135,6 +135,9 @@ class _RequestWebSocketTransport(RequestTransport):
         if CBLPyTestGlobal.running_test_name is not None:
             data["ts_testName"] = CBLPyTestGlobal.running_test_name
 
+        # Wait for an active connection (handles mid-run disconnects / reconnects).
+        await self.__ws_router.ensure_connected(self.__url)
+
         future = self.__ws_router.register(data["ts_id"])
         ws_conn = self.__ws_router.get_websocket_for_write(self.__url)
         await ws_conn.send_str(json.dumps(data))
