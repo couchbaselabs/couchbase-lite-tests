@@ -1,3 +1,4 @@
+import asyncio
 import json
 from abc import ABC, abstractmethod
 from typing import cast
@@ -13,6 +14,12 @@ from cbltest.logging import cbl_trace, cbl_warning
 from cbltest.request_types import GetRootRequest, TestServerRequest, TestServerResponse
 from cbltest.responses import _response_registry
 from cbltest.websocket_router import WebSocketRouter
+
+
+# Per-request timeout for WS responses.  Must be well below pytest's
+# --timeout=300 so a hung Android operation fails fast and leaves enough
+# time for the reconnect logic to relaunch the app before the next test.
+_WS_REQUEST_TIMEOUT_S = 90
 
 
 class RequestTransport(ABC):
@@ -135,13 +142,21 @@ class _RequestWebSocketTransport(RequestTransport):
         if CBLPyTestGlobal.running_test_name is not None:
             data["ts_testName"] = CBLPyTestGlobal.running_test_name
 
-        # Wait for an active connection (handles mid-run disconnects / reconnects).
         await self.__ws_router.ensure_connected(self.__url)
 
         future = self.__ws_router.register(data["ts_id"])
         ws_conn = self.__ws_router.get_websocket_for_write(self.__url)
         await ws_conn.send_str(json.dumps(data))
-        resp = await future
+        try:
+            resp = await asyncio.wait_for(future, timeout=_WS_REQUEST_TIMEOUT_S)
+        except asyncio.TimeoutError:
+            self.__ws_router.discard_pending(data["ts_id"])
+            self.__ws_router.begin_reconnect(self.__url)
+            raise ConnectionError(
+                f"Timed out after {_WS_REQUEST_TIMEOUT_S}s waiting for "
+                f"'{request.http_name}' response from {self.__url}; "
+                "forcing reconnect to clear stuck device state"
+            )
 
         resp_version = cast(int, resp.get("ts_apiVersion", 0))
         uuid = resp.get("ts_serverID")

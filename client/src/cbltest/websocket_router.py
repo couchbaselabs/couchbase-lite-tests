@@ -26,11 +26,9 @@ class WebSocketRouter:
         self.__connections: dict[str, web.WebSocketResponse] = {}
         self.__runner = web.AppRunner(self.__app)
         self.__stopping = False
-        # Per-URL event: set when a live connection exists, cleared while reconnecting.
         self.__connected_events: dict[str, asyncio.Event] = {
             url: asyncio.Event() for url in server_urls
         }
-        # Guard against concurrent reconnect attempts for the same URL.
         self.__reconnect_lock = asyncio.Lock()
 
     async def start(self) -> None:
@@ -41,10 +39,6 @@ class WebSocketRouter:
         self.__stopping = False
         await self.__runner.setup()
 
-        # For ws:// URLs, bind to the port from the first URL so that
-        # native apps (e.g. React Native) can connect to a known port.
-        # For browser-based servers the random port is communicated via
-        # the tdkURL query parameter, so a random port works fine.
         bind_port = 0
         first_url = self.__server_urls[0]
         parsed = urlparse(first_url)
@@ -63,11 +57,6 @@ class WebSocketRouter:
         )
         cbl_info(f"WebSocket router listening on port {chosen_port}")
 
-        # If a relaunch script is configured, run it now — the port is bound
-        # and the server is ready to accept connections.  Launching native WS
-        # apps (e.g. React Native) here guarantees their very first connection
-        # attempt hits a listening port, instead of getting ECONNREFUSED and
-        # relying on a retry window that may expire before pytest starts.
         relaunch_script = os.environ.get("CBL_NATIVE_WS_RELAUNCH_SCRIPT")
         has_native_ws = any(urlparse(u).scheme == "ws" for u in self.__server_urls)
         if has_native_ws and not relaunch_script:
@@ -87,8 +76,6 @@ class WebSocketRouter:
                 flush=True,
             )
             cbl_info(f"Relaunching native WS app via: {relaunch_script}")
-            # Use asyncio subprocess so the event loop stays responsive while
-            # the relaunch script runs (captures stdout/stderr for diagnostics).
             proc = await asyncio.create_subprocess_exec(
                 sys.executable,
                 relaunch_script,
@@ -126,9 +113,6 @@ class WebSocketRouter:
             query = urlencode(params)
             parsed_url = urlparse(url)
             is_native_ws = parsed_url.scheme == "ws"
-            # Native WS apps (React Native) are (re)launched by the relaunch
-            # hook above, right after this port was bound, so they should
-            # connect quickly.  90 s gives ample margin for app startup.
             timeout = 90 if is_native_ws else 30
             if not is_native_ws and CBLPyTestGlobal.auto_start_tdk_page:
                 webbrowser.open_new_tab(f"{url}/tdk.html?{query}")
@@ -192,9 +176,8 @@ class WebSocketRouter:
     async def ensure_connected(self, url: str, timeout: float = 120.0) -> None:
         """Wait until a live WebSocket connection for *url* is available.
 
-        If the device is currently reconnecting this will block until it
-        reconnects (or the timeout expires).  If the device is already
-        connected it returns immediately.
+        Returns immediately if already connected; blocks while a reconnect
+        is in progress.
         """
         event = self.__connected_events.get(url)
         if event is None or event.is_set():
@@ -236,7 +219,8 @@ class WebSocketRouter:
                 ts_id = data.get("ts_id")
                 if ts_id is not None and ts_id in self.__pending:
                     future = self.__pending.pop(ts_id)
-                    future.set_result(data)
+                    if not future.done():
+                        future.set_result(data)
                 else:
                     device = data.get("device")
                     if device is not None:
@@ -257,38 +241,27 @@ class WebSocketRouter:
                 )
 
         # ── Connection closed ──────────────────────────────────────────────
-        if current_url is not None and not self.__stopping:
+        # Only act if this ws is still THE active connection for the URL.
+        # begin_reconnect() may have already claimed ownership and scheduled
+        # its own _close_and_reconnect, in which case we must not interfere
+        # (especially: we must not clear the connected event after a
+        # successful reconnect has already set it).
+        if (
+            current_url is not None
+            and not self.__stopping
+            and self.__connections.get(current_url) is ws
+        ):
             print(
                 f"[cbltest] WebSocket connection from {current_url} dropped",
                 flush=True,
             )
             cbl_warning(f"WebSocket connection from {current_url} dropped")
 
-            # Remove the stale connection and mark as disconnected.
-            if self.__connections.get(current_url) is ws:
-                del self.__connections[current_url]
+            del self.__connections[current_url]
             self.__connected_events[current_url].clear()
 
-            # Fail any in-flight futures immediately so tests error fast
-            # instead of waiting out the full --timeout=300.
-            pending_ids = list(self.__pending.keys())
-            if pending_ids:
-                print(
-                    f"[cbltest] Cancelling {len(pending_ids)} in-flight request(s) "
-                    f"due to disconnected device",
-                    flush=True,
-                )
-            for ts_id in pending_ids:
-                fut = self.__pending.pop(ts_id)
-                if not fut.done():
-                    fut.set_exception(
-                        ConnectionError(
-                            f"WebSocket connection to {current_url} dropped "
-                            "while waiting for response"
-                        )
-                    )
+            self._fail_pending_futures(current_url)
 
-            # Trigger a reconnect in the background if we have a relaunch script.
             relaunch_script = os.environ.get("CBL_NATIVE_WS_RELAUNCH_SCRIPT")
             if relaunch_script:
                 asyncio.ensure_future(
@@ -297,10 +270,78 @@ class WebSocketRouter:
 
         return ws
 
+    # ── Timeout-triggered reconnect (called from send()) ───────────────
+
+    def discard_pending(self, ts_id: int) -> None:
+        """Remove a timed-out pending future so a late reply is harmless."""
+        self.__pending.pop(ts_id, None)
+
+    def begin_reconnect(self, url: str) -> None:
+        """Mark *url* as disconnected and schedule WS close + app relaunch.
+
+        This is called **synchronously** from send() after a per-request
+        timeout.  Clearing the connected event HERE (before send() raises
+        ConnectionError) guarantees the next test's ensure_connected() will
+        wait for the reconnect to finish instead of hitting the stale WS.
+        """
+        self.__connected_events[url].clear()
+
+        ws = self.__connections.pop(url, None)
+        print(
+            f"[cbltest] begin_reconnect: marked {url} disconnected, "
+            f"scheduling WS close + relaunch",
+            flush=True,
+        )
+        cbl_warning(f"Request timeout on {url} — beginning reconnect")
+
+        self._fail_pending_futures(url)
+
+        asyncio.ensure_future(self._close_and_reconnect(url, ws))
+
+    def register(self, ts_id: int) -> Future[dict]:
+        future: Future[dict] = Future()
+        self.__pending[ts_id] = future
+        return future
+
+    # ── Internal helpers ───────────────────────────────────────────────
+
+    def _fail_pending_futures(self, url: str) -> None:
+        pending_ids = list(self.__pending.keys())
+        if pending_ids:
+            print(
+                f"[cbltest] Failing {len(pending_ids)} in-flight request(s) "
+                f"for {url}",
+                flush=True,
+            )
+        for ts_id in pending_ids:
+            fut = self.__pending.pop(ts_id)
+            if not fut.done():
+                fut.set_exception(
+                    ConnectionError(
+                        f"WebSocket connection to {url} lost while waiting for response"
+                    )
+                )
+
+    async def _close_and_reconnect(
+        self, url: str, ws: web.WebSocketResponse | None
+    ) -> None:
+        """Close *ws* (if still open) and relaunch the native app."""
+        if ws is not None and not ws.closed:
+            try:
+                await ws.close(
+                    code=1011,
+                    message=b"Request timed out — forcing reconnect",
+                )
+            except Exception:
+                pass
+
+        relaunch_script = os.environ.get("CBL_NATIVE_WS_RELAUNCH_SCRIPT")
+        if relaunch_script:
+            await self._reconnect(url, relaunch_script)
+
     async def _reconnect(self, url: str, relaunch_script: str) -> None:
-        """Re-launch the native app and wait for it to re-establish the WS connection."""
+        """Re-launch the native app and wait for it to reconnect."""
         async with self.__reconnect_lock:
-            # Double-check: another coroutine may have already reconnected.
             if self.__connected_events[url].is_set():
                 return
 
@@ -333,7 +374,7 @@ class WebSocketRouter:
                     return
 
                 print(
-                    f"[cbltest] App relaunched; waiting up to 90 s for reconnect…",
+                    "[cbltest] App relaunched; waiting up to 90 s for reconnect…",
                     flush=True,
                 )
                 await wait_for(self.__connected_events[url].wait(), timeout=90)
@@ -341,18 +382,16 @@ class WebSocketRouter:
                 cbl_info(f"Device reconnected at {url}")
             except TimeoutError:
                 print(
-                    f"[cbltest] ERROR: device did not reconnect within 90 s after relaunch",
+                    "[cbltest] ERROR: device did not reconnect within 90 s "
+                    "after relaunch",
                     flush=True,
                 )
-                cbl_error(f"Device at {url} did not reconnect within 90 s after relaunch")
+                cbl_error(
+                    f"Device at {url} did not reconnect within 90 s after relaunch"
+                )
             except Exception as exc:
                 print(f"[cbltest] ERROR during reconnect: {exc}", flush=True)
                 cbl_error(f"Error during reconnect for {url}: {exc}")
-
-    def register(self, ts_id: int) -> Future[dict]:
-        future: Future[dict] = Future()
-        self.__pending[ts_id] = future
-        return future
 
     def _lookup_ip(self, remote_url: str) -> str:
         if "localhost" in remote_url:
