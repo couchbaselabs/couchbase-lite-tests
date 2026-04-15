@@ -529,7 +529,7 @@ class DatabaseStatusResponse:
 class _SyncGatewayBase:
     """
     Base class for Sync Gateway clients containing common document and database operations.
-    This class should not be instantiated directly - use SyncGateway or SyncGatewayPublic instead.
+    This class should not be instantiated directly - use SyncGateway or SyncGatewayUserClient instead.
     """
 
     def __init__(
@@ -556,21 +556,6 @@ class _SyncGatewayBase:
             port,
             BasicAuth(username, password, "ascii"),
         )
-        r = requests.get(
-            f"{scheme}{url}:{port}/_config",
-            auth=(username, password),
-            # disable hostname verification as we do in _create_session
-            verify=False,
-            timeout=10,
-        )
-        r.raise_for_status()
-        try:
-            self.using_rosmar = r.json()["bootstrap"]["server"].startswith("rosmar")
-        except AttributeError:
-            raise CblTestError(
-                "Unexpected response {r.json()} from Sync Gateway /_config endpoint, cannot determine if using Rosmar"
-            ) from None
-            self.using_rosmar = False
 
     @property
     def hostname(self) -> str:
@@ -586,6 +571,11 @@ class _SyncGatewayBase:
     def secure(self) -> bool:
         """Gets whether the Sync Gateway instance uses TLS"""
         return self.__secure
+
+    @property
+    def scheme(self) -> str:
+        """Gets the URL scheme to use when connecting to the Sync Gateway instance (http or https)"""
+        return "https://" if self.secure else "http://"
 
     def _create_session(
         self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None
@@ -646,9 +636,8 @@ class _SyncGatewayBase:
 
     async def get_version(self) -> CouchbaseVersion:
         # Telemetry not really important for this call
-        scheme = "https://" if self.secure else "http://"
         async with self._create_session(
-            self.secure, scheme, self.hostname, 4984, None
+            self.secure, self.scheme, self.hostname, 4984, None
         ) as s:
             resp = await self._send_request("get", "/", session=s)
             assert isinstance(resp, dict)
@@ -1345,9 +1334,8 @@ class _SyncGatewayBase:
         )
         params = {"rev": revision}
 
-        scheme = "https://" if self.secure else "http://"
         async with self._create_session(
-            self.secure, scheme, self.hostname, 4984, auth
+            self.secure, self.scheme, self.hostname, 4984, auth
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
@@ -1615,6 +1603,21 @@ class SyncGateway(_SyncGatewayBase):
         """
         super().__init__(url, username, password, port, secure)
         self.__public_port = public_port
+        r = requests.get(
+            f"{self.scheme}{url}:{port}/_config",
+            auth=(username, password),
+            # disable hostname verification as we do in _create_session
+            verify=False,
+            timeout=10,
+        )
+        r.raise_for_status()
+        try:
+            self.using_rosmar = r.json()["bootstrap"]["server"].startswith("rosmar")
+        except AttributeError:
+            raise CblTestError(
+                "Unexpected response {r.json()} from Sync Gateway /_config endpoint, cannot determine if using Rosmar"
+            ) from None
+            self.using_rosmar = False
 
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
@@ -1846,9 +1849,8 @@ class SyncGateway(_SyncGatewayBase):
         # Check if SGW is already running by probing the public endpoint (4984)
         try:
             # Use a short timeout to distinguish "not running" from "slow"
-            scheme = "https://" if self.secure else "http://"
             async with self._create_session(
-                self.secure, scheme, self.hostname, 4984, None
+                self.secure, self.scheme, self.hostname, 4984, None
             ) as session:
                 async with session.get("/", timeout=ClientTimeout(total=5)) as resp:
                     if resp.status == 200:
