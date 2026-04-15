@@ -670,6 +670,9 @@ class TestFest(CBLTestClass):
             }
         )
 
+        self.mark_test_step("Wait for repl1 to finish pushing the deletions")
+        await repl1.wait_for(ReplicatorActivityLevel.IDLE)
+
         self.mark_test_step(
             "Verify that _default.tasks.db1-list1-task1 was deleted from db1"
         )
