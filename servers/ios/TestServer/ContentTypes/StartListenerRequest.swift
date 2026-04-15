@@ -13,7 +13,7 @@ extension ContentTypes {
         let collections: [String]
         let port: UInt16?
         let disableTLS: Bool?
-        let identity: MultipeerReplicatorIdentity?
+        let identity: TLSIdentityData?
         let reuseIdentity: Bool?
         
         public var description: String {

@@ -86,7 +86,7 @@ class DatabaseManager {
         }
     }
     
-    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false, identity:ContentTypes.MultipeerReplicatorIdentity, reuseIdentity: Bool = false) throws -> UUID {
+    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false, identity:ContentTypes.TLSIdentityData, reuseIdentity: Bool = false) throws -> UUID {
         var collectionsArr: [Collection] = []
         
         guard let database = databases[dbName]
@@ -109,27 +109,18 @@ class DatabaseManager {
         listenerConfig.disableTLS = disableTLS
         if !listenerConfig.disableTLS {
             let label = "ios-p2p-\(dbName)"
-            guard let data = Data(base64Encoded: identity.data) else {
-                throw TestServerError.badRequest("Invalid replicator identity data")
-            }
-            if !reuseIdentity {
-                try TLSIdentity.deleteIdentity(withLabel: label)
-            }
             let importedIdentity: TLSIdentity
+            
             do {
-                if reuseIdentity {
+                if !reuseIdentity {
+                    importedIdentity = try DatabaseManager.createTLSIdentity( for: identity, label:label)
+                } else {
                     guard let existingIdentity = try TLSIdentity.identity(withLabel: label) else {
                         throw TestServerError.badRequest(
                             "reuseIdentity=true but no existing TLS identity found for label \(label)"
                         )
                     }
                     importedIdentity = existingIdentity
-                } else {
-                    importedIdentity = try TLSIdentity.importIdentity(
-                        withData: data,
-                        password: identity.password,
-                        label: label
-                    )
                 }
             } catch {
                 throw TestServerError.badRequest("Failed to import TLS identity")
@@ -327,8 +318,8 @@ class DatabaseManager {
     
     public func startMultipeerReplicator(config: ContentTypes.MultipeerReplicatorConfiguration) throws -> UUID {
         Log.log(level: .debug, message: "Starting Multipeer Replicator")
-        
-        let identity = try DatabaseManager.multipeerReplicatorIdentity(for: config)
+        let label = "ios-multipeer-\(config.peerGroupID)"
+        let identity = try DatabaseManager.createTLSIdentity(for: config.identity, label:label)
         
         let authenticator = try DatabaseManager.multipeerAuthenticator(for: config.authenticator)
         
@@ -739,15 +730,14 @@ class DatabaseManager {
         }
     }
     
-    private static func multipeerReplicatorIdentity(for config: ContentTypes.MultipeerReplicatorConfiguration) throws -> TLSIdentity {
-        let label = "ios-multipeer-\(config.peerGroupID)"
+    private static func createTLSIdentity(for identityData: TLSIdentityData, label: String) throws -> TLSIdentity {
         
-        guard let data = Data(base64Encoded: config.identity.data) else {
-            throw TestServerError.badRequest("Invalid multipeer replictor's identity data")
+        guard let data = Data(base64Encoded: identityData.data) else {
+            throw TestServerError.badRequest("Invalid TLS identity data")
         }
         
         try TLSIdentity.deleteIdentity(withLabel: label)
-        return try TLSIdentity.importIdentity(withData: data, password: config.identity.password, label: label)
+        return try TLSIdentity.importIdentity(withData: data, password: identityData.password, label: label)
     }
     
     private static func multipeerAuthenticator(for config: ContentTypes.MultipeerReplicatorCAAuthenticator?) throws -> MultipeerCertificateAuthenticator {

@@ -880,7 +880,7 @@ paths:
                   items:
                     $ref: "#/components/schemas/ReplicationCollection"
                 identity:
-                  $ref: '#/components/schemas/MultipeerReplicatorIdentity'
+                  $ref: '#/components/schemas/TLSIdentityData'
                 authenticator:
                   $ref: '#/components/schemas/MultipeerReplicatorCAAuthenticator'
                 transports:
@@ -1329,10 +1329,10 @@ components:
               transport:
                 type: string
                 enum: ['WIFI', 'BLUETOOTH']
-    MultipeerReplicatorIdentity:
+    TLSIdentityData:
       description: |-
-        MultipeerReplicatorIdentity is used to specify a TLS certificate and key particular
-        for a multipeer replciator so that it can identify itself.
+        TLSIdentityData is used to specify a TLS certificate and key particular
+        for a  replicator so that it can identify itself.
       type: object
       required: ['encoding', 'data']
       properties:
