@@ -730,7 +730,7 @@ class DatabaseManager {
         }
     }
     
-    private static func createTLSIdentity(for identityData: TLSIdentityData, label: String) throws -> TLSIdentity {
+    private static func createTLSIdentity(for identityData: ContentTypes.TLSIdentityData, label: String) throws -> TLSIdentity {
         
         guard let data = Data(base64Encoded: identityData.data) else {
             throw TestServerError.badRequest("Invalid TLS identity data")
