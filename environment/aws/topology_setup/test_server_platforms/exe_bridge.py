@@ -58,17 +58,25 @@ class ExeBridge(PlatformBridge):
     A class to manage executable applications on local or remote machines.
     """
 
-    def __init__(self, exe_path: str, extra_args: list[str] | None = None):
+    def __init__(
+        self,
+        exe_path: str,
+        extra_args: list[str] | None = None,
+        *,
+        log_filename: str = "server.log",
+    ):
         """
         Initialize the ExeBridge with the executable path and optional extra arguments.
 
         Args:
             exe_path (str): The path to the executable file.
             extra_args (Optional[List[str]]): A list of extra arguments to pass to the executable.
+            log_filename (str): The filename for the log output (default "server.log").
         """
         self.__exe_path = exe_path
         self.__extra_args = extra_args or []
         self.__exe_name = Path(self.__exe_path).name
+        self.__log_filename = log_filename
 
     def validate(self, location: str) -> None:
         """
@@ -104,7 +112,7 @@ class ExeBridge(PlatformBridge):
 
         args = [self.__exe_path]
         args.extend(self.__extra_args)
-        log_file = Path(self.__exe_path).parent / "server.log"
+        log_file = Path(self.__exe_path).parent / self.__log_filename
         log_fd = open(log_file, "w")
         process = subprocess.Popen(
             args, start_new_session=True, stdout=log_fd, stderr=log_fd
