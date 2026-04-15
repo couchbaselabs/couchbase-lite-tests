@@ -61,13 +61,23 @@ echo "Relaunch script exists: $(test -f "$CBL_NATIVE_WS_RELAUNCH_SCRIPT" && echo
 echo "Python executable used by uv: $(uv run python -c 'import sys; print(sys.executable)')"
 
 echo "Run the React Native Android tests"
+# Full suite (restore after validation)
+# uv run pytest \
+#     --maxfail=7 \
+#     -v \
+#     -W ignore::DeprecationWarning \
+#     --config config.json \
+#     --dataset-version $DATASET_VERSION \
+#     --ignore=test_multipeer.py \
+#     -k "not listener and not multipeer and not custom_conflict" \
+#     --tb=short \
+#     --timeout=300
+# Validation run: verify cleanup() fix for test_pull_after_restore_access -> test_push_after_remove_access
 uv run pytest \
-    --maxfail=7 \
     -v \
     -W ignore::DeprecationWarning \
     --config config.json \
     --dataset-version $DATASET_VERSION \
-    --ignore=test_multipeer.py \
-    -k "not listener and not multipeer and not custom_conflict" \
     --tb=short \
-    --timeout=300
+    --timeout=300 \
+    -k "test_pull_after_restore_access or test_push_after_remove_access"
