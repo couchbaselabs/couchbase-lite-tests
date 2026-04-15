@@ -8,6 +8,7 @@ from typing import Any, cast
 from urllib.parse import urljoin
 
 import requests
+import tenacity
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
@@ -17,7 +18,7 @@ from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_error, cbl_info, cbl_warning
+from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
 from cbltest.utils import assert_not_null
 from cbltest.version import VERSION
 
@@ -659,7 +660,7 @@ class _SyncGatewayBase:
 
     def tls_cert(self) -> str | None:
         if not self.secure:
-            cbl_warning(
+            cbl_trace(
                 "Sync Gateway instance not using TLS, returning empty tls_cert..."
             )
             return None
@@ -1873,6 +1874,22 @@ class SyncGateway(_SyncGatewayBase):
                         raise Exception(f"Failed to start SGW: {resp.status} - {body}")
                     # Wait a bit for SGW to fully initialize
                     await asyncio.sleep(5)
+
+    @tenacity.retry(
+        wait=tenacity.wait_fixed(0.1),
+        # Sync Gateway polling time is 10s, so wait 60s for polling time + any additional work
+        stop=tenacity.stop_after_delay(60),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type(AssertionError),
+    )
+    async def wait_for_no_databases(self, bucket_name: str):
+        with self._tracer.start_as_current_span("get_all_dbs"):
+            resp = await self._send_request("get", "/_all_dbs?verbose=true")
+            assert isinstance(resp, list), resp
+            for db in resp:
+                assert db["bucket"] != bucket_name, (
+                    f"Database {db=} is still backed by bucket {bucket_name}"
+                )
 
     async def wait_for_db_gone_clusterwide(
         self,

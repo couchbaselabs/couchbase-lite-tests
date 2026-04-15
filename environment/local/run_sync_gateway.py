@@ -49,6 +49,7 @@ def main(start, stop, server):
     if stop:
         bridge.stop("localhost")
     else:
+        bridge.stop("localhost")
         bridge.run("localhost")
 
 
