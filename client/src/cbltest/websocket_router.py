@@ -292,7 +292,7 @@ class WebSocketRouter:
             f"scheduling WS close + relaunch",
             flush=True,
         )
-        cbl_warning(f"Request timeout on {url} — beginning reconnect")
+        cbl_warning(f"Request timeout on {url} beginning reconnect")
 
         self._fail_pending_futures(url)
 
@@ -330,7 +330,7 @@ class WebSocketRouter:
             try:
                 await ws.close(
                     code=1011,
-                    message=b"Request timed out — forcing reconnect",
+                    message=b"Request timed out forcing reconnect",
                 )
             except Exception:
                 pass
