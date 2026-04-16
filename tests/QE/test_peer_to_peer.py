@@ -595,8 +595,7 @@ class TestPeerToPeer(CBLTestClass):
                 all_dbs[0],
                 ["_default._default"],
                 59840,
-                identity=listener1.identity,
-                reuse_identity=True,
+                identity=None
             )
             await listener2.start()
             return listener2

@@ -19,8 +19,7 @@ class Listener:
         collections: list[str],
         port: int = 59840,
         disable_tls: bool = False,
-        identity: CertKeyPair | None = None,
-        reuse_identity: bool = False,
+        identity: CertKeyPair | None = None
     ):
         self.database = database
         """The database that the listener will be serving"""
@@ -43,9 +42,6 @@ class Listener:
         self.__original_port = port
         self.__identity = identity
         self.__index = database._index
-        if not identity:
-            self.__identity = create_leaf_certificate(f"Test Server {self.__index}")
-        self.reuse_identity = reuse_identity
         self.__request_factory = database._request_factory
         self.__tracer = get_tracer(__name__, VERSION)
         self.__id: str = ""
@@ -53,7 +49,8 @@ class Listener:
     @property
     def identity(self) -> CertKeyPair:
         """Gets the identity used by the replicator"""
-        assert self.__identity is not None, "Listener identity not initialized"
+        if self.__identity is None:
+            self.__identity = create_leaf_certificate(f"Test Server {self.__index}")
         return self.__identity
 
     async def start(self) -> None:
@@ -65,8 +62,7 @@ class Listener:
                 collections=self.collections,
                 port=self.port,
                 disable_tls=self.disable_tls,
-                identity=self.__identity,
-                reuse_identity=self.reuse_identity,
+                identity=self.__identity
             )
             resp = await self.__request_factory.send_request(self.__index, request)
             if resp.error is not None:

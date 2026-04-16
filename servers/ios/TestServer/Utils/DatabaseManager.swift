@@ -86,7 +86,7 @@ class DatabaseManager {
         }
     }
     
-    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false, identity:ContentTypes.TLSIdentityData, reuseIdentity: Bool = false) throws -> UUID {
+    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false, identity:ContentTypes.TLSIdentityData) throws -> UUID {
         var collectionsArr: [Collection] = []
         
         guard let database = databases[dbName]
@@ -112,12 +112,12 @@ class DatabaseManager {
             let importedIdentity: TLSIdentity
             
             do {
-                if !reuseIdentity {
-                    importedIdentity = try DatabaseManager.createTLSIdentity( for: identity, label:label)
+                if let id = identity {
+                    importedIdentity = try DatabaseManager.createTLSIdentity( for: id, label:label)
                 } else {
                     guard let existingIdentity = try TLSIdentity.identity(withLabel: label) else {
                         throw TestServerError.badRequest(
-                            "reuseIdentity=true but no existing TLS identity found for label \(label)"
+                            "TLS enabled but no existing TLS identity found for label \(label)"
                         )
                     }
                     importedIdentity = existingIdentity
