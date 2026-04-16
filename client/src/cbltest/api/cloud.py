@@ -171,7 +171,8 @@ class CouchbaseCloud:
                     raise
         else:
             self.couchbase_server.drop_bucket(bucket_name)
-            await self.couchbase_server.wait_for_bucket_deleted(bucket_name)
+            if wait_for_deleted:
+                await self.couchbase_server.wait_for_bucket_deleted(bucket_name)
 
         if wait_for_deleted:
             await self.__sync_gateway.wait_for_no_databases(bucket_name)
