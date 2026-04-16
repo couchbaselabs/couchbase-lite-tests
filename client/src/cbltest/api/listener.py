@@ -19,7 +19,7 @@ class Listener:
         collections: list[str],
         port: int = 59840,
         disable_tls: bool = False,
-        identity: CertKeyPair | None = None
+        identity: CertKeyPair | None = None,
     ):
         self.database = database
         """The database that the listener will be serving"""
@@ -50,8 +50,11 @@ class Listener:
     def identity(self) -> CertKeyPair:
         """Gets the identity used by the replicator"""
         if self.__identity is None:
-            self.__identity = create_leaf_certificate(f"Test Server {self.__index}")
+            self.set_identity()
         return self.__identity
+
+    def set_identity(self):
+        self.__identity = create_leaf_certificate(f"Test Server {self.__index}")
 
     async def start(self) -> None:
         """Start listening for incoming connections"""
@@ -62,7 +65,7 @@ class Listener:
                 collections=self.collections,
                 port=self.port,
                 disable_tls=self.disable_tls,
-                identity=self.__identity
+                identity=self.__identity,
             )
             resp = await self.__request_factory.send_request(self.__index, request)
             if resp.error is not None:
