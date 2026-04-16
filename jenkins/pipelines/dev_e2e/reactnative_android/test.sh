@@ -61,25 +61,25 @@ echo "Relaunch script exists: $(test -f "$CBL_NATIVE_WS_RELAUNCH_SCRIPT" && echo
 echo "Python executable used by uv: $(uv run python -c 'import sys; print(sys.executable)')"
 
 # Single-test run (restore the full-suite block below when finished debugging).
-echo "Run the React Native Android tests (only test_push_after_remove_access)"
-uv run pytest \
-    -v \
-    -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version $DATASET_VERSION \
-    --tb=short \
-    --timeout=300 \
-    test_replication_auto_purge.py::TestReplicationAutoPurge::test_push_after_remove_access
-
-# Full suite:
-# echo "Run the React Native Android tests"
+# echo "Run the React Native Android tests (only test_push_after_remove_access)"
 # uv run pytest \
-#     --maxfail=7 \
 #     -v \
 #     -W ignore::DeprecationWarning \
 #     --config config.json \
 #     --dataset-version $DATASET_VERSION \
-#     --ignore=test_multipeer.py \
-#     -k "not listener and not multipeer and not custom_conflict" \
 #     --tb=short \
-#     --timeout=300
+#     --timeout=300 \
+#     test_replication_auto_purge.py::TestReplicationAutoPurge::test_push_after_remove_access
+
+# Full suite:
+echo "Run the React Native Android tests"
+uv run pytest \
+    --maxfail=7 \
+    -v \
+    -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version $DATASET_VERSION \
+    --ignore=test_multipeer.py \
+    -k "not listener and not multipeer and not custom_conflict" \
+    --tb=short \
+    --timeout=300
