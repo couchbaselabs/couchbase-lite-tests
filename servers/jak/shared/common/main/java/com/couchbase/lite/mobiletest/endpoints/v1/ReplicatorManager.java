@@ -201,13 +201,12 @@ public class ReplicatorManager extends BaseReplicatorManager {
             final Dictionary localDict = localDoc.getDictionary(docProp);
             final Dictionary remoteDict = remoteDoc.getDictionary(docProp);
             if (localDict == null || remoteDict == null) {
-                return doc.setString("bad", "really bad");
-//                 return doc.setString(docProp, "Both values are not dictionary");
+                return doc.setString(docProp, "Both values are not dictionary");
             }
 
             final MutableDictionary mergedDict = new MutableDictionary();
             for (String key : localDict) {
-                mergedDict.setValue(key, localDict.getValue(key));
+                mergedDict.setValue(docProp, localDict.getValue(key));
             }
 
             for (String key : remoteDict) {
@@ -216,10 +215,8 @@ public class ReplicatorManager extends BaseReplicatorManager {
                     return doc.setString(key, String.format("Conflicting values found at key named %s", key));
                 }
 
-                mergedDict.setValue(key, remoteValue);
+                mergedDict.setValue(docProp, remoteValue);
             }
-
-            mergedDict.setString("foo", "bar");
 
             return doc.setDictionary(docProp, mergedDict);
         }
