@@ -1876,8 +1876,9 @@ class SyncGateway(_SyncGatewayBase):
                     await asyncio.sleep(5)
 
     @tenacity.retry(
-        wait=tenacity.wait_fixed(0.1),
-        # Sync Gateway polling time is 10s, so wait 60s for polling time + any additional work
+        wait=tenacity.wait_random_exponential(multiplier=1, max=10),
+        # Sync Gateway polling time is 10s, so use bounded exponential backoff with jitter
+        # and wait up to 60s for polling time + any additional work.
         stop=tenacity.stop_after_delay(60),
         reraise=True,
         retry=tenacity.retry_if_exception_type(AssertionError),
