@@ -5,7 +5,7 @@ import ssl
 from abc import ABC, abstractmethod
 from json import dumps, loads
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, AsyncIterator, cast
 from urllib.parse import urljoin
 
 import requests
@@ -1961,23 +1961,27 @@ class SyncGateway(_SyncGatewayBase):
         await asyncio.sleep(settle_online)
 
     @contextlib.asynccontextmanager
+    @contextlib.asynccontextmanager
     async def create_user_client(
         self,
         db_name: str,
         username: str,
         password: str,
         channels: list[str],
-    ) -> "SyncGatewayUserClient":
+    ) -> AsyncIterator["SyncGatewayUserClient"]:
         """
-        Helper method to create a user with channel access and return a user-specific SG client.
+        Helper method to create a user with channel access and yield a user-specific SG client.
 
         This is a convenience method for tests that need to verify user-level access control.
+        Use it with ``async with`` only. The yielded client is automatically closed when the
+        context exits and must not be used outside that block.
 
         :param db_name: The database name
         :param username: The username to create
         :param password: The password for the user
         :param channels: List of channels the user should have access to
-        :return: A SyncGatewayUserClient instance authenticated as the user (uses public port)
+        :return: An async context manager yielding a SyncGatewayUserClient authenticated as
+            the user (uses public port)
         """
         # Clean up user if exists from previous run
         await self.delete_user(db_name, username)
