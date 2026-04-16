@@ -5,7 +5,6 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
-from packaging.version import Version
 
 
 @pytest.mark.sgw
@@ -121,10 +120,7 @@ class TestUsersChannels(CBLTestClass):
                     f"Invalid revision format for {row.id}: {row.revision}"
                 )
 
-        sgw_version_obj = await sgs[0].get_version()
-        sgw_version = Version(sgw_version_obj.version)
-        supports_version_vectors = sgw_version >= Version("4.0.0")
-        if supports_version_vectors:
+        if sg.supports_version_vectors():
             self.mark_test_step(
                 "Verify all documents have correct version vector format (SGW 4.0+)"
             )

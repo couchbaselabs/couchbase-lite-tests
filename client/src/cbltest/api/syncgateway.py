@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import re
 import ssl
 from abc import ABC, abstractmethod
@@ -634,6 +635,15 @@ class _SyncGatewayBase:
                 )
 
             return ret_val
+
+    async def supports_version_vectors(self) -> bool:
+        """Return true if Sync Gateway supports version vectors."""
+        resp_data = await self._send_request("get", "/_cluster_info")
+        for bucket in resp_data:
+            return bucket.get("enable_cross_cluster_versioning")
+        raise CblTestError(
+            "Could not determine if Sync Gateway supports version vectors, need at least one database"
+        )
 
     async def get_version(self) -> CouchbaseVersion:
         # Telemetry not really important for this call
@@ -1950,6 +1960,7 @@ class SyncGateway(_SyncGatewayBase):
         # Wait for the node to settle down after coming online
         await asyncio.sleep(settle_online)
 
+    @contextlib.asynccontextmanager
     async def create_user_client(
         self,
         db_name: str,
@@ -1978,13 +1989,17 @@ class SyncGateway(_SyncGatewayBase):
         )
 
         # Return user-specific SG client for public API access
-        return SyncGatewayUserClient(
+        client = SyncGatewayUserClient(
             self.hostname,
             username,
             password,
             port=self.__public_port,
             secure=self.secure,
         )
+        try:
+            yield client
+        finally:
+            await client.close()
 
     async def start_isgr(self, db_name: str, payload: ISGRPayload) -> str:
         """

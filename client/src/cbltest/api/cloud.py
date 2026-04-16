@@ -162,7 +162,32 @@ class CouchbaseCloud:
     async def drop_bucket(self, bucket_name: str, *, wait_for_deleted=False):
         """Drop the bucket from the backing cluster. This is an asynchronous operation unless wait_for_deleted is set to True."""
         if self.sync_gateway.using_rosmar:
-            await self.sync_gateway._send_request("delete", f"/_rosmar/{bucket_name}")
+            try:
+                await self.sync_gateway._send_request(
+                    "delete", f"/_rosmar/{bucket_name}"
+                )
+            except CblSyncGatewayBadResponseError as e:
+                if e.code != 404:
+                    raise
         else:
             self.couchbase_server.drop_bucket(bucket_name)
             await self.couchbase_server.wait_for_bucket_deleted(bucket_name)
+
+        if wait_for_deleted:
+            await self.__sync_gateway.wait_for_no_databases(bucket_name)
+
+    async def create_database(
+        self, db_name: str, db_payload: PutDatabasePayload
+    ) -> None:
+        """Create a Sync Gateway database with the given name and payload. Delete the bucket prior to creation of the database."""
+        await self.drop_bucket(db_payload.bucket, wait_for_deleted=True)
+        await self.__sync_gateway.wait_for_no_databases(db_payload.bucket)
+        await self.create_bucket(db_payload.bucket)
+        await self.__sync_gateway.put_database(db_name, db_payload)
+        await self.__sync_gateway.wait_for_db_up(db_name)
+
+    async def create_bucket(self, bucket_name: str) -> None:
+        """Create a bucket with the given name. Only applicable if not using Rosmar."""
+        if self.sync_gateway.using_rosmar:
+            return None
+        self.couchbase_server.create_bucket(bucket_name)

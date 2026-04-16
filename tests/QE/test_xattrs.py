@@ -7,7 +7,6 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
-from packaging.version import Version
 
 
 @pytest.mark.sgw
@@ -86,9 +85,7 @@ class TestXattrs(CBLTestClass):
         assert sg_created_count == num_docs, (
             f"Expected {num_docs} SG docs, but found {sg_created_count}"
         )
-        sgw_version_obj = await sg.get_version()
-        sgw_version = Version(sgw_version_obj.version)
-        supports_version_vectors = sgw_version >= Version("4.0.0")
+        supports_version_vectors = sg.supports_version_vectors()
         original_revisions = {row.id: row.revision for row in sg_all_docs.rows}
         if supports_version_vectors:
             original_vv = {row.id: row.cv for row in sg_all_docs.rows}
@@ -244,9 +241,7 @@ class TestXattrs(CBLTestClass):
             row.id: row.revision for row in sg_all_docs.rows
         }
 
-        sgw_version_obj = await sg.get_version()
-        sgw_version = Version(sgw_version_obj.version)
-        supports_version_vectors = sgw_version >= Version("4.0.0")
+        supports_version_vectors = sg.supports_version_vectors()
         all_doc_version_vectors: dict[str, str | None] = {}
         if supports_version_vectors:
             self.mark_test_step("Store original version vectors for SG docs (optional)")

@@ -150,10 +150,7 @@ class TestReplicationMultipleClients(CBLTestClass):
                 f"Invalid revision format for {row.id}: {row.revision}"
             )
 
-        sgw_version_obj = await sg.get_version()
-        sgw_version = Version(sgw_version_obj.version)
-        supports_version_vectors = sgw_version >= Version("4.0.0")
-        if supports_version_vectors:
+        if sg.supports_version_vectors():
             self.mark_test_step(
                 "Verify all documents have correct version vector format (SGW 4.0+)"
             )
