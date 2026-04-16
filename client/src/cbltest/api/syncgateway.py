@@ -1616,7 +1616,7 @@ class SyncGateway(_SyncGatewayBase):
             self.using_rosmar = config["bootstrap"]["server"].startswith("rosmar")
         except KeyError:
             raise CblTestError(
-                f"Unexpected response rom Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
+                f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
             ) from None
 
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
