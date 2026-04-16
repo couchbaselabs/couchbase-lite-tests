@@ -783,7 +783,7 @@ paths:
       operationId: startListener
       requestBody:
         description: |-
-          The request object containing the collections to share and, optionally, the port to listen on and disableTLS flag.
+          The request object containing the collections to share and, optionally, the port to listen on, disableTLS flag and TLS Identity.
         content:
           application/json:
             schema:
@@ -803,6 +803,8 @@ paths:
                   example: 12345
                 disableTLS:
                   type: boolean
+                identity:
+                  $ref: '#/components/schemas/TLSIdentityData'
         required: true
       responses:
         '200':

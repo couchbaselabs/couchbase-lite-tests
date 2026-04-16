@@ -49,8 +49,7 @@ class Listener:
     @property
     def identity(self) -> CertKeyPair:
         """Gets the identity used by the replicator"""
-        if self.__identity is None:
-            self.set_identity()
+        assert self.__identity is not None, "Listener identity not initialized"
         return self.__identity
 
     def set_identity(self):
