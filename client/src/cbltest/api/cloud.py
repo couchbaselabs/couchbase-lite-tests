@@ -159,10 +159,15 @@ class CouchbaseCloud:
 
             await self.__sync_gateway.load_dataset(dataset_name, data_filepath)
 
-    async def drop_bucket(self, bucket_name: str, *, wait_for_deleted=False):
-        """Drop the bucket from the backing cluster. This is an asynchronous operation unless wait_for_deleted is set to True."""
+    async def drop_bucket(self, bucket_name: str):
+        """Drop the bucket from the backing cluster."""
         if self.sync_gateway.using_rosmar:
-            await self.sync_gateway._send_request("delete", f"/_rosmar/{bucket_name}")
+            try:
+                await self.sync_gateway._send_request(
+                    "delete", f"/_rosmar/{bucket_name}"
+                )
+            except CblSyncGatewayBadResponseError as e:
+                if e.code != 404:
+                    raise
         else:
             self.couchbase_server.drop_bucket(bucket_name)
-            await self.couchbase_server.wait_for_bucket_deleted(bucket_name)
