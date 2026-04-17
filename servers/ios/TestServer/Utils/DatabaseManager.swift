@@ -86,7 +86,7 @@ class DatabaseManager {
         }
     }
     
-    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false, identity:ContentTypes.TLSIdentityData?) throws -> UUID {
+    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false, identity:ContentTypes.TLSIdentityData? ) throws -> UUID {
         var collectionsArr: [Collection] = []
         
         guard let database = databases[dbName]
