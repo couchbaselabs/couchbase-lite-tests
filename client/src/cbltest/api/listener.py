@@ -17,7 +17,7 @@ class Listener:
         self,
         database: Database,
         collections: list[str],
-        port: int = 59840,
+        port: int | None = None,
         disable_tls: bool = False,
         identity: CertKeyPair | None = None,
     ):
@@ -27,7 +27,7 @@ class Listener:
         self.collections = collections
         """The collections within the database that the listener will be serving"""
 
-        self.port = port
+        self.__port = port
         """
         The port that the listener will request to listen on
         (if None, the OS will choose).  Once start is called,
@@ -52,6 +52,11 @@ class Listener:
         assert self.__identity is not None, "Listener identity not initialized"
         return self.__identity
 
+    @property
+    def port(self) -> int:
+        assert self.__port is not None, "Listener port not set"
+        return self.__port
+
     def set_identity(self):
         self.__identity = create_leaf_certificate(f"Test Server {self.__index}")
 
@@ -62,7 +67,7 @@ class Listener:
                 TestServerRequestType.START_LISTENER,
                 db=self.database.name,
                 collections=self.collections,
-                port=self.port,
+                port=self.__port,
                 disable_tls=self.disable_tls,
                 identity=self.__identity,
             )
@@ -73,7 +78,7 @@ class Listener:
                 return
 
             cast_resp = cast(PostStartListenerResponseMethods, resp)
-            self.port = cast_resp.port
+            self.__port = cast_resp.port
             self.__id = cast_resp.listener_id
 
     async def stop(self) -> None:
@@ -89,5 +94,5 @@ class Listener:
                 cbl_trace(resp.error.message)
                 return
 
-            self.port = self.__original_port
+            self.__port = self.__original_port
             self.__id = ""
