@@ -48,7 +48,7 @@ info:
     Changes
     2.0.3 (04/17/2026)
     * Add identity property to [/startListener](#operation/startListener)
-    
+
     2.0.2 (07/24/2025)
     * Add peer ID property to return value of [/startMultipeerReplicator](#operation/startMultipeerReplicator)
 
