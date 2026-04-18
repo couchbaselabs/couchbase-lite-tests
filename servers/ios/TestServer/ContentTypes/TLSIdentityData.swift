@@ -1,5 +1,5 @@
 //
-//  MultipeerReplicatorIdentity.swift
+//  TLSIdentityData.swift
 //  TestServer
 //
 //  Created by Pasin Suriyentrakorn on 6/4/25.
@@ -12,7 +12,7 @@ extension ContentTypes {
         case PKCS12 = "PKCS12"
     }
     
-    struct MultipeerReplicatorIdentity : Content {
+    struct TLSIdentityData : Content {
         let encoding: IdentityDataEncoding
         let data: String
         let password: String?

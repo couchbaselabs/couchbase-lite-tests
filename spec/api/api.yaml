@@ -46,6 +46,9 @@ info:
       ```
 
     Changes
+    2.0.3 (04/17/2026)
+    * Add identity property to [/startListener](#operation/startListener)
+
     2.0.2 (07/24/2025)
     * Add peer ID property to return value of [/startMultipeerReplicator](#operation/startMultipeerReplicator)
 
@@ -152,7 +155,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 2.0.2
+  version: 2.0.3
 tags:
   - name: API
     description: The API endpoints of the test server
@@ -783,7 +786,7 @@ paths:
       operationId: startListener
       requestBody:
         description: |-
-          The request object containing the collections to share and, optionally, the port to listen on and disableTLS flag.
+          The request object containing the collections to share and, optionally, the port to listen on, disableTLS flag and TLS Identity.
         content:
           application/json:
             schema:
@@ -803,6 +806,8 @@ paths:
                   example: 12345
                 disableTLS:
                   type: boolean
+                identity:
+                  $ref: '#/components/schemas/TLSIdentityData'
         required: true
       responses:
         '200':
@@ -880,7 +885,7 @@ paths:
                   items:
                     $ref: "#/components/schemas/ReplicationCollection"
                 identity:
-                  $ref: '#/components/schemas/MultipeerReplicatorIdentity'
+                  $ref: '#/components/schemas/TLSIdentityData'
                 authenticator:
                   $ref: '#/components/schemas/MultipeerReplicatorCAAuthenticator'
                 transports:
@@ -1329,10 +1334,10 @@ components:
               transport:
                 type: string
                 enum: ['WIFI', 'BLUETOOTH']
-    MultipeerReplicatorIdentity:
+    TLSIdentityData:
       description: |-
-        MultipeerReplicatorIdentity is used to specify a TLS certificate and key particular
-        for a multipeer replciator so that it can identify itself.
+        TLSIdentityData is used to specify a TLS certificate and key particular
+        for a  replicator so that it can identify itself.
       type: object
       required: ['encoding', 'data']
       properties:
