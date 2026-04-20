@@ -1,7 +1,7 @@
 pipeline {
     agent none
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '3.3.2', description: 'Couchbase Lite Version to use')
+        string(name: 'CBL_VERSION', defaultValue: '3.3.3', description: 'Couchbase Lite Version to use')
         string(name: 'SGW_VERSIONS', defaultValue: '3.2.7 3.3.3 3.3.4', description: 'Sync Gateway Versions to upgrade across')
     }
     stages {
