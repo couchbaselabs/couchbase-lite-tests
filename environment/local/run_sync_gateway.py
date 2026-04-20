@@ -46,11 +46,10 @@ def main(start, stop, server):
         log_filename="sync_gateway.log",
     )
 
+    bridge.stop("localhost")
     if stop:
-        bridge.stop("localhost")
-    else:
-        bridge.stop("localhost")
-        bridge.run("localhost")
+        return
+    bridge.run("localhost")
 
 
 if __name__ == "__main__":
