@@ -63,7 +63,7 @@ class GreenboardUploader:
         :param platform: The platform name (e.g. couchbase-lite-net) as specified by the test server
         :param version: The version string (e.g. 3.2.0-b0136, etc) as specified by the test server
         """
-        if self.__overall_fail and not self.__has_sgw_marker:
+        if self.__overall_fail:
             cbl_warning("Overall result is failure, skipping upload...")
             return
 
