@@ -67,13 +67,22 @@ class GreenboardUploader:
             cbl_warning("Overall result is failure, skipping upload...")
             return
 
-        version_components = version.split("-")
-        if len(version_components) != 2:
-            version = "0.0.0"
-            build = 0
-        else:
-            version = version_components[0]
-            build = int(version_components[1].lstrip("b"))
+        version_to_parse = sgw_version if platform == "sync-gateway" else version
+        version_components = version_to_parse.split("-")
+
+        parsed_version = "0.0.0"
+        parsed_build = 0
+
+        if len(version_components) > 0 and version_components[0]:
+            parsed_version = version_components[0]
+
+        if len(version_components) > 1:
+            try:
+                # Handles build numbers like 'b1234' or just '1234'
+                parsed_build = int(version_components[1].lstrip("b"))
+            except ValueError:
+                # If the part after '-' is not a number, build remains 0
+                cbl_warning(f"Could not parse build number from '{version_to_parse}'")
 
         auth = PasswordAuthenticator(self.__username, self.__password)
         opts = ClusterOptions(auth)
@@ -87,8 +96,8 @@ class GreenboardUploader:
         cluster.bucket("greenboard").default_collection().upsert(
             str(uuid4()),
             {
-                "build": build,
-                "version": version,
+                "build": parsed_build,
+                "version": parsed_version,
                 "sgwVersion": sgw_version,
                 "failCount": self.__fail_count,
                 "passCount": self.__pass_count,
