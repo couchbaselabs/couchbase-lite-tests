@@ -10,7 +10,7 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSIONS == '') { error "SGW_VERSIONS are required (atleast one)" }
-                    currentBuild.displayName = "CBL:${params.CBL_VERSION} SGW:${params.SGW_VERSION} (#${currentBuild.number})"
+                    currentBuild.displayName = "SGWs:${params.SGW_VERSIONS} (#${currentBuild.number})"
                 }
             }
         }
