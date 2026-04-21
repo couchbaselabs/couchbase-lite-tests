@@ -129,14 +129,9 @@ class CouchbaseCloud:
 
                 current_span.add_event("Handle HTTP 412")
                 await self.__sync_gateway.delete_database(dataset_name)
-                if self.sync_gateway.using_rosmar:
-                    raise CblTestError(
-                        f"Database {dataset_name} already exists on Sync Gateway and cannot be deleted when "
-                        "using rosmar until CBG-5213 is implemented. To work around, restart a Sync Gateway to "
-                        "delete the rosmar buckets."
-                    )
-                else:
-                    self.__couchbase_server.drop_bucket(db_payload.bucket)
+                await self.drop_bucket(db_payload.bucket)
+                await self.__sync_gateway.wait_for_no_databases(db_payload.bucket)
+                if not self.sync_gateway.using_rosmar:
                     self.__couchbase_server.create_bucket(db_payload.bucket)
                     self._create_collections(db_payload)
 
@@ -163,3 +158,16 @@ class CouchbaseCloud:
                 )
 
             await self.__sync_gateway.load_dataset(dataset_name, data_filepath)
+
+    async def drop_bucket(self, bucket_name: str):
+        """Drop the bucket from the backing cluster."""
+        if self.sync_gateway.using_rosmar:
+            try:
+                await self.sync_gateway._send_request(
+                    "delete", f"/_rosmar/{bucket_name}"
+                )
+            except CblSyncGatewayBadResponseError as e:
+                if e.code != 404:
+                    raise
+        else:
+            self.couchbase_server.drop_bucket(bucket_name)
