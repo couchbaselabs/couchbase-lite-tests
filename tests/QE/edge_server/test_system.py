@@ -624,7 +624,8 @@ class TestSystem(CBLTestClass):
             es_db_name,
         ) = await self._setup_system_test(cblpytest)
 
-        shared = {"edge_server_down": False, "recent_docs": []}
+        shared = {"edge_server_down": False}
+        recent_docs: list[str] = []
 
         async def chaos_controller() -> None:
             while datetime.now() < end_time:
@@ -713,10 +714,9 @@ class TestSystem(CBLTestClass):
                         assert remote_doc.revid is not None, (
                             f"[Client {client_id}] {doc_id} missing _rev on Edge Server"
                         )
-                        recent = shared["recent_docs"]
-                        if len(recent) >= 10:
-                            recent.pop(0)
-                        recent.append(doc_id)
+                        if len(recent_docs) >= 10:
+                            recent_docs.pop(0)
+                        recent_docs.append(doc_id)
                         await fire_read_burst(doc_id)
 
                     rev_id = created_doc.revid
@@ -799,10 +799,9 @@ class TestSystem(CBLTestClass):
                             f"[Client {client_id}] {doc_id} missing _rev on Sync Gateway"
                         )
                         rev_id = sg_doc.revid
-                        recent = shared["recent_docs"]
-                        if len(recent) >= 10:
-                            recent.pop(0)
-                        recent.append(doc_id)
+                        if len(recent_docs) >= 10:
+                            recent_docs.pop(0)
+                        recent_docs.append(doc_id)
                         await fire_read_burst(doc_id)
 
                         if "update" in operations:
