@@ -522,7 +522,9 @@ class TestSystem(CBLTestClass):
                         assert (
                             isinstance(delete_resp, dict)
                             and delete_resp.get("ok") is True
-                        ), f"[Client {client_id}] Failed to delete {doc_id} via Edge Server"
+                        ), (
+                            f"[Client {client_id}] Failed to delete {doc_id} via Edge Server"
+                        )
                         self.mark_test_step(
                             f"[Client {client_id}] Verifying {doc_id} deleted on Edge Server and Sync Gateway."
                         )
@@ -598,7 +600,9 @@ class TestSystem(CBLTestClass):
 
         await asyncio.gather(*[client_worker(i) for i in range(NUM_CLIENTS)])
 
-        self.mark_test_step("Verifying final doc counts match between SG and Edge Server.")
+        self.mark_test_step(
+            "Verifying final doc counts match between SG and Edge Server."
+        )
         sg_response = await sync_gateway.get_all_documents(
             sg_db_name, "_default", "_default"
         )
@@ -662,8 +666,7 @@ class TestSystem(CBLTestClass):
                 f"Firing {NUM_CLIENTS} concurrent reads of {doc_id} on Edge Server."
             )
             reads = [
-                edge_server.get_document(es_db_name, doc_id)
-                for _ in range(NUM_CLIENTS)
+                edge_server.get_document(es_db_name, doc_id) for _ in range(NUM_CLIENTS)
             ]
             results = await asyncio.gather(*reads, return_exceptions=True)
             for result in results:
@@ -757,7 +760,9 @@ class TestSystem(CBLTestClass):
                             assert (
                                 isinstance(delete_resp, dict)
                                 and delete_resp.get("ok") is True
-                            ), f"[Client {client_id}] Failed to delete {doc_id} via Edge Server"
+                            ), (
+                                f"[Client {client_id}] Failed to delete {doc_id} via Edge Server"
+                            )
                             with pytest.raises(CblEdgeServerBadResponseError):
                                 await edge_server.get_document(es_db_name, doc_id)
                             await asyncio.sleep(2)
@@ -805,7 +810,10 @@ class TestSystem(CBLTestClass):
                                 f"[Client {client_id}] Updating {doc_id} on Edge Server."
                             )
                             updated_doc = await edge_server.put_document_with_id(
-                                _updated_doc_body(doc_id), doc_id, es_db_name, rev=rev_id
+                                _updated_doc_body(doc_id),
+                                doc_id,
+                                es_db_name,
+                                rev=rev_id,
                             )
                             assert updated_doc is not None, (
                                 f"[Client {client_id}] Failed to update {doc_id} via Edge Server"
@@ -843,7 +851,9 @@ class TestSystem(CBLTestClass):
         tasks.append(chaos_controller())
         await asyncio.gather(*tasks)
 
-        self.mark_test_step("Verifying final doc counts match between SG and Edge Server.")
+        self.mark_test_step(
+            "Verifying final doc counts match between SG and Edge Server."
+        )
         sg_response = await sync_gateway.get_all_documents(
             sg_db_name, "_default", "_default"
         )
