@@ -1,3 +1,16 @@
+def resolveProgetVersion(String product, String version, String label) {
+    def url = "http://proget.build.couchbase.com:8080/api/get_version?product=${product}&version=${version}&prerelease=true"
+    def resolved
+    if (isUnix()) {
+        resolved = sh(script: "curl -sf '${url}' | jq -r .version", returnStdout: true).trim()
+    } else {
+        resolved = powershell(script: "(Invoke-RestMethod '${url}').version", returnStdout: true).trim()
+    }
+    if (!resolved || resolved == 'null') { error "Could not resolve ${label} from '${version}'" }
+    echo "Resolved ${label}: ${resolved}"
+    return resolved
+}
+
 pipeline {
     agent none
     parameters {
@@ -13,15 +26,7 @@ pipeline {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSIONS == '') { error "SGW_VERSIONS are required (atleast one)" }
 
-                    def progetBase = 'http://proget.build.couchbase.com:8080/api/get_version'
-
-                    def cblVersion = sh(
-                        script: "curl -sf '${progetBase}?product=couchbase-lite-${params.CBL_PLATFORM}&version=${params.CBL_VERSION}&prerelease=true' | jq -r .version",
-                        returnStdout: true
-                    ).trim()
-                    if (!cblVersion || cblVersion == 'null') { error "Could not resolve CBL_VERSION from '${params.CBL_VERSION}'" }
-                    echo "Resolved CBL_VERSION: ${cblVersion}"
-                    env.CBL_VERSION = cblVersion
+                    env.CBL_VERSION = resolveProgetVersion("couchbase-lite-${params.CBL_PLATFORM}", params.CBL_VERSION, 'CBL_VERSION')
 
                     currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${params.SGW_VERSIONS} (#${currentBuild.number})"
                 }

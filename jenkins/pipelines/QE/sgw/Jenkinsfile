@@ -1,3 +1,16 @@
+def resolveProgetVersion(String product, String version, String label) {
+    def url = "http://proget.build.couchbase.com:8080/api/get_version?product=${product}&version=${version}&prerelease=true"
+    def resolved
+    if (isUnix()) {
+        resolved = sh(script: "curl -sf '${url}' | jq -r .version", returnStdout: true).trim()
+    } else {
+        resolved = powershell(script: "(Invoke-RestMethod '${url}').version", returnStdout: true).trim()
+    }
+    if (!resolved || resolved == 'null') { error "Could not resolve ${label} from '${version}'" }
+    echo "Resolved ${label}: ${resolved}"
+    return resolved
+}
+
 pipeline {
     agent none
     parameters {
@@ -13,23 +26,8 @@ pipeline {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
 
-                    def progetBase = 'http://proget.build.couchbase.com:8080/api/get_version'
-
-                    def cblVersion = sh(
-                        script: "curl -sf '${progetBase}?product=couchbase-lite-${params.CBL_PLATFORM}&version=${params.CBL_VERSION}&prerelease=true' | jq -r .version",
-                        returnStdout: true
-                    ).trim()
-                    if (!cblVersion || cblVersion == 'null') { error "Could not resolve CBL_VERSION from '${params.CBL_VERSION}'" }
-                    echo "Resolved CBL_VERSION: ${cblVersion}"
-                    env.CBL_VERSION = cblVersion
-
-                    def sgwVersion = sh(
-                        script: "curl -sf '${progetBase}?product=sync-gateway&version=${params.SGW_VERSION}&prerelease=true' | jq -r .version",
-                        returnStdout: true
-                    ).trim()
-                    if (!sgwVersion || sgwVersion == 'null') { error "Could not resolve SGW_VERSION from '${params.SGW_VERSION}'" }
-                    echo "Resolved SGW_VERSION: ${sgwVersion}"
-                    env.SGW_VERSION = sgwVersion
+                    env.CBL_VERSION = resolveProgetVersion("couchbase-lite-${params.CBL_PLATFORM}", params.CBL_VERSION, 'CBL_VERSION')
+                    env.SGW_VERSION = resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
 
                     currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
                 }
