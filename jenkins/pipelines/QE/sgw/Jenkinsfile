@@ -1,12 +1,16 @@
 def resolveProgetVersion(String product, String version, String label) {
     def url = "http://proget.build.couchbase.com:8080/api/get_version?product=${product}&version=${version}&prerelease=true"
+    echo "Resolving ${label}: ${url}"
     def resolved
     if (isUnix()) {
         resolved = sh(script: "curl -sf '${url}' | jq -r .version", returnStdout: true).trim()
     } else {
-        resolved = powershell(script: "(Invoke-RestMethod '${url}').version", returnStdout: true).trim()
+        resolved = powershell(script: """
+            try { (Invoke-RestMethod '${url}').version }
+            catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
+        """.stripIndent(), returnStdout: true).trim()
     }
-    if (!resolved || resolved == 'null') { error "Could not resolve ${label} from '${version}'" }
+    if (!resolved || resolved == 'null') { error "Could not resolve ${label} from '${version}' (url: ${url})" }
     echo "Resolved ${label}: ${resolved}"
     return resolved
 }
@@ -15,12 +19,12 @@ pipeline {
     agent none
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '4', description: 'Couchbase Lite Version to use')
-        string(name: 'CBL_PLATFORM', defaultValue: 'ios', description: 'Couchbase Lite Version to use')
+        string(name: 'CBL_PLATFORM', defaultValue: 'ios', description: 'Couchbase Lite platform for ProGet lookup')
         string(name: 'SGW_VERSION', defaultValue: '4', description: 'Sync Gateway Version to use')
     }
     stages {
         stage('Init') {
-            agent any
+            agent { label 'mac-mini-new' }
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
