@@ -13,6 +13,7 @@ function usage() {
 if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then usage; fi
 
 CBL_VERSION=${1}
+DATASET_VERSION=${3:-"4.0"}
 SGW_VERSION=${2}
 SETUP_ONLY=false
 
@@ -41,4 +42,4 @@ fi
 # Run Tests :
 echo "Run tests..."
 pushd $QE_TESTS_DIR > /dev/null
-uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m sgw
+uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "${DATASET_VERSION}" -m sgw
