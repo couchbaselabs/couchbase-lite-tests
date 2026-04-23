@@ -114,7 +114,7 @@ def create_signed_cert(cn: str, ca: CertKeyPair):
         .public_key(key.public_key())
         .serial_number(random_serial_number())
         .not_valid_before(datetime.now(timezone.utc))
-        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=1))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365))
         .add_extension(
             ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
             critical=False,
@@ -137,7 +137,7 @@ def create_client_cert(cn: str, ca: CertKeyPair):
         .public_key(key.public_key())
         .serial_number(random_serial_number())
         .not_valid_before(datetime.now(timezone.utc))
-        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=1))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365))
         .add_extension(
             ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]),
             critical=False,
