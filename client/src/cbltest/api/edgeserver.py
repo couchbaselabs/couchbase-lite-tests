@@ -1032,12 +1032,6 @@ class EdgeServer:
         with self.__tracer.start_as_current_span("reset firewall"):
             await self._send_request("post", "firewall", session=self.__shell_session)
 
-    async def get_ca(self):
-        with self.__tracer.start_as_current_span("get_ca"):
-            return await self._send_request(
-                "get", "get-ca", session=self.__shell_session
-            )
-
     async def add_user(self, name, password, role="admin"):
         with self.__tracer.start_as_current_span("Add user"):
             await self.kill_server()
