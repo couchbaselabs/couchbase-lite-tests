@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.serialization import (
     pkcs12,
 )
 from cryptography.x509 import (
+    BasicConstraints,
     Certificate,
     CertificateBuilder,
     ExtendedKeyUsage,
@@ -79,3 +80,69 @@ def create_self_signed_certificate(CN: str) -> CertKeyPair:
     )
 
     return CertKeyPair(leaf_certificate, private_key)
+
+
+def create_ca():
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    subject = issuer = Name([NameAttribute(NameOID.COMMON_NAME, "EdgeTestCA")])
+
+    cert = (
+        CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(random_serial_number())
+        .not_valid_before(datetime.now(timezone.utc))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365))
+        .add_extension(BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+
+    return CertKeyPair(cert, key)
+
+
+def create_signed_cert(cn: str, ca: CertKeyPair):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    subject = Name([NameAttribute(NameOID.COMMON_NAME, cn)])
+
+    cert = (
+        CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(ca.certificate.subject)
+        .public_key(key.public_key())
+        .serial_number(random_serial_number())
+        .not_valid_before(datetime.now(timezone.utc))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=1))
+        .add_extension(
+            ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
+            critical=False,
+        )
+        .sign(ca.private_key, hashes.SHA256())
+    )
+
+    return CertKeyPair(cert, key)
+
+
+def create_client_cert(cn: str, ca: CertKeyPair):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    subject = Name([NameAttribute(NameOID.COMMON_NAME, cn)])
+
+    cert = (
+        CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(ca.certificate.subject)
+        .public_key(key.public_key())
+        .serial_number(random_serial_number())
+        .not_valid_before(datetime.now(timezone.utc))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=1))
+        .add_extension(
+            ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]),
+            critical=False,
+        )
+        .sign(ca.private_key, hashes.SHA256())
+    )
+
+    return CertKeyPair(cert, key)

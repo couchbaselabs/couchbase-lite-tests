@@ -168,9 +168,15 @@ class EdgeServer:
         self, scheme: str, url: str, port: int, auth: BasicAuth | None
     ) -> ClientSession:
         if self.__secure:
-            ssl_context = ssl.create_default_context()
+            CERT_DIR = Path.home() / ".cbl_certs"
+            ssl_context = ssl.create_default_context(cafile=CERT_DIR / "ca_cert.pem")
             ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+            if self.__mtls:
+                ssl_context.load_cert_chain(
+                    certfile=str(CERT_DIR / "client_cert.pem"),
+                    keyfile=str(CERT_DIR / "client_key.pem"),
+                )
+
             return ClientSession(
                 f"{scheme}{url}:{port}",
                 auth=auth,
@@ -1047,6 +1053,12 @@ class EdgeServer:
     async def reset_firewall(self):
         with self.__tracer.start_as_current_span("reset firewall"):
             await self._send_request("post", "firewall", session=self.__shell_session)
+
+    async def get_ca(self):
+        with self.__tracer.start_as_current_span("get_ca"):
+            return await self._send_request(
+                "get", "get-ca", session=self.__shell_session
+            )
 
     async def add_user(self, name, password, role="admin"):
         with self.__tracer.start_as_current_span("Add user"):
