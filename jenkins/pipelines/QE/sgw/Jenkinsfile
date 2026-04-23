@@ -19,7 +19,6 @@ pipeline {
     agent none
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '4', description: 'Couchbase Lite Version to use')
-        string(name: 'CBL_PLATFORM', defaultValue: 'ios', description: 'Couchbase Lite platform for ProGet lookup')
         string(name: 'SGW_VERSION', defaultValue: '4', description: 'Sync Gateway Version to use')
     }
     stages {
@@ -29,10 +28,8 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-
-                    env.CBL_VERSION = resolveProgetVersion("couchbase-lite-${params.CBL_PLATFORM}", params.CBL_VERSION, 'CBL_VERSION')
+                    env.CBL_VERSION = resolveProgetVersion("couchbase-lite-ios", params.CBL_VERSION, 'CBL_VERSION')
                     env.SGW_VERSION = resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
-
                     currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
                 }
             }
