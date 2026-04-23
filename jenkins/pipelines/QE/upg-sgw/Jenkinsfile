@@ -1,5 +1,5 @@
 def resolveProgetVersion(String product, String version, String label) {
-    def url = "http://proget.build.couchbase.com:8080/api/get_version?product=${product}&version=${version}&prerelease=true"
+    def url = "http://proget.build.couchbase.com:8080/api/latest_release?product=${product}&version=${version}&prerelease=true"
     echo "Resolving ${label}: ${url}"
     def resolved
     if (isUnix()) {
@@ -24,7 +24,7 @@ pipeline {
     }
     stages {
         stage('Init') {
-            agent { label 'mac-mini-new' }
+            agent any
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
