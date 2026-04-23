@@ -678,7 +678,7 @@ class _SyncGatewayBase:
             return ret_val
 
     async def supports_version_vectors(self) -> bool:
-        """Returns whether the Sync Gateway instance supports version vectors (i.e. is 3.0 or later)"""
+        """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
         version = await self.get_version()
         return packaging.version.parse(version.version) >= packaging.version.parse(
             "4.0"
@@ -692,7 +692,8 @@ class _SyncGatewayBase:
         # In a dev build /_status "version" does not contain major.minor so use model.vendor.version
         if model.vendor.version in model.version:
             sg_version = SyncGatewayVersion(model.version)
-        sg_version = SyncGatewayVersion(model.vendor.version)
+        else:
+            sg_version = SyncGatewayVersion(model.vendor.version)
         assert packaging.version.parse(sg_version.version), (
             "Failed to parse Sync Gateway version from /_status response {model}"
         )
