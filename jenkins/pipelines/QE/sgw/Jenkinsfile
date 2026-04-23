@@ -1,16 +1,37 @@
 pipeline {
     agent none
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'Couchbase Lite Version to use')
-        string(name: 'SGW_VERSION', defaultValue: '4.0.0', description: 'Sync Gateway Version to use')
+        string(name: 'CBL_VERSION', defaultValue: '4', description: 'Couchbase Lite Version to use')
+        string(name: 'CBL_PLATFORM', defaultValue: 'ios', description: 'Couchbase Lite Version to use')
+        string(name: 'SGW_VERSION', defaultValue: '4', description: 'Sync Gateway Version to use')
     }
     stages {
         stage('Init') {
+            agent any
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "CBL:${params.CBL_VERSION} SGW:${params.SGW_VERSION} (#${currentBuild.number})"
+
+                    def progetBase = 'http://proget.build.couchbase.com:8080/api/get_version'
+
+                    def cblVersion = sh(
+                        script: "curl -sf '${progetBase}?product=couchbase-lite-${params.CBL_PLATFORM}&version=${params.CBL_VERSION}&prerelease=true' | jq -r .version",
+                        returnStdout: true
+                    ).trim()
+                    if (!cblVersion || cblVersion == 'null') { error "Could not resolve CBL_VERSION from '${params.CBL_VERSION}'" }
+                    echo "Resolved CBL_VERSION: ${cblVersion}"
+                    env.CBL_VERSION = cblVersion
+
+                    def sgwVersion = sh(
+                        script: "curl -sf '${progetBase}?product=sync-gateway&version=${params.SGW_VERSION}&prerelease=true' | jq -r .version",
+                        returnStdout: true
+                    ).trim()
+                    if (!sgwVersion || sgwVersion == 'null') { error "Could not resolve SGW_VERSION from '${params.SGW_VERSION}'" }
+                    echo "Resolved SGW_VERSION: ${sgwVersion}"
+                    env.SGW_VERSION = sgwVersion
+
+                    currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
                 }
             }
         }
@@ -19,7 +40,7 @@ pipeline {
                 build job: 'prebuild-test-server',
                 parameters: [
                     string(name: 'TS_PLATFORM', value: 'swift_ios'),
-                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                    string(name: 'CBL_VERSION', value: env.CBL_VERSION),
                 ],
                 wait: true,
                 propagate: true
@@ -37,7 +58,7 @@ pipeline {
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
                 timeout(time: 90, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/sgw/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
+                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION}"
                 }
                 echo "=== SGW Tests Complete"
             }
