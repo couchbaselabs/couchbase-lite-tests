@@ -35,7 +35,11 @@ from tqdm import tqdm
 
 from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
 from environment.aws.common.output import header
-from environment.aws.common.x509_certificate import create_self_signed_certificate
+from environment.aws.common.x509_certificate import (
+    create_ca,
+    create_client_cert,
+    create_signed_cert,
+)
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -257,17 +261,43 @@ def setup_server(
         )
 
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
-    cert = create_self_signed_certificate(hostname)
+    ca = create_ca()
+    ca_cert = ca.pem_bytes()
+    cert = create_signed_cert(hostname, ca)
     cert_pem = cert.pem_bytes()
     key_pem = cert.private_pem_bytes()
+    client = create_client_cert("test-client", ca)
+    client_cert = client.pem_bytes()
+    client_key = client.private_pem_bytes()
+
     with open("/tmp/es_key.pem", "wb") as f:
         f.write(key_pem)
 
     with open("/tmp/es_cert.pem", "wb") as f:
         f.write(cert_pem)
 
+    with open("/tmp/ca_cert.pem", "wb") as f:
+        f.write(ca_cert)
+
+    CERT_DIR = Path.home() / ".cbl_certs"
+    CERT_DIR.mkdir(exist_ok=True)
+
+    client_cert_path = CERT_DIR / "client_cert.pem"
+    client_key_path = CERT_DIR / "client_key.pem"
+    ca_cert_path = CERT_DIR / "ca_cert.pem"
+
+    with open(client_cert_path, "wb") as f:
+        f.write(client_cert)
+
+    with open(client_key_path, "wb") as f:
+        f.write(client_key)
+
+    with open(ca_cert_path, "wb") as f:
+        f.write(ca_cert)
+
     sftp_progress_bar(sftp, Path("/tmp/es_cert.pem"), "/home/ec2-user/cert/es_cert.pem")
     sftp_progress_bar(sftp, Path("/tmp/es_key.pem"), "/home/ec2-user/cert/es_key.pem")
+    sftp_progress_bar(sftp, Path("/tmp/ca_cert.pem"), "/home/ec2-user/cert/ca_cert.pem")
     sftp_progress_bar(
         sftp,
         SCRIPT_DIR / "config" / "config.json",

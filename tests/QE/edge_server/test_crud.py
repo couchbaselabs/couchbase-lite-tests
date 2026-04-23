@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.edgeserver import BulkDocOperation
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -176,3 +177,63 @@ class TestCrud(CBLTestClass):
             self.mark_test_step(
                 f"Deleted doc successfully threw exception on retrieval: {e}"
             )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_multiple_doc_crud(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
+        self.mark_test_step("test_multiple_doc_crud")
+
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+            db_name="names",
+            config_file=f"{SCRIPT_DIR}/config/adhoc_disabled_config.json",
+        )
+
+        self.mark_test_step("Prepare multiple CRUD operations")
+        db_name = "names"
+        all_docs = await edge_server.get_all_documents(db_name=db_name)
+
+        bulk_changes = []
+        created, deleted, updated = [], [], []
+
+        for i in range(1, 11):
+            new_id = f"doc_{i + 200}"
+            bulk_changes.append(BulkDocOperation(_id=new_id, body={"rev": 1, "idx": i}))
+            created.append(new_id)
+
+            bulk_changes.append(
+                BulkDocOperation(
+                    _id=all_docs.rows[i].id,
+                    body={},
+                    rev=all_docs.rows[i].revid,
+                    optype="delete",
+                )
+            )
+            deleted.append(all_docs.rows[i].id)
+
+            bulk_changes.append(
+                BulkDocOperation(
+                    _id=all_docs.rows[i + 50].id,
+                    body={"rev": 2, "idx": i + 50},
+                    rev=all_docs.rows[i + 50].revid,
+                    optype="update",
+                )
+            )
+            updated.append(all_docs.rows[i + 50].id)
+
+        self.mark_test_step("Execute bulk document operations")
+        await edge_server.bulk_doc_op(docs=bulk_changes, db_name=db_name)
+
+        self.mark_test_step("Verify created documents")
+        create_task = await edge_server.get_all_documents(db_name=db_name, keys=created)
+        assert len(create_task) == 10, "Created documents missing"
+
+        self.mark_test_step("Verify updated documents")
+        update_task = await edge_server.get_all_documents(db_name=db_name, keys=updated)
+        assert len(update_task) == 10, "Updated documents missing"
+        for row in update_task.rows:
+            assert row.revid.startswith("2")
+
+        self.mark_test_step("Verify deleted documents")
+        delete_task = await edge_server.get_all_documents(db_name=db_name, keys=deleted)
+        assert len(delete_task) == 0, "Deleted documents still exist"
