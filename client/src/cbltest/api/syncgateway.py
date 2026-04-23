@@ -694,9 +694,13 @@ class _SyncGatewayBase:
             sg_version = SyncGatewayVersion(model.version)
         else:
             sg_version = SyncGatewayVersion(model.vendor.version)
-        assert packaging.version.parse(sg_version.version), (
-            "Failed to parse Sync Gateway version from /_status response {model}"
-        )
+        try:
+            packaging.version.parse(sg_version.version)
+        except packaging.version.InvalidVersion as exc:
+            raise CblTestError(
+                "Failed to parse Sync Gateway version from /_status response: {resp}\n"
+                f"version={model.version}"
+            ) from exc
         return sg_version
 
     def tls_cert(self) -> str | None:
