@@ -26,6 +26,7 @@ from cbltest.api.syncgateway import (
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
+from cbltest.logging import cbl_warning
 from cbltest.version import VERSION
 
 
@@ -40,7 +41,22 @@ class EdgeServerVersion(CouchbaseVersion):
         if first_lparen == -1 or first_semicol == -1:
             return ("unknown", 0)
 
-        return input[0:first_lparen], int(input[first_lparen + 1 : first_semicol])
+        version = input[0:first_lparen].strip()
+        if not version:
+            cbl_warning(
+                f"Could not extract version from Edge Server version string: '{input}'"
+            )
+            version = "unknown"
+
+        try:
+            build = int(input[first_lparen + 1 : first_semicol])
+        except ValueError:
+            cbl_warning(
+                f"Could not parse build number from Edge Server version string: '{input}'"
+            )
+            build = 0
+
+        return (version, build)
 
 
 class BulkDocOperation(JSONSerializable):
@@ -229,8 +245,14 @@ class EdgeServer:
             assert isinstance(resp, dict)
             resp_dict = cast(dict, resp)
             raw_version = _get_typed_required(resp_dict, "version", str)
-            assert "/" in raw_version
-            return EdgeServerVersion(raw_version.split("/")[1])
+            if "/" in raw_version:
+                version_part = raw_version.rsplit("/", 1)[1]
+            else:
+                cbl_warning(
+                    f"Unexpected Edge Server version format (no '/' separator): '{raw_version}'"
+                )
+                version_part = raw_version
+            return EdgeServerVersion(version_part)
 
     async def get_all_documents(
         self,

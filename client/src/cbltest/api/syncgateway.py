@@ -498,7 +498,20 @@ class SyncGatewayVersion(CouchbaseVersion):
         if first_lparen == -1 or first_semicol == -1:
             return ("unknown", 0)
 
-        return input[0:first_lparen], int(input[first_lparen + 1 : first_semicol])
+        version = input[0:first_lparen].strip()
+        if not version:
+            cbl_warning(f"Could not extract version from SGW version string: '{input}'")
+            version = "unknown"
+
+        try:
+            build = int(input[first_lparen + 1 : first_semicol])
+        except ValueError:
+            cbl_warning(
+                f"Could not parse build number from SGW version string: '{input}'"
+            )
+            build = 0
+
+        return (version, build)
 
 
 class DatabaseStatusResponse:
@@ -644,8 +657,14 @@ class _SyncGatewayBase:
             assert isinstance(resp, dict)
             resp_dict = cast(dict, resp)
             raw_version = _get_typed_required(resp_dict, "version", str)
-            assert "/" in raw_version
-            return SyncGatewayVersion(raw_version.split("/")[1])
+            if "/" in raw_version:
+                version_part = raw_version.rsplit("/", 1)[1]
+            else:
+                cbl_warning(
+                    f"Unexpected SGW version format (no '/' separator): '{raw_version}'"
+                )
+                version_part = raw_version
+            return SyncGatewayVersion(version_part)
 
     def tls_cert(self) -> str | None:
         if not self.secure:

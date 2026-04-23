@@ -7,6 +7,7 @@ from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions
 
+from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.logging import cbl_warning
 
 
@@ -54,7 +55,13 @@ class GreenboardUploader:
         """
         return self.__has_sgw_marker
 
-    def upload(self, platform: str, os_name: str, version: str, sgw_version: str):
+    def upload(
+        self,
+        platform: str,
+        os_name: str,
+        version: str,
+        sgw_version: CouchbaseVersion | None,
+    ):
         """
         Uploads the results using the specified platform and version.  The reason that they
         are specified here is because they are probably unknown at the time that this object
@@ -62,27 +69,43 @@ class GreenboardUploader:
 
         :param platform: The platform name (e.g. couchbase-lite-net) as specified by the test server
         :param version: The version string (e.g. 3.2.0-b0136, etc) as specified by the test server
+        :param sgw_version: The parsed SGW CouchbaseVersion object, or None if unavailable
         """
         if self.__overall_fail:
             cbl_warning("Overall result is failure, skipping upload...")
             return
 
-        version_to_parse = sgw_version if platform == "sync-gateway" else version
-        version_components = version_to_parse.split("-")
-
         parsed_version = "0.0.0"
         parsed_build = 0
+        sgw_version_str = "n/a"
 
-        if len(version_components) > 0 and version_components[0]:
-            parsed_version = version_components[0]
+        if sgw_version is not None:
+            sgw_ver = sgw_version.version
+            sgw_build = sgw_version.build_number
+            sgw_version_str = f"{sgw_ver}-{sgw_build}"
 
-        if len(version_components) > 1:
-            try:
-                # Handles build numbers like 'b1234' or just '1234'
-                parsed_build = int(version_components[1].lstrip("b"))
-            except ValueError:
-                # If the part after '-' is not a number, build remains 0
-                cbl_warning(f"Could not parse build number from '{version_to_parse}'")
+        if platform == "sync-gateway" and sgw_version is not None:
+            # For SGW jobs, use the SGW version directly from the parsed object
+            # to avoid the fragile serialize-then-reparse pattern.
+            parsed_version = (
+                sgw_version.version
+                if sgw_version.version and sgw_version.version != "unknown"
+                else "0.0.0"
+            )
+            parsed_build = sgw_version.build_number
+        else:
+            version_components = version.split("-")
+
+            if len(version_components) > 0 and version_components[0]:
+                parsed_version = version_components[0]
+
+            if len(version_components) > 1:
+                try:
+                    # Handles build numbers like 'b1234' or just '1234'
+                    parsed_build = int(version_components[1].lstrip("b"))
+                except ValueError:
+                    # If the part after '-' is not a number, build remains 0
+                    cbl_warning(f"Could not parse build number from '{version}'")
 
         auth = PasswordAuthenticator(self.__username, self.__password)
         opts = ClusterOptions(auth)
@@ -98,7 +121,7 @@ class GreenboardUploader:
             {
                 "build": parsed_build,
                 "version": parsed_version,
-                "sgwVersion": sgw_version,
+                "sgwVersion": sgw_version_str,
                 "failCount": self.__fail_count,
                 "passCount": self.__pass_count,
                 "platform": platform,
