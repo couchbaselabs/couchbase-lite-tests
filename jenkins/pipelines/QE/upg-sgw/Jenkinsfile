@@ -57,7 +57,7 @@ pipeline {
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Upgrades"
                 timeout(time: 90, unit: 'MINUTES') {
-                  sh "jenkins/pipelines/QE/upg-sgw/test.sh ${env.CBL_VERSION} ${params.DATASET_VERSION} ${params.SGW_VERSIONS}"
+                    sh "jenkins/pipelines/QE/upg-sgw/test.sh ${env.CBL_VERSION} ${params.DATASET_VERSION} ${params.SGW_VERSIONS}"
                 }
                 echo "=== SGW Upgrades Complete"
             }
