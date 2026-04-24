@@ -2,7 +2,7 @@ pipeline {
     agent none
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '3', description: 'Couchbase Lite Version (major only auto-resolves via ProGet)')
-        string(name: 'DATASET_VERSION', defaultValue: '4.0', description: 'Dataset Version to use for test-server')
+        string(name: 'DATASET_VERSION', defaultValue: '3.2', description: 'Dataset Version to use for test-server')
         string(name: 'SGW_VERSIONS', defaultValue: '3.2.7 3.3.3 3.3.4', description: 'Sync Gateway Versions to upgrade across')
     }
     stages {

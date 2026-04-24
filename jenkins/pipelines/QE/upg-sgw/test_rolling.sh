@@ -14,7 +14,7 @@ function usage() {
 if [ "$#" -lt 2 ]; then usage; fi
 
 CBL_VERSION=${1}
-DATASET_VERSION=${2:-"4.0"}
+DATASET_VERSION=${2:-"3.2"}
 shift
 
 SETUP_ONLY=false
