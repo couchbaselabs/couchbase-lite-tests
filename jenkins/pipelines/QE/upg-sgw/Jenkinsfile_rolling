@@ -1,3 +1,20 @@
+def resolveProgetVersion(String product, String version, String label) {
+    def url = "http://proget.build.couchbase.com:8080/api/latest_release?product=${product}&version=${version}&prerelease=true"
+    echo "Resolving ${label}: ${url}"
+    def resolved
+    if (isUnix()) {
+        resolved = sh(script: "curl -sf '${url}' | jq -r .version", returnStdout: true).trim()
+    } else {
+        resolved = powershell(script: """
+            try { (Invoke-RestMethod '${url}').version }
+            catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
+        """.stripIndent(), returnStdout: true).trim()
+    }
+    if (!resolved || resolved == 'null') { error "Could not resolve ${label} from '${version}' (url: ${url})" }
+    echo "Resolved ${label}: ${resolved}"
+    return resolved
+}
+
 pipeline {
     agent none
     parameters {
@@ -7,11 +24,13 @@ pipeline {
     }
     stages {
         stage('Init') {
+            agent any
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSIONS == '') { error "SGW_VERSIONS are required (atleast one)" }
-                    currentBuild.displayName = "CBL:${params.CBL_VERSION} SGW:${params.SGW_VERSIONS} (#${currentBuild.number})"
+                    env.CBL_VERSION = resolveProgetVersion("couchbase-lite-ios", params.CBL_VERSION, 'CBL_VERSION')
+                    currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${params.SGW_VERSIONS} (#${currentBuild.number})"
                 }
             }
         }
@@ -20,7 +39,7 @@ pipeline {
                 build job: 'prebuild-test-server',
                 parameters: [
                     string(name: 'TS_PLATFORM', value: 'swift_ios'),
-                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                    string(name: 'CBL_VERSION', value: env.CBL_VERSION),
                 ],
                 wait: true,
                 propagate: true
