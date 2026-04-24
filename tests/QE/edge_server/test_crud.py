@@ -189,12 +189,13 @@ class TestCrud(CBLTestClass):
             config_file=f"{SCRIPT_DIR}/config/adhoc_disabled_config.json",
         )
 
-        self.mark_test_step("Prepare multiple CRUD operations")
+        self.mark_test_step("Fetch existing documents to prepare a list of bulk changes")
         db_name = "names"
         all_docs = await edge_server.get_all_documents(db_name=db_name)
 
         bulk_changes = []
         created, deleted, updated = [], [], []
+        self.mark_test_step("Prepare a bulk CRUD operation")
 
         for i in range(1, 11):
             new_id = f"doc_{i + 200}"
@@ -224,16 +225,16 @@ class TestCrud(CBLTestClass):
         self.mark_test_step("Execute bulk document operations")
         await edge_server.bulk_doc_op(docs=bulk_changes, db_name=db_name)
 
-        self.mark_test_step("Verify created documents")
+        self.mark_test_step("Validate the specifically created documents")
         create_task = await edge_server.get_all_documents(db_name=db_name, keys=created)
         assert len(create_task) == 10, "Created documents missing"
 
-        self.mark_test_step("Verify updated documents")
+        self.mark_test_step("Validate the specifically updated documents")
         update_task = await edge_server.get_all_documents(db_name=db_name, keys=updated)
         assert len(update_task) == 10, "Updated documents missing"
         for row in update_task.rows:
             assert row.revid.startswith("2")
 
-        self.mark_test_step("Verify deleted documents")
+        self.mark_test_step("Validate the specifically deleted documents")
         delete_task = await edge_server.get_all_documents(db_name=db_name, keys=deleted)
         assert len(delete_task) == 0, "Deleted documents still exist"
