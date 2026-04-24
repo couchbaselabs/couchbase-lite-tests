@@ -10,11 +10,11 @@ function usage() {
     exit 1
 }
 
-if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then usage; fi
+if [ "$#" -lt 2 ] || [ "$#" -gt 4 ]; then usage; fi
 
 CBL_VERSION=${1}
-DATASET_VERSION=${3:-"4.0"}
-SGW_VERSION=${2}
+DATASET_VERSION=${2:-"4.0"}
+SGW_VERSION=${3}
 SETUP_ONLY=false
 
 # Check for --setup-only flag
