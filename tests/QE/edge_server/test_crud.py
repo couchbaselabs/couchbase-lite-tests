@@ -190,7 +190,9 @@ class TestCrud(CBLTestClass):
             config_file=f"{SCRIPT_DIR}/config/adhoc_disabled_config.json",
         )
 
-        self.mark_test_step("Fetch existing documents to prepare a list of bulk changes")
+        self.mark_test_step(
+            "Fetch existing documents to prepare a list of bulk changes"
+        )
         db_name = "names"
         all_docs = await edge_server.get_all_documents(db_name=db_name)
 

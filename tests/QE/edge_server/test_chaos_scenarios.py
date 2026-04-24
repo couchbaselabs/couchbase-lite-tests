@@ -281,7 +281,9 @@ class TestEdgeServerChaos(CBLTestClass):
         sgw = cblpytest.sync_gateways[0]
         source_db = sgw.replication_url("travel")
 
-        self.mark_test_step("Configure Edge Server 1 to replicate from Sync Gateway for the `travel` dataset")
+        self.mark_test_step(
+            "Configure Edge Server 1 to replicate from Sync Gateway for the `travel` dataset"
+        )
         config_path = f"{SCRIPT_DIR}/config/test_sgw_edge_server.json"
         with open(config_path, "r") as file:
             config = json.load(file)
@@ -311,7 +313,9 @@ class TestEdgeServerChaos(CBLTestClass):
             db_name="travel", config_file=config_path2
         )
 
-        self.mark_test_step("Wait for replication to become idle across all Edge Servers")
+        self.mark_test_step(
+            "Wait for replication to become idle across all Edge Servers"
+        )
         await edge_server1.wait_for_idle()
         await edge_server2.wait_for_idle()
         await edge_server3.wait_for_idle()
@@ -333,7 +337,9 @@ class TestEdgeServerChaos(CBLTestClass):
         self.mark_test_step("Kill Edge Server 3")
         await edge_server3.kill_server()
 
-        self.mark_test_step("Verify the documents are deleted in Edge Server 1, Edge Server 2, and Sync Gateway")
+        self.mark_test_step(
+            "Verify the documents are deleted in Edge Server 1, Edge Server 2, and Sync Gateway"
+        )
         edge2_docs = await edge_server2.get_all_documents(
             "travel", collection="travel.hotels"
         )
@@ -354,7 +360,9 @@ class TestEdgeServerChaos(CBLTestClass):
         await edge_server3.start_server()
         await asyncio.sleep(100)
 
-        self.mark_test_step("Create 10,000 documents in `travel.hotels` on Edge Server 3")
+        self.mark_test_step(
+            "Create 10,000 documents in `travel.hotels` on Edge Server 3"
+        )
         docgen = JSONGenerator(seed=10, size=10000)
         create_docs = docgen.generate_all_documents()
         bulk_ops = [
@@ -363,7 +371,9 @@ class TestEdgeServerChaos(CBLTestClass):
         ]
         await edge_server3.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
 
-        self.mark_test_step("Verify documents are created on Edge Server 3 and wait for replication to become idle")
+        self.mark_test_step(
+            "Verify documents are created on Edge Server 3 and wait for replication to become idle"
+        )
         all_docs = await edge_server3.get_all_documents(
             db_name="travel", collection="travel.hotels"
         )
