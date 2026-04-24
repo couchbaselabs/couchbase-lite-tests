@@ -1,6 +1,7 @@
 import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
+from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.greenboarduploader import GreenboardUploader
 from cbltest.logging import cbl_info, cbl_warning
 
@@ -43,7 +44,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     yield
 
     try:
-        sgw_version: str = "n/a"
+        sgw_version: CouchbaseVersion | None = None
         test_platform: str = "sync-gateway"
         os_name: str = "n/a"
         library_version: str = "n/a"
@@ -58,10 +59,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
             if "systemName" in test_server_info.device:
                 os_name = test_server_info.device["systemName"]
         if len(cblpytest.sync_gateways) > 0:
-            sgw_version_parts = await cblpytest.sync_gateways[0].get_version()
-            sgw_version = (
-                f"{sgw_version_parts.version}-{sgw_version_parts.build_number}"
-            )
+            sgw_version = await cblpytest.sync_gateways[0].get_version()
         uploader.upload(test_platform, os_name, library_version, sgw_version)
     except Exception as e:
         cbl_warning(f"Failed to upload results to Greenboard: {e}")
