@@ -55,6 +55,8 @@ pipeline {
                     if (response.status != 200) {
                         env.BUILD_BRANCH = 'main'
                     }
+                    env.BUILD_BRANCH = 'maxAPI'
+
                     echo "Build will come from branch ${env.BUILD_BRANCH}"
                 }
             }
