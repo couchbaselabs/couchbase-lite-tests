@@ -346,6 +346,10 @@ class TestSystemMultipeer(CBLTestClass):
         num_devices = len(cblpytest.test_servers)
         assert num_devices >= 5, "Need at least 5 devices for this test"
 
+        transport_arr = MultipeerTransportType.build_group_transports(
+            num_devices, transport
+        )
+
         self.mark_test_step("""
         Start push/pull replication with SGW1
                     Start a replicator:
@@ -418,9 +422,9 @@ class TestSystemMultipeer(CBLTestClass):
                 "couchtest",
                 db,
                 [ReplicatorCollectionEntry(["_default._default"])],
-                transports=transport,
+                transports=transport_arr[idx],
             )
-            for db in all_dbs[:-1]
+            for idx, db in enumerate(all_dbs[:-1])
         ]
         await asyncio.gather(*[mp.start() for mp in multipeer_replicators])
 
