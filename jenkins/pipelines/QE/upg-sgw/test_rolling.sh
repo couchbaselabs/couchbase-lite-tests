@@ -4,9 +4,8 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-    echo "Usage: $0 <cbl_version> <dataset-version> <sgw_version_1> [<sgw_version_2> ... <sgw_version_N>] [--setup-only]"
+    echo "Usage: $0 <cbl_version> <sgw_version_1> [<sgw_version_2> ... <sgw_version_N>] [--setup-only]"
     echo "  <cbl_version>: The Couchbase Lite version to test against."
-    echo "  <dataset-version>: The version of Test Server dataset to be used, based on the CBL version."
     echo "  <sgw_version_X>: One or more Sync Gateway versions for the rolling upgrade test."
     echo "  --setup-only: Only build test servers and setup backend, skip test execution"
     exit 1
@@ -15,7 +14,6 @@ function usage() {
 if [ "$#" -lt 3 ]; then usage; fi
 
 CBL_VERSION=${1}
-DATASET_VERSION=${2:-"3.2"}
 shift
 
 SETUP_ONLY=false
@@ -56,7 +54,7 @@ function rolling_upgrade_to_version() {
         unset SGW_PREVIOUS_VERSION 2>/dev/null || true
 
         pushd $QE_TESTS_DIR > /dev/null
-        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "${DATASET_VERSION}" -m upg_sgw test_rolling_upgrade_sgw.py::TestSgwRollingUpgrade::test_rolling_upgrade_sgw_cluster
+        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
         popd > /dev/null
     else
         # Rolling upgrade: upgrade nodes one at a time
@@ -110,7 +108,7 @@ function rolling_upgrade_to_version() {
             export SGW_PREVIOUS_VERSION="$previous_version"
 
             pushd $QE_TESTS_DIR > /dev/null
-            uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "${DATASET_VERSION}" -m upg_sgw test_rolling_upgrade_sgw.py
+            uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
             popd > /dev/null
         done
 
@@ -123,7 +121,7 @@ function rolling_upgrade_to_version() {
         export SGW_PREVIOUS_VERSION="$previous_version"
 
         pushd $QE_TESTS_DIR > /dev/null
-        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "${DATASET_VERSION}" -m upg_sgw test_rolling_upgrade_sgw.py
+        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
         popd > /dev/null
     fi
 }

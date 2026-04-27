@@ -21,11 +21,6 @@ def resolveProgetVersion(String product, String version, String label) {
 
 pipeline {
     agent none
-    parameters {
-        string(name: 'CBL_VERSION', defaultValue: '4', description: 'Couchbase Lite Version to use')
-        string(name: 'DATASET_VERSION', defaultValue: '4.0', description: 'Dataset Version to use for test-server')
-        string(name: 'SGW_VERSION', defaultValue: '4', description: 'Sync Gateway Version to use')
-    }
     stages {
         stage('Init') {
             agent any
@@ -62,7 +57,7 @@ pipeline {
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
                 timeout(time: 90, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${params.DATASET_VERSION} ${env.SGW_VERSION}"
+                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION}"
                 }
                 echo "=== SGW Tests Complete"
             }

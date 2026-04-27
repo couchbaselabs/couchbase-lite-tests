@@ -4,9 +4,8 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-    echo "Usage: $0 <version> <dataset-version> <sgw_version_1> [<sgw_version_2> ... <sgw_version_N>] [--setup-only]"
+    echo "Usage: $0 <version> <sgw_version_1> [<sgw_version_2> ... <sgw_version_N>] [--setup-only]"
     echo "  <cbl_version>: The Couchbase Server version to test against."
-    echo "  <dataset-version>: The version of Test Server dataset to be used, based on the CBL version."
     echo "  <sgw_version_X>: One or more Sync Gateway versions for the upgrade test."
     echo "  --setup-only: Only build test server and setup backend, skip test execution"
     echo "  Build number will be auto-fetched for the specified version"
@@ -16,7 +15,6 @@ function usage() {
 if [ "$#" -lt 3 ]; then usage; fi
 
 CBL_VERSION=${1}
-DATASET_VERSION=${2:-"4.0"}
 shift # The rest of the arguments are SGW versions or flags
 
 SETUP_ONLY=false
@@ -53,7 +51,7 @@ fi
 echo ">>> Running tests for initial setup with SGW: $CURRENT_SGW_VERSION ..."
 export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
 pushd $QE_TESTS_DIR > /dev/null
-uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "${DATASET_VERSION}" -m upg_sgw test_upg_sgw.py
+uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_upg_sgw.py
 popd > /dev/null
 
 # Loop through the remaining SGW versions and perform upgrades
@@ -84,7 +82,7 @@ for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
     echo ">>> Running tests after upgrading to SGW: $CURRENT_SGW_VERSION ..."
     export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
     pushd $QE_TESTS_DIR > /dev/null
-    uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "${DATASET_VERSION}" -m upg_sgw test_upg_sgw.py
+    uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_upg_sgw.py
     popd > /dev/null
 done
 
