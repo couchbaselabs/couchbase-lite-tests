@@ -6,6 +6,7 @@ set -euo pipefail
 function usage() {
     echo "Usage: $0 <cbl_version> <dataset-version> <sgw_version_1> [<sgw_version_2> ... <sgw_version_N>] [--setup-only]"
     echo "  <cbl_version>: The Couchbase Lite version to test against."
+    echo "  <dataset-version>: The version of Test Server dataset to be used, based on the CBL version."
     echo "  <sgw_version_X>: One or more Sync Gateway versions for the rolling upgrade test."
     echo "  --setup-only: Only build test servers and setup backend, skip test execution"
     exit 1
