@@ -305,6 +305,7 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
         neighbors.forEach((key, value) -> {
             peerInfoMap.put(KEY_ID, key.toString());
             peerInfoMap.put(KEY_STATUS, parseReplStatus(value.getStatus(), null));
+            peerInfoMap.put("transport", value.getTransport().name().toLowerCase(Locale.US));
             peerInfoList.add(peerInfoMap);
         });
 
