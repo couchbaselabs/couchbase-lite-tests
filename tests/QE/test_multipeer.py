@@ -797,15 +797,13 @@ class TestMultipeer(CBLTestClass):
 
         self.mark_test_step("Wait for idle status on all devices")
         try:
-            for device_idx, multipeer in enumerate(multipeer_replicators[1:], 2):
+            for multipeer in multipeer_replicators:
                 status = await multipeer.wait_for_idle(
                     timeout=timedelta(seconds=timeout)
                 )
                 assert all(
                     r.status.replicator_error is None for r in status.replicators
                 ), "Multipeer replicator should not have any errors"
-        except Exception:
-            self.mark_test_step("Timeout while waiting for idle status")
         finally:
             self.mark_test_step("Check that all device databases have the same content")
             retry = 5
