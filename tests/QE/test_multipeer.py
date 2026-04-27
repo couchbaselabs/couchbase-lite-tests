@@ -749,13 +749,13 @@ class TestMultipeer(CBLTestClass):
     @pytest.mark.parametrize(
         "transport, timeout, blob",
         [
-            ("BLUETOOTH", 1200, "s1.jpg"),
-            ("WIFI", 600, "xl1.jpg"),
-            ("MIXED_MODE", 900, "s1.jpg"),
+            ("BLUETOOTH", 1200, "s1.jpg", 4),
+            ("WIFI", 600, "xl1.jpg", 10),
+            ("MIXED_MODE", 900, "s1.jpg", 5),
         ],
     )
     async def test_large_document_replication(
-        self, cblpytest: CBLPyTest, transport, timeout, blob
+        self, cblpytest: CBLPyTest, transport, timeout, blob, doc_count
     ):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
@@ -773,7 +773,7 @@ class TestMultipeer(CBLTestClass):
         db1 = all_dbs[0]
 
         async with db1.batch_updater() as b:
-            for i in range(1, 4):  # Add 10 documents
+            for i in range(1, doc_count + 1):
                 b.upsert_document(
                     "_default._default",
                     f"large_doc{i}",
@@ -817,9 +817,9 @@ class TestMultipeer(CBLTestClass):
 
                     # Verify document count on each device
                     for device_idx, docs in enumerate(all_docs_results, 1):
-                        doc_count = len(docs["_default._default"])
-                        assert doc_count == 3, (
-                            f"Device {device_idx} should have 3 docs, got {doc_count}"
+                        doc_count_per_device = len(docs["_default._default"])
+                        assert doc_count_per_device == doc_count, (
+                            f"Device {device_idx} should have {doc_count} docs, got {doc_count_per_device}"
                         )
 
                     # Verify content matches across all devices
