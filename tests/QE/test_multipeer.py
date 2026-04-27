@@ -833,6 +833,8 @@ class TestMultipeer(CBLTestClass):
                     self.mark_test_step(f"Document validation failed: {e}")
                     retry -= 1
                     await asyncio.sleep(30)
+            if not success:
+                raise AssertionError("Document validation failed after 5 retries")
             await asyncio.gather(
                 *[multipeer.stop() for multipeer in multipeer_replicators]
             )
