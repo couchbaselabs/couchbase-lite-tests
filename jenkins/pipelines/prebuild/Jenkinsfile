@@ -113,6 +113,6 @@ def getNodeForPlatform(platform) {
     } else if (platform.contains("linux")) {
         return 'mob-e2e-deb-02'
     } else {
-        return 'qe-mac-india'
+        return 'mob-e2e-mac-01'
     }
 }
