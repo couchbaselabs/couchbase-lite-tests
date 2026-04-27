@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.EnumSet
 
 import com.couchbase.lite.Conflict;
 import com.couchbase.lite.CouchbaseLiteException;
@@ -45,6 +46,7 @@ import com.couchbase.lite.KeyStoreUtils;
 import com.couchbase.lite.MultipeerCertificateAuthenticator;
 import com.couchbase.lite.MultipeerCollectionConfiguration;
 import com.couchbase.lite.MultipeerReplicatorConfiguration;
+import com.couchbase.lite.MultipeerTransport;
 import com.couchbase.lite.MutableArray;
 import com.couchbase.lite.MutableDictionary;
 import com.couchbase.lite.MutableDocument;
@@ -62,6 +64,7 @@ import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.trees.TypedMap;
 import com.couchbase.lite.mobiletest.util.StringUtils;
+
 
 
 public class MultipeerReplicatorManager extends BaseReplicatorManager {
@@ -86,6 +89,8 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
     // Authenticator
     private static final String KEY_AUTH_CERT = "certificate";
     private static final String TYPE_CERT_AUTH_TYPE = "CA-CERT";
+
+    private static final String KEY_TRANSPORTS = "transports";
 
 
     private interface ConfigurableConflictResolver extends MultipeerCollectionConfiguration.ConflictResolver {
@@ -228,6 +233,7 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
         l.add(KEY_PEER_GROUP);
         l.add(KEY_IDENTITY);
         l.add(KEY_AUTHENTICATOR);
+        l.add(KEY_TRANSPORTS);
         LEGAL_CREATE_KEYS = Collections.unmodifiableSet(l);
     }
 
@@ -320,7 +326,6 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
 
         return Collections.emptyMap();
     }
-
     @NonNull
     private MultipeerReplicatorConfiguration buildConfig(@NonNull TestContext ctxt, @NonNull TypedMap config) {
         final String peerGroup = config.getString(KEY_PEER_GROUP);
@@ -357,6 +362,18 @@ public class MultipeerReplicatorManager extends BaseReplicatorManager {
                 return true;
             }
         })); }
+
+        final TypedList transportList = config.getList(KEY_TRANSPORTS);
+        if (transportList != null && !transportList.isEmpty()) {
+            EnumSet<MultipeerTransport> transports =
+                EnumSet.noneOf(MultipeerTransport.class);
+            for (int i = 0; i < transportList.size(); i++) {
+                String t = transportList.getString(i).trim().toLowerCase(Locale.US);
+                if ("wifi".equals(t)) { transports.add(MultipeerTransport.WIFI); }
+                else if ("bluetooth".equals(t)) { transports.add(MultipeerTransport.BLUETOOTH); }
+            }
+            if (!transports.isEmpty()) { builder.setTransports(transports); }
+        }
 
         return builder.build();
     }
