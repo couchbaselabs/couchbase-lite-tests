@@ -1,4 +1,8 @@
 def resolveProgetVersion(String product, String version, String label) {
+    if (version.tokenize('.').size() >= 3) {
+        echo "${label} already fully qualified: ${version}"
+        return version
+    }
     def url = "http://proget.build.couchbase.com:8080/api/latest_release?product=${product}&version=${version}&prerelease=true"
     echo "Resolving ${label}: ${url}"
     def resolved
