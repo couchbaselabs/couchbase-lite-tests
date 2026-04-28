@@ -8,13 +8,13 @@ function usage() {
     echo "  <cbl_version>: The Couchbase Lite version to test against."
     echo "  <sgw_version_X>: One or more Sync Gateway versions for the rolling upgrade test."
     echo "  --setup-only: Only build test servers and setup backend, skip test execution"
+    echo "  Build number will be auto-fetched for the specified version"
     exit 1
 }
 
 if [ "$#" -lt 2 ]; then usage; fi
 
 CBL_VERSION=${1}
-DATASET_VERSION=${2:-"3.2"}
 shift
 
 SETUP_ONLY=false
@@ -55,7 +55,7 @@ function rolling_upgrade_to_version() {
         unset SGW_PREVIOUS_VERSION 2>/dev/null || true
 
         pushd $QE_TESTS_DIR > /dev/null
-        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "${DATASET_VERSION}" -m upg_sgw test_rolling_upgrade_sgw.py::TestSgwRollingUpgrade::test_rolling_upgrade_sgw_cluster
+        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
         popd > /dev/null
     else
         # Rolling upgrade: upgrade nodes one at a time
@@ -109,7 +109,7 @@ function rolling_upgrade_to_version() {
             export SGW_PREVIOUS_VERSION="$previous_version"
 
             pushd $QE_TESTS_DIR > /dev/null
-            uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "${DATASET_VERSION}" -m upg_sgw test_rolling_upgrade_sgw.py
+            uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
             popd > /dev/null
         done
 
@@ -122,7 +122,7 @@ function rolling_upgrade_to_version() {
         export SGW_PREVIOUS_VERSION="$previous_version"
 
         pushd $QE_TESTS_DIR > /dev/null
-        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "${DATASET_VERSION}" -m upg_sgw test_rolling_upgrade_sgw.py
+        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
         popd > /dev/null
     fi
 }

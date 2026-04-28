@@ -55,7 +55,6 @@ pipeline {
                     if (response.status != 200) {
                         env.BUILD_BRANCH = 'main'
                     }
-
                     echo "Build will come from branch ${env.BUILD_BRANCH}"
                 }
             }

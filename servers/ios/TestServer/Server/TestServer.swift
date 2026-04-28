@@ -11,7 +11,7 @@ import Vapor
 class TestServer : ObservableObject {
     var app : Vapor.Application
     
-    public static let maxAPIVersion = 2
+    public static let maxAPIVersion = 1
     
     public static let serverID = UUID()
     
