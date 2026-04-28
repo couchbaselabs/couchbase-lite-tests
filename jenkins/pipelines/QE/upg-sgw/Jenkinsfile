@@ -21,6 +21,13 @@ def resolveProgetVersion(String product, String version, String label) {
 
 pipeline {
     agent none
+    parameters {}
+// This job uses UI defined params and their default values.
+// That's because we want to be able to trigger this job with different versions without having to modify the Jenkinsfile.
+// The default values in the UI will be used if no parameters are provided at build time.
+// But just for reference, these are the params that are used by the job :
+//         string(name: 'CBL_VERSION', description: 'Couchbase Lite Version to use, eg : "4"')
+//         string(name: 'SGW_VERSIONS', description: 'Sync Gateway Version to use, eg : "4.0.1 4.0.3 4.1.0"')
     stages {
         stage('Init') {
             agent any
