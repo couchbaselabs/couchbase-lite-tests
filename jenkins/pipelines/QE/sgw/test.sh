@@ -4,9 +4,8 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-    echo "Usage: $0 <version> <dataset-version> <sgw_version> [--setup-only]"
+    echo "Usage: $0 <version> <sgw_version> [--setup-only]"
     echo "  <cbl_version>: The Couchbase Lite version to run the test against."
-    echo "  <dataset-version>: The version of Test Server dataset to be used, based on the CBL version."
     echo "  <sgw_version>: Sync Gateway version to be deployed for the test."
     echo "  --setup-only: Only build test server and setup backend, skip test execution"
     echo "  Build number will be auto-fetched for the specified version"

@@ -12,7 +12,7 @@ function usage() {
     exit 1
 }
 
-if [ "$#" -lt 3 ]; then usage; fi
+if [ "$#" -lt 2 ]; then usage; fi
 
 CBL_VERSION=${1}
 shift # The rest of the arguments are SGW versions or flags
