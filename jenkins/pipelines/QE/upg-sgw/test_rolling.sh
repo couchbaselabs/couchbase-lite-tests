@@ -1,6 +1,8 @@
 #!/bin/bash
 
-trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
+trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."
+SGW_UPGRADE_PASSED=false uv run python $SCRIPT_DIR/upload_upgrade_results.py --config $CONFIG_FILE 2>/dev/null || true
+exit 1' ERR
 set -euo pipefail
 
 function usage() {
@@ -33,6 +35,10 @@ source $SCRIPT_DIR/../../shared/config.sh
 TOPOLOGY_FILE="$AWS_ENVIRONMENT_DIR/topology_setup/topology.json"
 CONFIG_TEMPLATE="$SCRIPT_DIR/config.json"
 CONFIG_FILE="$QE_TESTS_DIR/config.json"
+
+# Setup deferred greenboard upload for upgrade batch
+export SGW_UPGRADE_VERSIONS=$(IFS=,; echo "${SGW_VERSIONS[*]}")
+export SGW_UPGRADE_RESULTS_FILE="/tmp/sgw_upgrade_results_$$.jsonl"
 
 # Store the rolling topology template for reuse
 TOPOLOGY_ROLLING_TEMPLATE="$SCRIPT_DIR/topology_rolling.json"
@@ -157,5 +163,7 @@ for SGW_VERSION in "${SGW_VERSIONS[@]}"; do
     fi
 done
 
-echo ""
+# All phases passed — upload combined result
+uv run python $SCRIPT_DIR/upload_upgrade_results.py --config $CONFIG_FILE
+
 echo ">>> SGW Rolling Upgrade test completed successfully."

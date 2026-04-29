@@ -9,6 +9,11 @@ from cbltest.logging import cbl_info, cbl_warning
 # fixture that will upload test results to greenboard, if it is
 # properly set up in config.json (see the schema for that file)
 # and if the --no-result-upload flag is not set on the command line.
+#
+# For upgrade jobs (SGW_UPGRADE_RESULTS_FILE is set), results are written
+# to a shared file instead of uploaded directly. A final upload script
+# reads the file after all pytest invocations complete and uploads one
+# combined document per upgrade batch.
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
@@ -44,23 +49,28 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     yield
 
     try:
-        sgw_version: CouchbaseVersion | None = None
-        test_platform: str = "sync-gateway"
-        os_name: str = "n/a"
-        library_version: str = "n/a"
-        if len(cblpytest.test_servers) > 0:
-            test_server_info = await cblpytest.test_servers[0].get_info()
-            # Keep the platform as SGW if it has one of the sgw markers, since
-            # the test might still use test server with it, but still belong
-            # to SGW and not CBL test platform.
-            library_version = test_server_info.library_version
-            if not uploader.has_sgw_marker():
-                test_platform = test_server_info.cbl
-            if "systemName" in test_server_info.device:
-                os_name = test_server_info.device["systemName"]
-        if len(cblpytest.sync_gateways) > 0:
-            sgw_version = await cblpytest.sync_gateways[0].get_version()
-        uploader.upload(test_platform, os_name, library_version, sgw_version)
+        if uploader.is_deferred:
+            # Upgrade job — write result to shared file; skip direct upload
+            uploader.write_deferred_result()
+            cbl_info("Upgrade mode: deferred result written, skipping direct upload")
+        else:
+            sgw_version: CouchbaseVersion | None = None
+            test_platform: str = "sync-gateway"
+            os_name: str = "n/a"
+            library_version: str = "n/a"
+            if len(cblpytest.test_servers) > 0:
+                test_server_info = await cblpytest.test_servers[0].get_info()
+                # Keep the platform as SGW if it has one of the sgw markers, since
+                # the test might still use test server with it, but still belong
+                # to SGW and not CBL test platform.
+                library_version = test_server_info.library_version
+                if not uploader.has_sgw_marker():
+                    test_platform = test_server_info.cbl
+                if "systemName" in test_server_info.device:
+                    os_name = test_server_info.device["systemName"]
+            if len(cblpytest.sync_gateways) > 0:
+                sgw_version = await cblpytest.sync_gateways[0].get_version()
+            uploader.upload(test_platform, os_name, library_version, sgw_version)
     except Exception as e:
         cbl_warning(f"Failed to upload results to Greenboard: {e}")
     finally:
