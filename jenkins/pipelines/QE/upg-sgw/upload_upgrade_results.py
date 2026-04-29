@@ -70,42 +70,39 @@ def main(config_path: str) -> None:
 
     target_version = upgrade_path[-1]
 
-    # Determine pass/fail
-    explicit_result = os.environ.get("SGW_UPGRADE_PASSED")
-    if explicit_result is not None:
-        passed = explicit_result.lower() != "false"
-    else:
-        # Infer from deferred results file
-        results_file = os.environ.get("SGW_UPGRADE_RESULTS_FILE")
-        if results_file and Path(results_file).exists():
-            passed = True
-            with open(results_file) as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    entry = json.loads(line)
-                    if not entry.get("passed", False):
-                        passed = False
-                        break
-        else:
-            print("WARNING: No results file found, assuming failure.", file=sys.stderr)
-            passed = False
-
-    # Parse target build number from SGW_VERSION_UNDER_TEST if available
-    version_under_test = os.environ.get("SGW_VERSION_UNDER_TEST", target_version)
+    # Read deferred results file — determines pass/fail and extracts SGW build info
+    results_file = os.environ.get("SGW_UPGRADE_RESULTS_FILE")
+    passed = True
+    sgw_full_version: str | None = None
     target_build = 0
-    if "-" in version_under_test:
-        try:
-            target_build = int(version_under_test.split("-")[1].lstrip("b"))
-        except (ValueError, IndexError):
-            pass
 
-    target_sgw_version = (
-        version_under_test
-        if "-" in version_under_test
-        else f"{target_version}-{target_build}"
-    )
+    explicit_result = os.environ.get("SGW_UPGRADE_PASSED")
+    if explicit_result is not None and explicit_result.lower() == "false":
+        passed = False
+
+    if results_file and Path(results_file).exists():
+        with open(results_file) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                entry = json.loads(line)
+                if not entry.get("passed", False):
+                    passed = False
+                # Take the last entry's SGW version (final upgrade target)
+                if "sgwVersion" in entry:
+                    sgw_full_version = entry["sgwVersion"]
+    elif explicit_result is None:
+        print("WARNING: No results file found, assuming failure.", file=sys.stderr)
+        passed = False
+
+    # sgwVersion is now "4.1.0-1234" format — parse build number from it
+    target_sgw_version = sgw_full_version or f"{target_version}-0"
+    if "-" in target_sgw_version:
+        try:
+            target_build = int(target_sgw_version.split("-")[1])
+        except (ValueError, IndexError):
+            target_build = 0
 
     # Import here to avoid requiring cbltest deps at module level for CLI parsing
     from cbltest.greenboarduploader import GreenboardUploader

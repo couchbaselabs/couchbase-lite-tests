@@ -50,8 +50,11 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
 
     try:
         if uploader.is_deferred:
-            # Upgrade job — write result to shared file; skip direct upload
-            uploader.write_deferred_result()
+            # Upgrade job — query SGW version, write result to shared file
+            sgw_version: CouchbaseVersion | None = None
+            if len(cblpytest.sync_gateways) > 0:
+                sgw_version = await cblpytest.sync_gateways[0].get_version()
+            uploader.write_deferred_result(sgw_version)
             cbl_info("Upgrade mode: deferred result written, skipping direct upload")
         else:
             sgw_version: CouchbaseVersion | None = None

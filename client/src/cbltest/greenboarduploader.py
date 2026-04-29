@@ -71,11 +71,14 @@ class GreenboardUploader:
         """True when running as part of an upgrade batch (deferred upload mode)."""
         return os.environ.get("SGW_UPGRADE_RESULTS_FILE") is not None
 
-    def write_deferred_result(self) -> None:
+    def write_deferred_result(
+        self, sgw_version: "CouchbaseVersion | None" = None
+    ) -> None:
         """Append this session's pass/fail outcome to the shared results file.
 
-        Each line is a JSON object: ``{"passed": true}`` or ``{"passed": false}``.
-        The final upload script reads all lines to determine overall pass/fail.
+        Each line is a JSON object with pass/fail and optional SGW version info.
+        The final upload script reads all lines to determine overall pass/fail
+        and extracts the SGW version (with build number) from the last entry.
         """
         results_file = os.environ.get("SGW_UPGRADE_RESULTS_FILE")
         if results_file is None:
@@ -85,7 +88,12 @@ class GreenboardUploader:
             return
 
         passed = not self.__overall_fail and self.__fail_count == 0
-        line = json.dumps({"passed": passed})
+        entry: dict[str, object] = {"passed": passed}
+        if sgw_version is not None:
+            entry["sgwVersion"] = (
+                sgw_version.version + "-" + str(sgw_version.build_number)
+            )
+        line = json.dumps(entry)
         Path(results_file).parent.mkdir(parents=True, exist_ok=True)
         with open(results_file, "a") as f:
             f.write(line + "\n")
