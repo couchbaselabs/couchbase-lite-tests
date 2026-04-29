@@ -92,7 +92,7 @@ for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
     popd > /dev/null
 done
 
-# All phases passed — upload combined result
-uv run python $SCRIPT_DIR/upload_upgrade_results.py --config $CONFIG_FILE
+# All phases passed — upload combined result (best-effort, don't fail the build)
+uv run python $SCRIPT_DIR/upload_upgrade_results.py --config $CONFIG_FILE || echo "WARNING: Greenboard upload failed (non-fatal)"
 
 echo ">>> SGW Upgrade test completed successfully."
