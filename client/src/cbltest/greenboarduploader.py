@@ -1,7 +1,5 @@
-import json
 import os
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -19,12 +17,10 @@ class GreenboardUploader:
     A class for uploading results to a specified greenboard server bucket.
 
     Supports two modes:
-    - **Normal mode**: uploads results directly at end of pytest session.
-    - **Deferred mode** (upgrade jobs): writes pass/fail to a shared JSONL file
-      so a final script can upload one combined document per upgrade batch.
-
-    Deferred mode activates when ``SGW_UPGRADE_RESULTS_FILE`` is set in the
-    environment.
+    - **Normal mode**: uploads results for regular test sessions.
+    - **Upgrade mode** (``SGW_UPGRADE_VERSIONS`` is set): uploads per-step
+      upgrade results with ``upgradePath``, ``upgradeFrom``, and ``upgradeTo``
+      fields under ``platform="sgw-upgrade"``.
     """
 
     def __init__(self, url: str, username: str, password: str):
@@ -67,37 +63,9 @@ class GreenboardUploader:
         return self.__has_sgw_marker
 
     @property
-    def is_deferred(self) -> bool:
-        """True when running as part of an upgrade batch (deferred upload mode)."""
-        return os.environ.get("SGW_UPGRADE_RESULTS_FILE") is not None
-
-    def write_deferred_result(
-        self, sgw_version: "CouchbaseVersion | None" = None
-    ) -> None:
-        """Append this session's pass/fail outcome to the shared results file.
-
-        Each line is a JSON object with pass/fail and optional SGW version info.
-        The final upload script reads all lines to determine overall pass/fail
-        and extracts the SGW version (with build number) from the last entry.
-        """
-        results_file = os.environ.get("SGW_UPGRADE_RESULTS_FILE")
-        if results_file is None:
-            cbl_warning(
-                "SGW_UPGRADE_RESULTS_FILE not set, cannot write deferred result"
-            )
-            return
-
-        passed = not self.__overall_fail and self.__fail_count == 0
-        entry: dict[str, object] = {"passed": passed}
-        if sgw_version is not None:
-            entry["sgwVersion"] = (
-                sgw_version.version + "-" + str(sgw_version.build_number)
-            )
-        line = json.dumps(entry)
-        Path(results_file).parent.mkdir(parents=True, exist_ok=True)
-        with open(results_file, "a") as f:
-            f.write(line + "\n")
-        cbl_info(f"Deferred upgrade result written: passed={passed}")
+    def is_upgrade(self) -> bool:
+        """True when running as part of an SGW upgrade pipeline."""
+        return os.environ.get("SGW_UPGRADE_VERSIONS") is not None
 
     def upload(
         self,
@@ -163,33 +131,48 @@ class GreenboardUploader:
             }
         )
 
-    def upload_upgrade_batch(
-        self,
-        upgrade_path: list[str],
-        target_sgw_version: str,
-        target_build: int,
-        passed: bool,
-    ) -> None:
-        """Upload a single combined document for an entire upgrade batch.
+    def upload_upgrade_step(self, sgw_version: CouchbaseVersion | None) -> None:
+        """Upload results for a single upgrade step.
 
-        :param upgrade_path: Ordered list of SGW versions tested (e.g. ["3.1.0", "3.2.0", "3.3.0"])
-        :param target_sgw_version: Full version string of the final target (e.g. "3.3.0-1234")
-        :param target_build: Build number of the target version
-        :param passed: Whether the entire upgrade batch passed
+        Reads upgrade context from environment variables:
+        - ``SGW_UPGRADE_VERSIONS``: comma-separated ordered version list
+        - ``SGW_UPGRADE_FROM``: version being upgraded from (this step)
+
+        :param sgw_version: The current SGW version (target of this step)
         """
+        if self.__overall_fail:
+            cbl_warning("Overall result is failure, skipping upload...")
+            return
+
+        versions_str = os.environ.get("SGW_UPGRADE_VERSIONS", "")
+        upgrade_path = [v.strip() for v in versions_str.split(",") if v.strip()]
+        upgrade_from = os.environ.get("SGW_UPGRADE_FROM", "initial")
+
+        # Target version: from the running SGW or last in upgrade path
         target_version = upgrade_path[-1] if upgrade_path else "0.0.0"
+        target_build = 0
+        if sgw_version is not None:
+            target_version = sgw_version.version or target_version
+            target_build = sgw_version.build_number
+
+        # upgradeTo is the current step's destination
+        upgrade_to = os.environ.get("SGW_VERSION_UNDER_TEST", target_version)
 
         self._upload_document(
             {
                 "build": target_build,
                 "version": target_version,
-                "sgwVersion": target_sgw_version,
                 "upgradePath": upgrade_path,
-                "failCount": 0 if passed else 1,
-                "passCount": 1 if passed else 0,
+                "upgradeFrom": upgrade_from,
+                "upgradeTo": upgrade_to,
+                "failCount": self.__fail_count,
+                "passCount": self.__pass_count,
                 "platform": "sgw-upgrade",
-                "os": "n/a",
             }
+        )
+        cbl_info(
+            f"Upgrade step uploaded: {upgrade_from} → {upgrade_to} "
+            f"(pass={self.__pass_count}, fail={self.__fail_count})"
         )
 
     def _upload_document(self, doc: dict) -> None:

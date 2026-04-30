@@ -1,8 +1,6 @@
 #!/bin/bash
 
-trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."
-SGW_UPGRADE_PASSED=false uv run python $SCRIPT_DIR/upload_upgrade_results.py --config $CONFIG_FILE 2>/dev/null || true
-exit 1' ERR
+trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
@@ -36,9 +34,8 @@ TOPOLOGY_FILE="$AWS_ENVIRONMENT_DIR/topology_setup/topology.json"
 CONFIG_TEMPLATE="$SCRIPT_DIR/config.json"
 CONFIG_FILE="$QE_TESTS_DIR/config.json"
 
-# Setup deferred greenboard upload for upgrade batch
+# Setup upgrade context for greenboard per-step uploads
 export SGW_UPGRADE_VERSIONS=$(IFS=,; echo "${SGW_VERSIONS[*]}")
-export SGW_UPGRADE_RESULTS_FILE="/tmp/sgw_upgrade_results_$$.jsonl"
 
 # Store the rolling topology template for reuse
 TOPOLOGY_ROLLING_TEMPLATE="$SCRIPT_DIR/topology_rolling.json"
@@ -57,6 +54,7 @@ function rolling_upgrade_to_version() {
         echo ">>> Phase: INITIAL SETUP with SGW version $target_version"
         export SGW_VERSION_UNDER_TEST="$target_version"
         export SGW_UPGRADE_PHASE="initial"
+        export SGW_UPGRADE_FROM="initial"
         unset SGW_UPGRADED_NODE_INDEX 2>/dev/null || true
         unset SGW_PREVIOUS_VERSION 2>/dev/null || true
 
@@ -113,6 +111,7 @@ function rolling_upgrade_to_version() {
             export SGW_UPGRADED_NODE_INDEX=$node_index
             export SGW_VERSION_UNDER_TEST="$target_version"
             export SGW_PREVIOUS_VERSION="$previous_version"
+            export SGW_UPGRADE_FROM="$previous_version"
 
             pushd $QE_TESTS_DIR > /dev/null
             uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
@@ -126,6 +125,7 @@ function rolling_upgrade_to_version() {
         unset SGW_UPGRADED_NODE_INDEX 2>/dev/null || true
         export SGW_VERSION_UNDER_TEST="$target_version"
         export SGW_PREVIOUS_VERSION="$previous_version"
+        export SGW_UPGRADE_FROM="$previous_version"
 
         pushd $QE_TESTS_DIR > /dev/null
         uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
@@ -162,8 +162,5 @@ for SGW_VERSION in "${SGW_VERSIONS[@]}"; do
         PREVIOUS_VERSION="$SGW_VERSION"
     fi
 done
-
-# All phases passed — upload combined result (best-effort, don't fail the build)
-uv run python $SCRIPT_DIR/upload_upgrade_results.py --config $CONFIG_FILE || echo "WARNING: Greenboard upload failed (non-fatal)"
 
 echo ">>> SGW Rolling Upgrade test completed successfully."
