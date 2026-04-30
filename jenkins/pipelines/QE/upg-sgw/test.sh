@@ -34,8 +34,8 @@ TOPOLOGY_FILE="$AWS_ENVIRONMENT_DIR/topology_setup/topology.json"
 CONFIG_TEMPLATE="$SCRIPT_DIR/config.json"
 CONFIG_FILE="$QE_TESTS_DIR/config.json"
 
-# Setup upgrade context for greenboard per-step uploads
-export SGW_UPGRADE_VERSIONS=$(IFS=,; echo "${SGW_VERSIONS[*]}")
+# Compute comma-separated upgrade path for greenboard
+UPGRADE_VERSIONS=$(IFS=,; echo "${SGW_VERSIONS[*]}")
 
 # Initial full setup with the first SGW version
 CURRENT_SGW_VERSION="${SGW_VERSIONS[0]}"
@@ -53,9 +53,10 @@ fi
 # Run initial tests
 echo ">>> Running tests for initial setup with SGW: $CURRENT_SGW_VERSION ..."
 export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
-export SGW_UPGRADE_FROM="initial"
 pushd $QE_TESTS_DIR > /dev/null
-uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_upg_sgw.py
+uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
+    --upgrade-versions "$UPGRADE_VERSIONS" \
+    test_upg_sgw.py
 popd > /dev/null
 
 # Loop through the remaining SGW versions and perform upgrades
@@ -85,9 +86,10 @@ for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
 
     echo ">>> Running tests after upgrading to SGW: $CURRENT_SGW_VERSION ..."
     export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
-    export SGW_UPGRADE_FROM="$PREVIOUS_SGW_VERSION"
     pushd $QE_TESTS_DIR > /dev/null
-    uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_upg_sgw.py
+    uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
+        --upgrade-versions "$UPGRADE_VERSIONS" \
+        test_upg_sgw.py
     popd > /dev/null
 done
 

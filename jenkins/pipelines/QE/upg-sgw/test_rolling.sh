@@ -34,8 +34,8 @@ TOPOLOGY_FILE="$AWS_ENVIRONMENT_DIR/topology_setup/topology.json"
 CONFIG_TEMPLATE="$SCRIPT_DIR/config.json"
 CONFIG_FILE="$QE_TESTS_DIR/config.json"
 
-# Setup upgrade context for greenboard per-step uploads
-export SGW_UPGRADE_VERSIONS=$(IFS=,; echo "${SGW_VERSIONS[*]}")
+# Compute comma-separated upgrade path for greenboard
+UPGRADE_VERSIONS=$(IFS=,; echo "${SGW_VERSIONS[*]}")
 
 # Store the rolling topology template for reuse
 TOPOLOGY_ROLLING_TEMPLATE="$SCRIPT_DIR/topology_rolling.json"
@@ -54,12 +54,13 @@ function rolling_upgrade_to_version() {
         echo ">>> Phase: INITIAL SETUP with SGW version $target_version"
         export SGW_VERSION_UNDER_TEST="$target_version"
         export SGW_UPGRADE_PHASE="initial"
-        export SGW_UPGRADE_FROM="initial"
         unset SGW_UPGRADED_NODE_INDEX 2>/dev/null || true
         unset SGW_PREVIOUS_VERSION 2>/dev/null || true
 
         pushd $QE_TESTS_DIR > /dev/null
-        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
+        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
+            --upgrade-versions "$UPGRADE_VERSIONS" \
+            test_rolling_upgrade_sgw.py
         popd > /dev/null
     else
         # Rolling upgrade: upgrade nodes one at a time
@@ -111,10 +112,11 @@ function rolling_upgrade_to_version() {
             export SGW_UPGRADED_NODE_INDEX=$node_index
             export SGW_VERSION_UNDER_TEST="$target_version"
             export SGW_PREVIOUS_VERSION="$previous_version"
-            export SGW_UPGRADE_FROM="$previous_version"
 
             pushd $QE_TESTS_DIR > /dev/null
-            uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
+            uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
+                --upgrade-versions "$UPGRADE_VERSIONS" \
+                test_rolling_upgrade_sgw.py
             popd > /dev/null
         done
 
@@ -125,10 +127,11 @@ function rolling_upgrade_to_version() {
         unset SGW_UPGRADED_NODE_INDEX 2>/dev/null || true
         export SGW_VERSION_UNDER_TEST="$target_version"
         export SGW_PREVIOUS_VERSION="$previous_version"
-        export SGW_UPGRADE_FROM="$previous_version"
 
         pushd $QE_TESTS_DIR > /dev/null
-        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
+        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
+            --upgrade-versions "$UPGRADE_VERSIONS" \
+            test_rolling_upgrade_sgw.py
         popd > /dev/null
     fi
 }

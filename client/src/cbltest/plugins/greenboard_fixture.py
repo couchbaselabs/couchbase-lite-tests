@@ -47,12 +47,13 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     yield
 
     try:
-        if uploader.is_upgrade:
+        upgrade_versions_str = pytestconfig.getoption("--upgrade-versions")
+        if upgrade_versions_str:
             # Upgrade job — upload this step's result directly
             sgw_version: CouchbaseVersion | None = None
             if len(cblpytest.sync_gateways) > 0:
                 sgw_version = await cblpytest.sync_gateways[0].get_version()
-            uploader.upload_upgrade_step(sgw_version)
+            uploader.upload_upgrade_step(sgw_version, upgrade_versions_str)
         else:
             sgw_version: CouchbaseVersion | None = None
             test_platform: str = "sync-gateway"
@@ -77,11 +78,19 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
         pytestconfig.pluginmanager.unregister(uploader)
 
 
-# This adds the --no-result-upload option to the pytest command line.
+# This adds CLI options for greenboard result uploads.
 def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("CBL E2E Testing")
     group.addoption(
         "--no-result-upload",
         action="store_true",
         help="Don't upload results to greenboard",
+    )
+    group.addoption(
+        "--upgrade-versions",
+        type=str,
+        default=None,
+        help="Comma-separated ordered SGW version list for upgrade jobs "
+        "(e.g. '3.3.0,4.0.1,4.1.0'). First is the baseline, rest are upgrade "
+        "targets. Triggers sgw-upgrade platform upload.",
     )

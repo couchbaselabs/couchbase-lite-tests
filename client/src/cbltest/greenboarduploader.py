@@ -1,4 +1,3 @@
-import os
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -61,11 +60,6 @@ class GreenboardUploader:
         Returns True if any test in the session has @pytest.mark.sgw or @pytest.mark.upg_sgw marker
         """
         return self.__has_sgw_marker
-
-    @property
-    def is_upgrade(self) -> bool:
-        """True when running as part of an SGW upgrade pipeline."""
-        return os.environ.get("SGW_UPGRADE_VERSIONS") is not None
 
     def upload(
         self,
@@ -131,32 +125,41 @@ class GreenboardUploader:
             }
         )
 
-    def upload_upgrade_step(self, sgw_version: CouchbaseVersion | None) -> None:
+    def upload_upgrade_step(
+        self,
+        sgw_version: CouchbaseVersion | None,
+        upgrade_versions_str: str,
+    ) -> None:
         """Upload results for a single upgrade step.
 
-        Reads upgrade context from environment variables:
-        - ``SGW_UPGRADE_VERSIONS``: comma-separated ordered version list
-        - ``SGW_UPGRADE_FROM``: version being upgraded from (this step)
+        Infers ``upgradeFrom`` by finding the current SGW version's position
+        in the upgrade path. The previous entry is the source; if it's the
+        first entry, ``upgradeFrom`` is "initial".
 
         :param sgw_version: The current SGW version (target of this step)
+        :param upgrade_versions_str: Comma-separated ordered version list
         """
         if self.__overall_fail:
             cbl_warning("Overall result is failure, skipping upload...")
             return
 
-        versions_str = os.environ.get("SGW_UPGRADE_VERSIONS", "")
-        upgrade_path = [v.strip() for v in versions_str.split(",") if v.strip()]
-        upgrade_from = os.environ.get("SGW_UPGRADE_FROM", "initial")
+        upgrade_path = [v.strip() for v in upgrade_versions_str.split(",") if v.strip()]
 
         # Target version: from the running SGW or last in upgrade path
         target_version = upgrade_path[-1] if upgrade_path else "0.0.0"
         target_build = 0
+        current_version = target_version
         if sgw_version is not None:
-            target_version = sgw_version.version or target_version
+            current_version = sgw_version.version or target_version
+            target_version = upgrade_path[-1] if upgrade_path else current_version
             target_build = sgw_version.build_number
 
-        # upgradeTo is the current step's destination
-        upgrade_to = os.environ.get("SGW_VERSION_UNDER_TEST", target_version)
+        # Infer upgradeFrom by finding current version in the path
+        upgrade_from = "initial"
+        for i, v in enumerate(upgrade_path):
+            if v == current_version and i > 0:
+                upgrade_from = upgrade_path[i - 1]
+                break
 
         self._upload_document(
             {
@@ -164,14 +167,14 @@ class GreenboardUploader:
                 "version": target_version,
                 "upgradePath": upgrade_path,
                 "upgradeFrom": upgrade_from,
-                "upgradeTo": upgrade_to,
+                "upgradeTo": current_version,
                 "failCount": self.__fail_count,
                 "passCount": self.__pass_count,
                 "platform": "sgw-upgrade",
             }
         )
         cbl_info(
-            f"Upgrade step uploaded: {upgrade_from} → {upgrade_to} "
+            f"Upgrade step uploaded: {upgrade_from} → {current_version} "
             f"(pass={self.__pass_count}, fail={self.__fail_count})"
         )
 
