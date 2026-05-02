@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import time
 from collections.abc import Callable
@@ -45,6 +46,12 @@ def verify_lfs_checkout() -> None:
     """
     This function is used to verify that the LFS files are being properly checked out.
     """
+    if os.name == "nt":
+        # This check, for whatever reason, is entirely unreliable on Windows.  The command itself returns 
+        # what I expect, but the checkout field is always false when invoking from python, 
+        # even when the files are properly checked out
+        return
+    
     try:
         process_output = subprocess.run(
             ["git", "lfs", "ls-files", "--json"],
