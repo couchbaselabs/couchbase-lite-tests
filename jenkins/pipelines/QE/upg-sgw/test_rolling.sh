@@ -34,6 +34,9 @@ TOPOLOGY_FILE="$AWS_ENVIRONMENT_DIR/topology_setup/topology.json"
 CONFIG_TEMPLATE="$SCRIPT_DIR/config.json"
 CONFIG_FILE="$QE_TESTS_DIR/config.json"
 
+# Compute comma-separated upgrade path for greenboard
+UPGRADE_VERSIONS=$(IFS=,; echo "${SGW_VERSIONS[*]}")
+
 # Store the rolling topology template for reuse
 TOPOLOGY_ROLLING_TEMPLATE="$SCRIPT_DIR/topology_rolling.json"
 
@@ -55,7 +58,9 @@ function rolling_upgrade_to_version() {
         unset SGW_PREVIOUS_VERSION 2>/dev/null || true
 
         pushd $QE_TESTS_DIR > /dev/null
-        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
+        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
+            --upgrade-versions "$UPGRADE_VERSIONS" \
+            test_rolling_upgrade_sgw.py
         popd > /dev/null
     else
         # Rolling upgrade: upgrade nodes one at a time
@@ -109,7 +114,9 @@ function rolling_upgrade_to_version() {
             export SGW_PREVIOUS_VERSION="$previous_version"
 
             pushd $QE_TESTS_DIR > /dev/null
-            uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
+            uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
+                --upgrade-versions "$UPGRADE_VERSIONS" \
+                test_rolling_upgrade_sgw.py
             popd > /dev/null
         done
 
@@ -122,7 +129,9 @@ function rolling_upgrade_to_version() {
         export SGW_PREVIOUS_VERSION="$previous_version"
 
         pushd $QE_TESTS_DIR > /dev/null
-        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw test_rolling_upgrade_sgw.py
+        uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
+            --upgrade-versions "$UPGRADE_VERSIONS" \
+            test_rolling_upgrade_sgw.py
         popd > /dev/null
     fi
 }
@@ -157,5 +166,4 @@ for SGW_VERSION in "${SGW_VERSIONS[@]}"; do
     fi
 done
 
-echo ""
 echo ">>> SGW Rolling Upgrade test completed successfully."

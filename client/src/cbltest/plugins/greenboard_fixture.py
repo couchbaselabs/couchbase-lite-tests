@@ -9,6 +9,9 @@ from cbltest.logging import cbl_info, cbl_warning
 # fixture that will upload test results to greenboard, if it is
 # properly set up in config.json (see the schema for that file)
 # and if the --no-result-upload flag is not set on the command line.
+#
+# For upgrade jobs (SGW_UPGRADE_VERSIONS is set), each pytest session
+# uploads its own per-step result directly under platform="sgw-upgrade".
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
@@ -44,34 +47,50 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     yield
 
     try:
-        sgw_version: CouchbaseVersion | None = None
-        test_platform: str = "sync-gateway"
-        os_name: str = "n/a"
-        library_version: str = "n/a"
-        if len(cblpytest.test_servers) > 0:
-            test_server_info = await cblpytest.test_servers[0].get_info()
-            # Keep the platform as SGW if it has one of the sgw markers, since
-            # the test might still use test server with it, but still belong
-            # to SGW and not CBL test platform.
-            library_version = test_server_info.library_version
-            if not uploader.has_sgw_marker():
-                test_platform = test_server_info.cbl
-            if "systemName" in test_server_info.device:
-                os_name = test_server_info.device["systemName"]
-        if len(cblpytest.sync_gateways) > 0:
-            sgw_version = await cblpytest.sync_gateways[0].get_version()
-        uploader.upload(test_platform, os_name, library_version, sgw_version)
+        upgrade_versions_str = pytestconfig.getoption("--upgrade-versions")
+        if upgrade_versions_str:
+            # Upgrade job — upload this step's result directly
+            sgw_version: CouchbaseVersion | None = None
+            if len(cblpytest.sync_gateways) > 0:
+                sgw_version = await cblpytest.sync_gateways[0].get_version()
+            uploader.upload_upgrade_step(sgw_version, upgrade_versions_str)
+        else:
+            sgw_version: CouchbaseVersion | None = None
+            test_platform: str = "sync-gateway"
+            os_name: str = "n/a"
+            library_version: str = "n/a"
+            if len(cblpytest.test_servers) > 0:
+                test_server_info = await cblpytest.test_servers[0].get_info()
+                # Keep the platform as SGW if it has one of the sgw markers, since
+                # the test might still use test server with it, but still belong
+                # to SGW and not CBL test platform.
+                library_version = test_server_info.library_version
+                if not uploader.has_sgw_marker():
+                    test_platform = test_server_info.cbl
+                if "systemName" in test_server_info.device:
+                    os_name = test_server_info.device["systemName"]
+            if len(cblpytest.sync_gateways) > 0:
+                sgw_version = await cblpytest.sync_gateways[0].get_version()
+            uploader.upload(test_platform, os_name, library_version, sgw_version)
     except Exception as e:
         cbl_warning(f"Failed to upload results to Greenboard: {e}")
     finally:
         pytestconfig.pluginmanager.unregister(uploader)
 
 
-# This adds the --no-result-upload option to the pytest command line.
+# This adds CLI options for greenboard result uploads.
 def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("CBL E2E Testing")
     group.addoption(
         "--no-result-upload",
         action="store_true",
         help="Don't upload results to greenboard",
+    )
+    group.addoption(
+        "--upgrade-versions",
+        type=str,
+        default=None,
+        help="Comma-separated ordered SGW version list for upgrade jobs "
+        "(e.g. '3.3.0,4.0.1,4.1.0'). First is the baseline, rest are upgrade "
+        "targets. Triggers sgw-upgrade platform upload.",
     )
