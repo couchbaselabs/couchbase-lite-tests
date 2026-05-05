@@ -7,11 +7,13 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
+import packaging.version
 import requests
 import tenacity
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
+from pydantic import BaseModel
 
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
@@ -486,6 +488,9 @@ class CouchbaseVersion(ABC):
         self.__version = parsed[0]
         self.__build_number = parsed[1]
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.__raw})"
+
 
 class SyncGatewayVersion(CouchbaseVersion):
     """
@@ -496,7 +501,7 @@ class SyncGatewayVersion(CouchbaseVersion):
         first_lparen = input.find("(")
         first_semicol = input.find(";")
         if first_lparen == -1 or first_semicol == -1:
-            return ("unknown", 0)
+            return input, 0
 
         version = input[0:first_lparen].strip()
         if not version:
@@ -512,6 +517,24 @@ class SyncGatewayVersion(CouchbaseVersion):
             build = 0
 
         return (version, build)
+
+
+class SyncGatewayStatusVendor(BaseModel):
+    """
+    Output of vendor field of /_status endpoint of Sync Gateway
+    """
+
+    name: str
+    version: str
+
+
+class SyncGatewayStatusResponse(BaseModel):
+    """
+    Output of GET /_status endpoint of Sync Gateway
+    """
+
+    version: str  # this version does not always include the full build number if it is a dev build
+    vendor: SyncGatewayStatusVendor
 
 
 class DatabaseStatusResponse:
@@ -553,12 +576,13 @@ class _SyncGatewayBase:
         password: str,
         port: int,
         secure: bool = False,
+        public_port: int = 4984,
     ):
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
         self.__http_url = f"{scheme}{url}:{port}"
-        # Replication always uses public port 4984
-        self.__replication_url = f"{ws_scheme}{url}:4984"
+        self.__public_port = public_port
+        self.__replication_url = f"{ws_scheme}{url}:{public_port}"
         self._tracer = get_tracer(__name__, VERSION)
         self.__secure: bool = secure
         self.__hostname: str = url
@@ -580,6 +604,11 @@ class _SyncGatewayBase:
     def port(self) -> int:
         """Gets the HTTP API port of the Sync Gateway instance"""
         return self.__port
+
+    @property
+    def public_port(self) -> int:
+        """Gets the public API port of the Sync Gateway instance"""
+        return self.__public_port
 
     @property
     def secure(self) -> bool:
@@ -648,23 +677,26 @@ class _SyncGatewayBase:
 
             return ret_val
 
-    async def get_version(self) -> CouchbaseVersion:
-        # Telemetry not really important for this call
-        async with self._create_session(
-            self.secure, self.scheme, self.hostname, 4984, None
-        ) as s:
-            resp = await self._send_request("get", "/", session=s)
-            assert isinstance(resp, dict)
-            resp_dict = cast(dict, resp)
-            raw_version = _get_typed_required(resp_dict, "version", str)
-            if "/" in raw_version:
-                version_part = raw_version.rsplit("/", 1)[1]
-            else:
-                cbl_warning(
-                    f"Unexpected SGW version format (no '/' separator): '{raw_version}'"
-                )
-                version_part = raw_version
-            return SyncGatewayVersion(version_part)
+    async def supports_version_vectors(self) -> bool:
+        """Returns whether the Sync Gateway instance supports version vectors (i.e. is 3.0 or later)"""
+        version = await self.get_version()
+        return packaging.version.parse(version.version) >= packaging.version.parse(
+            "4.0"
+        )
+
+    async def get_version(self) -> SyncGatewayVersion:
+        """Return version of Sync Gateway"""
+        resp = await self._send_request("get", "/_status")
+        assert isinstance(resp, dict)
+        model = SyncGatewayStatusResponse.model_validate(resp)
+        # In a dev build /_status "version" does not contain major.minor so use model.vendor.version
+        if model.vendor.version in model.version:
+            sg_version = SyncGatewayVersion(model.version)
+        sg_version = SyncGatewayVersion(model.vendor.version)
+        assert packaging.version.parse(sg_version.version), (
+            "Failed to parse Sync Gateway version from /_status response {model}"
+        )
+        return sg_version
 
     def tls_cert(self) -> str | None:
         if not self.secure:
@@ -1355,7 +1387,7 @@ class _SyncGatewayBase:
         params = {"rev": revision}
 
         async with self._create_session(
-            self.secure, self.scheme, self.hostname, 4984, auth
+            self.secure, self.scheme, self.hostname, self.public_port, auth
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
@@ -1621,8 +1653,7 @@ class SyncGateway(_SyncGatewayBase):
         :param secure: Whether to use TLS/HTTPS
         :param public_port: Public API port (default 4984)
         """
-        super().__init__(url, username, password, port, secure)
-        self.__public_port = public_port
+        super().__init__(url, username, password, port, secure, public_port)
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
             auth=(username, password),
@@ -1866,11 +1897,11 @@ class SyncGateway(_SyncGatewayBase):
         :param config_name: Name of the config file (without .json extension).
         :raises Exception: If the start fails
         """
-        # Check if SGW is already running by probing the public endpoint (4984)
+        # Check if SGW is already running by probing the public endpoint
         try:
             # Use a short timeout to distinguish "not running" from "slow"
             async with self._create_session(
-                self.secure, self.scheme, self.hostname, 4984, None
+                self.secure, self.scheme, self.hostname, self.public_port, None
             ) as session:
                 async with session.get("/", timeout=ClientTimeout(total=5)) as resp:
                     if resp.status == 200:
@@ -2002,7 +2033,7 @@ class SyncGateway(_SyncGatewayBase):
             self.hostname,
             username,
             password,
-            port=self.__public_port,
+            port=self.public_port,
             secure=self.secure,
         )
 
@@ -2143,4 +2174,4 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         :param port: Public API port (default 4984)
         :param secure: Whether to use TLS/HTTPS
         """
-        super().__init__(url, username, password, port, secure)
+        super().__init__(url, username, password, port, secure, port)
