@@ -30,9 +30,7 @@ import platform
 import shutil
 import subprocess
 from abc import abstractmethod
-from io import BytesIO
 from pathlib import Path
-from typing import cast
 
 import click
 
@@ -249,17 +247,22 @@ class CTestServer_iOS(CTestServer):
             env=env,
             cwd=C_TEST_SERVER_DIR / "platforms" / "ios",
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
         ) as xcodebuild_proc:
-            with subprocess.Popen(
-                ["xcpretty"], stdin=xcodebuild_proc.stdout, env=env
-            ) as xcpretty_proc:
-                # Close the stdout of the first process to allow it to receive a SIGPIPE if the second process exits
-                cast(BytesIO, xcodebuild_proc.stdout).close()
+            assert xcodebuild_proc.stdout is not None
 
-                xcpretty_proc.wait()
-                if xcpretty_proc.returncode != 0:
-                    raise RuntimeError("Build failed")
+            with subprocess.Popen(
+                ["xcpretty"],
+                stdin=xcodebuild_proc.stdout,
+                env=env,
+            ) as xcpretty_proc:
+                xcodebuild_proc.stdout.close()
+
+                xcpretty_rc = xcpretty_proc.wait()
+                xcodebuild_rc = xcodebuild_proc.wait()
+
+        if xcodebuild_rc != 0 or xcpretty_rc != 0:
+            raise RuntimeError("Build failed")
 
     @property
     def latestbuilds_path(self) -> str:
