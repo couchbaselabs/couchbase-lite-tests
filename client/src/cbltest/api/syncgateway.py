@@ -498,25 +498,28 @@ class SyncGatewayVersion(CouchbaseVersion):
     """
 
     def parse(self, input: str) -> tuple[str, int]:
-        first_lparen = input.find("(")
-        first_semicol = input.find(";")
-        if first_lparen == -1 or first_semicol == -1:
-            return input, 0
-
-        version = input[0:first_lparen].strip()
-        if not version:
+        m = re.match(r"^[^(\n]+", input)
+        if m:
+            version = m.group().strip()
+        else:
             cbl_warning(f"Could not extract version from SGW version string: '{input}'")
             version = "unknown"
 
-        try:
-            build = int(input[first_lparen + 1 : first_semicol])
-        except ValueError:
+        m = re.search(r"(?<=\()([^;)]+)", input)
+        if m:
+            try:
+                build = int(m.group())
+            except ValueError as e:
+                cbl_warning(
+                    f"Could not parse build number {m.group()} from SGW version string: '{input}': {e}"
+                )
+                build = 0
+        else:
             cbl_warning(
                 f"Could not parse build number from SGW version string: '{input}'"
             )
             build = 0
-
-        return (version, build)
+        return version, build
 
 
 class SyncGatewayStatusVendor(BaseModel):
