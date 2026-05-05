@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		400983F92D0A1F360029F26E /* blobs in Resources */ = {isa = PBXBuildFile; fileRef = 400983F82D0A1F360029F26E /* blobs */; };
-		400983FB2D0A1F570029F26E /* dbs in Resources */ = {isa = PBXBuildFile; fileRef = 400983FA2D0A1F570029F26E /* dbs */; };
 		40348A6F2A8AF842002DA787 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40348A6E2A8AF842002DA787 /* AppDelegate.swift */; };
 		40348A712A8AF842002DA787 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40348A702A8AF842002DA787 /* SceneDelegate.swift */; };
 		40348A732A8AF842002DA787 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40348A722A8AF842002DA787 /* ViewController.swift */; };
@@ -230,8 +228,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		400983F82D0A1F360029F26E /* blobs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = blobs; path = ../../../assets/blobs; sourceTree = "<group>"; };
-		400983FA2D0A1F570029F26E /* dbs */ = {isa = PBXFileReference; lastKnownFileType = folder; name = dbs; path = ../../../assets/dbs; sourceTree = "<group>"; };
 		40348A6B2A8AF842002DA787 /* TestServer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestServer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		40348A6E2A8AF842002DA787 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		40348A702A8AF842002DA787 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -796,8 +792,6 @@
 		4046821F2AA82AAF0068D5E7 /* assets */ = {
 			isa = PBXGroup;
 			children = (
-				400983F82D0A1F360029F26E /* blobs */,
-				400983FA2D0A1F570029F26E /* dbs */,
 			);
 			name = assets;
 			sourceTree = "<group>";
@@ -1083,8 +1077,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				400983FB2D0A1F570029F26E /* dbs in Resources */,
-				400983F92D0A1F360029F26E /* blobs in Resources */,
 				40348A7B2A8AF843002DA787 /* LaunchScreen.storyboard in Resources */,
 				40348A782A8AF843002DA787 /* Assets.xcassets in Resources */,
 				40348A892A8AFA8C002DA787 /* Project.xcconfig in Resources */,
