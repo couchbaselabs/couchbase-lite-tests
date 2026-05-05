@@ -55,6 +55,7 @@ pipeline {
                     if (response.status != 200) {
                         env.BUILD_BRANCH = 'main'
                     }
+                    env.BUILD_BRANCH ='build-c-ios'
                     echo "Build will come from branch ${env.BUILD_BRANCH}"
                 }
             }
