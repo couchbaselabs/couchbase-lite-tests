@@ -498,13 +498,23 @@ class SyncGatewayVersion(CouchbaseVersion):
     """
 
     def parse(self, input: str) -> tuple[str, int]:
-        m = re.match(r"^[^(\n]+", input)
+        # Version parsing can be different for dev builds and release builds. In a dev build, it is possible to miss a build number.
+        #
+        # Example input:
+        #   Couchbase Sync Gateway/4.0.0(350;def456)
+        #   4.0.0(350;def456)
+        #   4.0.0
+
+        # extract everything between an optional / and an option ( to represent a major.minor.patch build number
+        m = re.search(r"(?:^|/)([\d\.]+)(?=\s*\(|$)", input)
+        # (?:^|/)(?P<v>[\d\.]+)(?:\s*\(|$)", input)
         if m:
-            version = m.group().strip()
+            version = m.group(1).strip()
         else:
             cbl_warning(f"Could not extract version from SGW version string: '{input}'")
             version = "unknown"
 
+        # extract everything between ( and a ; character to guess at a build number
         m = re.search(r"(?<=\()([^;)]+)", input)
         if m:
             try:
@@ -579,13 +589,12 @@ class _SyncGatewayBase:
         password: str,
         port: int,
         secure: bool = False,
-        public_port: int = 4984,
     ):
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
         self.__http_url = f"{scheme}{url}:{port}"
-        self.__public_port = public_port
-        self.__replication_url = f"{ws_scheme}{url}:{public_port}"
+        # Replication always uses public port 4984
+        self.__replication_url = f"{ws_scheme}{url}:4984"
         self._tracer = get_tracer(__name__, VERSION)
         self.__secure: bool = secure
         self.__hostname: str = url
@@ -607,11 +616,6 @@ class _SyncGatewayBase:
     def port(self) -> int:
         """Gets the HTTP API port of the Sync Gateway instance"""
         return self.__port
-
-    @property
-    def public_port(self) -> int:
-        """Gets the public API port of the Sync Gateway instance"""
-        return self.__public_port
 
     @property
     def secure(self) -> bool:
@@ -692,7 +696,24 @@ class _SyncGatewayBase:
         resp = await self._send_request("get", "/_status")
         assert isinstance(resp, dict)
         model = SyncGatewayStatusResponse.model_validate(resp)
-        # In a dev build /_status "version" does not contain major.minor so use model.vendor.version
+
+        # In the case of a dev build, it is not possible to determine a build number, but there is a
+        # major.minor version.
+        # There only backward compatible difference is if "vendor.version" substring is contained in "version""
+
+        # In a production build, the output:
+        #
+        # "vendor": {
+        #    "version": "4.0"
+        # },
+        # "version": "Couchbase Sync Gateway/4.0.4(8;release) EE"
+        #
+        # In a dev build, the output:
+        #
+        # "vendor": {
+        #    "version": "4.0"
+        # },
+        # "version": "Couchbase Sync Gateway/() EE"
         if model.vendor.version in model.version:
             sg_version = SyncGatewayVersion(model.version)
         else:
@@ -1395,7 +1416,7 @@ class _SyncGatewayBase:
         params = {"rev": revision}
 
         async with self._create_session(
-            self.secure, self.scheme, self.hostname, self.public_port, auth
+            self.secure, self.scheme, self.hostname, 4984, auth
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
@@ -1661,7 +1682,8 @@ class SyncGateway(_SyncGatewayBase):
         :param secure: Whether to use TLS/HTTPS
         :param public_port: Public API port (default 4984)
         """
-        super().__init__(url, username, password, port, secure, public_port)
+        super().__init__(url, username, password, port, secure)
+        self.__public_port = public_port
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
             auth=(username, password),
@@ -1905,11 +1927,11 @@ class SyncGateway(_SyncGatewayBase):
         :param config_name: Name of the config file (without .json extension).
         :raises Exception: If the start fails
         """
-        # Check if SGW is already running by probing the public endpoint
+        # Check if SGW is already running by probing the public endpoint (4984)
         try:
             # Use a short timeout to distinguish "not running" from "slow"
             async with self._create_session(
-                self.secure, self.scheme, self.hostname, self.public_port, None
+                self.secure, self.scheme, self.hostname, 4984, None
             ) as session:
                 async with session.get("/", timeout=ClientTimeout(total=5)) as resp:
                     if resp.status == 200:
@@ -2041,7 +2063,7 @@ class SyncGateway(_SyncGatewayBase):
             self.hostname,
             username,
             password,
-            port=self.public_port,
+            port=self.__public_port,
             secure=self.secure,
         )
 
@@ -2182,4 +2204,4 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         :param port: Public API port (default 4984)
         :param secure: Whether to use TLS/HTTPS
         """
-        super().__init__(url, username, password, port, secure, port)
+        super().__init__(url, username, password, port, secure)
