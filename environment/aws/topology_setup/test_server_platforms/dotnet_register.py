@@ -129,6 +129,31 @@ class DotnetTestServer(TestServer):
             capture_output=False,
         )
 
+        header("Restoring .NET workloads")
+        subprocess.run(
+            [
+                DOTNET_PATH,
+                "workload",
+                "update",
+                "--from-rollback-file",
+                DOTNET_TEST_SERVER_DIR / "testserver" / "workload-pins.json",
+                "--skip-sign-check",
+            ],
+            check=True,
+            capture_output=False,
+        )
+        subprocess.run(
+            [
+                DOTNET_PATH,
+                "workload",
+                "restore",
+                "--project",
+                DOTNET_TEST_SERVER_DIR / "testserver" / "testserver.csproj",
+            ],
+            check=True,
+            capture_output=False,
+        )
+
         verb = "publish" if self.publish else "build"
         csproj_path = DOTNET_TEST_SERVER_DIR / "testserver" / "testserver.csproj"
         header(f"Building .NET test server for {self.platform}")
@@ -146,7 +171,11 @@ class DotnetTestServer(TestServer):
         if self.extra_args:
             args.append(self.extra_args)
 
-        subprocess.run(args, check=True, capture_output=False)
+        # Note, this is the version that works with the pinned workloads, so if you change one
+        # you need to consider the other
+        env = environ.copy()
+        env["DEVELOPER_DIR"] = "/Applications/Xcode-26.4.1.app/"
+        subprocess.run(args, check=True, capture_output=False, env=env)
 
 
 class DotnetTestServerCli(TestServer):
