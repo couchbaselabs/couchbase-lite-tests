@@ -1,4 +1,6 @@
+import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -125,57 +127,146 @@ class GreenboardUploader:
             }
         )
 
-    def upload_upgrade_step(
+    def record_upgrade_step(
         self,
+        results_file: str,
         sgw_version: CouchbaseVersion | None,
         upgrade_versions_str: str,
+        phase: str | None,
+        node_index: str | None,
     ) -> None:
-        """Upload results for a single upgrade step.
+        """Append this iteration's result to a JSON state file.
 
-        Infers ``upgradeFrom`` by finding the current SGW version's position
-        in the upgrade path. The previous entry is the source; if it's the
-        first entry, ``upgradeFrom`` is "initial".
+        The aggregated batch document is uploaded later (once per upgrade
+        run) by ``upload_upgrade_batch``. Failed iterations are recorded
+        too so the UI can surface where in the upgrade sequence the
+        failure occurred.
 
-        :param sgw_version: The current SGW version (target of this step)
+        :param results_file: Path to the JSON state file to append to
+        :param sgw_version: Current SGW version (target of this step)
         :param upgrade_versions_str: Comma-separated ordered version list
+        :param phase: SGW_UPGRADE_PHASE env value (e.g. "initial",
+            "rolling_node_0", "complete")
+        :param node_index: SGW_UPGRADED_NODE_INDEX env value, if any
         """
-        if self.__overall_fail:
-            cbl_warning("Overall result is failure, skipping upload...")
-            return
-
         upgrade_path = [v.strip() for v in upgrade_versions_str.split(",") if v.strip()]
 
-        # Target version: from the running SGW or last in upgrade path
-        target_version = upgrade_path[-1] if upgrade_path else "0.0.0"
         target_build = 0
-        current_version = target_version
+        current_version = upgrade_path[-1] if upgrade_path else "0.0.0"
         if sgw_version is not None:
-            current_version = sgw_version.version or target_version
-            target_version = upgrade_path[-1] if upgrade_path else current_version
+            current_version = sgw_version.version or current_version
             target_build = sgw_version.build_number
 
-        # Infer upgradeFrom by finding current version in the path
         upgrade_from = "initial"
         for i, v in enumerate(upgrade_path):
             if v == current_version and i > 0:
                 upgrade_from = upgrade_path[i - 1]
                 break
 
+        iteration = {
+            "phase": phase,
+            "nodeIndex": int(node_index) if node_index is not None else None,
+            "upgradeFrom": upgrade_from,
+            "upgradeTo": current_version,
+            "build": target_build,
+            "passCount": self.__pass_count,
+            "failCount": self.__fail_count,
+            "failed": self.__overall_fail or self.__fail_count > 0,
+        }
+
+        path = Path(results_file)
+        if path.exists():
+            try:
+                state = json.loads(path.read_text())
+            except (json.JSONDecodeError, OSError) as e:
+                cbl_warning(f"Could not read existing results file {path}: {e}")
+                state = {}
+        else:
+            state = {}
+
+        state.setdefault("upgradePath", upgrade_path)
+        state.setdefault("iterations", []).append(iteration)
+        path.write_text(json.dumps(state, indent=2))
+        cbl_info(
+            f"Upgrade step recorded ({phase}): {upgrade_from} → {current_version} "
+            f"(pass={self.__pass_count}, fail={self.__fail_count})"
+        )
+
+    def upload_upgrade_batch(self, results_file: str) -> None:
+        """Upload one aggregate document for the whole upgrade run.
+
+        Reads the iterations recorded by ``record_upgrade_step`` and emits
+        a single greenboard doc summarising the run. If any iteration
+        failed, ``failedAt`` points at the first failed iteration so the
+        UI can show where in the sequence the run broke.
+        """
+        path = Path(results_file)
+        if not path.exists():
+            cbl_warning(f"No upgrade results file at {path}; nothing to upload")
+            return
+
+        try:
+            state = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError) as e:
+            cbl_warning(f"Could not parse upgrade results file {path}: {e}")
+            return
+
+        iterations = state.get("iterations", [])
+        if not iterations:
+            cbl_warning(
+                f"Upgrade results file {path} has no iterations; skipping upload"
+            )
+            return
+
+        upgrade_path = state.get("upgradePath", [])
+        # version is always the planned final target so the UI's
+        # "filter by target version" picks up this run even when execution
+        # stopped early at an intermediate version.
+        target_version = (
+            upgrade_path[-1]
+            if upgrade_path
+            else iterations[-1].get("upgradeTo", "0.0.0")
+        )
+
+        failed_at = None
+        for i in iterations:
+            if i.get("failed"):
+                failed_at = {
+                    "phase": i.get("phase"),
+                    "upgradeFrom": i.get("upgradeFrom"),
+                    "upgradeTo": i.get("upgradeTo"),
+                    "nodeIndex": i.get("nodeIndex"),
+                }
+                break
+
+        # One upgrade batch == one upgrade test from the UI's POV. Bars are
+        # built by the UI by aggregating across past runs that share
+        # (version, upgradePath); per-run pass/fail is therefore 1/0.
+        if failed_at is None:
+            pass_count, fail_count = 1, 0
+            target_build = iterations[-1].get("build", 0)
+        else:
+            pass_count, fail_count = 0, 1
+            # The planned target build was never reached; per-iteration
+            # `build` fields preserve what was actually running at each step.
+            target_build = 0
+
         self._upload_document(
             {
                 "build": target_build,
                 "version": target_version,
                 "upgradePath": upgrade_path,
-                "upgradeFrom": upgrade_from,
-                "upgradeTo": current_version,
-                "failCount": self.__fail_count,
-                "passCount": self.__pass_count,
+                "iterations": iterations,
+                "passCount": pass_count,
+                "failCount": fail_count,
+                "failedAt": failed_at,
                 "platform": "sgw-upgrade",
             }
         )
         cbl_info(
-            f"Upgrade step uploaded: {upgrade_from} → {current_version} "
-            f"(pass={self.__pass_count}, fail={self.__fail_count})"
+            f"Upgrade batch uploaded: path={'->'.join(upgrade_path)} "
+            f"target={target_version} pass={pass_count} fail={fail_count} "
+            f"failedAt={failed_at}"
         )
 
     def _upload_document(self, doc: dict) -> None:
