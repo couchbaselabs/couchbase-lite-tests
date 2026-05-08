@@ -54,23 +54,21 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
             # Upgrade job — record this iteration's result to a state file.
             # The aggregate batch document is uploaded once at the end of
             # the upgrade run by jenkins/pipelines/QE/upg-sgw/upload_greenboard_batch.py.
-            results_file = os.environ.get("SGW_UPGRADE_RESULTS_FILE")
-            if not results_file:
-                cbl_warning(
-                    "SGW_UPGRADE_RESULTS_FILE not set; upgrade iteration "
-                    "result will not be recorded"
-                )
-            else:
-                sgw_version: CouchbaseVersion | None = None
-                if len(cblpytest.sync_gateways) > 0:
-                    sgw_version = await cblpytest.sync_gateways[0].get_version()
-                uploader.record_upgrade_step(
-                    results_file,
-                    sgw_version,
-                    upgrade_versions_str,
-                    os.environ.get("SGW_UPGRADE_PHASE"),
-                    os.environ.get("SGW_UPGRADED_NODE_INDEX"),
-                )
+            # Default matches the shell wrapper's path so direct pytest
+            # invocations still record correctly.
+            results_file = os.environ.get(
+                "SGW_UPGRADE_RESULTS_FILE", "/tmp/sgw_upgrade_results.json"
+            )
+            sgw_version: CouchbaseVersion | None = None
+            if len(cblpytest.sync_gateways) > 0:
+                sgw_version = await cblpytest.sync_gateways[0].get_version()
+            uploader.record_upgrade_step(
+                results_file,
+                sgw_version,
+                upgrade_versions_str,
+                os.environ.get("SGW_UPGRADE_PHASE"),
+                os.environ.get("SGW_UPGRADED_NODE_INDEX"),
+            )
         else:
             sgw_version: CouchbaseVersion | None = None
             test_platform: str = "sync-gateway"
