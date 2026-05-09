@@ -1,3 +1,5 @@
+$env:DOTNET_SDK_VERSION = "10.0.2xx"
+$env:DOTNET_RUNTIME_VERSION = "8.0"
 
 $target = Join-Path $PSScriptRoot 'prepare_dotnet.psm1'
 

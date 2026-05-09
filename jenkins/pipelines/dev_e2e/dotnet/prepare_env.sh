@@ -1,6 +1,7 @@
-#!/bin/bash -e
-
 export DOTNET_ROOT=$HOME/.dotnet
+export DOTNET_SDK_VERSION="10.0.2xx"
+export DOTNET_XCODE_VERSION="26.4.1"
+
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 PREPARE_DOTNET_SCRIPT="$SCRIPT_DIR/prepare_dotnet.sh"

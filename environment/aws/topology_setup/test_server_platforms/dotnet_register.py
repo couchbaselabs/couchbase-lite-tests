@@ -129,6 +129,31 @@ class DotnetTestServer(TestServer):
             capture_output=False,
         )
 
+        header("Restoring .NET workloads")
+        subprocess.run(
+            [
+                DOTNET_PATH,
+                "workload",
+                "update",
+                "--from-rollback-file",
+                DOTNET_TEST_SERVER_DIR / "testserver" / "workload-pins.json",
+                "--skip-sign-check",
+            ],
+            check=True,
+            capture_output=False,
+        )
+        subprocess.run(
+            [
+                DOTNET_PATH,
+                "workload",
+                "restore",
+                "--project",
+                DOTNET_TEST_SERVER_DIR / "testserver" / "testserver.csproj",
+            ],
+            check=True,
+            capture_output=False,
+        )
+
         verb = "publish" if self.publish else "build"
         csproj_path = DOTNET_TEST_SERVER_DIR / "testserver" / "testserver.csproj"
         header(f"Building .NET test server for {self.platform}")
@@ -249,7 +274,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
         Returns:
             str: The .NET framework version.
         """
-        return "net9.0-ios"
+        return "net10.0-ios"
 
     @property
     def rid(self) -> str:
@@ -308,7 +333,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-ios"
+            / "net10.0-ios"
             / "ios-arm64"
         )
         return iOSBridge(
@@ -329,7 +354,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-ios"
+            / "net10.0-ios"
             / "ios-arm64"
             / "testserver.app"
         )
@@ -378,7 +403,7 @@ class DotnetTestServer_Android(DotnetTestServer):
         Returns:
             str: The .NET framework version.
         """
-        return "net9.0-android"
+        return "net10.0-android"
 
     @property
     def publish(self) -> bool:
@@ -419,7 +444,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-android"
+            / "net10.0-android"
             / "com.couchbase.dotnet.testserver-Signed.apk"
         )
         return AndroidBridge(
@@ -440,7 +465,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-android"
+            / "net10.0-android"
             / "com.couchbase.dotnet.testserver-Signed.apk"
         )
         zip_path = apk_path.parents[5] / "testserver_android.apk"
@@ -587,7 +612,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
         Returns:
             str: The .NET framework version.
         """
-        return "net9.0-maccatalyst"
+        return "net10.0-maccatalyst"
 
     @property
     def publish(self) -> bool:
@@ -640,7 +665,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-maccatalyst"
+            / "net10.0-maccatalyst"
             / "maccatalyst-x64"
         )
         return macOSBridge(str(prefix / "testserver.app"))
@@ -660,7 +685,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             / "testserver"
             / "bin"
             / "Release"
-            / "net9.0-maccatalyst"
+            / "net10.0-maccatalyst"
             / "maccatalyst-x64"
             / "testserver.app"
         )
