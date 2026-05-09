@@ -52,9 +52,9 @@ DOTNET_TEST_SERVER_DIR = TEST_SERVER_DIR / "dotnet"
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 if platform.system() == "Windows":
-    DOTNET_PATH = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "dotnet" / "dotnet.exe"
+    DOTNET_PATH = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "dotnet9" / "dotnet.exe"
 else:
-    DOTNET_PATH = Path.home() / ".dotnet" / "dotnet"
+    DOTNET_PATH = Path.home() / ".dotnet9" / "dotnet"
 
 
 class DotnetTestServer(TestServer):

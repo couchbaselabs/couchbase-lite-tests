@@ -8,8 +8,8 @@ Import-Module $PSScriptRoot/../../shared/config.psm1 -Force
 Import-Module $PSScriptRoot/prepare_env.psm1 -Force
 $ErrorActionPreference = "Stop" 
 
-Install-DotNet -Version "9.0"
-Install-DotNetRuntime -Version "8.0"
+Install-DotNet -Version "$env:DOTNET_SDK_VERSION"
+Install-DotNetRuntime -Version "$env:DOTNET_RUNTIME_VERSION"
 
 Stop-Venv
 New-Venv venv

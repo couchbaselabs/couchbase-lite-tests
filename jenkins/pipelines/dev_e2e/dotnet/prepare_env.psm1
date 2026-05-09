@@ -1,4 +1,4 @@
-
+$env:DOTNET_ROOT="$HOME/.dotnet9"
 $target = Join-Path $PSScriptRoot 'prepare_dotnet.psm1'
 
 if (-not (Test-Path -Path $target)) {
