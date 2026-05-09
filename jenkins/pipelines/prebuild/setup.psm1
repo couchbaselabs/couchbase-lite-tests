@@ -5,5 +5,5 @@ if (-not $env:TS_PLATFORM) {
 
 Import-Module $PSScriptRoot/../shared/config.psm1 -Force
 if ($env:TS_PLATFORM -like "dotnet*") {
-    . "$PSScriptRoot\setup_dotnet.ps1"
+    Import-Module "$PSScriptRoot\setup_dotnet.ps1" -Force
 }
