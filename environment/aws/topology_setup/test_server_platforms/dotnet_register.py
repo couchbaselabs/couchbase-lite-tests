@@ -29,11 +29,9 @@ Functions:
         Uncompress the .NET test server package.
 """
 
-import platform
 import shutil
 import subprocess
 from abc import abstractmethod
-from os import environ
 from pathlib import Path
 
 import click
