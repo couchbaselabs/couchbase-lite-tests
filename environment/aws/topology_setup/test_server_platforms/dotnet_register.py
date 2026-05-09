@@ -29,7 +29,6 @@ Functions:
         Uncompress the .NET test server package.
 """
 
-import platform
 import shutil
 import subprocess
 from abc import abstractmethod
@@ -50,11 +49,7 @@ from .platform_bridge import PlatformBridge
 
 DOTNET_TEST_SERVER_DIR = TEST_SERVER_DIR / "dotnet"
 SCRIPT_DIR = Path(__file__).resolve().parent
-
-if platform.system() == "Windows":
-    DOTNET_PATH = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "dotnet9" / "dotnet.exe"
-else:
-    DOTNET_PATH = Path.home() / ".dotnet9" / "dotnet"
+DOTNET_PATH = Path.home() / ".dotnet9" / "dotnet"
 
 
 class DotnetTestServer(TestServer):
