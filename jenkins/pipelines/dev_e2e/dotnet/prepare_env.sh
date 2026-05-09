@@ -1,4 +1,4 @@
-export DOTNET_ROOT=$HOME/.dotnet
+export DOTNET_ROOT=$HOME/.dotnet10
 export DOTNET_SDK_VERSION="10.0.2xx"
 export DOTNET_XCODE_VERSION="26.4.1"
 
