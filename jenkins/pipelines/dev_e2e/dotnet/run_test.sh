@@ -17,7 +17,6 @@ function usage() {
 function prepare_dotnet() {
     source $SCRIPT_DIR/prepare_env.sh
     install_dotnet
-    install_maui
     if [ "$platform" != "macos" ]; then
         install_xharness
     fi

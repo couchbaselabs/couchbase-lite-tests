@@ -51,10 +51,7 @@ from .platform_bridge import PlatformBridge
 DOTNET_TEST_SERVER_DIR = TEST_SERVER_DIR / "dotnet"
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-if platform.system() == "Windows":
-    DOTNET_PATH = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "dotnet" / "dotnet.exe"
-else:
-    DOTNET_PATH = Path.home() / ".dotnet" / "dotnet"
+DOTNET_PATH = Path.home() / ".dotnet8" / "dotnet"
 
 
 class DotnetTestServer(TestServer):
@@ -124,6 +121,31 @@ class DotnetTestServer(TestServer):
                 "Couchbase.Lite.Enterprise",
                 "--version",
                 cbl_version,
+            ],
+            check=True,
+            capture_output=False,
+        )
+
+        header("Restoring .NET workloads")
+        subprocess.run(
+            [
+                DOTNET_PATH,
+                "workload",
+                "update",
+                "--from-rollback-file",
+                DOTNET_TEST_SERVER_DIR / "testserver" / "workload-pins.json",
+                "--skip-sign-check",
+            ],
+            check=True,
+            capture_output=False,
+        )
+        subprocess.run(
+            [
+                DOTNET_PATH,
+                "workload",
+                "restore",
+                "--project",
+                DOTNET_TEST_SERVER_DIR / "testserver" / "testserver.csproj",
             ],
             check=True,
             capture_output=False,
