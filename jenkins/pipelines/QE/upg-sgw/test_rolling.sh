@@ -11,20 +11,31 @@ rm -f "$SGW_UPGRADE_RESULTS_FILE"
 
 function upload_batch_results() {
     local exit_code=$?
+    echo ">>> EXIT trap: greenboard batch upload (script exit=$exit_code)"
     if [ ! -f "$SGW_UPGRADE_RESULTS_FILE" ]; then
         echo ">>> No upgrade results file at $SGW_UPGRADE_RESULTS_FILE; skipping batch upload"
         return $exit_code
     fi
     if [ -z "${QE_TESTS_DIR:-}" ] || [ -z "${SCRIPT_DIR:-}" ]; then
-        echo ">>> Paths not initialized; skipping batch upload"
+        echo ">>> Paths not initialized (QE_TESTS_DIR/SCRIPT_DIR); skipping batch upload"
         return $exit_code
     fi
-    echo ">>> Uploading aggregated greenboard batch result (exit=$exit_code)..."
+    echo ">>> Recorded iterations (${SGW_UPGRADE_RESULTS_FILE}):"
+    cat "$SGW_UPGRADE_RESULTS_FILE" || true
+    echo ""
+    echo ">>> Uploading aggregated greenboard batch result..."
     pushd "$QE_TESTS_DIR" > /dev/null || return $exit_code
+    set +e
     uv run "$SCRIPT_DIR/upload_greenboard_batch.py" \
         --config config.json \
-        --results-file "$SGW_UPGRADE_RESULTS_FILE" || \
-        echo ">>> WARNING: greenboard batch upload failed"
+        --results-file "$SGW_UPGRADE_RESULTS_FILE"
+    upload_rc=$?
+    set -e
+    if [ $upload_rc -ne 0 ]; then
+        echo ">>> ERROR: greenboard batch upload failed with exit code $upload_rc"
+    else
+        echo ">>> Greenboard batch upload completed."
+    fi
     popd > /dev/null || true
     return $exit_code
 }
