@@ -7,7 +7,11 @@ def resolveProgetVersion(String product, String version, String label) {
     echo "Resolving ${label}: ${url}"
     def resolved
     if (isUnix()) {
-        resolved = sh(script: "curl -sf '${url}' | jq -r .version", returnStdout: true).trim()
+        resolved = sh(
+              script: """curl -sf '${url}' | python3 -c 'import json,sys;
+          print(json.load(sys.stdin).get("version",""))'""",
+              returnStdout: true
+          ).trim()
     } else {
         resolved = powershell(script: """
             try { (Invoke-RestMethod '${url}').version }
