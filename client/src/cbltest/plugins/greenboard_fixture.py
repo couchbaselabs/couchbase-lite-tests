@@ -59,9 +59,20 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
             results_file = os.environ.get(
                 "SGW_UPGRADE_RESULTS_FILE", "/tmp/sgw_upgrade_results.json"
             )
+            # During rolling phases the SGW node under upgrade may be
+            # destroyed/restarting and get_version() will raise. We must
+            # still record the iteration (with sgw_version=None) so the
+            # failure shows up as a red dot on the track chart instead
+            # of being silently dropped.
             sgw_version: CouchbaseVersion | None = None
             if len(cblpytest.sync_gateways) > 0:
-                sgw_version = await cblpytest.sync_gateways[0].get_version()
+                try:
+                    sgw_version = await cblpytest.sync_gateways[0].get_version()
+                except Exception as ve:
+                    cbl_warning(
+                        f"Could not fetch SGW version for upgrade record: {ve}; "
+                        "recording iteration with sgw_version=None"
+                    )
             uploader.record_upgrade_step(
                 results_file,
                 sgw_version,

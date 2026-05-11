@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -34,6 +35,7 @@ class GreenboardUploader:
         self.__fail_count = 0
         self.__pass_count = 0
         self.__overall_fail = False
+        self.__test_ran = False
         self.__has_sgw_marker = False
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
@@ -44,6 +46,11 @@ class GreenboardUploader:
             if report.failed:
                 self.__overall_fail = True
             return
+
+        # Mark that at least one test reached the "call" phase. Zero
+        # collected tests is treated as a deviation from intent — recorded
+        # as a failed iteration so the chart doesn't silently turn green.
+        self.__test_ran = True
 
         if self.__overall_fail:
             return
@@ -151,17 +158,39 @@ class GreenboardUploader:
         """
         upgrade_path = [v.strip() for v in upgrade_versions_str.split(",") if v.strip()]
 
+        # Resolve the destination version of this iteration. Live SGW is
+        # primary; on get_version() failure the caller passes None and we
+        # fall back to the shell-exported step target so the dot still
+        # maps to the right node on the chart. Last-resort is the planned
+        # final target.
         target_build = 0
-        current_version = upgrade_path[-1] if upgrade_path else "0.0.0"
-        if sgw_version is not None:
-            current_version = sgw_version.version or current_version
+        if sgw_version is not None and sgw_version.version:
+            current_version = sgw_version.version
             target_build = sgw_version.build_number
+        else:
+            current_version = os.environ.get("SGW_VERSION_UNDER_TEST") or (
+                upgrade_path[-1] if upgrade_path else "0.0.0"
+            )
 
         upgrade_from = "initial"
         for i, v in enumerate(upgrade_path):
             if v == current_version and i > 0:
                 upgrade_from = upgrade_path[i - 1]
                 break
+
+        # Any deviation from "tests ran and all passed" is a failure.
+        # Includes: a test failed (call phase), setup/teardown crashed
+        # (overall_fail), or pytest collected zero tests (test_ran False).
+        had_test_failures = self.__fail_count > 0
+        setup_failure = self.__overall_fail
+        no_tests_collected = not self.__test_ran
+        failed = had_test_failures or setup_failure or no_tests_collected
+
+        # Surface non-test-call failures as at least one failed count so
+        # the top-level batch doc's failCount is correctly 1, not 0.
+        fail_count = self.__fail_count
+        if failed and fail_count == 0:
+            fail_count = 1
 
         iteration = {
             "phase": phase,
@@ -170,8 +199,8 @@ class GreenboardUploader:
             "upgradeTo": current_version,
             "build": target_build,
             "passCount": self.__pass_count,
-            "failCount": self.__fail_count,
-            "failed": self.__overall_fail or self.__fail_count > 0,
+            "failCount": fail_count,
+            "failed": failed,
         }
 
         path = Path(results_file)
