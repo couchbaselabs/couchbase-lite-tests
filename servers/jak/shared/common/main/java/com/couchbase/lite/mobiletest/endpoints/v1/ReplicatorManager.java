@@ -206,7 +206,7 @@ public class ReplicatorManager extends BaseReplicatorManager {
 
             final MutableDictionary mergedDict = new MutableDictionary();
             for (String key : localDict) {
-                mergedDict.setValue(docProp, localDict.getValue(key));
+                mergedDict.setValue(key, localDict.getValue(key));
             }
 
             for (String key : remoteDict) {
@@ -215,7 +215,7 @@ public class ReplicatorManager extends BaseReplicatorManager {
                     return doc.setString(key, String.format("Conflicting values found at key named %s", key));
                 }
 
-                mergedDict.setValue(docProp, remoteValue);
+                mergedDict.setValue(key, remoteValue);
             }
 
             return doc.setDictionary(docProp, mergedDict);
