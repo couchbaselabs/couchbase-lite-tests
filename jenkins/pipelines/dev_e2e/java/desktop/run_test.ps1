@@ -12,7 +12,7 @@ if($LASTEXITCODE -ne 0) {
 
 Push-Location $DEV_E2E_TESTS_DIR
 try {
-    uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version $DatasetVersion
+    uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version $DatasetVersion
     $saved_exit = $LASTEXITCODE
 } finally {
     Pop-Location
