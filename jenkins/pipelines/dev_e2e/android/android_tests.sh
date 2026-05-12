@@ -44,4 +44,4 @@ echo "Run the tests"
 # To re-enable this, this script needs to become aware of the
 # serial number of the device, which is not currently passed
 #adb shell input keyevent KEYCODE_WAKEUP
-uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version $DATASET_VERSION || STATUS=$?
+uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version $DATASET_VERSION || STATUS=$?
