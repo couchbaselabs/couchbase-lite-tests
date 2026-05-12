@@ -32,7 +32,7 @@ pipeline {
             agent { label 'qe-mac-india' }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
                 TS_ARTIFACTS_DIR = 'ios'
             }
             steps {
