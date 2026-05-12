@@ -83,7 +83,7 @@ pipeline {
                             -File jenkins\\pipelines\\QE\\java\\desktop\\run_test.ps1 ^
                             -Version %CBL_VERSION% ^
                             -SgwVersion %SGW_VERSION% ^
-                            -DatasetVersion ${params.TS_DATASET_VERSION}
+                            -DatasetVersion %TS_DATASET_VERSION%
                             '''                        }
                         echo "=== Windows Desktop Tests Complete"
                     }
