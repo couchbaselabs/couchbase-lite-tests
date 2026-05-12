@@ -177,6 +177,7 @@ public class ReplicatorManager {
     private static final String AUTH_TYPE_SESSION = "session";
     private static final String KEY_SESSION_AUTH_ID = "sessionID";
     private static final String KEY_SESSION_AUTH_COOKIE = "cookieName";
+    private static final String KEY_HEADERS = "headers";
     private static final String KEY_NAMES = "names";
     private static final String KEY_CHANNELS = "channels";
     private static final String KEY_DOCUMENT_IDS = "documentIDs";
@@ -219,6 +220,7 @@ public class ReplicatorManager {
         l.add(KEY_TYPE);
         l.add(KEY_IS_CONTINUOUS);
         l.add(KEY_AUTHENTICATOR);
+        l.add(KEY_HEADERS);
         l.add(KEY_ENABLE_DOC_LISTENER);
         l.add(KEY_ENABLE_AUTOPURGE);
         l.add(KEY_PINNED_CERT);
@@ -442,6 +444,19 @@ public class ReplicatorManager {
 
         final String pinnedCert = config.getString(KEY_PINNED_CERT);
         if (pinnedCert != null) { replConfig.setPinnedServerX509Certificate(str2X509Cert(pinnedCert)); }
+
+        final TypedMap headers = config.getMap(KEY_HEADERS);
+
+        if (headers != null) {
+            final Map<String, String> headerMap = new HashMap<>();
+            for (String key : headers.getKeys()) {
+                final String value = headers.getString(key);
+                if (value != null) {
+                    headerMap.put(key, value);
+                }
+            }
+            replConfig.setHeaders(headerMap);
+        }
 
         final TypedMap authenticator = config.getMap(KEY_AUTHENTICATOR);
         if (authenticator != null) {
