@@ -124,6 +124,10 @@ public class Server extends NanoHTTPD {
         resp.addHeader(TestApp.HEADER_PROTOCOL_VERSION, String.valueOf(version));
         resp.addHeader(TestApp.HEADER_SERVER, appId);
 
+        // Usually this is not recommended, but since our traffic is always on LAN it's not going to be
+        // a bottleneck source, and it eliminates a race with the keep alive timeout.
+        resp.closeConnection(true);
+
         return resp;
     }
 
