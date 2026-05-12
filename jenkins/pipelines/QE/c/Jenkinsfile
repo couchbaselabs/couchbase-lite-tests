@@ -48,6 +48,7 @@ pipeline {
                         -File jenkins\\pipelines\\QE\\c\\run_test.ps1 ^
                         -Version %CBL_VERSION% ^
                         -SgwVersion %SGW_VERSION%
+                        -DatasetVersion %TS_DATASET_VERSION%
                         '''
                     }
                     echo "=== C Windows Tests Complete"

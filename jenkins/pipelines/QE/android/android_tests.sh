@@ -26,19 +26,16 @@ if [ -z "$CBL_VERSION" ]; then usage; fi
 SG_VERSION="$2"
 if [ -z "$SG_VERSION" ]; then usage; fi
 
-DATASET_VERSION="4.0"
+DATASET_VERSION= ${3:-"4.0"}
+
 SETUP_ONLY=false
 
-# Parse optional args (starting from 3rd)
-for arg in "${@:3}"; do
-    case "$arg" in
-        --setup-only)
-            SETUP_ONLY=true
-            ;;
-        *)
-            DATASET_VERSION="$arg"
-            ;;
-    esac
+# Check for --setup-only flag
+for arg in "$@"; do
+    if [ "$arg" = "--setup-only" ]; then
+        SETUP_ONLY=true
+        break
+    fi
 done
 
 echo "Install Android SDK"
