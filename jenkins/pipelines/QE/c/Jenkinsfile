@@ -19,13 +19,28 @@ pipeline {
         }
         stage('Prebuild Servers') {
             steps {
-                build job: 'prebuild-test-server',
-                parameters: [
-                    string(name: 'TS_PLATFORM', value: 'c_linux_x86_64'),
-                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                ],
-                wait: true,
-                propagate: true
+                script {
+                    def platforms = [
+                        'c_windows', 'c_ios', 'c_android'
+                    ]
+                    def parallelBuilds = [:]
+                    for(p in platforms) {
+                        // Groovy stupidness.  Need to set a local variable here
+                        // to avoid late binding (all jobs use dotnet_macos).
+                        def platform = p
+                        parallelBuilds[platform] = {
+                            build job: 'prebuild-test-server',
+                            parameters: [
+                                string(name: 'TS_PLATFORM', value: platform),
+                                string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                                string(name: 'CBL_BUILD', value: params.CBL_BUILD)
+                            ],
+                            wait: true,
+                            propagate: true
+                        }
+                    }
+                    parallel parallelBuilds
+                }
             }
         }
         stage('Tests') {
