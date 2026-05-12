@@ -6,7 +6,6 @@ import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DocumentUpdateEntry, ISGRPayload, PutDatabasePayload
-from packaging.version import Version
 
 
 def _check_node_in_cluster(cbs_hostname: str, cluster_nodes: list) -> tuple[bool, bool]:
@@ -138,9 +137,7 @@ class TestMultipleServers(CBLTestClass):
         original_revs = {row.id: row.revision for row in all_docs.rows}
         original_vvs = {}
 
-        sgw_version_obj = await sg.get_version()
-        sgw_version = Version(sgw_version_obj.version)
-        supports_version_vectors = sgw_version >= Version("4.0.0")
+        supports_version_vectors = await sg.supports_version_vectors()
         if supports_version_vectors:
             changes_initial = await sg_user.get_changes(sg_db, version_type="cv")
             original_vvs = {
