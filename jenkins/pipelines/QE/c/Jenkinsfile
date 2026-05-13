@@ -21,7 +21,7 @@ pipeline {
             steps {
                 script {
                     def platforms = [
-                        'c_windows', 'c_ios', 'c_android'
+                        'c_windows', 'c_ios', 'c_android','c_linux_x86_64'
                     ]
                     def parallelBuilds = [:]
                     for(p in platforms) {
@@ -140,26 +140,30 @@ pipeline {
                         }
                         archiveArtifacts artifacts: 'tests/QE/c_ios/**/*', fingerprint: true, allowEmptyArchive: true
                         echo "=== C iOS Test Teardown Complete"
-            }
-            agent { label 'linux-c' }
-            environment {
-                TS_ARTIFACTS_DIR = 'c'
-            }
-            steps {
-                echo "=== Run C Linux Tests"
-                timeout(time: 120, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} linux_x86_64 ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
-                }
-                echo "=== C Linux Tests Complete"
-            }
-            post {
-                always {
-                    echo "=== Teardown C Linux Tests"
-                    timeout(time: 5, unit: 'MINUTES') {
-                        sh 'jenkins/pipelines/QE/c/teardown.sh'
                     }
-                    archiveArtifacts artifacts: 'tests/QE/c_linux/**/*', fingerprint: true, allowEmptyArchive: true
-                    echo "=== C Linux Test Teardown Complete"
+                }
+            }
+            stage('linux_x86_64') {
+                agent { label 'linux-c' }
+                environment {
+                    TS_ARTIFACTS_DIR = 'c'
+                }
+                steps {
+                    echo "=== Run C Linux Tests"
+                    timeout(time: 120, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} linux_x86_64 ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                    }
+                    echo "=== C Linux Tests Complete"
+                }
+                post {
+                    always {
+                        echo "=== Teardown C Linux Tests"
+                        timeout(time: 5, unit: 'MINUTES') {
+                            sh 'jenkins/pipelines/QE/c/teardown.sh'
+                        }
+                        archiveArtifacts artifacts: 'tests/QE/c_linux/**/*', fingerprint: true, allowEmptyArchive: true
+                        echo "=== C Linux Test Teardown Complete"
+                    }
                 }
             }
         }
