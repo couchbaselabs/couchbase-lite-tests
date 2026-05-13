@@ -47,9 +47,8 @@ class GreenboardUploader:
                 self.__overall_fail = True
             return
 
-        # Mark that at least one test reached the "call" phase. Zero
-        # collected tests is treated as a deviation from intent — recorded
-        # as a failed iteration so the chart doesn't silently turn green.
+        # Used by record_upgrade_step to skip iterations where pytest
+        # collected zero tests (and no setup crash occurred).
         self.__test_ran = True
 
         if self.__overall_fail:
@@ -158,6 +157,16 @@ class GreenboardUploader:
         """
         upgrade_path = [v.strip() for v in upgrade_versions_str.split(",") if v.strip()]
 
+        # No tests collected AND no setup crash means nothing was ever
+        # attempted (e.g. wrong marker filter). Don't record an iteration
+        # — the chart shouldn't show a row for a run that never executed.
+        if not self.__test_ran and not self.__overall_fail:
+            cbl_info(
+                f"No tests ran for phase={phase!r}; skipping iteration "
+                "record (no upload contribution)"
+            )
+            return
+
         # Resolve the destination version of this iteration. Live SGW is
         # primary; on get_version() failure the caller passes None and we
         # fall back to the shell-exported step target so the dot still
@@ -179,12 +188,11 @@ class GreenboardUploader:
                 break
 
         # Any deviation from "tests ran and all passed" is a failure.
-        # Includes: a test failed (call phase), setup/teardown crashed
-        # (overall_fail), or pytest collected zero tests (test_ran False).
+        # Includes: a test failed (call phase) or setup/teardown crashed
+        # (overall_fail). Zero-collected was already short-circuited above.
         had_test_failures = self.__fail_count > 0
         setup_failure = self.__overall_fail
-        no_tests_collected = not self.__test_ran
-        failed = had_test_failures or setup_failure or no_tests_collected
+        failed = had_test_failures or setup_failure
 
         # Surface non-test-call failures as at least one failed count so
         # the top-level batch doc's failCount is correctly 1, not 0.
