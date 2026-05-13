@@ -726,8 +726,8 @@ class TestDeltaSync(CBLTestClass):
             ],
         )
 
-        self.mark_test_step("Wait for 10 seconds to ensure delta rev expires.")
-        await asyncio.sleep(10)
+        self.mark_test_step("Wait for 12 seconds to ensure delta rev expires.")
+        await asyncio.sleep(12)
 
         self.mark_test_step("Verify old revision is not accessible through public API.")
         try:
