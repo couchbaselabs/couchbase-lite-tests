@@ -750,6 +750,16 @@ class TestDeltaSync(CBLTestClass):
             assert "404" in str(e) or "not found" in str(e).lower(), (
                 f"Expected 404 error, got: {e}"
             )
+        self.mark_test_step("Verify CBL still has old doc before second replication.")
+        cbl_doc_before = await db.get_document(DocumentEntry("_default._default", "doc1"))
+        assert cbl_doc_before is not None
+        assert cbl_doc_before.body.get("name") != "SGW", (
+            "CBL should not have the SGW update yet"
+        )
+        # Move this to just before replicator.start() the second time
+        read_pull_bytes_before, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+            "short_expiry"
+        )
 
         self.mark_test_step("Start the same replicator again.")
         await replicator.start()
@@ -760,6 +770,24 @@ class TestDeltaSync(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
+        read_pull_bytes_after, _ = await cblpytest.sync_gateways[0].bytes_transferred(
+            "short_expiry"
+        )
+        delta_bytes_read = read_pull_bytes_after - read_pull_bytes_before
+
+        self.mark_test_step(f"Start the same replicator again. delta_bytes_read before: {delta_bytes_read}")
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+        cbl_doc = await db.get_document(DocumentEntry("_default._default", "doc1"))
+        assert cbl_doc is not None
+        assert cbl_doc.body.get("name") == "SGW", (
+            f"CBL should have received SGW update, got: {cbl_doc.body}"
+        )
         self.mark_test_step("Record the bytes transferred post expiry.")
         read_pull_bytes_after, _ = await cloud.sync_gateway.bytes_transferred(
             "short_expiry"
