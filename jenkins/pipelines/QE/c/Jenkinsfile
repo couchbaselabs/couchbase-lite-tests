@@ -62,7 +62,7 @@ pipeline {
                             -ExecutionPolicy Bypass ^
                             -File jenkins\\pipelines\\QE\\c\\run_test.ps1 ^
                             -Version %CBL_VERSION% ^
-                            -SgwVersion %SGW_VERSION%
+                            -SgwVersion %SGW_VERSION% ^
                             -DatasetVersion %TS_DATASET_VERSION%
                             '''
                         }
@@ -100,7 +100,7 @@ pipeline {
                         }
                         echo "=== Run C Android Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION}"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
                         }
                         echo "=== C Android Tests Complete"
                     }
@@ -128,7 +128,7 @@ pipeline {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "=== Run C iOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION}"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
                         }
                         echo "=== C iOS Tests Complete"
                     }
