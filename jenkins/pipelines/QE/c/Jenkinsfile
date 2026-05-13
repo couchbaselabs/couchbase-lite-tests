@@ -27,7 +27,6 @@ pipeline {
                         parameters: [
                             string(name: 'TS_PLATFORM', value: 'c_macos'),
                             string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                            string(name: 'BRANCH', value: 'jenkins-prebuild'),
                         ],
                         wait: true,
                         propagate: true
