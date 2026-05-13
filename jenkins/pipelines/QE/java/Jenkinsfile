@@ -34,75 +34,75 @@ pipeline {
         }
         stage('Run Tests') {
             parallel {
-//                 stage('macOS Desktop') {
-//                     agent { label 'mac-mini-new' }
-//                     options {
-//                         lock('mac-mini-new')
-//                     }
-//                     environment {
-//                         KEYCHAIN_PASSWORD = credentials('mobile-qe')
-//                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-//                         TS_ARTIFACTS_DIR = 'java_macos_desktop'
-//                         TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
-//                     }
-//                     steps {
-//                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-//                         echo "=== Run macOS Desktop Tests"
-//                         timeout(time: 120, unit: 'MINUTES') {
-//                             sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
-//                         }
-//                         echo "=== macOS Desktop Tests Complete"
-//                     }
-//                     post {
-//                         always {
-//                             echo "=== Teardown macOS Desktop Tests"
-//                             timeout(time: 5, unit: 'MINUTES') {
-//                                 sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'
-//                             }
-//                             archiveArtifacts artifacts: 'tests/QE/java_macos_desktop/**/*', fingerprint: true, allowEmptyArchive: true
-//                             echo "=== macOS Desktop Test Teardown Complete"
-//                         }
-//                     }
-//                 }
-//                 stage('Windows Desktop') {
-//                     agent { label 'net-windows' }
-//                     options {
-//                         lock('net-windows')
-//                     }
-//                     environment {
-//                         TS_ARTIFACTS_DIR = 'java_windows_desktop'
-//                         TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
-//                     }
-//                     steps {
-//                         echo "=== Run Windows Desktop Tests"
-//                         timeout(time: 120, unit: 'MINUTES') {
-//                             bat '''
-//                             "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
-//                             -NoProfile ^
-//                             -ExecutionPolicy Bypass ^
-//                             -File jenkins\\pipelines\\QE\\java\\desktop\\run_test.ps1 ^
-//                             -Version %CBL_VERSION% ^
-//                             -SgwVersion %SGW_VERSION% ^
-//                             -DatasetVersion %TS_DATASET_VERSION%
-//                             '''                        }
-//                         echo "=== Windows Desktop Tests Complete"
-//                     }
-//                     post {
-//                         always {
-//                             echo "=== Teardown Windows Desktop Tests"
-//                             timeout(time: 5, unit: 'MINUTES') {
-//                                 bat '''
-//                                 "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
-//                                 -NoProfile ^
-//                                 -ExecutionPolicy Bypass ^
-//                                 -File jenkins\\pipelines\\QE\\java\\desktop\\teardown.ps1
-//                                 '''
-//                             }
-//                             archiveArtifacts artifacts: 'tests\\QE\\java_windows_desktop\\**\\*', fingerprint: true, allowEmptyArchive: true
-//                             echo "=== Windows Desktop Test Teardown Complete"
-//                         }
-//                     }
-//                 }
+                stage('macOS Desktop') {
+                    agent { label 'mac-mini-new' }
+                    options {
+                        lock('mac-mini-new')
+                    }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        TS_ARTIFACTS_DIR = 'java_macos_desktop'
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                    }
+                    steps {
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        echo "=== Run macOS Desktop Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                        }
+                        echo "=== macOS Desktop Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown macOS Desktop Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/java_macos_desktop/**/*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== macOS Desktop Test Teardown Complete"
+                        }
+                    }
+                }
+                stage('Windows Desktop') {
+                    agent { label 'net-windows' }
+                    options {
+                        lock('net-windows')
+                    }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'java_windows_desktop'
+                        TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                    }
+                    steps {
+                        echo "=== Run Windows Desktop Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            bat '''
+                            "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
+                            -NoProfile ^
+                            -ExecutionPolicy Bypass ^
+                            -File jenkins\\pipelines\\QE\\java\\desktop\\run_test.ps1 ^
+                            -Version %CBL_VERSION% ^
+                            -SgwVersion %SGW_VERSION% ^
+                            -DatasetVersion %TS_DATASET_VERSION%
+                            '''                        }
+                        echo "=== Windows Desktop Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown Windows Desktop Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                bat '''
+                                "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" ^
+                                -NoProfile ^
+                                -ExecutionPolicy Bypass ^
+                                -File jenkins\\pipelines\\QE\\java\\desktop\\teardown.ps1
+                                '''
+                            }
+                            archiveArtifacts artifacts: 'tests\\QE\\java_windows_desktop\\**\\*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== Windows Desktop Test Teardown Complete"
+                        }
+                    }
+                }
                 stage('Linux Desktop') {
                     agent { label 'linux-java' }
                     options {
