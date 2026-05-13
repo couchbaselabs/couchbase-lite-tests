@@ -55,22 +55,16 @@ pipeline {
                     if (response.status != 200) {
                         env.BUILD_BRANCH = 'main'
                     }
-
                     echo "Build will come from branch ${env.BUILD_BRANCH}"
                 }
             }
         }
         stage('Build') {
             agent {
-                // label getNodeForPlatform(params.TS_PLATFORM)
-                label 'qe-mac-india'
-            }
-            options {
-                lock('qe-mac-india')
+                label getNodeForPlatform(params.TS_PLATFORM)
             }
             environment {
-                // KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
             }
             steps {
                 cleanWs()
@@ -95,23 +89,24 @@ pipeline {
 
                         if (params.TS_PLATFORM.contains("windows")) {
                             pwsh """
-                                python -m venv venv
-                                .\\venv\\Scripts\\activate
-                                pip install uv
-                                uv pip install -r environment/aws/requirements.txt
-                                python environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
-                                deactivate
+                                Import-Module ./jenkins/pipelines/prebuild/setup.psm1 -Force
+                                if ( Test-Path -Path ./jenkins/pipelines/prebuild/setup.psm1 ) {
+                                    Import-Module ./jenkins/pipelines/prebuild/setup.psm1 -Force
+                                } else {
+                                    Import-Module ./jenkins/pipelines/shared/config.psm1 -Force
+                                }
+
+                                uv run ./environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
                             """
                         } else {
                             sh """#!/bin/bash -e
-
-                                source jenkins/pipelines/shared/config.sh
-                                create_venv venv
-                                source venv/bin/activate
-                                pip install uv
-                                uv pip install -r "environment/aws/requirements.txt"
-                                python "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci
-                                deactivate
+                                if [ -f jenkins/pipelines/prebuild/setup.sh ]; then
+                                    source jenkins/pipelines/prebuild/setup.sh
+                                else 
+                                    source jenkins/pipelines/shared/config.sh
+                                fi
+                                
+                                uv run "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci
                             """
                         }
                     }
