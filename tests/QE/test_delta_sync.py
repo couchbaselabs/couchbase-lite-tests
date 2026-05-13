@@ -727,7 +727,11 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Wait for 10 seconds to ensure delta rev expires.")
-        await asyncio.sleep(10)
+        await asyncio.sleep(12)
+
+        await cblpytest.sync_gateways[0].get_document(
+            "short_expiry", "doc1", "_default", "_default"
+        )
 
         self.mark_test_step("Verify old revision is not accessible through public API.")
         try:
@@ -740,6 +744,8 @@ class TestDeltaSync(CBLTestClass):
             assert "stub" in expired_rev_doc or "_attachments" in expired_rev_doc, (
                 f"Expected old revision to be a stub, but got full document: {expired_rev_doc}"
             )
+        except AssertionError:
+            raise
         except Exception as e:
             assert "404" in str(e) or "not found" in str(e).lower(), (
                 f"Expected 404 error, got: {e}"
