@@ -29,11 +29,9 @@ Functions:
         Uncompress the .NET test server package.
 """
 
-import platform
 import shutil
 import subprocess
 from abc import abstractmethod
-from os import environ
 from pathlib import Path
 
 import click
@@ -128,16 +126,10 @@ class DotnetTestServer(TestServer):
 
         header("Restoring .NET workloads")
         subprocess.run(
-            [
-                DOTNET_PATH,
-                "workload",
-                "update",
-                "--from-rollback-file",
-                DOTNET_TEST_SERVER_DIR / "testserver" / "workload-pins.json",
-                "--skip-sign-check",
-            ],
+            [DOTNET_PATH, "workload", "update"],
             check=True,
             capture_output=False,
+            cwd=DOTNET_TEST_SERVER_DIR / "testserver",
         )
         subprocess.run(
             [
