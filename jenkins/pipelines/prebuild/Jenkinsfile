@@ -63,12 +63,9 @@ pipeline {
             agent {
                 label getNodeForPlatform(params.TS_PLATFORM)
             }
-            environment {
-                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
-            }
             steps {
                 cleanWs()
-                
+
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: "*/${env.BUILD_BRANCH}"]],
@@ -84,7 +81,9 @@ pipeline {
 
                     withEnv(["FULL_CBL_VERSION=${fullVersion}"]) {
                         if (params.TS_PLATFORM.contains("ios")) {
-                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                            withCredentials([string(credentialsId: 'mobile-qe-india', variable: 'KEYCHAIN_PASSWORD')]) {
+                                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                            }
                         }
 
                         if (params.TS_PLATFORM.contains("windows")) {
@@ -118,10 +117,10 @@ pipeline {
 
 def getNodeForPlatform(platform) {
     if (platform.contains("windows")) {
-        return 'mob-e2e-win-01'
+        return 'couchbase-lite-net-validation'
     } else if (platform.contains("linux")) {
         return 'mob-e2e-deb-02'
     } else {
-        return 'mob-e2e-mac-01'
+        return 'qe-mac-india'
     }
 }
