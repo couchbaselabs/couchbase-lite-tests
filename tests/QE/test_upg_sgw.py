@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import pytest
@@ -31,7 +30,7 @@ class TestSgwUpgrade(CBLTestClass):
         """
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
-        current_upgrade_ver = os.environ.get("SGW_VERSION_UNDER_TEST", "0.0.0")
+        current_upgrade_ver = (await sg.get_version()).version
         num_docs_per_iteration = 10
         sg_db = "upg_db"
         bucket = "upg_bucket"
@@ -47,12 +46,9 @@ class TestSgwUpgrade(CBLTestClass):
 
         self.mark_test_step("Add a bucket on CBS if not there already")
         if bucket not in cbs.get_bucket_names():
-            print(f"Bucket '{bucket}' not found on CBS. Creating it for the test...")
             cbs.create_bucket(bucket)
 
         self.mark_test_step("Load dataset on CBL")
-        if not hasattr(self, "db"):
-            print(f"Resetting CBL database '{cbl_db}' for the test...")
         self.db = (await cblpytest.test_servers[0].create_and_reset_db([cbl_db]))[0]
         db = self.db
 

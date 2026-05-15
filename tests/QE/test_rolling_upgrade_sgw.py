@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import pytest
@@ -60,8 +59,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
     ) -> None:
         sg_nodes = cblpytest.sync_gateways[:3]
         cbs = cblpytest.couchbase_servers[0]
-        upgrade_phase = os.environ.get("SGW_UPGRADE_PHASE", "initial")
-        current_version = os.environ.get("SGW_VERSION_UNDER_TEST", "0.0.0")
+        current_version = (await sg_nodes[0].get_version()).version
         num_docs_per_iteration = 10
         sg_db = "rolling_upg_db"
         bucket: str = SGW_BUCKET
@@ -69,8 +67,8 @@ class TestSgwRollingUpgrade(CBLTestClass):
         scope = "_default"
         collection = "_default"
 
-        self.mark_test_step(f"Phase: {upgrade_phase} | SGW version: {current_version}")
-        doc_id_prefix = f"rolling_{upgrade_phase}_{current_version}"
+        self.mark_test_step(f"SGW version: {current_version}")
+        doc_id_prefix = f"rolling_{current_version}"
 
         self.mark_test_step("Ensure bucket exists on CBS")
         if bucket not in cbs.get_bucket_names():
@@ -124,7 +122,6 @@ class TestSgwRollingUpgrade(CBLTestClass):
                     body={
                         "type": "rolling_upgrade_doc",
                         "version": current_version,
-                        "phase": upgrade_phase,
                         "index": i,
                         "message": "SGW rolling upgrade test document.",
                     },
@@ -157,7 +154,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
                     revs_before[row.id],
                     body={
                         **row.doc,
-                        "message": f"updated in {upgrade_phase}",
+                        "message": "updated",
                     },
                 )
             )
