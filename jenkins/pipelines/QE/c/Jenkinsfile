@@ -60,7 +60,7 @@ pipeline {
                         }
                         echo "=== Run C macOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION}"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
                         }
                         echo "=== C macOS Tests Complete"
                     }
