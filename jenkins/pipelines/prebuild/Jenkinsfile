@@ -99,12 +99,14 @@ pipeline {
                             """
                         } else {
                             sh """#!/bin/bash -e
+                                export PATH="\$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:\$PATH"
+
                                 if [ -f jenkins/pipelines/prebuild/setup.sh ]; then
                                     source jenkins/pipelines/prebuild/setup.sh
-                                else 
+                                else
                                     source jenkins/pipelines/shared/config.sh
                                 fi
-                                
+
                                 uv run "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci
                             """
                         }
