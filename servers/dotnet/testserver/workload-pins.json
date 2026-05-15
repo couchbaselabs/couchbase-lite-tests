@@ -1,8 +1,0 @@
-{
-  "microsoft.net.sdk.android": "35.0.105/9.0.100",
-  "microsoft.net.sdk.ios": "26.4.9015/9.0.100",
-  "microsoft.net.sdk.maccatalyst": "26.4.9015/9.0.100",
-  "microsoft.net.sdk.macos": "26.4.9015/9.0.100",
-  "microsoft.net.sdk.maui": "9.0.120/9.0.100",
-  "microsoft.net.workload.mono.toolchain.current": "9.0.15/9.0.100"
-}

@@ -32,7 +32,6 @@ Functions:
 import shutil
 import subprocess
 from abc import abstractmethod
-from os import environ
 from pathlib import Path
 
 import click
@@ -126,16 +125,10 @@ class DotnetTestServer(TestServer):
 
         header("Restoring .NET workloads")
         subprocess.run(
-            [
-                DOTNET_PATH,
-                "workload",
-                "update",
-                "--from-rollback-file",
-                DOTNET_TEST_SERVER_DIR / "testserver" / "workload-pins.json",
-                "--skip-sign-check",
-            ],
+            [DOTNET_PATH, "workload", "update"],
             check=True,
             capture_output=False,
+            cwd=DOTNET_TEST_SERVER_DIR / "testserver",
         )
         subprocess.run(
             [
@@ -166,11 +159,7 @@ class DotnetTestServer(TestServer):
         if self.extra_args:
             args.append(self.extra_args)
 
-        # Note, this is the version that works with the pinned workloads, so if you change one
-        # you need to consider the other
-        env = environ.copy()
-        env["DEVELOPER_DIR"] = "/Applications/Xcode-26.4.1.app/"
-        subprocess.run(args, check=True, capture_output=False, env=env)
+        subprocess.run(args, check=True, capture_output=False)
 
 
 class DotnetTestServerCli(TestServer):
@@ -185,6 +174,10 @@ class DotnetTestServerCli(TestServer):
         super().__init__(version)
 
     @property
+    def product(self) -> str:
+        return "couchbase-lite-net"
+
+    @property
     @abstractmethod
     def rid(self) -> str:
         """
@@ -194,10 +187,6 @@ class DotnetTestServerCli(TestServer):
             str: The runtime identifier.
         """
         pass
-
-    @property
-    def product(self) -> str:
-        return "couchbase-lite-net"
 
     def build(self) -> None:
         """
