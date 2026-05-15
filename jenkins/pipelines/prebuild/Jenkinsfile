@@ -89,6 +89,11 @@ pipeline {
                         if (params.TS_PLATFORM.contains("windows")) {
                             pwsh """
                                 \$env:Path = "\$env:USERPROFILE\\.local\\bin;\$env:Path"
+                                if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+                                    Write-Host "Installing uv..."
+                                    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+                                    \$env:Path = "\$env:USERPROFILE\\.local\\bin;\$env:Path"
+                                }
 
                                 if ( Test-Path -Path ./jenkins/pipelines/prebuild/setup.psm1 ) {
                                     Import-Module ./jenkins/pipelines/prebuild/setup.psm1 -Force
