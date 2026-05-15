@@ -19,58 +19,8 @@ pipeline {
                 }
             }
         }
-        stage('Prebuild Servers') {
-            steps {
-                script {
-                    def platforms = [
-                        'dotnet_windows', 'dotnet_ios', 'dotnet_android', 'dotnet_macos'
-                    ]
-                    def parallelBuilds = [:]
-                    for(p in platforms) {
-                        def platform = p
-                        parallelBuilds[platform] = {
-                            build job: 'prebuild-test-server',
-                            parameters: [
-                                string(name: 'TS_PLATFORM', value: platform),
-                                string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                                string(name: 'BRANCH', value: "fix-qe-jenkins-ios-prebuild"),
-                            ],
-                            wait: true,
-                            propagate: true
-                        }
-                    }
-                    parallel parallelBuilds
-                }
-            }
-        }
         stage('Run Tests') {
             parallel {
-                stage('Windows') {
-                    agent { label 'net-windows' }
-                    options {
-                        lock('net-windows')
-                    }
-                    environment {
-                        TS_ARTIFACTS_DIR = 'dotnet_windows'
-                    }
-                    steps {
-                        echo "=== Run Dotnet Windows Tests"
-                        timeout(time: 120, unit: 'MINUTES') {
-                            powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION}"
-                        }
-                        echo "=== Dotnet Windows Tests Complete"
-                    }
-                    post {
-                        always {
-                            echo "=== Teardown Dotnet Windows Tests"
-                            timeout(time: 5, unit: 'MINUTES') {
-                                powershell 'jenkins\\pipelines\\QE\\dotnet\\teardown.ps1'
-                            }
-                            archiveArtifacts artifacts: 'tests\\QE\\dotnet_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
-                            echo "=== Dotnet Windows Test Teardown Complete"
-                        }
-                    }
-                }
                 stage('macOS') {
                     agent { label 'qe-mac-india' }
                     options {
