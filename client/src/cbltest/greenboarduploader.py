@@ -14,6 +14,21 @@ from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.logging import cbl_info, cbl_warning
 
 
+def _version_sort_key(v: str) -> tuple[Version, int]:
+    """Sort key for SGW-style version strings of the form ``<semver>[-<build>]``.
+
+    Splits on the first ``-``: if the suffix is a pure integer, returns
+    ``(Version(semver), int(build))`` so that ``3.3.0-99 < 3.3.0-100 <
+    3.3.0-1234``. Plain semver (no suffix) sorts as build ``0`` of that
+    semver. Non-numeric suffixes fall through to ``Version(v)`` so PEP 440
+    pre/post/rc tags still order correctly.
+    """
+    semver, _, build = v.partition("-")
+    if build and build.isdigit():
+        return Version(semver), int(build)
+    return Version(v), 0
+
+
 class GreenboardUploader:
     """
     A class for uploading results to a specified greenboard server bucket.
@@ -184,7 +199,7 @@ class GreenboardUploader:
 
         versions = list({*doc.get("versions", []), from_version, to_version})
         try:
-            versions.sort(key=Version)
+            versions.sort(key=_version_sort_key)
         except InvalidVersion:
             cbl_warning(f"Falling back to lexicographic sort for versions {versions}")
             versions.sort()
