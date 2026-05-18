@@ -747,7 +747,7 @@ class TestMultipeer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
-        "transport, timeout, blob",
+        "transport, timeout, blob","doc_count"
         [
             ("BLUETOOTH", 1200, "s1.jpg", 4),
             ("WIFI", 600, "xl1.jpg", 10),
