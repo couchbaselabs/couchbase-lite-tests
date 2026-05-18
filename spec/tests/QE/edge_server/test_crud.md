@@ -49,3 +49,15 @@ Test CRUD operations with document expiry (TTL).
 2. Create a document with TTL=20 seconds and verify retrieval fails after expiry.
 3. Create a document with TTL=50 seconds, update it with TTL=20 seconds, and verify retrieval fails after expiry.
 4. Create a document with TTL=60 seconds and delete it, then verify retrieval fails.
+
+## test_multiple_doc_crud
+
+Test bulk CRUD operations combining document creations, updates, and deletions in a single request.
+
+1. Configure Edge Server with the `names` database.
+2. Fetch existing documents to prepare a list of bulk changes.
+3. Prepare a bulk operation containing 10 document creations, 10 document updates, and 10 document deletions.
+4. Execute the bulk document operations on the Edge Server.
+5. Fetch the specifically created documents by key and verify all 10 exist.
+6. Fetch the updated documents by key and verify they exist with updated revisions.
+7. Fetch the deleted documents by key and verify they are no longer returned.

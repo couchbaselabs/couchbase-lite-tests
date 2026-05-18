@@ -33,4 +33,29 @@ Test multi-edge synchronization and recovery with chained replications.
 9. Kill Edge Server 1, update documents via Edge Servers 2/3, and verify replication.
 10. Kill Edge Servers 1 and 3, update documents via Edge Server 2, and verify replication.
 
+## test_edge_server_offline_sync_and_recovery
 
+Test the offline synchronization and recovery capabilities of a chained Edge Server topology.
+
+1. Configure Edge Server 1 to replicate from Sync Gateway for the `travel` dataset.
+2. Configure Edge Server 2 to replicate from Edge Server 1.
+3. Configure Edge Server 3 to replicate from Edge Server 2.
+4. Wait for replication to become idle across all Edge Servers.
+5. Delete all documents in the `travel.hotels` collection on Edge Server 3 using a bulk delete.
+6. Wait for replication to become idle, then kill Edge Server 3.
+7. Verify the documents are deleted in Edge Server 1, Edge Server 2, and Sync Gateway.
+8. Restart Edge Server 3 and wait for it to come online.
+9. Create 10,000 documents in `travel.hotels` via bulk create on Edge Server 3.
+10. Verify documents are created on Edge Server 3 and wait for replication to become idle.
+11. Kill Edge Server 3 again.
+12. Verify the created documents propagated successfully to Edge Server 2, Edge Server 1, and Sync Gateway.
+
+## test_edge_server_with_concurrent_rest_requests
+
+Test the stability and consistency of Edge Server under a randomized concurrent REST CRUD workload.
+
+1. Configure Edge Server with a database named `db`.
+2. Seed the database with 10,000 documents using bulk create operations.
+3. Verify the initial document load is successful and document counts match.
+4. Run a randomized CRUD workload for 1,000 iterations containing a mix of create, update, delete, and read operations.
+5. Perform final data consistency validation by verifying the documents on Edge Server match the expected state tracked locally.
