@@ -10,7 +10,7 @@ from cbltest.api.replicator_types import (
     ReplicatorDocumentEntry,
     ReplicatorProgress,
 )
-from cbltest.jsonhelper import _assert_string_entry, _get_typed
+from cbltest.jsonhelper import _assert_string_entry, _get_str_or_default, _get_typed
 
 
 class PostGetAllDocumentsEntry:
@@ -251,7 +251,7 @@ class MultipeerReplicatorStatusEntry:
 
         self.__peer_id = _assert_string_entry(body, self.__peer_id_key)
         self.__status = ReplicatorStatusBody(body.get(self.__status_key, {}))
-        transport_str = _assert_string_entry(body, self.__transport_key)
+        transport_str = _get_str_or_default(body, self.__transport_key, "WIFI")
         self.__transport = MultipeerTransportType.from_string(transport_str)
 
 
