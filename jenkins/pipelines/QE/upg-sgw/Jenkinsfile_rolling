@@ -29,16 +29,20 @@ pipeline {
 // The default values in the UI will be used if no parameters are provided at build time.
 // But just for reference, these are the params that are used by the job :
 //         string(name: 'CBL_VERSION', description: 'Couchbase Lite Version to use, eg : "4"')
-//         string(name: 'SGW_VERSIONS', description: 'Sync Gateway Version to use, eg : "4.0.1 4.0.3 4.1.0"')
+//         string(name: 'SGW_VERSION_FROM', description: 'Starting Sync Gateway version, eg : "3.3.0"')
+//         string(name: 'SGW_VERSION_TO',   description: 'Target Sync Gateway version, eg : "4.0.1"')
     stages {
         stage('Init') {
             agent any
             steps {
                 script {
-                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.SGW_VERSIONS == '') { error "SGW_VERSIONS are required (atleast one)" }
-                    env.CBL_VERSION = resolveProgetVersion("couchbase-lite-ios", params.CBL_VERSION, 'CBL_VERSION')
-                    currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${params.SGW_VERSIONS} (#${currentBuild.number})"
+                    if (params.CBL_VERSION == '')      { error "CBL_VERSION is required" }
+                    if (params.SGW_VERSION_FROM == '') { error "SGW_VERSION_FROM is required" }
+                    if (params.SGW_VERSION_TO == '')   { error "SGW_VERSION_TO is required" }
+                    env.CBL_VERSION      = resolveProgetVersion("couchbase-lite-ios", params.CBL_VERSION, 'CBL_VERSION')
+                    env.SGW_VERSION_FROM = resolveProgetVersion("sync-gateway", params.SGW_VERSION_FROM, 'SGW_VERSION_FROM')
+                    env.SGW_VERSION_TO   = resolveProgetVersion("sync-gateway", params.SGW_VERSION_TO,   'SGW_VERSION_TO')
+                    currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION_FROM}→${env.SGW_VERSION_TO} (#${currentBuild.number})"
                 }
             }
         }
@@ -65,7 +69,7 @@ pipeline {
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Upgrades"
                 timeout(time: 90, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/upg-sgw/test_rolling.sh ${env.CBL_VERSION} ${params.SGW_VERSIONS}"
+                    sh "jenkins/pipelines/QE/upg-sgw/test_rolling.sh ${env.CBL_VERSION} ${env.SGW_VERSION_FROM} ${env.SGW_VERSION_TO}"
                 }
                 echo "=== SGW Upgrades Complete"
             }

@@ -8,12 +8,17 @@ from cbltest.greenboarduploader import GreenboardUploader
 from cbltest.logging import cbl_info, cbl_warning
 
 # This plugin provides an automatic (i.e. not used directly by tests)
-# fixture that will upload test results to greenboard, if it is
-# properly set up in config.json (see the schema for that file)
-# and if the --no-result-upload flag is not set on the command line.
+# fixture that will upload test results to greenboard, if it is properly
+# set up in config.json (see the schema for that file) and if the
+# --no-result-upload flag is not set on the command line.
 #
-# For upgrade jobs (SGW_UPGRADE_VERSIONS is set), each pytest session
-# uploads its own per-step result directly under platform="sgw-upgrade".
+# Two upload paths:
+#   - Normal sessions go through GreenboardUploader.upload().
+#   - SGW upgrade sessions (with SGW_UPGRADE_FROM and SGW_UPGRADE_TO env
+#     vars set) go through GreenboardUploader.upload_upgrade_result(),
+#     which merges this run's pass/fail entry into a per-type matrix doc
+#     (sgw-upgrade::waterfall or sgw-upgrade::rolling). The upgrade type
+#     is derived from the invoked test file name.
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
@@ -41,45 +46,18 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     )
     pytestconfig.pluginmanager.register(uploader)
 
-    # This is a pytest-ism.  You may have noticed it in other tests.  The
-    # way that fixtures work is that you can yield in the middle and what
-    # ends up happening is that all other things happening within the scope
-    # will happen, and then return back to this point.  Since the scope here
-    # is 'session' it basically means "before and after the run"
     yield
 
     try:
-        upgrade_versions_str = pytestconfig.getoption("--upgrade-versions")
-        if upgrade_versions_str:
-            # Upgrade job — record this iteration's result to a state file.
-            # The aggregate batch document is uploaded once at the end of
-            # the upgrade run by jenkins/pipelines/QE/upg-sgw/upload_greenboard_batch.py.
-            # Default matches the shell wrapper's path so direct pytest
-            # invocations still record correctly.
-            results_file = os.environ.get(
-                "SGW_UPGRADE_RESULTS_FILE", "/tmp/sgw_upgrade_results.json"
+        upg_from = os.environ.get("SGW_UPGRADE_FROM")
+        upg_to = os.environ.get("SGW_UPGRADE_TO")
+        if upg_from and upg_to:
+            upgrade_type = (
+                "rolling"
+                if any("test_rolling_upgrade_sgw" in a for a in pytestconfig.args)
+                else "waterfall"
             )
-            # During rolling phases the SGW node under upgrade may be
-            # destroyed/restarting and get_version() will raise. We must
-            # still record the iteration (with sgw_version=None) so the
-            # failure shows up as a red dot on the track chart instead
-            # of being silently dropped.
-            sgw_version: CouchbaseVersion | None = None
-            if len(cblpytest.sync_gateways) > 0:
-                try:
-                    sgw_version = await cblpytest.sync_gateways[0].get_version()
-                except Exception as ve:
-                    cbl_warning(
-                        f"Could not fetch SGW version for upgrade record: {ve}; "
-                        "recording iteration with sgw_version=None"
-                    )
-            uploader.record_upgrade_step(
-                results_file,
-                sgw_version,
-                upgrade_versions_str,
-                os.environ.get("SGW_UPGRADE_PHASE"),
-                os.environ.get("SGW_UPGRADED_NODE_INDEX"),
-            )
+            uploader.upload_upgrade_result(upgrade_type, upg_from, upg_to)
         else:
             sgw_version: CouchbaseVersion | None = None
             test_platform: str = "sync-gateway"
@@ -111,12 +89,4 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--no-result-upload",
         action="store_true",
         help="Don't upload results to greenboard",
-    )
-    group.addoption(
-        "--upgrade-versions",
-        type=str,
-        default=None,
-        help="Comma-separated ordered SGW version list for upgrade jobs "
-        "(e.g. '3.3.0,4.0.1,4.1.0'). First is the baseline, rest are upgrade "
-        "targets. Triggers sgw-upgrade platform upload.",
     )
