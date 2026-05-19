@@ -79,7 +79,7 @@ pipeline {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
                         DEVELOPER_DIR = "/Applications/Xcode.app"
                         MD_APPLE_SDK_ROOT = "/Applications/Xcode.app"
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
                         TS_ARTIFACTS_DIR = 'dotnet_macos'
                     }
                     steps {
@@ -110,7 +110,7 @@ pipeline {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
                         DEVELOPER_DIR = "/Applications/Xcode.app"
                         MD_APPLE_SDK_ROOT = "/Applications/Xcode.app"
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
                         TS_ARTIFACTS_DIR = 'dotnet_ios'
                     }
                     steps {
@@ -133,12 +133,12 @@ pipeline {
                     }
                 }
                 stage('Android') {
-                    agent { label 'mac-mini-CBL-Android1' }
+                    agent { label 'qe-mac-india' }
                     options {
-                        lock('mac-mini-CBL-Android1,R5CT20FYA7R')
+                        lock('qe-mac-india,51131XEKB7DBF1')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
                         ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
                         JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
                         PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
@@ -164,6 +164,14 @@ pipeline {
                     }
                 }
             }
+        }
+    }
+    post {
+        success {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> succeeded.", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} succeeded", to: "sanjivani.patra@couchbase.com";
+        }
+        regression {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> regressed (first failure after success).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} regressed", to: "sanjivani.patra@couchbase.com";
         }
     }
 }
