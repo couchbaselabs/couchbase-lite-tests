@@ -166,4 +166,12 @@ pipeline {
             }
         }
     }
+    post {
+        success {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> succeeded.", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} succeeded", to: "sanjivani.patra@couchbase.com";
+        }
+        regression {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> regressed (first failure after success).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} regressed", to: "sanjivani.patra@couchbase.com";
+        }
+    }
 }
