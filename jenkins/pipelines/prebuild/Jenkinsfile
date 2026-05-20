@@ -64,7 +64,8 @@ pipeline {
                 label getNodeForPlatform(params.TS_PLATFORM)
             }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
+                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
             }
             steps {
                 cleanWs()
@@ -118,7 +119,7 @@ pipeline {
 
 def getNodeForPlatform(platform) {
     if (platform.contains("windows")) {
-        return 'mob-e2e-win-01'
+        return 'qe-mac-india'
     } else if (platform.contains("linux")) {
         return 'mob-e2e-deb-02'
     } else {
