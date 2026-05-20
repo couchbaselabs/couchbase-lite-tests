@@ -46,9 +46,6 @@ pipeline {
             parallel {
                 stage('macOS') {
                     agent { label 'mac-mini-new' }
-                    options {
-                        lock('mac-mini-new')
-                    }
                     environment {
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         TS_ARTIFACTS_DIR = 'c_macos'
@@ -77,7 +74,7 @@ pipeline {
                 stage('iOS') {
                     agent { label 'mac-mini-new' }
                     options {
-                        lock('mac-mini-new,00008101-000E0519020A001E')
+                        lock('00008101-000E0519020A001E')
                     }
                     environment {
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
@@ -107,7 +104,7 @@ pipeline {
                 stage('Android') {
                     agent { label 'mac-mini-CBL-Android1' }
                     options {
-                        lock('mac-mini-CBL-Android1,R5CT20FYA7R')
+                        lock('R5CT20FYA7R')
                     }
                     environment {
                         ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
@@ -138,9 +135,6 @@ pipeline {
                 }
                 stage('Linux') {
                     agent { label 'linux-c' }
-                    options {
-                        lock('linux-c')
-                    }
                     environment {
                         TS_ARTIFACTS_DIR = 'c_linux'
                     }
@@ -164,9 +158,6 @@ pipeline {
                 }
                 stage('Windows') {
                     agent { label 'net-windows' }
-                    options {
-                        lock('net-windows')
-                    }
                     environment {
                         TS_ARTIFACTS_DIR = 'c_windows'
                     }
