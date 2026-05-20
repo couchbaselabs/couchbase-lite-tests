@@ -132,7 +132,7 @@ public class EndptListenerManager {
         final Boolean disableTLS = req.getBoolean(KEY_DISABLE_TLS);
         if (disableTLS != null) { listenerConfig.setDisableTls(disableTLS); }
 
-        if (!disableTLS) {
+        if (!Boolean.TRUE.equals(disableTLS)) {
             final TypedMap identityReq = req.getMap(KEY_IDENTITY);
             TLSIdentity tlsId;
             if (identityReq != null) {
