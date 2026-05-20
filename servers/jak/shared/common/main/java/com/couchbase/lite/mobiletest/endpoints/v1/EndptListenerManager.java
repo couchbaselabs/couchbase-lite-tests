@@ -30,6 +30,7 @@ import com.couchbase.lite.Database;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.URLEndpointListener;
 import com.couchbase.lite.URLEndpointListenerConfiguration;
+import com.couchbase.lite.internal.utils.PlatformUtils;
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
