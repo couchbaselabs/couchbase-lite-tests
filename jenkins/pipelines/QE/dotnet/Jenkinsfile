@@ -46,9 +46,6 @@ pipeline {
             parallel {
                 stage('Windows') {
                     agent { label 'net-windows' }
-                    options {
-                        lock('net-windows')
-                    }
                     environment {
                         TS_ARTIFACTS_DIR = 'dotnet_windows'
                     }
@@ -72,9 +69,6 @@ pipeline {
                 }
                 stage('macOS') {
                     agent { label 'qe-mac-india' }
-                    options {
-                        lock('qe-mac-india')
-                    }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
                         DEVELOPER_DIR = "/Applications/Xcode.app"
@@ -104,7 +98,7 @@ pipeline {
                 stage('iOS') {
                     agent { label 'qe-mac-india' }
                     options {
-                        lock('qe-mac-india,00008140-0006458A0C22801C')
+                        lock('00008140-0006458A0C22801C')
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
@@ -135,7 +129,7 @@ pipeline {
                 stage('Android') {
                     agent { label 'qe-mac-india' }
                     options {
-                        lock('qe-mac-india,51131XEKB7DBF1')
+                        lock('51131XEKB7DBF1')
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
