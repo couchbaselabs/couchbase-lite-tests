@@ -7,11 +7,13 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
+import packaging.version
 import requests
 import tenacity
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
+from pydantic import BaseModel
 
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
@@ -486,6 +488,9 @@ class CouchbaseVersion(ABC):
         self.__version = parsed[0]
         self.__build_number = parsed[1]
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.__raw})"
+
 
 class SyncGatewayVersion(CouchbaseVersion):
     """
@@ -493,25 +498,56 @@ class SyncGatewayVersion(CouchbaseVersion):
     """
 
     def parse(self, input: str) -> tuple[str, int]:
-        first_lparen = input.find("(")
-        first_semicol = input.find(";")
-        if first_lparen == -1 or first_semicol == -1:
-            return ("unknown", 0)
+        # Version parsing can be different for dev builds and release builds. In a dev build, it is possible to miss a build number.
+        #
+        # Example input:
+        #   Couchbase Sync Gateway/4.0.0(350;def456)
+        #   4.0.0(350;def456)
+        #   4.0.0
 
-        version = input[0:first_lparen].strip()
-        if not version:
+        # extract everything between an optional / and an option ( to represent a major.minor.patch build number
+        m = re.search(r"(?:^|/)([\d\.]+)(?=\s*\(|$)", input)
+        # (?:^|/)(?P<v>[\d\.]+)(?:\s*\(|$)", input)
+        if m:
+            version = m.group(1).strip()
+        else:
             cbl_warning(f"Could not extract version from SGW version string: '{input}'")
             version = "unknown"
 
-        try:
-            build = int(input[first_lparen + 1 : first_semicol])
-        except ValueError:
+        # extract everything between ( and a ; character to guess at a build number
+        m = re.search(r"(?<=\()([^;)]+)", input)
+        if m:
+            try:
+                build = int(m.group())
+            except ValueError as e:
+                cbl_warning(
+                    f"Could not parse build number {m.group()} from SGW version string: '{input}': {e}"
+                )
+                build = 0
+        else:
             cbl_warning(
                 f"Could not parse build number from SGW version string: '{input}'"
             )
             build = 0
+        return version, build
 
-        return (version, build)
+
+class SyncGatewayStatusVendor(BaseModel):
+    """
+    Output of vendor field of /_status endpoint of Sync Gateway
+    """
+
+    name: str
+    version: str
+
+
+class SyncGatewayStatusResponse(BaseModel):
+    """
+    Output of GET /_status endpoint of Sync Gateway
+    """
+
+    version: str  # this version does not always include the full build number if it is a dev build
+    vendor: SyncGatewayStatusVendor
 
 
 class DatabaseStatusResponse:
@@ -648,23 +684,48 @@ class _SyncGatewayBase:
 
             return ret_val
 
-    async def get_version(self) -> CouchbaseVersion:
-        # Telemetry not really important for this call
-        async with self._create_session(
-            self.secure, self.scheme, self.hostname, 4984, None
-        ) as s:
-            resp = await self._send_request("get", "/", session=s)
-            assert isinstance(resp, dict)
-            resp_dict = cast(dict, resp)
-            raw_version = _get_typed_required(resp_dict, "version", str)
-            if "/" in raw_version:
-                version_part = raw_version.rsplit("/", 1)[1]
-            else:
-                cbl_warning(
-                    f"Unexpected SGW version format (no '/' separator): '{raw_version}'"
-                )
-                version_part = raw_version
-            return SyncGatewayVersion(version_part)
+    async def supports_version_vectors(self) -> bool:
+        """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
+        version = await self.get_version()
+        return packaging.version.parse(version.version) >= packaging.version.parse(
+            "4.0"
+        )
+
+    async def get_version(self) -> SyncGatewayVersion:
+        """Return version of Sync Gateway"""
+        resp = await self._send_request("get", "/_status")
+        assert isinstance(resp, dict)
+        model = SyncGatewayStatusResponse.model_validate(resp)
+
+        # In the case of a dev build, it is not possible to determine a build number, but there is a
+        # major.minor version.
+        # There only backward compatible difference is if "vendor.version" substring is contained in "version""
+
+        # In a production build, the output:
+        #
+        # "vendor": {
+        #    "version": "4.0"
+        # },
+        # "version": "Couchbase Sync Gateway/4.0.4(8;release) EE"
+        #
+        # In a dev build, the output:
+        #
+        # "vendor": {
+        #    "version": "4.0"
+        # },
+        # "version": "Couchbase Sync Gateway/() EE"
+        if model.vendor.version in model.version:
+            sg_version = SyncGatewayVersion(model.version)
+        else:
+            sg_version = SyncGatewayVersion(model.vendor.version)
+        try:
+            packaging.version.parse(sg_version.version)
+        except packaging.version.InvalidVersion as exc:
+            raise CblTestError(
+                "Failed to parse Sync Gateway version from /_status response: {resp}\n"
+                f"version={model.version}"
+            ) from exc
+        return sg_version
 
     def tls_cert(self) -> str | None:
         if not self.secure:
