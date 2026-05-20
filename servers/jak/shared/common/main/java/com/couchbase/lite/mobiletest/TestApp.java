@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
+import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.mobiletest.endpoints.v1.Session;
 import com.couchbase.lite.mobiletest.errors.ClientError;
@@ -129,6 +130,16 @@ public abstract class TestApp {
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     @NonNull
     public abstract TLSIdentity getClientCertsIdentity() throws Exception;
+
+    @NonNull
+    public abstract TLSIdentity importTlsIdentity(
+        @NonNull String alias,
+        @NonNull String encoding,
+        @NonNull byte[] data,
+        @NonNull char[] password) throws CouchbaseLiteException;
+
+    @Nullable
+    public abstract TLSIdentity getExistingTlsIdentity(@NonNull String alias) throws CouchbaseLiteException;
 
     @NonNull
     public final String getAppId() { return APP_ID.get(); }

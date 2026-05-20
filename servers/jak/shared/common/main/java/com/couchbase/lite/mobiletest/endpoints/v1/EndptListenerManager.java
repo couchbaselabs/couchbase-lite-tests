@@ -30,6 +30,7 @@ import com.couchbase.lite.Database;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.URLEndpointListener;
 import com.couchbase.lite.URLEndpointListenerConfiguration;
+import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
@@ -75,40 +76,34 @@ public class EndptListenerManager {
 
 
     @NonNull
+    private final TestApp app;
+    @NonNull
     private final DatabaseService dbSvc;
     @NonNull
     private final ListenerService listenerSvc;
 
-    public EndptListenerManager(@NonNull DatabaseService dbSvc, @NonNull ListenerService listenerSvc) {
+    public EndptListenerManager(@NonNull TestApp app, @NonNull DatabaseService dbSvc, @NonNull ListenerService listenerSvc) {
+        this.app = app;
         this.dbSvc = dbSvc;
         this.listenerSvc = listenerSvc;
     }
+
     private TLSIdentity importTlsIdentity(String dbName, TypedMap identity) {
-        String encoding = identity.getString(KEY_ENCODING);
-        String dataB64 = identity.getString(KEY_DATA);
-        String password = identity.getString(KEY_PASSWORD);
-        byte[] p12;
+        final byte[] data = PlatformUtils.getDecoder().decodeString(identity.getString(KEY_DATA));
+        if (data == null) { throw new ClientError("Could not decode identity data for listener"); }
+
+        final String encoding = identity.getString(KEY_ENCODING);
+        if (encoding == null) { throw new ClientError("Null encoding for listener identity"); }
+
+        final String password = identity.getString(KEY_PASSWORD);
+        if (password == null) { throw new ClientError("Null password for listener identity"); }
+
         try {
-            p12 = java.util.Base64.getDecoder().decode(dataB64);
-        }
-        catch (IllegalArgumentException ex) {
-            throw new ClientError("Invalid base64 identity data");
-        }
-        String label = "java-p2p-" + dbName;
-        try { TLSIdentity.deleteIdentity(label); }
-        catch (CouchbaseLiteException ignore) {}
-        TLSIdentity imported;
-        try {
-            imported = TLSIdentity.importIdentity(
-                p12,
-                password.toCharArray(),
-                label
-            );
+            return app.importTlsIdentity("java-p2p-" + dbName, encoding, data, password.toCharArray());
         }
         catch (CouchbaseLiteException e) {
-            throw new CblApiFailure("Failed to import TLS identity", e);
+            throw new CblApiFailure("Failed to import TLS identity for listener", e);
         }
-        return imported;
     }
 
 
@@ -134,7 +129,7 @@ public class EndptListenerManager {
         if (port != null) { listenerConfig.setPort(port); }
 
         final Boolean disableTLS = req.getBoolean(KEY_DISABLE_TLS);
-        if (disableTLS != null) { listenerConfig.setDisableTLS(disableTLS); }
+        if (disableTLS != null) { listenerConfig.setDisableTls(disableTLS); }
 
         if (!disableTLS) {
             final TypedMap identityReq = req.getMap(KEY_IDENTITY);
@@ -143,7 +138,7 @@ public class EndptListenerManager {
                 tlsId = importTlsIdentity(dbName, identityReq);
             } else {
                 try {
-                    tlsId = TLSIdentity.getIdentity("java-p2p-" + dbName);
+                    tlsId = app.getExistingTlsIdentity("java-p2p-" + dbName);
                 } catch (CouchbaseLiteException e) {
                     throw new CblApiFailure("Failed to retrieve existing TLS identity", e);
                 }

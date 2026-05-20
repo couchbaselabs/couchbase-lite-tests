@@ -1,11 +1,14 @@
 package com.couchbase.lite.mobiletest;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -140,4 +143,30 @@ public abstract class BaseTestApp extends TestApp {
         if (identity == null) { throw new ServerError("Identity not found"); }
         return identity;
     }
+
+    @NonNull
+    @Override
+    public TLSIdentity importTlsIdentity(
+        @NonNull String alias,
+        @NonNull String encoding,
+        @NonNull byte[] data,
+        @NonNull char[] password)
+        throws CouchbaseLiteException {
+        try {
+            final KeyStore keyStore = KeyStore.getInstance(encoding);
+            try (InputStream in = new ByteArrayInputStream(data)) { keyStore.load(in, password); }
+            final KeyStore.ProtectionParameter protParam = new KeyStore.PasswordProtection(password);
+            keyStore.setEntry(alias, keyStore.getEntry("cbltest", protParam), protParam);
+            final TLSIdentity identity = TLSIdentity.getIdentity(keyStore, alias, password);
+            if (identity == null) { throw new CouchbaseLiteException("Failed to create TLS identity"); }
+            return identity;
+        }
+        catch (GeneralSecurityException | IOException e) {
+            throw new CouchbaseLiteException("Failed to import TLS identity", e);
+        }
+    }
+
+    @Nullable
+    @Override
+    public TLSIdentity getExistingTlsIdentity(@NonNull String alias) { return null; }
 }
