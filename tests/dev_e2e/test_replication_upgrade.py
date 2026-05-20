@@ -1,168 +1,24 @@
-import time
-from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from cbltest import CBLPyTest, CouchbaseServer
+from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.database import Database, GetDocumentResult
-from cbltest.api.database_types import DocumentEntry
-from cbltest.api.error import CblSyncGatewayBadResponseError
-from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
-    ReplicatorActivityLevel,
-    ReplicatorBasicAuthenticator,
-    ReplicatorCollectionEntry,
     ReplicatorConflictResolver,
     ReplicatorType,
     WaitForDocumentEventEntry,
 )
-from cbltest.api.syncgateway import RemoteDocument
-from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.logging import cbl_info
+from cbltest.api.upgrade_test_helpers import (
+    DocSnapshot,
+    do_upgrade_replication_test,
+    setup_upgrade_env,
+)
 
 
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestReplicationUpgrade(CBLTestClass):
-    @staticmethod
-    def tools_path() -> Path:
-        return Path(__file__).resolve().parent.parent / ".tools"
-
-    async def setup_env(self, cblpytest: CBLPyTest, dataset_path: Path) -> Database:
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
-
-        dataset_ver = cblpytest.test_servers[0].dataset_version
-        self.skip_if_not(
-            dataset_ver == "4.0", f"Requires dataset v4.0 (current: {dataset_ver})."
-        )
-
-        # Delete SG database first to avoid reset error after backup is restored
-        self.mark_test_step("Delete Sync Gateway 'upgrade' database if exists")
-        sg = cblpytest.sync_gateways[0]
-        try:
-            await sg.delete_database("upgrade")
-        except CblSyncGatewayBadResponseError as e:
-            if e.code != 403:
-                raise
-
-        self.mark_test_step("Restore Couchbase Server Bucket using `upgrade` dataset")
-        cbs: CouchbaseServer = cblpytest.couchbase_servers[0]
-        cbs.drop_bucket("upgrade")
-        cbs.restore_bucket("upgrade", self.tools_path(), dataset_path, "upgrade")
-
-        self.mark_test_step("Wait 2s to ensure SG picks up the restored database.")
-        time.sleep(2)
-
-        self.mark_test_step("Reset local database, and load `upgrade` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="upgrade"
-        )
-        return dbs[0]
-
-    # A simple snapshot class to hold local and remote documents
-    class DocSnapshot:
-        def __init__(self, local: GetDocumentResult, remote: RemoteDocument):
-            self.local = local
-            self.remote = remote
-
-    # (pre_doc, post_doc) -> None
-    DocValidator = Callable[[DocSnapshot, DocSnapshot], None]
-
-    async def do_replication_test(
-        self,
-        cblpytest: CBLPyTest,
-        db: Database,
-        doc_id: str,
-        replicator_type: ReplicatorType,
-        conflict_resolver: ReplicatorConflictResolver | None = None,
-        doc_events: set[WaitForDocumentEventEntry] | None = None,
-        compare_docs: bool | None = True,
-        validator: DocValidator | None = None,
-    ):
-        sg = cblpytest.sync_gateways[0]
-
-        pre_local_doc = await db.get_document(
-            DocumentEntry("_default._default", doc_id)
-        )
-        pre_remote_doc = await sg.get_document("upgrade", doc_id)
-
-        assert pre_local_doc is not None
-        assert pre_remote_doc is not None
-        cbl_info(f"Revision Info before Replication ({replicator_type}):")
-        cbl_info(f"Local : RevID = {pre_local_doc.revid}, HLV = {pre_local_doc.cv}")
-        cbl_info(f"Remote : RevID = {pre_remote_doc.revid}, HLV = {pre_remote_doc.cv}")
-
-        wait_for_doc_events = bool(doc_events)
-
-        conflict_resolver_name = (
-            f"{conflict_resolver.name}" if conflict_resolver else "None"
-        )
-
-        self.mark_test_step(f"""
-            Start a replicator:
-            * endpoint: '/upgrade'
-            * collections : '_default._default'
-            * type: {replicator_type}
-            * document_ids: ['{doc_id}']
-            * continuous: {wait_for_doc_events}
-            * conflict_resolver: {conflict_resolver_name}
-        """)
-        replicator = Replicator(
-            db,
-            cblpytest.sync_gateways[0].replication_url("upgrade"),
-            collections=[
-                ReplicatorCollectionEntry(
-                    names=["_default._default"],
-                    document_ids=[doc_id],
-                    conflict_resolver=conflict_resolver,
-                )
-            ],
-            replicator_type=replicator_type,
-            continuous=wait_for_doc_events,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
-            enable_document_listener=wait_for_doc_events,
-        )
-
-        await replicator.start()
-
-        if doc_events:
-            self.mark_test_step("Wait until receiving all document replication events")
-            await replicator.wait_for_all_doc_events(
-                events=doc_events,
-                max_retries=100,
-            )
-        else:
-            self.mark_test_step("Wait until the replicator is stopped.")
-            status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-            assert status.error is None, (
-                f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-            )
-
-        if compare_docs:
-            self.mark_test_step("Check that the doc is replicated correctly.")
-            await compare_local_and_remote(
-                db, sg, replicator_type, "upgrade", ["_default._default"], [doc_id]
-            )
-
-        local_doc = await db.get_document(DocumentEntry("_default._default", doc_id))
-        remote_doc = await sg.get_document("upgrade", doc_id)
-
-        assert local_doc is not None
-        assert remote_doc is not None
-        cbl_info(f"Revision Info after Replication ({replicator_type}):")
-        cbl_info(f"Local : RevID = {local_doc.revid}, HLV = {local_doc.cv}")
-        cbl_info(f"Remote : RevID = {remote_doc.revid}, HLV = {remote_doc.cv}")
-
-        if validator:
-            self.mark_test_step("Validate revid and HLV of local and remote doc.")
-            validator(
-                self.DocSnapshot(pre_local_doc, pre_remote_doc),
-                self.DocSnapshot(local_doc, remote_doc),
-            )
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_nonconflict_case_1(
         self, cblpytest: CBLPyTest, dataset_path: Path
@@ -179,11 +35,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |  2-def, 1-abc |      none     |  2-def, 1-abc | Encoded 2-def |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
@@ -213,7 +69,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Expected remote doc's HLV to end with '@Revision+Tree+Encoding', but got: {post.remote.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="nonconflict_1",
@@ -237,11 +94,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |  2-def,1-abc  | Encoded 2-def |     2-def     |      none     |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
@@ -269,7 +126,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Expected remove doc to have no HLV, but got: {post.remote.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="nonconflict_2",
@@ -294,11 +152,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |     2-abc     |      none     |     2-abc     |      none     |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
@@ -326,7 +184,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Expected remove doc to have no HLV, but got: {post.remote.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="nonconflict_3",
@@ -352,11 +211,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |      none     |  [100@SGW1]   |  3-ghi 2-def  |   [100@SGW1]  |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
@@ -382,7 +241,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"HLV mismatch: Local:  {post.local.cv}, Remote: {post.remote.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="nonconflict_4",
@@ -407,11 +267,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |      none     |   [100@SGW1]  |  3-ghi 2-def  |   [100@SGW1]  |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
@@ -437,7 +297,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"HLV mismatch: Local:  {post.local.cv}, Remote: {post.remote.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="nonconflict_5",
@@ -463,11 +324,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |         none           | [100@CBL1]             |     3-def     |   [100@CBL1]  |
         +------------------+------------------------+------------------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is None and pre.local.cv is not None, (
@@ -491,7 +352,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"HLV mismatch: Local:  {post.local.cv}, Remote: {post.remote.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="nonconflict_6",
@@ -515,7 +377,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |     3-abc     |      none     |     3-def     |      none     |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         doc_events = {
             WaitForDocumentEventEntry(
@@ -529,8 +391,8 @@ class TestReplicationUpgrade(CBLTestClass):
         }
 
         def validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
@@ -556,7 +418,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"but got {post.remote.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_1",
@@ -584,11 +447,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |     3-def     |      none     |     3-def     |      none     |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def pull_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
@@ -616,7 +479,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Expected local doc to have no HLV, but got: {post.local.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_2",
@@ -626,8 +490,8 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
         def push_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             assert pre.remote.revid == post.remote.revid, (
                 f"Expected remote doc revID to be unchanged after resolved doc was pushed. "
@@ -638,7 +502,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Expected remote doc to have no HLV after resolved doc was pushed, but got: {post.local.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_2",
@@ -664,11 +529,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |      none     |  [100@SGW1]   |     3-def     |  [100@SGW1]   |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def pull_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
@@ -692,7 +557,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"HLV mismatch: Local:  {post.local.cv}, Remote: {post.remote.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_3",
@@ -702,8 +568,8 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
         def push_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             assert pre.remote.revid == post.remote.revid, (
                 f"Expected remote doc revID to be unchanged after resolved doc was pushed. "
@@ -715,7 +581,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Before: {pre.remote.revid}, After: {post.remote.revid}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_3",
@@ -742,11 +609,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |      none     | [100@CBL1, 3abc@RTE] |     4-def     | [100@CBL1, 3abc@RTE] |
         +------------------+---------------+----------------------+---------------+----------------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def pull_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
@@ -770,7 +637,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Expected local doc to have HLV, bot got: {post.local.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_4",
@@ -781,8 +649,8 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
         def push_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             assert post.remote.revid != pre.remote.revid, (
                 f"Expected remote doc revID to be updated after resolved doc was pushed. "
@@ -794,7 +662,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Remote: {post.remote.cv}, After: {post.local.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_4",
@@ -821,11 +690,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |             | [3def@RTE, 100@SGW1] |    4-def    | [3def@RTE, 100@SGW1] |
         +------------------+-------------+----------------------+-------------+----------------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def pull_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
@@ -850,7 +719,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"but got local={post.local.cv}, remote={post.remote.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_5",
@@ -861,8 +731,8 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
         def push_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             assert post.remote.revid and pre.remote.revid != post.remote.revid, (
                 f"Expected remote doc revID to be updated after resolved doc was pushed. "
@@ -879,7 +749,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Remote: {post.remote.cv}, After: {post.local.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_5",
@@ -907,11 +778,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |              | [100@CBL1, 3abc@RTE] |   4-abc      | [100@CBL1, 3abc@RTE] |
         +------------------+--------------+----------------------+--------------+----------------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def pull_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is None and pre.local.cv is not None, (
@@ -932,7 +803,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"but got before={pre.local.cv}, after={post.local.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_6",
@@ -943,8 +815,8 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
         def push_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             assert post.remote.revid and post.remote.revid != pre.remote.revid, (
                 f"Expected remote doc revID to be updated after resolved doc was pushed. "
@@ -956,7 +828,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Remote: {post.remote.cv}, After: {post.local.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_6",
@@ -985,11 +858,11 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |             |   3abc@RTE  |    3-abc    |     none    |
         +------------------+-------------+-------------+-------------+-------------+
         """
-        db = await self.setup_env(cblpytest, dataset_path)
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
 
         def pull_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             # Validate pre-condition:
             assert pre.local.revid is None and pre.local.cv is not None, (
@@ -1015,7 +888,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"but got before={post.local.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_7",
@@ -1026,8 +900,8 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
         def push_validator(
-            pre: TestReplicationUpgrade.DocSnapshot,
-            post: TestReplicationUpgrade.DocSnapshot,
+            pre: DocSnapshot,
+            post: DocSnapshot,
         ):
             assert post.remote.revid == pre.remote.revid, (
                 f"Expected remote doc revID to be unchanged after resolved doc was pushed. "
@@ -1039,7 +913,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"but got {post.remote.cv}"
             )
 
-        await self.do_replication_test(
+        await do_upgrade_replication_test(
+            self,
             cblpytest,
             db,
             doc_id="conflict_7",
