@@ -105,6 +105,11 @@ public class EndptListenerManager {
         catch (CouchbaseLiteException e) {
             throw new CblApiFailure("Failed to import TLS identity for listener", e);
         }
+        catch (Exception e) {
+        throw new CblApiFailure("Unexpected error importing TLS identity for listener: " + e.getMessage(),
+            new CouchbaseLiteException(e.getMessage()));
+    }
+
     }
 
 
@@ -136,6 +141,7 @@ public class EndptListenerManager {
             final TypedMap identityReq = req.getMap(KEY_IDENTITY);
             TLSIdentity tlsId;
             if (identityReq != null) {
+
                 tlsId = importTlsIdentity(dbName, identityReq);
             } else {
                 try {

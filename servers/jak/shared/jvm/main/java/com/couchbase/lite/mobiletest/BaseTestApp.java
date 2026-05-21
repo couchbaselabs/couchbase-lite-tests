@@ -164,6 +164,11 @@ public abstract class BaseTestApp extends TestApp {
         catch (GeneralSecurityException | IOException e) {
             throw new CouchbaseLiteException("Failed to import TLS identity", e);
         }
+        catch (Exception e) {
+        throw new CblApiFailure("Unexpected error importing TLS identity for listener: " + e.getMessage(),
+            new CouchbaseLiteException(e.getMessage()));
+    }
+
     }
 
     @Nullable

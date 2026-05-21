@@ -76,15 +76,15 @@ class TestPeerToPeer(CBLTestClass):
         all_dbs = [dbs[0] for dbs in all_devices_dbs]
 
         self.mark_test_step("Start listener on Device-1")
-        listener = Listener(all_dbs[0], ["_default._default"], 59840)
+        listener = Listener(all_dbs[0], ["_default._default"])
         listener.set_identity()
         await listener.start()
-        await asyncio.sleep(0.3)
         self.mark_test_step(f"listener started at {listener.port}")
-        port = listener.port if listener.port is not None else 59840
         self.mark_test_step(f"Add {num_of_docs} docs to Device-2")
         documents = await self._testserver_crud(all_dbs[1], num_of_docs)
-        endpoint = cblpytest.test_servers[0].replication_url("db1", port, tls=True)
+        endpoint = cblpytest.test_servers[0].replication_url(
+            "db1", listener.port, tls=True
+        )
         cert = listener.identity.pem_bytes().decode("utf-8")
         self.mark_test_step(f"""
                     Start a replicator on Device-2 with listener endpoint
@@ -184,11 +184,11 @@ class TestPeerToPeer(CBLTestClass):
         await self._testserver_crud(all_dbs[0], num_of_docs)
 
         self.mark_test_step("Start listener on Device-2 and Device-3")
-        listener1 = Listener(all_dbs[1], ["_default._default"], 59840)
+        listener1 = Listener(all_dbs[1], ["_default._default"])
         listener1.set_identity()
         cert1 = listener1.identity.pem_bytes().decode("utf-8")
         await listener1.start()
-        listener2 = Listener(all_dbs[2], ["_default._default"], 59840)
+        listener2 = Listener(all_dbs[2], ["_default._default"])
         listener2.set_identity()
         await listener2.start()
         cert2 = listener2.identity.pem_bytes().decode("utf-8")
@@ -206,7 +206,6 @@ class TestPeerToPeer(CBLTestClass):
         await replicator1.start()
 
         self.mark_test_step("Setup Replication on Device-1 with listener endpoint-2")
-
         replicator2 = Replicator(
             all_dbs[0],
             endpoint=cblpytest.test_servers[2].replication_url(
@@ -276,7 +275,7 @@ class TestPeerToPeer(CBLTestClass):
         await self._testserver_crud(all_dbs[0], num_of_docs)
 
         self.mark_test_step("Start listener on Device-1")
-        listener1 = Listener(all_dbs[0], ["_default._default"], 59840)
+        listener1 = Listener(all_dbs[0], ["_default._default"])
         listener1.set_identity()
         await listener1.start()
         cert1 = listener1.identity.pem_bytes().decode("utf-8")
@@ -361,7 +360,7 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step(f"Add {num_of_docs} docs to Device-1")
         await self._testserver_crud(all_dbs[0], num_of_docs)
         self.mark_test_step("Start listener on Device-1")
-        listener1 = Listener(all_dbs[0], ["_default._default"], 59840)
+        listener1 = Listener(all_dbs[0], ["_default._default"])
         listener1.set_identity()
         await listener1.start()
         cert1 = listener1.identity.pem_bytes().decode("utf-8")
@@ -468,15 +467,15 @@ class TestPeerToPeer(CBLTestClass):
         server_db_list = await cblpytest.test_servers[1].create_and_reset_db(
             ["db1", "db2", "db3"]
         )
-        listener1 = Listener(server_db_list[0], ["_default._default"], 59840)
+        listener1 = Listener(server_db_list[0], ["_default._default"])
         listener1.set_identity()
         await listener1.start()
         cert1 = listener1.identity.pem_bytes().decode("utf-8")
-        listener2 = Listener(server_db_list[1], ["_default._default"], 59841)
+        listener2 = Listener(server_db_list[1], ["_default._default"])
         listener2.set_identity()
         await listener2.start()
         cert2 = listener2.identity.pem_bytes().decode("utf-8")
-        listener3 = Listener(server_db_list[2], ["_default._default"], 59842)
+        listener3 = Listener(server_db_list[2], ["_default._default"])
         listener3.set_identity()
         await listener3.start()
         cert3 = listener3.identity.pem_bytes().decode("utf-8")
@@ -582,7 +581,7 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step(
             "Asynchronously: Setup continuous Replication on Device-2 with listener endpoint and perform updates and stop and start the listener on the same port"
         )
-        listener1 = Listener(all_dbs[0], ["_default._default"], 59840)
+        listener1 = Listener(all_dbs[0], ["_default._default"])
         listener1.set_identity()
         await listener1.start()
         cert1 = listener1.identity.pem_bytes().decode("utf-8")
@@ -599,10 +598,9 @@ class TestPeerToPeer(CBLTestClass):
         await replicator1.start()
 
         async def stop_restart_task():
+            port = listener1.port
             await listener1.stop()
-            listener2 = Listener(
-                all_dbs[0], ["_default._default"], 59840, identity=None
-            )
+            listener2 = Listener(all_dbs[0], ["_default._default"], port, identity=None)
             await listener2.start()
             return listener2
 
