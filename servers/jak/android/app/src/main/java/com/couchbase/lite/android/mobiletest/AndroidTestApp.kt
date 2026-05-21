@@ -134,10 +134,7 @@ class AndroidTestApp(private val context: Context) : TestApp("Android") {
         }
         catch (e: GeneralSecurityException) { throw CouchbaseLiteException("Failed to import TLS identity", e) }
         catch (e: IOException) { throw CouchbaseLiteException("Failed to import TLS identity", e) }
-        catch (Exception e) {
-        throw new CblApiFailure("Unexpected error importing TLS identity for listener: " + e.getMessage(),
-            new CouchbaseLiteException(e.getMessage()));
-    }
+        catch (e: Exception) { throw CouchbaseLiteException("Failed to import TLS identity", e) }
         return TLSIdentity.getIdentity(alias) ?: throw CouchbaseLiteException("Failed to create TLS identity")
     }
 
