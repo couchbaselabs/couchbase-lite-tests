@@ -165,7 +165,7 @@ public abstract class BaseTestApp extends TestApp {
             throw new CouchbaseLiteException("Failed to import TLS identity", e);
         }
         catch (Exception e) {
-        throw new CouchbaseLiteException("Unexpected error importing TLS identity for listener: " + e.getMessage())
+        throw new CouchbaseLiteException("Unexpected error importing TLS identity for listener: " + e.getMessage());
     }
 
     }
