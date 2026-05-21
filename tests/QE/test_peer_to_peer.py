@@ -79,6 +79,7 @@ class TestPeerToPeer(CBLTestClass):
         listener = Listener(all_dbs[0], ["_default._default"])
         listener.set_identity()
         await listener.start()
+        await asyncio.sleep(0.3)
         self.mark_test_step(f"listener started at {listener.port}")
         self.mark_test_step(f"Add {num_of_docs} docs to Device-2")
         documents = await self._testserver_crud(all_dbs[1], num_of_docs)
@@ -470,14 +471,17 @@ class TestPeerToPeer(CBLTestClass):
         listener1 = Listener(server_db_list[0], ["_default._default"])
         listener1.set_identity()
         await listener1.start()
+        await asyncio.sleep(0.3)
         cert1 = listener1.identity.pem_bytes().decode("utf-8")
         listener2 = Listener(server_db_list[1], ["_default._default"])
         listener2.set_identity()
         await listener2.start()
+        await asyncio.sleep(0.3)
         cert2 = listener2.identity.pem_bytes().decode("utf-8")
         listener3 = Listener(server_db_list[2], ["_default._default"])
         listener3.set_identity()
         await listener3.start()
+        await asyncio.sleep(0.3)
         cert3 = listener3.identity.pem_bytes().decode("utf-8")
         self.mark_test_step(
             "Setup 3 different Replication sessions using corresponding dbs on Device-1 with listener endpoints"
@@ -600,6 +604,7 @@ class TestPeerToPeer(CBLTestClass):
         async def stop_restart_task():
             port = listener1.port
             await listener1.stop()
+            await asyncio.sleep(0.1)
             listener2 = Listener(all_dbs[0], ["_default._default"], port, identity=None)
             await listener2.start()
             return listener2
