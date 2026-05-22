@@ -67,7 +67,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
         scope = "_default"
         collection = "_default"
 
-        self.mark_test_step(f"SGW version: {current_version}")
+        print(f"SGW version: {current_version}")  # for debugging purposes
         doc_id_prefix = f"rolling_{current_version}"
 
         self.mark_test_step("Ensure bucket exists on CBS")
