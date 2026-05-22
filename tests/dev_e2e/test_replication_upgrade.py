@@ -123,7 +123,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             assert post.remote.cv is None, (
-                f"Expected remove doc to have no HLV, but got: {post.remote.cv}"
+                f"Expected remote doc to have no HLV, but got: {post.remote.cv}"
             )
 
         await do_upgrade_replication_test(
@@ -181,7 +181,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             assert post.remote.cv is None, (
-                f"Expected remove doc to have no HLV, but got: {post.remote.cv}"
+                f"Expected remote doc to have no HLV, but got: {post.remote.cv}"
             )
 
         await do_upgrade_replication_test(
@@ -634,7 +634,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             assert pre.local.cv is None and post.local.cv, (
-                f"Expected local doc to have HLV, bot got: {post.local.cv}"
+                f"Expected local doc to have HLV, but got: {post.local.cv}"
             )
 
         await do_upgrade_replication_test(

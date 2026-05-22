@@ -52,10 +52,18 @@ class TestUpgradeDeltaSync(CBLTestClass):
         except CblSyncGatewayBadResponseError as e:
             if e.code != 412:
                 raise
-            # in case DB already exits, force-recreate, so our delta_sync
-            # config is rather than running against the previous config
+            # DB already exists. Try to force-recreate so our delta_sync
+            # config is applied. delete_database silently swallows 403
+            # internally (config-managed DBs), so the delete may be a no-op
+            # and the retry put may also 412. Tolerate that — the
+            # verify-config assertion below is the real backstop and will
+            # dump the active config if delta_sync is not enabled.
             await sg.delete_database("upgrade")
-            await sg.put_database("upgrade", payload)
+            try:
+                await sg.put_database("upgrade", payload)
+            except CblSyncGatewayBadResponseError as e2:
+                if e2.code != 412:
+                    raise
         await sg.wait_for_db_up("upgrade")
 
         self.mark_test_step(

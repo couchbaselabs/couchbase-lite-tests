@@ -763,8 +763,8 @@ class _SyncGatewayBase:
                     current_span.add_event("SGW returned 500, retry")
                     await asyncio.sleep(2)
                     await self._delete_database(db_name, retry_count + 1)
-                elif e.code == 403:
-                    pass
+                elif e.code == 403 or e.code == 404:
+                    pass  # Database doesn't exist anyway.
                 else:
                     raise
 
