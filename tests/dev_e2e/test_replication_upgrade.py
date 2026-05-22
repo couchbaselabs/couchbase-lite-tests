@@ -8,7 +8,7 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
     WaitForDocumentEventEntry,
 )
-from cbltest.api.upgrade_test_helpers import (
+from shared.upgrade_test_helpers import (
     DocSnapshot,
     do_upgrade_replication_test,
     setup_upgrade_env,

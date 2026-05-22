@@ -6,7 +6,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator_types import ReplicatorType
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
-from cbltest.api.upgrade_test_helpers import (
+from shared.upgrade_test_helpers import (
     DocSnapshot,
     do_upgrade_replication_test,
     setup_upgrade_env,

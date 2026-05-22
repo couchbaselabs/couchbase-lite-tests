@@ -31,8 +31,8 @@ DocValidator: TypeAlias = Callable[[DocSnapshot, DocSnapshot], None]
 
 
 def tools_path() -> Path:
-    # client/src/cbltest/api/upgrade_test_helpers.py -> parents[4] is repo root
-    return Path(__file__).resolve().parents[4] / "tests" / ".tools"
+    # tests/shared/upgrade_test_helpers.py -> parents[1] is tests/
+    return Path(__file__).resolve().parents[1] / ".tools"
 
 
 async def setup_upgrade_env(
@@ -46,6 +46,8 @@ async def setup_upgrade_env(
     )
 
     test_case.mark_test_step("Delete Sync Gateway 'upgrade' database if exists")
+    # delete_database silently swallows 403 internally (config-managed DBs)
+    # and retries 500s; no need to wrap further.
     await cblpytest.sync_gateways[0].delete_database("upgrade")
 
     test_case.mark_test_step("Restore Couchbase Server Bucket using `upgrade` dataset")
