@@ -42,18 +42,31 @@ _DELTA_SYNC_UPGRADE_CONFIG: dict = {
 class TestUpgradeDeltaSync(CBLTestClass):
     async def _prepare_sg_with_delta_sync(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
+        payload = PutDatabasePayload(_DELTA_SYNC_UPGRADE_CONFIG)
 
         self.mark_test_step(
             "Create SG 'upgrade' database with delta_sync enabled and import from bucket"
         )
         try:
-            await sg.put_database(
-                "upgrade", PutDatabasePayload(_DELTA_SYNC_UPGRADE_CONFIG)
-            )
+            await sg.put_database("upgrade", payload)
         except CblSyncGatewayBadResponseError as e:
             if e.code != 412:
                 raise
+            # in case DB already exits, force-recreate, so our delta_sync
+            # config is rather than running against the previous config
+            await sg.delete_database("upgrade")
+            await sg.put_database("upgrade", payload)
         await sg.wait_for_db_up("upgrade")
+
+        self.mark_test_step(
+            "Verify delta_sync is actually enabled on SGW 'upgrade' database"
+        )
+        config = await sg.get_database_config("upgrade")
+        delta_sync = config.get("delta_sync") or {}
+        assert delta_sync.get("enabled") is True, (
+            "Prerequisite failed: SGW 'upgrade' database does not have "
+            f"delta_sync.enabled=True. Active config: {config!r}"
+        )
 
         self.mark_test_step("Create user1 for replication")
         collection_access = sg.create_collection_access_dict(

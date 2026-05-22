@@ -1,4 +1,4 @@
-import time
+import asyncio
 from collections.abc import Callable
 from pathlib import Path
 from typing import TypeAlias
@@ -7,7 +7,6 @@ from cbltest import CBLPyTest, CouchbaseServer
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database, GetDocumentResult
 from cbltest.api.database_types import DocumentEntry
-from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -47,12 +46,7 @@ async def setup_upgrade_env(
     )
 
     test_case.mark_test_step("Delete Sync Gateway 'upgrade' database if exists")
-    sg = cblpytest.sync_gateways[0]
-    try:
-        await sg.delete_database("upgrade")
-    except CblSyncGatewayBadResponseError as e:
-        if e.code != 403:
-            raise
+    await cblpytest.sync_gateways[0].delete_database("upgrade")
 
     test_case.mark_test_step("Restore Couchbase Server Bucket using `upgrade` dataset")
     cbs: CouchbaseServer = cblpytest.couchbase_servers[0]
@@ -60,7 +54,7 @@ async def setup_upgrade_env(
     cbs.restore_bucket("upgrade", tools_path(), dataset_path, "upgrade")
 
     test_case.mark_test_step("Wait 2s to ensure SG picks up the restored database.")
-    time.sleep(2)
+    await asyncio.sleep(2)
 
     test_case.mark_test_step("Reset local database, and load `upgrade` dataset.")
     dbs = await cblpytest.test_servers[0].create_and_reset_db(
