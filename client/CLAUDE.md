@@ -16,7 +16,7 @@ client/
 │   └── test_*.py               # Individual smoke tests
 └── src/cbltest/
     ├── __init__.py             # CBLPyTest class — top-level entry point (create, close, resolve_api_version)
-    ├── version.py              # __version__ = "2.0.2", available_api_version() — supports v1 and v2
+    ├── version.py              # __version__ = "2.0.3", available_api_version() — supports v1 and v2
     ├── globals.py              # CBLPyTestGlobal — shared state (running_test_name, auto_start_tdk_page)
     │
     ├── requests.py             # RequestFactory, TestServerRequestType enum, @register_request / @register_body decorators
