@@ -29,6 +29,9 @@ info "Python $py_version"
 if ! command -v uv &>/dev/null; then
   warn "uv not found. Installing via pip..."
   python3 -m pip install --quiet uv || fail "Could not install uv."
+  if ! command -v uv &>/dev/null; then
+    fail "uv was installed but is still not on PATH. Add your Python scripts/bin directory to PATH (for example ~/.local/bin) and re-run this script."
+  fi
 fi
 info "uv $(uv --version 2>/dev/null || echo 'installed')"
 
