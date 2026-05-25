@@ -481,7 +481,7 @@ class TestPeerToPeer(CBLTestClass):
         listener3 = Listener(server_db_list[2], ["_default._default"])
         listener3.set_identity()
         await listener3.start()
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(2)
         cert3 = listener3.identity.pem_bytes().decode("utf-8")
         self.mark_test_step(
             "Setup 3 different Replication sessions using corresponding dbs on Device-1 with listener endpoints"
