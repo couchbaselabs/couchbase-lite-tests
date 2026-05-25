@@ -91,7 +91,7 @@ class TestReplicationEventing(CBLTestClass):
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(
             ReplicatorActivityLevel.STOPPED,
-            timedelta(seconds=5),
+            timedelta(seconds=30),
             timedelta(seconds=300),
         )
         assert status.error is None, (

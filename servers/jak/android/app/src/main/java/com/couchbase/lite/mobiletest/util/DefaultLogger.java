@@ -21,7 +21,6 @@ import com.couchbase.lite.LogDomain;
 import com.couchbase.lite.LogLevel;
 import com.couchbase.lite.mobiletest.services.Log;
 
-
 public class DefaultLogger extends Log.TestLogger {
 
     public DefaultLogger(@NonNull LogLevel level) {
@@ -51,8 +50,7 @@ public class DefaultLogger extends Log.TestLogger {
 
     @Override
     protected void writeLog(@NonNull LogLevel level, @NonNull LogDomain domain, @NonNull String message) {
-        // these CBL messages have already been sent to the console
-        throw new RuntimeException("Unsupported, Do not call");
+        // NOOPS: these CBL messages have already been sent to the console
     }
 
     @Override
