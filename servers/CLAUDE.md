@@ -49,6 +49,7 @@ Every server must implement these endpoints:
 | `/getAllDocuments` | POST | Get all document IDs in specified collections |
 | `/updateDatabase` | POST | CRUD operations on documents |
 | `/startReplicator` | POST | Start a replication session |
+| `/stopReplicator` | POST | Stop a replication session |
 | `/getReplicatorStatus` | POST | Get replicator status/activity |
 | `/snapshotDocuments` | POST | Snapshot document state for later verification |
 | `/verifyDocuments` | POST | Verify documents match a previous snapshot |
