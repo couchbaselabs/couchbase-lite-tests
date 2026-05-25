@@ -23,7 +23,7 @@ they must follow.
 ## API Specification (`api/api.yaml`)
 
 - **Format:** OpenAPI 3.1.0
-- **Current version:** 2.0.2
+- **Current version:** 2.0.3
 - **Required request headers:** `CBLTest-API-Version` (integer), `CBLTest-Client-ID` (UUID)
 - **Response headers:** `CBLTest-API-Version`, `CBLTest-Server-ID`
 - **Enum values are case-insensitive** (stated in the spec description)
