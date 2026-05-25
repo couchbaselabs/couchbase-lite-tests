@@ -80,19 +80,12 @@ spec/
 - **Required headers:** `CBLTest-API-Version` (integer), `CBLTest-Client-ID` (UUID)
 - **Response headers:** `CBLTest-API-Version`, `CBLTest-Server-ID`
 
-### Version History (recent)
-| Version | Date | Changes |
-|---------|------|---------|
-| 2.0.3 | 07/24/2025 | Add peer ID to startMultipeerReplicator return |
-| 2.0.2 | 07/10/2025 | Add Merge-Dict Conflict Resolver |
-| 2.0.1 | 07/10/2025 | Add Merge-Dict Conflict Resolver |
-| 2.0.0 | 06/13/2025 | **Breaking**: API version → 2, dataset URLs, blob URLs |
-| 1.2.3 | 12/09/2025 | Transport type for multipeer |
-| 1.2.2 | 09/19/2025 | Headers property in ReplicatorConfiguration |
-| 1.2.1 | 06/04/2025 | Authenticator for multipeer |
-| 1.2.0 | 04/09/2025 | Multipeer replicator endpoints |
-| 1.1.0 | 03/05/2025 | Listener endpoints |
-| 1.0.0 | 09/27/2024 | newSession, log endpoint |
+### Version History
+The authoritative API version changelog is maintained in `spec/api/api.yaml` under
+`info.description`.
+
+To avoid documentation drift, this file intentionally does not duplicate that history.
+Refer to `spec/api/api.yaml` for the current version history and change details.
 
 ### Endpoints Defined
 All 19 endpoints that every test server must implement:
