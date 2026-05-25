@@ -94,12 +94,12 @@ spec/
 | 1.0.0 | 09/27/2024 | newSession, log endpoint |
 
 ### Endpoints Defined
-All 17 endpoints that every test server must implement:
+All 18 endpoints that every test server must implement:
 `/` (GET), `/newSession`, `/reset`, `/getAllDocuments`, `/updateDatabase`,
-`/startReplicator`, `/getReplicatorStatus`, `/snapshotDocuments`, `/verifyDocuments`,
-`/performMaintenance`, `/runQuery`, `/getDocument`, `/log`, `/startListener`,
-`/stopListener`, `/startMultipeerReplicator`, `/stopMultipeerReplicator`,
-`/getMultipeerReplicatorStatus`
+`/startReplicator`, `/getReplicatorStatus`, `/stopReplicator`, `/snapshotDocuments`,
+`/verifyDocuments`, `/performMaintenance`, `/runQuery`, `/getDocument`, `/log`,
+`/startListener`, `/stopListener`, `/startMultipeerReplicator`,
+`/stopMultipeerReplicator`, `/getMultipeerReplicatorStatus`
 
 ### Supplementary API Docs
 - **`conflict-resolvers.md`** — Predefined resolvers: `local-wins`, `remote-wins`, `null`,
