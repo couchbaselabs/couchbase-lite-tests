@@ -153,20 +153,20 @@ cd environment/docker && python start_environment.py
 - **Never commit `terraform.tfstate`** — contains sensitive data
 - **Always use `stop_backend.py`** to tear down — orphaned EC2 instances cost money
 - **AWS SSO must be active** — `aws sso login` before any orchestrator operation
-- **`uv run --group orchestrator`** required for all AWS scripts
+- **Use `uv run`** for AWS scripts
 
 ## Commands
 ```bash
 # Install deps
-uv sync --group orchestrator
+uv sync
 
 # Start full
-cd environment/aws && uv run --group orchestrator python start_backend.py \
+cd environment/aws && uv run python start_backend.py \
   --topology topology_setup/topology.json \
   --tdk-config-in <template> --tdk-config-out <output>
 
 # Stop full
-cd environment/aws && uv run --group orchestrator python stop_backend.py \
+cd environment/aws && uv run python stop_backend.py \
   --topology topology_setup/topology.json
 
 # Partial destroy (SGW only)
