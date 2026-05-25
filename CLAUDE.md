@@ -96,7 +96,6 @@ All hooks are enforced automatically on commit via `.pre-commit-config.yaml`:
 
 - **Syntax & Style**: ruff (lint + import sorting), ruff-format, pyupgrade, ty check
 - **Merge Safety**: check-merge-conflict
-- **Security**: detect-secrets (scans for API keys/passwords/tokens with `.secrets.baseline`)
 - **Commit Format**: Conventional Commits validation (`<type>[scope]: <description>`)
 
 See `scripts/hooks/check-commit-msg.sh` for commit message validation and `.pre-commit-config.yaml` for full hook configuration.
