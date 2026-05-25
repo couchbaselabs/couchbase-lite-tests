@@ -39,6 +39,7 @@ All servers implement the REST API defined in `spec/api/api.yaml`. The full endp
 | `/getAllDocuments` | POST | List document IDs in collections |
 | `/updateDatabase` | POST | CRUD on documents |
 | `/startReplicator` | POST | Start replication |
+| `/stopReplicator` | POST | Stop replication |
 | `/getReplicatorStatus` | POST | Replicator status/activity |
 | `/snapshotDocuments` | POST | Snapshot document state |
 | `/verifyDocuments` | POST | Verify against snapshot |
