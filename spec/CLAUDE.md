@@ -76,14 +76,15 @@ spec/
 ### Overview
 - **Format:** OpenAPI 3.1.0
 - **Server:** `http://{tenant}:8080` (test server on localhost or EC2)
-- **Current version:** 2.0.2
+- **Current version:** 2.0.3
 - **Required headers:** `CBLTest-API-Version` (integer), `CBLTest-Client-ID` (UUID)
 - **Response headers:** `CBLTest-API-Version`, `CBLTest-Server-ID`
 
 ### Version History (recent)
 | Version | Date | Changes |
 |---------|------|---------|
-| 2.0.2 | 07/24/2025 | Add peer ID to startMultipeerReplicator return |
+| 2.0.3 | 07/24/2025 | Add peer ID to startMultipeerReplicator return |
+| 2.0.2 | 07/10/2025 | Add Merge-Dict Conflict Resolver |
 | 2.0.1 | 07/10/2025 | Add Merge-Dict Conflict Resolver |
 | 2.0.0 | 06/13/2025 | **Breaking**: API version → 2, dataset URLs, blob URLs |
 | 1.2.3 | 12/09/2025 | Transport type for multipeer |
