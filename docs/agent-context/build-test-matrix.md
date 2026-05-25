@@ -16,7 +16,7 @@ bash scripts/setup-hooks.sh
 | Lint | `uv run ruff check .` | Includes import sorting checks (`I` rules). |
 | Format | `uv run ruff format .` | Use `--check` in CI-equivalent runs. |
 | Typecheck | `uv run --group lint ty check` | Root + `client/src` type environment. |
-| Pre-commit suite | `uv run pre-commit run --all-files` | Includes secrets and commit standards hooks. |
+| Pre-commit suite | `uv run pre-commit run --all-files` | Runs the repository's configured pre-commit hooks. |
 
 ## Component-Specific Validation
 
