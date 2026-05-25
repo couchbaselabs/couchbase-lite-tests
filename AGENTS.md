@@ -79,7 +79,7 @@ If full integration tests are not runnable locally, state exactly what was run a
   - `environment/aws/temp.pem`
   - `environment/aws/terraform.tfstate*` (if present locally)
   - generated configs containing hostnames/credentials
-- Use `detect-secrets`/pre-commit findings as blockers, not warnings.
+- Use `detect-secrets` findings and any configured pre-commit findings as blockers, not warnings.
 - Avoid logging credentials or signed URLs in test output and fixtures.
 
 ## Supporting Agent Context
