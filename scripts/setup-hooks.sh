@@ -63,13 +63,11 @@ pre-commit install || fail "pre-commit install failed."
 pre-commit install --hook-type commit-msg || fail "commit-msg hook install failed."
 info "Git hooks installed (pre-commit + commit-msg)"
 
-# --- Regenerate secrets baseline if missing ---
-if [ ! -f "$REPO_ROOT/.secrets.baseline" ]; then
-  warn ".secrets.baseline not found. Generating..."
-  detect-secrets scan > "$REPO_ROOT/.secrets.baseline"
-  info "Secrets baseline generated"
-else
+# --- detect-secrets baseline ---
+if [ -f "$REPO_ROOT/.secrets.baseline" ]; then
   info "Secrets baseline exists"
+else
+  warn ".secrets.baseline not found. Skipping generation because this script does not verify that detect-secrets is configured in pre-commit."
 fi
 
 echo ""
