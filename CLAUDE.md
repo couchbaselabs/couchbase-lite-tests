@@ -109,7 +109,6 @@ This is a `uv` workspace with two members:
 
 Dependency groups in root:
 
-- `orchestrator` — deps for AWS orchestrator scripts
 - `lint` — lint tools (ty, ruff, type stubs)
 
 ## Coding Standards
