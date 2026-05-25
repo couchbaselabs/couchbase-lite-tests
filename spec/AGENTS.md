@@ -28,13 +28,13 @@ they must follow.
 - **Response headers:** `CBLTest-API-Version`, `CBLTest-Server-ID`
 - **Enum values are case-insensitive** (stated in the spec description)
 
-### Endpoints (17 total)
+### Endpoints (19 total)
 `GET /`, `POST /newSession`, `POST /reset`, `POST /getAllDocuments`,
-`POST /updateDatabase`, `POST /startReplicator`, `POST /getReplicatorStatus`,
-`POST /snapshotDocuments`, `POST /verifyDocuments`, `POST /performMaintenance`,
-`POST /runQuery`, `POST /getDocument`, `POST /log`, `POST /startListener`,
-`POST /stopListener`, `POST /startMultipeerReplicator`, `POST /stopMultipeerReplicator`,
-`POST /getMultipeerReplicatorStatus`
+`POST /updateDatabase`, `POST /startReplicator`, `POST /stopReplicator`,
+`POST /getReplicatorStatus`, `POST /snapshotDocuments`, `POST /verifyDocuments`,
+`POST /performMaintenance`, `POST /runQuery`, `POST /getDocument`, `POST /log`,
+`POST /startListener`, `POST /stopListener`, `POST /startMultipeerReplicator`,
+`POST /stopMultipeerReplicator`, `POST /getMultipeerReplicatorStatus`
 
 ### Supplementary API Docs
 - `conflict-resolvers.md` — `local-wins`, `remote-wins`, `null`, `merge`, `delete`, `merge-dict`
