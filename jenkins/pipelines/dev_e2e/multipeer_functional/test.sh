@@ -6,6 +6,11 @@ set -euo pipefail
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
 
+init_greenboard_results_dir
+trap 'uv run python -m cbltest.greenboard_upload \
+    --config "$DEV_E2E_TESTS_DIR/config.json" \
+    --results-dir "$GREENBOARD_RESULTS_DIR" || true' EXIT
+
 dataset_version="4.0"
 setup_args=()
 # Get arguments for pytest, and send the rest to setup_test
@@ -52,7 +57,9 @@ echo "========== PYTEST OUTPUT START =========="
 
 pushd "${DEV_E2E_TESTS_DIR}" > /dev/null
 
-if uv run pytest -v --no-header --config config.json --dataset-version=$dataset_version test_multipeer.py; then
+if uv run pytest -v --no-header --config config.json --dataset-version=$dataset_version \
+    --junitxml="$GREENBOARD_RESULTS_DIR/junit_dev_e2e_multipeer.xml" \
+    test_multipeer.py; then
     echo "========== PYTEST OUTPUT END =========="
     echo ""
     echo "🎉 COORDINATED TEST PASSED!"

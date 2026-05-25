@@ -34,6 +34,11 @@ done
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source "$SCRIPT_DIR/../../shared/config.sh"
 
+init_greenboard_results_dir
+trap 'uv run python -m cbltest.greenboard_upload \
+    --config "$QE_TESTS_DIR/config.json" \
+    --results-dir "$GREENBOARD_RESULTS_DIR" || true' EXIT
+
 echo "Setup backend..."
 
 export PATH="/opt/homebrew/bin:$PATH"
@@ -54,4 +59,5 @@ pushd "${QE_TESTS_DIR}" > /dev/null
 uv run pytest -v --no-header -W ignore::DeprecationWarning \
     --config config.json \
     --dataset-version "$DATASET_VERSION" \
+    --junitxml="$GREENBOARD_RESULTS_DIR/junit_qe_ios.xml" \
     -m cbl

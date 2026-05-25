@@ -78,6 +78,8 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/desktop/teardown.sh
                                 '''
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests/dev_e2e/macos_desktop/**', fingerprint: true, allowEmptyArchive: true
                             echo "=== OSX Desktop Test Teardown Complete"
                         }
@@ -107,6 +109,8 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 pwsh 'jenkins\\pipelines\\dev_e2e\\java\\desktop\\teardown.ps1'
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests\\dev_e2e\\windows_desktop\\**', fingerprint: true, allowEmptyArchive: true
                             echo "=== Windows Desktop Test Teardown Complete"
                         }
@@ -138,6 +142,8 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/desktop/teardown.sh
                                 '''
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests/dev_e2e/linux_desktop/**', fingerprint: true, allowEmptyArchive: true
                             echo "=== Linux Desktop Test Teardown Complete"
                         }
@@ -169,6 +175,8 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/webservice/teardown.sh
                                 """
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests/dev_e2e/macos_webservice/**', fingerprint: true, allowEmptyArchive: true
                             echo "=== OSX Web Service Test Teardown Complete"
                         }
@@ -200,6 +208,8 @@ pipeline {
                                     jenkins\\pipelines\\dev_e2e\\java\\webservice\\teardown.ps1
                                 """
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests\\dev_e2e\\windows_webservice\\**', fingerprint: true, allowEmptyArchive: true
                             echo "=== Windows Web Service Test Teardown Complete"
                         }
@@ -231,6 +241,8 @@ pipeline {
                                     jenkins/pipelines/dev_e2e/java/webservice/teardown.sh
                                 """
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests/dev_e2e/linux_webservice/**', fingerprint: true, allowEmptyArchive: true
                             echo "=== Linux Web Service Test Teardown Complete"
                         }

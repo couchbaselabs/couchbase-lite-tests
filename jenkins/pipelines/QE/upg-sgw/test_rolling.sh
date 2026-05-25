@@ -31,6 +31,12 @@ CONFIG_TEMPLATE="$SCRIPT_DIR/config.json"
 CONFIG_FILE="$QE_TESTS_DIR/config.json"
 TOPOLOGY_ROLLING_TEMPLATE="$SCRIPT_DIR/topology_rolling.json"
 
+init_greenboard_results_dir
+trap 'uv run python -m cbltest.greenboard_upload \
+    --config "$CONFIG_FILE" \
+    --results-dir "$GREENBOARD_RESULTS_DIR" \
+    --upgrade-to "$SGW_TO" || true' EXIT
+
 echo ">>> Initial setup of 3-node SGW cluster with $SGW_FROM ..."
 pushd $AWS_ENVIRONMENT_DIR > /dev/null
 uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_FROM --topology-file $TOPOLOGY_ROLLING_TEMPLATE
@@ -41,10 +47,11 @@ if [ "$SETUP_ONLY" = true ]; then
     exit 0
 fi
 
-echo ">>> Pre-upgrade pytest (seed; result NOT uploaded to greenboard) ..."
+echo ">>> Pre-upgrade pytest ..."
 pushd $QE_TESTS_DIR > /dev/null
 uv run pytest -s -v --no-header -W ignore::DeprecationWarning \
-    --config config.json --no-result-upload -m upg_sgw \
+    --config config.json -m upg_sgw \
+    --junitxml="$GREENBOARD_RESULTS_DIR/junit_rolling_pre.xml" \
     test_rolling_upgrade_sgw.py
 popd > /dev/null
 
@@ -84,12 +91,11 @@ for node_index in 0 1 2; do
     popd > /dev/null
 done
 
-echo ">>> Post-upgrade pytest (uploads pass/fail to sgw-upgrade::rolling doc) ..."
-export SGW_UPGRADE_FROM="$SGW_FROM"
-export SGW_UPGRADE_TO="$SGW_TO"
+echo ">>> Post-upgrade pytest ..."
 pushd $QE_TESTS_DIR > /dev/null
 uv run pytest -s -v --no-header -W ignore::DeprecationWarning \
     --config config.json -m upg_sgw \
+    --junitxml="$GREENBOARD_RESULTS_DIR/junit_rolling_post.xml" \
     test_rolling_upgrade_sgw.py
 popd > /dev/null
 

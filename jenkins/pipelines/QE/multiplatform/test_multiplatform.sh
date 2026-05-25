@@ -12,6 +12,11 @@ set -euo pipefail
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
 
+init_greenboard_results_dir
+trap 'uv run python -m cbltest.greenboard_upload \
+    --config "$QE_TESTS_DIR/config.json" \
+    --results-dir "$GREENBOARD_RESULTS_DIR" || true' EXIT
+
 function list_available_tests() {
     echo "📋 Available tests (found in $QE_TESTS_DIR):"
 
@@ -198,7 +203,9 @@ pushd "${QE_TESTS_DIR}" > /dev/null
 # Set environment variables to prevent output truncation
 export COLUMNS=200
 
-if uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json "$TEST_NAME"; then
+if uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json \
+    --junitxml="$GREENBOARD_RESULTS_DIR/junit_qe_multiplatform.xml" \
+    "$TEST_NAME"; then
     echo "========== PYTEST OUTPUT END =========="
     echo ""
     echo "🎉 COORDINATED TEST PASSED!"

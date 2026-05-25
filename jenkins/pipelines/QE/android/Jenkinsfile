@@ -53,6 +53,8 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/android/android_teardown.sh"
                     }
+                    junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                    archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                     archiveArtifacts artifacts: 'tests/QE/android/**/*', fingerprint: true, allowEmptyArchive: true
                     echo "=== Android Test Teardown Complete"
                 }

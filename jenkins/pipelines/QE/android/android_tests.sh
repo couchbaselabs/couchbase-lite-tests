@@ -10,6 +10,11 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:/opt/homebrew/bin:$PATH"
 source $SCRIPT_DIR/../../shared/config.sh
 
+init_greenboard_results_dir
+trap 'uv run python -m cbltest.greenboard_upload \
+    --config "$QE_TESTS_DIR/config.json" \
+    --results-dir "$GREENBOARD_RESULTS_DIR" || true' EXIT
+
 function usage() {
     echo "Usage: $0 <cbl_version> <sg_version> [dataset_version] [--setup-only]"
     echo "  dataset_version: Version of CBL dataset to use (default: 4.0)"
@@ -65,4 +70,5 @@ adb shell input keyevent KEYCODE_WAKEUP
 uv run pytest --maxfail=7 -W ignore::DeprecationWarning \
     --config config.json \
     --dataset-version "$DATASET_VERSION" \
+    --junitxml="$GREENBOARD_RESULTS_DIR/junit_qe_android.xml" \
     -m cbl

@@ -30,6 +30,12 @@ TOPOLOGY_FILE="$AWS_ENVIRONMENT_DIR/topology_setup/topology.json"
 CONFIG_TEMPLATE="$SCRIPT_DIR/config.json"
 CONFIG_FILE="$QE_TESTS_DIR/config.json"
 
+init_greenboard_results_dir
+trap 'uv run python -m cbltest.greenboard_upload \
+    --config "$CONFIG_FILE" \
+    --results-dir "$GREENBOARD_RESULTS_DIR" \
+    --upgrade-to "$SGW_TO" || true' EXIT
+
 echo ">>> Initial setup with SGW: $SGW_FROM ..."
 pushd $AWS_ENVIRONMENT_DIR > /dev/null
 uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_FROM
@@ -40,10 +46,11 @@ if [ "$SETUP_ONLY" = true ]; then
     exit 0
 fi
 
-echo ">>> Pre-upgrade pytest (seed; result NOT uploaded to greenboard) ..."
+echo ">>> Pre-upgrade pytest ..."
 pushd $QE_TESTS_DIR > /dev/null
 uv run pytest -s -v --no-header -W ignore::DeprecationWarning \
-    --config config.json --no-result-upload -m upg_sgw \
+    --config config.json -m upg_sgw \
+    --junitxml="$GREENBOARD_RESULTS_DIR/junit_waterfall_pre.xml" \
     test_upg_sgw.py
 popd > /dev/null
 
@@ -61,12 +68,11 @@ uv run ./start_backend.py \
     --no-ts-run
 popd > /dev/null
 
-echo ">>> Post-upgrade pytest (uploads pass/fail to sgw-upgrade::waterfall doc) ..."
-export SGW_UPGRADE_FROM="$SGW_FROM"
-export SGW_UPGRADE_TO="$SGW_TO"
+echo ">>> Post-upgrade pytest ..."
 pushd $QE_TESTS_DIR > /dev/null
 uv run pytest -s -v --no-header -W ignore::DeprecationWarning \
     --config config.json -m upg_sgw \
+    --junitxml="$GREENBOARD_RESULTS_DIR/junit_waterfall_post.xml" \
     test_upg_sgw.py
 popd > /dev/null
 

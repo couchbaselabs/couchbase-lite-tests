@@ -29,6 +29,11 @@ done
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source $SCRIPT_DIR/../../shared/config.sh
 
+init_greenboard_results_dir
+trap 'uv run python -m cbltest.greenboard_upload \
+    --config "$QE_TESTS_DIR/config.json" \
+    --results-dir "$GREENBOARD_RESULTS_DIR" || true' EXIT
+
 echo "Setup backend..."
 pushd $AWS_ENVIRONMENT_DIR > /dev/null
 uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
@@ -43,4 +48,5 @@ fi
 # Run Tests :
 echo "Run tests..."
 pushd $QE_TESTS_DIR > /dev/null
-uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m sgw
+uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m sgw \
+    --junitxml="$GREENBOARD_RESULTS_DIR/junit_qe_sgw.xml"

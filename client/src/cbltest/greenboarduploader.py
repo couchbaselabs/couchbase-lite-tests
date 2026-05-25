@@ -1,49 +1,89 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from pathlib import Path
 from uuid import uuid4
 
-import pytest
-from _pytest.reports import TestReport
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
-from couchbase.exceptions import DocumentNotFoundException
 from couchbase.options import ClusterOptions
-from packaging.version import InvalidVersion, Version
+from junitparser import JUnitXml, TestSuite
 
 from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.logging import cbl_info, cbl_warning
 
 
-def _version_sort_key(v: str) -> tuple[Version, int]:
-    """Sort key for SGW-style version strings of the form ``<semver>[-<build>]``.
-
-    Splits on the first ``-``: if the suffix is a pure integer, returns
-    ``(Version(semver), int(build))`` so that ``3.3.0-99 < 3.3.0-100 <
-    3.3.0-1234``. Plain semver (no suffix) sorts as build ``0`` of that
-    semver. Non-numeric suffixes fall through to ``Version(v)`` so PEP 440
-    pre/post/rc tags still order correctly.
+def parse_version_and_build(
+    platform: str, version: str, sgw_version: CouchbaseVersion | None
+) -> tuple[str, int, str]:
     """
-    semver, _, build = v.partition("-")
-    if build and build.isdigit():
-        return Version(semver), int(build)
-    return Version(v), 0
+    Compute the ``(version, build, sgwVersion)`` triple that should land on a
+    greenboard doc, given a platform and the raw values reported by the test
+    server / SGW.
+
+    The first two are the doc's ``version`` and ``build`` fields; the third
+    is the ``sgwVersion`` field. Centralising the parsing here lets both the
+    in-process fixture (which produces sidecar files) and the aggregator
+    (which never sees the live test server) agree on the same shape.
+    """
+    parsed_version = "0.0.0"
+    parsed_build = 0
+    sgw_version_str = "n/a"
+
+    if sgw_version is not None:
+        sgw_version_str = f"{sgw_version.version}-{sgw_version.build_number}"
+
+    if platform == "sync-gateway" and sgw_version is not None:
+        # For SGW jobs, use the SGW version directly from the parsed object
+        # to avoid the fragile serialize-then-reparse pattern.
+        parsed_version = (
+            sgw_version.version
+            if sgw_version.version and sgw_version.version != "unknown"
+            else "0.0.0"
+        )
+        parsed_build = sgw_version.build_number
+    else:
+        version_components = version.split("-")
+
+        if len(version_components) > 0 and version_components[0]:
+            parsed_version = version_components[0]
+
+        if len(version_components) > 1:
+            try:
+                # Handles build numbers like 'b1234' or just '1234'
+                parsed_build = int(version_components[1].lstrip("b"))
+            except ValueError:
+                # If the part after '-' is not a number, build remains 0
+                cbl_warning(f"Could not parse build number from '{version}'")
+
+    return parsed_version, parsed_build, sgw_version_str
+
+
+def _suite_counts(suite: TestSuite) -> tuple[int, int]:
+    """Return ``(passed, failed)`` for a single JUnit ``<testsuite>``.
+
+    ``passed = tests - failures - errors - skipped``; failures and errors are
+    both lumped into the failed bucket since the greenboard doc only carries
+    pass/fail counts.
+    """
+    tests = suite.tests or 0
+    failures = suite.failures or 0
+    errors = suite.errors or 0
+    skipped = suite.skipped or 0
+    passed = max(0, tests - failures - errors - skipped)
+    failed = failures + errors
+    return passed, failed
 
 
 class GreenboardUploader:
     """
-    A class for uploading results to a specified greenboard server bucket.
+    Uploads a single per-Jenkins-build document to the greenboard bucket.
 
-    Two upload paths are supported:
-
-    - **Normal mode** (:py:meth:`upload`) — writes a new per-session document
-      with a fresh ``uuid4`` doc id. Used by every regular (non-upgrade) test
-      session.
-    - **Upgrade matrix mode** (:py:meth:`upload_upgrade_result`) —
-      read-merge-upserts a single deterministic document per upgrade type
-      (``sgw-upgrade::waterfall`` and ``sgw-upgrade::rolling``). Each doc
-      holds a semver-sorted ``versions`` axis plus a ``matrix[from][to]``
-      nested map of pass/fail entries. Reruns of the same ``(from, to)``
-      pair override their prior entry.
+    The class is a thin wrapper around the Couchbase SDK and the JUnit XML +
+    sidecar aggregation logic. There is no per-test in-process state: the
+    pytest fixture writes meta sidecars and ``--junitxml`` files into a
+    per-build results directory, and :py:meth:`upload_from_results_dir` reads
+    that directory at the end of the Jenkins build to produce one doc.
     """
 
     def __init__(self, url: str, username: str, password: str):
@@ -53,165 +93,184 @@ class GreenboardUploader:
         self.__url = url
         self.__username = username
         self.__password = password
-        self.__fail_count = 0
-        self.__pass_count = 0
-        self.__overall_fail = False
-        self.__has_sgw_marker = False
-
-    @pytest.hookimpl(hookwrapper=True, tryfirst=True)
-    def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]):
-        outcome = yield
-        report: TestReport = outcome.get_result()
-        if report.when != "call":
-            if report.failed:
-                self.__overall_fail = True
-            return
-
-        if self.__overall_fail:
-            return
-
-        # Track if any test has SGW-focused markers
-        if item.get_closest_marker("sgw") or item.get_closest_marker("upg_sgw"):
-            self.__has_sgw_marker = True
-
-        if report.passed:
-            self.__pass_count += 1
-        elif report.failed:
-            self.__fail_count += 1
-
-    def has_sgw_marker(self) -> bool:
-        """
-        Returns True if any test in the session has @pytest.mark.sgw or @pytest.mark.upg_sgw marker
-        """
-        return self.__has_sgw_marker
 
     def upload(
         self,
+        *,
         platform: str,
         os_name: str,
         version: str,
-        sgw_version: CouchbaseVersion | None,
-    ):
+        build: int,
+        sgw_version_str: str,
+        pass_count: int,
+        fail_count: int,
+        build_url: str | None = None,
+        upgrade_to: str | None = None,
+    ) -> None:
         """
-        Uploads the results using the specified platform and version.  The reason that they
-        are specified here is because they are probably unknown at the time that this object
-        is created as they need to be retrieved from the test server.
+        Upload a single greenboard doc with a fresh ``uuid4`` id.
 
-        :param platform: The platform name (e.g. couchbase-lite-net) as specified by the test server
-        :param version: The version string (e.g. 3.2.0-b0136, etc) as specified by the test server
-        :param sgw_version: The parsed SGW CouchbaseVersion object, or None if unavailable
+        Caller is responsible for having already filtered out the no-upload
+        cases (zero tests, zero passes). This method assumes the data is
+        worth persisting.
         """
-        if self.__overall_fail:
-            cbl_warning("Overall result is failure, skipping upload...")
-            return
+        doc: dict = {
+            "build": build,
+            "version": version,
+            "sgwVersion": sgw_version_str,
+            "failCount": fail_count,
+            "passCount": pass_count,
+            "platform": platform,
+            "os": os_name,
+        }
+        if build_url:
+            doc["buildUrl"] = build_url
+        if upgrade_to:
+            doc["upgradeTo"] = upgrade_to
 
-        parsed_version = "0.0.0"
-        parsed_build = 0
-        sgw_version_str = "n/a"
+        now = datetime.now(timezone.utc)
+        unix_timestamp = (
+            now - datetime(1970, 1, 1, tzinfo=timezone.utc)
+        ).total_seconds()
+        doc["uploaded"] = unix_timestamp
+        doc["date"] = now.strftime("%Y-%m-%d")
 
-        if sgw_version is not None:
-            sgw_ver = sgw_version.version
-            sgw_build = sgw_version.build_number
-            sgw_version_str = f"{sgw_ver}-{sgw_build}"
-
-        if platform == "sync-gateway" and sgw_version is not None:
-            # For SGW jobs, use the SGW version directly from the parsed object
-            # to avoid the fragile serialize-then-reparse pattern.
-            parsed_version = (
-                sgw_version.version
-                if sgw_version.version and sgw_version.version != "unknown"
-                else "0.0.0"
-            )
-            parsed_build = sgw_version.build_number
-        else:
-            version_components = version.split("-")
-
-            if len(version_components) > 0 and version_components[0]:
-                parsed_version = version_components[0]
-
-            if len(version_components) > 1:
-                try:
-                    # Handles build numbers like 'b1234' or just '1234'
-                    parsed_build = int(version_components[1].lstrip("b"))
-                except ValueError:
-                    # If the part after '-' is not a number, build remains 0
-                    cbl_warning(f"Could not parse build number from '{version}'")
-
-        self._upload_document(
-            {
-                "build": parsed_build,
-                "version": parsed_version,
-                "sgwVersion": sgw_version_str,
-                "failCount": self.__fail_count,
-                "passCount": self.__pass_count,
-                "platform": platform,
-                "os": os_name,
-            }
+        self._open_collection().upsert(str(uuid4()), doc)
+        cbl_info(
+            f"Greenboard upload: passCount={pass_count} failCount={fail_count} "
+            f"platform={platform} buildUrl={build_url or '-'} "
+            f"upgradeTo={upgrade_to or '-'}"
         )
 
-    def upload_upgrade_result(
-        self,
-        upgrade_type: str,
-        from_version: str,
-        to_version: str,
+    @classmethod
+    def upload_from_results_dir(
+        cls,
+        url: str,
+        username: str,
+        password: str,
+        results_dir: Path,
+        *,
+        build_url: str | None = None,
+        upgrade_to: str | None = None,
     ) -> None:
-        """Upsert one pass/fail entry into the per-type SGW upgrade matrix doc.
-
-        Doc id is ``sgw-upgrade::{upgrade_type}``; entry is stored at
-        ``matrix[from_version][to_version]`` and overrides any prior entry
-        for the same pair. ``versions`` axis is the union of all FROM/TO
-        versions ever seen, semver-sorted ascending for the UI to render
-        as both row and column labels of an N×N grid.
         """
-        if (
-            self.__pass_count == 0
-            and self.__fail_count == 0
-            and not self.__overall_fail
-        ):
+        Aggregate every ``junit_*.xml`` + ``meta_*.json`` pair found in
+        ``results_dir`` and produce a single greenboard upload.
+
+        No-op conditions (silently skip the upload):
+
+        - ``results_dir`` doesn't exist or contains no meta sidecars.
+        - All JUnit XMLs report zero tests (nothing actually ran).
+        - The aggregated pass count is zero (all failures / a fully red run
+          should not produce a doc, per design).
+
+        Hard error (raises):
+
+        - Meta sidecars disagree on ``platform`` or ``os``. Within one
+          Jenkins build these must be identical; disagreement signals a real
+          configuration bug.
+        """
+        results_dir = Path(results_dir)
+        if not results_dir.is_dir():
+            cbl_info(f"Greenboard results dir {results_dir} not found; skipping upload")
+            return
+
+        meta_files = sorted(
+            results_dir.glob("meta_*.json"), key=lambda p: p.stat().st_mtime
+        )
+        if not meta_files:
             cbl_info(
-                "No tests ran for upgrade upload; skipping "
-                f"({upgrade_type} {from_version} -> {to_version})"
+                f"No meta_*.json sidecars in {results_dir}; skipping greenboard upload"
             )
             return
 
-        passed = not (self.__overall_fail or self.__fail_count > 0)
-        now = datetime.now(timezone.utc)
-        unix_ts = (now - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds()
-        entry = {
-            "passed": passed,
-            "uploaded": unix_ts,
-            "date": now.strftime("%Y-%m-%d"),
-        }
+        xml_files = sorted(
+            results_dir.glob("junit_*.xml"), key=lambda p: p.stat().st_mtime
+        )
+        total_pass = 0
+        total_fail = 0
+        any_tests = False
+        for xml_path in xml_files:
+            try:
+                xml = JUnitXml.fromfile(str(xml_path))
+            except Exception as e:
+                cbl_warning(f"Failed to parse {xml_path}: {e}")
+                continue
+            # JUnitXml can be a single TestSuite or a TestSuites container.
+            suites = list(xml) if isinstance(xml, JUnitXml) else [xml]
+            for suite in suites:
+                if not isinstance(suite, TestSuite):
+                    continue
+                if (suite.tests or 0) == 0:
+                    continue
+                any_tests = True
+                p, f = _suite_counts(suite)
+                total_pass += p
+                total_fail += f
 
-        doc_id = f"sgw-upgrade::{upgrade_type}"
-        coll = self._open_collection()
+        if not any_tests:
+            cbl_info(
+                f"All JUnit XMLs in {results_dir} report zero tests; "
+                "skipping greenboard upload"
+            )
+            return
+        if total_pass == 0:
+            cbl_info(
+                f"Greenboard: passCount=0 (failCount={total_fail}) — "
+                "fully-failed run, skipping upload per policy"
+            )
+            return
 
-        doc: dict[str, Any]
-        try:
-            doc = coll.get(doc_id).content_as[dict]
-        except DocumentNotFoundException:
-            doc = {
-                "type": upgrade_type,
-                "lastUpdated": 0.0,
-                "versions": [],
-                "matrix": {},
-            }
+        # Use the chronologically-first sidecar's metadata for version/sgwVersion
+        # — for upgrade tests that's the pre-upgrade (FROM) run, which matches
+        # the convention that `version`/`build`/`sgwVersion` reflect the "from"
+        # side and `upgradeTo` records the target.
+        import json
 
-        versions = list({*doc.get("versions", []), from_version, to_version})
-        try:
-            versions.sort(key=_version_sort_key)
-        except InvalidVersion:
-            cbl_warning(f"Falling back to lexicographic sort for versions {versions}")
-            versions.sort()
-        doc["versions"] = versions
+        metas: list[dict] = []
+        for mp in meta_files:
+            try:
+                metas.append(json.loads(mp.read_text()))
+            except Exception as e:
+                cbl_warning(f"Failed to read meta sidecar {mp}: {e}")
+        if not metas:
+            cbl_info("No readable meta sidecars; skipping greenboard upload")
+            return
 
-        doc.setdefault("matrix", {}).setdefault(from_version, {})[to_version] = entry
-        doc["lastUpdated"] = unix_ts
+        # Consistency check on non-version fields.
+        platforms = {m.get("platform") for m in metas}
+        oses = {m.get("os") for m in metas}
+        if len(platforms) > 1:
+            raise ValueError(
+                f"Meta sidecars disagree on platform: {platforms}. "
+                "All pytest invocations in one Jenkins build must report the "
+                "same platform."
+            )
+        if len(oses) > 1:
+            raise ValueError(
+                f"Meta sidecars disagree on os: {oses}. "
+                "All pytest invocations in one Jenkins build must report the "
+                "same os."
+            )
 
-        coll.upsert(doc_id, doc)
-        cbl_info(
-            f"Greenboard upgrade upload: {doc_id} "
-            f"{from_version} -> {to_version} ({'pass' if passed else 'fail'})"
+        first = metas[0]
+        platform = first.get("platform") or "sync-gateway"
+        os_name = first.get("os") or "n/a"
+        version = first.get("version") or "0.0.0"
+        build = int(first.get("build") or 0)
+        sgw_version_str = first.get("sgwVersion") or "n/a"
+
+        uploader = cls(url, username, password)
+        uploader.upload(
+            platform=platform,
+            os_name=os_name,
+            version=version,
+            build=build,
+            sgw_version_str=sgw_version_str,
+            pass_count=total_pass,
+            fail_count=total_fail,
+            build_url=build_url,
+            upgrade_to=upgrade_to,
         )
 
     def _open_collection(self):
@@ -220,15 +279,3 @@ class GreenboardUploader:
         cluster = Cluster(self.__url, opts)
         cluster.wait_until_ready(timedelta(seconds=10))
         return cluster.bucket("greenboard").default_collection()
-
-    def _upload_document(self, doc: dict) -> None:
-        """Upload a document to the greenboard bucket with common fields added."""
-        now = datetime.now(timezone.utc)
-        unix_timestamp = (
-            now - datetime(1970, 1, 1, tzinfo=timezone.utc)
-        ).total_seconds()
-
-        doc["uploaded"] = unix_timestamp
-        doc["date"] = now.strftime("%Y-%m-%d")
-
-        self._open_collection().upsert(str(uuid4()), doc)

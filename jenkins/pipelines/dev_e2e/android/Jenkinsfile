@@ -53,6 +53,8 @@ pipeline {
                             jenkins/pipelines/dev_e2e/android/android_teardown.sh
                         '''
                     }
+                    junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                    archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                     archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
                     archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
                 }

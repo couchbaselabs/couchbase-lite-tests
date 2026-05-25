@@ -65,6 +65,8 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 powershell 'jenkins\\pipelines\\QE\\dotnet\\teardown.ps1'
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests\\QE\\dotnet_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Dotnet Windows Test Teardown Complete"
                         }
@@ -96,6 +98,8 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests/QE/dotnet_macos/**/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Dotnet macOS Test Teardown Complete"
                         }
@@ -127,6 +131,8 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests/QE/dotnet_ios/**/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Dotnet iOS Test Teardown Complete"
                         }
@@ -158,6 +164,8 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests/QE/dotnet_android/**/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Dotnet Android Test Teardown Complete"
                         }

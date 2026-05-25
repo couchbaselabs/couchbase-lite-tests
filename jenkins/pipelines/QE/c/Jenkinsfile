@@ -46,6 +46,8 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh 'jenkins/pipelines/QE/c/teardown.sh'
                     }
+                    junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                    archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                     archiveArtifacts artifacts: 'tests/QE/c_linux/**/*', fingerprint: true, allowEmptyArchive: true
                     echo "=== C Linux Test Teardown Complete"
                 }

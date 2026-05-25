@@ -69,6 +69,8 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 pwsh 'jenkins\\pipelines\\dev_e2e\\dotnet\\teardown.ps1'
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests\\dev_e2e\\windows\\**', fingerprint: true, allowEmptyArchive: true
                         }
                     }
@@ -93,6 +95,8 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/dotnet/teardown.sh'
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests/dev_e2e/macos/**', fingerprint: true, allowEmptyArchive: true
                         }
                     }
@@ -117,6 +121,8 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/dotnet/teardown.sh'
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests/dev_e2e/ios/**', fingerprint: true, allowEmptyArchive: true
                         }
                     }
@@ -139,6 +145,8 @@ pipeline {
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/dotnet/teardown.sh'
                             }
+                            junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                             archiveArtifacts artifacts: 'tests/dev_e2e/android/**', fingerprint: true, allowEmptyArchive: true
                         }
                     }

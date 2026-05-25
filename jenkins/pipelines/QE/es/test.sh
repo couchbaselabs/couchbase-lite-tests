@@ -15,7 +15,12 @@ if [ -z "$SGW_VERSION" ]; then
 fi
 
 source $SCRIPT_DIR/../../shared/config.sh
-#
+
+init_greenboard_results_dir
+trap 'uv run python -m cbltest.greenboard_upload \
+    --config "$QE_TESTS_DIR/config.json" \
+    --results-dir "$GREENBOARD_RESULTS_DIR" || true' EXIT
+
 echo "Setup backend..."
 uv run $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}"
 
@@ -25,7 +30,9 @@ echo "RUNNING COORDINATED TEST"
 pushd "${QE_TESTS_DIR}/edge_server" > /dev/null
 export COLUMNS=200
 
-if uv run pytest -v --no-header -W ignore::DeprecationWarning --config ../config.json "$TEST_NAME"; then
+if uv run pytest -v --no-header -W ignore::DeprecationWarning --config ../config.json \
+    --junitxml="$GREENBOARD_RESULTS_DIR/junit_qe_es.xml" \
+    "$TEST_NAME"; then
     echo "========== PYTEST OUTPUT END =========="
     echo ""
     echo "🎉 COORDINATED TEST PASSED!"

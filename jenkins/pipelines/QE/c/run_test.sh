@@ -6,6 +6,11 @@ set -euo pipefail
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source $SCRIPT_DIR/../../shared/config.sh
 
+init_greenboard_results_dir
+trap 'uv run python -m cbltest.greenboard_upload \
+    --config "$QE_TESTS_DIR/config.json" \
+    --results-dir "$GREENBOARD_RESULTS_DIR" || true' EXIT
+
 function usage() {
     echo "Usage: $0 <version> <platform> <sgw_version> [dataset_version] [--setup-only]"
     echo "version: CBL version (e.g. 3.2.1-2)"
@@ -51,4 +56,5 @@ pushd $QE_TESTS_DIR
 uv run pytest -v --no-header -W ignore::DeprecationWarning \
     --config config.json \
     --dataset-version "$DATASET_VERSION" \
+    --junitxml="$GREENBOARD_RESULTS_DIR/junit_qe_c.xml" \
     -m cbl

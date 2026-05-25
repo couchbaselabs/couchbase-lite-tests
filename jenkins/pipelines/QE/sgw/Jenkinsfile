@@ -76,6 +76,8 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/sgw/teardown.sh"
                     }
+                    junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
+                    archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
                     archiveArtifacts artifacts: 'tests/QE/sgw/**/*', fingerprint: true, allowEmptyArchive: true
                     echo "=== SGW Test Teardown Complete"
                 }

@@ -83,8 +83,26 @@ readonly QE_TESTS_DIR="$TESTS_DIR/QE"
 readonly QE_PIPELINES_DIR="$PIPELINES_DIR/QE"
 readonly AWS_ENVIRONMENT_DIR="$ENVIRONMENT_DIR/aws"
 
+# Per-Jenkins-build directory where every pytest invocation drops its
+# --junitxml output and the greenboard fixture drops its meta_*.json
+# sidecar. The aggregator (python -m cbltest.greenboard_upload) reads
+# this dir at the end of the build to produce one greenboard doc.
+# Default to $WORKSPACE on Jenkins agents; fall back to $PWD locally.
+readonly GREENBOARD_RESULTS_DIR="${WORKSPACE:-$PWD}/.greenboard-results"
+
 export PIPELINES_DIR TESTS_DIR ENVIRONMENT_DIR TEST_SERVER_DIR
 export SHARED_PIPELINES_DIR DEV_E2E_PIPELINES_DIR DEV_E2E_TESTS_DIR AWS_ENVIRONMENT_DIR
+export GREENBOARD_RESULTS_DIR
+
+# Call this once per test.sh / run_test.sh, after sourcing config.sh, to
+# reset the greenboard results dir for the current build. Subsequent
+# pytest invocations write junit_*.xml + meta_*.json into it; the
+# aggregator reads them all at exit.
+init_greenboard_results_dir() {
+    rm -rf "$GREENBOARD_RESULTS_DIR"
+    mkdir -p "$GREENBOARD_RESULTS_DIR"
+}
+export -f init_greenboard_results_dir
 
 content="PIPELINES_DIR: $PIPELINES_DIR
 TESTS_DIR: $TESTS_DIR
