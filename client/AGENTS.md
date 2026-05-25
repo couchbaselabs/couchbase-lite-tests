@@ -24,7 +24,7 @@ cbltest/
 ├── __init__.py         # CBLPyTest — top-level entry point
 ├── requests.py         # RequestFactory + TestServerRequestType enum + registries
 ├── responses.py        # Response registry
-├── version.py          # __version__ = "2.0.2"; available_api_version() supports v1 & v2
+├── version.py          # __version__ = "2.0.3"; available_api_version() supports v1 & v2
 │
 ├── api/                # High-level API classes (public interface for test authors)
 │   ├── testserver.py   #   TestServer — per-platform server communication
