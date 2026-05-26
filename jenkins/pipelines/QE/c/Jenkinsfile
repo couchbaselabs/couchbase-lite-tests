@@ -142,7 +142,7 @@ pipeline {
                             }
                             junit testResults: '.greenboard-results/junit_*.xml', allowEmptyResults: true
                             archiveArtifacts artifacts: '.greenboard-results/**/*', fingerprint: true, allowEmptyArchive: true
-                            archiveArtifacts artifacts: 'tests/QE/java_desktop/**/*', fingerprint: true, allowEmptyArchive: true
+                            archiveArtifacts artifacts: 'tests/QE/c_ios/**/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== C iOS Test Teardown Complete"
                         }
                     }
