@@ -145,8 +145,8 @@ cd jenkins/pipelines/dev_e2e/ios
 | What | Where | Relationship |
 |------|-------|-------------|
 | Parent pipelines docs | `../CLAUDE.md`, `../AGENTS.md` | Higher-level pipeline documentation |
-| dev_e2e test suites | `../../tests/dev_e2e/` | Source of `@pytest.mark.min_*` requirements |
-| Test specifications | `../../spec/tests/dev_e2e/` | Define expected behavior for dev_e2e tests |
+| dev_e2e test suites | `../../../tests/dev_e2e/` | Source of `@pytest.mark.min_*` requirements |
+| Test specifications | `../../../spec/tests/dev_e2e/` | Define expected behavior for dev_e2e tests |
 | Shared setup | `../shared/setup_test.py` | `setup_test()` function all pipelines use |
-| AWS orchestrator | `../../environment/aws/start_backend.py` | Called by setup_test() to provision infra |
+| AWS orchestrator | `../../../environment/aws/start_backend.py` | Called by setup_test() to provision infra |
 
