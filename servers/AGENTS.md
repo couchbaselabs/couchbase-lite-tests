@@ -221,7 +221,7 @@ cd servers/javascript && npm install && npm run dev
 |---|---|---|
 | API contract | [spec/api/api.yaml](../spec/api/api.yaml) | Defines what every server implements |
 | Python framework | [client/src/cbltest/](../client/src/cbltest/) | Sends requests to these servers |
-| Test suites | [tests/dev_e2e/](../tests/), [tests/QE/](../tests/) | Exercise these servers via the framework |
+| Test suites | [tests/dev_e2e/](../tests/dev_e2e/), [tests/QE/](../tests/QE/) | Exercise these servers via the framework |
 | Platform bridges | [environment/aws/topology_setup/test_server_platforms/](../environment/aws/topology_setup/test_server_platforms/) | Deploys and manages servers in AWS |
 | CI prebuild | [jenkins/pipelines/prebuild/](../jenkins/pipelines/prebuild/) | Builds server artifacts for CI |
-| CI test pipelines | [jenkins/pipelines/{dev_e2e,QE}/{platform}/](../jenkins/pipelines/) | Runs tests against these servers |
+| CI test pipelines | [jenkins/pipelines/dev_e2e/](../jenkins/pipelines/dev_e2e/), [jenkins/pipelines/QE/](../jenkins/pipelines/QE/) | Runs tests against these servers |

@@ -202,7 +202,7 @@ npx @redocly/cli preview-docs spec/api/api.yaml
 | Server implementations | [servers/](../servers/) (c, dotnet, ios, jak, javascript) | Must implement every `api.yaml` endpoint |
 | Python framework | [client/src/cbltest/requests.py](../client/src/cbltest/requests.py) | `TestServerRequestType` enum maps to `api.yaml` endpoints |
 | Versioned requests/responses | [client/src/cbltest/v1/](../client/src/cbltest/v1/), [v2/](../client/src/cbltest/v2/) | Match `api.yaml` schemas |
-| Test suites (dev_e2e) | [tests/dev_e2e/](../tests/) | Must follow `spec/tests/dev_e2e/` |
-| Test suites (QE) | [tests/QE/](../tests/) | Must follow `spec/tests/QE/` |
-| Datasets (actual files) | [dataset/sg/](../dataset/), [dataset/server/](../dataset/) | Schema documented in `spec/dataset/` |
+| Test suites (dev_e2e) | [tests/dev_e2e/](../tests/dev_e2e/) | Must follow `spec/tests/dev_e2e/` |
+| Test suites (QE) | [tests/QE/](../tests/QE/) | Must follow `spec/tests/QE/` |
+| Datasets (actual files) | [dataset/sg/](../dataset/sg/), [dataset/server/](../dataset/server/) | Schema documented in `spec/dataset/` |
 | CI validation | [.github/workflows/openapi.yml](../.github/workflows/openapi.yml) | Lints `api.yaml` on every PR |

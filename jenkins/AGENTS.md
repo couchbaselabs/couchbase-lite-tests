@@ -236,7 +236,7 @@ source jenkins/pipelines/shared/config.sh
 | AWS orchestrator | [environment/aws/start_backend.py](../environment/aws/start_backend.py) | Called by `setup_test()` |
 | AWS teardown | [environment/aws/stop_backend.py](../environment/aws/stop_backend.py) | Called by `teardown.sh` / `upg-sgw/test.sh` |
 | Shared setup | [jenkins/pipelines/shared/setup_test.py](pipelines/shared/setup_test.py) | Core function all pipelines delegate to |
-| Test suites | [tests/dev_e2e/](../tests/), [tests/QE/](../tests/) | What pipelines ultimately run |
+| Test suites | [tests/dev_e2e/](../tests/dev_e2e/), [tests/QE/](../tests/QE/) | What pipelines ultimately run |
 | Test server source | [servers/](../servers/) | Built by the prebuild pipeline |
 | Framework | [client/src/cbltest/](../client/src/cbltest/) | Consumed by the tests pipelines run |
 | Topology schema | [environment/aws/topology_setup/topology_schema.json](../environment/aws/topology_setup/topology_schema.json) | Validates generated topology |

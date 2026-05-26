@@ -121,6 +121,6 @@ cd jenkins/pipelines/QE/upg-sgw && ./teardown.sh
 |---|---|---|
 | Parent CI/CD doc | [../AGENTS.md](../AGENTS.md) | Higher-level pipeline documentation |
 | Shared setup logic | [shared/setup_test.py](shared/setup_test.py) | Core function all pipelines delegate to |
-| Test suites | [../../tests/dev_e2e/](../../tests/), [../../tests/QE/](../../tests/) | Source of `@pytest.mark.min_*` requirements |
+| Test suites | [tests/dev_e2e/](../../tests/dev_e2e/), [tests/QE/](../../tests/QE/) | Source of `@pytest.mark.min_*` requirements |
 | AWS orchestrator | [../../environment/aws/start_backend.py](../../environment/aws/start_backend.py) | Called by `setup_test()` |
 | Topology schema | [../../environment/aws/topology_setup/topology_schema.json](../../environment/aws/topology_setup/topology_schema.json) | Validates topology JSON |

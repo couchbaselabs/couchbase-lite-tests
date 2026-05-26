@@ -257,7 +257,7 @@ cd environment/docker && python start_environment.py
 | Test server source | [servers/](../servers/) | Built and deployed by `topology_setup/` |
 | Platform bridges | [environment/aws/topology_setup/test_server_platforms/](aws/topology_setup/test_server_platforms/) | Platform-specific install/run/stop |
 | Jenkins pipelines | [jenkins/pipelines/](../jenkins/pipelines/) | Call `start_backend.py`/`stop_backend.py` via `setup_test.py` |
-| Test suites | [tests/dev_e2e/](../tests/), [tests/QE/](../tests/) | Consume the `config.json` this generates |
+| Test suites | [tests/dev_e2e/](../tests/dev_e2e/), [tests/QE/](../tests/QE/) | Consume the `config.json` this generates |
 | Config parser | [client/src/cbltest/configparser.py](../client/src/cbltest/configparser.py) | Parses the config JSON this outputs |
 | Topology schema | [aws/topology_setup/topology_schema.json](aws/topology_setup/topology_schema.json) | Validates topology JSON |
 | Datasets | [dataset/](../dataset/) | Copied into test servers during build |

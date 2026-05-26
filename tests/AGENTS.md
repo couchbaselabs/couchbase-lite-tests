@@ -204,5 +204,5 @@ uv run ruff format tests/
 | Test specs (dev_e2e) | [spec/tests/dev_e2e/](../spec/tests/dev_e2e/) | Behavior contracts mirroring `mark_test_step` |
 | Test specs (QE) | [spec/tests/QE/](../spec/tests/QE/) | Same, for QE tests |
 | Datasets | [dataset/sg/](../dataset/sg/) | JSON data + SGW configs used in tests |
-| CI pipelines | [jenkins/pipelines/{dev_e2e,QE}/](../jenkins/pipelines/) | Drive these tests per platform |
+| CI pipelines | [jenkins/pipelines/dev_e2e/](../jenkins/pipelines/dev_e2e/), [jenkins/pipelines/QE/](../jenkins/pipelines/QE/) | Drive these tests per platform |
 | Config schema | `https://packages.couchbase.com/couchbase-lite/testserver.schema.json` | Validates `config.json` |
