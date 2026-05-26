@@ -121,8 +121,8 @@ cd jenkins/pipelines/dev_e2e/ios
 | What | Where | Relationship |
 |------|-------|-------------|
 | Parent pipelines docs | `../CLAUDE.md`, `../AGENTS.md` | Higher-level pipeline documentation |
-| dev_e2e test suites | `../../tests/dev_e2e/` | Source of requirements |
-| Test specifications | `../../spec/tests/dev_e2e/` | Define expected behavior for dev_e2e tests |
+| dev_e2e test suites | `../../../tests/dev_e2e/` | Source of requirements |
+| Test specifications | `../../../spec/tests/dev_e2e/` | Define expected behavior for dev_e2e tests |
 | Shared setup logic | `../shared/setup_test.py` | Core function all pipelines delegate to |
-| AWS orchestrator | `../../environment/aws/start_backend.py` | Called to provision infrastructure |
+| AWS orchestrator | `../../../environment/aws/start_backend.py` | Called to provision infrastructure |
 
