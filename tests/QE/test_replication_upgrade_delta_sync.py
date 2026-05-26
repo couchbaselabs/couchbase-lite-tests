@@ -98,7 +98,7 @@ class TestUpgradeDeltaSync(CBLTestClass):
     async def test_delta_sync_history_pull_post_upgrade_sgw_mutation(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
-        doc_id = "nonconflict_2"
+        doc_id = "nonconflict_3"
         db = await setup_upgrade_env(self, cblpytest, dataset_path)
         await self._prepare_sg_with_delta_sync(cblpytest)
         sg = cblpytest.sync_gateways[0]
