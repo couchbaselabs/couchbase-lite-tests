@@ -9,7 +9,7 @@ You own everything under `servers/`:
 | Path | Language | Build System | Target Platforms | Transport |
 |---|---|---|---|---|
 | `c/` | C++ (C++17) | CMake 3.23+ | macOS, Linux, Windows, iOS, Android | HTTP (CivetWeb) |
-| `dotnet/` | C# (.NET 8) | MSBuild / `dotnet` CLI | Windows, macOS, iOS, Android | HTTP (Kestrel) |
+| `dotnet/` | C# (.NET 10 / `net10.0-*`) | MSBuild / `dotnet` CLI | Windows, macOS, iOS, Android | HTTP (Kestrel) |
 | `ios/` | Swift | Xcode | iOS device + simulator | HTTP |
 | `jak/` | Java / Kotlin | Gradle | Android, JVM Desktop, Web Service | HTTP |
 | `javascript/` | TypeScript | Vite / Vitest | Browser | **WebSocket** (not HTTP) |
