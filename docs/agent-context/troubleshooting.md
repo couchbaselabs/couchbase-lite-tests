@@ -66,8 +66,8 @@
   - stack trace/error output
   - topology/config file used
   - recent related changes
-- Escalate to QE/infra owners with those artifacts.
+- Escalate to the QE/infra team with those artifacts.
 
 ## Escalation
 
-- For persistent infra failures, escalate to the QE/infra owners listed in `.github/CODEOWNERS` (or the team Slack channel referenced in the repo README). Avoid pinging individuals directly — route through the owning team.
+- For persistent infra failures, escalate through the repository issue or pull request you are working in, include the artifacts listed above, and request QE/infra team review. Avoid pinging individuals directly — route through the owning team.
