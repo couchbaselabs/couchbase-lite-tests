@@ -1,47 +1,4 @@
-# CLAUDE.md — QE Test Pipelines (jenkins/pipelines/QE/)
-
-## What This Is
-
-This directory contains the QA test pipelines for the Couchbase Lite System Test Harness. Unlike
-`dev_e2e/` which focuses on core developer-facing features, the QE suite includes:
-- Broader regression coverage
-- Edge cases and failure scenarios
-- Multi-node cluster testing
-- SGW upgrade scenarios
-- Edge Server functionality
-- Multi-platform integration tests
-
-## Directory Structure
-
-```
-QE/
-├── android/                         # Android QA pipeline
-├── c/                               # C platform QA pipeline
-├── dotnet/                          # .NET platform QA pipeline
-├── ios/                             # iOS QA pipeline
-├── java/                            # Java QA (desktop/ + webservice/)
-├── sgw/                             # SGW-specific QA tests (no CBL platform)
-├── upg-sgw/                         # SGW upgrade tests with multi-node clusters
-├── es/                              # Edge Server QA tests (custom setup)
-└── multiplatform/                   # Multi-platform QA tests
-```
-
-## Pipeline Types
-
-### Standard Platform Pipelines
-
-Most QE pipelines follow the standard structure with `setup_test.py` delegating to shared `setup_test()`:
-- `android/`, `c/`, `dotnet/`, `ios/`, `java/`
-
-Each has:
-- `Jenkinsfile` — Pipeline definition
-- `setup_test.py` — Calls `setup_test()` with platform-specific args
-- `topology*.json` — Infrastructure template(s)
-- `config*.json` — TDK config template(s)
-- `test.sh` — Runs tests via `pytest`
-- `teardown.sh` — Cleanup script
-
-### Special Pipelines
+@AGENTS.md
 
 #### SGW Pipeline (sgw/)
 
