@@ -162,8 +162,8 @@ cd jenkins/pipelines/QE/upg-sgw
 | What | Where | Relationship |
 |------|-------|-------------|
 | Parent pipelines docs | `../CLAUDE.md`, `../AGENTS.md` | Higher-level pipeline documentation |
-| QE test suites | `../../tests/QE/` | Source of `@pytest.mark.min_*` requirements |
-| Topology schema | `../../environment/aws/topology_setup/topology_schema.json` | Validates topology JSON |
+| QE test suites | `../../../tests/QE/` | Source of `@pytest.mark.min_*` requirements |
+| Topology schema | `../../../environment/aws/topology_setup/topology_schema.json` | Validates topology JSON |
 | Shared setup | `../shared/setup_test.py` | `setup_test()` function all QE pipelines use |
-| AWS orchestrator | `../../environment/aws/start_backend.py` | Called by setup_test() to provision infra |
+| AWS orchestrator | `../../../environment/aws/start_backend.py` | Called by setup_test() to provision infra |
 
