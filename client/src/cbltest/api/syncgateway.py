@@ -703,6 +703,29 @@ class _SyncGatewayBase:
         doc_writes_bytes = db_stats["doc_writes_bytes_blip"]
         return doc_reads_bytes, doc_writes_bytes
 
+    async def get_delta_sync_stats(self, dataset_name: str) -> dict:
+        """
+        Gets the delta_sync counters for a given database as exposed by
+        ``GET /_expvar``. Returns the raw ``delta_sync`` sub-dict so callers
+        can diff counters (e.g. ``deltas_sent``, ``delta_pull_replication_count``)
+        across a replication run to confirm delta-sync actually engaged.
+
+        Returns an empty dict if the delta_sync section is absent (older SGW
+        builds, or feature disabled).
+
+        :param dataset_name: The name of the SGW database to inspect.
+        """
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+
+        try:
+            db_section = expvars["syncgateway"]["per_db"][dataset_name]
+        except KeyError:
+            return {}
+        delta = db_section.get("delta_sync")
+        return delta if isinstance(delta, dict) else {}
+
     async def _put_database(
         self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0
     ) -> None:
