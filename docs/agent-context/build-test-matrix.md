@@ -16,7 +16,7 @@ bash scripts/setup-hooks.sh
 | Lint | `uv run ruff check .` | Includes import sorting checks (`I` rules). |
 | Format | `uv run ruff format .` | Use `--check` in CI-equivalent runs. |
 | Typecheck | `uv run --group lint ty check` | Root + `client/src` type environment. |
-| Pre-commit suite | `uv run pre-commit run --all-files` | Includes secrets and commit standards hooks. |
+| Pre-commit suite | `uv run pre-commit run --all-files` | Runs ruff, ruff-format, pyupgrade, ty, merge-conflict/shebang checks, and the commit-msg conventional-commits hook. Secrets scanning is not wired into pre-commit; run `detect-secrets scan --baseline .secrets.baseline` manually. |
 
 ## Component-Specific Validation
 
@@ -27,7 +27,7 @@ bash scripts/setup-hooks.sh
 | `tests/dev_e2e` | `cd tests/dev_e2e && uv run pytest -x -v --config config.json` | Full developer E2E suite. |
 | `tests/QE` | `cd tests/QE && uv run pytest -x -v --config config.json` | Full QE suite. |
 | `tests/QE` SGW subset | `cd tests/QE && uv run pytest -x -v --config config.json -m sgw` | Marker-focused validation. |
-| AWS orchestrator lint/type | `uv run --group orchestrator-lint ty check` | Recommended when touching `environment/aws`. |
+| AWS orchestrator lint/type | `uv run --group lint ty check` | Recommended when touching `environment/aws`. |
 
 ## Infrastructure Control Flows
 

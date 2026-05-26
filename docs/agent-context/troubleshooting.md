@@ -70,4 +70,4 @@
 
 ## Escalation
 
-- Primary escalation contact for persistent infra failures: Jim Borden.
+- For persistent infra failures, escalate to the QE/infra owners listed in `.github/CODEOWNERS` (or the team Slack channel referenced in the repo README). Avoid pinging individuals directly — route through the owning team.

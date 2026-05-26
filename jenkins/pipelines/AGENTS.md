@@ -1,168 +1,126 @@
-# Agent: Pipeline Structure (jenkins/pipelines/)
+# Pipeline Structure — `jenkins/pipelines/`
 
-## Identity
-
-You are a specialized agent for the per-platform Jenkins pipeline definitions. You understand
-the structure of `setup_test.py` scripts, topology file synchronization with test requirements,
-and the critical relationship between what tests request and what infrastructure provides.
+This file covers the per-pipeline structure and the **topology-test synchronization rule** that lives here. For the full inventory of platforms, shared scripts (`setup_test.py`, `config.sh`), and Jenkinsfile patterns, see [../AGENTS.md](../AGENTS.md).
 
 ## Scope
 
-You own all code under `jenkins/pipelines/`:
-- `shared/` — Shared setup/config scripts used by ALL pipelines
-- `dev_e2e/` — Developer E2E pipelines (one per platform)
-- `QE/` — QA pipelines (one per platform + special: sgw, upg-sgw, es, multiplatform)
-- `prebuild/` — Test server prebuild pipeline
+You own everything under `jenkins/pipelines/`:
+- `shared/` — `setup_test.py` (`setup_test` / `setup_test_multi`), `config.sh`, `config.psm1`
+- `dev_e2e/` — developer E2E pipelines (one per platform + `multipeer_functional/`)
+- `QE/` — QA pipelines (one per platform + `sgw/`, `upg-sgw/`, `es/`, `multiplatform/`)
+- `prebuild/` — test server artifact prebuild pipeline
 
-You do NOT own the AWS orchestrator or test suites, but you understand how to wire them together.
+## ⚠️ Topology–Test Synchronization (most important rule)
 
-## Critical Rule: Topology-Test Synchronization
-
-**YOUR MOST IMPORTANT RESPONSIBILITY:**
-
-Every test file has `@pytest.mark.min_*` decorators that specify resource requirements:
+Every test declares resource requirements via `@pytest.mark.min_*`:
 
 ```python
-@pytest.mark.min_sync_gateways(2)      # Needs 2 SGW nodes
-@pytest.mark.min_couchbase_servers(2)  # Needs 2 CBS instances
-@pytest.mark.min_test_servers(1)       # Needs 1 test server
-class TestMultiNode(CBLTestClass):
-    ...
+@pytest.mark.min_sync_gateways(2)
+@pytest.mark.min_couchbase_servers(2)
+@pytest.mark.min_test_servers(1)
+class TestMultiNode(CBLTestClass): ...
 ```
 
-Your topology file **MUST** provide AT LEAST these resources:
+The matching topology file MUST provision **at least** those resources:
 
 ```json
 {
-    "clusters": [
-        {"server_count": 1},    // CBS cluster 1
-        {"server_count": 1}     // CBS cluster 2 (2 total)
-    ],
-    "sync_gateways": [
-        {"cluster": 0},         // SGW node 1
-        {"cluster": 1}          // SGW node 2 (2 total)
-    ],
-    "test_servers": [
-        {
-            "platform": "swift_ios",
-            "cbl_version": "{{version}}"
-        }                       // 1 test server
-    ]
+  "clusters":      [{"server_count": 1}, {"server_count": 1}],
+  "sync_gateways": [{"cluster": 0},      {"cluster": 1}],
+  "test_servers":  [{"platform": "swift_ios", "cbl_version": "{{version}}"}]
 }
 ```
 
-**If topology resources < test requirements → TESTS HANG FOREVER waiting for instances.**
+**If topology resources < test requirements → tests hang waiting for instances.**
 
-**ALWAYS CHECK:** When a test adds new `@pytest.mark.min_*` decorators, update the topology file FIRST.
+When a test adds new `@pytest.mark.min_*` decorators, **update the topology file first**, then the test.
 
-## Platform Pipeline Template
+## Per-Platform Layout
 
-Every `{platform}/setup_test.py` follows this exact pattern:
+Every `{platform}/` directory under `dev_e2e/` or `QE/` contains:
 
-```python
-#!/usr/bin/env python3
-import os, sys
-from io import TextIOWrapper
-from pathlib import Path
-import click
-
-SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
-if __name__ == "__main__":
-    sys.path.append(str(SCRIPT_DIR.parents[3]))
-    if isinstance(sys.stdout, TextIOWrapper):
-        sys.stdout.reconfigure(encoding="utf-8")
-
-from jenkins.pipelines.shared.setup_test import setup_test
-
-@click.command()
-@click.argument("cbl_version")
-@click.argument("sgw_version")
-def cli_entry(cbl_version: str, sgw_version: str) -> None:
-    setup_test(
-        cbl_version, sgw_version,
-        SCRIPT_DIR / "TOPOLOGY_FILE",   # ← only varies per platform
-        SCRIPT_DIR / "CONFIG_FILE",     # ← only varies per platform
-        "PLATFORM_TAG",                 # ← only varies per platform
-        setup_dir="SUITE",              # ← "dev_e2e" (default) or "QE"
-    )
-
-if __name__ == "__main__":
-    cli_entry()
+```
+{platform}/
+├── Jenkinsfile                       # Groovy pipeline definition
+├── setup_test.py                     # Calls shared setup_test()/setup_test_multi()
+├── config*.json                      # TDK config template(s)
+├── topology*.json                    # Topology template(s)
+├── test.sh / run_test.sh / run_test.ps1
+├── teardown.sh / teardown.ps1
+└── (platform-specific extras)
 ```
 
-## Per-Platform Differences
-
-| Platform | `topology_file` | `config_file` | `platform_tag` | `setup_dir` |
-|----------|-----------------|---------------|-----------------|------------|
-| `dev_e2e/ios/` | `topology_single_device.json` | `config.json` | `swift_ios` | (default) |
-| `QE/upg-sgw/` | `topology.json` | `config.json` | `upg-sgw` | `"QE"` |
-| `QE/es/` | **custom** | `config.json` | `es` | **different pattern** |
-| `multiplatform/` | `topology.json` | varies | varies | **uses `setup_test_multi()`** |
+`setup_test.py` template + per-platform argument table → see [../AGENTS.md](../AGENTS.md).
 
 ## Topology File Rules
 
-1. **Match test requirements:** `clusters` and `sync_gateways` entries must equal `@pytest.mark.min_*` counts
-2. **CBS-SGW pairing:** Each `sync_gateway` has a `cluster` index; each `cluster` is one CBS
-3. **Template placeholders:** `{{version}}`, `{{jak_android}}`, `{{cbs_version}}`, etc.
-4. **Single topology files** for simple topologies (most common)
-5. **Multiple topology files** (`topologies/` directory) for complex multi-platform setups
+| Concept | Rule |
+|---|---|
+| **CBS–SGW pairing** | Each `sync_gateways[i].cluster` is the index into `clusters[]`. Every `cluster` entry is one CBS instance. |
+| **Resource counts** | `clusters`, `sync_gateways`, `test_servers`, `edge_servers`, `load_balancers` must individually satisfy the tests' `min_*` markers. |
+| **Templates** | Files use `{{placeholder}}` syntax — resolved at runtime by `setup_test.py`. |
+| **Single-file topology** | Most pipelines use one `topology*.json`. |
+| **Multi-file topology** | `c/`, `dotnet/` use `topologies/topology_single_{platform}.json` per-target. |
+| **Programmatic topology** | `QE/es/` builds topology via `generate_topology()` instead of a JSON template. |
 
-## Special Pipeline Patterns
+Common placeholders: `{{version}}`, `{{cbl_version}}`, `{{cbs_version}}`, per-platform variants like `{{swift_ios}}`, `{{jak_android}}`, `{{jak_desktop}}`.
 
-### SGW Upgrade Pipeline (upg-sgw/)
+## Special Pipelines
 
-The `upg-sgw/` pipeline is UNIQUE:
-- Iterates through multiple SGW versions
-- Runs tests after each version upgrade
-- Requires multi-node topology for cluster consistency testing
-- Must provision **at least 2 SGW nodes and 2 CBS clusters**
+### `QE/upg-sgw/` — SGW upgrade
 
-### Edge Server Pipeline (es/)
+Iterates SGW versions. Requires **≥ 2 SGW nodes and ≥ 2 CBS clusters** for upgrade consistency testing. `test.sh`:
 
-The `es/setup_test.py` does NOT use shared `setup_test()`:
-- Has custom `generate_topology()` function
-- Calls `start_backend()` directly
-- Different CLI signature: `--sgw-version`, `--cbs-version`
+1. Initial setup at first SGW version → run `upg_sgw` tests.
+2. For each subsequent version:
+   - `stop_backend.py --destroy-sgw --no-ts-stop`
+   - `start_backend.py --no-cbs-provision --no-es-provision --no-lb-provision --no-ls-provision --no-ts-run`
+   - Re-run `upg_sgw` tests.
 
-### Multi-Platform Pipeline (multiplatform/)
+### `QE/es/` — Edge Server
 
-Uses `setup_test_multi()` with per-platform version maps:
-- Supports testing cross-platform replication
-- Each platform can have different CBL version
-- Requires more complex topology
+Does NOT use shared `setup_test()`. Has its own `generate_topology()` and calls `start_backend()` directly. CLI options: `--sgw-version`, `--cbs-version`.
 
-## Coding Rules
+### `dev_e2e/multipeer_functional/` and `QE/multiplatform/`
 
-- **`sys.path.append(str(SCRIPT_DIR.parents[3]))`** — every `setup_test.py` must add repo root
-- **Use `click`** for CLI parsing in all Python scripts
-- **Use `setup_dir="QE"`** for QE pipelines; omit for dev_e2e (defaults to `"dev_e2e"`)
-- **Topology/config JSONs are templates** — committed; final versions generated at runtime
-- **TOPOLOGY-TEST SYNC IS CRITICAL** — always validate markers before provisioning
-- **Always call `move_artifacts`** in `teardown.sh`
-- **Teardown must run on failure** — `post { always { ... } }` in Jenkinsfile
-- **Never commit generated files** — `config.json` in test dirs, `topology.json` in `topology_setup/`
-- **Python 3.10+**: `X | Y`, never `Union[X, Y]`
-- **⚠️ DO NOT create markdown documentation files** for pipeline changes. Markdown files are for AI understanding only. The actual pipeline code is self-documenting via shared scripts and comments.
+Use `setup_test_multi()` (not `setup_test()`) with per-platform version maps for cross-platform mesh tests.
+
+## `shared/setup_test.py` Recap
+
+- `setup_test(cbl_version, sgw_version, topology_file_in, config_file_in, topology_tag, couchbase_version="7.6", setup_dir="dev_e2e")` — wraps all platforms with the same `cbl_version` and delegates.
+- `setup_test_multi(cbl_version_map, sgw_version, …)` — reads the topology template, resolves versions via `proget`, sets defaults + tag + per-test-server CBL version, writes the final topology to `environment/aws/topology_setup/topology.json`, downloads `cbbackupmgr`, then calls `start_backend()`.
+- `ts_to_topology()` maps platform tags: `swift_* → ios`, `jak_android → android`, `jak_* → java`, `dotnet_* → dotnet`, `c_* → c`.
+
+## Rules
+
+- **`sys.path.append(str(SCRIPT_DIR.parents[3]))`** in every `setup_test.py` (puts repo root on `sys.path`).
+- **`click`** for all CLI parsing.
+- **`setup_dir="QE"`** for QE pipelines; omit for dev_e2e (defaults to `"dev_e2e"`).
+- **Topology/config JSONs are templates** — final versions generated at runtime, never committed.
+- **Topology must match `@pytest.mark.min_*` decorators** before tests change.
+- **Always call `move_artifacts`** in `teardown.sh`.
+- **Teardown runs on failure** — Jenkinsfile uses `post { always { … } }`.
+- **Python 3.10+** — `X | Y`, never `Union[X, Y]`.
+- **No markdown sidecars** for pipeline changes.
 
 ## Commands
 
 ```bash
-# Run setup for a platform pipeline
+# Run a pipeline's setup locally
 cd environment/aws
+uv run ../jenkins/pipelines/dev_e2e/ios/setup_test.py 4.0.0 4.0.0
 uv run ../jenkins/pipelines/QE/upg-sgw/setup_test.py 4.0.0 4.0.0
 
 # Teardown
-cd jenkins/pipelines/QE/upg-sgw
-./teardown.sh
+cd jenkins/pipelines/QE/upg-sgw && ./teardown.sh
 ```
 
 ## Cross-References
 
 | What | Where | Relationship |
-|------|-------|-------------|
-| Parent CI/CD docs | `jenkins/CLAUDE.md`, `jenkins/AGENTS.md` | Higher-level pipeline documentation |
-| Shared setup logic | `shared/setup_test.py` | Core function all pipelines delegate to |
-| Test suites | `tests/dev_e2e/`, `tests/QE/` | What pipelines run; source of `@pytest.mark.min_*` requirements |
-| AWS orchestrator | `environment/aws/start_backend.py` | Called by `setup_test()` to provision infrastructure |
-| Topology schema | `environment/aws/topology_setup/topology_schema.json` | Validates topology JSON files |
-
+|---|---|---|
+| Parent CI/CD doc | [../AGENTS.md](../AGENTS.md) | Higher-level pipeline documentation |
+| Shared setup logic | [shared/setup_test.py](shared/setup_test.py) | Core function all pipelines delegate to |
+| Test suites | [../../tests/dev_e2e/](../../tests/), [../../tests/QE/](../../tests/) | Source of `@pytest.mark.min_*` requirements |
+| AWS orchestrator | [../../environment/aws/start_backend.py](../../environment/aws/start_backend.py) | Called by `setup_test()` |
+| Topology schema | [../../environment/aws/topology_setup/topology_schema.json](../../environment/aws/topology_setup/topology_schema.json) | Validates topology JSON |

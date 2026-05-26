@@ -1,48 +1,81 @@
-# Agent: Test Writer (tests/)
+# Test Suites — `tests/`
 
-## Identity
-
-You are a specialized agent for writing and maintaining Python test suites that verify
-Couchbase Lite functionality across all supported platforms. You use the `cbltest` framework
-to orchestrate multi-component tests (Couchbase Lite ↔ Sync Gateway ↔ Couchbase Server).
+The two Python test suites that exercise Couchbase Lite via the `cbltest` framework. Tests issue REST calls to per-platform test servers, which execute CBL operations against Sync Gateway (SGW) and Couchbase Server (CBS).
 
 ## Scope
 
-You own all code under `tests/`:
+You own everything under `tests/`:
+- `tests/dev_e2e/` — Developer E2E (12 test modules + `test_replication_filter_data.py` data helper)
+- `tests/QE/` — QA suite (21 test files + 12 edge-server tests)
+- `tests/.tools/` — binary tools used during tests (e.g. `cbbackupmgr`)
 
-- `tests/dev_e2e/` — Developer end-to-end tests (12 test files)
-- `tests/QE/` — QA tests (18+ test files, includes edge server sub-suite)
-- `tests/.tools/` — Binary tools used by tests (e.g., `cbbackupmgr`)
+You do **not** own `client/`, `servers/`, `environment/`, or `jenkins/`, but you understand how they wire into your tests.
 
-You do NOT own the test framework (`client/`), platform servers (`servers/`),
-infrastructure (`environment/`), or CI pipelines (`jenkins/`), but you understand
-how they connect to your test code.
+## Layout
 
-## Test Suites
+```
+tests/
+├── dev_e2e/                            # Developer E2E
+│   ├── conftest.py                     # dataset_path fixture (../../dataset/sg)
+│   ├── config.json                     # Generated — DO NOT hand-edit
+│   ├── config.example.json
+│   ├── test_basic_replication.py
+│   ├── test_replication_filter.py
+│   ├── test_replication_filter_data.py # Data helper for filter tests
+│   ├── test_replication_auto_purge.py
+│   ├── test_replication_blob.py
+│   ├── test_replication_behavior.py
+│   ├── test_replication_upgrade.py
+│   ├── test_replication_xdcr.py
+│   ├── test_custom_conflict.py
+│   ├── test_encrypted_properties.py
+│   ├── test_fest.py
+│   ├── test_multipeer.py
+│   └── test_query_consistency.py
+│
+├── QE/                                 # QA — broader coverage + edge cases
+│   ├── conftest.py                     # dataset_path + cleanup_after_test (autouse)
+│   ├── config.json                     # Generated — DO NOT hand-edit
+│   ├── test_db_online_offline.py
+│   ├── test_delta_sync.py
+│   ├── test_high_availability.py
+│   ├── test_large_doc_workloads.py
+│   ├── test_log_redaction.py
+│   ├── test_multipeer.py
+│   ├── test_multiple_servers.py
+│   ├── test_no_conflicts.py
+│   ├── test_peer_to_peer.py
+│   ├── test_peer_to_peer_topology.py
+│   ├── test_replication_eventing.py
+│   ├── test_replication_functional.py
+│   ├── test_replication_multiple_clients.py
+│   ├── test_replicator_encryption_hook.py
+│   ├── test_rolling_upgrade_sgw.py
+│   ├── test_server_setup.py
+│   ├── test_system_multipeer.py
+│   ├── test_ttl.py
+│   ├── test_upg_sgw.py
+│   ├── test_users_channels.py
+│   ├── test_xattrs.py
+│   └── edge_server/                    # Edge Server sub-suite (12 tests)
+│       ├── test_authentication.py
+│       ├── test_blobs.py
+│       ├── test_changes_feed.py
+│       ├── test_chaos_scenarios.py
+│       ├── test_crud.py
+│       ├── test_database_edge_server.py
+│       ├── test_logging.py
+│       ├── test_query_edge_server.py
+│       ├── test_replication_edge_server.py
+│       ├── test_replication_sanity.py
+│       ├── test_system.py
+│       └── test_ttl_expires.py
+│
+└── .tools/
+    └── cbbackupmgr/                    # Couchbase Backup Manager binary
+```
 
-### dev_e2e (Developer E2E)
-
-Core replication and feature tests run during CBL releases:
-`test_basic_replication`, `test_replication_filter`, `test_replication_auto_purge`,
-`test_replication_blob`, `test_replication_behavior`, `test_replication_upgrade`,
-`test_replication_xdcr`, `test_custom_conflict`, `test_encrypted_properties`,
-`test_fest`, `test_multipeer`, `test_query_consistency`
-
-### QE (Quality Engineering)
-
-Broader regression coverage plus edge cases:
-`test_db_online_offline`, `test_delta_sync`, `test_high_availability`, `test_large_doc_workloads`,
-`test_log_redaction`, `test_multipeer`, `test_multiple_servers`, `test_no_conflicts`,
-`test_peer_to_peer`, `test_peer_to_peer_topology`, `test_replication_eventing`,
-`test_replication_functional`, `test_replication_multiple_clients`,
-`test_replicator_encryption_hook`, `test_rolling_upgrade_sgw`, `test_server_setup`,
-`test_system_multipeer`, `test_ttl`, `test_upg_sgw`, `test_users_channels`, `test_xattrs`
-
-Sub-suite: `QE/edge_server/` — 12 test files for Edge Server functionality
-
-## Test Structure Pattern
-
-Every test file follows this exact structure:
+## Test Pattern (use this exact shape)
 
 ```python
 from pathlib import Path
@@ -54,129 +87,108 @@ from cbltest.api.replicator import Replicator, ReplicatorCollectionEntry, Replic
 from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorBasicAuthenticator
 
 
-@pytest.mark.min_test_servers(1)  # Always declare topology requirements
+@pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
-class TestFeatureName(CBLTestClass):  # Always extend CBLTestClass
-    @pytest.mark.asyncio(loop_scope="session")  # Required on every test
+class TestFeatureName(CBLTestClass):
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_something(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        # 1. Mark each logical step
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "names")
 
-        # 2. Reset local DB
-        self.mark_test_step("Reset local database")
+        self.mark_test_step("Reset local database, and load `names` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
-        # 3. Perform operations (replication, updates, queries, etc.)
-        self.mark_test_step("Start replicator")
+        self.mark_test_step("Start a replicator …")
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"), ...)
         await replicator.start()
 
-        # 4. Assert results
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None
 
-        # 5. Cleanup (dev_e2e only — QE has auto-cleanup)
+        # dev_e2e: manual cleanup. QE: handled by cleanup_after_test.
         await cblpytest.test_servers[0].cleanup()
 ```
 
-## Key Fixtures
+## Fixtures
 
-### `cblpytest` (session-scoped, auto-injected)
+| Fixture | Scope | Provided By | Purpose |
+|---|---|---|---|
+| `cblpytest` | session (auto) | `cbltest.plugins.cblpytest_fixture` | Top-level entry: `.test_servers`, `.sync_gateways`, `.couchbase_servers`, `.edge_servers`, `.load_balancers`, `.request_factory` |
+| `dataset_path` | session | per-suite `conftest.py` | `Path` to `dataset/sg/` |
+| `cleanup_after_test` | function (autouse, QE only) | `tests/QE/conftest.py` | Cleans up SGW DBs + CBS buckets after every `@pytest.mark.sgw` test |
 
-The main entry point — provides:
+## Markers
 
-- `.test_servers` — list of `TestServer` instances
-- `.sync_gateways` — list of `SyncGateway` instances
-- `.couchbase_servers` — list of `CouchbaseServer` instances
-- `.edge_servers` — list of `EdgeServer` instances
+| Marker | Use For |
+|---|---|
+| `@pytest.mark.sgw` | Sync Gateway feature (QE: triggers auto-cleanup) |
+| `@pytest.mark.cbl` | Couchbase Lite feature only |
+| `@pytest.mark.upg_sgw` | SGW upgrade scenarios |
+| `@pytest.mark.min_test_servers(N)` | Topology: ≥ N test servers |
+| `@pytest.mark.min_sync_gateways(N)` | Topology: ≥ N SGW |
+| `@pytest.mark.min_couchbase_servers(N)` | Topology: ≥ N CBS |
+| `@pytest.mark.min_load_balancers(N)` | Topology: ≥ N load balancers |
+| `@pytest.mark.asyncio(loop_scope="session")` | **Required on every async test** |
 
-### `dataset_path` (session-scoped)
+## dev_e2e vs QE
 
-`Path` to `dataset/sg/`. Defined in each suite's `conftest.py`.
+| Aspect | dev_e2e | QE |
+|---|---|---|
+| Audience | CBL release validation | QA regression |
+| Cleanup | manual `await ts.cleanup()` | autouse `cleanup_after_test` |
+| Markers | topology only | `sgw` / `cbl` + topology |
+| Edge Server | — | `edge_server/` sub-suite |
+| SGW upgrade | `test_replication_upgrade.py` | `test_upg_sgw.py` |
+| Multi-SGW | `test_replication_xdcr.py` (2 SGW + 2 CBS + LB) | `test_users_channels.py` (3+ SGW), `test_high_availability.py` |
+| Spec location | `spec/tests/dev_e2e/NNN-feature.md` | `spec/tests/QE/test_feature.md` |
 
-### `cleanup_after_test` (QE only, function-scoped, autouse)
+## Framework Classes You'll Use Most
 
-Runs after every `@pytest.mark.sgw` test. Deletes all SGW databases and CBS buckets.
+| Class | Import | Use For |
+|---|---|---|
+| `CBLTestClass` | `cbltest.api.cbltestclass` | Base class — `mark_test_step()`, `skip_if_*()` |
+| `CouchbaseCloud` | `cbltest.api.cloud` | Configure datasets on SGW + CBS |
+| `Replicator`, `ReplicatorCollectionEntry`, `ReplicatorType` | `cbltest.api.replicator` | Start/stop/wait replication |
+| `ReplicatorActivityLevel`, `ReplicatorBasicAuthenticator` | `cbltest.api.replicator_types` | Replicator state + auth |
+| `Database`, `SnapshotUpdater` | `cbltest.api.database` | CRUD, snapshot, verify, queries, `async with db.batch_updater()` |
+| `Listener` | `cbltest.api.listener` | P2P passive listener |
+| `MultipeerReplicator` | `cbltest.api.multipeer_replicator` | Multi-device mesh sync |
+| `SyncGateway`, `PutDatabasePayload`, `DocumentUpdateEntry` | `cbltest.api.syncgateway` | SGW admin API |
+| `CouchbaseServer` | `cbltest.api.couchbaseserver` | CBS bucket/scope/collection mgmt |
+| `ServerVariant` | `cbltest.responses` | Platform checks (`C`, `DOTNET`, `JAVA`, `JS`) |
 
-## Test Markers
+## Datasets
 
-| Marker                                       | When to Use                                                      |
-|----------------------------------------------|------------------------------------------------------------------|
-| `@pytest.mark.sgw`                           | Test exercises Sync Gateway features (QE: triggers auto-cleanup) |
-| `@pytest.mark.cbl`                           | Test exercises Couchbase Lite features only                      |
-| `@pytest.mark.upg_sgw`                       | Test covers SGW upgrade scenarios                                |
-| `@pytest.mark.min_test_servers(N)`           | Test needs N test server instances                               |
-| `@pytest.mark.min_sync_gateways(N)`          | Test needs N Sync Gateway instances                              |
-| `@pytest.mark.min_couchbase_servers(N)`      | Test needs N Couchbase Server instances                          |
-| `@pytest.mark.min_load_balancers(N)`         | Test needs N load balancers                                      |
-| `@pytest.mark.asyncio(loop_scope="session")` | **Required on every async test method**                          |
+Located in `dataset/sg/`. Each has a `-sg.json` (data) and `-sg-config.json` (SGW config):
+`names`, `travel`, `posts`, `todo`, `short_expiry`, `upgrade`.
 
-## dev_e2e vs QE Key Differences
+## Rules
 
-| Aspect          | dev_e2e                             | QE                                     |
-|-----------------|-------------------------------------|----------------------------------------|
-| Cleanup         | Manual (`await ts.cleanup()`)       | Auto (`cleanup_after_test` fixture)    |
-| Feature markers | Topology markers only               | `@pytest.mark.sgw` / `.cbl` + topology |
-| Edge Server     | No                                  | Yes (`edge_server/` subdirectory)      |
-| Spec location   | `spec/tests/dev_e2e/NNN-feature.md` | `spec/tests/QE/test_feature.md`        |
-
-## Commonly Used Framework Classes
-
-| Class                       | Import                             | Use For                                                      |
-|-----------------------------|------------------------------------|--------------------------------------------------------------|
-| `CBLTestClass`              | `cbltest.api.cbltestclass`         | Base class — `mark_test_step()`, `skip_if_*()`               |
-| `CouchbaseCloud`            | `cbltest.api.cloud`                | Configure datasets on SGW + CBS                              |
-| `Replicator`                | `cbltest.api.replicator`           | Start/stop/wait for sync replication                         |
-| `ReplicatorCollectionEntry` | `cbltest.api.replicator`           | Specify collections for replication                          |
-| `Database`                  | `cbltest.api.database`             | CRUD, snapshot, verify, N1QL queries                         |
-| `SnapshotUpdater`           | `cbltest.api.database`             | Batch updates via `async with db.batch_updater()`            |
-| `Listener`                  | `cbltest.api.listener`             | P2P passive listener                                         |
-| `MultipeerReplicator`       | `cbltest.api.multipeer_replicator` | Multi-device mesh sync                                       |
-| `SyncGateway`               | `cbltest.api.syncgateway`          | SGW admin: users, roles, docs, databases                     |
-| `CouchbaseServer`           | `cbltest.api.couchbaseserver`      | CBS bucket/scope/collection management                       |
-| `PutDatabasePayload`        | `cbltest.api.syncgateway`          | Create SGW database configurations                           |
-| `DocumentUpdateEntry`       | `cbltest.api.syncgateway`          | Create/update docs via SGW admin API                         |
-| `ServerVariant`             | `cbltest.responses`                | Platform check: `ServerVariant.C`, `.DOTNET`, `.JAVA`, `.JS` |
-
-## Available Datasets
-
-Located in `dataset/sg/`, each has `-sg.json` (data) and `-sg-config.json` (SGW config):
-`names`, `travel`, `posts`, `todo`, `short_expiry`, `upgrade`
-
-## Coding Rules
-
-- **Python 3.10+**: always `X | Y`, never `Union[X, Y]` or `Optional[X]`
-- **All tests async**: `async def test_*` with `@pytest.mark.asyncio(loop_scope="session")`
-- **Never hardcode URLs** — always use `cblpytest` fixtures and config
-- **Never hand-edit `config.json`** — it is generated by Jenkins setup scripts
-- **Always use `self.mark_test_step()`** — required for test logging and tracing
-- **Platform-agnostic** — tests must work with any test server (C, .NET, iOS, JVM, JS)
-- **Use `self.skip_if_not_platform()`** for platform-specific behavior
-- **Use `self.skip_if_cbl_not(server, ">= 3.3.0")`** for version-gated behavior
-- **Use `self.skip_if_sgw_not(sg, ">= 4.0.0")`** for SGW version-gated behavior
-- **Check the spec** before writing or modifying a test (`spec/tests/`)
-- **⚠️ DO NOT create markdown documentation files** for code changes (e.g., `ENHANCEMENT_SUMMARY.md`,
-  `IMPLEMENTATION_GUIDE.md`). Markdown files are for AI understanding only. The actual test code in `.py` files is
-  self-documenting via `spec/tests/` specifications and inline comments.
+- **Python 3.10+** — `X | Y`, never `Union[X, Y]` / `Optional[X]`.
+- **All tests async** — `async def test_*` with `@pytest.mark.asyncio(loop_scope="session")`.
+- **Never hardcode URLs** — pull from `cblpytest` fixtures.
+- **Never hand-edit `config.json`** — generated by Jenkins setup scripts.
+- **Always call `self.mark_test_step()`** for every logical step — drives test logging and tracing.
+- **No docstrings or inline step descriptions on test methods** — the matching `spec/tests/**.md` file is the source of truth for the test flow; `mark_test_step()` text mirrors its numbered steps. Helper functions still need docstrings.
+- **Platform-agnostic** — must work on every test server (C, .NET, iOS, JVM, JS). Use `self.skip_if_not_platform()` for platform-specific behavior.
+- **Version gates** — use `self.skip_if_cbl_not(server, ">= 3.3.0")` / `self.skip_if_sgw_not(sg, ">= 4.0.0")` rather than runtime checks.
+- **Check the spec first** — every new/modified test must align with `spec/tests/`. Add or update the spec before changing the code.
+- **No markdown sidecars for code changes** — do not create `ENHANCEMENT_*.md`, `IMPLEMENTATION_*.md`, etc. PR descriptions cover motivation; the spec covers behavior.
 
 ## Commands
 
 ```bash
-# Run all dev_e2e tests
+# Full suites
 cd tests/dev_e2e && uv run pytest -x -v --config config.json
+cd tests/QE      && uv run pytest -x -v --config config.json
 
-# Run specific test by name
+# Targeted runs
 cd tests/dev_e2e && uv run pytest -x -v --config config.json -k test_push
-
-# Run specific test file
-cd tests/QE && uv run pytest -x -v --config config.json test_xattrs.py
-
-# Run only SGW-marked QE tests
-cd tests/QE && uv run pytest -x -v --config config.json -m sgw
+cd tests/QE      && uv run pytest -x -v --config config.json test_xattrs.py
+cd tests/QE      && uv run pytest -x -v --config config.json -m sgw
 
 # Lint & format
 uv run ruff check tests/
@@ -185,13 +197,12 @@ uv run ruff format tests/
 
 ## Cross-References
 
-| What                 | Where                             | Relationship                                     |
-|----------------------|-----------------------------------|--------------------------------------------------|
-| Test framework       | `client/src/cbltest/`             | Provides all API classes and fixtures used here  |
-| API spec             | `spec/api/api.yaml`               | Defines the REST API that test servers implement |
-| Test specs (dev_e2e) | `spec/tests/dev_e2e/`             | Markdown docs defining expected test behavior    |
-| Test specs (QE)      | `spec/tests/QE/`                  | Markdown docs defining expected test behavior    |
-| Datasets             | `dataset/sg/`                     | JSON data files and SGW configs used by tests    |
-| CI pipelines         | `jenkins/pipelines/{dev_e2e,QE}/` | Automate test execution per-platform             |
-| Config schema        | `testserver.schema.json` (remote) | Validates the config JSON these tests consume    |
-
+| What | Where | Relationship |
+|---|---|---|
+| Test framework | [client/src/cbltest/](../client/src/cbltest/) | Provides every fixture / API class |
+| API contract | [spec/api/api.yaml](../spec/api/api.yaml) | Defines the REST API test servers implement |
+| Test specs (dev_e2e) | [spec/tests/dev_e2e/](../spec/tests/dev_e2e/) | Behavior contracts mirroring `mark_test_step` |
+| Test specs (QE) | [spec/tests/QE/](../spec/tests/QE/) | Same, for QE tests |
+| Datasets | [dataset/sg/](../dataset/sg/) | JSON data + SGW configs used in tests |
+| CI pipelines | [jenkins/pipelines/{dev_e2e,QE}/](../jenkins/pipelines/) | Drive these tests per platform |
+| Config schema | `https://packages.couchbase.com/couchbase-lite/testserver.schema.json` | Validates `config.json` |

@@ -29,6 +29,17 @@ info "Python $py_version"
 if ! command -v uv &>/dev/null; then
   warn "uv not found. Installing via pip..."
   python3 -m pip install --quiet uv || fail "Could not install uv."
+  # pip may have installed uv into a user/site directory that isn't on PATH yet.
+  if ! command -v uv &>/dev/null; then
+    pip_user_base="$(python3 -m site --user-base 2>/dev/null)"
+    if [ -n "$pip_user_base" ] && [ -x "$pip_user_base/bin/uv" ]; then
+      export PATH="$pip_user_base/bin:$PATH"
+      warn "Added $pip_user_base/bin to PATH for this session — add it to your shell rc for future runs."
+    fi
+  fi
+  if ! command -v uv &>/dev/null; then
+    fail "uv installed but not on PATH. Add $(python3 -m site --user-base)/bin (or the relevant Python scripts dir) to your PATH and re-run."
+  fi
 fi
 info "uv $(uv --version 2>/dev/null || echo 'installed')"
 
