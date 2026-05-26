@@ -129,8 +129,8 @@ cd jenkins/pipelines/QE/{platform}
 | What | Where | Relationship |
 |------|-------|-------------|
 | Parent pipelines docs | `../CLAUDE.md`, `../AGENTS.md` | Higher-level pipeline guidance |
-| QE test suites | `../../tests/QE/` | Source of `@pytest.mark.min_*` requirements |
-| Test specifications | `../../spec/tests/QE/` | Define expected behavior for QE tests |
+| QE test suites | `../../../tests/QE/` | Source of `@pytest.mark.min_*` requirements |
+| Test specifications | `../../../spec/tests/QE/` | Define expected behavior for QE tests |
 | Shared setup logic | `../shared/setup_test.py` | Core function all QE pipelines delegate to |
-| AWS orchestrator | `../../environment/aws/start_backend.py` | Called to provision infrastructure |
+| AWS orchestrator | `../../../environment/aws/start_backend.py` | Called to provision infrastructure |
 
