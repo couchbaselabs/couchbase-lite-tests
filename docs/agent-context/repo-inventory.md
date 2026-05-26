@@ -46,4 +46,4 @@
 
 - Doc-only edits: run basic checks.
 - Validation backend preference: AWS.
-- Infra escalation point: Jim Borden.
+- Infra escalation point: route via the repo owners/team channel.
