@@ -36,7 +36,11 @@ def tools_path() -> Path:
 
 
 async def setup_upgrade_env(
-    test_case: CBLTestClass, cblpytest: CBLPyTest, dataset_path: Path
+    test_case: CBLTestClass,
+    cblpytest: CBLPyTest,
+    dataset_path: Path,
+    *,
+    reset_expired_ttl: bool = False,
 ) -> Database:
     await test_case.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
 
@@ -53,7 +57,15 @@ async def setup_upgrade_env(
     test_case.mark_test_step("Restore Couchbase Server Bucket using `upgrade` dataset")
     cbs: CouchbaseServer = cblpytest.couchbase_servers[0]
     cbs.drop_bucket("upgrade")
-    cbs.restore_bucket("upgrade", tools_path(), dataset_path, "upgrade")
+    # reset_expired_ttl restores the delta-sync old-revision backup bodies
+    # (`_sync:rev:*`) so SGW can delta against a legacy ancestor rev.
+    cbs.restore_bucket(
+        "upgrade",
+        tools_path(),
+        dataset_path,
+        "upgrade",
+        reset_expired_ttl=reset_expired_ttl,
+    )
 
     test_case.mark_test_step("Wait 2s to ensure SG picks up the restored database.")
     await asyncio.sleep(2)

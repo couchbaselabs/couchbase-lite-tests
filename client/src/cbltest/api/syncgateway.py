@@ -705,13 +705,8 @@ class _SyncGatewayBase:
 
     async def get_delta_sync_stats(self, dataset_name: str) -> dict:
         """
-        Gets the delta_sync counters for a given database as exposed by
-        ``GET /_expvar``. Returns the raw ``delta_sync`` sub-dict so callers
-        can diff counters (e.g. ``deltas_sent``, ``delta_pull_replication_count``)
-        across a replication run to confirm delta-sync actually engaged.
-
-        Returns an empty dict if the delta_sync section is absent (older SGW
-        builds, or feature disabled).
+        Gets the ``delta_sync`` counters for a database from ``GET /_expvar``.
+        Returns an empty dict if the section is absent.
 
         :param dataset_name: The name of the SGW database to inspect.
         """
