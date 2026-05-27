@@ -15,7 +15,7 @@ from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.logging import cbl_info, cbl_warning
 
 
-class IntegrationTestRun(BaseModel):
+class RunResult(BaseModel):
     """
     Store the information for a test run in greenboard
     """
@@ -139,7 +139,7 @@ class GreenboardUploader:
                     cbl_warning(f"Could not parse build number from '{version}'")
 
         self._upload_document(
-            IntegrationTestRun(
+            RunResult(
                 build=parsed_build,
                 version=parsed_version,
                 sgwVersion=sgw_version_str,
@@ -323,7 +323,7 @@ class GreenboardUploader:
             f"failedAt={failed_at}"
         )
 
-    def _upload_document(self, test_run: IntegrationTestRun) -> None:
+    def _upload_document(self, test_run: RunResult) -> None:
         self._upsert(test_run.model_dump(by_alias=True))
 
     def _upsert(self, doc: dict) -> None:
@@ -333,6 +333,7 @@ class GreenboardUploader:
             now - datetime(1970, 1, 1, tzinfo=timezone.utc)
         ).total_seconds()
 
+        # Do not add to RunResult since this code will go away shortly
         doc["uploaded"] = unix_timestamp
         doc["date"] = now.strftime("%Y-%m-%d")
 
