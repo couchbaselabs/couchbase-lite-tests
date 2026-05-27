@@ -75,23 +75,24 @@ CBL ingests the delta and ends up HLV-only with an HLV matching SGW; the
 
 ### Description
 
-PULL replication where the client holds an **older legacy ancestor** while SGW
-has advanced past a pre-upgrade revision. Uses doc `nonconflict_2`: after
-restore the client is at rev 1 and SGW is at rev 2 (both revtree-only, no HLV);
-a new revision is then created on 4.x SGW. SGW must compute the delta against
-the client's rev 1, which requires the restored rev-1 backup body — exercising
-the delta path across a pre-upgrade revision.
+PULL replication of a **legacy, pre-upgrade** second revision. Uses doc
+`nonconflict_2`: after restore the client is at rev 1 and SGW is at rev 2, both
+revtree-only with **no HLV** (rev 2 was created pre-upgrade on 3.x, so it never
+got an HLV). There is **no in-test mutation**. SGW sends the existing rev 2 as a
+**revID-identified (legacy) delta** computed against the client's rev 1 — which
+requires rev 1's old-revision backup body, made available by the TTL rescue at
+restore. This is the distinguishing case from #1: the delta is of a revtree-only
+rev with no HLV, not a 4.x HLV-bearing rev.
 
 ```
-+-------------------+-----------------------------------+-----------------------------------+
-|                   |               CBL                 |                SGW                |
-|                   +---------------+-------------------+-------------------+---------------+
-|                   |   Rev Tree    |        HLV        |     Rev Tree      |      HLV      |
-+-------------------+---------------+-------------------+-------------------+---------------+
-| After restore     |     1-abc     |       none        |   2-def, 1-abc    |     none      |
-| After SGW mutate  |     1-abc     |       none        | 3-xxx,2-def,1-abc |   [N@SGW]     |
-| Expected post-PULL|     none      |     [N@SGW]       | 3-xxx,2-def,1-abc |   [N@SGW]     |
-+-------------------+---------------+-------------------+-------------------+---------------+
++-------------------+-------------------------------+-------------------------------+
+|                   |             CBL               |              SGW              |
+|                   +---------------+---------------+---------------+---------------+
+|                   |   Rev Tree    |      HLV      |   Rev Tree    |      HLV      |
++-------------------+---------------+---------------+---------------+---------------+
+| After restore     |     1-abc     |     none      | 2-def, 1-abc  |     none      |
+| Expected post-PULL| 2-def, 1-abc  |     none      | 2-def, 1-abc  |     none      |
++-------------------+---------------+---------------+---------------+---------------+
 ```
 
 ### Steps
@@ -105,23 +106,23 @@ the delta path across a pre-upgrade revision.
    On 412 (already exists), force-recreate by `delete_database` + `put_database`.
 6. Verify delta_sync is actually enabled on SGW 'upgrade' database.
 7. Create user `user1` with full access to `_default._default`.
-8. Mutate `nonconflict_2` on 4.x SGW to create a new revtree leaf + HLV.
-9. Start a replicator:
+8. Start a replicator:
    * endpoint: `/upgrade`
    * collections: `_default._default`
    * type: pull
    * document_ids: `['nonconflict_2']`
    * continuous: False
    * credentials: user1/pass
-10. Wait until the replicator is stopped.
-11. Check that the doc is replicated correctly.
-12. Validate revid and HLV of local and remote doc:
-    * Pre: local has revid + no HLV; SGW has revid + HLV; local revid < SGW revid.
-    * Post: local has no revid (4.x CBL is HLV-only); local HLV equals SGW HLV.
-13. Confirm SGW sent the revision as a delta (`deltas_sent` incremented).
+9. Wait until the replicator is stopped.
+10. Check that the doc is replicated correctly.
+11. Validate revid and HLV of local and remote doc:
+    * Pre: both sides have revid and no HLV; local revid < SGW revid.
+    * Post: local and SGW share the same revid; neither has an HLV (the legacy
+      rev carries no HLV and PULL doesn't touch SGW).
+12. Confirm SGW sent the revision as a delta (`deltas_sent` incremented).
 
 ### Expected Outcome
 
-CBL ingests the delta computed against its legacy rev-1 ancestor and ends up
-HLV-only with an HLV matching SGW; the `deltas_sent` counter confirms a delta
-(not a full body) was sent.
+SGW sends rev 2 as a revID-identified legacy delta (no HLV) computed against the
+client's rev 1; CBL applies it and ends up revtree-only at rev 2; the
+`deltas_sent` counter confirms a delta (not a full body) was sent.

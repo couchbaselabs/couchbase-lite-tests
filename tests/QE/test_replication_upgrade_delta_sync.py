@@ -177,40 +177,27 @@ class TestUpgradeDeltaSync(CBLTestClass):
         await self._prepare_sg_with_delta_sync(cblpytest)
         sg = cblpytest.sync_gateways[0]
 
-        self.mark_test_step(
-            f"Mutate '{doc_id}' on 4.x SGW to create a new revtree leaf + HLV."
-        )
-        current = await sg.get_document("upgrade", doc_id)
-        assert current is not None, f"Expected '{doc_id}' imported from bucket"
-        assert current.revid is not None, f"Expected '{doc_id}' to have a revid"
         deltas_sent_before = _deltas_sent(await sg.get_delta_sync_stats("upgrade"))
-        await sg.update_documents(
-            "upgrade",
-            [
-                DocumentUpdateEntry(
-                    doc_id,
-                    current.revid,
-                    body={**current.body, "updated_by": "delta_sync_history_test"},
-                )
-            ],
-        )
 
         def validator(pre: DocSnapshot, post: DocSnapshot) -> None:
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Pre local expected revtree-only: revid={pre.local.revid}, hlv={pre.local.cv}"
             )
-            assert pre.remote.revid is not None and pre.remote.cv is not None, (
-                f"Pre remote expected revtree+HLV: revid={pre.remote.revid}, hlv={pre.remote.cv}"
+            assert pre.remote.revid is not None and pre.remote.cv is None, (
+                f"Pre remote expected revtree-only (no HLV): revid={pre.remote.revid}, hlv={pre.remote.cv}"
             )
             assert pre.local.revid < pre.remote.revid, (
                 f"Pre expected local revid < remote revid: "
                 f"local={pre.local.revid}, remote={pre.remote.revid}"
             )
-            assert post.local.revid is None, (
-                f"Post local expected HLV-only, got revid={post.local.revid}"
+            assert post.local.revid and post.local.revid == post.remote.revid, (
+                f"Post expected matching revtree revid: local={post.local.revid}, remote={post.remote.revid}"
             )
-            assert post.local.cv and post.local.cv == post.remote.cv, (
-                f"Post HLV mismatch: local={post.local.cv}, remote={post.remote.cv}"
+            assert post.local.cv is None, (
+                f"Post local expected revtree-only (no HLV), got {post.local.cv}"
+            )
+            assert post.remote.cv is None, (
+                f"Post remote expected no HLV (PULL doesn't touch SGW), got {post.remote.cv}"
             )
 
         await do_upgrade_replication_test(
