@@ -116,7 +116,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 `.pre-commit-config.yaml` enforces on every commit:
 - **Syntax / style**: ruff (lint + import sort), ruff-format, pyupgrade, ty
 - **Merge safety**: check-merge-conflict, check-executables-have-shebangs, check-shebang-scripts-are-executable
-- **Commit format**: Conventional Commits via `scripts/hooks/check-commit-msg.sh` (`<type>[scope]: <description>`)
+- **Commit format**: Conventional Commits via `scripts/hooks/check_commit_msg.py` (`<type>[scope]: <description>`) — interactively prompts to fix a non-conforming message when run from a terminal; fails with guidance in CI / non-interactive contexts
 
 `scripts/setup-hooks.sh` additionally installs `detect-secrets` and generates `.secrets.baseline` for **manual** scans. It is not wired into pre-commit — run `detect-secrets scan --baseline .secrets.baseline` manually before pushing changes that touch credentials, hostnames, or generated configs.
 

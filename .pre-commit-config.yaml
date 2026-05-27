@@ -21,8 +21,8 @@ repos:
         entry: uv run ty check
       - id: conventional-commits
         name: Conventional Commits
-        language: script
-        entry: scripts/hooks/check-commit-msg.sh
+        language: system
+        entry: python3 scripts/hooks/check_commit_msg.py
         stages: [commit-msg]
         always_run: true
   - repo: https://github.com/asottile/pyupgrade
