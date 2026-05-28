@@ -39,13 +39,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.mobiletest.endpoints.v1.Session;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.ListenerService;
+import com.couchbase.lite.mobiletest.services.KeyStoreService;
 import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.util.StringUtils;
@@ -132,16 +132,6 @@ public abstract class TestApp {
     public abstract TLSIdentity getClientCertsIdentity() throws Exception;
 
     @NonNull
-    public abstract TLSIdentity importTlsIdentity(
-        @NonNull String alias,
-        @NonNull String encoding,
-        @NonNull byte[] data,
-        @NonNull char[] password) throws CouchbaseLiteException;
-
-    @Nullable
-    public abstract TLSIdentity getExistingTlsIdentity(@NonNull String alias) throws CouchbaseLiteException;
-
-    @NonNull
     public final String getAppId() { return APP_ID.get(); }
 
     @NonNull
@@ -196,6 +186,9 @@ public abstract class TestApp {
 
     @Nullable
     public final ListenerService clearListenerService() { return listenerSvc.getAndSet(null); }
+
+    @NonNull
+    public abstract KeyStoreService getKeyStoreService();
 
     @NonNull
     protected final Date getExpirationTime() {

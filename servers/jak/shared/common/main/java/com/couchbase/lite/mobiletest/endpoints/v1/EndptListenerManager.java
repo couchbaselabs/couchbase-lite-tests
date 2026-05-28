@@ -31,12 +31,12 @@ import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.URLEndpointListener;
 import com.couchbase.lite.URLEndpointListenerConfiguration;
 import com.couchbase.lite.internal.utils.PlatformUtils;
-import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.ListenerService;
+import com.couchbase.lite.mobiletest.services.KeyStoreService;
 import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.trees.TypedMap;
@@ -77,41 +77,17 @@ public class EndptListenerManager {
 
 
     @NonNull
-    private final TestApp app;
-    @NonNull
     private final DatabaseService dbSvc;
     @NonNull
     private final ListenerService listenerSvc;
+    @NonNull
+    private final KeyStoreService keyStoreSvc;
 
-    public EndptListenerManager(@NonNull TestApp app, @NonNull DatabaseService dbSvc, @NonNull ListenerService listenerSvc) {
-        this.app = app;
+    public EndptListenerManager(@NonNull DatabaseService dbSvc, @NonNull ListenerService listenerSvc, NonNull KeyStoreService keyStoreSvc) {
         this.dbSvc = dbSvc;
         this.listenerSvc = listenerSvc;
+        this.keyStoreSvc = keyStoreSvc;
     }
-
-    private TLSIdentity importTlsIdentity(String dbName, TypedMap identity) {
-        final byte[] data = PlatformUtils.getDecoder().decodeString(identity.getString(KEY_DATA));
-        if (data == null) { throw new ClientError("Could not decode identity data for listener"); }
-
-        final String encoding = identity.getString(KEY_ENCODING);
-        if (encoding == null) { throw new ClientError("Null encoding for listener identity"); }
-
-        final String password = identity.getString(KEY_PASSWORD);
-        if (password == null) { throw new ClientError("Null password for listener identity"); }
-
-        try {
-            return app.importTlsIdentity("java-p2p-" + dbName, encoding, data, password.toCharArray());
-        }
-        catch (CouchbaseLiteException e) {
-            throw new CblApiFailure("Failed to import TLS identity for listener", e);
-        }
-        catch (Exception e) {
-        throw new CblApiFailure("Unexpected error importing TLS identity for listener: " + e.getMessage(),
-            new CouchbaseLiteException(e.getMessage()));
-    }
-
-    }
-
 
     @NonNull
     public Map<String, Object> startListener(@NonNull TestContext ctxt, @NonNull TypedMap req) {
@@ -136,22 +112,18 @@ public class EndptListenerManager {
 
         final Boolean disableTLS = req.getBoolean(KEY_DISABLE_TLS);
         if (disableTLS != null) { listenerConfig.setDisableTls(disableTLS); }
+        final String alias ="java-p2p-" + dbName;
 
         if (!Boolean.TRUE.equals(disableTLS)) {
             final TypedMap identityReq = req.getMap(KEY_IDENTITY);
             TLSIdentity tlsId;
             if (identityReq != null) {
-
-                tlsId = importTlsIdentity(dbName, identityReq);
+                final byte[] data = PlatformUtils.getDecoder().decodeString(identityReq.getString(KEY_DATA));
+                final String encoding = identityReq.getString(KEY_ENCODING);
+                final String password = identityReq.getString(KEY_PASSWORD);
+                tlsId = keyStoreSvc.getTLSIdentity(alias, encoding, data, password.toCharArray());
             } else {
-                try {
-                    tlsId = app.getExistingTlsIdentity("java-p2p-" + dbName);
-                } catch (CouchbaseLiteException e) {
-                    throw new CblApiFailure("Failed to retrieve existing TLS identity", e);
-                }
-            }
-            if (tlsId == null) {
-                throw new ClientError("TLS is enabled but no identity was provided or found");
+                tlsId = keyStoreSvc.getTLSIdentity(alias, null, null, null);
             }
             listenerConfig.setTlsIdentity(tlsId);
         }

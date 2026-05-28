@@ -1,14 +1,11 @@
 package com.couchbase.lite.mobiletest;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -24,6 +21,8 @@ import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
 import com.couchbase.lite.mobiletest.errors.ServerError;
+import com.couchbase.lite.mobiletest.services.KeyStoreService;
+import com.couchbase.lite.jvm.mobiletest.services.JavaDesktopKeyStoreService;
 
 
 /**
@@ -144,49 +143,9 @@ public abstract class BaseTestApp extends TestApp {
         return identity;
     }
 
-    private final Map<String, KeyStore> tlsKeyStores = new HashMap<>();
-    private final Map<String, char[]> tlsKeyPasswords = new HashMap<>();
+    private final KeyStoreService keyStoreService = new JavaDesktopKeyStoreService();
 
     @NonNull
     @Override
-    public TLSIdentity importTlsIdentity(
-        @NonNull String alias,
-        @NonNull String encoding,
-        @NonNull byte[] data,
-        @NonNull char[] password)
-        throws CouchbaseLiteException {
-        try {
-            final KeyStore keyStore = KeyStore.getInstance(encoding);
-            try (InputStream in = new ByteArrayInputStream(data)) { keyStore.load(in, password); }
-            final KeyStore.ProtectionParameter protParam = new KeyStore.PasswordProtection(password);
-            keyStore.setEntry(alias, keyStore.getEntry("cbltest", protParam), protParam);
-            final TLSIdentity identity = TLSIdentity.getIdentity(keyStore, alias, password);
-            if (identity == null) { throw new CouchbaseLiteException("Failed to create TLS identity"); }
-
-            tlsKeyStores.put(alias, keyStore);
-            tlsKeyPasswords.put(alias, password);
-
-            return identity;
-        }
-        catch (GeneralSecurityException | IOException e) {
-            throw new CouchbaseLiteException("Failed to import TLS identity", e);
-        }
-        catch (Exception e) {
-            throw new CouchbaseLiteException("Unexpected error importing TLS identity: " + e.getMessage());
-        }
-    }
-
-    @Nullable
-    @Override
-    public TLSIdentity getExistingTlsIdentity(@NonNull String alias) throws CouchbaseLiteException {
-        final KeyStore keyStore = tlsKeyStores.get(alias);
-        if (keyStore == null) { return null; }
-        final char[] password = tlsKeyPasswords.get(alias);
-        try {
-            return TLSIdentity.getIdentity(keyStore, alias, password);
-        }
-        catch (CouchbaseLiteException e) {
-            throw new CouchbaseLiteException("Failed to retrieve existing TLS identity", e);
-        }
-    }
+    public KeyStoreService getKeyStoreService() { return keyStoreService; }
 }

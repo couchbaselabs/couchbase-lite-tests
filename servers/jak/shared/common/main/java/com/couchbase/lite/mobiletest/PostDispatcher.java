@@ -84,7 +84,7 @@ public final class PostDispatcher extends BaseDispatcher<PostDispatcher.Endpoint
         addEndpoint(
             1,
             "/startListener",
-            (c, r) -> new EndptListenerManager(app, app.getDbSvc(), app.getListenerService())
+            (c, r) -> new EndptListenerManager(app.getDbSvc(), app.getListenerService(), app.getKeyStoreService())
                 .startListener(app.getTestContext(c), r));
         addEndpoint(
             1,

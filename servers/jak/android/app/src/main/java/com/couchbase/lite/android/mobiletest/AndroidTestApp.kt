@@ -26,15 +26,15 @@ import com.couchbase.lite.TLSIdentity
 import com.couchbase.lite.android.mobiletest.services.MultipeerReplicatorService
 import com.couchbase.lite.internal.core.CBLVersion
 import com.couchbase.lite.mobiletest.TestApp
-import java.io.ByteArrayInputStream
 import java.io.IOException
-import java.security.GeneralSecurityException
 import java.security.KeyStoreException
 import java.security.NoSuchAlgorithmException
 import java.security.UnrecoverableEntryException
 import java.security.cert.CertificateException
 import java.util.*
 import java.util.concurrent.atomic.AtomicReference
+import com.couchbase.lite.android.mobiletest.services.AndroidKeyStoreService;
+import com.couchbase.lite.mobiletest.services.KeyStoreService;
 
 
 class AndroidTestApp(private val context: Context) : TestApp("Android") {
@@ -127,20 +127,6 @@ class AndroidTestApp(private val context: Context) : TestApp("Android") {
     }
 
 
-    @Throws(CouchbaseLiteException::class)
-    override fun importTlsIdentity(alias: String, encoding: String, data: ByteArray, password: CharArray): TLSIdentity {
-        try {
-            ByteArrayInputStream(data).use { KeyStoreUtils.importEntry(encoding, it, password, "cbltest", password, alias) }
-        }
-        catch (e: GeneralSecurityException) { throw CouchbaseLiteException("Failed to import TLS identity", e) }
-        catch (e: IOException) { throw CouchbaseLiteException("Failed to import TLS identity", e) }
-        catch (e: Exception) { throw CouchbaseLiteException("Failed to import TLS identity", e) }
-        return TLSIdentity.getIdentity(alias) ?: throw CouchbaseLiteException("Failed to create TLS identity")
-    }
-
-    @Throws(CouchbaseLiteException::class)
-    override fun getExistingTlsIdentity(alias: String): TLSIdentity? = TLSIdentity.getIdentity(alias)
-
     fun getMultipeerReplSvc(): MultipeerReplicatorService {
         val mgr = multipeerReplSvc.get()
         if (mgr == null) {
@@ -152,4 +138,10 @@ class AndroidTestApp(private val context: Context) : TestApp("Android") {
     fun clearMultipeerReplSvc(): MultipeerReplicatorService? {
         return multipeerReplSvc.getAndSet(null)
     }
+
+    private final KeyStoreService keyStoreService = new AndroidKeyStoreService();
+
+    @NonNull
+    @Override
+    public KeyStoreService getKeyStoreService() { return keyStoreService; }
 }
