@@ -19,12 +19,6 @@ repos:
         language: unsupported
         types_or: [python, pyi]
         entry: uv run ty check
-      - id: conventional-commits
-        name: Conventional Commits
-        language: system
-        entry: python3 scripts/hooks/check_commit_msg.py
-        stages: [commit-msg]
-        always_run: true
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.0
     hooks:

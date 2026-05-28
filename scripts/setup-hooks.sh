@@ -68,8 +68,7 @@ info "detect-secrets installed"
 echo ""
 echo "Installing git hooks..."
 pre-commit install || fail "pre-commit install failed."
-pre-commit install --hook-type commit-msg || fail "commit-msg hook install failed."
-info "Git hooks installed (pre-commit + commit-msg)"
+info "Git hooks installed (pre-commit)"
 
 # --- Regenerate secrets baseline if missing ---
 if [ ! -f "$REPO_ROOT/.secrets.baseline" ]; then
