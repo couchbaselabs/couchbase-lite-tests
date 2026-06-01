@@ -16,16 +16,17 @@ from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.logging import cbl_info, cbl_warning
 
 
-def count_from_junit_xml(xml_path: Path) -> tuple[int, int] | None:
+def count_from_junit_xml(xml_path: Path) -> tuple[int, int]:
     """Return ``(passed, failed)`` summed across every ``<testsuite>`` in
-    a JUnit XML file at ``xml_path``, or ``None`` if the file is missing or
-    can't be parsed.
+    a JUnit XML file at ``xml_path``.
 
     ``passed = tests - failures - errors - skipped``; ``failed`` lumps
     failures and errors together (the greenboard doc only carries a single
     fail bucket). Used by the greenboard pytest fixture to derive upload
     counts from pytest's ``--junitxml`` output instead of in-process
     hook-driven counters.
+
+    Raises the underlying exception if the file can't be read or parsed.
     """
     xml = JUnitXml.fromfile(str(xml_path))
 
@@ -138,12 +139,10 @@ class GreenboardUploader:
             self.upload(platform, os_name, version, sgw_version)
             return
 
-        counts = count_from_junit_xml(junit_output)
-        assert counts is not None, f"Failed to parse JUnit XML at {junit_output}"
-        junit_pass, junit_fail = counts
+        junit_pass, junit_fail = count_from_junit_xml(junit_output)
         if junit_pass + junit_fail == 0:
             cbl_info(
-                f"Greenboard: JUnit XML at {junit_output} reports zero tests; "
+                f"Greenboard: JUnit XML at {junit_output} reports no executed tests; "
                 "skipping upload"
             )
             return
