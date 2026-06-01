@@ -9,7 +9,7 @@ from _pytest.reports import TestReport
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions
-from junitparser import JUnitXml, TestSuite
+from junitparser import JUnitXml
 from pydantic import BaseModel, ConfigDict, Field
 
 from cbltest.api.syncgateway import CouchbaseVersion
@@ -27,21 +27,12 @@ def count_from_junit_xml(xml_path: Path) -> tuple[int, int] | None:
     counts from pytest's ``--junitxml`` output instead of in-process
     hook-driven counters.
     """
-    xml_path = Path(xml_path)
-    if not xml_path.is_file():
-        return None
-    try:
-        xml = JUnitXml.fromfile(str(xml_path))
-    except Exception as e:
-        cbl_warning(f"Failed to parse JUnit XML {xml_path}: {e}")
-        return None
+    xml = JUnitXml.fromfile(str(xml_path))
 
     total_pass = 0
     total_fail = 0
-    suites = list(xml) if isinstance(xml, JUnitXml) else [xml]
+    suites = list(xml)
     for suite in suites:
-        if not isinstance(suite, TestSuite):
-            continue
         tests = suite.tests or 0
         failures = suite.failures or 0
         errors = suite.errors or 0
@@ -115,6 +106,62 @@ class GreenboardUploader:
             self.__pass_count += 1
         elif report.failed:
             self.__fail_count += 1
+
+    def upload_from_junit_file(
+        self,
+        junit_output: Path,
+        platform: str,
+        os_name: str,
+        version: str,
+        sgw_version: CouchbaseVersion | None,
+    ) -> None:
+        """
+        Upload one greenboard doc whose pass/fail counts come from a JUnit
+        XML file produced by pytest.
+        Policy:
+        - If ``junit_output`` doesn't exist, fall back to the in-process
+          counter (``self.upload()`` without count overrides). This covers
+          the cold-start case where pytest never wrote an XML — e.g.
+          ``--junitxml`` was explicitly disabled by the caller.
+        - If the file exists but reports zero tests, skip the upload (the
+          session collected nothing worth recording).
+        - If it reports zero passes (a fully-red run), skip the upload per
+          the project's "don't post all-failed runs to greenboard" policy.
+        - Otherwise, upload with the JUnit-derived counts.
+
+        Parse errors propagate — a malformed JUnit XML is a real bug and
+        should fail the Jenkins job loudly.
+        """
+        if not junit_output.is_file():
+            # Pytest didn't write an XML for this session; use the in-process
+            # counter populated by pytest_runtest_makereport instead.
+            self.upload(platform, os_name, version, sgw_version)
+            return
+
+        counts = count_from_junit_xml(junit_output)
+        assert counts is not None, f"Failed to parse JUnit XML at {junit_output}"
+        junit_pass, junit_fail = counts
+        if junit_pass + junit_fail == 0:
+            cbl_info(
+                f"Greenboard: JUnit XML at {junit_output} reports zero tests; "
+                "skipping upload"
+            )
+            return
+        if junit_pass == 0:
+            cbl_info(
+                f"Greenboard: all tests failed (failCount={junit_fail}); "
+                "skipping upload per policy"
+            )
+            return
+
+        self.upload(
+            platform,
+            os_name,
+            version,
+            sgw_version,
+            pass_count=junit_pass,
+            fail_count=junit_fail,
+        )
 
     def has_sgw_marker(self) -> bool:
         """
