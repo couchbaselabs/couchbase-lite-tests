@@ -27,6 +27,7 @@ dependencies = [
     "couchbase==4.3.4",
     "cryptography==44.0.0",
     "deepdiff==8.6.1",
+    "junitparser==4.0.2",
     "netifaces==0.11.0",
     "opentelemetry-api==1.29.0",
     "opentelemetry-exporter-otlp-proto-common==1.29.0",
@@ -69,3 +70,7 @@ packages = [
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "session"
+# Always emit a JUnit XML next to the test invocation so the greenboard
+# fixture can read pass/fail counts from it at session-finish. Users can
+# override the path with `--junitxml=...` on the CLI; last-wins.
+addopts = "--junitxml=junit_result.xml"

@@ -1,10 +1,11 @@
 import os
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.syncgateway import CouchbaseVersion
-from cbltest.greenboarduploader import GreenboardUploader
+from cbltest.greenboarduploader import GreenboardUploader, count_from_junit_xml
 from cbltest.logging import cbl_info, cbl_warning
 
 # This plugin provides an automatic (i.e. not used directly by tests)
@@ -97,7 +98,39 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
                     os_name = test_server_info.device["systemName"]
             if len(cblpytest.sync_gateways) > 0:
                 sgw_version = await cblpytest.sync_gateways[0].get_version()
-            uploader.upload(test_platform, os_name, library_version, sgw_version)
+
+            # Prefer JUnit XML for pass/fail counts when pytest wrote one
+            # (--junitxml is set by default via pyproject.toml's addopts).
+            # If the XML is missing or unparseable, fall through to the
+            # in-process counter populated by the uploader's
+            # pytest_runtest_makereport hook.
+            xmlpath = getattr(pytestconfig.option, "xmlpath", None)
+            counts = count_from_junit_xml(Path(xmlpath)) if xmlpath else None
+
+            if counts is not None:
+                junit_pass, junit_fail = counts
+                if junit_pass + junit_fail == 0:
+                    cbl_info(
+                        "Greenboard: JUnit XML reports zero tests; skipping upload"
+                    )
+                    return
+                if junit_pass == 0:
+                    cbl_info(
+                        f"Greenboard: all tests failed (failCount={junit_fail}); "
+                        "skipping upload per policy"
+                    )
+                    return
+                uploader.upload(
+                    test_platform,
+                    os_name,
+                    library_version,
+                    sgw_version,
+                    pass_count=junit_pass,
+                    fail_count=junit_fail,
+                )
+            else:
+                # No usable JUnit XML — fall back to the in-process counter.
+                uploader.upload(test_platform, os_name, library_version, sgw_version)
     except Exception as e:
         cbl_warning(f"Failed to upload results to Greenboard: {e}")
     finally:

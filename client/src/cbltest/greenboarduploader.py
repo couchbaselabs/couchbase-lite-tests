@@ -9,10 +9,46 @@ from _pytest.reports import TestReport
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions
+from junitparser import JUnitXml, TestSuite
 from pydantic import BaseModel, ConfigDict, Field
 
 from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.logging import cbl_info, cbl_warning
+
+
+def count_from_junit_xml(xml_path: Path) -> tuple[int, int] | None:
+    """Return ``(passed, failed)`` summed across every ``<testsuite>`` in
+    a JUnit XML file at ``xml_path``, or ``None`` if the file is missing or
+    can't be parsed.
+
+    ``passed = tests - failures - errors - skipped``; ``failed`` lumps
+    failures and errors together (the greenboard doc only carries a single
+    fail bucket). Used by the greenboard pytest fixture to derive upload
+    counts from pytest's ``--junitxml`` output instead of in-process
+    hook-driven counters.
+    """
+    xml_path = Path(xml_path)
+    if not xml_path.is_file():
+        return None
+    try:
+        xml = JUnitXml.fromfile(str(xml_path))
+    except Exception as e:
+        cbl_warning(f"Failed to parse JUnit XML {xml_path}: {e}")
+        return None
+
+    total_pass = 0
+    total_fail = 0
+    suites = list(xml) if isinstance(xml, JUnitXml) else [xml]
+    for suite in suites:
+        if not isinstance(suite, TestSuite):
+            continue
+        tests = suite.tests or 0
+        failures = suite.failures or 0
+        errors = suite.errors or 0
+        skipped = suite.skipped or 0
+        total_pass += max(0, tests - failures - errors - skipped)
+        total_fail += failures + errors
+    return total_pass, total_fail
 
 
 class RunResult(BaseModel):
@@ -92,6 +128,9 @@ class GreenboardUploader:
         os_name: str,
         version: str,
         sgw_version: CouchbaseVersion | None,
+        *,
+        pass_count: int | None = None,
+        fail_count: int | None = None,
     ):
         """
         Uploads the results using the specified platform and version.  The reason that they
@@ -101,10 +140,20 @@ class GreenboardUploader:
         :param platform: The platform name (e.g. couchbase-lite-net) as specified by the test server
         :param version: The version string (e.g. 3.2.0-b0136, etc) as specified by the test server
         :param sgw_version: The parsed SGW CouchbaseVersion object, or None if unavailable
+        :param pass_count: Optional override for the pass count. When ``None``
+            (default), uses the in-process counter populated by
+            :py:meth:`pytest_runtest_makereport`. When provided (e.g. the
+            greenboard fixture derived counts from a JUnit XML), the supplied
+            value is used instead.
+        :param fail_count: Optional override for the fail count. Same
+            semantics as ``pass_count``.
         """
         if self.__overall_fail:
             cbl_warning("Overall result is failure, skipping upload...")
             return
+
+        resolved_pass = pass_count if pass_count is not None else self.__pass_count
+        resolved_fail = fail_count if fail_count is not None else self.__fail_count
 
         parsed_version = "0.0.0"
         parsed_build = 0
@@ -143,8 +192,8 @@ class GreenboardUploader:
                 build=parsed_build,
                 version=parsed_version,
                 sgwVersion=sgw_version_str,
-                failCount=self.__fail_count,
-                passCount=self.__pass_count,
+                failCount=resolved_fail,
+                passCount=resolved_pass,
                 platform=platform,
                 os=os_name,
             )
