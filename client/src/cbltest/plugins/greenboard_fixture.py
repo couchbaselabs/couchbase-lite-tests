@@ -153,3 +153,21 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "(e.g. '3.3.0,4.0.1,4.1.0'). First is the baseline, rest are upgrade "
         "targets. Triggers sgw-upgrade platform upload.",
     )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Default ``--junitxml=junit_result.xml`` so the greenboard fixture's
+    session-finish step can read pass/fail counts from the XML.
+
+    Doing this in code (instead of via ``addopts`` in ``client/pyproject.toml``)
+    is necessary because pytest's rootdir discovery walks up from the cwd and
+    typically picks the repo-root ``pyproject.toml`` for production runs from
+    ``tests/QE`` or ``tests/dev_e2e`` — never reaching ``client/pyproject.toml``.
+    The plugin's entry-point registration guarantees this hook fires on every
+    pytest invocation that imports ``cbltest``.
+
+    Users can override with ``--junitxml=<path>`` on the CLI; pytest's
+    last-wins behavior leaves the explicit flag in charge.
+    """
+    if not getattr(config.option, "xmlpath", None):
+        config.option.xmlpath = "junit_result.xml"

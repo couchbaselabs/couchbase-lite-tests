@@ -3,6 +3,7 @@
 import inspect
 from collections.abc import Callable
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal, cast
 from unittest.mock import MagicMock, patch
 
@@ -130,7 +131,10 @@ def _make_cblpytest(
 
 
 def _make_pytestconfig(*, no_upload: bool = False) -> pytest.Config:
-    args = ["--config", "tests/empty_config.json"]
+    # Resolve relative to this test file so the helper works regardless of
+    # pytest's cwd. A cwd-relative "tests/empty_config.json" only worked
+    # when pytest was invoked from the client/ directory.
+    args = ["--config", str(Path(__file__).with_name("empty_config.json"))]
     if no_upload:
         args.append("--no-result-upload")
     return pytest.Config.fromdictargs({}, args)

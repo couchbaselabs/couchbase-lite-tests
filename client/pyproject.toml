@@ -70,7 +70,3 @@ packages = [
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "session"
-# Always emit a JUnit XML next to the test invocation so the greenboard
-# fixture can read pass/fail counts from it at session-finish. Users can
-# override the path with `--junitxml=...` on the CLI; last-wins.
-addopts = "--junitxml=junit_result.xml"
