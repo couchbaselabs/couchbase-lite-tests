@@ -9,9 +9,26 @@ from _pytest.reports import TestReport
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions
+from pydantic import BaseModel, ConfigDict, Field
 
 from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.logging import cbl_info, cbl_warning
+
+
+class RunResult(BaseModel):
+    """
+    Store the information for a test run in greenboard
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    build: int  # build number of CBL build
+    version: str  # major.minor.patch version of CBL
+    sgw_version: str = Field(alias="sgwVersion")  # Sync Gateway version, optional
+    fail_count: int = Field(alias="failCount")  # number of failing tests
+    pass_count: int = Field(alias="passCount")  # number of passing tests
+    platform: str  # CBL platform
+    os: str  # Operating system for CBL
 
 
 class GreenboardUploader:
@@ -122,15 +139,15 @@ class GreenboardUploader:
                     cbl_warning(f"Could not parse build number from '{version}'")
 
         self._upload_document(
-            {
-                "build": parsed_build,
-                "version": parsed_version,
-                "sgwVersion": sgw_version_str,
-                "failCount": self.__fail_count,
-                "passCount": self.__pass_count,
-                "platform": platform,
-                "os": os_name,
-            }
+            RunResult(
+                build=parsed_build,
+                version=parsed_version,
+                sgwVersion=sgw_version_str,
+                failCount=self.__fail_count,
+                passCount=self.__pass_count,
+                platform=platform,
+                os=os_name,
+            )
         )
 
     def record_upgrade_step(
@@ -288,7 +305,7 @@ class GreenboardUploader:
             # `build` fields preserve what was actually running at each step.
             target_build = 0
 
-        self._upload_document(
+        self._upsert(
             {
                 "build": target_build,
                 "version": target_version,
@@ -306,13 +323,17 @@ class GreenboardUploader:
             f"failedAt={failed_at}"
         )
 
-    def _upload_document(self, doc: dict) -> None:
-        """Upload a document to the greenboard bucket with common fields added."""
+    def _upload_document(self, test_run: RunResult) -> None:
+        self._upsert(test_run.model_dump(by_alias=True))
+
+    def _upsert(self, doc: dict) -> None:
+        """Add timestamp fields and write one document to the greenboard bucket."""
         now = datetime.now(timezone.utc)
         unix_timestamp = (
             now - datetime(1970, 1, 1, tzinfo=timezone.utc)
         ).total_seconds()
 
+        # Do not add to RunResult since this code will go away shortly
         doc["uploaded"] = unix_timestamp
         doc["date"] = now.strftime("%Y-%m-%d")
 
