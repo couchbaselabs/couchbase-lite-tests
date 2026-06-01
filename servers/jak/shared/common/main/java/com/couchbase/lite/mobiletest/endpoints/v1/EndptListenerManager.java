@@ -83,7 +83,7 @@ public class EndptListenerManager {
     @NonNull
     private final KeyStoreService keyStoreSvc;
 
-    public EndptListenerManager(@NonNull DatabaseService dbSvc, @NonNull ListenerService listenerSvc, NonNull KeyStoreService keyStoreSvc) {
+    public EndptListenerManager(@NonNull DatabaseService dbSvc, @NonNull ListenerService listenerSvc, @NonNull KeyStoreService keyStoreSvc) {
         this.dbSvc = dbSvc;
         this.listenerSvc = listenerSvc;
         this.keyStoreSvc = keyStoreSvc;
