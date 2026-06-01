@@ -139,9 +139,8 @@ class AndroidTestApp(private val context: Context) : TestApp("Android") {
         return multipeerReplSvc.getAndSet(null)
     }
 
-    private final KeyStoreService keyStoreService = new AndroidKeyStoreService();
+    private val keyStoreService = AndroidKeyStoreService()
+    override fun getKeyStoreService(): KeyStoreService = keyStoreService
 
-    @NonNull
-    @Override
-    public KeyStoreService getKeyStoreService() { return keyStoreService; }
+
 }
