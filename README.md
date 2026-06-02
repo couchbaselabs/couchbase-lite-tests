@@ -88,7 +88,6 @@ This repo uses [pre-commit](https://pre-commit.com/#intro) hooks to enforce code
 | **ty check** | Type checking |
 | **pyupgrade** | Python 3.10+ syntax upgrades |
 | **check-merge-conflict** | Detects unresolved merge markers |
-| **detect-secrets** | Scans for API keys, passwords, tokens |
-| **conventional-commits** | Enforces commit message format (`feat:`, `fix(scope):`, etc.) |
+| **detect-secrets** | Installed by `setup-hooks.sh` and maintains `.secrets.baseline`. Not wired into pre-commit yet — run `detect-secrets scan --baseline .secrets.baseline` manually before pushing changes that touch credentials. |
 
-If a hook fails, it will block your commit with a clear error message. Fix the issues and try again. For details on each hook, see `.pre-commit-config.yaml` and `scripts/hooks/` directory.
+If a hook fails, it will block your commit with a clear error message. Fix the issues and try again. For details on each hook, see `.pre-commit-config.yaml`.
