@@ -17,14 +17,24 @@ from cbltest.logging import cbl_info, cbl_warning
 
 
 def count_from_junit_xml(xml_path: Path) -> tuple[int, int, int]:
-    """Return ``(passed, failed)`` summed across every ``<testsuite>`` in
-    a JUnit XML file at ``xml_path``.
+    """Return ``(passed, failed, errored)`` summed across every
+    ``<testsuite>`` in a JUnit XML file at ``xml_path``.
 
-    ``passed = tests - failures - errors - skipped``; ``failed`` lumps
-    failures and errors together (the greenboard doc only carries a single
-    fail bucket). Used by the greenboard pytest fixture to derive upload
-    counts from pytest's ``--junitxml`` output instead of in-process
-    hook-driven counters.
+    Per junitparser's mapping of pytest output:
+
+    - ``passed`` = ``tests - failures - errors - skipped`` (the cases that
+      ran and asserted successfully).
+    - ``failed`` = ``failures`` (cases that ran but assertion-failed).
+    - ``errored`` = ``errors`` (cases that never executed — collection
+      failure, setup crash, etc.).
+
+    Failures and errors are kept separate so callers can distinguish
+    "tests legitimately failed" from "harness was broken and tests didn't
+    run." Skipped cases count as neither pass nor fail.
+
+    Used by the greenboard pytest fixture to derive upload counts from
+    pytest's ``--junitxml`` output instead of in-process hook-driven
+    counters.
 
     Raises the underlying exception if the file can't be read or parsed.
     """
@@ -61,13 +71,23 @@ class RunResult(BaseModel):
 
 class GreenboardUploader:
     """
-    A class for uploading results to a specified greenboard server bucket.
+    Uploads test-run results to a greenboard couchbase bucket.
 
-    Supports two modes:
-    - **Normal mode**: uploads results for regular test sessions.
-    - **Upgrade mode** (``SGW_UPGRADE_VERSIONS`` is set): uploads per-step
-      upgrade results with ``upgradePath``, ``upgradeFrom``, and ``upgradeTo``
-      fields under ``platform="sgw-upgrade"``.
+    Three entry points, each for a different upload-time context:
+
+    - :py:meth:`upload` — in-process pytest fixture path. Pass/fail counts
+      come from :py:meth:`pytest_runtest_makereport` tallying ``TestReport``
+      objects as tests run within the same session.
+    - :py:meth:`upload_from_junit_file` — JUnit-XML-driven path. Pass/fail
+      counts come from a JUnit XML file produced by pytest's
+      ``--junitxml``. Falls back to :py:meth:`upload` if the file is
+      absent. Decouples count-collection from in-process pytest hooks
+      (needed for pipelines whose pytest invocations are orchestrated
+      from a shell script).
+    - :py:meth:`record_upgrade_step` + :py:meth:`upload_upgrade_batch` —
+      legacy upgrade-job path. Each pytest session appends to a JSON
+      state file; the wrapper script invokes ``upload_upgrade_batch`` at
+      the end to emit one aggregate ``platform="sgw-upgrade"`` doc.
     """
 
     def __init__(self, url: str, username: str, password: str):
@@ -107,60 +127,6 @@ class GreenboardUploader:
             self.__pass_count += 1
         elif report.failed:
             self.__fail_count += 1
-
-    def upload_from_junit_file(
-        self,
-        junit_output: Path,
-        platform: str,
-        os_name: str,
-        version: str,
-        sgw_version: CouchbaseVersion | None,
-    ) -> None:
-        """
-        Upload one greenboard doc whose pass/fail counts come from a JUnit
-        XML file produced by pytest.
-        Policy:
-        - If ``junit_output`` doesn't exist, fall back to the in-process
-          counter (``self.upload()`` without count overrides). This covers
-          the cold-start case where pytest never wrote an XML — e.g.
-          ``--junitxml`` was explicitly disabled by the caller.
-        - If the file exists but reports zero tests, skip the upload (the
-          session collected nothing worth recording).
-        - If it reports zero passes (a fully-red run), skip the upload per
-          the project's "don't post all-failed runs to greenboard" policy.
-        - Otherwise, upload with the JUnit-derived counts.
-
-        Parse errors propagate — a malformed JUnit XML is a real bug and
-        should fail the Jenkins job loudly.
-        """
-        if not junit_output.is_file():
-            # Pytest didn't write an XML for this session; use the in-process
-            # counter populated by pytest_runtest_makereport instead.
-            self.upload(platform, os_name, version, sgw_version)
-            return
-
-        junit_pass, junit_fail, junit_error = count_from_junit_xml(junit_output)
-        if junit_pass + junit_fail + junit_error == 0:
-            cbl_info(
-                f"Greenboard: JUnit XML at {junit_output} reports no tests collected; "
-                "skipping upload"
-            )
-            return
-        if junit_pass == 0 and junit_fail == 0 and junit_error > 0:
-            cbl_info(
-                f"Greenboard: all {junit_error} tests errored before running "
-                "(harness failure); skipping upload"
-            )
-            return
-
-        self.upload(
-            platform,
-            os_name,
-            version,
-            sgw_version,
-            pass_count=junit_pass,
-            fail_count=junit_fail + junit_error,
-        )
 
     def has_sgw_marker(self) -> bool:
         """
@@ -243,6 +209,71 @@ class GreenboardUploader:
                 platform=platform,
                 os=os_name,
             )
+        )
+
+    def upload_from_junit_file(
+        self,
+        junit_output: Path,
+        platform: str,
+        os_name: str,
+        version: str,
+        sgw_version: CouchbaseVersion | None,
+    ) -> None:
+        """
+        Upload one greenboard doc whose pass/fail counts come from a JUnit
+        XML file produced by pytest.
+
+        Policy:
+        - If ``junit_output`` doesn't exist, fall back to the in-process
+          counter (``self.upload()`` without count overrides). This covers
+          the cold-start case where pytest never wrote an XML — e.g.
+          ``--junitxml`` was explicitly disabled by the caller.
+        - If the file exists but reports zero tests collected, skip the
+          upload (selector misfired or the harness never executed
+          anything; no signal worth recording).
+        - If every collected test errored before running (zero passes,
+          zero failures, errors > 0), skip the upload — that's a
+          harness/setup failure, not a real test result. A run with
+          legitimate assertion failures DOES upload; a red bar is the
+          signal that those tests broke and we want to see it.
+        - Otherwise, upload with the JUnit-derived counts. Errors are
+          collapsed into ``failCount`` on the doc since the greenboard
+          schema doesn't distinguish failures from errors.
+
+        Implementation notes:
+        - Parse errors from a malformed JUnit XML propagate to the
+          caller — a bad XML is a real bug and should fail the Jenkins
+          job loudly.
+        - An absent JUnit XML is *not* an error; it's the documented
+          fall-back path described in the first bullet.
+        """
+        if not junit_output.is_file():
+            # Pytest didn't write an XML for this session; use the in-process
+            # counter populated by pytest_runtest_makereport instead.
+            self.upload(platform, os_name, version, sgw_version)
+            return
+
+        junit_pass, junit_fail, junit_error = count_from_junit_xml(junit_output)
+        if junit_pass + junit_fail + junit_error == 0:
+            cbl_info(
+                f"Greenboard: JUnit XML at {junit_output} reports no tests collected; "
+                "skipping upload"
+            )
+            return
+        if junit_pass == 0 and junit_fail == 0 and junit_error > 0:
+            cbl_info(
+                f"Greenboard: all {junit_error} tests errored before running "
+                "(harness failure); skipping upload"
+            )
+            return
+
+        self.upload(
+            platform,
+            os_name,
+            version,
+            sgw_version,
+            pass_count=junit_pass,
+            fail_count=junit_fail + junit_error,
         )
 
     def record_upgrade_step(

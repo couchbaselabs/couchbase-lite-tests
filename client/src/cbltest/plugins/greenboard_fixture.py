@@ -69,9 +69,9 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
             if len(cblpytest.sync_gateways) > 0:
                 try:
                     sgw_version = await cblpytest.sync_gateways[0].get_version()
-                except Exception as ve:
+                except Exception as e:
                     cbl_warning(
-                        f"Could not fetch SGW version for upgrade record: {ve}; "
+                        f"Could not fetch SGW version for upgrade record: {e}; "
                         "recording iteration with sgw_version=None"
                     )
             uploader.record_upgrade_step(
@@ -102,9 +102,22 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
                 except Exception as e:
                     cbl_warning(f"Could not fetch SGW version for greenboard doc: {e}")
             xmlpath = pytestconfig.option.xmlpath
-            uploader.upload_from_junit_file(
-                Path(xmlpath), test_platform, os_name, library_version, sgw_version
-            )
+            if xmlpath:
+                uploader.upload_from_junit_file(
+                    Path(xmlpath),
+                    test_platform,
+                    os_name,
+                    library_version,
+                    sgw_version,
+                )
+            else:
+                # No --junitxml configured. Normally our pytest_configure
+                # hook defaults this to "junit_result.xml", but it doesn't
+                # fire for synthetic Configs (e.g. ones built via
+                # pytest.Config.fromdictargs in unit tests). Fall back to
+                # the in-process counter — mirrors upload_from_junit_file's
+                # file-missing branch.
+                uploader.upload(test_platform, os_name, library_version, sgw_version)
     finally:
         pytestconfig.pluginmanager.unregister(uploader)
 
