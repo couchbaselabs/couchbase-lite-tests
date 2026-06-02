@@ -16,7 +16,7 @@ from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.logging import cbl_info, cbl_warning
 
 
-def count_from_junit_xml(xml_path: Path) -> tuple[int, int]:
+def count_from_junit_xml(xml_path: Path) -> tuple[int, int, int]:
     """Return ``(passed, failed)`` summed across every ``<testsuite>`` in
     a JUnit XML file at ``xml_path``.
 
@@ -29,18 +29,18 @@ def count_from_junit_xml(xml_path: Path) -> tuple[int, int]:
     Raises the underlying exception if the file can't be read or parsed.
     """
     xml = JUnitXml.fromfile(str(xml_path))
-
     total_pass = 0
     total_fail = 0
-    suites = list(xml)
-    for suite in suites:
+    total_error = 0
+    for suite in xml:
         tests = suite.tests or 0
         failures = suite.failures or 0
         errors = suite.errors or 0
         skipped = suite.skipped or 0
         total_pass += max(0, tests - failures - errors - skipped)
-        total_fail += failures + errors
-    return total_pass, total_fail
+        total_fail += failures
+        total_error += errors
+    return total_pass, total_fail, total_error
 
 
 class RunResult(BaseModel):
@@ -139,17 +139,17 @@ class GreenboardUploader:
             self.upload(platform, os_name, version, sgw_version)
             return
 
-        junit_pass, junit_fail = count_from_junit_xml(junit_output)
-        if junit_pass + junit_fail == 0:
+        junit_pass, junit_fail, junit_error = count_from_junit_xml(junit_output)
+        if junit_pass + junit_fail + junit_error == 0:
             cbl_info(
-                f"Greenboard: JUnit XML at {junit_output} reports no executed tests; "
+                f"Greenboard: JUnit XML at {junit_output} reports no tests collected; "
                 "skipping upload"
             )
             return
-        if junit_pass == 0:
+        if junit_pass == 0 and junit_fail == 0 and junit_error > 0:
             cbl_info(
-                f"Greenboard: all tests failed (failCount={junit_fail}); "
-                "skipping upload per policy"
+                f"Greenboard: all {junit_error} tests errored before running "
+                "(harness failure); skipping upload"
             )
             return
 
@@ -159,7 +159,7 @@ class GreenboardUploader:
             version,
             sgw_version,
             pass_count=junit_pass,
-            fail_count=junit_fail,
+            fail_count=junit_fail + junit_error,
         )
 
     def has_sgw_marker(self) -> bool:
