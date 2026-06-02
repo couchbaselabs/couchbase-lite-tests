@@ -484,8 +484,10 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_upload_exception_is_caught_and_plugin_unregistered(self):
-        """An exception from _upload_document is swallowed; the finally block still unregisters."""
+    async def test_upload_exception_propagates_and_plugin_unregistered(self):
+        """An exception from _upload_document propagates (fail-loud policy);
+        the finally block still unregisters the plugin so the next session
+        starts clean."""
         server = _make_server()
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
@@ -493,7 +495,8 @@ class TestGreenboardFixture:
             "cbltest.greenboarduploader.GreenboardUploader._upload_document",
             side_effect=RuntimeError("connection refused"),
         ):
-            await _run_fixture(_raw_greenboard(cblpytest, config))
+            with pytest.raises(RuntimeError, match="connection refused"):
+                await _run_fixture(_raw_greenboard(cblpytest, config))
         assert not any(
             isinstance(p, GreenboardUploader)
             for p in config.pluginmanager.get_plugins()
