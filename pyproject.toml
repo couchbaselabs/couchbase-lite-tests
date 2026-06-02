@@ -33,10 +33,11 @@ lint = [
 members = [ "client" ]
 
 [tool.ty.environment]
-root = [".", "client/src"]
+root = [".", "client/src", "tests"]
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "session"
+pythonpath = ["tests"]
 filterwarnings = [
   "ignore:Class property max_ttl is deprecated.*:couchbase.logic.supportability.CouchbaseDeprecationWarning",
 ]

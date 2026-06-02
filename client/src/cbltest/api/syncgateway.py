@@ -764,6 +764,24 @@ class _SyncGatewayBase:
         doc_writes_bytes = db_stats["doc_writes_bytes_blip"]
         return doc_reads_bytes, doc_writes_bytes
 
+    async def get_delta_sync_stats(self, dataset_name: str) -> dict:
+        """
+        Gets the ``delta_sync`` counters for a database from ``GET /_expvar``.
+        Returns an empty dict if the section is absent.
+
+        :param dataset_name: The name of the SGW database to inspect.
+        """
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+
+        try:
+            db_section = expvars["syncgateway"]["per_db"][dataset_name]
+        except KeyError:
+            return {}
+        delta = db_section.get("delta_sync")
+        return delta if isinstance(delta, dict) else {}
+
     async def _put_database(
         self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0
     ) -> None:
@@ -824,8 +842,8 @@ class _SyncGatewayBase:
                     current_span.add_event("SGW returned 500, retry")
                     await asyncio.sleep(2)
                     await self._delete_database(db_name, retry_count + 1)
-                elif e.code == 403:
-                    pass
+                elif e.code == 403 or e.code == 404:
+                    pass  # Database doesn't exist anyway.
                 else:
                     raise
 
