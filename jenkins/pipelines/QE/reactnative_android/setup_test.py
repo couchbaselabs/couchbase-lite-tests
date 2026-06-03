@@ -30,6 +30,7 @@ def cli_entry(
         SCRIPT_DIR / "topology_single_device.json",
         SCRIPT_DIR / "config.json",
         "reactnative_android",
+        setup_dir="QE"
     )
 
 
