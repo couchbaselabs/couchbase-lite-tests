@@ -49,10 +49,20 @@ pipeline {
                     branches: [[name: "*/tdk_reactnative"]],
                     userRemoteConfigs: [[url: 'https://github.com/couchbaselabs/couchbase-lite-tests']]
                 ])
+                sh """
+                    git fetch origin qe-react-native-android
+                    git checkout origin/qe-react-native-android -- jenkins/pipelines/QE/reactnative_android/test.sh
+                    git checkout origin/qe-react-native-android -- jenkins/pipelines/QE/reactnative_android/tesardown.sh
+                    git checkout origin/qe-react-native-android -- jenkins/pipelines/QE/reactnative_android/setup_test.py
+                    git checkout origin/qe-react-native-android -- jenkins/pipelines/QE/reactnative_android/config.json
+                    git checkout origin/qe-react-native-android -- jenkins/pipelines/QE/reactnative_android/relaunch_app.py
+                    git checkout origin/qe-react-native-android -- jenkins/pipelines/QE/reactnative_android/topology_single_device.json
+
+                """
                 echo "Run React Native Android Tests"
                 timeout(time: 60, unit: 'MINUTES') {
                     sh """
-                        jenkins/pipelines/dev_e2e/reactnative_android/test.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.SGW_VERSION}" ${params.TS_DATASET_VERSION}
+                        jenkins/pipelines/QE/reactnative_android/test.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.SGW_VERSION}" ${params.TS_DATASET_VERSION}
                     """
                 }
             }
@@ -60,10 +70,10 @@ pipeline {
                 always {
                     echo "Teardown React Native Android Tests"
                     timeout(time: 5, unit: 'MINUTES') {
-                        sh 'jenkins/pipelines/dev_e2e/reactnative_android/teardown.sh'
+                        sh 'jenkins/pipelines/QE/reactnative_android/teardown.sh'
                     }
-                    archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
                 }
             }
         }

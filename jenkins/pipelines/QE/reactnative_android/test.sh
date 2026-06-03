@@ -44,7 +44,7 @@ fi
 
 uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 
-pushd $DEV_E2E_TESTS_DIR > /dev/null
+pushd "${QE_TESTS_DIR}" > /dev/null
 rm -rf http_log testserver.log
 
 # Tell the pytest WebSocket router to relaunch the React Native app right after
@@ -76,10 +76,12 @@ echo "Run the React Native Android tests"
 uv run pytest \
     --maxfail=7 \
     -v \
+    -m cbl \
     -W ignore::DeprecationWarning \
     --config config.json \
     --dataset-version $DATASET_VERSION \
     --ignore=test_multipeer.py \
+    --ignore=test_system_multipeer.py \
     -k "not listener and not multipeer and not custom_conflict" \
     --tb=short \
     --timeout=300
