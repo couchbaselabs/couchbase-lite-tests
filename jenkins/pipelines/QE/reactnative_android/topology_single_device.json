@@ -2,7 +2,7 @@
     "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
     "test_servers": [
         {
-            "platform": "jak_android",
+            "platform": "reactnative_android",
             "cbl_version": "{{version}}",
             "location": "1BCACS00001MX3",
             "download": true
