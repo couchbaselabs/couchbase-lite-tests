@@ -49,6 +49,16 @@ class AndroidBridge(PlatformBridge):
         "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools",
     ]
 
+    # Dangerous (runtime) permissions the MultipeerReplicator may need. These are
+    # granted right after install so the test server doesn't need to block waiting
+    # for a system permission dialog during a test run.
+    __runtime_permissions: list[str] = [
+        "android.permission.ACCESS_FINE_LOCATION",  # BLE scanning on API <= 30
+        "android.permission.BLUETOOTH_SCAN",  # API 31+
+        "android.permission.BLUETOOTH_CONNECT",  # API 31+
+        "android.permission.BLUETOOTH_ADVERTISE",  # API 31+
+    ]
+
     def __init__(self, app_path: str, app_id: str, activity: str = "MainActivity"):
         """
         Initialize the AndroidBridge with the application path, application ID, and activity name.
@@ -117,6 +127,39 @@ class AndroidBridge(PlatformBridge):
             check=True,
             capture_output=False,
         )
+        self.__grant_runtime_permissions(location)
+
+    def __grant_runtime_permissions(self, location: str) -> None:
+        """
+        Grant of the runtime permissions for MultipeerReplicator when using
+        Bluetooth, so the test server never blocks on a system permission
+        dialog.
+
+        Args:
+            location (str): The device location (e.g., device serial number).
+        """
+        header(f"Granting runtime permissions to {self.__app_id} on {location}")
+        for permission in self.__runtime_permissions:
+            result = subprocess.run(
+                [
+                    str(self.__adb_location),
+                    "-s",
+                    location,
+                    "shell",
+                    "pm",
+                    "grant",
+                    self.__app_id,
+                    permission,
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                click.echo(f"  granted {permission}")
+            else:
+                message = (result.stderr or result.stdout).strip()
+                click.echo(f"  skipped {permission} ({message})")
 
     def run(self, location: str) -> None:
         """
