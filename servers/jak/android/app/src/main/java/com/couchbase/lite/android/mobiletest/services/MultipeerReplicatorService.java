@@ -33,14 +33,19 @@ import com.couchbase.lite.MultipeerReplicatorConfiguration;
 import com.couchbase.lite.PeerInfo;
 import com.couchbase.lite.PeerReplicatorStatus;
 import com.couchbase.lite.ReplicatorActivityLevel;
+import com.couchbase.lite.android.mobiletest.AndroidTestApp;
+import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
+import com.couchbase.lite.mobiletest.services.Log;
 
 
 public class MultipeerReplicatorService {
+    private static final String TAG = "MP_REPL_SVC";
+
     private final Map<String, Map<PeerInfo.PeerId, PeerReplicatorStatus>> statusMap = new HashMap<>();
     private final Map<String, ListenerToken> listenerTokens = new HashMap<>();
 
@@ -75,6 +80,25 @@ public class MultipeerReplicatorService {
         final MultipeerReplicator repl;
         try { repl = new MultipeerReplicator(config); }
         catch (CouchbaseLiteException e) { throw new CblApiFailure("Failed creating multipeer replicator", e); }
+
+        // Sanity check: the multipeer replicator needs dangerous runtime permissions (e.g. Bluetooth
+        // on API 31+). These are expected to be pre-granted on the device (see AndroidBridge.install,
+        // which runs "adb pm grant" after installing). If any are still missing, fail fast with the
+        // exact commands needed rather than letting the replicator fail later with an opaque error.
+        final AndroidTestApp app = (AndroidTestApp) TestApp.getApp();
+        final Set<String> missingPerms = repl.getMissingPermissions(app.getContext());
+        if (!missingPerms.isEmpty()) {
+            repl.close();
+            final String pkg = app.getContext().getPackageName();
+            final StringBuilder msg = new StringBuilder(
+                "Cannot start the multipeer replicator: the following runtime permissions are not"
+                    + " granted: " + missingPerms + ". Grant them on the device before running, e.g.:");
+            for (String perm : missingPerms) {
+                msg.append("\n  adb shell pm grant ").append(pkg).append(' ').append(perm);
+            }
+            Log.err(TAG, msg.toString());
+            throw new ServerError(msg.toString());
+        }
 
         final String replId = UUID.randomUUID().toString();
         statusMap.put(replId, new HashMap<>());

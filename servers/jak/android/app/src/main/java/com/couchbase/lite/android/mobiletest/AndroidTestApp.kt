@@ -125,6 +125,8 @@ class AndroidTestApp(private val context: Context) : TestApp("Android") {
     }
 
 
+    fun getContext(): Context = context
+
     fun getMultipeerReplSvc(): MultipeerReplicatorService {
         val mgr = multipeerReplSvc.get()
         if (mgr == null) {
