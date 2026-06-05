@@ -12,6 +12,9 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 
 class TestEdgeServerChaos(CBLTestClass):
+    @pytest.mark.min_couchbase_servers(1)
+    @pytest.mark.min_sync_gateways(1)
+    @pytest.mark.min_edge_servers(1)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_kill_sgw_mid_replication(self, cblpytest, dataset_path) -> None:
         self.mark_test_step("test_edge_to_sgw_replication")
@@ -153,6 +156,7 @@ class TestEdgeServerChaos(CBLTestClass):
         self.mark_test_step("Edge servers replication verified")
         return update_docs
 
+    @pytest.mark.min_edge_servers(1)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_3_edge_with_sync(self, cblpytest, dataset_path) -> None:
         self.mark_test_step("test_3_edge_with_sync")

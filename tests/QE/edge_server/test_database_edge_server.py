@@ -10,6 +10,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestDatabase(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.min_edge_servers(1)
     async def test_edge_server_incorrect_db_config(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:

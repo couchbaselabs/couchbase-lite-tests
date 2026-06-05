@@ -1,6 +1,7 @@
 import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
+from cbltest.configparser import _parse_config
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
@@ -73,3 +74,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="The default dataset version to use for test servers",
         default="4.0",
     )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config_path = config.getoption("--config")
+    if config_path is not None and isinstance(config_path, str):
+        setattr(config, "_parsed_config", _parse_config(config_path))

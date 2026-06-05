@@ -17,6 +17,9 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestReplicationSanity(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.min_edge_servers(1)
+    @pytest.mark.min_sync_gateways(1)
+    @pytest.mark.min_couchbase_servers(1)
     async def test_replication_sanity(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:

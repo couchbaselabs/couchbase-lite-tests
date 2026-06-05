@@ -11,6 +11,9 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestEdgeServerSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.min_edge_servers(1)
+    @pytest.mark.min_sync_gateways(1)
+    @pytest.mark.min_couchbase_servers(1)
     async def test_edge_to_sgw_replication(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
@@ -106,6 +109,7 @@ class TestEdgeServerSync(CBLTestClass):
         await edge_server.stop_replication(1)
 
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.min_edge_servers(2)
     async def test_edge_to_edge_replication(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):

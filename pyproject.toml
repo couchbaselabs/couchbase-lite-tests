@@ -39,6 +39,7 @@ root = [".", "client/src", "tests"]
 asyncio_default_fixture_loop_scope = "session"
 pythonpath = ["tests"]
 filterwarnings = [
+  "error::pytest.PytestUnknownMarkWarning",
   "ignore:Class property max_ttl is deprecated.*:couchbase.logic.supportability.CouchbaseDeprecationWarning",
 ]
 markers = [

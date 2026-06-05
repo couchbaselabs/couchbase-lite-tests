@@ -10,6 +10,9 @@ from cbltest.api.syncgateway import PutDatabasePayload
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
+@pytest.mark.min_couchbase_servers(1)
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_edge_servers(1)
 class TestChangesFeed(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_changes_feed_longpoll(

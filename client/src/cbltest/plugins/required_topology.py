@@ -1,75 +1,105 @@
-from typing import Final, cast
+from dataclasses import dataclass
+from typing import Final
 
 import pytest
-from cbltest.configparser import _parse_config
-from cbltest.logging import cbl_info, cbl_warning
-
-_min_test_servers_key: Final[str] = "min_test_servers"
-_min_sync_gateways_key: Final[str] = "min_sync_gateways"
-_min_couchbase_servers_key: Final[str] = "min_couchbase_servers"
-_min_load_balancers_key: Final[str] = "min_load_balancers"
+from cbltest.configparser import ParsedConfig
+from cbltest.logging import cbl_info
 
 # This plugin adds test markers to check that the required topology is present
 # in the TDK config file.  If not, the test will be skipped.
 
 
-# This adds markers for minimum number of test servers, sync gateways,
-# couchbase servers, and load balancers.
+@dataclass(frozen=True)
+class Marker:
+    """
+    Represents a pytest marker used to enforce minimum topology constraints for backend resources.
+
+    Attributes:
+        name: The name of the pytest marker (e.g., 'min_test_servers').
+        description: A human-readable description of the marker's constraint.
+        config_attribute: The name of the attribute on cblpytest
+            to inspect for resource count.
+    """
+
+    name: str
+    description: str
+    config_attribute: str
+
+    def check_length(self, config: ParsedConfig, minimum: int) -> None:
+        """
+        Validates that the number of available resources in the config is at least the specified minimum.
+
+        If the resource count is insufficient, skips the test using pytest.skip.
+
+        Args:
+            config: The parsed TDK configuration instance.
+            minimum: The minimum count or resource.
+        """
+        value = getattr(config, self.config_attribute)
+        available = len(value)
+        if available < minimum:
+            cbl_info(
+                f"Test requires at least {minimum} {self.config_attribute}, "
+                f"but only {available} are available."
+            )
+            pytest.skip(f"Insufficient {self.config_attribute}")
+
+
+MARKERS: Final[list[Marker]] = [
+    Marker(
+        name="min_test_servers",
+        description="Require at least `min` test servers to be available",
+        config_attribute="test_servers",
+    ),
+    Marker(
+        name="min_sync_gateways",
+        description="Require at least `min` sync gateways to be available",
+        config_attribute="sync_gateways",
+    ),
+    Marker(
+        name="min_couchbase_servers",
+        description="Require at least `min` couchbase servers to be available",
+        config_attribute="couchbase_servers",
+    ),
+    Marker(
+        name="min_load_balancers",
+        description="Require at least `min` load balancers to be available",
+        config_attribute="load_balancers",
+    ),
+    Marker(
+        name="min_edge_servers",
+        description="Require at least `min` edge servers to be available",
+        config_attribute="edge_servers",
+    ),
+]
+
+
 def pytest_configure(config: pytest.Config) -> None:
-    config.addinivalue_line(
-        "markers",
-        f"{_min_test_servers_key}(min): Require at least `min` test servers to be available",
-    )
-    config.addinivalue_line(
-        "markers",
-        f"{_min_sync_gateways_key}(min): Require at least `min` sync gateways to be available",
-    )
-    config.addinivalue_line(
-        "markers",
-        f"{_min_couchbase_servers_key}(min): Require at least `min` couchbase servers to be available",
-    )
-    config.addinivalue_line(
-        "markers",
-        f"{_min_load_balancers_key}(min): Require at least `min` load balancers to be available",
-    )
+    for marker in MARKERS:
+        config.addinivalue_line(
+            "markers",
+            f"{marker.name}(min): {marker.description}",
+        )
 
 
 # This is run before each test to determine if there are enough backend
 # resources to run the test.  If not, the test is skipped.
-def pytest_runtest_setup(item: pytest.Item):
-    min_test_servers_mark = item.get_closest_marker(_min_test_servers_key)
-    min_sync_gateways_mark = item.get_closest_marker(_min_sync_gateways_key)
-    min_couchbase_servers_mark = item.get_closest_marker(_min_couchbase_servers_key)
-    min_load_balancers_mark = item.get_closest_marker(_min_load_balancers_key)
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    config = getattr(item.config, "_parsed_config", None)
+    assert isinstance(config, ParsedConfig), (
+        "Parsed config not found in item.config, should have been added in cblpytest"
+    )
 
-    if (
-        min_test_servers_mark is None
-        and min_sync_gateways_mark is None
-        and min_couchbase_servers_mark is None
-        and min_load_balancers_mark is None
-    ):
-        return
-
-    config_path_raw = item.config.getoption("--config")
-    if config_path_raw is None or not isinstance(config_path_raw, str):
-        cbl_warning("Unable to get config option in required_topology plugin")
-        return  # Don't fail the test, just don't do validation
-
-    def check(mark: pytest.Mark | None, value: list, desc: str) -> None:
-        if mark is None:
-            return
-
-        minimum = mark.args[0]
-        if len(value) < minimum:
-            cbl_info(
-                f"Test requires at least {minimum} {desc}, but only {len(value)} are available."
-            )
-            pytest.skip(f"Insufficient {desc}")
-
-    config_path = cast(str, config_path_raw)
-    config = _parse_config(config_path)
-
-    check(min_test_servers_mark, config.test_servers, "Test Servers")
-    check(min_sync_gateways_mark, config.sync_gateways, "Sync Gateways")
-    check(min_couchbase_servers_mark, config.couchbase_servers, "Couchbase Servers")
-    check(min_load_balancers_mark, config.load_balancers, "Load Balancers")
+    for marker in MARKERS:
+        mark = item.get_closest_marker(marker.name)
+        if mark is not None:
+            if not mark.args:
+                raise ValueError(
+                    f"Marker '{marker.name}' requires a minimum count argument."
+                )
+            minimum = mark.args[0]
+            if not isinstance(minimum, int):
+                raise TypeError(
+                    f"Marker '{marker.name}' argument must be an integer, got {type(minimum).__name__}."
+                )
+            marker.check_length(config, minimum)

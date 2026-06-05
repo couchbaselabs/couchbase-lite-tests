@@ -12,6 +12,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 class TestQueryEdgeServer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.min_edge_servers(1)
     async def test_named_queries(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
@@ -35,6 +36,7 @@ class TestQueryEdgeServer(CBLTestClass):
         assert len(response) == 1
 
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.min_edge_servers(1)
     async def test_adhoc_queries(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
@@ -73,6 +75,7 @@ class TestQueryEdgeServer(CBLTestClass):
         assert DeepDiff(expected_results, response[0]) == {}
 
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.min_edge_servers(1)
     async def test_negative_scenarios(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
@@ -109,6 +112,7 @@ class TestQueryEdgeServer(CBLTestClass):
         assert failed
 
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.min_edge_servers(1)
     async def test_query_on_expired_doc(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
@@ -153,6 +157,7 @@ class TestQueryEdgeServer(CBLTestClass):
         assert len(response) == 0
 
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.min_edge_servers(1)
     async def test_adhoc_queries_incorrect_field(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:

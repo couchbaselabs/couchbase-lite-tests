@@ -74,6 +74,9 @@ AUDIT_CONFIG_APPLIERS: dict[str, Callable[[dict], None]] = {
 class TestLogging(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("audit_mode", ["default", "disabled", "enabled"])
+    @pytest.mark.min_edge_servers(1)
+    @pytest.mark.min_couchbase_servers(1)
+    @pytest.mark.min_sync_gateways(1)
     async def test_audit_logging(
         self,
         cblpytest: CBLPyTest,
