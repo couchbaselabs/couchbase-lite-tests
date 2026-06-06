@@ -338,7 +338,7 @@ internal static partial class HandlerList
             PinnedServerCertificate = deserializedBody.config.pinnedServerCert != null
                 ? new(Encoding.ASCII.GetBytes(deserializedBody.config.pinnedServerCert))
                 : null,
-            Headers = deserializedBody.config.headers?.ToImmutableDictionary() ?? ImmutableDictionary<string, string?>.Empty,
+            Headers = deserializedBody.config.headers?.ToDictionary() ?? new Dictionary<string, string?>()
         };
 
         if (deserializedBody.config.collections.Any()) {
@@ -352,8 +352,8 @@ internal static partial class HandlerList
                     }
 
                     var collectionConfig = new CollectionConfiguration {
-                        Channels = c.channels.Any() ? c.channels.ToImmutableList() : null,
-                        DocumentIDs = c.documentIDs.Any() ? c.documentIDs.ToImmutableList() : null,
+                        Channels = c.channels.Any() ? c.channels.ToList() : null,
+                        DocumentIDs = c.documentIDs.Any() ? c.documentIDs.ToList() : null,
                         PushFilter = GetFilter(session, c.pushFilter),
                         PullFilter = GetFilter(session, c.pullFilter),
                         ConflictResolver = c.ConflictResolver
