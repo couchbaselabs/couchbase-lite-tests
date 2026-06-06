@@ -126,15 +126,10 @@ class DotnetTestServer(TestServer):
 
         header("Restoring .NET workloads")
         subprocess.run(
-            [
-                DOTNET_PATH,
-                "workload",
-                "install",
-                "maui"
-            ],
+            [DOTNET_PATH, "workload", "install", "maui"],
             check=True,
             capture_output=False,
-            cwd=DOTNET_TEST_SERVER_DIR / "testserver"
+            cwd=DOTNET_TEST_SERVER_DIR / "testserver",
         )
 
         verb = "publish" if self.publish else "build"
