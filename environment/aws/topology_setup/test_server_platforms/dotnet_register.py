@@ -129,24 +129,12 @@ class DotnetTestServer(TestServer):
             [
                 DOTNET_PATH,
                 "workload",
-                "update",
-                "--from-rollback-file",
-                DOTNET_TEST_SERVER_DIR / "testserver" / "workload-pins.json",
-                "--skip-sign-check",
+                "install",
+                "maui"
             ],
             check=True,
             capture_output=False,
-        )
-        subprocess.run(
-            [
-                DOTNET_PATH,
-                "workload",
-                "restore",
-                "--project",
-                DOTNET_TEST_SERVER_DIR / "testserver" / "testserver.csproj",
-            ],
-            check=True,
-            capture_output=False,
+            cwd=DOTNET_TEST_SERVER_DIR / "testserver"
         )
 
         verb = "publish" if self.publish else "build"
