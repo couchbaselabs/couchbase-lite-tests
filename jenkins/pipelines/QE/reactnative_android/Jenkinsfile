@@ -39,9 +39,16 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'mob-e2e-mac-01' }
+            agent { label 'qe-mac-india' }
             options {
-                lock("mob-e2e-android-01")
+                lock('56141JEBF18456')
+            }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                ANDROID_HOME = "${env.HOME}/Library/Android/sdk"
+                ANDROID_SERIAL = "56141JEBF18456"
+                JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
+                PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
             }
             steps {
                 checkout([
