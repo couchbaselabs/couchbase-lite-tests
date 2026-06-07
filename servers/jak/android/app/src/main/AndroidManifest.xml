@@ -17,12 +17,13 @@
 
     <!-- Android 12+ (API 31+) -->
     <uses-permission
-        android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation" />
+        android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission
         android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission
         android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <!-- MultipeerReplicator Bluetooth transport -->
     <!-- Android 11 (API 30) and lower -->
