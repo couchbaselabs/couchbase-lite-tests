@@ -23,6 +23,8 @@
         android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission
         android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES" />
 
     <!-- MultipeerReplicator Bluetooth transport -->
     <!-- Android 11 (API 30) and lower -->
