@@ -7,7 +7,6 @@
             "location": "56141JEBF18456",
             "ip_hint": "172.16.150.165",
             "download": true
-        },
         }
     ],
     "include": "../../../../environment/aws/topology_setup/default_topology.json"
