@@ -35,7 +35,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
-import java.util.EnumSet
+import java.util.EnumSet;
 
 import com.couchbase.lite.Conflict;
 import com.couchbase.lite.CouchbaseLiteException;
