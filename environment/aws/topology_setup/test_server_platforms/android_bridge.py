@@ -57,6 +57,7 @@ class AndroidBridge(PlatformBridge):
         "android.permission.BLUETOOTH_SCAN",  # API 31+
         "android.permission.BLUETOOTH_CONNECT",  # API 31+
         "android.permission.BLUETOOTH_ADVERTISE",  # API 31+
+        "android.permission.NEARBY_WIFI_DEVICES",  # API 31+
     ]
 
     def __init__(self, app_path: str, app_id: str, activity: str = "MainActivity"):
