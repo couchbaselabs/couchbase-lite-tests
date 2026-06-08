@@ -3,6 +3,7 @@
 import inspect
 from collections.abc import Callable
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal, cast
 from unittest.mock import MagicMock, patch
 
@@ -130,7 +131,10 @@ def _make_cblpytest(
 
 
 def _make_pytestconfig(*, no_upload: bool = False) -> pytest.Config:
-    args = ["--config", "tests/empty_config.json"]
+    # Resolve relative to this test file so the helper works regardless of
+    # pytest's cwd. A cwd-relative "tests/empty_config.json" only worked
+    # when pytest was invoked from the client/ directory.
+    args = ["--config", str(Path(__file__).with_name("empty_config.json"))]
     if no_upload:
         args.append("--no-result-upload")
     return pytest.Config.fromdictargs({}, args)
@@ -480,8 +484,10 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_upload_exception_is_caught_and_plugin_unregistered(self):
-        """An exception from _upload_document is swallowed; the finally block still unregisters."""
+    async def test_upload_exception_propagates_and_plugin_unregistered(self):
+        """An exception from _upload_document propagates (fail-loud policy);
+        the finally block still unregisters the plugin so the next session
+        starts clean."""
         server = _make_server()
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
@@ -489,7 +495,8 @@ class TestGreenboardFixture:
             "cbltest.greenboarduploader.GreenboardUploader._upload_document",
             side_effect=RuntimeError("connection refused"),
         ):
-            await _run_fixture(_raw_greenboard(cblpytest, config))
+            with pytest.raises(RuntimeError, match="connection refused"):
+                await _run_fixture(_raw_greenboard(cblpytest, config))
         assert not any(
             isinstance(p, GreenboardUploader)
             for p in config.pluginmanager.get_plugins()
