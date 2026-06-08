@@ -59,7 +59,7 @@ pipeline {
                 sh """
                     git fetch origin qe-react-native-android
                     git checkout origin/qe-react-native-android -- jenkins/pipelines/QE/reactnative_android
-                    git checkout origin/qe-react-native-android -- tests/QE
+                    git checkout origin/qe-react-native-android -- tests
                 """
                 echo "Run React Native Android Tests"
                 timeout(time: 60, unit: 'MINUTES') {
