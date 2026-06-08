@@ -329,33 +329,7 @@ internal static partial class HandlerList
         }
 
         var endpoint = new URLEndpoint(new Uri(deserializedBody.config.endpoint));
-        var collectionConfigs = new List<CollectionConfiguration>();
-        if (deserializedBody.config.collections.Any()) {
-            foreach (var c in deserializedBody.config.collections) {
-                foreach(var name in c.names) {
-                    var spec = CollectionSpec(name);
-                    var coll = db.GetCollection(spec.name, spec.scope);
-                    if (coll == null) {
-                        response.WriteBody(Router.CreateErrorResponse($"Unable to find collection '{name}'"), HttpStatusCode.BadRequest);
-                        return Task.CompletedTask;
-                    }
-
-                    var collectionConfig = new CollectionConfiguration(coll)
-                    {
-                        Channels = c.channels.Any() ? c.channels.ToImmutableList() : null,
-                        DocumentIDs = c.documentIDs.Any() ? c.documentIDs.ToImmutableList() : null,
-                        PushFilter = GetFilter(session, c.pushFilter),
-                        PullFilter = GetFilter(session, c.pullFilter),
-                        ConflictResolver = c.ConflictResolver
-                    };
-                    collectionConfigs.Add(collectionConfig);
-                }
-            }
-        } else {
-            collectionConfigs = CollectionConfiguration.FromCollections(db.GetDefaultCollection());
-        }
-
-        var replConfig = new ReplicatorConfiguration(collectionConfigs, endpoint)
+        var replConfig = new ReplicatorConfiguration(endpoint)
         {
             Authenticator = deserializedBody.config.authenticator?.CreateAuthenticator(),
             Continuous = deserializedBody.config.continuous,
@@ -366,6 +340,30 @@ internal static partial class HandlerList
                 : null,
             Headers = deserializedBody.config.headers?.ToImmutableDictionary() ?? ImmutableDictionary<string, string?>.Empty,
         };
+
+        if (deserializedBody.config.collections.Any()) {
+            foreach (var c in deserializedBody.config.collections) {
+                foreach(var name in c.names) {
+                    var spec = CollectionSpec(name);
+                    var coll = db.GetCollection(spec.name, spec.scope);
+                    if (coll == null) {
+                        response.WriteBody(Router.CreateErrorResponse($"Unable to find collection '{name}'"), HttpStatusCode.BadRequest);
+                        return Task.CompletedTask;
+                    }
+
+                    var collectionConfig = new CollectionConfiguration {
+                        Channels = c.channels.Any() ? c.channels.ToImmutableList() : null,
+                        DocumentIDs = c.documentIDs.Any() ? c.documentIDs.ToImmutableList() : null,
+                        PushFilter = GetFilter(session, c.pushFilter),
+                        PullFilter = GetFilter(session, c.pullFilter),
+                        ConflictResolver = c.ConflictResolver
+                    };
+                    replConfig.AddCollection(coll, collectionConfig);
+                }
+            }
+        } else {
+            replConfig.AddCollection(db.GetDefaultCollection());
+        }
 
         var (repl, id) = session.ObjectManager.RegisterObject(() => new Replicator(replConfig));
         if(deserializedBody.config.enableDocumentListener) {
