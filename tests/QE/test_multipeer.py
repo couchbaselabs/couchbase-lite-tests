@@ -93,7 +93,7 @@ class TestMultipeer(CBLTestClass):
             ]
         )
         expected_keys = {f"device{i + 1}" for i in range(len(all_dbs))}
-        for doc in results:
+        for idx,doc in enumnerate(results):
             counter = doc.body["counter"]
             assert set(counter.keys()) == expected_keys, (
                 "All device keys must be present"
@@ -104,24 +104,31 @@ class TestMultipeer(CBLTestClass):
                 for key, value in counter.items()
             ), "Each key's value must be device_id"
             retry = 5
-            while results[0].revs != doc.revs and retry > 0:
-                self.mark_test_step("Rev IDs don't match, wait for 30 seconds")
+            while retry > 0:
+                rev_ids = [doc.revs for doc in results]
+                if len(set(rev_ids)) == 1:
+                    break
+                self.mark_test_step(
+                    f"Rev IDs don't match across devices, waiting 30 seconds (retries left: {retry})"
+                )
                 await asyncio.sleep(30)
-                retry = retry - 1
+                retry -= 1
                 for mp in multipeer_replicators:
                     status = await mp.wait_for_idle(timeout=timedelta(seconds=timeout))
                     assert all(
                         r.status.replicator_error is None for r in status.replicators
                     ), "Multipeer replicator should not have any errors"
+
                 results = await asyncio.gather(
                     *[
                         db.get_document(DocumentEntry("_default._default", "conflict1"))
                         for db in all_dbs
                     ]
                 )
-                assert results[0].revs == doc.revs, (
-                    f"revision IDs dont match for {doc} even after 5 retries"
-                )
+            assert len(set(doc.revs for doc in results)) == 1, (
+                f"Revision IDs don't match across all devices after 5 retries: "
+                f"{[doc.revs for doc in results]}"
+            )
         self.mark_test_step("Stopping multipeer replicator on all devices")
         await asyncio.gather(*[mp.stop() for mp in multipeer_replicators])
 
