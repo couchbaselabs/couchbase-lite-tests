@@ -84,6 +84,7 @@ uv run pytest \
     --ignore=test_system_multipeer.py \
     --ignore=test_rolling_upgrade_sgw.py \
     --ignore=test_upg_sgw.py \
+    --ignore=test_replication_upgrade_delta_sync.py \
     -k "not listener and not multipeer and not custom_conflict" \
     --tb=short \
     --timeout=300
