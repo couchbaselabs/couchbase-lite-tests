@@ -5,11 +5,15 @@ from pathlib import Path
 from typing import Any
 
 import click
+SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
+
+if __name__ == "__main__":
+    sys.path.append(str(SCRIPT_DIR.parents[3]))
+    if isinstance(sys.stdout, TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8")
 
 from environment.aws.start_backend import script_entry as start_backend
 from environment.aws.topology_setup.setup_topology import TopologyConfig
-
-SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def generate_topology(
