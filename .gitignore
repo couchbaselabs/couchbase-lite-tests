@@ -19,6 +19,7 @@ http_log
 .terraform
 servers/downloaded
 .version
+junit_result.xml
 
 servers/*/CMakeFiles
 servers/*/_deps
