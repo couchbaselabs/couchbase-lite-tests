@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from io import TextIOWrapper
 from typing import Any
 
 import click
