@@ -149,7 +149,7 @@ class EdgeServerInfo:
         repo_root = next(
             p
             for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents)
-            if "-lite-tests" in p.name
+            if "-lite-tests" in p.name or "-edge-server-pipeline" in p.name
         )
         return repo_root
 
