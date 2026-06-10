@@ -149,7 +149,7 @@ class EdgeServerInfo:
         repo_root = next(
             p
             for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents)
-            if p.name == "couchbase-lite-tests"
+            if "-lite-tests" in p.name
         )
         return repo_root
 
