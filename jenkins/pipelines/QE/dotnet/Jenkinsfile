@@ -129,7 +129,7 @@ pipeline {
                 stage('Android') {
                     agent { label 'qe-mac-india' }
                     options {
-                        lock('51131XEKB7DBF1')
+                        lock('45291VDJH01660')
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
