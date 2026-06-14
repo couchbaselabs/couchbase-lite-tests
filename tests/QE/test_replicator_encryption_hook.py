@@ -20,7 +20,6 @@ from cbltest.responses import ServerVariant
 @pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
-@pytest.mark.min_couchbase_servers(1)
 class TestReplicatorEncryptionHook(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replication_complex_doc_encryption(

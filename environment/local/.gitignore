@@ -1,0 +1,7 @@
+# Build artifacts for windows
+*.exe
+
+# Sync Gateway local builds
+sync_gateway
+sync_gateway_clone/
+*.log

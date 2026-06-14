@@ -22,6 +22,7 @@
 import pathlib
 import sys
 
+import click
 import requests
 
 SCRIPT_DIR = pathlib.Path(__file__).parent
@@ -34,14 +35,26 @@ from environment.aws.topology_setup import setup_topology
 TOPOLOGY_CONFIG = SCRIPT_DIR / "topology.json"
 
 
-def main():
+@click.command()
+@click.option(
+    "--build-testserver",
+    help="Build the test server from source rather than downloading it. Takes a version string (e.g., 4.0.3).",
+)
+def main(build_testserver: str | None):
+    if build_testserver:
+        cbl_version = f"{build_testserver}-0"
+        download = False
+    else:
+        cbl_version = get_latest_released_cbl_c_version()
+        download = True
+
     config = {
         "test_servers": [
             {
                 "location": "localhost",
-                "download": True,
+                "download": download,
                 "platform": get_cbl_platform(),
-                "cbl_version": get_latest_released_cbl_c_version(),
+                "cbl_version": cbl_version,
             }
         ],
     }

@@ -5,6 +5,8 @@ set -euo pipefail
 
 function usage() {
     echo "Usage: $0 <version> <sgw_version> [--setup-only]"
+    echo "  <cbl_version>: The Couchbase Lite version to run the test against."
+    echo "  <sgw_version>: Sync Gateway version to be deployed for the test."
     echo "  --setup-only: Only build test server and setup backend, skip test execution"
     echo "  Build number will be auto-fetched for the specified version"
     exit 1

@@ -24,7 +24,7 @@ class DatabaseManager {
     private var replicatorDocumentsToken : [ UUID : ListenerToken ] = [:]
     
     private var multipeerReplicators : [ UUID : MultipeerReplicator ] = [:]
-    private var peerReplicatorStatus : [ UUID : [ PeerID: Replicator.Status ] ] = [:]
+    private var peerReplicatorStatus : [ UUID : [ PeerID: PeerReplicatorStatus] ] = [:]
     private var peerReplicatorTransport : [ UUID : [ PeerID: ContentTypes.MultipeerTransport ] ] = [:]
     private var peerReplicatorStatusToken : [ UUID : ListenerToken ] = [:]
     private var peerReplicatorDocuments : [ UUID : [ PeerID: [ ContentTypes.DocumentReplication ] ] ] = [:]
@@ -86,7 +86,7 @@ class DatabaseManager {
         }
     }
     
-    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false) throws -> UUID {
+    public func startListener(dbName: String, collections: [String], port: UInt16?, disableTLS: Bool = false, identity:ContentTypes.TLSIdentityData? ) throws -> UUID {
         var collectionsArr: [Collection] = []
         
         guard let database = databases[dbName]
@@ -107,7 +107,27 @@ class DatabaseManager {
         var listenerConfig = URLEndpointListenerConfiguration(collections: collectionsArr)
         listenerConfig.port = port
         listenerConfig.disableTLS = disableTLS
-        
+        if !listenerConfig.disableTLS {
+            let label = "ios-p2p-\(dbName)"
+            let importedIdentity: TLSIdentity
+            
+            do {
+                if let id = identity {
+                    importedIdentity = try DatabaseManager.createTLSIdentity( for: id, label:label)
+                } else {
+                    guard let existingIdentity = try TLSIdentity.identity(withLabel: label) else {
+                        throw TestServerError.badRequest(
+                            "TLS enabled but no existing TLS identity found for label \(label)"
+                        )
+                    }
+                    importedIdentity = existingIdentity
+                }
+            } catch {
+                throw TestServerError.badRequest("Failed to import TLS identity")
+            }
+            
+            listenerConfig.tlsIdentity = importedIdentity
+        }
         let listener = URLEndpointListener(config: listenerConfig)
         
         let listenerID = UUID()
@@ -298,8 +318,8 @@ class DatabaseManager {
     
     public func startMultipeerReplicator(config: ContentTypes.MultipeerReplicatorConfiguration) throws -> UUID {
         Log.log(level: .debug, message: "Starting Multipeer Replicator")
-        
-        let identity = try DatabaseManager.multipeerReplicatorIdentity(for: config)
+        let label = "ios-multipeer-\(config.peerGroupID)"
+        let identity = try DatabaseManager.createTLSIdentity(for: config.identity, label:label)
         
         let authenticator = try DatabaseManager.multipeerAuthenticator(for: config.authenticator)
         
@@ -353,7 +373,7 @@ class DatabaseManager {
         
         let listenerToken = multipeerReplicator.addPeerReplicatorStatusListener(on: listenerQueue) { [weak self] status in
             guard let strongSelf = self else { return }
-            strongSelf.peerReplicatorStatus[id, default: [:]][status.peerID] = status.status
+            strongSelf.peerReplicatorStatus[id, default: [:]][status.peerID] = status
         }
         
         let docReplToken = multipeerReplicator.addPeerDocumentReplicationListener(on: listenerQueue) { [weak self] docRepl in
@@ -397,14 +417,27 @@ class DatabaseManager {
             var replicators: [ContentTypes.PeerReplicatorStatus] = []
             
             if let statuses = peerReplicatorStatus[id] {
-                for (peerID, status) in statuses {
+                for (peerID, peerStatus) in statuses {
+                    let status = peerStatus.status
+                    let transport = peerStatus.transport
                     let docs = peerReplicatorDocuments[id]?[peerID] ?? []
                     let replStatus = ContentTypes.ReplicatorStatus.init(status: status, docs: docs)
-                    replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus))
+                    let transportType: ContentTypes.MultipeerTransport = {
+                        switch transport {
+                        case .wifi:
+                            return .wifi
+                        case .bluetooth:
+                            return .bluetooth
+                        @unknown default:
+                            fatalError("Unknown transport")
+                        }
+                    }()
+                    
+                    replicators.append(ContentTypes.PeerReplicatorStatus(peerID: "\(peerID)", status: replStatus, transport:transportType ))
                     peerReplicatorDocuments[id]?[peerID] = [] // Reset after return per spec
                 }
                 // Remove disconected peers with stopped replicators so their statuses are not included next time.
-                peerReplicatorStatus[id] = statuses.filter { $0.value.activity != .stopped }
+                peerReplicatorStatus[id] = statuses.filter { $0.value.status.activity != .stopped }
             }
             
             status = ContentTypes.MultipeerReplicatorStatus.init(replicators: replicators)
@@ -597,7 +630,7 @@ class DatabaseManager {
             .appendingPathComponent(datasetVersion)
             .appendingPathComponent("\(name).cblite2.zip")
             .relativePath
-            
+        
         let datasetZipURL = try downloadDatasetFileIfNecessary(relativePath: datasetRelativePath)
         Log.log(level: .debug, message: "Load dataset at \(datasetZipURL.path)")
         
@@ -697,15 +730,14 @@ class DatabaseManager {
         }
     }
     
-    private static func multipeerReplicatorIdentity(for config: ContentTypes.MultipeerReplicatorConfiguration) throws -> TLSIdentity {
-        let label = "ios-multipeer-\(config.peerGroupID)"
+    private static func createTLSIdentity(for identityData: ContentTypes.TLSIdentityData, label: String) throws -> TLSIdentity {
         
-        guard let data = Data(base64Encoded: config.identity.data) else {
-            throw TestServerError.badRequest("Invalid multipeer replictor's identity data")
+        guard let data = Data(base64Encoded: identityData.data) else {
+            throw TestServerError.badRequest("Invalid TLS identity data")
         }
         
         try TLSIdentity.deleteIdentity(withLabel: label)
-        return try TLSIdentity.importIdentity(withData: data, password: config.identity.password, label: label)
+        return try TLSIdentity.importIdentity(withData: data, password: identityData.password, label: label)
     }
     
     private static func multipeerAuthenticator(for config: ContentTypes.MultipeerReplicatorCAAuthenticator?) throws -> MultipeerCertificateAuthenticator {
@@ -718,11 +750,11 @@ class DatabaseManager {
         let lines = auth.certificate
             .components(separatedBy: .newlines)
             .filter { !$0.contains("-----BEGIN CERTIFICATE-----") &&
-                      !$0.contains("-----END CERTIFICATE-----") &&
-                      !$0.isEmpty }
+                !$0.contains("-----END CERTIFICATE-----") &&
+                !$0.isEmpty }
         
         let certData = lines.joined()
-
+        
         guard let derData = Data(base64Encoded: certData) else {
             throw TestServerError.badRequest("Failed to convert multipeer authenticator's root certificate from PEM to DER")
         }

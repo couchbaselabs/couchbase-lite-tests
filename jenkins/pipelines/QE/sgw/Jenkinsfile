@@ -1,16 +1,45 @@
+def resolveProgetVersion(String product, String version, String label) {
+    if (version.tokenize('.').size() >= 3) {
+        echo "${label} already fully qualified: ${version}"
+        return version
+    }
+    def url = "http://proget.build.couchbase.com:8080/api/latest_release?product=${product}&version=${version}&prerelease=true"
+    echo "Resolving ${label}: ${url}"
+    def resolved
+    if (isUnix()) {
+        resolved = powershell(script: """
+            try { (Invoke-RestMethod '${url}').version }
+            catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
+        """.stripIndent(), returnStdout: true).trim()
+    } else {
+        resolved = powershell(script: """
+            try { (Invoke-RestMethod '${url}').version }
+            catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
+        """.stripIndent(), returnStdout: true).trim()
+    }
+    if (!resolved || resolved == 'null') { error "Could not resolve ${label} from '${version}' (url: ${url})" }
+    echo "Resolved ${label}: ${resolved}"
+    return resolved
+}
+
 pipeline {
     agent none
-    parameters {
-        string(name: 'CBL_VERSION', defaultValue: '4.0.0', description: 'Couchbase Lite Version to use')
-        string(name: 'SGW_VERSION', defaultValue: '4.0.0', description: 'Sync Gateway Version to use')
-    }
+// This job uses UI defined params and their default values.
+// That's because we want to be able to trigger this job with different versions without having to modify the Jenkinsfile.
+// The default values in the UI will be used if no parameters are provided at build time.
+// But just for reference, these are the params that are used by the job :
+//         string(name: 'CBL_VERSION', description: 'Couchbase Lite Version to use, eg : "4" for latest version-build, or "4.1.0-18" for specific version and build')
+//         string(name: 'SGW_VERSION', description: 'Sync Gateway Version to use, eg : its the same way, check out "resolveProgetVersion" function for more details)')
     stages {
         stage('Init') {
+            agent any
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "CBL:${params.CBL_VERSION} SGW:${params.SGW_VERSION} (#${currentBuild.number})"
+                    env.CBL_VERSION = resolveProgetVersion("couchbase-lite-ios", params.CBL_VERSION, 'CBL_VERSION')
+                    env.SGW_VERSION = resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
+                    currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
                 }
             }
         }
@@ -19,7 +48,7 @@ pipeline {
                 build job: 'prebuild-test-server',
                 parameters: [
                     string(name: 'TS_PLATFORM', value: 'swift_ios'),
-                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                    string(name: 'CBL_VERSION', value: env.CBL_VERSION),
                 ],
                 wait: true,
                 propagate: true
@@ -37,7 +66,7 @@ pipeline {
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
                 timeout(time: 90, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/sgw/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION}"
+                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION}"
                 }
                 echo "=== SGW Tests Complete"
             }

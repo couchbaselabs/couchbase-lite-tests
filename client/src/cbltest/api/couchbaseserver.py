@@ -357,12 +357,16 @@ class CouchbaseServer:
         dataset_name: str,
         *,
         repo_name: str | None = None,
+        reset_expired_ttl: bool = False,
     ) -> None:
         """
         Restores a bucket from a backup source
 
         :param name: The name of the bucket to restore
         :param backup_source: The path to the backup source
+        :param reset_expired_ttl: When True, restore already-expired documents
+            with no expiry (``--replace-ttl expired --replace-ttl-with 0``) so
+            they are not purged on access.
         """
         with self.__tracer.start_as_current_span(
             "restore_bucket",
@@ -396,24 +400,29 @@ class CouchbaseServer:
                         f"Backup zip '{data_filepath}' is invalid: {e}"
                     ) from e
 
-                subprocess.run(
-                    [
-                        cbbackupmgr_path,
-                        "restore",
-                        "-a",
-                        str(extract_path / dataset_name),
-                        "-c",
-                        self.__hostname,
-                        "-r",
-                        repo_name or dataset_name,
-                        "-u",
-                        self.__username,
-                        "-p",
-                        self.__password,
-                        "--auto-create-buckets",
-                    ],
-                    check=True,
-                )
+                restore_args = [
+                    cbbackupmgr_path,
+                    "restore",
+                    "-a",
+                    str(extract_path / dataset_name),
+                    "-c",
+                    self.__hostname,
+                    "-r",
+                    repo_name or dataset_name,
+                    "-u",
+                    self.__username,
+                    "-p",
+                    self.__password,
+                    "--auto-create-buckets",
+                ]
+                if reset_expired_ttl:
+                    restore_args += [
+                        "--replace-ttl",
+                        "expired",
+                        "--replace-ttl-with",
+                        "0",
+                    ]
+                subprocess.run(restore_args, check=True)
 
     def indexes_count(self, bucket: str) -> int:
         """

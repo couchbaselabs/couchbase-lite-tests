@@ -15,10 +15,10 @@ function usage() {
 }
 
 function prepare_dotnet() {
+    # This used to install maui but that's too messy here since it constantly changes
+    # the version of Xcode needed.  This is handled now as part of the server build instead.
     source $SCRIPT_DIR/prepare_env.sh
-    install_dotnet "9.0"
-    install_dotnet_runtime "8.0"
-    install_maui
+    install_dotnet "$DOTNET_SDK_VERSION"
     if [ "$platform" != "macos" ]; then
         install_xharness
     fi

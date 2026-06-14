@@ -21,7 +21,6 @@ from cbltest.utils import assert_not_null
 
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
-@pytest.mark.min_couchbase_servers(1)
 class TestReplicationBlob(CBLTestClass):
     @pytest.mark.cbse(14861)
     @pytest.mark.asyncio(loop_scope="session")

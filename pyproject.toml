@@ -9,6 +9,7 @@ dependencies = [
     "psutil==7.0.0",
     "pytest-timeout",
     "pyyaml==6.0.2",
+    "tenacity==9.1.4",
     "tqdm==4.67.1",
 ]
 
@@ -33,14 +34,16 @@ lint = [
 members = [ "client" ]
 
 [tool.ty.environment]
-root = [".", "client/src"]
+root = [".", "client/src", "tests"]
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "session"
+pythonpath = ["tests"]
 filterwarnings = [
   "ignore:Class property max_ttl is deprecated.*:couchbase.logic.supportability.CouchbaseDeprecationWarning",
 ]
 markers = [
   "sgw: tests that focus on Sync Gateway functionality",
+  "upg_sgw: tests that focus on Sync Gateway upgrade scenario",
   "cbl: tests that focus on Couchbase Lite functionality",
 ]

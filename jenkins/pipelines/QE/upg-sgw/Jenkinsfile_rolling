@@ -1,0 +1,89 @@
+def resolveProgetVersion(String product, String version, String label) {
+    if (version.tokenize('.').size() >= 3) {
+        echo "${label} already fully qualified: ${version}"
+        return version
+    }
+    def url = "http://proget.build.couchbase.com:8080/api/latest_release?product=${product}&version=${version}&prerelease=true"
+    echo "Resolving ${label}: ${url}"
+    def resolved
+    if (isUnix()) {
+        resolved = sh(
+            script: "curl -sf '${url}' | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"version\",\"\"))'",
+            returnStdout: true
+        ).trim()
+    } else {
+        resolved = powershell(script: """
+            try { (Invoke-RestMethod '${url}').version }
+            catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
+        """.stripIndent(), returnStdout: true).trim()
+    }
+    if (!resolved || resolved == 'null') { error "Could not resolve ${label} from '${version}' (url: ${url})" }
+    echo "Resolved ${label}: ${resolved}"
+    return resolved
+}
+
+pipeline {
+    agent none
+// This job uses UI defined params and their default values.
+// That's because we want to be able to trigger this job with different versions without having to modify the Jenkinsfile.
+// The default values in the UI will be used if no parameters are provided at build time.
+// But just for reference, these are the params that are used by the job :
+//         string(name: 'CBL_VERSION', description: 'Couchbase Lite Version to use, eg : "4"')
+//         string(name: 'SGW_VERSIONS', description: 'Sync Gateway Version to use, eg : "4.0.1 4.0.3 4.1.0"')
+    stages {
+        stage('Init') {
+            agent any
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.SGW_VERSIONS == '') { error "SGW_VERSIONS are required (atleast one)" }
+                    env.CBL_VERSION = resolveProgetVersion("couchbase-lite-ios", params.CBL_VERSION, 'CBL_VERSION')
+                    currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${params.SGW_VERSIONS} (#${currentBuild.number})"
+                }
+            }
+        }
+        stage('Prebuild Servers') {
+            steps {
+                build job: 'prebuild-test-server',
+                parameters: [
+                    string(name: 'TS_PLATFORM', value: 'swift_ios'),
+                    string(name: 'CBL_VERSION', value: env.CBL_VERSION),
+                ],
+                wait: true,
+                propagate: true
+            }
+        }
+        stage('Run Test') {
+            agent { label 'mac-mini-new' }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mac-mini-new-keychain-password')
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                TS_ARTIFACTS_DIR = 'sgw'
+            }
+            steps {
+                // Unlock keychain:
+                sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
+                echo "=== Run SGW Upgrades"
+                timeout(time: 90, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/QE/upg-sgw/test_rolling.sh ${env.CBL_VERSION} ${params.SGW_VERSIONS}"
+                }
+                echo "=== SGW Upgrades Complete"
+            }
+            post {
+                always {
+                    echo "=== Teardown SGW Upgrades"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/QE/upg-sgw/teardown.sh"
+                    }
+                    archiveArtifacts artifacts: 'tests/QE/upg-sgw/**/*', fingerprint: true, allowEmptyArchive: true
+                    echo "=== SGW Upgrades Teardown Complete"
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+        }
+    }
+}

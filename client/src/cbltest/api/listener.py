@@ -3,6 +3,7 @@ from typing import cast
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.database import Database
+from cbltest.api.x509_certificate import CertKeyPair, create_leaf_certificate
 from cbltest.logging import cbl_error, cbl_trace
 from cbltest.requests import TestServerRequestType
 from cbltest.response_types import PostStartListenerResponseMethods
@@ -18,6 +19,7 @@ class Listener:
         collections: list[str],
         port: int | None = None,
         disable_tls: bool = False,
+        identity: CertKeyPair | None = None,
     ):
         self.database = database
         """The database that the listener will be serving"""
@@ -25,7 +27,7 @@ class Listener:
         self.collections = collections
         """The collections within the database that the listener will be serving"""
 
-        self.port = port
+        self.__port = port
         """
         The port that the listener will request to listen on
         (if None, the OS will choose).  Once start is called,
@@ -38,10 +40,25 @@ class Listener:
         """If True, TLS will be disabled for the listener"""
 
         self.__original_port = port
+        self.__identity = identity
         self.__index = database._index
         self.__request_factory = database._request_factory
         self.__tracer = get_tracer(__name__, VERSION)
         self.__id: str = ""
+
+    @property
+    def identity(self) -> CertKeyPair:
+        """Gets the identity used by the replicator"""
+        assert self.__identity is not None, "Listener identity not initialized"
+        return self.__identity
+
+    @property
+    def port(self) -> int:
+        assert self.__port is not None, "Listener port not set"
+        return self.__port
+
+    def set_identity(self):
+        self.__identity = create_leaf_certificate(f"Test Server {self.__index}")
 
     async def start(self) -> None:
         """Start listening for incoming connections"""
@@ -50,8 +67,9 @@ class Listener:
                 TestServerRequestType.START_LISTENER,
                 db=self.database.name,
                 collections=self.collections,
-                port=self.port,
+                port=self.__port,
                 disable_tls=self.disable_tls,
+                identity=self.__identity,
             )
             resp = await self.__request_factory.send_request(self.__index, request)
             if resp.error is not None:
@@ -60,7 +78,7 @@ class Listener:
                 return
 
             cast_resp = cast(PostStartListenerResponseMethods, resp)
-            self.port = cast_resp.port
+            self.__port = cast_resp.port
             self.__id = cast_resp.listener_id
 
     async def stop(self) -> None:
@@ -76,5 +94,5 @@ class Listener:
                 cbl_trace(resp.error.message)
                 return
 
-            self.port = self.__original_port
+            self.__port = self.__original_port
             self.__id = ""

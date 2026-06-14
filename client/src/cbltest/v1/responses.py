@@ -502,6 +502,7 @@ class PostGetMultipeerReplicatorStatusResponse(
         {
             "peerID": "1234567890abcdef",
             "status": <replicator status>,
+            "transport": "wifi"
         }
     ]
     """

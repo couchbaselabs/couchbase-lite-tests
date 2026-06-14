@@ -17,9 +17,7 @@ function usage() {
 
 function prepare_dotnet() {
     source "$SCRIPT_DIR/prepare_env.sh"
-    install_dotnet "$DOTNET_VERSION"
-    install_dotnet_runtime "8.0"
-    install_maui
+    install_dotnet "$DOTNET_SDK_VERSION"
     if [ "$platform" != "macos" ]; then
         install_xharness
     fi
@@ -61,6 +59,7 @@ fi
 
 pushd "$QE_TESTS_DIR"
 
+export DEVELOPER_DIR="/Applications/Xcode-$DOTNET_XCODE_VERSION.app/"
 uv run pytest -v --no-header -W ignore::DeprecationWarning \
     --config config.json \
     --dataset-version "$DATASET_VERSION" \

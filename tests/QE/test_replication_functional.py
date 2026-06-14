@@ -16,7 +16,6 @@ from cbltest.api.syncgateway import DocumentUpdateEntry
 @pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
-@pytest.mark.min_couchbase_servers(1)
 class TestReplicationFunctional(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_roles_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
@@ -755,6 +754,7 @@ class TestReplicationFunctional(CBLTestClass):
     async def test_default_conflict_withConflicts_withChannels(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ):
+        await self.skip_if_sgw_not(cblpytest.sync_gateways[0], "<=4.0.0")
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "posts")

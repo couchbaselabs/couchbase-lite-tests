@@ -3,8 +3,6 @@
 #include "KeyPath.h"
 #include "JSON.h"
 
-#include FLEECE_HEADER(FLExpert.h)
-
 #include <unordered_set>
 
 using namespace std;

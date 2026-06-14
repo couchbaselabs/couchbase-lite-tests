@@ -7,16 +7,20 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
+import packaging.version
+import requests
+import tenacity
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
+from pydantic import BaseModel
 
-from cbltest.api.error import CblSyncGatewayBadResponseError
+from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_error, cbl_info, cbl_warning
+from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
 from cbltest.utils import assert_not_null
 from cbltest.version import VERSION
 
@@ -259,11 +263,24 @@ class AllDocumentsResponseRow:
         """Gets the either revid or cv, whichever is populated (at least one must be)"""
         return cast(str, self.__revid if self.__revid is not None else self.__cv)
 
-    def __init__(self, key: str, id: str, revid: str | None, cv: str | None) -> None:
+    @property
+    def doc(self) -> dict | None:
+        """Gets the document body (only available if include_docs=True was used)"""
+        return self.__doc
+
+    def __init__(
+        self,
+        key: str,
+        id: str,
+        revid: str | None,
+        cv: str | None,
+        doc: dict | None = None,
+    ) -> None:
         self.__key = key
         self.__id = id
         self.__revid = revid
         self.__cv = cv
+        self.__doc = doc
 
 
 class AllDocumentsResponse:
@@ -289,12 +306,14 @@ class AllDocumentsResponse:
         self.__revmap = dict()
         for row in cast(list[dict], input["rows"]):
             rev = cast(dict, row["value"])
+            doc = cast(dict, row["doc"]) if "doc" in row else None
             self.__rows.append(
                 AllDocumentsResponseRow(
                     row["key"],
                     row["id"],
                     cast(str, rev["rev"]) if "rev" in rev else None,
                     cast(str, rev["cv"]) if "cv" in rev else None,
+                    doc,
                 )
             )
             self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
@@ -476,6 +495,9 @@ class CouchbaseVersion(ABC):
         self.__version = parsed[0]
         self.__build_number = parsed[1]
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.__raw})"
+
 
 class SyncGatewayVersion(CouchbaseVersion):
     """
@@ -483,12 +505,56 @@ class SyncGatewayVersion(CouchbaseVersion):
     """
 
     def parse(self, input: str) -> tuple[str, int]:
-        first_lparen = input.find("(")
-        first_semicol = input.find(";")
-        if first_lparen == -1 or first_semicol == -1:
-            return ("unknown", 0)
+        # Version parsing can be different for dev builds and release builds. In a dev build, it is possible to miss a build number.
+        #
+        # Example input:
+        #   Couchbase Sync Gateway/4.0.0(350;def456)
+        #   4.0.0(350;def456)
+        #   4.0.0
 
-        return input[0:first_lparen], int(input[first_lparen + 1 : first_semicol])
+        # extract everything between an optional / and an option ( to represent a major.minor.patch build number
+        m = re.search(r"(?:^|/)([\d\.]+)(?=\s*\(|$)", input)
+        # (?:^|/)(?P<v>[\d\.]+)(?:\s*\(|$)", input)
+        if m:
+            version = m.group(1).strip()
+        else:
+            cbl_warning(f"Could not extract version from SGW version string: '{input}'")
+            version = "unknown"
+
+        # extract everything between ( and a ; character to guess at a build number
+        m = re.search(r"(?<=\()([^;)]+)", input)
+        if m:
+            try:
+                build = int(m.group())
+            except ValueError as e:
+                cbl_warning(
+                    f"Could not parse build number {m.group()} from SGW version string: '{input}': {e}"
+                )
+                build = 0
+        else:
+            cbl_warning(
+                f"Could not parse build number from SGW version string: '{input}'"
+            )
+            build = 0
+        return version, build
+
+
+class SyncGatewayStatusVendor(BaseModel):
+    """
+    Output of vendor field of /_status endpoint of Sync Gateway
+    """
+
+    name: str
+    version: str
+
+
+class SyncGatewayStatusResponse(BaseModel):
+    """
+    Output of GET /_status endpoint of Sync Gateway
+    """
+
+    version: str  # this version does not always include the full build number if it is a dev build
+    vendor: SyncGatewayStatusVendor
 
 
 class DatabaseStatusResponse:
@@ -520,7 +586,7 @@ class DatabaseStatusResponse:
 class _SyncGatewayBase:
     """
     Base class for Sync Gateway clients containing common document and database operations.
-    This class should not be instantiated directly - use SyncGateway or SyncGatewayPublic instead.
+    This class should not be instantiated directly - use SyncGateway or SyncGatewayUserClient instead.
     """
 
     def __init__(
@@ -562,6 +628,11 @@ class _SyncGatewayBase:
     def secure(self) -> bool:
         """Gets whether the Sync Gateway instance uses TLS"""
         return self.__secure
+
+    @property
+    def scheme(self) -> str:
+        """Gets the URL scheme to use when connecting to the Sync Gateway instance (http or https)"""
+        return "https://" if self.secure else "http://"
 
     def _create_session(
         self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None
@@ -620,22 +691,52 @@ class _SyncGatewayBase:
 
             return ret_val
 
-    async def get_version(self) -> CouchbaseVersion:
-        # Telemetry not really important for this call
-        scheme = "https://" if self.secure else "http://"
-        async with self._create_session(
-            self.secure, scheme, self.hostname, 4984, None
-        ) as s:
-            resp = await self._send_request("get", "/", session=s)
-            assert isinstance(resp, dict)
-            resp_dict = cast(dict, resp)
-            raw_version = _get_typed_required(resp_dict, "version", str)
-            assert "/" in raw_version
-            return SyncGatewayVersion(raw_version.split("/")[1])
+    async def supports_version_vectors(self) -> bool:
+        """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
+        version = await self.get_version()
+        return packaging.version.parse(version.version) >= packaging.version.parse(
+            "4.0"
+        )
+
+    async def get_version(self) -> SyncGatewayVersion:
+        """Return version of Sync Gateway"""
+        resp = await self._send_request("get", "/_status")
+        assert isinstance(resp, dict)
+        model = SyncGatewayStatusResponse.model_validate(resp)
+
+        # In the case of a dev build, it is not possible to determine a build number, but there is a
+        # major.minor version.
+        # There only backward compatible difference is if "vendor.version" substring is contained in "version""
+
+        # In a production build, the output:
+        #
+        # "vendor": {
+        #    "version": "4.0"
+        # },
+        # "version": "Couchbase Sync Gateway/4.0.4(8;release) EE"
+        #
+        # In a dev build, the output:
+        #
+        # "vendor": {
+        #    "version": "4.0"
+        # },
+        # "version": "Couchbase Sync Gateway/() EE"
+        if model.vendor.version in model.version:
+            sg_version = SyncGatewayVersion(model.version)
+        else:
+            sg_version = SyncGatewayVersion(model.vendor.version)
+        try:
+            packaging.version.parse(sg_version.version)
+        except packaging.version.InvalidVersion as exc:
+            raise CblTestError(
+                "Failed to parse Sync Gateway version from /_status response: {resp}\n"
+                f"version={model.version}"
+            ) from exc
+        return sg_version
 
     def tls_cert(self) -> str | None:
         if not self.secure:
-            cbl_warning(
+            cbl_trace(
                 "Sync Gateway instance not using TLS, returning empty tls_cert..."
             )
             return None
@@ -680,6 +781,24 @@ class _SyncGatewayBase:
         doc_reads_bytes = db_stats["doc_reads_bytes_blip"]
         doc_writes_bytes = db_stats["doc_writes_bytes_blip"]
         return doc_reads_bytes, doc_writes_bytes
+
+    async def get_delta_sync_stats(self, dataset_name: str) -> dict:
+        """
+        Gets the ``delta_sync`` counters for a database from ``GET /_expvar``.
+        Returns an empty dict if the section is absent.
+
+        :param dataset_name: The name of the SGW database to inspect.
+        """
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+
+        try:
+            db_section = expvars["syncgateway"]["per_db"][dataset_name]
+        except KeyError:
+            return {}
+        delta = db_section.get("delta_sync")
+        return delta if isinstance(delta, dict) else {}
 
     async def _put_database(
         self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0
@@ -741,8 +860,8 @@ class _SyncGatewayBase:
                     current_span.add_event("SGW returned 500, retry")
                     await asyncio.sleep(2)
                     await self._delete_database(db_name, retry_count + 1)
-                elif e.code == 403:
-                    pass
+                elif e.code == 403 or e.code == 404:
+                    pass  # Database doesn't exist anyway.
                 else:
                     raise
 
@@ -839,6 +958,7 @@ class _SyncGatewayBase:
         db_name: str,
         scope: str = "_default",
         collection: str = "_default",
+        include_docs: bool = False,
     ) -> AllDocumentsResponse:
         """
         Gets all the documents in the given collection from Sync Gateway (id and revid)
@@ -846,6 +966,7 @@ class _SyncGatewayBase:
         :param db_name: The name of the Sync Gateway database to query
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
+        :param include_docs: If True, include full document bodies in the response (efficient bulk fetching)
         """
         with self._tracer.start_as_current_span(
             "get_all_documents",
@@ -853,10 +974,15 @@ class _SyncGatewayBase:
                 "cbl.database.name": db_name,
                 "cbl.scope.name": scope,
                 "cbl.collection.name": collection,
+                "cbl.include_docs": include_docs,
             },
         ):
+            params = {}
+            if include_docs:
+                params["include_docs"] = "true"
+
             resp = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/_all_docs"
+                "get", f"/{db_name}.{scope}.{collection}/_all_docs", params=params
             )
 
             assert isinstance(resp, dict)
@@ -1325,9 +1451,8 @@ class _SyncGatewayBase:
         )
         params = {"rev": revision}
 
-        scheme = "https://" if self.secure else "http://"
         async with self._create_session(
-            self.secure, scheme, self.hostname, 4984, auth
+            self.secure, self.scheme, self.hostname, 4984, auth
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
@@ -1595,6 +1720,21 @@ class SyncGateway(_SyncGatewayBase):
         """
         super().__init__(url, username, password, port, secure)
         self.__public_port = public_port
+        r = requests.get(
+            f"{self.scheme}{url}:{port}/_config",
+            auth=(username, password),
+            # disable hostname verification as we do in _create_session
+            verify=False,
+            timeout=10,
+        )
+        r.raise_for_status()
+        config = r.json()
+        try:
+            self.using_rosmar = config["bootstrap"]["server"].startswith("rosmar")
+        except KeyError:
+            raise CblTestError(
+                f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
+            ) from None
 
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
@@ -1826,9 +1966,8 @@ class SyncGateway(_SyncGatewayBase):
         # Check if SGW is already running by probing the public endpoint (4984)
         try:
             # Use a short timeout to distinguish "not running" from "slow"
-            scheme = "https://" if self.secure else "http://"
             async with self._create_session(
-                self.secure, scheme, self.hostname, 4984, None
+                self.secure, self.scheme, self.hostname, 4984, None
             ) as session:
                 async with session.get("/", timeout=ClientTimeout(total=5)) as resp:
                     if resp.status == 200:
@@ -1853,6 +1992,23 @@ class SyncGateway(_SyncGatewayBase):
                         raise Exception(f"Failed to start SGW: {resp.status} - {body}")
                     # Wait a bit for SGW to fully initialize
                     await asyncio.sleep(5)
+
+    @tenacity.retry(
+        wait=tenacity.wait_random_exponential(multiplier=1, max=10),
+        # Sync Gateway polling time is 10s, so use bounded exponential backoff with jitter
+        # and wait up to 60s for polling time + any additional work.
+        stop=tenacity.stop_after_delay(60),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type(AssertionError),
+    )
+    async def wait_for_no_databases(self, bucket_name: str):
+        with self._tracer.start_as_current_span("get_all_dbs"):
+            resp = await self._send_request("get", "/_all_dbs?verbose=true")
+            assert isinstance(resp, list), resp
+            for db in resp:
+                assert db["bucket"] != bucket_name, (
+                    f"Database {db=} is still backed by bucket {bucket_name}"
+                )
 
     async def wait_for_db_gone_clusterwide(
         self,

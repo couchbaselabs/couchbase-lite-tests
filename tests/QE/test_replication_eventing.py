@@ -16,7 +16,6 @@ from cbltest.api.replicator_types import (
 @pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
-@pytest.mark.min_couchbase_servers(1)
 class TestReplicationEventing(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_replication_for_20mb_doc(
@@ -92,7 +91,7 @@ class TestReplicationEventing(CBLTestClass):
         self.mark_test_step("Wait until the replicator is stopped.")
         status = await replicator.wait_for(
             ReplicatorActivityLevel.STOPPED,
-            timedelta(seconds=5),
+            timedelta(seconds=30),
             timedelta(seconds=300),
         )
         assert status.error is None, (

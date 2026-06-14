@@ -20,6 +20,7 @@
 | name     | content_type | digest                                      | length    |
 | :------- | ------------ | ------------------------------------------- | --------- |
 | xl1.jpg  | image/jpeg   | sha1-35626dfbdafb966833ee60121cb7edcf9884bd3f | 21200000  |
+| xl2.jpg  | image/jpeg   | sha1-49886561f8e26ed5e2ae549897a28aaab44881bd | 52428800  |
 
 ## Small Size
 
