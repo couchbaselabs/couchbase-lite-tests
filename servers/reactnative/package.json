@@ -14,7 +14,7 @@
     "postinstall": "node scripts/patch-android-cert-pinning.js"
   },
   "dependencies": {
-    "cbl-reactnative": "^1.0.1",
+    "cbl-reactnative": "file:./cbl-reactnative-1.1.0.tgz",
     "react": "18.3.1",
     "react-native": "0.76.2",
     "react-native-launch-arguments": "^4.1.1",
