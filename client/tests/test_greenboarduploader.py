@@ -14,7 +14,11 @@ from cbltest import CBLPyTest
 from cbltest.api import testserver
 from cbltest.api.syncgateway import SyncGateway, SyncGatewayVersion
 from cbltest.configparser import ParsedConfig
-from cbltest.greenboarduploader import GreenboardUploader, RunResult
+from cbltest.greenboarduploader import (
+    GreenboardUploader,
+    RunResult,
+    resolve_job_url,
+)
 from cbltest.plugins import greenboard_fixture
 from cbltest.requests import RequestFactory
 from cbltest.responses import GetRootResponse
@@ -27,6 +31,19 @@ FIXED_UNIX_TS = (FIXED_NOW - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_se
 # Importing `greenboard` directly into module scope would expose it as an autouse
 # fixture to pytest. Access via the module and unwrap to get the raw async generator.
 _raw_greenboard = inspect.unwrap(greenboard_fixture.greenboard)
+
+
+@pytest.fixture(autouse=True)
+def _clear_build_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Strip ``BUILD_URL`` from the test environment so ``resolve_job_url()``
+    deterministically returns ``"local"``.
+
+    Without this, a Jenkins-style host that happens to have ``BUILD_URL``
+    exported in the shell would leak its real value into doc assertions
+    and flake the suite. Tests that exercise the BUILD_URL-present path
+    set it explicitly via ``monkeypatch.setenv``.
+    """
+    monkeypatch.delenv("BUILD_URL", raising=False)
 
 
 def make_report(
@@ -188,6 +205,7 @@ class TestGreenboardUploaderDocument:
             passCount=2,
             platform="couchbase-lite-ios",
             os="iOS",
+            jobUrl="local",
         )
 
     def test_document_platform_and_os(self):
@@ -205,6 +223,7 @@ class TestGreenboardUploaderDocument:
             passCount=1,
             platform="couchbase-lite-net",
             os="Android",
+            jobUrl="local",
         )
 
     def test_version_and_build_parsed_from_version_string(self):
@@ -222,6 +241,7 @@ class TestGreenboardUploaderDocument:
             passCount=1,
             platform="couchbase-lite-ios",
             os="iOS",
+            jobUrl="local",
         )
 
     def test_sgw_version_field_with_sgw(self):
@@ -240,6 +260,7 @@ class TestGreenboardUploaderDocument:
             passCount=1,
             platform="couchbase-lite-ios",
             os="iOS",
+            jobUrl="local",
         )
 
     def test_sgw_platform_uses_sgw_version_for_build(self):
@@ -258,6 +279,7 @@ class TestGreenboardUploaderDocument:
             passCount=1,
             platform="sync-gateway",
             os="n/a",
+            jobUrl="local",
         )
 
     def test_no_sgw_version_sets_na(self):
@@ -275,6 +297,7 @@ class TestGreenboardUploaderDocument:
             passCount=1,
             platform="couchbase-lite-ios",
             os="iOS",
+            jobUrl="local",
         )
 
     def test_setup_failure_skips_upload(self):
@@ -341,6 +364,7 @@ class TestGreenboardFixture:
             passCount=0,
             platform="couchbase-lite-ios",
             os="iOS",
+            jobUrl="local",
         )
 
     @pytest.mark.asyncio
@@ -374,6 +398,7 @@ class TestGreenboardFixture:
             passCount=1,
             platform="sync-gateway",
             os="iOS",
+            jobUrl="local",
         )
 
     @pytest.mark.asyncio
@@ -409,6 +434,7 @@ class TestGreenboardFixture:
             passCount=1,
             platform="sync-gateway",
             os="iOS",
+            jobUrl="local",
         )
 
     @pytest.mark.asyncio
@@ -440,6 +466,7 @@ class TestGreenboardFixture:
             passCount=0,
             platform="couchbase-lite-ios",
             os="n/a",
+            jobUrl="local",
         )
 
     @pytest.mark.asyncio
@@ -461,6 +488,7 @@ class TestGreenboardFixture:
             passCount=0,
             platform="couchbase-lite-ios",
             os="iOS",
+            jobUrl="local",
         )
 
     @pytest.mark.asyncio
@@ -481,6 +509,7 @@ class TestGreenboardFixture:
             passCount=0,
             platform="sync-gateway",
             os="n/a",
+            jobUrl="local",
         )
 
     @pytest.mark.asyncio
@@ -575,6 +604,7 @@ class TestRunResultFullDocument:
                 passCount=2,
                 platform="couchbase-lite-ios",
                 os="iOS",
+                jobUrl="local",
             ).model_dump(by_alias=True),
             "uploaded": FIXED_UNIX_TS,
             "date": "2024-03-15",
@@ -596,7 +626,84 @@ class TestRunResultFullDocument:
                 passCount=1,
                 platform="sync-gateway",
                 os="n/a",
+                jobUrl="local",
             ).model_dump(by_alias=True),
             "uploaded": FIXED_UNIX_TS,
             "date": "2024-03-15",
         }
+
+
+class TestResolveJobUrl:
+    """Direct unit tests for :func:`resolve_job_url`.
+
+    Documents the contract greenboard's bar/matrix graphs depend on:
+    a real Jenkins ``BUILD_URL`` flows through verbatim; off-CI runs
+    (or runs where the env var is explicitly cleared) collapse to the
+    literal ``"local"`` so the UI never deep-links to a dead URL.
+    """
+
+    def test_build_url_present_returns_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("BUILD_URL", "https://jenkins.example.com/job/foo/123/")
+        assert resolve_job_url() == "https://jenkins.example.com/job/foo/123/"
+
+    def test_build_url_absent_returns_local(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("BUILD_URL", raising=False)
+        assert resolve_job_url() == "local"
+
+    def test_build_url_empty_returns_local(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # An empty-string env value is operationally indistinguishable from
+        # "not on a Jenkins run" — collapse it to "local" so we never write
+        # a bare empty string into the greenboard doc.
+        monkeypatch.setenv("BUILD_URL", "")
+        assert resolve_job_url() == "local"
+
+
+class TestJobUrlPropagation:
+    """End-to-end coverage: a real ``BUILD_URL`` reaches the uploaded doc
+    on both upload paths (standard ``upload`` and ``upload_upgrade_batch``).
+    """
+
+    def test_build_url_propagates_to_standard_upload(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        build_url = "https://jenkins.example.com/job/cbl-ios/456/"
+        monkeypatch.setenv("BUILD_URL", build_url)
+        uploader = make_uploader()
+        drive_hook(uploader, make_report("call", passed=True))
+
+        with patch.object(uploader, "_upload_document") as mock_upload:
+            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b1234", None)
+
+        assert mock_upload.call_args[0][0].job_url == build_url
+
+    def test_build_url_propagates_to_upgrade_batch(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        build_url = "https://jenkins.example.com/job/upg-sgw/789/"
+        monkeypatch.setenv("BUILD_URL", build_url)
+
+        # Minimal results file representing a clean two-step upgrade run.
+        results_file = tmp_path / "sgw_upgrade_results.json"
+        results_file.write_text(
+            '{"upgradePath": ["3.3.0", "4.0.0"], "iterations": ['
+            '{"phase": "initial", "nodeIndex": null, "upgradeFrom": "initial", '
+            '"upgradeTo": "3.3.0", "build": 100, "passCount": 5, "failCount": 0, '
+            '"failed": false}, '
+            '{"phase": "complete", "nodeIndex": null, "upgradeFrom": "3.3.0", '
+            '"upgradeTo": "4.0.0", "build": 200, "passCount": 5, "failCount": 0, '
+            '"failed": false}]}'
+        )
+
+        uploader = make_uploader()
+        with patch.object(uploader, "_upsert") as mock_upsert:
+            uploader.upload_upgrade_batch(str(results_file))
+
+        doc = mock_upsert.call_args[0][0]
+        assert doc["jobUrl"] == build_url
+        assert doc["platform"] == "sgw-upgrade"

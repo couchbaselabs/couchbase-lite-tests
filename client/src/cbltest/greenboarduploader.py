@@ -53,6 +53,28 @@ def count_from_junit_xml(xml_path: Path) -> tuple[int, int, int]:
     return total_pass, total_fail, total_error
 
 
+def resolve_job_url() -> str:
+    """Return the Jenkins build URL for the current run, or ``"local"`` off-CI.
+
+    Jenkins exports ``BUILD_URL`` automatically for every build — the URL
+    of the specific run's status page (e.g.
+    ``https://jenkins.example.com/job/foo/123/``). That's exactly the
+    target greenboard's bar/matrix graphs should deep-link to, so we
+    pass it through verbatim. Local pytest invocations have no
+    ``BUILD_URL`` set and there are no persisted Jenkins logs to link
+    to; those records carry the literal ``"local"`` so the UI can
+    render them without dangling at a dead URL.
+
+    Resolved at upload time (not at uploader construction) because the
+    upgrade-batch path runs from a separate Python process invoked by
+    the wrapper shell script — the same Jenkins env is still present
+    there since it's the same job, and reading env on each call keeps
+    a single source of truth without threading the value through
+    constructors.
+    """
+    return os.environ.get("BUILD_URL") or "local"
+
+
 class RunResult(BaseModel):
     """
     Store the information for a test run in greenboard
@@ -67,6 +89,7 @@ class RunResult(BaseModel):
     pass_count: int = Field(alias="passCount")  # number of passing tests
     platform: str  # CBL platform
     os: str  # Operating system for CBL
+    job_url: str = Field(alias="jobUrl")  # Jenkins BUILD_URL, or "local" off-CI
 
 
 class GreenboardUploader:
@@ -208,6 +231,7 @@ class GreenboardUploader:
                 passCount=resolved_pass,
                 platform=platform,
                 os=os_name,
+                jobUrl=resolve_job_url(),
             )
         )
 
@@ -441,6 +465,7 @@ class GreenboardUploader:
                 "failCount": fail_count,
                 "failedAt": failed_at,
                 "platform": "sgw-upgrade",
+                "jobUrl": resolve_job_url(),
             }
         )
         cbl_info(
