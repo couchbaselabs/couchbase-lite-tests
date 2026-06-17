@@ -24,7 +24,7 @@ import {
 import {LaunchArguments} from 'react-native-launch-arguments';
 
 import {TestServer, StateNames, TestServerState} from './testServer';
-import {TDKImpl, APIVersion} from './tdk';
+import type {TDKImpl} from './tdk';
 import {WebSocketState} from './webSocketClient';
 
 interface AutoConnectParams {
@@ -86,62 +86,74 @@ const App: React.FC = () => {
       setStatus('Connecting...');
       addLog(`Connecting to ${url} as device ${id}...`);
 
-      const tdk = new TDKImpl();
-      tdk.onLog = addLog;
-      tdkRef.current = tdk;
+      void (async () => {
+        try {
+          // Defer loading cbl-reactnative until the RN bridge is ready (embedded bundle).
+          const {TDKImpl, APIVersion} = await import('./tdk');
+          const tdk = new TDKImpl();
+          tdk.onLog = addLog;
+          tdkRef.current = tdk;
 
-      const server = new TestServer(id.trim(), APIVersion);
-      server.onLog = addLog;
-      server.delegate = tdk;
+          const server = new TestServer(id.trim(), APIVersion);
+          server.onLog = addLog;
+          server.delegate = tdk;
 
-      server.onStateChange = (state: WebSocketState) => {
-        if (serverRef.current !== server) {
-          return;
-        }
-
-        const stateName = StateNames[state] ?? 'unknown';
-        setStatus(server.error ?? stateName);
-        addLog(`Connection state: ${stateName}`);
-
-        if (state === WebSocketState.Open) {
-          setIsConnected(true);
-          setIsConnecting(false);
-          if (autoConnectRef.current) {
-            autoConnectRef.current.retryCount = 0;
-          }
-        } else if (
-          state === WebSocketState.Closed ||
-          state === WebSocketState.Closing
-        ) {
-          setIsConnected(false);
-          setIsConnecting(false);
-          if (server.error) {
-            addLog(`Error: ${server.error}`);
-          }
-
-          const ac = autoConnectRef.current;
-          if (ac && state === WebSocketState.Closed) {
-            ac.retryCount++;
-            if (ac.retryCount <= MAX_AUTO_CONNECT_RETRIES) {
-              const delaySec = AUTO_CONNECT_RETRY_INTERVAL_MS / 1000;
-              addLog(
-                `Auto-reconnect in ${delaySec}s (attempt ${ac.retryCount}/${MAX_AUTO_CONNECT_RETRIES})...`,
-              );
-              setStatus(`Retrying (${ac.retryCount}/${MAX_AUTO_CONNECT_RETRIES})...`);
-              setTimeout(
-                () => connectToServer(ac.id, ac.url),
-                AUTO_CONNECT_RETRY_INTERVAL_MS,
-              );
-            } else {
-              addLog('Auto-connect failed: max retries exceeded');
-              setStatus('Auto-connect failed');
+          server.onStateChange = (state: WebSocketState) => {
+            if (serverRef.current !== server) {
+              return;
             }
-          }
-        }
-      };
 
-      serverRef.current = server;
-      server.connect(url.trim());
+            const stateName = StateNames[state] ?? 'unknown';
+            setStatus(server.error ?? stateName);
+            addLog(`Connection state: ${stateName}`);
+
+            if (state === WebSocketState.Open) {
+              setIsConnected(true);
+              setIsConnecting(false);
+              if (autoConnectRef.current) {
+                autoConnectRef.current.retryCount = 0;
+              }
+            } else if (
+              state === WebSocketState.Closed ||
+              state === WebSocketState.Closing
+            ) {
+              setIsConnected(false);
+              setIsConnecting(false);
+              if (server.error) {
+                addLog(`Error: ${server.error}`);
+              }
+
+              const ac = autoConnectRef.current;
+              if (ac && state === WebSocketState.Closed) {
+                ac.retryCount++;
+                if (ac.retryCount <= MAX_AUTO_CONNECT_RETRIES) {
+                  const delaySec = AUTO_CONNECT_RETRY_INTERVAL_MS / 1000;
+                  addLog(
+                    `Auto-reconnect in ${delaySec}s (attempt ${ac.retryCount}/${MAX_AUTO_CONNECT_RETRIES})...`,
+                  );
+                  setStatus(`Retrying (${ac.retryCount}/${MAX_AUTO_CONNECT_RETRIES})...`);
+                  setTimeout(
+                    () => connectToServer(ac.id, ac.url),
+                    AUTO_CONNECT_RETRY_INTERVAL_MS,
+                  );
+                } else {
+                  addLog('Auto-connect failed: max retries exceeded');
+                  setStatus('Auto-connect failed');
+                }
+              }
+            }
+          };
+
+          serverRef.current = server;
+          server.connect(url.trim());
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          addLog(`ERROR: failed to initialize TDK: ${msg}`);
+          console.error('[App] TDK init failed:', err);
+          setIsConnecting(false);
+          setStatus('TDK init failed');
+        }
+      })();
     },
     [addLog],
   );

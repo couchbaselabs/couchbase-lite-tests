@@ -42,6 +42,7 @@ local.properties
 
 # Bundle artifacts
 *.jsbundle
+android/app/src/main/assets/
 
 # CocoaPods
 ios/Pods/

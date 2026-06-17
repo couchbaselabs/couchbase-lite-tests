@@ -1,3 +1,4 @@
+import json
 import os
 import platform
 import shutil
@@ -361,6 +362,24 @@ class _ReactNativeTestServerBase(TestServer):
             return DOWNLOADED_TEST_SERVER_DIR / "reactnative" / self.version
         return RN_TEST_SERVER_DIR
 
+    def _prepare_npm(self) -> None:
+        """Pin the cbl-reactnative dependency to the ProGet build for this version.
+
+        package.json ships with a default version of couchbase-lite-react-native.
+        This method overwrites that entry with the exact build version
+        (e.g. 1.1.0-14) so that ``npm install`` fetches the correct artifact
+        from the ProGet cbl-npm feed.
+        """
+        pkg_path = self._working_dir() / "package.json"
+        with open(pkg_path) as f:
+            pkg = json.load(f)
+        pkg["dependencies"]["cbl-reactnative"] = (
+            f"npm:couchbase-lite-react-native@{self.version}"
+        )
+        with open(pkg_path, "w") as f:
+            json.dump(pkg, f, indent=2)
+            f.write("\n")
+
 
 @TestServer.register("reactnative_android")
 class ReactNativeAndroidTestServer(_ReactNativeTestServerBase):
@@ -379,6 +398,7 @@ class ReactNativeAndroidTestServer(_ReactNativeTestServerBase):
     def build(self) -> None:
         header(f"Building React Native Android test server {self.version}")
         working = self._working_dir()
+        self._prepare_npm()
         subprocess.run(["npm", "install"], check=True, cwd=working)
         subprocess.run(
             ["./gradlew", "assembleRelease"],
@@ -505,6 +525,7 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
     def build(self) -> None:
         header(f"Building React Native iOS test server {self.version}")
         working = self._working_dir()
+        self._prepare_npm()
         subprocess.run(["npm", "install"], check=True, cwd=working)
 
         # React Native's Xcode build phases (including the Hermes Replace

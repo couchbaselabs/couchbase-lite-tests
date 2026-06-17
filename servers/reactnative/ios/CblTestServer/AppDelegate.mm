@@ -21,10 +21,15 @@
 
 - (NSURL *)bundleURL
 {
+  // Prefer embedded bundle for test-server runs (no Metro dependency).
+  NSURL *embedded = [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
+  if (embedded) {
+    return embedded;
+  }
 #if DEBUG
   return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"index"];
 #else
-  return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
+  return embedded;
 #endif
 }
 

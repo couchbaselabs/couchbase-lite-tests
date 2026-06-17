@@ -105,11 +105,11 @@ export class TDKImpl implements tdk.TDK {
     for (const [dbName, uniqueName] of this.databases) {
       this.log(`Reset: Deleting database ${dbName} (${uniqueName})`);
       try {
-        await this.engine.database_Delete({name: uniqueName});
+        await this.engine.database_Delete({databaseUniqueName: uniqueName});
       } catch (e) {
         this.log(`Error deleting database ${dbName}: ${e}`);
         try {
-          await this.engine.database_Close({name: uniqueName});
+          await this.engine.database_Close({databaseUniqueName: uniqueName});
         } catch (e2) {
           this.log(`Error closing database ${dbName}: ${e2}`);
         }
@@ -212,9 +212,10 @@ export class TDKImpl implements tdk.TDK {
         this.log(`getAllDocuments: executing query on db="${uniqueName}": ${queryStr}`);
         this.log(`[DIAG] GetAllDocuments: executing query: ${queryStr}`);
         const result = await this.engine.query_Execute({
+          queryId: `getAllDocs_${scope}_${collection}_${Date.now()}`,
           query: queryStr,
           parameters: {},
-          name: uniqueName,
+          databaseUniqueName: uniqueName,
         });
         this.log(`[DIAG] GetAllDocuments: query_Execute result keys=${result ? Object.keys(result as any).join(',') : 'null'}`);
 
@@ -259,7 +260,7 @@ export class TDKImpl implements tdk.TDK {
 
     const result = await this.engine.collection_GetDocument({
       docId: rq.document.id,
-      name: uniqueName,
+      databaseUniqueName: uniqueName,
       scopeName: scope,
       collectionName: collection,
     });
@@ -307,7 +308,7 @@ export class TDKImpl implements tdk.TDK {
           try {
             const docResult = await this.engine.collection_GetDocument({
               docId: update.documentID,
-              name: uniqueName,
+              databaseUniqueName: uniqueName,
               scopeName: scope,
               collectionName: collection,
             });
@@ -389,7 +390,7 @@ export class TDKImpl implements tdk.TDK {
             id: existingId,
             document: JSON.stringify(existingDoc),
             blobs: JSON.stringify(blobs),
-            name: uniqueName,
+            databaseUniqueName: uniqueName,
             scopeName: scope,
             collectionName: collection,
             concurrencyControl: null,
@@ -399,7 +400,7 @@ export class TDKImpl implements tdk.TDK {
         case 'DELETE': {
           await this.engine.collection_DeleteDocument({
             docId: update.documentID,
-            name: uniqueName,
+            databaseUniqueName: uniqueName,
             scopeName: scope,
             collectionName: collection,
             concurrencyControl: 1, // lastWriteWins
@@ -409,7 +410,7 @@ export class TDKImpl implements tdk.TDK {
         case 'PURGE': {
           await this.engine.collection_PurgeDocument({
             docId: update.documentID,
-            name: uniqueName,
+            databaseUniqueName: uniqueName,
             scopeName: scope,
             collectionName: collection,
           });
@@ -468,13 +469,13 @@ export class TDKImpl implements tdk.TDK {
           collection: {
             name: collection,
             scopeName: scope,
-            databaseName: uniqueName,
+            databaseUniqueName: uniqueName,
           },
           config: {
             channels: colls.channels ?? [],
             documentIds: colls.documentIDs ?? [],
-            pushFilter: pushFilterStr,
-            pullFilter: pullFilterStr,
+            ...(pushFilterStr ? {pushFilter: pushFilterStr} : {}),
+            ...(pullFilterStr ? {pullFilter: pullFilterStr} : {}),
           },
         };
         this.log(`[DIAG] StartReplicator: collectionEntry for "${collName}": channels=${JSON.stringify(colls.channels)} documentIds=${JSON.stringify(colls.documentIDs)} pushFilter=${pushFilterStr ? colls.pushFilter!.name : 'null'} pullFilter=${pullFilterStr ? colls.pullFilter!.name : 'null'}`);
@@ -888,9 +889,10 @@ export class TDKImpl implements tdk.TDK {
     const uniqueName = this.getDatabase(rq.database);
 
     const result = await this.engine.query_Execute({
+      queryId: `runQuery_${Date.now()}`,
       query: rq.query,
       parameters: {},
-      name: uniqueName,
+      databaseUniqueName: uniqueName,
     });
 
     let rows: any[] = [];
@@ -937,7 +939,7 @@ export class TDKImpl implements tdk.TDK {
 
     await this.engine.database_PerformMaintenance({
       maintenanceType: maintenanceType as any,
-      name: uniqueName,
+      databaseUniqueName: uniqueName,
     });
   }
 
@@ -1080,7 +1082,7 @@ export class TDKImpl implements tdk.TDK {
 
     this.log(`[DIAG] createDatabase: calling database_Open name="${name}"`);
     const result = await this.engine.database_Open({
-      name: name,
+      databaseName: name,
       config: new DatabaseConfiguration(),
     });
     this.log(`[DIAG] createDatabase: database_Open result=${JSON.stringify(result)}`);
@@ -1097,7 +1099,7 @@ export class TDKImpl implements tdk.TDK {
           this.log(`[DIAG] createDatabase: calling collection_CreateCollection scope="${scope}" collection="${collection}" db="${uniqueName}"`);
           await this.engine.collection_CreateCollection({
             collectionName: collection,
-            name: uniqueName,
+            databaseUniqueName: uniqueName,
             scopeName: scope,
           });
           this.log(`[DIAG] createDatabase: collection_CreateCollection OK for "${collName}"`);
@@ -1252,7 +1254,7 @@ export class TDKImpl implements tdk.TDK {
             id: docId,
             document: JSON.stringify(body),
             blobs: JSON.stringify(enrichedBlobs),
-            name: uniqueName,
+            databaseUniqueName: uniqueName,
             scopeName: scope,
             collectionName: collection,
             concurrencyControl: null,
@@ -1378,7 +1380,8 @@ export class TDKImpl implements tdk.TDK {
   private createFilterFunction(filter: tdk.Filter, collectionName: string): string {
     switch (filter.name) {
       case 'deletedDocumentsOnly':
-        return `(function(doc, flags) { return flags.includes('DELETED'); })`;
+        // Arrow fn + indexOf for JavaScriptCore compatibility (no Array.includes dependency).
+        return `(doc, flags) => { for (var i = 0; i < flags.length; i++) { if (flags[i] === 'DELETED') return true; } return false; }`;
 
       case 'documentIDs': {
         const rawParam = filter.params?.documentIDs;
@@ -1425,7 +1428,7 @@ export class TDKImpl implements tdk.TDK {
       try {
         const result = await this.engine.collection_GetDocument({
           docId,
-          name: dbName,
+          databaseUniqueName: dbName,
           scopeName,
           collectionName,
         });

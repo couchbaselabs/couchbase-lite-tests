@@ -1,7 +1,7 @@
 PODS:
   - boost (1.84.0)
-  - cbl-reactnative (1.0.1):
-    - CouchbaseLite-Swift-Enterprise (= 3.3.0)
+  - cbl-reactnative (1.1.0-14):
+    - CouchbaseLite-Swift-Enterprise (= 3.3.3)
     - DoubleConversion
     - glog
     - hermes-engine
@@ -22,7 +22,7 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - CouchbaseLite-Swift-Enterprise (3.3.0)
+  - CouchbaseLite-Swift-Enterprise (3.3.3)
   - DoubleConversion (1.1.6)
   - FBLazyVector (0.76.2)
   - fmt (9.1.0)
@@ -1746,8 +1746,8 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   boost: 1dca942403ed9342f98334bf4c3621f011aa7946
-  cbl-reactnative: 39d4dec9d6cf44daffb3eb65d62d1d84e71bcc41
-  CouchbaseLite-Swift-Enterprise: 6ad2f9e69180d8093753aa213cdcf90502989a0f
+  cbl-reactnative: 028fe7dd5d79e44b6a0cc53cef223158242115a7
+  CouchbaseLite-Swift-Enterprise: 42f504d641812abf02a9a63d47bf5363ef3fd90c
   DoubleConversion: f16ae600a246532c4020132d54af21d0ddb2a385
   FBLazyVector: bc70dcb22ad30ce734a7cce7210791dc737e230f
   fmt: 10c6e61f4be25dc963c36bd73fc7b1705fe975be
