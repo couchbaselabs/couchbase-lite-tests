@@ -1,0 +1,59 @@
+pipeline {
+    agent none
+// This job runs the dev_e2e suite against a locally provisioned backend
+// (Couchbase Server in Docker + Sync Gateway built from source). It is meant
+// to be triggered on a Sync Gateway PR merge to catch CBL <-> SGW replicator
+// regressions. The trigger is configured on the job/webhook side.
+//
+// Params (UI-defined defaults so the job can be re-triggered without editing
+// this file):
+//   SGW_REF      Sync Gateway git ref (branch/tag/commit) to build from source.
+//   CBS_VERSION  Couchbase Server version for the local container
+//                (blank = docker-compose default).
+    parameters {
+        string(name: 'SGW_REF', defaultValue: 'main', description: 'Sync Gateway git ref (branch/tag/commit) to build from source')
+        string(name: 'CBS_VERSION', defaultValue: '', description: 'Couchbase Server version for the local Docker container (blank = compose default)')
+    }
+    stages {
+        stage('Init') {
+            agent any
+            steps {
+                script {
+                    if (params.SGW_REF == '') { error "SGW_REF is required" }
+                    currentBuild.displayName = "SGW:${params.SGW_REF} (#${currentBuild.number})"
+                }
+            }
+        }
+        stage('Run Test') {
+            // Requires an agent with Docker (for the CBS container), Go (to build
+            // Sync Gateway) and uv.
+            agent { label 'mac-mini-new' }
+            environment {
+                TS_ARTIFACTS_DIR = 'sgw'
+                COUCHBASE_VERSION = "${params.CBS_VERSION}"
+            }
+            steps {
+                echo "=== Run dev_e2e against local CBS + SGW built from '${params.SGW_REF}'"
+                timeout(time: 60, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/dev_e2e/sgw/test.sh '${params.SGW_REF}'"
+                }
+                echo "=== dev_e2e Tests Complete"
+            }
+            post {
+                always {
+                    echo "=== Teardown"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/dev_e2e/sgw/teardown.sh"
+                    }
+                    archiveArtifacts artifacts: 'tests/dev_e2e/sgw/**/*', fingerprint: true, allowEmptyArchive: true
+                    echo "=== Teardown Complete"
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+        }
+    }
+}
