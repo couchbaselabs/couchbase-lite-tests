@@ -76,6 +76,10 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/sgw/teardown.sh"
                     }
+                    // Publish and archive pytest's JUnit XML so failures show
+                    // up per-test (with messages and tracebacks) in Jenkins.
+                    junit testResults: 'tests/QE/junit_result.xml', allowEmptyResults: true
+                    archiveArtifacts artifacts: 'tests/QE/junit_result.xml', fingerprint: true, allowEmptyArchive: true
                     archiveArtifacts artifacts: 'tests/QE/sgw/**/*', fingerprint: true, allowEmptyArchive: true
                     echo "=== SGW Test Teardown Complete"
                 }
