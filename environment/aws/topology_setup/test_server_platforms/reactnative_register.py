@@ -400,6 +400,7 @@ class ReactNativeAndroidTestServer(_ReactNativeTestServerBase):
         working = self._working_dir()
         self._prepare_npm()
         subprocess.run(["npm", "install"], check=True, cwd=working)
+        subprocess.run(["npm", "run", "bundle-datasets"], check=True, cwd=working)
         subprocess.run(
             ["./gradlew", "assembleRelease"],
             check=True,
@@ -527,6 +528,7 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
         working = self._working_dir()
         self._prepare_npm()
         subprocess.run(["npm", "install"], check=True, cwd=working)
+        subprocess.run(["npm", "run", "bundle-datasets"], check=True, cwd=working)
 
         # React Native's Xcode build phases (including the Hermes Replace
         # script) all resolve node via NODE_BINARY, which .xcode.env sets to

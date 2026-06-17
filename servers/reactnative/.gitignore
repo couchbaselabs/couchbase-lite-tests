@@ -43,6 +43,7 @@ local.properties
 # Bundle artifacts
 *.jsbundle
 android/app/src/main/assets/
+src/datasetBundle.ts
 
 # CocoaPods
 ios/Pods/

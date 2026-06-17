@@ -9,9 +9,10 @@
     "start": "react-native start",
     "build:android": "cd android && ./gradlew assembleDebug",
     "build:ios": "cd ios && xcodebuild -workspace CblTestServer.xcworkspace -scheme CblTestServer -configuration Debug -sdk iphoneos build",
+    "bundle-datasets": "node scripts/bundle-datasets.js",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "postinstall": "node scripts/patch-android-cert-pinning.js && node scripts/patch-android-replicator-status.js && node scripts/patch-ios-replicator-status.js && node scripts/patch-ios-logsinks.js"
+    "typecheck": "node scripts/bundle-datasets.js && tsc --noEmit",
+    "postinstall": "node scripts/patch-android-cert-pinning.js && node scripts/patch-android-replicator-status.js && node scripts/patch-ios-replicator-status.js && node scripts/patch-ios-logsinks.js && node scripts/bundle-datasets.js"
   },
   "dependencies": {
     "cbl-reactnative": "npm:couchbase-lite-react-native@1.1.0-14",

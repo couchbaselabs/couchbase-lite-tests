@@ -39,6 +39,7 @@ import {Snapshot} from './snapshot';
 import type {TestRequest} from './testServer';
 import type {JSONObject, JSONValue} from './utils';
 import * as tdk from './tdkSchema';
+import DATASETS from './datasetBundle';
 
 interface ReplicatorInfo {
   replicatorId: string;
@@ -1120,137 +1121,81 @@ export class TDKImpl implements tdk.TDK {
     dbName: string,
     datasetName: string,
   ): Promise<void> {
-    const url = tdk.kDatasetBaseURL + datasetName + '/';
-    this.log(`[DIAG] loadDataset: start dbName="${dbName}" datasetName="${datasetName}" url="${url}"`);
+    this.log(
+      `[DIAG] loadDataset: start dbName="${dbName}" datasetName="${datasetName}" (bundled)`,
+    );
 
-    const fetchRelative = async (suffix: string): Promise<string> => {
-      const fullUrl = url + suffix;
-      this.log(`[DIAG] loadDataset: fetching ${fullUrl}`);
-      const response = await fetch(fullUrl);
-      this.log(`[DIAG] loadDataset: fetch ${suffix} → HTTP ${response.status}`);
-      if (response.status !== 200) {
-        throw new HTTPError(
-          502,
-          `Unable to load dataset <${fullUrl}>: ${response.status} ${response.statusText}`,
-        );
-      }
-      return await response.text();
-    };
-
-    this.log(`Loading dataset "${datasetName}" into database "${dbName}" from ${url}`);
-
-    this.log(`[DIAG] loadDataset: fetching index.json`);
-    const indexText = await fetchRelative('index.json');
-    this.log(`[DIAG] loadDataset: index.json text (first 300 chars): ${indexText.substring(0, 300)}`);
-    const config = JSON.parse(indexText) as tdk.DatasetIndex;
-    if (
-      typeof config.name !== 'string' ||
-      !Array.isArray(config.collections)
-    ) {
+    const bundle = DATASETS[datasetName];
+    if (!bundle) {
       throw new HTTPError(
         400,
-        `Not a valid dataset index at <${url}index.json>`,
+        `Unknown dataset "${datasetName}" — not found in datasetBundle.ts`,
       );
     }
 
-    this.log(`Dataset index OK: name="${config.name}", collections=[${config.collections.join(', ')}]`);
-    this.log(`[DIAG] loadDataset: index parsed — name="${config.name}" collections=${JSON.stringify(config.collections)}`);
+    const {index, collections, blobs} = bundle;
 
-    this.log(`[DIAG] loadDataset: calling createDatabase`);
-    await this.createDatabase(dbName, config.collections);
+    if (typeof index.name !== 'string' || !Array.isArray(index.collections)) {
+      throw new HTTPError(400, `Invalid dataset index for "${datasetName}"`);
+    }
+
+    this.log(
+      `Dataset index OK: name="${index.name}", collections=[${index.collections.join(', ')}]`,
+    );
+
+    await this.createDatabase(dbName, index.collections);
     const uniqueName = this.databases.get(dbName)!;
-    this.log(`[DIAG] loadDataset: createDatabase done, uniqueName="${uniqueName}"`);
-
-    // Cache blob binaries by digest to avoid redundant network fetches.
-    // Swift's blobsFromJsonString expects: { "<path>": { "_type": "blob", "data": { "contentType": "...", "data": [bytes as integers] } } }
-    const blobDataCache = new Map<string, Uint8Array>();
-
-    const fetchBlobBinary = async (digest: string): Promise<Uint8Array | null> => {
-      if (blobDataCache.has(digest)) {
-        this.log(`[DIAG] loadDataset: blob cache HIT digest="${digest}"`);
-        return blobDataCache.get(digest)!;
-      }
-      // Strip "sha1-" prefix and replace "/" with "_" to form the filename.
-      const filename = digest.substring(5).replace(/\//g, '_');
-      const blobUrl = `https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/dbs/js/${datasetName}/Attachments/${filename}.blob`;
-      this.log(`[DIAG] loadDataset: fetching blob digest="${digest}" url="${blobUrl}"`);
-      try {
-        const resp = await fetch(blobUrl);
-        if (resp.status !== 200) {
-          this.log(`[DIAG] loadDataset: blob fetch FAILED HTTP=${resp.status} digest="${digest}"`);
-          return null;
-        }
-        const buf = await resp.arrayBuffer();
-        const bytes = new Uint8Array(buf);
-        blobDataCache.set(digest, bytes);
-        this.log(`[DIAG] loadDataset: blob fetched OK digest="${digest}" size=${bytes.byteLength}`);
-        return bytes;
-      } catch (err: any) {
-        this.log(`[DIAG] loadDataset: blob fetch ERROR digest="${digest}" error=${err?.message}`);
-        return null;
-      }
-    };
+    this.log(
+      `[DIAG] loadDataset: createDatabase done, uniqueName="${uniqueName}"`,
+    );
 
     let totalDocs = 0;
-    for (const collID of config.collections) {
-      const {scope, collection} = this.parseCollectionName(collID);
-      this.log(`[DIAG] loadDataset: processing collection "${collID}" → scope="${scope}" collection="${collection}"`);
-
-      this.log(`Fetching ${collID}.jsonl from dataset...`);
-      const jsonl = await fetchRelative(`${collID}.jsonl`);
-      const rawLines = jsonl.trim().split('\n');
-      const nonEmptyLines = rawLines.filter(l => l.trim().length > 0);
-      this.log(`  ${collID}.jsonl: ${rawLines.length} raw lines, ${nonEmptyLines.length} non-empty`);
-      this.log(`[DIAG] loadDataset: [${collID}] first non-empty line sample: ${nonEmptyLines[0]?.substring(0, 120) ?? '(none)'}`);
-      if (nonEmptyLines.length === 0) {
-        this.log(`  ${collID}: empty .jsonl — 0 docs to load (expected for pull-only collections)`);
-      }
+    for (const collId of index.collections) {
+      const {scope, collection} = this.parseCollectionName(collId);
+      const docs = collections[collId] ?? [];
+      this.log(
+        `[DIAG] loadDataset: processing collection "${collId}" — ${docs.length} doc(s)`,
+      );
 
       let collDocs = 0;
       let collErrors = 0;
-      const isHotels = collID.includes('hotel');
 
-      for (const line of rawLines) {
-        if (line.trim().length === 0) {
-          continue;
-        }
-        const docData = JSON.parse(line) as tdk.DatasetDoc;
-        const docId = docData._id;
-        const body: JSONObject = {...docData};
+      for (const docData of docs) {
+        const doc = docData as tdk.DatasetDoc;
+        const docId = doc._id;
+        const body: JSONObject = {...doc};
         delete (body as any)._id;
 
-        const rawBlobs = this.findBlobs(body, url);
-        if (isHotels) {
-          this.log(`[DIAG] loadDataset: [hotels] saving docId="${docId}" bodyKeys=${JSON.stringify(Object.keys(body))} blobCount=${Object.keys(rawBlobs).length}`);
-        }
-
-        // Enrich each blob with binary data in the format Swift's blobsFromJsonString expects:
-        // { "_type": "blob", "data": { "contentType": "...", "data": [<byte integers>] } }
-        const enrichedBlobs: Record<string, any> = {};
+        const enrichedBlobs: Record<string, unknown> = {};
+        const rawBlobs = this.findBlobs(body, '');
         for (const [blobPath, blobMeta] of Object.entries(rawBlobs)) {
           const digest = blobMeta.digest as string | undefined;
-          const contentType = (blobMeta.content_type as string | undefined) ?? 'application/octet-stream';
+          const contentType =
+            (blobMeta.content_type as string | undefined) ??
+            'application/octet-stream';
           if (digest && digest.startsWith('sha1-')) {
-            const bytes = await fetchBlobBinary(digest);
-            if (bytes !== null) {
+            const filename =
+              digest.substring(5).replace(/\//g, '_') + '.blob';
+            const b64 = blobs[filename];
+            if (b64) {
+              const binary = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
               enrichedBlobs[blobPath] = {
                 _type: 'blob',
                 data: {
                   contentType,
-                  data: Array.from(bytes),
+                  data: Array.from(binary),
                 },
               };
-              if (isHotels) {
-                this.log(`[DIAG] loadDataset: [hotels] blob enriched docId="${docId}" path="${blobPath}" byteLen=${bytes.byteLength}`);
-              }
             } else {
-              this.log(`[DIAG] loadDataset: [hotels] blob data unavailable docId="${docId}" path="${blobPath}" — skipping blob`);
+              this.log(
+                `[DIAG] loadDataset: blob not found in bundle docId="${docId}" path="${blobPath}" filename="${filename}"`,
+              );
             }
           }
         }
 
         try {
-          const saveResult = await this.engine.collection_Save({
+          await this.engine.collection_Save({
             id: docId,
             document: JSON.stringify(body),
             blobs: JSON.stringify(enrichedBlobs),
@@ -1259,26 +1204,25 @@ export class TDKImpl implements tdk.TDK {
             collectionName: collection,
             concurrencyControl: null,
           });
-          if (isHotels) {
-            this.log(`[DIAG] loadDataset: [hotels] save OK docId="${docId}" result=${JSON.stringify(saveResult)}`);
-          }
           collDocs++;
         } catch (saveErr: any) {
           collErrors++;
-          this.log(`[DIAG] loadDataset: [${collID}] SAVE ERROR docId="${docId}" error=${JSON.stringify(saveErr)} message=${saveErr?.message}`);
-          if (collErrors <= 3) {
-            this.log(`Error saving doc "${docId}" in ${collID}: ${saveErr.message}`);
-          }
+          this.log(
+            `[DIAG] loadDataset: [${collId}] SAVE ERROR docId="${docId}" error=${saveErr?.message}`,
+          );
         }
       }
 
-      this.log(`Loaded ${collDocs} docs into ${collID}${collErrors > 0 ? ` (${collErrors} errors)` : ''}`);
-      this.log(`[DIAG] loadDataset: [${collID}] SUMMARY — saved=${collDocs} errors=${collErrors} out of ${nonEmptyLines.length} lines`);
+      this.log(
+        `Loaded ${collDocs} docs into ${collId}${collErrors > 0 ? ` (${collErrors} errors)` : ''}`,
+      );
       totalDocs += collDocs;
     }
 
-    this.log(`Dataset "${datasetName}" loaded: ${totalDocs} total docs into "${dbName}"`);
-    this.log(`[DIAG] loadDataset: done — totalDocs=${totalDocs}`);
+    this.log(
+      `Dataset "${datasetName}" loaded: ${totalDocs} total docs into "${dbName}"`,
+    );
+    this.log(`[DIAG] loadDataset: done`);
   }
 
   private findBlobs(
