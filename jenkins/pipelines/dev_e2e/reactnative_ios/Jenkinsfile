@@ -61,8 +61,6 @@ pipeline {
                     }
                     archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
                     archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/dev_e2e/junit_*.xml', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/dev_e2e/pytest_*.log', fingerprint: true, allowEmptyArchive: true
                 }
             }
         }

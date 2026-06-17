@@ -38,5 +38,30 @@ uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 pushd $DEV_E2E_TESTS_DIR > /dev/null
 rm -rf http_log testserver.log
 
-bash "${SHARED_PIPELINES_DIR}/run_rn_dev_e2e_pytest.sh" ios
+# Full suite (restore when finished debugging):
+# echo "Run the React Native iOS tests"
+# uv run pytest \
+#     --maxfail=7 \
+#     -v \
+#     -W ignore::DeprecationWarning \
+#     --config config.json \
+#     --dataset-version $DATASET_VERSION \
+#     --ignore=test_multipeer.py \
+#     -k "not listener and not multipeer and not custom_conflict" \
+#     --tb=short \
+#     --timeout=300
+
+echo "Run the React Native iOS tests (failed tests only)"
+uv run pytest \
+    -v \
+    -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version $DATASET_VERSION \
+    --tb=short \
+    --timeout=300 \
+    test_replication_filter.py::TestReplicationFilter::test_pull_document_ids_filter \
+    test_replication_filter.py::TestReplicationFilter::test_pull_channels_filter \
+    test_replication_filter.py::TestReplicationFilter::test_replicate_public_channel \
+    test_replication_filter.py::TestReplicationFilter::test_custom_push_filter \
+    test_replication_filter.py::TestReplicationFilter::test_custom_pull_filter
 popd > /dev/null

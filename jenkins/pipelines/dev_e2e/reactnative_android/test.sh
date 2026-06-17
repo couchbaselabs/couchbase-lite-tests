@@ -60,6 +60,37 @@ echo "CBL_NATIVE_WS_RELAUNCH_SCRIPT=$CBL_NATIVE_WS_RELAUNCH_SCRIPT"
 echo "Relaunch script exists: $(test -f "$CBL_NATIVE_WS_RELAUNCH_SCRIPT" && echo yes || echo NO - FILE MISSING)"
 echo "Python executable used by uv: $(uv run python -c 'import sys; print(sys.executable)')"
 
-# Full suite (or only previously failed tests — see run_rn_dev_e2e_pytest.sh):
-bash "${SHARED_PIPELINES_DIR}/run_rn_dev_e2e_pytest.sh" android
+# Single-test run (restore the full-suite block below when finished debugging).
+# echo "Run the React Native Android tests (only test_push_after_remove_access)"
+# uv run pytest \
+#     -v \
+#     -W ignore::DeprecationWarning \
+#     --config config.json \
+#     --dataset-version $DATASET_VERSION \
+#     --tb=short \
+#     --timeout=300 \
+#     test_replication_auto_purge.py::TestReplicationAutoPurge::test_push_after_remove_access
+
+# Full suite (restore when finished debugging):
+# echo "Run the React Native Android tests"
+# uv run pytest \
+#     --maxfail=7 \
+#     -v \
+#     -W ignore::DeprecationWarning \
+#     --config config.json \
+#     --dataset-version $DATASET_VERSION \
+#     --ignore=test_multipeer.py \
+#     -k "not listener and not multipeer and not custom_conflict" \
+#     --tb=short \
+#     --timeout=300
+
+echo "Run the React Native Android tests (failed tests only)"
+uv run pytest \
+    -v \
+    -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version $DATASET_VERSION \
+    --tb=short \
+    --timeout=300 \
+    test_basic_replication.py::TestBasicReplication::test_continuous_push_and_pull
 popd > /dev/null
