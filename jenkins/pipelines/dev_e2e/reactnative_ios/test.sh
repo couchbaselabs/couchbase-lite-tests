@@ -38,14 +38,5 @@ uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 pushd $DEV_E2E_TESTS_DIR > /dev/null
 rm -rf http_log testserver.log
 
-echo "Run the React Native iOS tests"
-uv run pytest \
-    --maxfail=7 \
-    -v \
-    -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version $DATASET_VERSION \
-    --ignore=test_multipeer.py \
-    -k "not listener and not multipeer and not custom_conflict" \
-    --tb=short \
-    --timeout=300
+bash "${SHARED_PIPELINES_DIR}/run_rn_dev_e2e_pytest.sh" ios
+popd > /dev/null
