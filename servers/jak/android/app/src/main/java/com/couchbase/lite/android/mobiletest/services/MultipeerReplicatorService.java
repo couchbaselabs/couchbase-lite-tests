@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Document;
@@ -46,8 +47,8 @@ import com.couchbase.lite.mobiletest.services.Log;
 public class MultipeerReplicatorService {
     private static final String TAG = "MP_REPL_SVC";
 
-    private final Map<String, Map<PeerInfo.PeerId, PeerReplicatorStatus>> statusMap = new HashMap<>();
-    private final Map<String, ListenerToken> listenerTokens = new HashMap<>();
+    private final Map<String, Map<PeerInfo.PeerId, PeerReplicatorStatus>> statusMap = new ConcurrentHashMap<>();
+    private final Map<String, ListenerToken> listenerTokens = new ConcurrentHashMap<>();
 
     private static class DeletedDocFilter implements MultipeerCollectionConfiguration.ReplicationFilter {
         @Override
@@ -101,16 +102,12 @@ public class MultipeerReplicatorService {
         }
 
         final String replId = UUID.randomUUID().toString();
-        statusMap.put(replId, new HashMap<>());
+        statusMap.put(replId, new ConcurrentHashMap<>());
 
         listenerTokens.put(replId, repl.addPeerReplicatorStatusListener(status -> {
-            Map<PeerInfo.PeerId, PeerReplicatorStatus> myStatusMap = statusMap.get(replId);
-            if(myStatusMap == null) {
-                throw new ServerError("Null status map");
-            }
-
+            final Map<PeerInfo.PeerId, PeerReplicatorStatus> myStatusMap = statusMap.get(replId);
+            if (myStatusMap == null) { return; }
             myStatusMap.put(status.getPeerId(), status);
-            statusMap.put(replId, myStatusMap);
         }));
 
         ctxt.addMultipeerRepl(replId, repl);
