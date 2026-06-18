@@ -38,7 +38,7 @@ uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 pushd $QE_TESTS_DIR > /dev/null
 rm -rf http_log testserver.log
 
-Full suite (restore when finished debugging):
+# Full suite (restore when finished debugging):
 echo "Run the React Native iOS tests"
 uv run pytest \
     --maxfail=7 \
@@ -68,4 +68,4 @@ uv run pytest \
 #     test_replication_filter.py::TestReplicationFilter::test_replicate_public_channel \
 #     test_replication_filter.py::TestReplicationFilter::test_custom_push_filter \
 #     test_replication_filter.py::TestReplicationFilter::test_custom_pull_filter
-# popd > /dev/null
+popd > /dev/null
