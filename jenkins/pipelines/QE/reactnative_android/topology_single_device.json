@@ -1,0 +1,13 @@
+{
+    "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
+    "test_servers": [
+        {
+            "platform": "reactnative_android",
+            "cbl_version": "{{version}}",
+            "location": "56141JEBF18456",
+            "ip_hint": "172.16.150.165",
+            "download": true
+        }
+    ],
+    "include": "../../../../environment/aws/topology_setup/default_topology.json"
+}
