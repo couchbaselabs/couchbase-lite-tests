@@ -44,7 +44,7 @@ fi
 
 uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 
-pushd "${QE_TESTS_DIR}" > /dev/null
+pushd $QE_TESTS_DIR > /dev/null
 rm -rf http_log testserver.log
 
 # Tell the pytest WebSocket router to relaunch the React Native app right after
@@ -56,12 +56,26 @@ rm -rf http_log testserver.log
 # JS-bundle compilation on the device, so the relaunch done by the router is
 # fast (a few seconds).
 export CBL_NATIVE_WS_RELAUNCH_SCRIPT="$SCRIPT_DIR/relaunch_app.py"
-echo "CBL_NATIVE_WS_RELAUNCH_SCRIPT=$CBL_NATIVE_WS_RELAUNCH_SCRIPT"
-echo "Relaunch script exists: $(test -f "$CBL_NATIVE_WS_RELAUNCH_SCRIPT" && echo yes || echo NO - FILE MISSING)"
-echo "Python executable used by uv: $(uv run python -c 'import sys; print(sys.executable)')"
 
-# Single-test run (restore the full-suite block below when finished debugging).
-# echo "Run the React Native Android tests (only test_push_after_remove_access)"
+# Full suite (restore when finished debugging):
+echo "Run the React Native Android tests"
+uv run pytest \
+    --maxfail=7 \
+    -v \
+    -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version $DATASET_VERSION \
+    --ignore=test_multipeer.py \
+    --ignore=test_system_multipeer.py \
+    --ignore=test_upg_sgw.py \
+    --ignore=test_rolling_upgrade_sgw.py \
+    --ignore=test_replication_upgrade_delta_sync.py \
+    -k "not listener and not multipeer and not custom_conflict" \
+    -m cbl \
+    --tb=short \
+    --timeout=300
+
+# echo "Run the React Native Android tests (failed tests only)"
 # uv run pytest \
 #     -v \
 #     -W ignore::DeprecationWarning \
@@ -70,21 +84,4 @@ echo "Python executable used by uv: $(uv run python -c 'import sys; print(sys.ex
 #     --tb=short \
 #     --timeout=300 \
 #     test_replication_auto_purge.py::TestReplicationAutoPurge::test_push_after_remove_access
-
-# Full suite:
-echo "Run the React Native Android tests"
-uv run pytest \
-    --maxfail=7 \
-    -v \
-    -m cbl \
-    -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version $DATASET_VERSION \
-    --ignore=test_multipeer.py \
-    --ignore=test_system_multipeer.py \
-    --ignore=test_rolling_upgrade_sgw.py \
-    --ignore=test_upg_sgw.py \
-    --ignore=test_replication_upgrade_delta_sync.py \
-    -k "not listener and not multipeer and not custom_conflict" \
-    --tb=short \
-    --timeout=300
+popd > /dev/null
