@@ -72,10 +72,24 @@ pipeline {
             }
             post {
                 always {
+                    // Publish and archive pytest's JUnit XML so
+                    // per-test failures (messages and tracebacks) are
+                    // surfaced in Jenkins even if teardown fails.
+                    script {
+                        try {
+                            junit testResults: 'tests/QE/junit_result.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: 'tests/QE/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                        } catch (err) {
+                            echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                        }
+                    }
+
                     echo "=== Teardown SGW Tests"
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/sgw/teardown.sh"
                     }
+                    // Archived after teardown because teardown's move_artifacts
+                    // is what populates tests/QE/sgw/.
                     archiveArtifacts artifacts: 'tests/QE/sgw/**/*', fingerprint: true, allowEmptyArchive: true
                     echo "=== SGW Test Teardown Complete"
                 }
