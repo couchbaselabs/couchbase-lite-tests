@@ -2087,7 +2087,9 @@ class SyncGateway(_SyncGatewayBase):
         """
         import_count = 0
         for _ in range(max_retries):
-            expvars = cast(dict, await self._send_request("get", "/_expvar"))
+            resp_data = await self._send_request("get", "/_expvar")
+            assert isinstance(resp_data, dict)
+            expvars = cast(dict, resp_data)
             import_count = (
                 expvars.get("syncgateway", {})
                 .get("per_db", {})
