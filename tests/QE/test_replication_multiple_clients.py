@@ -323,7 +323,7 @@ class TestReplicationMultipleClients(CBLTestClass):
             Verify all documents are present in Sync Gateway:
                 * Should have: 5 docs from db1 + 5 docs from db2 = 10 total
         """)
-        sg_all_docs = await sg.get_all_documents(sg_db)
+        sg_all_docs = await sg.wait_for_all_documents(sg_db, len(all_doc_ids))
         sg_doc_ids = {row.id for row in sg_all_docs.rows}
         for doc_id in all_doc_ids:
             assert doc_id in sg_doc_ids, f"Document {doc_id} not found in Sync Gateway"

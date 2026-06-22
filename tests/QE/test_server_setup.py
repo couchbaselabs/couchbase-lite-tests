@@ -1,5 +1,4 @@
 import asyncio
-from typing import cast
 
 import pytest
 from cbltest import CBLPyTest
@@ -47,27 +46,15 @@ class TestServerSetup(CBLTestClass):
             }
             cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
 
-        self.mark_test_step("Wait for SGW to import documents")
-        await asyncio.sleep(10)
-
         self.mark_test_step("Verify documents were imported via SGW")
-        all_docs = await sg.get_all_documents(sg_db)
-        imported_count = len([r for r in all_docs.rows])
+        all_docs = await sg.wait_for_all_documents(sg_db, num_docs)
+        imported_count = len(all_docs.rows)
         assert imported_count == num_docs, (
             f"Expected {num_docs} imported docs, got {imported_count}"
         )
 
         self.mark_test_step("Verify import_count in expvars")
-        expvars = await sg._send_request("get", "/_expvar")
-        assert isinstance(expvars, dict)
-        expvars_dict = cast(dict, expvars)
-        import_count = (
-            expvars_dict.get("syncgateway", {})
-            .get("per_db", {})
-            .get(sg_db, {})
-            .get("shared_bucket_import", {})
-            .get("import_count", 0)
-        )
+        import_count = await sg.wait_for_import_count(sg_db, num_docs)
         assert import_count != 0, f"Expected import_count > 0, got {import_count}"
         await sg.restart_with_config("bootstrap")
         await sg.wait_for_db_up(sg_db)

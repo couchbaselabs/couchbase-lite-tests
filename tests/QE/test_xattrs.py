@@ -233,7 +233,7 @@ class TestXattrs(CBLTestClass):
         all_doc_ids = sg_doc_ids + sdk_doc_ids
 
         self.mark_test_step("Get all docs via Sync Gateway and save revisions")
-        sg_all_docs = await sg_user.get_all_documents(sg_db)
+        sg_all_docs = await sg_user.wait_for_all_documents(sg_db, num_docs * 2)
         assert len(sg_all_docs.rows) == num_docs * 2, (
             f"Expected {num_docs * 2} docs via SG, got {len(sg_all_docs.rows)}"
         )
@@ -822,16 +822,9 @@ class TestXattrs(CBLTestClass):
             )
 
         self.mark_test_step("Wait for SG to import all docs (as admin)")
-        deadline_polls, sg_all_docs = 30, None
-        for _ in range(deadline_polls):  # ~30s budget
-            sg_all_docs = await sg.get_all_documents(sg_db)
-            if sg_all_docs and len(sg_all_docs.rows) >= num_docs:
-                break
-            await asyncio.sleep(1)
-        assert sg_all_docs is not None, "All Docs should be visible to admin user"
+        sg_all_docs = await sg.wait_for_all_documents(sg_db, num_docs)
         assert len(sg_all_docs.rows) >= num_docs, (
-            f"Expected at least {num_docs} docs imported within {deadline_polls}s, "
-            f"got {len(sg_all_docs.rows)}"
+            f"Expected at least {num_docs} docs to be imported, got {len(sg_all_docs.rows)}"
         )
 
         self.mark_test_step(
