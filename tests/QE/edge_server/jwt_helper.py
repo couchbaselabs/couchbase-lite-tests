@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
+
 # Generates a 2048-bit RSA key pair
 # Private key → signs the JWT token (ES uses this token)
 # Public key → given to SGW so it can verify the token's signature

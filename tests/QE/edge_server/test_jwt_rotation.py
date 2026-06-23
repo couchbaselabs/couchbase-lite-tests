@@ -8,7 +8,6 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.api.syncgateway import PutDatabasePayload
-
 from jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -49,9 +48,7 @@ class TestJWTReplication(CBLTestClass):
         jwk = public_key_to_jwk(public_key)
 
         # --- Step 2: Setup SGW with travel dataset and local_jwt auth ---
-        self.mark_test_step(
-            "Configure SGW travel database with local_jwt provider"
-        )
+        self.mark_test_step("Configure SGW travel database with local_jwt provider")
         cloud = cblpytest.simple_cloud()
         sgw = cloud.sync_gateway
         cbs = cloud.couchbase_server
@@ -201,8 +198,12 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Generate two RSA key pairs for token rotation")
         private_key_a, public_key_a = generate_rsa_keypair()
         private_key_b, public_key_b = generate_rsa_keypair()
-        token_a = generate_jwt(private_key_a, subject="user1", expires_in=3600, kid="test-key-1")
-        token_b = generate_jwt(private_key_b, subject="user1", expires_in=3600, kid="test-key-2")
+        token_a = generate_jwt(
+            private_key_a, subject="user1", expires_in=3600, kid="test-key-1"
+        )
+        token_b = generate_jwt(
+            private_key_b, subject="user1", expires_in=3600, kid="test-key-2"
+        )
         jwk_a = public_key_to_jwk(public_key_a)
         jwk_b = public_key_to_jwk(public_key_b)
         # Use different kid for key B
@@ -231,9 +232,7 @@ class TestJWTReplication(CBLTestClass):
             "scopes": {
                 "travel": {
                     "collections": {
-                        "airlines": {
-                            "sync": "function(doc){channel(doc.channels);}"
-                        }
+                        "airlines": {"sync": "function(doc){channel(doc.channels);}"}
                     }
                 }
             },
@@ -264,9 +263,15 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Insert 5 test documents into CBS")
         for i in range(1, 6):
             doc_id = f"rotation_test_{i}"
-            doc = {"id": doc_id, "channels": ["*"], "type": "airline", "name": f"Rotation Airline {i}"}
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
-
+            doc = {
+                "id": doc_id,
+                "channels": ["*"],
+                "type": "airline",
+                "name": f"Rotation Airline {i}",
+            }
+            cbs.upsert_document(
+                "travel", doc_id, doc, scope="travel", collection="airlines"
+            )
 
         # --- Step 3: Write Token-A to file and start ES ---
         self.mark_test_step("Write Token-A to file and start ES")
@@ -291,7 +296,9 @@ class TestJWTReplication(CBLTestClass):
         await edge_server.wait_for_idle(timeout=30)
 
         # Verify initial replication pulled docs
-        response = await edge_server.get_all_documents("travel", collection="travel.airlines")
+        response = await edge_server.get_all_documents(
+            "travel", collection="travel.airlines"
+        )
         initial_count = len(response.rows)
         assert initial_count >= 5, (
             f"Initial replication failed: expected >= 5 docs, got {initial_count}"
@@ -309,9 +316,15 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Insert 5 more docs to verify replication after rotation")
         for i in range(6, 11):
             doc_id = f"rotation_test_{i}"
-            doc = {"id": doc_id, "channels": ["*"], "type": "airline", "name": f"Rotation Airline {i}"}
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
-
+            doc = {
+                "id": doc_id,
+                "channels": ["*"],
+                "type": "airline",
+                "name": f"Rotation Airline {i}",
+            }
+            cbs.upsert_document(
+                "travel", doc_id, doc, scope="travel", collection="airlines"
+            )
 
         # --- Step 8: Verify ES has the new docs (replication works with Token-B) ---
         self.mark_test_step("Verify replication continues with Token-B")
@@ -320,7 +333,9 @@ class TestJWTReplication(CBLTestClass):
         elapsed = 0
         final_count = 0
         while elapsed < max_wait:
-            response = await edge_server.get_all_documents("travel", collection="travel.airlines")
+            response = await edge_server.get_all_documents(
+                "travel", collection="travel.airlines"
+            )
             final_count = len(response.rows)
             if final_count >= initial_count + 5:
                 break
@@ -361,7 +376,9 @@ class TestJWTReplication(CBLTestClass):
 
         # Generate invalid token (signed by a DIFFERENT key not registered with SGW)
         invalid_private_key, _ = generate_rsa_keypair()
-        token_invalid = generate_jwt(invalid_private_key, subject="user1", expires_in=3600, kid="unknown-key")
+        token_invalid = generate_jwt(
+            invalid_private_key, subject="user1", expires_in=3600, kid="unknown-key"
+        )
 
         cloud = cblpytest.simple_cloud()
         sgw = cloud.sync_gateway
@@ -406,8 +423,15 @@ class TestJWTReplication(CBLTestClass):
         # Insert test docs
         for i in range(1, 4):
             doc_id = f"disconnect_test_{i}"
-            doc = {"id": doc_id, "channels": ["*"], "type": "airline", "name": f"Disconnect Airline {i}"}
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
+            doc = {
+                "id": doc_id,
+                "channels": ["*"],
+                "type": "airline",
+                "name": f"Disconnect Airline {i}",
+            }
+            cbs.upsert_document(
+                "travel", doc_id, doc, scope="travel", collection="airlines"
+            )
 
         # --- Step 2: Start ES with valid token ---
         self.mark_test_step("Start ES with valid JWT token")
@@ -437,7 +461,9 @@ class TestJWTReplication(CBLTestClass):
         await self._write_file_on_es(es_manager, JWT_FILE, token_invalid)
 
         # --- Step 4: Wait for ES to detect change, reconnect, and fail auth ---
-        self.mark_test_step("Waiting for automatic token change detection and auth failure")
+        self.mark_test_step(
+            "Waiting for automatic token change detection and auth failure"
+        )
 
         # Poll for up to 60s — the ES file watcher may take time to detect
         # the token change, disconnect, and reconnect with the invalid token.
@@ -445,18 +471,15 @@ class TestJWTReplication(CBLTestClass):
         poll_interval = 5
         elapsed = 0
         repl_status = []
-        detected = False
         while elapsed < max_wait:
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
             repl_status = await edge_server.all_replication_status()
             if len(repl_status) == 0:
-                detected = True
                 break
             task = repl_status[0]
             status = task.get("status", "")
             if status in ("Stopped", "Offline"):
-                detected = True
                 break
 
         # Check replication status.
@@ -475,11 +498,11 @@ class TestJWTReplication(CBLTestClass):
             task = repl_status[0]
             status = task.get("status", "")
             error = task.get("error", {})
-            error_code = error.get("x-litecore-code", 0) if isinstance(error, dict) else 0
-
-            self.mark_test_step(
-                f"Replication status: {status}, error: {error}"
+            error_code = (
+                error.get("x-litecore-code", 0) if isinstance(error, dict) else 0
             )
+
+            self.mark_test_step(f"Replication status: {status}, error: {error}")
 
             assert status in ("Stopped", "Offline"), (
                 f"Expected replication to stop/go offline with invalid token, "
@@ -489,9 +512,7 @@ class TestJWTReplication(CBLTestClass):
                 f"Expected 401 auth error, got: {error}"
             )
 
-            self.mark_test_step(
-                "PASSED — Invalid token correctly causes auth failure"
-            )
+            self.mark_test_step("PASSED — Invalid token correctly causes auth failure")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_corrupt_token_file_content_mid_replication(
@@ -556,8 +577,15 @@ class TestJWTReplication(CBLTestClass):
         # Insert docs
         for i in range(1, 4):
             doc_id = f"filedel_test_{i}"
-            doc = {"id": doc_id, "channels": ["*"], "type": "airline", "name": f"FileDel Airline {i}"}
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
+            doc = {
+                "id": doc_id,
+                "channels": ["*"],
+                "type": "airline",
+                "name": f"FileDel Airline {i}",
+            }
+            cbs.upsert_document(
+                "travel", doc_id, doc, scope="travel", collection="airlines"
+            )
 
         # --- Step 2: Start ES with valid token ---
         self.mark_test_step("Start ES with valid JWT file")
@@ -654,15 +682,23 @@ class TestJWTReplication(CBLTestClass):
         """
 
         # --- Step 1: Generate keys ---
-        self.mark_test_step("Generate valid key pair A, invalid key, and valid key pair C")
+        self.mark_test_step(
+            "Generate valid key pair A, invalid key, and valid key pair C"
+        )
         # ...existing code through Step 3 and initial replication verify...
         private_key_a, public_key_a = generate_rsa_keypair()
         private_key_c, public_key_c = generate_rsa_keypair()
         private_key_invalid, _ = generate_rsa_keypair()
 
-        token_a = generate_jwt(private_key_a, subject="user1", expires_in=3600, kid="test-key-1")
-        token_invalid = generate_jwt(private_key_invalid, subject="user1", expires_in=3600, kid="bad-key")
-        token_c = generate_jwt(private_key_c, subject="user1", expires_in=3600, kid="test-key-3")
+        token_a = generate_jwt(
+            private_key_a, subject="user1", expires_in=3600, kid="test-key-1"
+        )
+        token_invalid = generate_jwt(
+            private_key_invalid, subject="user1", expires_in=3600, kid="bad-key"
+        )
+        token_c = generate_jwt(
+            private_key_c, subject="user1", expires_in=3600, kid="test-key-3"
+        )
 
         jwk_a = public_key_to_jwk(public_key_a)
         jwk_c = public_key_to_jwk(public_key_c)
@@ -718,8 +754,15 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Insert 3 initial documents")
         for i in range(1, 4):
             doc_id = f"cycle_test_{i}"
-            doc = {"id": doc_id, "channels": ["*"], "type": "airline", "name": f"Cycle Airline {i}"}
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
+            doc = {
+                "id": doc_id,
+                "channels": ["*"],
+                "type": "airline",
+                "name": f"Cycle Airline {i}",
+            }
+            cbs.upsert_document(
+                "travel", doc_id, doc, scope="travel", collection="airlines"
+            )
 
         # --- Step 3: Start with valid Token-A ---
         self.mark_test_step("Phase 1: Start ES with valid Token-A")
@@ -741,7 +784,9 @@ class TestJWTReplication(CBLTestClass):
         await edge_server.wait_for_idle(timeout=30)
 
         # Verify initial replication worked
-        response = await edge_server.get_all_documents("travel", collection="travel.airlines")
+        response = await edge_server.get_all_documents(
+            "travel", collection="travel.airlines"
+        )
         initial_count = len(response.rows)
         assert initial_count >= 3, f"Initial replication failed: {initial_count} docs"
         self.mark_test_step(f"Phase 1 OK: {initial_count} docs replicated with Token-A")
@@ -787,11 +832,20 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Insert 3 more docs while replication is stopped")
         for i in range(4, 7):
             doc_id = f"cycle_test_{i}"
-            doc = {"id": doc_id, "channels": ["*"], "type": "airline", "name": f"Cycle Airline {i}"}
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
+            doc = {
+                "id": doc_id,
+                "channels": ["*"],
+                "type": "airline",
+                "name": f"Cycle Airline {i}",
+            }
+            cbs.upsert_document(
+                "travel", doc_id, doc, scope="travel", collection="airlines"
+            )
 
         # Verify ES does NOT have the new docs (replication is dead)
-        response = await edge_server.get_all_documents("travel", collection="travel.airlines")
+        response = await edge_server.get_all_documents(
+            "travel", collection="travel.airlines"
+        )
         count_while_stopped = len(response.rows)
         self.mark_test_step(
             f"Docs on ES while stopped: {count_while_stopped} (should still be {initial_count})"
@@ -819,7 +873,9 @@ class TestJWTReplication(CBLTestClass):
         await edge_server.wait_for_idle(timeout=30)
 
         # Verify recovery — ES should now have all docs including the 3 new ones
-        response = await edge_server.get_all_documents("travel", collection="travel.airlines")
+        response = await edge_server.get_all_documents(
+            "travel", collection="travel.airlines"
+        )
         final_count = len(response.rows)
         assert final_count >= initial_count + 3, (
             f"After recovery with Token-C and _replicate re-trigger, "
@@ -831,6 +887,3 @@ class TestJWTReplication(CBLTestClass):
             f"Phase 3: Valid token → manual _replicate re-trigger required "
             f"(FileWatcher destroyed after 401)."
         )
-
-
-

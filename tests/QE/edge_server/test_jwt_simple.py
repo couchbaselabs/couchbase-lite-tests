@@ -104,7 +104,6 @@ class TestJWTSimple(CBLTestClass):
         payload = PutDatabasePayload(sg_config)
         await sync_gateway.put_database(sg_db_name, payload)
 
-
         # =====================================================================
         # STEP 4: Pre-create JWT user with channel access.
         # SGW auto-registers users on first JWT auth (register=true), but the
