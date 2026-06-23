@@ -1,0 +1,8 @@
+{
+	"$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
+	"greenboard": {
+		"hostname": "10.100.150.106",
+		"username": "writer",
+		"password": "couchbase2"
+	}
+}

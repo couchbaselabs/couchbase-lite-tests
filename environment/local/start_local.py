@@ -9,16 +9,15 @@
 # ]
 # ///
 #
-# This script builds and starts a CBL-C test server for local testing. Prior to running, this expects Couchbase
-# Server and Sync Gateway running locally. The test server is built from source, so a C toolchain (cmake + a C/C++
-# compiler) is required.
+# This script sets up a test server for local testing. Prior to running, this expects Couchbase Server and Sync
+# Gateway running locally. See config.json if need to modify to configuration.
 #
 #
 # Usage::
 #
 #   uv run environment/local/start_local.py
 #   cd tests/dev_e2e
-#   uv run pytest --config ../../environment/local/cbs_config.json
+#   uv run pytest --config ../../environment/local/config.json
 #
 import pathlib
 import sys
@@ -39,30 +38,21 @@ TOPOLOGY_CONFIG = SCRIPT_DIR / "topology.json"
 @click.command()
 @click.option(
     "--build-testserver",
-    help="CBL-C version to build the test server from (e.g., 4.0.3). Defaults to the latest released version.",
+    help="Build the test server from source rather than downloading it. Takes a version string (e.g., 4.0.3).",
 )
-@click.option(
-    "--stop",
-    is_flag=True,
-    help="Stop the running local test server and exit (used during teardown).",
-)
-def main(build_testserver: str | None, stop: bool):
-    if stop:
-        stop_test_server()
-        return
-
-    # The test server is always built from source. Downloading a prebuilt
-    # server requires a specific build number; a released version resolves to a
-    # bare X.Y.Z that the latestbuilds download path cannot locate, so building
-    # (which handles released versions via build number 0) is the reliable path.
-    version = build_testserver or get_latest_released_cbl_c_version()
-    cbl_version = f"{version}-0"
+def main(build_testserver: str | None):
+    if build_testserver:
+        cbl_version = f"{build_testserver}-0"
+        download = False
+    else:
+        cbl_version = get_latest_released_cbl_c_version()
+        download = True
 
     config = {
         "test_servers": [
             {
                 "location": "localhost",
-                "download": False,
+                "download": download,
                 "platform": get_cbl_platform(),
                 "cbl_version": cbl_version,
             }
@@ -74,25 +64,6 @@ def main(build_testserver: str | None, stop: bool):
 
     # hard code cbbackupmgr 8.0.0 for ease of use
     download_tool.download_tool(download_tool.ToolName.BackupManager, version="8.0.0")
-
-
-def stop_test_server() -> None:
-    """
-    Stop the locally running CBL-C test server. The test server process is
-    matched by name, so the version is irrelevant here.
-    """
-    config = {
-        "test_servers": [
-            {
-                "location": "localhost",
-                "download": False,
-                "platform": get_cbl_platform(),
-                "cbl_version": "0.0.0",
-            }
-        ],
-    }
-    topology_config = setup_topology.TopologyConfig(config_input=config)
-    topology_config.stop_test_servers()
 
 
 def get_cbl_platform() -> str:

@@ -1,52 +1,96 @@
+def resolveProgetVersion(String product, String version, String label) {
+    if (version.tokenize('.').size() >= 3) {
+        echo "${label} already fully qualified: ${version}"
+        return version
+    }
+    def url = "http://proget.build.couchbase.com:8080/api/latest_release?product=${product}&version=${version}&prerelease=true"
+    echo "Resolving ${label}: ${url}"
+    def resolved
+    if (isUnix()) {
+        resolved = powershell(script: """
+            try { (Invoke-RestMethod '${url}').version }
+            catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
+        """.stripIndent(), returnStdout: true).trim()
+    } else {
+        resolved = powershell(script: """
+            try { (Invoke-RestMethod '${url}').version }
+            catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
+        """.stripIndent(), returnStdout: true).trim()
+    }
+    if (!resolved || resolved == 'null') { error "Could not resolve ${label} from '${version}' (url: ${url})" }
+    echo "Resolved ${label}: ${resolved}"
+    return resolved
+}
+
 pipeline {
     agent none
-// This job runs the dev_e2e suite against a locally provisioned backend
-// (Couchbase Server in Docker + Sync Gateway built from source). It is meant
-// to be triggered on a Sync Gateway PR merge to catch CBL <-> SGW replicator
-// regressions. The trigger is configured on the job/webhook side.
+// This job runs the dev_e2e suite against an AWS-provisioned backend
+// (Couchbase Server + Sync Gateway), exercising Couchbase Lite C against SGW
+// to catch replicator regressions. It mirrors the QE/sgw pipeline's TDK flow.
 //
-// Params (UI-defined defaults so the job can be re-triggered without editing
-// this file):
-//   SGW_REF      Sync Gateway git ref (branch/tag/commit) to build from source.
-//   CBS_VERSION  Couchbase Server version for the local container
-//                (blank = docker-compose default).
-    parameters {
-        string(name: 'SGW_REF', defaultValue: 'main', description: 'Sync Gateway git ref (branch/tag/commit) to build from source')
-        string(name: 'CBS_VERSION', defaultValue: '', description: 'Couchbase Server version for the local Docker container (blank = compose default)')
-    }
+// This job uses UI defined params and their default values, so it can be
+// triggered with different versions without modifying this file. For reference:
+//         string(name: 'CBL_VERSION', description: 'Couchbase Lite Version to use, eg : "4" for latest version-build, or "4.1.0-18" for specific version and build')
+//         string(name: 'SGW_VERSION', description: 'Sync Gateway Version to use, eg : its the same way, check out "resolveProgetVersion" function for more details)')
     stages {
         stage('Init') {
             agent any
             steps {
                 script {
-                    if (params.SGW_REF == '') { error "SGW_REF is required" }
-                    currentBuild.displayName = "SGW:${params.SGW_REF} (#${currentBuild.number})"
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    env.CBL_VERSION = resolveProgetVersion("couchbase-lite-c", params.CBL_VERSION, 'CBL_VERSION')
+                    env.SGW_VERSION = resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
+                    currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
                 }
             }
         }
+        stage('Prebuild Servers') {
+            steps {
+                build job: 'prebuild-test-server',
+                parameters: [
+                    string(name: 'TS_PLATFORM', value: 'c_macos'),
+                    string(name: 'CBL_VERSION', value: env.CBL_VERSION),
+                ],
+                wait: true,
+                propagate: true
+            }
+        }
         stage('Run Test') {
-            // Requires an agent with Docker (for the CBS container), Go (to build
-            // Sync Gateway) and uv.
             agent { label 'mac-mini-new' }
             environment {
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 TS_ARTIFACTS_DIR = 'sgw'
-                COUCHBASE_VERSION = "${params.CBS_VERSION}"
             }
             steps {
-                echo "=== Run dev_e2e against local CBS + SGW built from '${params.SGW_REF}'"
-                timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/dev_e2e/sgw/test.sh '${params.SGW_REF}'"
+                echo "=== Run dev_e2e Tests"
+                timeout(time: 180, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/dev_e2e/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION}"
                 }
                 echo "=== dev_e2e Tests Complete"
             }
             post {
                 always {
-                    echo "=== Teardown"
+                    // Publish and archive pytest's JUnit XML so
+                    // per-test failures (messages and tracebacks) are
+                    // surfaced in Jenkins even if teardown fails.
+                    script {
+                        try {
+                            junit testResults: 'tests/dev_e2e/junit_result.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                        } catch (err) {
+                            echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                        }
+                    }
+
+                    echo "=== Teardown dev_e2e Tests"
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/dev_e2e/sgw/teardown.sh"
                     }
+                    // Archived after teardown because teardown's move_artifacts
+                    // is what populates tests/dev_e2e/sgw/.
                     archiveArtifacts artifacts: 'tests/dev_e2e/sgw/**/*', fingerprint: true, allowEmptyArchive: true
-                    echo "=== Teardown Complete"
+                    echo "=== dev_e2e Test Teardown Complete"
                 }
             }
         }

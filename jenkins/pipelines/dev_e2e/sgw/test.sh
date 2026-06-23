@@ -1,76 +1,46 @@
 #!/bin/bash
 
-# Runs the dev_e2e test suite against a locally provisioned backend:
-#   - Couchbase Server in Docker (reuses environment/docker)
-#   - Sync Gateway built from source at the given git ref (the PR under test)
-#   - A local CBL-C test server (latest released build)
-#
-# Designed to be runnable both in Jenkins and locally. See
-# jenkins/pipelines/dev_e2e/sgw/Jenkinsfile for the CI wrapper.
-
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-    echo "Usage: $0 <sgw_ref>"
-    echo "  <sgw_ref>: Sync Gateway git ref (branch/tag/commit) to build from source."
+    echo "Usage: $0 <cbl_version> <sgw_version> [--setup-only]"
+    echo "  <cbl_version>: The Couchbase Lite version to run the test against."
+    echo "  <sgw_version>: Sync Gateway version to be deployed for the test."
+    echo "  --setup-only: Only build test server and setup backend, skip test execution"
+    echo "  Build number will be auto-fetched for the specified version"
     exit 1
 }
 
-if [ "$#" -ne 1 ]; then usage; fi
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then usage; fi
 
-SGW_REF=${1}
+CBL_VERSION=${1}
+SGW_VERSION=${2}
+SETUP_ONLY=false
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-source "$SCRIPT_DIR/../../shared/config.sh"
-
-REPO_ROOT=$(dirname "$ENVIRONMENT_DIR")
-LOCAL_DIR="$ENVIRONMENT_DIR/local"
-DOCKER_DIR="$ENVIRONMENT_DIR/docker"
-
-# 1. Start Couchbase Server (only the CBS service from the docker environment).
-#    configure-node.sh inside the container performs cluster-init with the
-#    Administrator/password credentials that Sync Gateway and the test
-#    framework expect.
-echo "Starting Couchbase Server..."
-pushd "$DOCKER_DIR" > /dev/null
-docker compose up -d cbl-test-cbs
-popd > /dev/null
-
-echo "Waiting for Couchbase Server to finish cluster initialization..."
-for _ in $(seq 1 90); do
-    status=$(curl -s -o /dev/null -w "%{http_code}" -u Administrator:password \
-        http://localhost:8091/pools/default || true)
-    if [ "$status" = "200" ]; then
-        echo "Couchbase Server is ready."
+# Check for --setup-only flag
+for arg in "$@"; do
+    if [ "$arg" = "--setup-only" ]; then
+        SETUP_ONLY=true
         break
     fi
-    sleep 2
 done
-if [ "${status:-}" != "200" ]; then
-    echo "Couchbase Server did not become ready in time." >&2
-    exit 1
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+source $SCRIPT_DIR/../../shared/config.sh
+
+echo "Setup backend..."
+pushd $AWS_ENVIRONMENT_DIR > /dev/null
+uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
+popd > /dev/null
+
+# Exit early if setup-only mode
+if [ "$SETUP_ONLY" = true ]; then
+    echo "Setup completed. Exiting due to --setup-only flag."
+    exit 0
 fi
 
-# 2. Build Sync Gateway from source at the requested ref.
-echo "Building Sync Gateway from ref '$SGW_REF'..."
-pushd "$REPO_ROOT" > /dev/null
-uv run "$LOCAL_DIR/build_sync_gateway.py" --git-tag "$SGW_REF"
-
-# 3. Run Sync Gateway against Couchbase Server.
-echo "Starting Sync Gateway against Couchbase Server..."
-uv run "$LOCAL_DIR/run_sync_gateway.py" --start --server cbs
-
-# 4. Start the local CBL-C test server (latest released build).
-echo "Starting CBL-C test server..."
-uv run "$LOCAL_DIR/start_local.py"
-popd > /dev/null
-
-# 5. Run the dev_e2e suite. Tests requiring resources the local backend does
-#    not provide (e.g. the 2-CBS + load-balancer XDCR test) skip themselves
-#    via their @pytest.mark.min_* markers.
-echo "Running dev_e2e tests..."
-pushd "$DEV_E2E_TESTS_DIR" > /dev/null
-uv run pytest -v --no-header -W ignore::DeprecationWarning \
-    --config "$LOCAL_DIR/cbs_config.json"
-popd > /dev/null
+# Run Tests :
+echo "Run tests..."
+pushd $DEV_E2E_TESTS_DIR > /dev/null
+uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json
