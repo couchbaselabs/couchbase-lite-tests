@@ -1,6 +1,6 @@
+import asyncio
 import json
 import ssl
-import time
 import urllib.parse
 import uuid
 from json import dumps
@@ -1072,7 +1072,7 @@ class EdgeServer:
                 if status[replicator_key]["status"] == "Idle":
                     is_idle = True
                 else:
-                    time.sleep(timeout)
+                    await asyncio.sleep(timeout)
                     retry -= 1
             else:
                 is_idle = True
