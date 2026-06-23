@@ -6,17 +6,10 @@ def resolveProgetVersion(String product, String version, String label) {
     def url = "http://proget.build.couchbase.com:8080/api/latest_release?product=${product}&version=${version}&prerelease=true"
     echo "Resolving ${label}: ${url}"
     def resolved
-    if (isUnix()) {
-        resolved = powershell(script: """
-            try { (Invoke-RestMethod '${url}').version }
-            catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
-        """.stripIndent(), returnStdout: true).trim()
-    } else {
-        resolved = powershell(script: """
-            try { (Invoke-RestMethod '${url}').version }
-            catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
-        """.stripIndent(), returnStdout: true).trim()
-    }
+    resolved = powershell(script: """
+        try { (Invoke-RestMethod '${url}').version }
+        catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
+    """.stripIndent(), returnStdout: true).trim()
     if (!resolved || resolved == 'null') { error "Could not resolve ${label} from '${version}' (url: ${url})" }
     echo "Resolved ${label}: ${resolved}"
     return resolved
