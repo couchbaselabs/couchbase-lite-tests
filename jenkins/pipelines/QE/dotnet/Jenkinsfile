@@ -98,7 +98,7 @@ pipeline {
                 stage('iOS') {
                     agent { label 'qe-mac-india' }
                     options {
-                        lock('00008140-0006458A0C22801C')
+                        lock('00008110-000E544201D1401E')
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
