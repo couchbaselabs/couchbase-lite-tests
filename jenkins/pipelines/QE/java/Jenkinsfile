@@ -41,9 +41,9 @@ pipeline {
                 stage('macOS Desktop') {
                     when { expression { params.RUN_MAC }
                        beforeAgent true }
-                    agent { label 'mac-mini-m4' }
+                    agent { label 'mac-mini-CBL-Android1' }
                     options {
-                        lock('mac-mini-m4')
+                        lock('mac-mini-CBL-Android1')
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe')
