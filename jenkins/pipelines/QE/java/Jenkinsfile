@@ -32,8 +32,10 @@ pipeline {
         }
 
         stage('Prebuild Servers') {
+            when {
+                expression { !params.DISABLE_PREBUILD }
+            }
             steps {
-                if(!params.DISABLE_PREBUILD) {
                     build job: 'prebuild-test-server',
                     parameters: [
                         string(name: 'TS_PLATFORM', value: 'jak_desktop'),
@@ -41,7 +43,6 @@ pipeline {
                     ],
                     wait: true,
                     propagate: true
-                }
             }
         }
         stage('Run Tests') {
