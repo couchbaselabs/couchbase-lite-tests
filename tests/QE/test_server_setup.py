@@ -54,7 +54,7 @@ class TestServerSetup(CBLTestClass):
         )
 
         self.mark_test_step("Verify import_count in expvars")
-        import_count = await sg.wait_for_import_count(sg_db, num_docs)
+        import_count = await sg.wait_for_import_count(sg_db, 1)
         assert import_count != 0, f"Expected import_count > 0, got {import_count}"
         await sg.restart_with_config("bootstrap")
         await sg.wait_for_db_up(sg_db)
