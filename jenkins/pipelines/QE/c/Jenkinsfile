@@ -4,6 +4,12 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
         string(name: 'SGW_VERSION', defaultValue: '3.3.0', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+        booleanParam(name: 'RUN_IOS', defaultValue: true, description: 'Check to run C-IOS tests')
+        booleanParam(name: 'RUN_WINDOWS', defaultValue: true, description: 'Check to run C- Windows tests')
+        booleanParam(name: 'RUN_ANDROID', defaultValue: true, description: 'Check to run C-Android tests')
+        booleanParam(name: 'RUN_LINUX', defaultValue: true, description: 'Check to run C-LINUX tests')
+    }
+    options {
     }
     stages {
         stage('Init') {
@@ -11,6 +17,9 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    if (!params.RUN_IOS && !params.RUN_WINDOWS && !params.RUN_ANDROID && !params.RUN_LINUX) {
+                        error "At least one platform should be selected"
+                    }
 
                     currentBuild.displayName = "C Linux CBL:${params.CBL_VERSION} (#${currentBuild.number})"
                     currentBuild.description = "SGW: ${params.SGW_VERSION}"
@@ -25,8 +34,6 @@ pipeline {
                     ]
                     def parallelBuilds = [:]
                     for(p in platforms) {
-                        // Groovy stupidness.  Need to set a local variable here
-                        // to avoid late binding (all jobs use dotnet_macos).
                         def platform = p
                         parallelBuilds[platform] = {
                             build job: 'prebuild-test-server',
@@ -46,6 +53,7 @@ pipeline {
         stage('Tests') {
             parallel {
                 stage('Windows') {
+                    when { expression { params.RUN_WINDOWS } }
                     agent { label 'net-windows' }
                     options {
                         lock('net-windows')
@@ -85,6 +93,7 @@ pipeline {
                     }
                 }
                 stage('Android') {
+                    when { expression { params.RUN_ANDROID} }
                     agent { label 'qe-mac-india' }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
@@ -94,10 +103,7 @@ pipeline {
                         ANDROID_HOME = "/Users/qe_mobile_india/Library/Android/sdk"
                     }
                     steps {
-                        // Unlock keychain:
-                        withCredentials([string(credentialsId: 'mobile-qe', variable: 'KEYCHAIN_PASSWORD')]) {
-                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        }
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "=== Run C Android Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
@@ -116,6 +122,7 @@ pipeline {
                     }
                 }
                 stage('iOS') {
+                    when { expression { params.RUN_IOS} }
                     agent { label 'qe-mac-india' }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
@@ -144,6 +151,7 @@ pipeline {
                     }
                 }
                 stage('linux_x86_64') {
+                    when { expression { params.RUN_LINUX} }
                     agent { label 'linux-c' }
                     environment {
                         TS_ARTIFACTS_DIR = 'c'

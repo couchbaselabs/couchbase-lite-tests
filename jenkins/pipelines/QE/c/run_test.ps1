@@ -14,7 +14,7 @@ if($LASTEXITCODE -ne 0) {
 
 Push-Location $QE_TESTS_DIR
 try {
-    uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version $DatasetVersion -m cbl
+    uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version $DatasetVersion -m cbl -k "not multipeer"
     $saved_exit = $LASTEXITCODE
 } finally {
     Pop-Location

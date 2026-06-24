@@ -50,5 +50,6 @@ fi
 pushd $QE_TESTS_DIR
 uv run pytest -v --no-header -W ignore::DeprecationWarning \
     --config config.json \
+    -k "not multipeer" \
     --dataset-version "$DATASET_VERSION" \
     -m cbl

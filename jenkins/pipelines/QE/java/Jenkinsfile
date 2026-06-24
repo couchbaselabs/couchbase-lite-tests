@@ -4,6 +4,9 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
         string(name: 'SGW_VERSION', defaultValue: '3.3.0', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+        booleanParam(name: 'RUN_MAC', defaultValue: true, description: 'Check to run macOS Desktop tests')
+        booleanParam(name: 'RUN_WINDOWS', defaultValue: true, description: 'Check to run Windows Desktop tests')
+        booleanParam(name: 'RUN_LINUX', defaultValue: true, description: 'Check to run Linux Desktop tests')
     }
     options {
         timeout(time: 150, unit: 'MINUTES')
@@ -14,6 +17,7 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    if (!params.RUN_MAC && !params.RUN_WINDOWS && !params.RUN_LINUX){error "Atleast one platform should be selected"}
                     
                     currentBuild.displayName = "Java Desktop CBL:${params.CBL_VERSION} (#${currentBuild.number})"
                     currentBuild.description = "SGW: ${params.SGW_VERSION}"
@@ -35,9 +39,10 @@ pipeline {
         stage('Run Tests') {
             parallel {
                 stage('macOS Desktop') {
-                    agent { label 'mac-mini-new' }
+                    when { expression { params.RUN_MAC } }
+                    agent { label 'mac-mini-m4' }
                     options {
-                        lock('mac-mini-new')
+                        lock('mac-mini-m4')
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe')
@@ -65,6 +70,7 @@ pipeline {
                     }
                 }
                 stage('Windows Desktop') {
+                    when { expression { params.RUN_WINDOWS } }
                     agent { label 'net-windows' }
                     options {
                         lock('net-windows')
@@ -104,6 +110,7 @@ pipeline {
                     }
                 }
                 stage('Linux Desktop') {
+                    when { expression { params.RUN_LINUX } }
                     agent { label 'linux-java' }
                     options {
                         lock('linux-java')
