@@ -8,6 +8,11 @@ pipeline {
         booleanParam(name: 'RUN_WINDOWS', defaultValue: true, description: 'Check to run C- Windows tests')
         booleanParam(name: 'RUN_ANDROID', defaultValue: true, description: 'Check to run C-Android tests')
         booleanParam(name: 'RUN_LINUX', defaultValue: true, description: 'Check to run C-LINUX tests')
+        booleanParam(
+            name: 'DISABLE_PREBUILD',
+            defaultValue: false,
+            description: 'Disable automatic prebuilding of testserver)'
+        )
     }
     stages {
         stage('Init') {
@@ -27,6 +32,7 @@ pipeline {
         stage('Prebuild Servers') {
             steps {
                 script {
+                    if(!params.DISABLE_PREBUILD) {
                     def platforms = [
                         'c_windows', 'c_ios', 'c_android','c_linux_x86_64'
                     ]
@@ -45,6 +51,7 @@ pipeline {
                         }
                     }
                     parallel parallelBuilds
+                }
                 }
             }
         }
