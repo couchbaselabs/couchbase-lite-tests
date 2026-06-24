@@ -9,8 +9,6 @@ pipeline {
         booleanParam(name: 'RUN_ANDROID', defaultValue: true, description: 'Check to run C-Android tests')
         booleanParam(name: 'RUN_LINUX', defaultValue: true, description: 'Check to run C-LINUX tests')
     }
-    options {
-    }
     stages {
         stage('Init') {
             steps {
