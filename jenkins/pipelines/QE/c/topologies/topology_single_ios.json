@@ -5,7 +5,7 @@
             "platform": "c_ios",
             "cbl_version": "{{version}}",
             "location": "00008122-001108DC2EB9801C",
-            "ip_hint": "172.16.150.155",
+            "ip_hint": "172.16.150.152",
             "download": true
         }
     ],
