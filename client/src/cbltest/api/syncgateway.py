@@ -970,29 +970,33 @@ class _SyncGatewayBase:
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
 
+    @tenacity.retry(
+        wait=tenacity.wait_random_exponential(multiplier=1, max=10),
+        # SGW import/propagation polling is ~10s, so allow 60s for it plus work.
+        stop=tenacity.stop_after_delay(60),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type(AssertionError),
+    )
     async def wait_for_all_documents(
         self,
         db_name: str,
         min_count: int,
         scope: str = "_default",
         collection: str = "_default",
-        max_retries: int = 30,
-        retry_delay: int = 1,
     ) -> AllDocumentsResponse:
         """
-        Poll _all_docs until at least min_count docs are present, or time out.
+        Retry _all_docs until at least min_count docs are present, then return the
+        response. Raises AssertionError if the count is not reached within 60s.
 
         Docs that arrive via an asynchronous path (SDK import, re-import after an
         SGW restart, cross-node/ISGR propagation) are not guaranteed to be visible
-        in a single read. Returns the last response either way so the caller can
-        assert and report how far it got.
+        in a single read.
         """
         all_docs = await self.get_all_documents(db_name, scope, collection)
-        for _ in range(max_retries):
-            if len(all_docs.rows) >= min_count:
-                break
-            await asyncio.sleep(retry_delay)
-            all_docs = await self.get_all_documents(db_name, scope, collection)
+        assert len(all_docs.rows) >= min_count, (
+            f"Expected at least {min_count} docs in "
+            f"{db_name}.{scope}.{collection}, got {len(all_docs.rows)}"
+        )
         return all_docs
 
     async def get_changes(
@@ -2074,32 +2078,31 @@ class SyncGateway(_SyncGatewayBase):
         # Wait for the node to settle down after coming online
         await asyncio.sleep(settle_online)
 
-    async def wait_for_import_count(
-        self,
-        db_name: str,
-        min_count: int,
-        max_retries: int = 30,
-        retry_delay: int = 1,
-    ) -> int:
+    @tenacity.retry(
+        wait=tenacity.wait_random_exponential(multiplier=1, max=10),
+        # SGW import polling is ~10s, so allow 60s for it plus work.
+        stop=tenacity.stop_after_delay(60),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type(AssertionError),
+    )
+    async def wait_for_import_count(self, db_name: str, min_count: int) -> int:
         """
-        Poll the shared_bucket_import expvar until import_count >= min_count, or
-        time out. Returns the last observed count so the caller can assert on it.
+        Retry the shared_bucket_import expvar until import_count >= min_count, then
+        return it. Raises AssertionError if not reached within 60s.
         """
-        import_count = 0
-        for _ in range(max_retries):
-            resp_data = await self._send_request("get", "/_expvar")
-            assert isinstance(resp_data, dict)
-            expvars = cast(dict, resp_data)
-            import_count = (
-                expvars.get("syncgateway", {})
-                .get("per_db", {})
-                .get(db_name, {})
-                .get("shared_bucket_import", {})
-                .get("import_count", 0)
-            )
-            if import_count >= min_count:
-                break
-            await asyncio.sleep(retry_delay)
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+        import_count = (
+            expvars.get("syncgateway", {})
+            .get("per_db", {})
+            .get(db_name, {})
+            .get("shared_bucket_import", {})
+            .get("import_count", 0)
+        )
+        assert import_count >= min_count, (
+            f"Expected import_count >= {min_count} for {db_name}, got {import_count}"
+        )
         return import_count
 
     async def create_user_client(

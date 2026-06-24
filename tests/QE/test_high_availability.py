@@ -107,9 +107,7 @@ class TestHighAvailability(CBLTestClass):
         )
         await write_task
 
-        lb_docs_final = await lb_user.wait_for_all_documents(
-            sg_db, num_docs + 50, retry_delay=2
-        )
+        lb_docs_final = await lb_user.wait_for_all_documents(sg_db, num_docs + 50)
         final_doc_count = len(lb_docs_final.rows)
         assert final_doc_count >= num_docs + 50, (
             f"Expected at least {num_docs + 50} docs via LB, got {final_doc_count}"
