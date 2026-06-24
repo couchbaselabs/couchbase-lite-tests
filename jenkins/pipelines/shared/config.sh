@@ -29,6 +29,9 @@ function move_artifacts() {
     mkdir -p "$dst_dir"
     mv "$src_dir/session.log" "$dst_dir/session.log" || true
     mv "$src_dir/http_log" "$dst_dir/http_log" || true
+    # Include the JUnit XML so each platform's results are preserved per
+    # artifacts dir in a multi-pipeline (matrix) build.
+    mv "$src_dir/junit_result.xml" "$dst_dir/junit_result.xml" || true
 }
 
 find_dir() {

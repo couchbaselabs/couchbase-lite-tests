@@ -1,20 +1,3 @@
-def resolveProgetVersion(String product, String version, String label) {
-    if (version.tokenize('.').size() >= 3) {
-        echo "${label} already fully qualified: ${version}"
-        return version
-    }
-    def url = "http://proget.build.couchbase.com:8080/api/latest_release?product=${product}&version=${version}&prerelease=true"
-    echo "Resolving ${label}: ${url}"
-    def resolved
-    resolved = powershell(script: """
-        try { (Invoke-RestMethod '${url}').version }
-        catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
-    """.stripIndent(), returnStdout: true).trim()
-    if (!resolved || resolved == 'null') { error "Could not resolve ${label} from '${version}' (url: ${url})" }
-    echo "Resolved ${label}: ${resolved}"
-    return resolved
-}
-
 pipeline {
     agent none
 // This job runs the dev_e2e suite against an AWS-provisioned backend
@@ -32,8 +15,9 @@ pipeline {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    env.CBL_VERSION = resolveProgetVersion("couchbase-lite-c", params.CBL_VERSION, 'CBL_VERSION')
-                    env.SGW_VERSION = resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
+                    def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+                    env.CBL_VERSION = proget.resolveProgetVersion("couchbase-lite-c", params.CBL_VERSION, 'CBL_VERSION')
+                    env.SGW_VERSION = proget.resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
                     currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
                 }
             }
