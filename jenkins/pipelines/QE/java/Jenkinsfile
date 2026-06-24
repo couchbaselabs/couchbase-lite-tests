@@ -7,6 +7,12 @@ pipeline {
         booleanParam(name: 'RUN_MAC', defaultValue: true, description: 'Check to run macOS Desktop tests')
         booleanParam(name: 'RUN_WINDOWS', defaultValue: true, description: 'Check to run Windows Desktop tests')
         booleanParam(name: 'RUN_LINUX', defaultValue: true, description: 'Check to run Linux Desktop tests')
+        booleanParam(
+            name: 'DISABLE_PREBUILD',
+            defaultValue: false,
+            description: 'Disable automatic prebuilding of testserver)'
+        )
+
     }
     options {
         timeout(time: 150, unit: 'MINUTES')
@@ -27,13 +33,15 @@ pipeline {
 
         stage('Prebuild Servers') {
             steps {
-                build job: 'prebuild-test-server',
-                parameters: [
-                    string(name: 'TS_PLATFORM', value: 'jak_desktop'),
-                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                ],
-                wait: true,
-                propagate: true
+                if(!params.DISABLE_PREBUILD) {
+                    build job: 'prebuild-test-server',
+                    parameters: [
+                        string(name: 'TS_PLATFORM', value: 'jak_desktop'),
+                        string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                    ],
+                    wait: true,
+                    propagate: true
+                }
             }
         }
         stage('Run Tests') {
