@@ -39,7 +39,8 @@ pipeline {
         stage('Run Tests') {
             parallel {
                 stage('macOS Desktop') {
-                    when { expression { params.RUN_MAC } }
+                    when { expression { params.RUN_MAC }
+                       beforeAgent true }
                     agent { label 'mac-mini-m4' }
                     options {
                         lock('mac-mini-m4')
@@ -70,7 +71,8 @@ pipeline {
                     }
                 }
                 stage('Windows Desktop') {
-                    when { expression { params.RUN_WINDOWS } }
+                    when { expression { params.RUN_WINDOWS }
+                     beforeAgent true }
                     agent { label 'net-windows' }
                     options {
                         lock('net-windows')
@@ -110,7 +112,8 @@ pipeline {
                     }
                 }
                 stage('Linux Desktop') {
-                    when { expression { params.RUN_LINUX } }
+                    when { expression { params.RUN_LINUX }
+                     beforeAgent true }
                     agent { label 'linux-java' }
                     options {
                         lock('linux-java')
