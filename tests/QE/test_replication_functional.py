@@ -805,8 +805,16 @@ class TestReplicationFunctional(CBLTestClass):
             collection="posts",
         )
 
-        self.mark_test_step("Create a CBL database.")
-        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"]))[0]
+        # Load the `posts` dataset locally so the `_default.posts` collection
+        # exists in the CBL database; a replicator targeting `_default.posts`
+        # cannot start otherwise.  The shared_doc* documents are not part of the
+        # dataset and are pulled from Sync Gateway below.
+        self.mark_test_step("Create a CBL database with the `posts` collection.")
+        db = (
+            await cblpytest.test_servers[0].create_and_reset_db(
+                ["db1"], dataset="posts"
+            )
+        )[0]
 
         self.mark_test_step("""
             Start a one-shot pull replicator to seed the shared documents into CBL:
