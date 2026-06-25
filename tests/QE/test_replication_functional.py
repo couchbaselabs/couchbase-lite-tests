@@ -805,144 +805,111 @@ class TestReplicationFunctional(CBLTestClass):
             collection="posts",
         )
 
-        self.mark_test_step(
-            "Create conflicts by having both users update the same documents."
-        )
-        doc1 = await cloud.sync_gateway.get_document(
-            "posts", "shared_doc1", "_default", "posts"
-        )
-        doc2 = await cloud.sync_gateway.get_document(
-            "posts", "shared_doc2", "_default", "posts"
-        )
-        assert doc1 is not None, "Document shared_doc1 not found in SGW"
-        assert doc2 is not None, "Document shared_doc2 not found in SGW"
-        assert doc1.revid is not None, "Document shared_doc1 has no revision ID"
-        assert doc2.revid is not None, "Document shared_doc2 has no revision ID"
-
-        await cloud.sync_gateway.update_documents(
-            "posts",
-            [
-                DocumentUpdateEntry(
-                    "shared_doc1",
-                    doc1.revid,
-                    {
-                        "title": "Shared Document 1 - User1's version",
-                        "content": "Content modified by user1",
-                        "channels": ["channel1", "channel2"],
-                        "type": "shared",
-                        "owner": "user1",
-                        "version": 2,
-                    },
-                ),
-                DocumentUpdateEntry(
-                    "shared_doc2",
-                    doc2.revid,
-                    {
-                        "title": "Shared Document 2 - User1's version",
-                        "content": "Content modified by user1",
-                        "channels": ["channel1", "channel2"],
-                        "type": "shared",
-                        "owner": "user1",
-                        "version": 2,
-                    },
-                ),
-            ],
-            collection="posts",
-        )
-
-        # Branch a second, competing revision from the SAME base revision that
-        # user1 updated.  update_documents / upsert_documents cannot create a
-        # conflict here: _rewrite_rev_ids rewrites the supplied rev to the current
-        # winning leaf, so a second call simply extends the linear history (the
-        # original cause of this test's failure).  new_edits=false forks a real
-        # conflicting sibling revision instead.
-        await cloud.sync_gateway.create_conflicting_revision(
-            "posts",
-            "shared_doc1",
-            doc1.revid,
-            {
-                "title": "Shared Document 1 - User2's version",
-                "content": "Content modified by user2",
-                "channels": ["channel1", "channel2"],
-                "type": "shared",
-                "owner": "user2",
-                "version": 2,
-            },
-            collection="posts",
-        )
-        await cloud.sync_gateway.create_conflicting_revision(
-            "posts",
-            "shared_doc2",
-            doc2.revid,
-            {
-                "title": "Shared Document 2 - User2's version",
-                "content": "Content modified by user2",
-                "channels": ["channel1", "channel2"],
-                "type": "shared",
-                "owner": "user2",
-                "version": 2,
-            },
-            collection="posts",
-        )
-
-        self.mark_test_step(
-            "Verify conflicts now exist in Sync Gateway before replication."
-        )
-        doc1_conflicts = await cloud.sync_gateway.get_conflicting_revisions(
-            "posts", "shared_doc1", "_default", "posts"
-        )
-        doc2_conflicts = await cloud.sync_gateway.get_conflicting_revisions(
-            "posts", "shared_doc2", "_default", "posts"
-        )
-        assert doc1_conflicts, "No conflicts found in shared_doc1"
-        assert doc2_conflicts, "No conflicts found in shared_doc2"
-
         self.mark_test_step("Create a CBL database.")
-        db = (
-            await cblpytest.test_servers[0].create_and_reset_db(
-                ["db1"], dataset="posts"
-            )
-        )[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"]))[0]
 
-        self.mark_test_step("Start push-pull replication for both users.")
-        replicator1 = Replicator(
+        self.mark_test_step("""
+            Start a one-shot pull replicator to seed the shared documents into CBL:
+                * endpoint: `/posts`
+                * collections: `_default.posts`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass1
+        """)
+        replicator = Replicator(
             db,
             cloud.sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
-            replicator_type=ReplicatorType.PUSH_AND_PULL,
-            continuous=True,
+            replicator_type=ReplicatorType.PULL,
+            continuous=False,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass1"),
             pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
-        await replicator1.start()
-
-        replicator2 = Replicator(
-            db,
-            cloud.sync_gateway.replication_url("posts"),
-            collections=[ReplicatorCollectionEntry(["_default.posts"])],
-            replicator_type=ReplicatorType.PUSH_AND_PULL,
-            continuous=True,
-            authenticator=ReplicatorBasicAuthenticator("user2", "pass2"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
-        )
-        await replicator2.start()
-
-        self.mark_test_step("Wait for initial replications to be idle.")
-        status1 = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status1.error is None, (
-            f"Error waiting for replicator1: ({status1.error.domain} / {status1.error.code}) {status1.error.message}"
+        await replicator.start()
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for seed replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        status2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status2.error is None, (
-            f"Error waiting for replicator2: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
+        self.mark_test_step("Verify the shared documents replicated into CBL.")
+        seeded_doc1 = await db.get_document(
+            DocumentEntry("_default.posts", "shared_doc1")
+        )
+        seeded_doc2 = await db.get_document(
+            DocumentEntry("_default.posts", "shared_doc2")
+        )
+        assert seeded_doc1 is not None, "shared_doc1 was not pulled into CBL"
+        assert seeded_doc2 is not None, "shared_doc2 was not pulled into CBL"
+
+        self.mark_test_step("""
+            Create a conflict for each shared document via divergent edits from the
+            same base revision:
+                * Edit the document locally in CBL (unsynced).
+                * Edit the same document on Sync Gateway twice, so the server
+                  revision out-generations the local edit.
+            Sync Gateway 3.x runs conflict-free (allow_conflicts is unsupported and
+            new_edits=false conflicting writes are rejected), so the conflict must be
+            produced on the client at pull time rather than stored on the server.
+        """)
+        async with db.batch_updater() as b:
+            b.upsert_document(
+                "_default.posts",
+                "shared_doc1",
+                new_properties=[
+                    {"title": "Shared Document 1 - CBL edit"},
+                    {"owner": "cbl"},
+                ],
+            )
+            b.upsert_document(
+                "_default.posts",
+                "shared_doc2",
+                new_properties=[
+                    {"title": "Shared Document 2 - CBL edit"},
+                    {"owner": "cbl"},
+                ],
+            )
+
+        # Two server-side edits => the SGW revision is a higher generation than the
+        # local CBL edit, so CBL's default resolver (highest generation wins)
+        # deterministically keeps the server revision and the later push back is a
+        # clean linear extension.
+        for _ in range(2):
+            sgw_doc1 = await cloud.sync_gateway.get_document(
+                "posts", "shared_doc1", "_default", "posts"
+            )
+            sgw_doc2 = await cloud.sync_gateway.get_document(
+                "posts", "shared_doc2", "_default", "posts"
+            )
+            assert sgw_doc1 is not None and sgw_doc2 is not None
+            await cloud.sync_gateway.update_documents(
+                "posts",
+                [
+                    DocumentUpdateEntry(
+                        "shared_doc1",
+                        sgw_doc1.revid,
+                        {**sgw_doc1.body, "title": "Shared Document 1 - SGW edit", "owner": "sgw"},
+                    ),
+                    DocumentUpdateEntry(
+                        "shared_doc2",
+                        sgw_doc2.revid,
+                        {**sgw_doc2.body, "title": "Shared Document 2 - SGW edit", "owner": "sgw"},
+                    ),
+                ],
+                collection="posts",
+            )
+
+        self.mark_test_step("""
+            Pull again with the default conflict resolver (none specified).  CBL must
+            detect the incoming server revisions as conflicts with the local edits and
+            resolve them automatically, without a replication error.
+        """)
+        await replicator.start()
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Default conflict resolution failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        # Verify the conflicting documents replicated into CBL.  The conflict
-        # itself is asserted against Sync Gateway above (its revision tree is
-        # authoritative); the CBL test server's `_revs` reports only the winning
-        # revision on some platforms (e.g. React Native), so a comma-in-revs
-        # check is not portable across platforms.
+        self.mark_test_step("Verify each conflict resolved to a single revision.")
         doc1_result = await db.get_document(
             DocumentEntry("_default.posts", "shared_doc1")
         )
@@ -951,8 +918,18 @@ class TestReplicationFunctional(CBLTestClass):
         )
         assert doc1_result is not None, "Document shared_doc1 not found"
         assert doc2_result is not None, "Document shared_doc2 not found"
+        assert doc1_result.body.get("title") in {
+            "Shared Document 1 - CBL edit",
+            "Shared Document 1 - SGW edit",
+        }, f"shared_doc1 not resolved to a conflicting edit: {doc1_result.body.get('title')}"
+        assert doc2_result.body.get("title") in {
+            "Shared Document 2 - CBL edit",
+            "Shared Document 2 - SGW edit",
+        }, f"shared_doc2 not resolved to a conflicting edit: {doc2_result.body.get('title')}"
 
-        self.mark_test_step("Update documents in CBL database with different users.")
+        self.mark_test_step(
+            "Update the resolved documents in CBL (final, deterministic state)."
+        )
         async with db.batch_updater() as b:
             b.upsert_document(
                 "_default.posts",
@@ -966,11 +943,6 @@ class TestReplicationFunctional(CBLTestClass):
                     {"version": 3},
                 ],
             )
-        status1 = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status1.error is None, (
-            f"Error waiting for replicator1 after doc1 update: ({status1.error.domain} / {status1.error.code}) {status1.error.message}"
-        )
-        async with db.batch_updater() as b:
             b.upsert_document(
                 "_default.posts",
                 "shared_doc2",
@@ -983,12 +955,24 @@ class TestReplicationFunctional(CBLTestClass):
                     {"version": 3},
                 ],
             )
-        status2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status2.error is None, (
-            f"Error waiting for replicator2 after doc2 update: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
+
+        self.mark_test_step("Push the resolved documents back to Sync Gateway.")
+        push_replicator = Replicator(
+            db,
+            cloud.sync_gateway.replication_url("posts"),
+            collections=[ReplicatorCollectionEntry(["_default.posts"])],
+            replicator_type=ReplicatorType.PUSH_AND_PULL,
+            continuous=False,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass1"),
+            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+        )
+        await push_replicator.start()
+        status = await push_replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error pushing resolved documents: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Verify documents in Sync Gateway have the latest updates.")
+        self.mark_test_step("Verify Sync Gateway converged on the CBL updates.")
         sgw_doc1 = await cloud.sync_gateway.get_document(
             "posts", "shared_doc1", "_default", "posts"
         )

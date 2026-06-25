@@ -6,7 +6,6 @@ from json import dumps, loads
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
-from uuid import uuid4
 
 import packaging.version
 import requests
@@ -1144,110 +1143,6 @@ class _SyncGatewayBase:
                 f"/{db_name}.{scope}.{collection}/_bulk_docs",
                 JSONDictionary(body),
             )
-
-    async def create_conflicting_revision(
-        self,
-        db_name: str,
-        doc_id: str,
-        parent_rev: str,
-        body: dict,
-        scope: str = "_default",
-        collection: str = "_default",
-    ) -> str:
-        """
-        Injects a sibling (conflicting) revision for an existing document using
-        ``_bulk_docs`` with ``new_edits=false``.
-
-        Unlike :func:`update_documents` / :func:`upsert_documents` (which rewrite
-        the supplied rev to the current winning leaf and therefore only ever
-        extend the linear history), this branches a new revision directly from
-        ``parent_rev``, producing a genuine conflict in Sync Gateway.
-
-        :param db_name: The name of the DB endpoint where the document exists
-        :param doc_id: The document ID to fork
-        :param parent_rev: The revision to branch from (e.g. ``'1-abc'``)
-        :param body: The body for the conflicting revision
-        :param scope: The scope where the document exists (default '_default')
-        :param collection: The collection where the document exists (default '_default')
-        :return: The revision ID of the newly created conflicting revision
-        """
-        with self._tracer.start_as_current_span(
-            "create_conflicting_revision",
-            attributes={
-                "cbl.database.name": db_name,
-                "cbl.scope.name": scope,
-                "cbl.collection.name": collection,
-                "cbl.document.id": doc_id,
-            },
-        ):
-            generation_str, _, parent_digest = parent_rev.partition("-")
-            new_generation = int(generation_str) + 1
-            new_digest = uuid4().hex
-            new_rev = f"{new_generation}-{new_digest}"
-
-            doc_body = dict(body)
-            doc_body["_id"] = doc_id
-            doc_body["_rev"] = new_rev
-            doc_body["_revisions"] = {
-                "start": new_generation,
-                "ids": [new_digest, parent_digest],
-            }
-
-            cbl_info(
-                f"For document {doc_id}: Creating conflicting revision {new_rev} "
-                f"branched from {parent_rev}"
-            )
-            response = await self._send_request(
-                "post",
-                f"/{db_name}.{scope}.{collection}/_bulk_docs",
-                JSONDictionary({"new_edits": False, "docs": [doc_body]}),
-            )
-            # new_edits=false returns a list; any entry with an "error" means the
-            # revision was rejected (e.g. malformed history).
-            if isinstance(response, list):
-                self._analyze_dataset_response(cast(list, response))
-            return new_rev
-
-    async def get_conflicting_revisions(
-        self,
-        db_name: str,
-        doc_id: str,
-        scope: str = "_default",
-        collection: str = "_default",
-    ) -> list[str]:
-        """
-        Returns the non-winning conflicting leaf revisions for a document, i.e.
-        the ``_conflicts`` array from ``GET /<doc>?conflicts=true``.
-
-        This is the authoritative, platform-independent way to detect a conflict:
-        it reflects Sync Gateway's own revision tree rather than relying on what a
-        particular CBL test server chooses to expose in its ``_revs`` field.
-
-        :param db_name: The name of the DB endpoint that the document exists in
-        :param doc_id: The document ID to inspect
-        :param scope: The scope that the document exists in (default '_default')
-        :param collection: The collection that the document exists in (default '_default')
-        :return: A list of conflicting revision IDs (empty when there is no conflict)
-        """
-        with self._tracer.start_as_current_span(
-            "get_conflicting_revisions",
-            attributes={
-                "cbl.database.name": db_name,
-                "cbl.scope.name": scope,
-                "cbl.collection.name": collection,
-                "cbl.document.id": doc_id,
-            },
-        ):
-            response = await self._send_request(
-                "get",
-                f"/{db_name}.{scope}.{collection}/{doc_id}",
-                params={"conflicts": "true"},
-            )
-            if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from sync gateway get /doc (not JSON)"
-                )
-            return cast(list, cast(dict, response).get("_conflicts", []))
 
     async def _replaced_revid(
         self, doc_id: str, revid: str, db_name: str, scope: str, collection: str
