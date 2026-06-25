@@ -850,36 +850,52 @@ class TestReplicationFunctional(CBLTestClass):
             collection="posts",
         )
 
-        await cloud.sync_gateway.update_documents(
+        # Branch a second, competing revision from the SAME base revision that
+        # user1 updated.  update_documents / upsert_documents cannot create a
+        # conflict here: _rewrite_rev_ids rewrites the supplied rev to the current
+        # winning leaf, so a second call simply extends the linear history (the
+        # original cause of this test's failure).  new_edits=false forks a real
+        # conflicting sibling revision instead.
+        await cloud.sync_gateway.create_conflicting_revision(
             "posts",
-            [
-                DocumentUpdateEntry(
-                    "shared_doc1",
-                    doc1.revid,  # Using same base revision as user1 to create conflict
-                    {
-                        "title": "Shared Document 1 - User2's version",
-                        "content": "Content modified by user2",
-                        "channels": ["channel1", "channel2"],
-                        "type": "shared",
-                        "owner": "user2",
-                        "version": 2,
-                    },
-                ),
-                DocumentUpdateEntry(
-                    "shared_doc2",
-                    doc2.revid,  # Using same base revision as user1 to create conflict
-                    {
-                        "title": "Shared Document 2 - User2's version",
-                        "content": "Content modified by user2",
-                        "channels": ["channel1", "channel2"],
-                        "type": "shared",
-                        "owner": "user2",
-                        "version": 2,
-                    },
-                ),
-            ],
+            "shared_doc1",
+            doc1.revid,
+            {
+                "title": "Shared Document 1 - User2's version",
+                "content": "Content modified by user2",
+                "channels": ["channel1", "channel2"],
+                "type": "shared",
+                "owner": "user2",
+                "version": 2,
+            },
             collection="posts",
         )
+        await cloud.sync_gateway.create_conflicting_revision(
+            "posts",
+            "shared_doc2",
+            doc2.revid,
+            {
+                "title": "Shared Document 2 - User2's version",
+                "content": "Content modified by user2",
+                "channels": ["channel1", "channel2"],
+                "type": "shared",
+                "owner": "user2",
+                "version": 2,
+            },
+            collection="posts",
+        )
+
+        self.mark_test_step(
+            "Verify conflicts now exist in Sync Gateway before replication."
+        )
+        doc1_conflicts = await cloud.sync_gateway.get_conflicting_revisions(
+            "posts", "shared_doc1", "_default", "posts"
+        )
+        doc2_conflicts = await cloud.sync_gateway.get_conflicting_revisions(
+            "posts", "shared_doc2", "_default", "posts"
+        )
+        assert doc1_conflicts, "No conflicts found in shared_doc1"
+        assert doc2_conflicts, "No conflicts found in shared_doc2"
 
         self.mark_test_step("Create a CBL database.")
         db = (
@@ -922,7 +938,11 @@ class TestReplicationFunctional(CBLTestClass):
             f"Error waiting for replicator2: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
         )
 
-        # Verify that conflicts exist in the database
+        # Verify the conflicting documents replicated into CBL.  The conflict
+        # itself is asserted against Sync Gateway above (its revision tree is
+        # authoritative); the CBL test server's `_revs` reports only the winning
+        # revision on some platforms (e.g. React Native), so a comma-in-revs
+        # check is not portable across platforms.
         doc1_result = await db.get_document(
             DocumentEntry("_default.posts", "shared_doc1")
         )
@@ -931,8 +951,6 @@ class TestReplicationFunctional(CBLTestClass):
         )
         assert doc1_result is not None, "Document shared_doc1 not found"
         assert doc2_result is not None, "Document shared_doc2 not found"
-        assert "," in doc1_result.revs, "No conflicts found in shared_doc1"
-        assert "," in doc2_result.revs, "No conflicts found in shared_doc2"
 
         self.mark_test_step("Update documents in CBL database with different users.")
         async with db.batch_updater() as b:

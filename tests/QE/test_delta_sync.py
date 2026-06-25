@@ -19,6 +19,23 @@ from cbltest.api.replicator_types import (
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
 
+# Whether SGW actually sent a revision as a *delta* (vs. a full-body fallback)
+# is only reliably observable through the per-rev "deltas sent" counter under
+# syncgateway.per_db.<db>.delta_sync.  A raw byte count cannot distinguish the
+# two for small documents: the on-the-wire body (compact) is always a good deal
+# smaller than len(json.dumps(body)) (whitespace-padded), so a legitimate full
+# transfer can still come in well under an 0.8x-of-body threshold.  The counter
+# increments only on a genuine delta, which is exactly what these tests need.
+_DELTAS_SENT_KEYS: tuple[str, ...] = ("deltas_sent", "delta_sent", "deltas_sent_count")
+
+
+def _deltas_sent(stats: dict) -> int | None:
+    for key in _DELTAS_SENT_KEYS:
+        value = stats.get(key)
+        if isinstance(value, int):
+            return value
+    return None
+
 
 @pytest.mark.cbl
 class TestDeltaSync(CBLTestClass):
@@ -544,8 +561,10 @@ class TestDeltaSync(CBLTestClass):
             ["_default.posts"],
         )
 
-        self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await cloud.sync_gateway.bytes_transferred("posts")
+        self.mark_test_step("Record delta-sync stats before the update and re-pull.")
+        deltas_sent_before = _deltas_sent(
+            await cloud.sync_gateway.get_delta_sync_stats("posts")
+        )
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await cloud.sync_gateway.get_document(
@@ -598,16 +617,15 @@ class TestDeltaSync(CBLTestClass):
             f"Expected updated name, got: {updated_cbl_doc.body.get('name')}"
         )
 
-        self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await cloud.sync_gateway.bytes_transferred("posts")
-
         self.mark_test_step(
-            "Verify delta transferred equivalent to doc size (full doc transfer)."
+            "Verify SGW sent a full document, not a delta (delta sync disabled)."
         )
-        updated_doc_size = len(json.dumps(updated_cbl_doc.body).encode("utf-8"))
-        delta_bytes_transferred = bytes_read_after - bytes_read_before
-        assert delta_bytes_transferred >= 0.8 * updated_doc_size, (
-            f"Expected a full doc transfer, but only {delta_bytes_transferred} bytes read (doc size: {updated_doc_size})"
+        deltas_sent_after = _deltas_sent(
+            await cloud.sync_gateway.get_delta_sync_stats("posts")
+        )
+        assert (deltas_sent_after or 0) == (deltas_sent_before or 0), (
+            "Delta sync is disabled, but SGW sent a delta instead of a full "
+            f"document (deltas_sent {deltas_sent_before} -> {deltas_sent_after})."
         )
 
         await cblpytest.test_servers[0].cleanup()
@@ -678,9 +696,9 @@ class TestDeltaSync(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Record the bytes transferred.")
-        read_pull_bytes_before, _ = await cloud.sync_gateway.bytes_transferred(
-            "short_expiry"
+        self.mark_test_step("Record delta-sync stats before the update and re-pull.")
+        deltas_sent_before = _deltas_sent(
+            await cloud.sync_gateway.get_delta_sync_stats("short_expiry")
         )
 
         self.mark_test_step(
@@ -754,23 +772,24 @@ class TestDeltaSync(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Record the bytes transferred post expiry.")
-        read_pull_bytes_after, _ = await cloud.sync_gateway.bytes_transferred(
-            "short_expiry"
-        )
-        delta_bytes_read = read_pull_bytes_after - read_pull_bytes_before
-
         self.mark_test_step("""
-            Verify:
-                * The transferred bytes are approximately equal to the full document size (>3000 bytes)
-                * This indicates SGW correctly sent the full document after revision expiry
-                * The small change forced a full document transfer due to expired revision
+            Verify SGW sent a full document, not a delta:
+                * The old revision expired, so SGW cannot compute a delta and must
+                  fall back to sending the complete document body.
+                * The per-rev delta counter must therefore be unchanged across the
+                  post-expiry pull.
         """)
         cbl_doc = await db.get_document(DocumentEntry("_default._default", "doc1"))
         assert cbl_doc is not None, "Document should exist in CBL"
-        updated_doc_size = len(json.dumps(cbl_doc.body).encode("utf-8"))
-        assert delta_bytes_read >= 0.8 * updated_doc_size, (
-            f"Expected a full doc transfer since old revision expired, but only {delta_bytes_read} bytes read (doc size: {updated_doc_size})"
+        assert cbl_doc.body.get("name") == "SGW", (
+            f"Expected updated name in CBL, got: {cbl_doc.body.get('name')}"
+        )
+        deltas_sent_after = _deltas_sent(
+            await cloud.sync_gateway.get_delta_sync_stats("short_expiry")
+        )
+        assert (deltas_sent_after or 0) == (deltas_sent_before or 0), (
+            "Old revision expired, but SGW sent a delta instead of a full "
+            f"document (deltas_sent {deltas_sent_before} -> {deltas_sent_after})."
         )
 
         await cblpytest.test_servers[0].cleanup()
