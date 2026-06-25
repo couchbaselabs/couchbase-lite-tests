@@ -243,6 +243,17 @@ export class TDKImpl implements tdk.TDK {
       } catch (e: any) {
         this.log(`Error in getAllDocuments for ${inputColl}: ${e}`);
         this.log(`[DIAG] GetAllDocuments: EXCEPTION for "${inputColl}": ${JSON.stringify(e)} message=${e?.message}`);
+        // Parity fix (M7): surface genuine query failures instead of silently
+        // returning an empty array. Swallowing here makes an errored read look
+        // like "0 documents", which masks failures and diverges from the iOS and
+        // Android servers, both of which propagate the error to the client.
+        if (e instanceof HTTPError) {
+          throw e;
+        }
+        throw new HTTPError(
+          400,
+          `Failed to query collection "${inputColl}" in database "${rq.database}": ${e?.message ?? e}`,
+        );
       }
     }
     this.log(`[DIAG] GetAllDocuments: done — summary: ${rq.collections.map(c => `${c}=${response[c]?.length ?? 'err'}`).join(', ')}`);
@@ -507,7 +518,13 @@ export class TDKImpl implements tdk.TDK {
             : 'PUSH_AND_PULL',
       continuous: rq.config.continuous ?? false,
       acceptParentDomainCookies: false,
-      acceptSelfSignedCerts: true,
+      // Parity fix (M1): do not unconditionally accept self-signed certificates.
+      // Honor an explicit request flag; otherwise only accept self-signed when no
+      // pinned server certificate was supplied. When a cert IS pinned, forcing
+      // accept-self-signed would silently defeat the pinning the test intends to
+      // verify (iOS/Android set only pinnedServerCertificate and never force this).
+      acceptSelfSignedCerts:
+        rq.config.acceptSelfSignedCerts ?? pinnedCertBase64 === '',
       allowReplicationInBackground: false,
       autoPurgeEnabled: rq.config.enableAutoPurge ?? true,
       heartbeat: 300,
@@ -865,7 +882,7 @@ export class TDKImpl implements tdk.TDK {
             code: (info.error as any).code != null && !isNaN(Number((info.error as any).code)) ? Number((info.error as any).code) : -1,
             message: info.error.message,
           }
-        : null);
+        : undefined);
 
     if (errorResult) {
       this.log(`GetStatus ${rq.id}: returning error to Python — ${errorResult.domain}/${errorResult.code}: ${errorResult.message}`);
@@ -978,10 +995,12 @@ export class TDKImpl implements tdk.TDK {
         `Snapshot is of a different database, ${rq.database}`,
       );
     }
-    // Use a lightweight blob loader for verification: just signal "a blob exists here"
-    // without downloading actual bytes. compareDocs treats any blob object as equal to
-    // any other blob object, so the exact content doesn't matter for snapshot comparison.
-    const verifyBlobLoader = async (_url: string) => ({_type: 'blob'} as const);
+    // Parity fix (M6): verify against real blob content. Download the expected blob
+    // bytes (same source updateDatabase used) so snapshot.compareDocs can check the
+    // blob's content-type and byte length rather than merely asserting "a blob exists
+    // here". iOS/Android compare blob properties/content; presence-only comparison let
+    // wrong or missing blob content pass verification as a false positive.
+    const verifyBlobLoader = (url: string) => this.downloadBlobMetadata(url);
     return await snap.verify(rq.changes, verifyBlobLoader);
   }
 

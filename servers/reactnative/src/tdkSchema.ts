@@ -118,6 +118,7 @@ export interface StartReplicatorRequest extends TestRequest {
     enableAutoPurge?: boolean;
     headers?: Record<string, string>;
     pinnedServerCert?: string;
+    acceptSelfSignedCerts?: boolean;
   };
   reset?: boolean;
 }

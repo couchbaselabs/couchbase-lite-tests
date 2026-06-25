@@ -176,6 +176,34 @@ export class Snapshot {
       return o['_type'] === 'blob' || o['@type'] === 'blob';
     };
 
+    // Normalize either blob representation into comparable fields.
+    // Save format:  { _type:'blob',  data:{ contentType, data:[bytes] } }
+    // Read format:  { '@type':'blob', content_type, length, digest }
+    const blobInfo = (
+      o: JSONObject,
+    ): {contentType?: string; length?: number; digest?: string} => {
+      if (o['_type'] === 'blob') {
+        const data = o['data'] as JSONObject | undefined;
+        const bytes = data ? data['data'] : undefined;
+        return {
+          contentType:
+            typeof data?.['contentType'] === 'string'
+              ? (data['contentType'] as string)
+              : undefined,
+          length: Array.isArray(bytes) ? bytes.length : undefined,
+          digest: undefined,
+        };
+      }
+      return {
+        contentType:
+          typeof o['content_type'] === 'string'
+            ? (o['content_type'] as string)
+            : undefined,
+        length: typeof o['length'] === 'number' ? (o['length'] as number) : undefined,
+        digest: typeof o['digest'] === 'string' ? (o['digest'] as string) : undefined,
+      };
+    };
+
     const compare = (
       exp?: JSONValue,
       act?: JSONValue,
@@ -212,12 +240,30 @@ export class Snapshot {
         if (Array.isArray(act)) {
           return fail();
         }
-        // Blob-aware comparison: bridge save format (_type) vs read format (@type).
-        if (isBlob(exp) && isBlob(act)) {
-          return true;
-        }
+        // Blob-aware comparison (M6 parity fix). Instead of treating any blob as
+        // equal to any other, compare blob digest when both sides expose it,
+        // otherwise compare content-type and byte length. This catches wrong-size,
+        // wrong-type, or missing blob content that presence-only checks let slip.
         if (isBlob(exp) || isBlob(act)) {
-          return fail();
+          if (!isBlob(exp) || !isBlob(act)) {
+            return fail();
+          }
+          const e = blobInfo(exp as JSONObject);
+          const a = blobInfo(act as JSONObject);
+          if (e.digest !== undefined && a.digest !== undefined) {
+            return e.digest === a.digest || fail();
+          }
+          if (
+            e.contentType !== undefined &&
+            a.contentType !== undefined &&
+            e.contentType !== a.contentType
+          ) {
+            return fail();
+          }
+          if (e.length !== undefined && a.length !== undefined && e.length !== a.length) {
+            return fail();
+          }
+          return true;
         }
         const actObj = act as JSONObject;
         const expKeys = Object.keys(exp);
