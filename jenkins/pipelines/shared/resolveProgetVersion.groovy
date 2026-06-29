@@ -1,6 +1,6 @@
 // Shared helper to resolve a partial product version (e.g. "4") to a concrete
-// released version via ProGet. A fully-qualified version (>= 3 dot-separated
-// components, e.g. "4.1.0" or "4.1.0-18") is returned unchanged.
+// published version via ProGet (including prereleases when available). A fully-qualified
+// version (>= 3 dot-separated components, e.g. "4.1.0" or "4.1.0-18") is returned unchanged.
 //
 // Load it from a Jenkinsfile inside a node/agent context (so sh/powershell are
 // available), then call the method on the returned object:
