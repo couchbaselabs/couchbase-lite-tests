@@ -50,7 +50,7 @@ uv run pytest \
     --ignore=test_system_multipeer.py \
     --ignore=test_upg_sgw.py \
     --ignore=test_rolling_upgrade_sgw.py \
-    -k "test_default_conflict_withConflicts_withChannels" \
+    -k "not listener and not multipeer and not custom_conflict" \
     -m cbl \
     --tb=short \
     --timeout=300
