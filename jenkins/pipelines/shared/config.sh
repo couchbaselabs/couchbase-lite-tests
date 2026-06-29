@@ -6,19 +6,18 @@ function move_artifacts() {
         return
     fi
 
-    # Determine if we're in dev_e2e or QE based on current directory
-    local current_dir=$(pwd)
-    if [[ "$current_dir" == *"/dev_e2e"* ]]; then
-        local src_dir=$(realpath $(dirname "${BASH_SOURCE[0]}")/../../../tests/dev_e2e)
-    elif [[ "$current_dir" == *"/QE"* ]]; then
-        local src_dir=$(realpath $(dirname "${BASH_SOURCE[0]}")/../../../tests/QE)
-    else
-        # Fallback: try to detect from the directory structure
-        local script_dir=$(dirname "${BASH_SOURCE[0]}")
-        if [[ "$script_dir" == *"/QE/"* ]]; then
-            local src_dir=$(realpath $(dirname "${BASH_SOURCE[0]}")/../../../tests/QE)
+    # Determine the suite's tests dir from the CALLING script's path
+    # (${BASH_SOURCE[1]} = the teardown.sh that invoked this), NOT from the
+    # current working directory. Teardown scripts pushd into environment/aws
+    # before calling this, so pwd is unreliable and would always fall through
+    # to dev_e2e -- silently skipping QE artifacts. The caller path always
+    # lives under /QE/ or /dev_e2e/. An explicit dir may also be passed as $1.
+    local src_dir="${1:-}"
+    if [ -z "$src_dir" ]; then
+        if [[ "${BASH_SOURCE[1]:-}" == *"/QE/"* ]]; then
+            src_dir="$QE_TESTS_DIR"
         else
-            local src_dir=$(realpath $(dirname "${BASH_SOURCE[0]}")/../../../tests/dev_e2e)
+            src_dir="$DEV_E2E_TESTS_DIR"
         fi
     fi
     
