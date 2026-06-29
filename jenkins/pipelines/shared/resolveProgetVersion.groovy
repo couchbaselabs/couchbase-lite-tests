@@ -23,7 +23,7 @@ def resolveProgetVersion(String product, String version, String label) {
     } else {
         resolved = powershell(script: """
             try { (Invoke-RestMethod '${url}').version }
-            catch { Write-Error "ProGet request failed for ${label}: \$_"; exit 1 }
+            catch { Write-Error "ProGet request failed for ${label}: ${'$'}_"; exit 1 }
         """.stripIndent(), returnStdout: true).trim()
     }
     if (!resolved || resolved == 'null') { error "Could not resolve ${label} from '${version}' (url: ${url})" }
