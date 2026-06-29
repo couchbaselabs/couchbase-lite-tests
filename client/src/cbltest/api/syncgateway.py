@@ -971,8 +971,9 @@ class _SyncGatewayBase:
             return AllDocumentsResponse(cast(dict, resp))
 
     @tenacity.retry(
-        wait=tenacity.wait_random_exponential(multiplier=1, max=10),
-        # SGW import/propagation polling is ~10s, so allow 60s for it plus work.
+        # Import/propagation state flips on SGW's polling cadence, not sub-second,
+        # so poll at a steady interval; give up after 60s.
+        wait=tenacity.wait_fixed(2),
         stop=tenacity.stop_after_delay(60),
         reraise=True,
         retry=tenacity.retry_if_exception_type(AssertionError),
@@ -2079,8 +2080,9 @@ class SyncGateway(_SyncGatewayBase):
         await asyncio.sleep(settle_online)
 
     @tenacity.retry(
-        wait=tenacity.wait_random_exponential(multiplier=1, max=10),
-        # SGW import polling is ~10s, so allow 60s for it plus work.
+        # Import count flips on SGW's polling cadence, not sub-second, so poll at
+        # a steady interval; give up after 60s.
+        wait=tenacity.wait_fixed(2),
         stop=tenacity.stop_after_delay(60),
         reraise=True,
         retry=tenacity.retry_if_exception_type(AssertionError),
