@@ -12,7 +12,7 @@ def resolveProgetVersion(String product, String version, String label) {
         echo "${label} already fully qualified: ${version}"
         return version
     }
-    def url = "http://proget.build.couchbase.com:8080/api/latest_release?product=${product}&version=${version}&prerelease=true"
+    def url = "http://proget.build.couchbase.com:8080/api/latest_release?product=${java.net.URLEncoder.encode(product, 'UTF-8')}&version=${java.net.URLEncoder.encode(version, 'UTF-8')}&prerelease=true"
     echo "Resolving ${label}: ${url}"
     def resolved
     if (isUnix()) {
