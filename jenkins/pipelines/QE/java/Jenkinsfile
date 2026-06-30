@@ -50,12 +50,12 @@ pipeline {
                 stage('macOS Desktop') {
                     when { expression { params.RUN_MAC }
                        beforeAgent true }
-                    agent { label 'qe-mac-india' }
+                    agent { label 'mac-mini-m4' }
                     options {
-                        lock('qe-mac-india')
+                        lock('mac-mini-m4')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         TS_ARTIFACTS_DIR = 'java_macos_desktop'
                         TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
