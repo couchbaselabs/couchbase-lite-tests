@@ -970,6 +970,36 @@ class _SyncGatewayBase:
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
 
+    @tenacity.retry(
+        # Import/propagation state flips on SGW's polling cadence, not sub-second,
+        # so poll at a steady interval; give up after 60s.
+        wait=tenacity.wait_fixed(2),
+        stop=tenacity.stop_after_delay(60),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type(AssertionError),
+    )
+    async def wait_for_all_documents(
+        self,
+        db_name: str,
+        min_count: int,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> AllDocumentsResponse:
+        """
+        Retry _all_docs until at least min_count docs are present, then return the
+        response. Raises AssertionError if the count is not reached within 60s.
+
+        Docs that arrive via an asynchronous path (SDK import, re-import after an
+        SGW restart, cross-node/ISGR propagation) are not guaranteed to be visible
+        in a single read.
+        """
+        all_docs = await self.get_all_documents(db_name, scope, collection)
+        assert len(all_docs.rows) >= min_count, (
+            f"Expected at least {min_count} docs in "
+            f"{db_name}.{scope}.{collection}, got {len(all_docs.rows)}"
+        )
+        return all_docs
+
     async def get_changes(
         self,
         db_name: str,
@@ -2048,6 +2078,34 @@ class SyncGateway(_SyncGatewayBase):
 
         # Wait for the node to settle down after coming online
         await asyncio.sleep(settle_online)
+
+    @tenacity.retry(
+        # Import count flips on SGW's polling cadence, not sub-second, so poll at
+        # a steady interval; give up after 60s.
+        wait=tenacity.wait_fixed(2),
+        stop=tenacity.stop_after_delay(60),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type(AssertionError),
+    )
+    async def wait_for_import_count(self, db_name: str, min_count: int) -> int:
+        """
+        Retry the shared_bucket_import expvar until import_count >= min_count, then
+        return it. Raises AssertionError if not reached within 60s.
+        """
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+        import_count = (
+            expvars.get("syncgateway", {})
+            .get("per_db", {})
+            .get(db_name, {})
+            .get("shared_bucket_import", {})
+            .get("import_count", 0)
+        )
+        assert import_count >= min_count, (
+            f"Expected import_count >= {min_count} for {db_name}, got {import_count}"
+        )
+        return import_count
 
     async def create_user_client(
         self,

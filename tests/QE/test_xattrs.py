@@ -233,7 +233,7 @@ class TestXattrs(CBLTestClass):
         all_doc_ids = sg_doc_ids + sdk_doc_ids
 
         self.mark_test_step("Get all docs via Sync Gateway and save revisions")
-        sg_all_docs = await sg_user.get_all_documents(sg_db)
+        sg_all_docs = await sg_user.wait_for_all_documents(sg_db, num_docs * 2)
         assert len(sg_all_docs.rows) == num_docs * 2, (
             f"Expected {num_docs * 2} docs via SG, got {len(sg_all_docs.rows)}"
         )
@@ -822,7 +822,7 @@ class TestXattrs(CBLTestClass):
             )
 
         self.mark_test_step("Wait for SG to import all docs (as admin)")
-        sg_all_docs = await sg.get_all_documents(sg_db)
+        sg_all_docs = await sg.wait_for_all_documents(sg_db, num_docs)
         assert len(sg_all_docs.rows) >= num_docs, (
             f"Expected at least {num_docs} docs to be imported, got {len(sg_all_docs.rows)}"
         )

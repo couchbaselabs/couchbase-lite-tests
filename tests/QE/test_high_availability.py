@@ -95,8 +95,7 @@ class TestHighAvailability(CBLTestClass):
         await sg2.stop()
 
         self.mark_test_step("Verify load balancer still works with SG2 offline")
-        await asyncio.sleep(2)
-        lb_docs_after = await lb_user.get_all_documents(sg_db)
+        lb_docs_after = await lb_user.wait_for_all_documents(sg_db, len(all_doc_ids))
         lb_doc_ids_after = {row.id for row in lb_docs_after.rows}
 
         assert len(lb_doc_ids_after) >= len(all_doc_ids), (
@@ -108,15 +107,7 @@ class TestHighAvailability(CBLTestClass):
         )
         await write_task
 
-        max_retries = 30
-        retry_delay = 2
-        for _ in range(max_retries):
-            lb_docs_final = await lb_user.get_all_documents(sg_db)
-            if len(lb_docs_final.rows) >= num_docs + 50:
-                break
-            await asyncio.sleep(retry_delay)
-
-        lb_docs_final = await lb_user.get_all_documents(sg_db)
+        lb_docs_final = await lb_user.wait_for_all_documents(sg_db, num_docs + 50)
         final_doc_count = len(lb_docs_final.rows)
         assert final_doc_count >= num_docs + 50, (
             f"Expected at least {num_docs + 50} docs via LB, got {final_doc_count}"
@@ -138,8 +129,9 @@ class TestHighAvailability(CBLTestClass):
         ]
         await lb_user.update_documents(sg_db, final_docs)
         final_doc_ids = [d.id for d in final_docs]
-        await asyncio.sleep(2)
-        lb_final_check = await lb_user.get_all_documents(sg_db)
+        lb_final_check = await lb_user.wait_for_all_documents(
+            sg_db, num_docs + 50 + len(final_docs)
+        )
         lb_final_ids = {row.id for row in lb_final_check.rows}
         for doc_id in final_doc_ids:
             assert doc_id in lb_final_ids, f"Final doc {doc_id} not accessible via LB"

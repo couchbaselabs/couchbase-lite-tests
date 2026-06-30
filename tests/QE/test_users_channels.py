@@ -106,7 +106,7 @@ class TestUsersChannels(CBLTestClass):
         self.mark_test_step(
             "Verify user can retrieve all documents via _all_docs from one SGW node"
         )
-        all_docs = await sg_user.get_all_documents(sg_db)
+        all_docs = await sg_user.wait_for_all_documents(sg_db, total_docs)
         all_docs_ids = [row.id for row in all_docs.rows if row.id in doc_ids]
         assert len(all_docs_ids) == total_docs, (
             f"Expected {total_docs} docs via _all_docs, got {len(all_docs_ids)}"
@@ -139,7 +139,7 @@ class TestUsersChannels(CBLTestClass):
         )
         for i, sg in enumerate(sgs):
             test_user = await sg.create_user_client(sg_db, username, password, channels)
-            node_all_docs = await test_user.get_all_documents(sg_db)
+            node_all_docs = await test_user.wait_for_all_documents(sg_db, total_docs)
             node_doc_ids = [row.id for row in node_all_docs.rows if row.id in doc_ids]
             assert len(node_doc_ids) == total_docs, (
                 f"SGW node {i}: Expected {total_docs} docs, got {len(node_doc_ids)}"
