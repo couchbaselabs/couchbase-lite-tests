@@ -72,5 +72,8 @@
         "rotated_logs_size_limit": 10240
       }
     }
-  } 
+  },
+  "unsupported": {
+      "use_gocb_fast_fail_retry": true
+  }
 }
