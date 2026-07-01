@@ -51,9 +51,6 @@ pipeline {
                         TS_ARTIFACTS_DIR = 'c_macos'
                     }
                     steps {
-                        withCredentials([string(credentialsId: 'mobile-qe', variable: 'KEYCHAIN_PASSWORD')]) {
-                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        }
                         echo "=== Run C macOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
@@ -72,17 +69,17 @@ pipeline {
                     }
                 }
                 stage('iOS') {
-                    agent { label 'mac-mini-new' }
+                    agent { label 'qe-mac-india' }
                     options {
-                        lock('00008101-000E0519020A001E')
+                        lock('00008140-0006458A0C22801C')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         TS_ARTIFACTS_DIR = 'c_ios'
                     }
                     steps {
-                        withCredentials([string(credentialsId: 'mobile-qe', variable: 'KEYCHAIN_PASSWORD')]) {
+                        withCredentials([string(credentialsId: 'mobile-qe-india', variable: 'KEYCHAIN_PASSWORD')]) {
                             sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         }
                         echo "=== Run C iOS Tests"
@@ -116,9 +113,6 @@ pipeline {
                         TS_ARTIFACTS_DIR = 'c_android'
                     }
                     steps {
-                        withCredentials([string(credentialsId: 'mobile-qe', variable: 'KEYCHAIN_PASSWORD')]) {
-                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        }
                         echo "=== Run C Android Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
