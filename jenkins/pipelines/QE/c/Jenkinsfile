@@ -23,7 +23,7 @@ pipeline {
             steps {
                 script {
                     def platforms = [
-                        'c_macos', 'c_linux_x86_64'
+                        'c_macos', 'c_ios', 'c_android', 'c_windows', 'c_linux_x86_64'
                     ]
                     def parallelBuilds = [:]
                     for(p in platforms) {
@@ -71,6 +71,68 @@ pipeline {
                         }
                     }
                 }
+                stage('iOS') {
+                    agent { label 'mac-mini-new' }
+                    options {
+                        lock('00008101-000E0519020A001E')
+                    }
+                    environment {
+                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        TS_ARTIFACTS_DIR = 'c_ios'
+                    }
+                    steps {
+                        withCredentials([string(credentialsId: 'mobile-qe', variable: 'KEYCHAIN_PASSWORD')]) {
+                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        }
+                        echo "=== Run C iOS Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                        }
+                        echo "=== C iOS Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown C iOS Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/c/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/c_ios/**/*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== C iOS Test Teardown Complete"
+                        }
+                    }
+                }
+                stage('Android') {
+                    agent { label 'mac-mini-CBL-Android1' }
+                    options {
+                        lock('R5CT20FYA7R')
+                    }
+                    environment {
+                        ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
+                        JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
+                        PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        TS_ARTIFACTS_DIR = 'c_android'
+                    }
+                    steps {
+                        withCredentials([string(credentialsId: 'mobile-qe', variable: 'KEYCHAIN_PASSWORD')]) {
+                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                        }
+                        echo "=== Run C Android Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                        }
+                        echo "=== C Android Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown C Android Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                sh 'jenkins/pipelines/QE/c/teardown.sh'
+                            }
+                            archiveArtifacts artifacts: 'tests/QE/c_android/**/*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== C Android Test Teardown Complete"
+                        }
+                    }
+                }
                 stage('Linux') {
                     agent { label 'linux-c' }
                     environment {
@@ -91,6 +153,29 @@ pipeline {
                             }
                             archiveArtifacts artifacts: 'tests/QE/c_linux/**/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== C Linux Test Teardown Complete"
+                        }
+                    }
+                }
+                stage('Windows') {
+                    agent { label 'net-windows' }
+                    environment {
+                        TS_ARTIFACTS_DIR = 'c_windows'
+                    }
+                    steps {
+                        echo "=== Run C Windows Tests"
+                        timeout(time: 120, unit: 'MINUTES') {
+                            powershell "jenkins\\pipelines\\QE\\c\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION}"
+                        }
+                        echo "=== C Windows Tests Complete"
+                    }
+                    post {
+                        always {
+                            echo "=== Teardown C Windows Tests"
+                            timeout(time: 5, unit: 'MINUTES') {
+                                powershell 'jenkins\\pipelines\\QE\\c\\teardown.ps1'
+                            }
+                            archiveArtifacts artifacts: 'tests\\QE\\c_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
+                            echo "=== C Windows Test Teardown Complete"
                         }
                     }
                 }
