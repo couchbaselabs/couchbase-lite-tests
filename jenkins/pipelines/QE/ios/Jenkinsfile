@@ -32,7 +32,7 @@ pipeline {
             agent { label 'qe-mac-india' }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
                 TS_ARTIFACTS_DIR = 'ios'
             }
             steps {
@@ -54,6 +54,14 @@ pipeline {
                     echo "=== iOS Test Teardown Complete"
                 }
             }
+        }
+    }
+    post {
+        success {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> succeeded.", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} succeeded", to: "sanjivani.patra@couchbase.com";
+        }
+        regression {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> regressed (first failure after success).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} regressed", to: "sanjivani.patra@couchbase.com";
         }
     }
 }

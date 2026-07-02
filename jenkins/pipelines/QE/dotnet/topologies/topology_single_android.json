@@ -4,7 +4,8 @@
         {
             "platform": "dotnet_android",
             "cbl_version": "{{version}}",
-            "location": "R5CT20FYA7R",
+            "location": "45291VDJH01660",
+            "ip_hint": "172.16.150.159",
             "download": true
         }
     ],
