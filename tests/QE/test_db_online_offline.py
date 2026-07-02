@@ -112,6 +112,7 @@ class TestDbOnlineOffline(CBLTestClass):
 
         self.mark_test_step("Delete bucket to sever connection")
         cbs.drop_bucket(bucket_name)
+        cbs.wait_for_bucket_deleted(bucket_name)
         await sg.wait_for_db_offline(sg_db)
 
         self.mark_test_step("Verify database is offline - REST endpoints return 403")
