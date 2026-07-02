@@ -4,6 +4,7 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
         string(name: 'SGW_VERSION', defaultValue: '3.3.0', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+        booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the test server. Uncheck to skip prebuild entirely and reuse existing artifacts.')
     }
     stages {
         stage('Init') {
@@ -17,6 +18,7 @@ pipeline {
             }
         }
         stage('Prebuild Servers') {
+            when { expression { params.RUN_PREBUILD } }
             agent { label 'mob-e2e-mac-01' }
             steps {
                 build job: 'prebuild-test-server',
