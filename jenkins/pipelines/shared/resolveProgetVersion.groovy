@@ -8,6 +8,9 @@
 //     def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
 //     env.CBL_VERSION = proget.resolveProgetVersion('couchbase-lite-c', params.CBL_VERSION, 'CBL_VERSION')
 def resolveProgetVersion(String product, String version, String label) {
+    version = version?.trim()
+    if (!version) { error "${label} is required" }
+
     if (version.tokenize('.').size() >= 3) {
         echo "${label} already fully qualified: ${version}"
         return version
