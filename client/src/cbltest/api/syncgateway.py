@@ -2100,6 +2100,7 @@ class SyncGateway(_SyncGatewayBase):
         :param retry_delay: Seconds between polls.
         :param request_timeout: Per-poll timeout, in seconds, for the status request.
         """
+        start = asyncio.get_running_loop().time()
         for _ in range(max_retries):
             try:
                 status = await asyncio.wait_for(
@@ -2110,9 +2111,9 @@ class SyncGateway(_SyncGatewayBase):
             if status is None or status.state != "Online":
                 return
             await asyncio.sleep(retry_delay)
-        total_seconds = max_retries * request_timeout + max(0, max_retries - 1) * retry_delay
+        elapsed = asyncio.get_running_loop().time() - start
         raise TimeoutError(
-            f"Database {db_name} did not go offline within {total_seconds} seconds"
+            f"Database {db_name} did not go offline after {elapsed:.1f} seconds"
         )
 
     @tenacity.retry(
