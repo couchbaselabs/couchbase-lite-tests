@@ -2101,13 +2101,19 @@ class SyncGateway(_SyncGatewayBase):
         :param request_timeout: Per-poll timeout, in seconds, for the status request.
         """
         start = asyncio.get_running_loop().time()
+        consecutive_failures = 0
         for _ in range(max_retries):
             try:
                 status = await asyncio.wait_for(
                     self.get_database_status(db_name), request_timeout
                 )
+                consecutive_failures = 0
             except (asyncio.TimeoutError, ClientConnectorError):
-                return
+                consecutive_failures += 1
+                if consecutive_failures >= 2:
+                    return
+                await asyncio.sleep(retry_delay)
+                continue
             if status is None or status.state != "Online":
                 return
             await asyncio.sleep(retry_delay)
