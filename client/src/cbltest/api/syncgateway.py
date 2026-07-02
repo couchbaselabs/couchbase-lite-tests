@@ -2108,7 +2108,7 @@ class SyncGateway(_SyncGatewayBase):
                     self.get_database_status(db_name), request_timeout
                 )
                 consecutive_failures = 0
-            except (asyncio.TimeoutError, ClientConnectorError):
+            except (asyncio.TimeoutError, ClientError):
                 consecutive_failures += 1
                 if consecutive_failures >= 2:
                     return
