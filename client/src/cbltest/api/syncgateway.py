@@ -2079,6 +2079,41 @@ class SyncGateway(_SyncGatewayBase):
         # Wait for the node to settle down after coming online
         await asyncio.sleep(settle_online)
 
+    async def wait_for_db_offline(
+        self,
+        db_name: str,
+        max_retries: int = 20,
+        retry_delay: int = 3,
+        request_timeout: int = 15,
+    ) -> None:
+        """
+        Wait until the SGW database is no longer online.
+
+        A database whose Couchbase Server bucket has been deleted may leave the
+        admin ``/{db}/`` endpoint hanging rather than promptly reporting a
+        non-Online state. Each poll is therefore bounded by ``request_timeout``,
+        and a timeout (or connection error) is treated as the database being
+        offline/unavailable -- which is the condition this waits for.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        :param request_timeout: Per-poll timeout, in seconds, for the status request.
+        """
+        for _ in range(max_retries):
+            try:
+                status = await asyncio.wait_for(
+                    self.get_database_status(db_name), request_timeout
+                )
+            except (asyncio.TimeoutError, ClientConnectorError):
+                return
+            if status is None or status.state != "Online":
+                return
+            await asyncio.sleep(retry_delay)
+        raise TimeoutError(
+            f"Database {db_name} did not go offline within {max_retries * retry_delay} seconds"
+        )
+
     @tenacity.retry(
         # Import count flips on SGW's polling cadence, not sub-second, so poll at
         # a steady interval; give up after 60s.

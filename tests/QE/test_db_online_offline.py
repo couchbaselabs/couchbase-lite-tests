@@ -1,4 +1,3 @@
-import asyncio
 from json.decoder import JSONDecodeError
 from pathlib import Path
 from typing import Any
@@ -113,10 +112,7 @@ class TestDbOnlineOffline(CBLTestClass):
 
         self.mark_test_step("Delete bucket to sever connection")
         cbs.drop_bucket(bucket_name)
-        db_status = await sg.get_database_status(sg_db)
-        while db_status is not None and db_status.state == "Online":
-            db_status = await sg.get_database_status(sg_db)
-            await asyncio.sleep(10)
+        await sg.wait_for_db_offline(sg_db)
 
         self.mark_test_step("Verify database is offline - REST endpoints return 403")
         endpoints_tested, errors_403 = await self.scan_rest_endpoints(
@@ -186,10 +182,7 @@ class TestDbOnlineOffline(CBLTestClass):
         await cbs.wait_for_bucket_deleted("data-bucket-1")
         await cbs.wait_for_bucket_deleted("data-bucket-3")
         for db_name in ["db1", "db3"]:
-            db_status = await sg.get_database_status(db_name)
-            while db_status is not None and db_status.state == "Online":
-                db_status = await sg.get_database_status(db_name)
-                await asyncio.sleep(10)
+            await sg.wait_for_db_offline(db_name)
 
         self.mark_test_step("Verify db2 and db4 remain online")
         for db_name in ["db2", "db4"]:
