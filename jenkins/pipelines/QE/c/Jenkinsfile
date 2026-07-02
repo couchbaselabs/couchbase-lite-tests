@@ -26,7 +26,7 @@ pipeline {
             }
         }
         stage('Prebuild Servers') {
-            when { expression { params.RUN_PREBUILD } }
+            when { beforeAgent true; expression { params.RUN_PREBUILD } }
             steps {
                 script {
                     def platforms = []
@@ -59,7 +59,7 @@ pipeline {
         stage('Run Tests') {
             parallel {
                 stage('macOS') {
-                    when { expression { params.RUN_MACOS } }
+                    when { beforeAgent true; expression { params.RUN_MACOS } }
                     agent { label 'mac-mini-new' }
                     environment {
                         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
@@ -84,7 +84,7 @@ pipeline {
                     }
                 }
                 stage('iOS') {
-                    when { expression { params.RUN_IOS } }
+                    when { beforeAgent true; expression { params.RUN_IOS } }
                     agent { label 'qe-mac-india' }
                     options {
                         lock('00008140-0006458A0C22801C')
@@ -116,7 +116,7 @@ pipeline {
                     }
                 }
                 stage('Android') {
-                    when { expression { params.RUN_ANDROID } }
+                    when { beforeAgent true; expression { params.RUN_ANDROID } }
                     agent { label 'qe-mac-india' }
                     options {
                         lock('56141JEBF18456')
@@ -148,7 +148,7 @@ pipeline {
                     }
                 }
                 stage('Linux') {
-                    when { expression { params.RUN_LINUX } }
+                    when { beforeAgent true; expression { params.RUN_LINUX } }
                     agent { label 'linux-c' }
                     environment {
                         TS_ARTIFACTS_DIR = 'c_linux'
@@ -172,7 +172,7 @@ pipeline {
                     }
                 }
                 stage('Windows') {
-                    when { expression { params.RUN_WINDOWS } }
+                    when { beforeAgent true; expression { params.RUN_WINDOWS } }
                     agent { label 'net-windows' }
                     environment {
                         TS_ARTIFACTS_DIR = 'c_windows'

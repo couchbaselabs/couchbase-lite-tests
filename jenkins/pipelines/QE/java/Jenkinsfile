@@ -26,7 +26,7 @@ pipeline {
         }
 
         stage('Prebuild Servers') {
-            when { expression { params.RUN_PREBUILD } }
+            when { beforeAgent true; expression { params.RUN_PREBUILD } }
             steps {
                 build job: 'prebuild-test-server',
                 parameters: [
@@ -40,7 +40,7 @@ pipeline {
         stage('Run Tests') {
             parallel {
                 stage('macOS Desktop') {
-                    when { expression { params.RUN_MACOS } }
+                    when { beforeAgent true; expression { params.RUN_MACOS } }
                     agent { label 'mac-mini-new' }
                     options {
                         lock('mac-mini-new')
@@ -70,7 +70,7 @@ pipeline {
                     }
                 }
                 stage('Windows Desktop') {
-                    when { expression { params.RUN_WINDOWS } }
+                    when { beforeAgent true; expression { params.RUN_WINDOWS } }
                     agent { label 'net-windows' }
                     options {
                         lock('net-windows')
@@ -110,7 +110,7 @@ pipeline {
                     }
                 }
                 stage('Linux Desktop') {
-                    when { expression { params.RUN_LINUX } }
+                    when { beforeAgent true; expression { params.RUN_LINUX } }
                     agent { label 'linux-java' }
                     options {
                         lock('linux-java')

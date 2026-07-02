@@ -18,7 +18,7 @@ pipeline {
             }
         }
         stage('Prebuild Servers') {
-            when { expression { params.RUN_PREBUILD } }
+            when { beforeAgent true; expression { params.RUN_PREBUILD } }
             agent { label 'mob-e2e-mac-01' }
             steps {
                 build job: 'prebuild-test-server',

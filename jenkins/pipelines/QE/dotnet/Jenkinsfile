@@ -25,7 +25,7 @@ pipeline {
             }
         }
         stage('Prebuild Servers') {
-            when { expression { params.RUN_PREBUILD } }
+            when { beforeAgent true; expression { params.RUN_PREBUILD } }
             steps {
                 script {
                     def platforms = []
@@ -57,7 +57,7 @@ pipeline {
         stage('Run Tests') {
             parallel {
                 stage('Windows') {
-                    when { expression { params.RUN_WINDOWS } }
+                    when { beforeAgent true; expression { params.RUN_WINDOWS } }
                     agent { label 'net-windows' }
                     environment {
                         TS_ARTIFACTS_DIR = 'dotnet_windows'
@@ -81,7 +81,7 @@ pipeline {
                     }
                 }
                 stage('macOS') {
-                    when { expression { params.RUN_MACOS } }
+                    when { beforeAgent true; expression { params.RUN_MACOS } }
                     agent { label 'qe-mac-india' }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
@@ -109,7 +109,7 @@ pipeline {
                     }
                 }
                 stage('iOS') {
-                    when { expression { params.RUN_IOS } }
+                    when { beforeAgent true; expression { params.RUN_IOS } }
                     agent { label 'qe-mac-india' }
                     options {
                         lock('00008110-000E544201D1401E')
@@ -141,7 +141,7 @@ pipeline {
                     }
                 }
                 stage('Android') {
-                    when { expression { params.RUN_ANDROID } }
+                    when { beforeAgent true; expression { params.RUN_ANDROID } }
                     agent { label 'qe-mac-india' }
                     options {
                         lock('45291VDJH01660')
