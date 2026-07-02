@@ -2110,7 +2110,7 @@ class SyncGateway(_SyncGatewayBase):
             if status is None or status.state != "Online":
                 return
             await asyncio.sleep(retry_delay)
-        total_seconds = max_retries * request_timeout + (max_retries - 1) * retry_delay
+        total_seconds = max_retries * request_timeout + max(0, max_retries - 1) * retry_delay
         raise TimeoutError(
             f"Database {db_name} did not go offline within {total_seconds} seconds"
         )
