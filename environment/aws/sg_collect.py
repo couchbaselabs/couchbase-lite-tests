@@ -107,26 +107,26 @@ def wait_for_collection(scheme: str, hostname: str, timeout: int) -> None:
         Exception: If the collection does not finish within the timeout.
     """
     deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        resp = requests.get(
-            _sgcollect_url(scheme, hostname),
-            auth=SGW_ADMIN_AUTH,
-            verify=False,
-            timeout=30,
-        )
-        resp.raise_for_status()
-        status_resp = cast(dict, resp.json())
-        status = status_resp.get("status")
-        if status in {"stopped", "completed"}:
-            return
-        if status != "running":
-            raise Exception(
-                f"sgcollect_info on {hostname} ended with status={status!r}: {status_resp.get('error')}"
+    with requests.Session() as session:
+        while time.monotonic() < deadline:
+            resp = session.get(
+                _sgcollect_url(scheme, hostname),
+                auth=SGW_ADMIN_AUTH,
+                verify=False,
+                timeout=30,
             )
+            resp.raise_for_status()
+            status_resp = cast(dict, resp.json())
+            status = status_resp.get("status")
+            if status in {"stopped", "completed"}:
+                return
+            if status != "running":
+                raise Exception(
+                    f"sgcollect_info on {hostname} ended with status={status!r}: {status_resp.get('error')}"
+                )
 
-        click.echo(f"[{hostname}] sgcollect_info still running...")
-        time.sleep(POLL_INTERVAL_SECS)
-
+            click.echo(f"[{hostname}] sgcollect_info still running...")
+            time.sleep(POLL_INTERVAL_SECS)
     raise Exception(
         f"sgcollect_info on {hostname} did not finish within {timeout} seconds"
     )
