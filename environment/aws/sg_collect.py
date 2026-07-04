@@ -84,7 +84,11 @@ def start_collection(
             )
             resp.raise_for_status()
             return scheme
-        except (requests.exceptions.SSLError, requests.ConnectionError) as e:
+        except (
+            requests.exceptions.SSLError,
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as e:
             last_error = e
 
     raise Exception(f"Could not reach SGW admin API on {hostname}: {last_error}")
