@@ -2066,9 +2066,9 @@ class SyncGateway(_SyncGatewayBase):
         """
         status = await self.get_database_status(db_name)
         assert status is not None, f"Database {db_name} is not up yet"
-
-        # Wait for the node to settle down after coming online
-        await asyncio.sleep(settle_online)
+        assert status.state == "Online", (
+            f"Database {db_name} is not Online yet (state={status.state})"
+        )
 
     @tenacity.retry(
         # Same polling cadence as wait_for_db_up; give up after 60s.
