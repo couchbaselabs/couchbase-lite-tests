@@ -7,7 +7,8 @@ It is intended to run from teardown scripts right before the environment is dest
 so that SGW diagnostics survive the teardown.
 
 Functions:
-    main(topology_file: str | None, upload_host: str, customer: str, timeout: int) -> bool:
+    main(topology_file: str | None, upload_host: str, customer: str, timeout: int,
+         sgw_hosts: list[str] | None = None, ticket: str | None = None) -> bool:
         Main function to collect and upload logs from all Sync Gateway nodes.
 """
 
