@@ -12,8 +12,8 @@ pushd $AWS_ENVIRONMENT_DIR
 # BUILD_NUMBER (set by Jenkins) groups the run's uploads under one
 # "ticket" folder in the supportal.
 uv run ./sg_collect.py --topology topology_setup/topology.json \
-    ${BUILD_NUMBER:+--ticket "$BUILD_NUMBER"} || \
-    echo "WARNING: sgcollect_info failed; continuing with teardown"
+    ${BUILD_NUMBER:+--ticket "${BUILD_NUMBER: -7}"} || \
+    echo "WARNING: sg_collect.py failed; continuing with teardown"
 move_artifacts
 
 uv run ./stop_backend.py --topology topology_setup/topology.json
