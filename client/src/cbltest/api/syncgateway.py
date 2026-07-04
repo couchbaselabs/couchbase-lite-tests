@@ -2048,46 +2048,41 @@ class SyncGateway(_SyncGatewayBase):
             await asyncio.sleep(retry_delay)
         raise TimeoutError(f"Database {db_name} still exists on some SG nodes")
 
-    async def wait_for_db_up(
-        self,
-        db_name: str,
-        max_retries: int = 20,
-        retry_delay: int = 3,
-        settle_online: int = 10,
-    ) -> None:
+    @tenacity.retry(
+        # DB state flips on SGW's config-polling cadence, not sub-second, so
+        # poll at a steady interval; give up after 60s. Connection errors mean
+        # the node is still coming up, so they retry too.
+        wait=tenacity.wait_fixed(3),
+        stop=tenacity.stop_after_delay(60),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type((AssertionError, ClientError)),
+    )
+    async def wait_for_db_up(self, db_name: str, settle_online: int = 10) -> None:
         """
-        Wait until the SGW node is online.
+        Wait until the SGW database is up. Raises if it still isn't after 60s.
 
         :param db_name: Database name to poll.
-        :param max_retries: Number of polls before timing out.
-        :param retry_delay: Seconds between polls.
-        :param settle_online: Extra seconds to wait after seeing Online.
+        :param settle_online: Extra seconds to wait after seeing the DB up.
         """
-        for _ in range(max_retries):
-            try:
-                sg_status = await self.get_database_status(db_name)
-            except ClientConnectorError:
-                sg_status = None
-            if sg_status is not None:
-                break
-            await asyncio.sleep(retry_delay)
-        else:
-            raise TimeoutError(
-                f"Node {db_name} is not online within {max_retries * retry_delay} seconds"
-            )
+        status = await self.get_database_status(db_name)
+        assert status is not None, f"Database {db_name} is not up yet"
 
         # Wait for the node to settle down after coming online
         await asyncio.sleep(settle_online)
 
+    @tenacity.retry(
+        # Same polling cadence as wait_for_db_up; give up after 60s.
+        wait=tenacity.wait_fixed(3),
+        stop=tenacity.stop_after_delay(60),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type(AssertionError),
+    )
     async def wait_for_db_offline(
-        self,
-        db_name: str,
-        max_retries: int = 20,
-        retry_delay: int = 3,
-        request_timeout: int = 15,
+        self, db_name: str, request_timeout: int = 15
     ) -> None:
         """
-        Wait until the SGW database is no longer online.
+        Wait until the SGW database is no longer online. Raises if it is still
+        Online after 60s.
 
         A database whose Couchbase Server bucket has been deleted may leave the
         admin ``/{db}/`` endpoint hanging rather than promptly reporting a
@@ -2096,30 +2091,17 @@ class SyncGateway(_SyncGatewayBase):
         offline/unavailable -- which is the condition this waits for.
 
         :param db_name: Database name to poll.
-        :param max_retries: Number of polls before timing out.
-        :param retry_delay: Seconds between polls.
         :param request_timeout: Per-poll timeout, in seconds, for the status request.
         """
-        start = asyncio.get_running_loop().time()
-        consecutive_failures = 0
-        for _ in range(max_retries):
-            try:
-                status = await asyncio.wait_for(
-                    self.get_database_status(db_name), request_timeout
-                )
-                consecutive_failures = 0
-            except (asyncio.TimeoutError, ClientError):
-                consecutive_failures += 1
-                if consecutive_failures >= 2:
-                    return
-                await asyncio.sleep(retry_delay)
-                continue
-            if status is None or status.state != "Online":
-                return
-            await asyncio.sleep(retry_delay)
-        elapsed = asyncio.get_running_loop().time() - start
-        raise TimeoutError(
-            f"Database {db_name} did not go offline after {elapsed:.1f} seconds"
+        try:
+            status = await asyncio.wait_for(
+                self.get_database_status(db_name), request_timeout
+            )
+        except (asyncio.TimeoutError, ClientError):
+            # Hung or unreachable admin endpoint -- effectively offline.
+            return
+        assert status is None or status.state != "Online", (
+            f"Database {db_name} is still Online"
         )
 
     @tenacity.retry(
