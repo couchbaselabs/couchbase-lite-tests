@@ -2100,6 +2100,11 @@ class SyncGateway(_SyncGatewayBase):
         except (asyncio.TimeoutError, ClientError):
             # Hung or unreachable admin endpoint -- effectively offline.
             return
+        except CblSyncGatewayBadResponseError as e:
+            if e.code == 503:
+                # DB endpoint can return 503 when its backing bucket is gone.
+                return
+            raise
         assert status is None or status.state != "Online", (
             f"Database {db_name} is still Online"
         )
