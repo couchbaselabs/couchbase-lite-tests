@@ -67,8 +67,7 @@ def start_collection(hostname: str) -> str:
     Raises:
         Exception: If the admin API is unreachable or rejects the request.
     """
-    body = {"output_dir": SGW_LOG_DIR}
-    last_error: Exception | None = None
+    body = {"output_dir": SGW_LOG_DIR, "upload": False}
     for scheme in ("https", "http"):
         try:
             resp = requests.post(
