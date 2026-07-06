@@ -320,7 +320,7 @@ def main(
         )
         return True
 
-    output_path = Path(output_dir).resolve()
+    output_path = Path(output_dir).expanduser().resolve()
     output_path.mkdir(parents=True, exist_ok=True)
 
     header(f"Running sgcollect_info on {len(hostnames)} SGW node(s): {hostnames}")
