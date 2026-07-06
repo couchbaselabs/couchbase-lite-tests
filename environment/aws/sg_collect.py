@@ -150,7 +150,7 @@ def list_sgcollect_zips(hostname: str) -> set[str]:
         # Fallback: Caddy may return HTML in some configurations.
         import re
 
-        return set(re.findall(r"sgcollectinfo-[^\"\s<>]+\\.zip", resp.text))
+        return set(re.findall(r"sgcollectinfo-[^\"\s<>]+\.zip", resp.text))
 
     files = {
         entry.get("name")
