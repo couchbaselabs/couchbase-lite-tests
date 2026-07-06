@@ -2,17 +2,17 @@
 
 """
 This module runs sgcollect_info on every Sync Gateway node in a previously created
-E2E AWS EC2 testing backend and uploads the results to the Couchbase support portal.
-It is intended to run from teardown scripts right before the environment is destroyed
-so that SGW diagnostics survive the teardown.
+E2E AWS EC2 testing backend and downloads the resulting zips to a local directory.
+It is intended to run from teardown scripts right before the environment is destroyed:
+the zips land in the suite's tests directory, where move_artifacts places them in
+the Jenkins artifacts directory to be archived under the job's normal retention.
 
 Functions:
-    main(topology_file: str | None, upload_host: str, customer: str, timeout: int,
-         sgw_hosts: list[str] | None = None, ticket: str | None = None) -> bool:
-        Main function to collect and upload logs from all Sync Gateway nodes.
+    main(topology_file: str | None, output_dir: str, timeout: int,
+         sgw_hosts: list[str] | None = None) -> bool:
+        Main function to collect and download logs from all Sync Gateway nodes.
 """
 
-import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -35,6 +35,10 @@ from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SGW_ADMIN_PORT = 4985
 SGW_ADMIN_AUTH = ("admin", "password")
+# Caddy on each SGW node serves this directory (see sgw_setup/Caddyfile),
+# so zips written here are downloadable without SSH.
+CADDY_PORT = 20000
+SGW_LOG_DIR = "/home/ec2-user/log"
 POLL_INTERVAL_SECS = 15
 
 # The SGW instances use a self-signed certificate
@@ -45,18 +49,17 @@ def _sgcollect_url(scheme: str, hostname: str) -> str:
     return f"{scheme}://{hostname}:{SGW_ADMIN_PORT}/_sgcollect_info"
 
 
-def start_collection(
-    hostname: str, upload_host: str, customer: str, ticket: str | None
-) -> str:
+def _caddy_url(hostname: str, filename: str = "") -> str:
+    return f"http://{hostname}:{CADDY_PORT}/{filename}"
+
+
+def start_collection(hostname: str) -> str:
     """
-    Start sgcollect_info on a Sync Gateway node.
+    Start sgcollect_info on a Sync Gateway node, writing the zip into the
+    Caddy-served log directory.
 
     Args:
         hostname (str): The public hostname of the Sync Gateway instance.
-        upload_host (str): The host to upload the collected logs to.
-        customer (str): The customer name to file the upload under.
-        ticket (str | None): Optional ticket number (1-7 digits) grouping the
-            uploads of one run under <customer>/<ticket>/ on the upload host.
 
     Returns:
         str: The URL scheme ("https" or "http") that the admin API answered on.
@@ -64,14 +67,7 @@ def start_collection(
     Raises:
         Exception: If the admin API is unreachable or rejects the request.
     """
-    body: dict[str, str | bool] = {
-        "output_dir": "/tmp",
-        "upload": True,
-        "upload_host": upload_host,
-        "customer": customer,
-    }
-    if ticket:
-        body["ticket"] = ticket
+    body = {"output_dir": SGW_LOG_DIR}
     last_error: Exception | None = None
     for scheme in ("https", "http"):
         try:
@@ -104,7 +100,7 @@ def wait_for_collection(scheme: str, hostname: str, timeout: int) -> None:
         timeout (int): Maximum number of seconds to wait.
 
     Raises:
-        Exception: If the collection does not finish within the timeout.
+        Exception: If the collection fails or does not finish within the timeout.
     """
     deadline = time.monotonic() + timeout
     with requests.Session() as session:
@@ -132,6 +128,87 @@ def wait_for_collection(scheme: str, hostname: str, timeout: int) -> None:
     )
 
 
+def list_sgcollect_zips(hostname: str) -> set[str]:
+    """
+    List sgcollect zips currently in the node's Caddy-served log directory.
+
+    Args:
+        hostname (str): The public hostname of the Sync Gateway instance.
+
+    Returns:
+        set[str]: Filenames matching sgcollectinfo-*.zip.
+    """
+    resp = requests.get(
+        _caddy_url(hostname),
+        headers={"Accept": "application/json"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return {
+        entry["name"]
+        for entry in cast(list, resp.json())
+        if isinstance(entry, dict)
+        and not entry.get("is_dir", False)
+        and entry.get("name", "").startswith("sgcollectinfo-")
+        and entry.get("name", "").endswith(".zip")
+    }
+
+
+def download_zip(hostname: str, filename: str, output_dir: Path) -> Path:
+    """
+    Stream one sgcollect zip from the node's Caddy fileserver to output_dir.
+
+    Args:
+        hostname (str): The public hostname of the Sync Gateway instance.
+        filename (str): The zip filename to download.
+        output_dir (Path): Local directory to write the zip into.
+
+    Returns:
+        Path: The local path of the downloaded zip.
+    """
+    local_path = output_dir / filename
+    with requests.get(_caddy_url(hostname, filename), stream=True, timeout=300) as r:
+        r.raise_for_status()
+        with open(local_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                f.write(chunk)
+    return local_path
+
+
+def collect_node(hostname: str, output_dir: Path, timeout: int) -> bool:
+    """
+    Run sgcollect_info on a single node and download the resulting zip.
+
+    Args:
+        hostname (str): The public hostname of the Sync Gateway instance.
+        output_dir (Path): Local directory to write the zip into.
+        timeout (int): Seconds to wait for the collection to finish.
+
+    Returns:
+        bool: True if the collection and download succeeded, False otherwise.
+    """
+    try:
+        # Snapshot first so a zip left over from an earlier collection on this
+        # node is never mistaken for this run's output.
+        before = list_sgcollect_zips(hostname)
+        scheme = start_collection(hostname)
+        wait_for_collection(scheme, hostname, timeout)
+        new_zips = list_sgcollect_zips(hostname) - before
+        if not new_zips:
+            raise Exception(f"no new sgcollect zip appeared in {SGW_LOG_DIR}")
+
+        for filename in sorted(new_zips):
+            local_path = download_zip(hostname, filename, output_dir)
+            size_mb = local_path.stat().st_size / (1024 * 1024)
+            click.secho(
+                f"[{hostname}] Downloaded {local_path} ({size_mb:.1f} MB)", fg="green"
+            )
+        return True
+    except Exception as e:
+        click.secho(f"[{hostname}] sgcollect_info failed: {e}", fg="red")
+        return False
+
+
 @click.command()
 @click.option(
     "--topology",
@@ -139,14 +216,10 @@ def wait_for_collection(scheme: str, hostname: str, timeout: int) -> None:
     type=click.Path(exists=True),
 )
 @click.option(
-    "--upload-host",
-    default="uploads.couchbase.com",
-    help="The host to upload the collected logs to",
-)
-@click.option(
-    "--customer",
-    default="sgw-qe",
-    help="The customer name to file the upload under",
+    "--output-dir",
+    default=".",
+    help="Local directory to download the sgcollect zips into "
+    "(teardown passes the suite's tests dir so move_artifacts picks them up)",
 )
 @click.option(
     "--timeout",
@@ -159,21 +232,13 @@ def wait_for_collection(scheme: str, hostname: str, timeout: int) -> None:
     help="Explicit SGW hostname(s) to collect from, bypassing terraform state "
     "(for ad-hoc runs against an environment provisioned elsewhere)",
 )
-@click.option(
-    "--ticket",
-    default=None,
-    help="Ticket number (1-7 digits, e.g. the Jenkins BUILD_NUMBER) grouping "
-    "this run's uploads under <customer>/<ticket>/ on the upload host",
-)
 def cli_entry(
     topology: str | None,
-    upload_host: str,
-    customer: str,
+    output_dir: str,
     timeout: int,
     sgw_host: tuple[str, ...],
-    ticket: str | None,
 ) -> None:
-    if not main(topology, upload_host, customer, timeout, list(sgw_host), ticket):
+    if not main(topology, output_dir, timeout, list(sgw_host)):
         sys.exit(1)
 
 
@@ -200,63 +265,26 @@ def resolve_sgw_hostnames(topology_file: str | None) -> list[str] | None:
     return [sgw.hostname for sgw in topology.sync_gateways]
 
 
-def collect_node(
-    hostname: str, upload_host: str, customer: str, timeout: int, ticket: str | None
-) -> bool:
-    """
-    Run sgcollect_info on a single node from start to upload completion.
-
-    Args:
-        hostname (str): The public hostname of the Sync Gateway instance.
-        upload_host (str): The host to upload the collected logs to.
-        customer (str): The customer name to file the upload under.
-        timeout (int): Seconds to wait for the collection to finish.
-        ticket (str | None): Optional ticket number grouping this run's uploads.
-
-    Returns:
-        bool: True if the collection succeeded, False otherwise.
-    """
-    try:
-        scheme = start_collection(hostname, upload_host, customer, ticket)
-        wait_for_collection(scheme, hostname, timeout)
-        destination = f"{upload_host}/{customer}" + (f"/{ticket}" if ticket else "")
-        click.secho(f"[{hostname}] Logs uploaded to {destination}", fg="green")
-        return True
-    except Exception as e:
-        click.secho(f"[{hostname}] sgcollect_info failed: {e}", fg="red")
-        return False
-
-
 def main(
     topology_file: str | None,
-    upload_host: str,
-    customer: str,
+    output_dir: str,
     timeout: int,
     sgw_hosts: list[str] | None = None,
-    ticket: str | None = None,
 ) -> bool:
     """
-    Collect and upload logs from every Sync Gateway node in the environment,
+    Collect and download logs from every Sync Gateway node in the environment,
     in parallel. Does not return until all collections have finished, so a
     teardown that runs afterwards cannot destroy a node mid-collection.
 
     Args:
         topology_file (str | None): The topology file that was used to start the environment.
-        upload_host (str): The host to upload the collected logs to.
-        customer (str): The customer name to file the upload under.
+        output_dir (str): Local directory to download the sgcollect zips into.
         timeout (int): Seconds to wait for each node's collection to finish.
         sgw_hosts (list[str] | None): Explicit SGW hostnames, bypassing terraform state.
-        ticket (str | None): Optional ticket number grouping this run's uploads.
 
     Returns:
         bool: True if every node was collected successfully, False otherwise.
     """
-    if ticket and not re.fullmatch(r"\d{1,7}", ticket):
-        # SGW rejects malformed tickets with a 400; dropping it keeps the
-        # upload itself (the part that matters) alive.
-        click.secho(f"Ignoring ticket '{ticket}': must be 1 to 7 digits.", fg="yellow")
-        ticket = None
-
     hostnames = sgw_hosts or resolve_sgw_hostnames(topology_file)
     if hostnames is None:
         return False
@@ -267,15 +295,16 @@ def main(
         )
         return True
 
+    output_path = Path(output_dir).resolve()
+    output_path.mkdir(parents=True, exist_ok=True)
+
     header(f"Running sgcollect_info on {len(hostnames)} SGW node(s): {hostnames}")
     # Exiting the `with` block joins every worker (Go's WaitGroup.Wait()),
     # guaranteeing no collection is still running when teardown proceeds.
     with ThreadPoolExecutor(max_workers=len(hostnames)) as pool:
         results = list(
             pool.map(
-                lambda hostname: collect_node(
-                    hostname, upload_host, customer, timeout, ticket
-                ),
+                lambda hostname: collect_node(hostname, output_path, timeout),
                 hostnames,
             )
         )

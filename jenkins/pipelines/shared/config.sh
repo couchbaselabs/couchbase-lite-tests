@@ -31,6 +31,9 @@ function move_artifacts() {
     # Include the JUnit XML so each platform's results are preserved per
     # artifacts dir in a multi-pipeline (matrix) build.
     mv "$src_dir/junit_result.xml" "$dst_dir/junit_result.xml" || true
+    # SGW diagnostics downloaded by sg_collect.py during teardown; moving
+    # them here gets them archived (and later purged) by Jenkins retention.
+    mv "$src_dir"/sgcollectinfo-*.zip "$dst_dir/" 2> /dev/null || true
 }
 
 find_dir() {
