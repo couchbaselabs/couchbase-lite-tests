@@ -139,14 +139,31 @@ def list_sgcollect_zips(hostname: str) -> set[str]:
     """
     resp = requests.get(
         _caddy_url(hostname),
+        headers={"Accept": "application/json"},
         timeout=30,
     )
     resp.raise_for_status()
 
-    # Caddy `file_server browse` returns HTML; extract zip names from the listing.
-    import re
+    try:
+        listing = resp.json()
+    except ValueError:
+        # Fallback: Caddy may return HTML in some configurations.
+        import re
 
-    return set(re.findall(r"sgcollectinfo-[^\"\s<>]+\.zip", resp.text))
+        return set(re.findall(r"sgcollectinfo-[^\"\s<>]+\\.zip", resp.text))
+
+    files = {
+        entry.get("name")
+        for entry in listing
+        if isinstance(entry, dict) and not entry.get("is_dir", False)
+    }
+    return {
+        name
+        for name in files
+        if isinstance(name, str)
+        and name.startswith("sgcollectinfo-")
+        and name.endswith(".zip")
+    }
 
 
 def download_zip(hostname: str, filename: str, output_dir: Path) -> Path:
