@@ -170,11 +170,20 @@ def download_zip(hostname: str, filename: str, output_dir: Path) -> Path:
         f"sgcollectinfo-{safe_host}-{filename.removeprefix('sgcollectinfo-')}"
     )
     local_path = output_dir / local_filename
-    with requests.get(_caddy_url(hostname, filename), stream=True, timeout=300) as r:
-        r.raise_for_status()
-        with open(local_path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024 * 1024):
-                f.write(chunk)
+    tmp_path = local_path.with_suffix(local_path.suffix + ".part")
+    try:
+        with requests.get(
+            _caddy_url(hostname, filename), stream=True, timeout=300
+        ) as r:
+            r.raise_for_status()
+            with open(tmp_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        f.write(chunk)
+        tmp_path.replace(local_path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
     return local_path
 
 
