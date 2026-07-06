@@ -270,15 +270,12 @@ def main(
     header(f"Running sgcollect_info on {len(hostnames)} SGW node(s): {hostnames}")
     # Exiting the `with` block joins every worker (Go's WaitGroup.Wait()),
     # guaranteeing no collection is still running when teardown proceeds.
-    with ThreadPoolExecutor(max_workers=len(hostnames)) as pool:
-        results = list(
-            pool.map(
-                lambda hostname: collect_node(
-                    hostname, upload_host, customer, timeout, ticket
-                ),
-                hostnames,
-            )
-        )
+with ThreadPoolExecutor(max_workers=len(hostnames)) as pool:
+    futures = [
+        pool.submit(collect_node, hostname, upload_host, customer, timeout, ticket)
+        for hostname in hostnames
+    ]
+    results = [f.result() for f in futures]
 
     return all(results)
 
