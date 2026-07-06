@@ -115,13 +115,15 @@ def wait_for_collection(scheme: str, hostname: str, timeout: int) -> None:
             status = status_resp.get("status")
             if status in {"stopped", "completed"}:
                 return
-            if status != "running":
-                raise Exception(
-                    f"sgcollect_info on {hostname} ended with status={status!r}: {status_resp.get('error')}"
+            if status in {"running", "started"}:
+                click.echo(
+                    f"[{hostname}] sgcollect_info still running (status={status})..."
                 )
-
-            click.echo(f"[{hostname}] sgcollect_info still running...")
-            time.sleep(POLL_INTERVAL_SECS)
+                time.sleep(POLL_INTERVAL_SECS)
+                continue
+            raise Exception(
+                f"sgcollect_info on {hostname} ended with status={status!r}: {status_resp.get('error')}"
+            )
     raise Exception(
         f"sgcollect_info on {hostname} did not finish within {timeout} seconds"
     )
