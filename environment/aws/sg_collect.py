@@ -165,7 +165,11 @@ def download_zip(hostname: str, filename: str, output_dir: Path) -> Path:
     Returns:
         Path: The local path of the downloaded zip.
     """
-    local_path = output_dir / filename
+    safe_host = hostname.replace(".", "_")
+    local_filename = (
+        f"sgcollectinfo-{safe_host}-{filename.removeprefix('sgcollectinfo-')}"
+    )
+    local_path = output_dir / local_filename
     with requests.get(_caddy_url(hostname, filename), stream=True, timeout=300) as r:
         r.raise_for_status()
         with open(local_path, "wb") as f:
