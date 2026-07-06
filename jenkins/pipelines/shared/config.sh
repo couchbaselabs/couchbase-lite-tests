@@ -33,6 +33,9 @@ function move_artifacts() {
     mv "$src_dir/junit_result.xml" "$dst_dir/junit_result.xml" || true
     # SGW diagnostics downloaded by sg_collect.py during teardown; moving
     # them here gets them archived (and later purged) by Jenkins retention.
+    # Purge zips left by earlier builds first — the workspace persists and
+    # zips have unique names, so they'd accumulate into every build's archive.
+    rm -f "$dst_dir"/sgcollectinfo-*.zip
     mv "$src_dir"/sgcollectinfo-*.zip "$dst_dir/" 2> /dev/null || true
 }
 

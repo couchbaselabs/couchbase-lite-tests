@@ -325,6 +325,13 @@ def main(
     output_path = Path(output_dir).expanduser().resolve()
     output_path.mkdir(parents=True, exist_ok=True)
 
+    # The Jenkins workspace persists between builds; zips have unique names,
+    # so leftovers from an earlier run would be re-archived by every
+    # subsequent build. Only this run's downloads may remain.
+    for stale in output_path.glob("sgcollectinfo-*.zip"):
+        click.secho(f"Removing stale {stale.name} from a previous run", fg="yellow")
+        stale.unlink()
+
     header(f"Running sgcollect_info on {len(hostnames)} SGW node(s): {hostnames}")
     # Exiting the `with` block joins every worker (Go's WaitGroup.Wait()),
     # guaranteeing no collection is still running when teardown proceeds.
