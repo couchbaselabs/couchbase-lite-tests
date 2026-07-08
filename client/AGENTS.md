@@ -81,15 +81,14 @@ client/
 ### `CBLPyTest` — the entry point
 
 ```python
-cblpytest = await CBLPyTest.create(config_path, ...)
+cblpytest = await CBLPyTest.create(parsed_config, ...)
 ```
 
-It:
-1. Parses the JSON config → `ParsedConfig`
-2. Creates a `RequestFactory` (HTTP transport)
-3. Creates `TestServer[]`, `SyncGateway[]`, `CouchbaseServer[]`, `EdgeServer[]`, `LoadBalancer[]`
-4. Resolves the API version — queries every test server, requires consensus
-5. Starts a session on each test server
+Takes an already-parsed `ParsedConfig` (the `cblpytest` pytest fixture parses the `--config` JSON once in `pytest_configure` and stashes it on `pytest.Config`; see `plugins/cblpytest_fixture.py`). It:
+1. Creates a `RequestFactory` (HTTP transport)
+2. Creates `TestServer[]`, `SyncGateway[]`, `CouchbaseServer[]`, `EdgeServer[]`, `LoadBalancer[]`
+3. Resolves the API version — queries every test server, requires consensus
+4. Starts a session on each test server
 
 Exposed properties: `.request_factory`, `.test_servers`, `.sync_gateways`, `.couchbase_servers`, `.edge_servers`, `.load_balancers`, `.config`, `.log_level`, `.extra_props`.
 

@@ -1,8 +1,8 @@
-from typing import Final, cast
+from typing import Final
 
 import pytest
-from cbltest.configparser import _parse_config
-from cbltest.logging import cbl_info, cbl_warning
+from cbltest.logging import cbl_info
+from cbltest.plugins.cblpytest_fixture import parsed_config_key
 
 _min_test_servers_key: Final[str] = "min_test_servers"
 _min_sync_gateways_key: Final[str] = "min_sync_gateways"
@@ -50,10 +50,7 @@ def pytest_runtest_setup(item: pytest.Item):
     ):
         return
 
-    config_path_raw = item.config.getoption("--config")
-    if config_path_raw is None or not isinstance(config_path_raw, str):
-        cbl_warning("Unable to get config option in required_topology plugin")
-        return  # Don't fail the test, just don't do validation
+    config = item.config.stash[parsed_config_key]
 
     def check(mark: pytest.Mark | None, value: list, desc: str) -> None:
         if mark is None:
@@ -65,9 +62,6 @@ def pytest_runtest_setup(item: pytest.Item):
                 f"Test requires at least {minimum} {desc}, but only {len(value)} are available."
             )
             pytest.skip(f"Insufficient {desc}")
-
-    config_path = cast(str, config_path_raw)
-    config = _parse_config(config_path)
 
     check(min_test_servers_mark, config.test_servers, "Test Servers")
     check(min_sync_gateways_mark, config.sync_gateways, "Sync Gateways")

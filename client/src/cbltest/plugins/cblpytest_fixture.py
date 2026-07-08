@@ -1,6 +1,9 @@
+from typing import Final, cast
+
 import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
+from cbltest.configparser import ParsedConfig, _parse_config
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
@@ -11,10 +14,13 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 # It will make a fixture available called "cblpytest" which can
 # be used as an argument to any test that has the TDK installed.
 
+# Other plugins that need the parsed TDK config can read from item.config.stash or request.node.stash.
+parsed_config_key: Final[pytest.StashKey[ParsedConfig]] = pytest.StashKey()
+
 
 @pytest_asyncio.fixture(scope="session")
 async def cblpytest(request: pytest.FixtureRequest):
-    config = request.config.getoption("--config")
+    config = request.config.stash[parsed_config_key]
     log_level = request.config.getoption("--cbl-log-level")
     test_props = request.config.getoption("--test-props")
     otel_endpoint = request.config.getoption("--otel-endpoint")
@@ -73,3 +79,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="The default dataset version to use for test servers",
         default="4.0",
     )
+
+
+# Parse the TDK config file once up front and stash it on the pytest Config, so that other plugins (and pytest_runtest_setup hooks) can use this.
+def pytest_configure(config: pytest.Config) -> None:
+    config_path_raw = config.getoption("--config")
+    if config_path_raw is None or not isinstance(config_path_raw, str):
+        raise pytest.UsageError(
+            "Unable to get --config option in cblpytest_fixture plugin"
+        )
+
+    config.stash[parsed_config_key] = _parse_config(cast(str, config_path_raw))
