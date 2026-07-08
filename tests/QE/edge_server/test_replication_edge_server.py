@@ -9,6 +9,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
+@pytest.mark.min_edge_servers(1)
 class TestEdgeServerSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_to_sgw_replication(
@@ -105,6 +106,7 @@ class TestEdgeServerSync(CBLTestClass):
         assert failed, f"Document not purged on Edge server {edge_doc}"
         await edge_server.stop_replication(1)
 
+    @pytest.mark.min_edge_servers(2)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_to_edge_replication(
         self, cblpytest: CBLPyTest, dataset_path: Path

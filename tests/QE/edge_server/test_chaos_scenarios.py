@@ -11,6 +11,7 @@ from cbltest.api.json_generator import JSONGenerator
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
+@pytest.mark.min_edge_servers(1)
 class TestEdgeServerChaos(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_kill_sgw_mid_replication(self, cblpytest, dataset_path) -> None:
@@ -153,6 +154,7 @@ class TestEdgeServerChaos(CBLTestClass):
         self.mark_test_step("Edge servers replication verified")
         return update_docs
 
+    @pytest.mark.min_edge_servers(3)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_3_edge_with_sync(self, cblpytest, dataset_path) -> None:
         self.mark_test_step("test_3_edge_with_sync")
