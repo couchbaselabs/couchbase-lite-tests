@@ -65,7 +65,7 @@ pipeline {
                                 }
 
                                 try {
-                                    sgwUrl = sh script: "jenkins/pipelines/main/dev_e2e/latest_sgw_url.sh ${sgwVersion}", returnStdout: true
+                                    sgwUrl = sh script: "jenkins/pipelines/dev_e2e/main/latest_sgw_url.sh ${sgwVersion}", returnStdout: true
                                 } catch(Exception e) {
                                     error "Cannot get Sync Gateway download URL : ${e} for v${version}"
                                 }
