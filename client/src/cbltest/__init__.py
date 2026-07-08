@@ -7,14 +7,12 @@ from .api.couchbaseserver import CouchbaseServer
 from .api.edgeserver import EdgeServer
 from .api.syncgateway import SyncGateway
 from .api.testserver import TestServer
-from .assertions import _assert_not_null
 from .configparser import (
     CouchbaseServerInfo,
     EdgeServerInfo,
     ParsedConfig,
     SyncGatewayInfo,
     TestServerInfo,
-    _parse_config,
 )
 from .extrapropsparser import _parse_extra_props
 from .globals import CBLPyTestGlobal
@@ -31,7 +29,7 @@ class CBLPyTest:
 
     @property
     def config(self) -> ParsedConfig:
-        """Gets the config as parsed from the provided JSON file path"""
+        """Gets the config that was provided"""
         return self.__config
 
     @property
@@ -76,14 +74,14 @@ class CBLPyTest:
 
     @staticmethod
     async def create(
-        config_path: str,
+        config: ParsedConfig,
         log_level: LogLevel = LogLevel.VERBOSE,
         extra_props_path: str | None = None,
         test_server_only: bool = False,
         dataset_version: str = "4.0",
     ):
         ret_val = CBLPyTest(
-            config_path, log_level, extra_props_path, test_server_only, dataset_version
+            config, log_level, extra_props_path, test_server_only, dataset_version
         )
         if not ret_val.extra_props.get("auto_start_tdk_page", True):
             CBLPyTestGlobal.auto_start_tdk_page = False
@@ -105,14 +103,13 @@ class CBLPyTest:
 
     def __init__(
         self,
-        config_path: str,
+        config: ParsedConfig,
         log_level: LogLevel = LogLevel.VERBOSE,
         extra_props_path: str | None = None,
         test_server_only: bool = False,
         dataset_version: str = "4.0",
     ):
-        _assert_not_null(config_path, "config_path")
-        self.__config = _parse_config(config_path)
+        self.__config = config
         self.__log_level = LogLevel(log_level)
         cbl_setLogLevel(self.__log_level)
         self.__extra_props = {}
