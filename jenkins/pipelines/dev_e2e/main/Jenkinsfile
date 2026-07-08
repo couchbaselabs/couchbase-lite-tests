@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'mob-e2e-docker-01' }
+    agent { label 'mob-e2e-deb-02' }
     parameters {
         choice(name: 'CBL_PLATFORM', choices: ['all', 'c', 'android', 'java', 'ios', 'dotnet'], description: 'CBL Platform')
         string(name: 'CBL_VERSION', defaultValue: 'master', description: "CBL Version, or 'master' to auto-resolve each platform's current mainline version via ProGet")
