@@ -14,7 +14,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 # It will make a fixture available called "cblpytest" which can
 # be used as an argument to any test that has the TDK installed.
 
-# Other plugins that need the parsed TDK config can read from item.config.stash or request.node.stash.
+# Other plugins that need the parsed TDK config can read from request.config.stash or item.config.stash.
 parsed_config_key: Final[pytest.StashKey[ParsedConfig]] = pytest.StashKey()
 
 
