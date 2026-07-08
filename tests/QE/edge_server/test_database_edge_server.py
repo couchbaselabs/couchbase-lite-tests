@@ -8,6 +8,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
+@pytest.mark.min_edge_servers(1)
 class TestDatabase(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_server_incorrect_db_config(

@@ -8,6 +8,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
+@pytest.mark.min_edge_servers(1)
 class TestCrud(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_basic_information_retrieval(

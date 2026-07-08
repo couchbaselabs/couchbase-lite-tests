@@ -8,6 +8,7 @@ _min_test_servers_key: Final[str] = "min_test_servers"
 _min_sync_gateways_key: Final[str] = "min_sync_gateways"
 _min_couchbase_servers_key: Final[str] = "min_couchbase_servers"
 _min_load_balancers_key: Final[str] = "min_load_balancers"
+_min_edge_servers_key: Final[str] = "min_edge_servers"
 
 # This plugin adds test markers to check that the required topology is present
 # in the TDK config file.  If not, the test will be skipped.
@@ -32,6 +33,10 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         f"{_min_load_balancers_key}(min): Require at least `min` load balancers to be available",
     )
+    config.addinivalue_line(
+        "markers",
+        f"{_min_edge_servers_key}(min): Require at least `min` edge servers to be available",
+    )
 
 
 # This is run before each test to determine if there are enough backend
@@ -41,12 +46,14 @@ def pytest_runtest_setup(item: pytest.Item):
     min_sync_gateways_mark = item.get_closest_marker(_min_sync_gateways_key)
     min_couchbase_servers_mark = item.get_closest_marker(_min_couchbase_servers_key)
     min_load_balancers_mark = item.get_closest_marker(_min_load_balancers_key)
+    min_edge_servers_mark = item.get_closest_marker(_min_edge_servers_key)
 
     if (
         min_test_servers_mark is None
         and min_sync_gateways_mark is None
         and min_couchbase_servers_mark is None
         and min_load_balancers_mark is None
+        and min_edge_servers_mark is None
     ):
         return
 
@@ -73,3 +80,4 @@ def pytest_runtest_setup(item: pytest.Item):
     check(min_sync_gateways_mark, config.sync_gateways, "Sync Gateways")
     check(min_couchbase_servers_mark, config.couchbase_servers, "Couchbase Servers")
     check(min_load_balancers_mark, config.load_balancers, "Load Balancers")
+    check(min_edge_servers_mark, config.edge_servers, "Edge Servers")
