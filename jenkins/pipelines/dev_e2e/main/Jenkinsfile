@@ -69,7 +69,12 @@ pipeline {
                                 } catch(Exception e) {
                                     error "Cannot get Sync Gateway download URL : ${e} for v${version}"
                                 }
-                                
+
+                                // Pick dataset version from CBL version: 4.0+ uses the 4.0 dataset, else 3.2:
+                                def versionParts = version.tokenize('.')
+                                def majorVersion = versionParts[0].toInteger()
+                                def datasetVersion = (majorVersion >= 4) ? "4.0" : "3.2"
+
                                 if (params.CBL_PLATFORM == "all") {
                                     currentBuild.displayName = "${version}-${buildNo}-SGW${sgwVersion} (#${currentBuild.number})"
                                 } else {
@@ -109,7 +114,8 @@ pipeline {
                                         string(name: "CBL_VERSION", value: version),
                                         string(name: "CBL_BUILD", value: buildNo),
                                         string(name: "SGW_URL", value: sgwUrl),
-                                        string(name: "SGW_VERSION", value: sgwVersion)
+                                        string(name: "SGW_VERSION", value: sgwVersion),
+                                        string(name: "TS_DATASET_VERSION", value: datasetVersion)
                                     ], wait: false
 
                                     // Save CBL build info:
