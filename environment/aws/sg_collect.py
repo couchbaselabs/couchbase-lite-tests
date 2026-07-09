@@ -337,8 +337,12 @@ def main(
     # subsequent build. Only this run's downloads may remain.
     for stale in output_path.glob("sgcollectinfo-*.zip"):
         click.secho(f"Removing stale {stale.name} from a previous run", fg="yellow")
-        stale.unlink()
-
+        try:
+            stale.unlink()
+        except OSError as e:
+            click.secho(
+                f"Unable to remove stale {stale.name} (continuing): {e}", fg="yellow"
+            )
     header(f"Running sgcollect_info on {len(hostnames)} SGW node(s): {hostnames}")
     # Exiting the `with` block joins every worker (Go's WaitGroup.Wait()),
     # guaranteeing no collection is still running when teardown proceeds.
