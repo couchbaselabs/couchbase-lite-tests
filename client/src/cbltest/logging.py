@@ -103,8 +103,8 @@ def cbl_setLogLevel(level: LogLevel):
         console.setLevel(DEBUG)
 
 
-def cbl_error(msg: str):
-    _cbl_log.error(msg, stack_info=True, stacklevel=3)
+def cbl_error(msg: str, include_stack: bool = True):
+    _cbl_log.error(msg, stack_info=include_stack, stacklevel=3)
 
 
 def cbl_warning(msg: str):

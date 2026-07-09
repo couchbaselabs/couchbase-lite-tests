@@ -585,6 +585,16 @@ class SGCollectRedactLevel(str, Enum):
     FULL = "full"
 
 
+class SGCollectOptions(BaseModel):
+    """Body for Sync Gateway's POST /_sgcollect_info. Unset fields are omitted
+    so Sync Gateway falls back to its own defaults."""
+
+    upload: bool = False
+    redact_level: SGCollectRedactLevel | None = None
+    redact_salt: str | None = None
+    output_dir: str | None = None
+
+
 class _SyncGatewayBase:
     """
     Base class for Sync Gateway clients containing common document and database operations.
@@ -1642,37 +1652,33 @@ class _SyncGatewayBase:
 
     async def start_sgcollect(
         self,
-        redact_level: SGCollectRedactLevel = SGCollectRedactLevel.NONE,
+        upload: bool = False,
+        redact_level: SGCollectRedactLevel | None = None,
         redact_salt: str | None = None,
         output_dir: str | None = None,
     ) -> dict:
         """
         Starts SGCollect using the REST API endpoint
 
-        :param redact_level: Redaction level to apply to the collected logs
+        :param upload: Whether Sync Gateway should upload the resulting archive
+        :param redact_level: Redaction level for the collected logs (SGW default if omitted)
         :param redact_salt: Custom salt for redaction hashing
         :param output_dir: Output directory on the remote server
         :return: Response dict with status
         """
+        options = SGCollectOptions(
+            upload=upload,
+            redact_level=redact_level,
+            redact_salt=redact_salt,
+            output_dir=output_dir,
+        )
         with self._tracer.start_as_current_span(
-            "start_sgcollect",
-            attributes={
-                "redact.level": redact_level.value,
-            },
+            "start_sgcollect", attributes=options.model_dump(exclude_none=True)
         ):
-            body: dict[str, Any] = {
-                "upload": False,
-                "redact_level": redact_level.value,
-            }
-            if redact_salt is not None:
-                body["redact_salt"] = redact_salt
-            if output_dir is not None:
-                body["output_dir"] = output_dir
-
             resp = await self._send_request(
                 "post",
                 "/_sgcollect_info",
-                JSONDictionary(body),
+                JSONDictionary(options.model_dump(exclude_none=True)),
             )
             assert isinstance(resp, dict)
             return cast(dict, resp)
@@ -1713,7 +1719,7 @@ class _SyncGatewayBase:
     async def run_sgcollect(
         self,
         local_output_dir: Path,
-        redact_level: SGCollectRedactLevel = SGCollectRedactLevel.NONE,
+        redact_level: SGCollectRedactLevel | None = None,
     ) -> Path:
         """
         Runs SGCollect on this Sync Gateway node end to end: starts the collection,
@@ -1723,7 +1729,7 @@ class _SyncGatewayBase:
         earlier collection is never mistaken for this run's output.
 
         :param local_output_dir: Local directory to download the resulting zip into
-        :param redact_level: Redaction level to apply to the collected logs
+        :param redact_level: Redaction level for the collected logs (SGW default if omitted)
         :return: The local path of the downloaded zip
         :raises CblTestError: If no new zip appears after collection, or if more
             than one new zip appears (ambiguous result)
@@ -1751,9 +1757,9 @@ class _SyncGatewayBase:
                     f"after collection, found {len(new_files)}: {sorted(new_files)}"
                 )
 
-            zip_name = next(iter(new_files))
+            (zip_name,) = new_files
             safe_host = self.hostname.replace(".", "_")
-            local_path = local_output_dir / f"sgcollectinfo-{safe_host}-{zip_name}"
+            local_path = local_output_dir / f"{safe_host}-{zip_name}"
             await self.download_file_via_caddy(zip_name, str(local_path))
             return local_path
 
@@ -2347,11 +2353,7 @@ async def run_sgcollects(
     Runs SGCollect on every given Sync Gateway node in parallel, downloading each
     resulting zip into output_dir, and logs a summary of what was collected.
 
-    This is the multi-node counterpart to
-    :func:`SyncGateway.run_sgcollect()<cbltest.api.syncgateway._SyncGatewayBase.run_sgcollect>`,
-    which collects from a single node. Per-node failures are logged as errors
-    (not raised) so that one node's failure does not prevent collection on the
-    others, or fail an already-finished test session.
+    Per-node failures are logged as errors (not raised).
 
     :param sync_gateways: The Sync Gateway nodes to collect from
     :param output_dir: Local directory to download the resulting zips into
@@ -2363,7 +2365,10 @@ async def run_sgcollects(
         try:
             return await sg.run_sgcollect(output_dir)
         except Exception as e:
-            cbl_error(f"sgcollect: failed to collect logs from {sg.hostname}: {e}")
+            cbl_error(
+                f"sgcollect: failed to collect logs from {sg.hostname}: {e}",
+                include_stack=False,
+            )
 
     results = await asyncio.gather(*(_collect_one(sg) for sg in sync_gateways))
     collected = [path for path in results if path is not None]
@@ -2374,6 +2379,7 @@ async def run_sgcollects(
     if len(collected) < len(results):
         cbl_error(
             f"sgcollect: {len(results) - len(collected)}/{len(results)} node(s) "
-            "failed to collect logs, see errors above"
+            "failed to collect logs, see errors above",
+            include_stack=False,
         )
     return collected

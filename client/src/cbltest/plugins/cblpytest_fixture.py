@@ -45,10 +45,11 @@ async def cblpytest(request: pytest.FixtureRequest):
     )
     yield cblpytest
 
-    if sgcollect_on_test_failure and request.session.testsfailed:
-        await run_sgcollects(cblpytest.sync_gateways, Path.cwd())
-
-    await cblpytest.close()
+    try:
+        if sgcollect_on_test_failure and request.session.testsfailed:
+            await run_sgcollects(cblpytest.sync_gateways, Path.cwd())
+    finally:
+        await cblpytest.close()
 
 
 # Some command line options are added as part of this plugin,

@@ -76,7 +76,7 @@ class TestStartSGCollect:
         method, path, payload = sg.sent_requests[-1]
         assert (method, path) == ("post", "/_sgcollect_info")
         assert payload is not None
-        assert payload.to_json() == {"upload": False, "redact_level": "none"}
+        assert payload.to_json() == {"upload": False}
 
     @pytest.mark.asyncio
     async def test_passes_through_redact_options(self):
@@ -106,13 +106,13 @@ class TestRunSGCollect:
         result = await sg.run_sgcollect(tmp_path)
 
         safe_host = sg.hostname.replace(".", "_")
-        expected = tmp_path / f"sgcollectinfo-{safe_host}-sgcollectinfo-abc.zip"
+        expected = tmp_path / f"{safe_host}-sgcollectinfo-abc.zip"
         assert result == expected
         assert sg.downloaded == [("sgcollectinfo-abc.zip", str(expected))]
-        # start_sgcollect() ran for real, so confirm it sent the default redact level.
+        # start_sgcollect() ran for real, so confirm no redact level was sent by default.
         _, _, payload = sg.sent_requests[-1]
         assert payload is not None
-        assert payload.to_json()["redact_level"] == "none"
+        assert "redact_level" not in payload.to_json()
 
     @pytest.mark.asyncio
     async def test_ignores_zip_that_already_existed(self, tmp_path: Path):
@@ -162,10 +162,8 @@ class TestRunSgcollects:
         collected = await run_sgcollects([sg1, sg2], output_dir)
 
         assert collected == [
-            output_dir
-            / f"sgcollectinfo-{sg1.hostname.replace('.', '_')}-sgcollectinfo-a.zip",
-            output_dir
-            / f"sgcollectinfo-{sg2.hostname.replace('.', '_')}-sgcollectinfo-b.zip",
+            output_dir / f"{sg1.hostname.replace('.', '_')}-sgcollectinfo-a.zip",
+            output_dir / f"{sg2.hostname.replace('.', '_')}-sgcollectinfo-b.zip",
         ]
         assert output_dir.is_dir()
 
@@ -181,10 +179,7 @@ class TestRunSgcollects:
         with caplog.at_level(logging.ERROR, logger="CBL"):
             collected = await run_sgcollects([sg1, sg2], tmp_path)
 
-        expected = (
-            tmp_path
-            / f"sgcollectinfo-{sg2.hostname.replace('.', '_')}-sgcollectinfo-b.zip"
-        )
+        expected = tmp_path / f"{sg2.hostname.replace('.', '_')}-sgcollectinfo-b.zip"
         assert collected == [expected]
         assert sg1.downloaded == []
 
