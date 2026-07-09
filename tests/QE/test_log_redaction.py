@@ -6,7 +6,11 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from cbltest.api.syncgateway import (
+    DocumentUpdateEntry,
+    PutDatabasePayload,
+    SGCollectRedactLevel,
+)
 
 
 def scan_logs_for_untagged_sensitive_data(
@@ -232,7 +236,7 @@ class TestLogRedaction(CBLTestClass):
 
         self.mark_test_step("Trigger SGCollect with redaction enabled")
         sgcollect_resp = await sg.start_sgcollect(
-            redact_level="partial", output_dir="/home/ec2-user/log"
+            redact_level=SGCollectRedactLevel.PARTIAL, output_dir="/home/ec2-user/log"
         )
         assert sgcollect_resp.get("status") in ["running", "started"], (
             f"SGCollect failed to start: {sgcollect_resp}"

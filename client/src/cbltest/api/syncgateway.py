@@ -2,6 +2,7 @@ import asyncio
 import re
 import ssl
 from abc import ABC, abstractmethod
+from enum import Enum
 from json import dumps, loads
 from pathlib import Path
 from typing import Any, cast
@@ -574,6 +575,14 @@ class DatabaseStatusResponse:
         self.__db_name = response.get("db_name", "")
         self.__state = response.get("state", "Unknown")
         self.__update_seq = response.get("update_seq", 0)
+
+
+class SGCollectRedactLevel(str, Enum):
+    """Redaction level accepted by Sync Gateway's /_sgcollect_info endpoint"""
+
+    NONE = "none"
+    PARTIAL = "partial"
+    FULL = "full"
 
 
 class _SyncGatewayBase:
@@ -1633,14 +1642,14 @@ class _SyncGatewayBase:
 
     async def start_sgcollect(
         self,
-        redact_level: str | None = None,
+        redact_level: SGCollectRedactLevel = SGCollectRedactLevel.NONE,
         redact_salt: str | None = None,
         output_dir: str | None = None,
     ) -> dict:
         """
         Starts SGCollect using the REST API endpoint
 
-        :param redact_level: Redaction level ('none', 'partial', 'full')
+        :param redact_level: Redaction level to apply to the collected logs
         :param redact_salt: Custom salt for redaction hashing
         :param output_dir: Output directory on the remote server
         :return: Response dict with status
@@ -1648,12 +1657,13 @@ class _SyncGatewayBase:
         with self._tracer.start_as_current_span(
             "start_sgcollect",
             attributes={
-                "redact.level": redact_level or "none",
+                "redact.level": redact_level.value,
             },
         ):
-            body: dict[str, Any] = {"upload": False}
-            if redact_level is not None:
-                body["redact_level"] = redact_level
+            body: dict[str, Any] = {
+                "upload": False,
+                "redact_level": redact_level.value,
+            }
             if redact_salt is not None:
                 body["redact_salt"] = redact_salt
             if output_dir is not None:
@@ -1703,9 +1713,7 @@ class _SyncGatewayBase:
     async def run_sgcollect(
         self,
         local_output_dir: Path,
-        redact_level: str | None = None,
-        redact_salt: str | None = None,
-        remote_output_dir: str | None = None,
+        redact_level: SGCollectRedactLevel = SGCollectRedactLevel.NONE,
     ) -> Path:
         """
         Runs SGCollect on this Sync Gateway node end to end: starts the collection,
@@ -1715,9 +1723,7 @@ class _SyncGatewayBase:
         earlier collection is never mistaken for this run's output.
 
         :param local_output_dir: Local directory to download the resulting zip into
-        :param redact_level: Redaction level ('none', 'partial', 'full')
-        :param redact_salt: Custom salt for redaction hashing
-        :param remote_output_dir: Output directory on the remote server
+        :param redact_level: Redaction level to apply to the collected logs
         :return: The local path of the downloaded zip
         :raises CblTestError: If no new zip appears after collection, or if more
             than one new zip appears (ambiguous result)
@@ -1729,11 +1735,7 @@ class _SyncGatewayBase:
             pattern = r"sgcollectinfo-.*\.zip"
             before = set(await self.list_files_via_caddy(pattern=pattern))
 
-            await self.start_sgcollect(
-                redact_level=redact_level,
-                redact_salt=redact_salt,
-                output_dir=remote_output_dir,
-            )
+            await self.start_sgcollect(redact_level=redact_level)
             await self.wait_for_sgcollect_to_complete()
 
             after = set(await self.list_files_via_caddy(pattern=pattern))
@@ -2362,7 +2364,6 @@ async def run_sgcollects(
             return await sg.run_sgcollect(output_dir)
         except Exception as e:
             cbl_error(f"sgcollect: failed to collect logs from {sg.hostname}: {e}")
-            return None
 
     results = await asyncio.gather(*(_collect_one(sg) for sg in sync_gateways))
     collected = [path for path in results if path is not None]
