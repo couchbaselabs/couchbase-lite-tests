@@ -1,13 +1,14 @@
-from typing import Final, cast
+from typing import Final
 
 import pytest
-from cbltest.configparser import _parse_config
-from cbltest.logging import cbl_info, cbl_warning
+from cbltest.logging import cbl_info
+from cbltest.plugins.cblpytest_fixture import parsed_config_key
 
 _min_test_servers_key: Final[str] = "min_test_servers"
 _min_sync_gateways_key: Final[str] = "min_sync_gateways"
 _min_couchbase_servers_key: Final[str] = "min_couchbase_servers"
 _min_load_balancers_key: Final[str] = "min_load_balancers"
+_min_edge_servers_key: Final[str] = "min_edge_servers"
 
 # This plugin adds test markers to check that the required topology is present
 # in the TDK config file.  If not, the test will be skipped.
@@ -32,6 +33,10 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         f"{_min_load_balancers_key}(min): Require at least `min` load balancers to be available",
     )
+    config.addinivalue_line(
+        "markers",
+        f"{_min_edge_servers_key}(min): Require at least `min` edge servers to be available",
+    )
 
 
 # This is run before each test to determine if there are enough backend
@@ -41,19 +46,18 @@ def pytest_runtest_setup(item: pytest.Item):
     min_sync_gateways_mark = item.get_closest_marker(_min_sync_gateways_key)
     min_couchbase_servers_mark = item.get_closest_marker(_min_couchbase_servers_key)
     min_load_balancers_mark = item.get_closest_marker(_min_load_balancers_key)
+    min_edge_servers_mark = item.get_closest_marker(_min_edge_servers_key)
 
     if (
         min_test_servers_mark is None
         and min_sync_gateways_mark is None
         and min_couchbase_servers_mark is None
         and min_load_balancers_mark is None
+        and min_edge_servers_mark is None
     ):
         return
 
-    config_path_raw = item.config.getoption("--config")
-    if config_path_raw is None or not isinstance(config_path_raw, str):
-        cbl_warning("Unable to get config option in required_topology plugin")
-        return  # Don't fail the test, just don't do validation
+    config = item.config.stash[parsed_config_key]
 
     def check(mark: pytest.Mark | None, value: list, desc: str) -> None:
         if mark is None:
@@ -66,10 +70,8 @@ def pytest_runtest_setup(item: pytest.Item):
             )
             pytest.skip(f"Insufficient {desc}")
 
-    config_path = cast(str, config_path_raw)
-    config = _parse_config(config_path)
-
     check(min_test_servers_mark, config.test_servers, "Test Servers")
     check(min_sync_gateways_mark, config.sync_gateways, "Sync Gateways")
     check(min_couchbase_servers_mark, config.couchbase_servers, "Couchbase Servers")
     check(min_load_balancers_mark, config.load_balancers, "Load Balancers")
+    check(min_edge_servers_mark, config.edge_servers, "Edge Servers")

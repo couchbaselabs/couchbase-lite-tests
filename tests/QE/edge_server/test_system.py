@@ -33,6 +33,7 @@ def _updated_doc_body(doc_id: str) -> dict[str, Any]:
     }
 
 
+@pytest.mark.min_edge_servers(1)
 class TestSystem(CBLTestClass):
     async def _setup_system_test(self, cblpytest: CBLPyTest):
         """Create bucket, 10 docs, Sync Gateway db, Edge Server db; verify 10 docs on both.

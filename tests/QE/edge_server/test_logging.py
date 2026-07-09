@@ -71,6 +71,7 @@ AUDIT_CONFIG_APPLIERS: dict[str, Callable[[dict], None]] = {
 }
 
 
+@pytest.mark.min_edge_servers(1)
 class TestLogging(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("audit_mode", ["default", "disabled", "enabled"])
