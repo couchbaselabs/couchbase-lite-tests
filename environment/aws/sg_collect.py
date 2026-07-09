@@ -67,6 +67,7 @@ def start_collection(hostname: str) -> str:
         Exception: If the admin API is unreachable or rejects the request.
     """
     body = {"output_dir": SGW_LOG_DIR, "upload": False}
+    last_error: Exception | None = None
     for scheme in ("https", "http"):
         try:
             resp = requests.post(
@@ -85,7 +86,9 @@ def start_collection(hostname: str) -> str:
         ) as e:
             last_error = e
 
-    raise Exception(f"Could not reach SGW admin API on {hostname}: {last_error}")
+    raise Exception(
+        f"Could not reach SGW admin API on {hostname}: {last_error or 'unknown error'}"
+    )
 
 
 def wait_for_collection(scheme: str, hostname: str, timeout: int) -> None:
