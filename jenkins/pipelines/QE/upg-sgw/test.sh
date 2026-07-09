@@ -96,6 +96,7 @@ unset SGW_UPGRADED_NODE_INDEX 2>/dev/null || true
 pushd $QE_TESTS_DIR > /dev/null
 uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
     --upgrade-versions "$UPGRADE_VERSIONS" \
+    --sgcollect-on-test-failure \
     test_upg_sgw.py
 popd > /dev/null
 
@@ -131,6 +132,7 @@ for ((i=1; i<${#SGW_VERSIONS[@]}; i++)); do
     pushd $QE_TESTS_DIR > /dev/null
     uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
         --upgrade-versions "$UPGRADE_VERSIONS" \
+        --sgcollect-on-test-failure \
         test_upg_sgw.py
     popd > /dev/null
 done

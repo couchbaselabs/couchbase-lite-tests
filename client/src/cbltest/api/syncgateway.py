@@ -1700,6 +1700,61 @@ class _SyncGatewayBase:
             f"Error: {status_resp.get('error')}"
         )
 
+    async def run_sgcollect(
+        self,
+        local_output_dir: Path,
+        redact_level: str | None = None,
+        redact_salt: str | None = None,
+        remote_output_dir: str | None = None,
+    ) -> Path:
+        """
+        Runs SGCollect on this Sync Gateway node end to end: starts the collection,
+        waits for it to finish, then downloads the resulting zip via Caddy.
+
+        Snapshots the zips present before starting so a zip left over from an
+        earlier collection is never mistaken for this run's output.
+
+        :param local_output_dir: Local directory to download the resulting zip into
+        :param redact_level: Redaction level ('none', 'partial', 'full')
+        :param redact_salt: Custom salt for redaction hashing
+        :param remote_output_dir: Output directory on the remote server
+        :return: The local path of the downloaded zip
+        :raises CblTestError: If no new zip appears after collection, or if more
+            than one new zip appears (ambiguous result)
+        :raises Exception: If SGCollect fails to complete
+        """
+        with self._tracer.start_as_current_span(
+            "run_sgcollect", attributes={"cbl.sgw.hostname": self.hostname}
+        ):
+            pattern = r"sgcollectinfo-.*\.zip"
+            before = set(await self.list_files_via_caddy(pattern=pattern))
+
+            await self.start_sgcollect(
+                redact_level=redact_level,
+                redact_salt=redact_salt,
+                output_dir=remote_output_dir,
+            )
+            await self.wait_for_sgcollect_to_complete()
+
+            after = set(await self.list_files_via_caddy(pattern=pattern))
+            new_files = after - before
+            if not new_files:
+                raise CblTestError(
+                    f"No new sgcollect zip found on {self.hostname} after collection. "
+                    f"Files present: {sorted(after) or '(none)'}"
+                )
+            if len(new_files) > 1:
+                raise CblTestError(
+                    f"Expected exactly one new sgcollect zip on {self.hostname} "
+                    f"after collection, found {len(new_files)}: {sorted(new_files)}"
+                )
+
+            zip_name = next(iter(new_files))
+            safe_host = self.hostname.replace(".", "_")
+            local_path = local_output_dir / f"sgcollectinfo-{safe_host}-{zip_name}"
+            await self.download_file_via_caddy(zip_name, str(local_path))
+            return local_path
+
 
 class SyncGateway(_SyncGatewayBase):
     """
@@ -2281,3 +2336,43 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         :param secure: Whether to use TLS/HTTPS
         """
         super().__init__(url, username, password, port, secure)
+
+
+async def run_sgcollects(
+    sync_gateways: list[SyncGateway], output_dir: Path
+) -> list[Path]:
+    """
+    Runs SGCollect on every given Sync Gateway node in parallel, downloading each
+    resulting zip into output_dir, and logs a summary of what was collected.
+
+    This is the multi-node counterpart to
+    :func:`SyncGateway.run_sgcollect()<cbltest.api.syncgateway._SyncGatewayBase.run_sgcollect>`,
+    which collects from a single node. Per-node failures are logged as errors
+    (not raised) so that one node's failure does not prevent collection on the
+    others, or fail an already-finished test session.
+
+    :param sync_gateways: The Sync Gateway nodes to collect from
+    :param output_dir: Local directory to download the resulting zips into
+    :return: The local paths of the zips that were successfully collected
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    async def _collect_one(sg: SyncGateway) -> Path | None:
+        try:
+            return await sg.run_sgcollect(output_dir)
+        except Exception as e:
+            cbl_error(f"sgcollect: failed to collect logs from {sg.hostname}: {e}")
+            return None
+
+    results = await asyncio.gather(*(_collect_one(sg) for sg in sync_gateways))
+    collected = [path for path in results if path is not None]
+    cbl_info(
+        f"sgcollect: collected {len(collected)}/{len(results)} node(s) to "
+        f"{output_dir}: {[str(p) for p in collected]}"
+    )
+    if len(collected) < len(results):
+        cbl_error(
+            f"sgcollect: {len(results) - len(collected)}/{len(results)} node(s) "
+            "failed to collect logs, see errors above"
+        )
+    return collected

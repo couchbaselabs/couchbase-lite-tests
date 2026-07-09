@@ -1,6 +1,9 @@
+from pathlib import Path
+
 import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
+from cbltest.api.syncgateway import run_sgcollects
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
@@ -19,6 +22,7 @@ async def cblpytest(request: pytest.FixtureRequest):
     test_props = request.config.getoption("--test-props")
     otel_endpoint = request.config.getoption("--otel-endpoint")
     dataset_version = request.config.getoption("--dataset-version", "4.0")
+    sgcollect_on_test_failure = request.config.getoption("--sgcollect-on-test-failure")
     if otel_endpoint is not None:
         # This section is all about setting up the OpenTelemetry report
         # and can be ignored if not using OpenTelemetry.
@@ -35,6 +39,10 @@ async def cblpytest(request: pytest.FixtureRequest):
         config, log_level, test_props, dataset_version=dataset_version
     )
     yield cblpytest
+
+    if sgcollect_on_test_failure and request.session.testsfailed:
+        await run_sgcollects(cblpytest.sync_gateways, Path.cwd())
+
     await cblpytest.close()
 
 
@@ -72,4 +80,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         metavar="VERSION",
         help="The default dataset version to use for test servers",
         default="4.0",
+    )
+    group.addoption(
+        "--sgcollect-on-test-failure",
+        action="store_true",
+        default=False,
+        help="If set, run sgcollect_info on every Sync Gateway node when at least one "
+        "test in the session fails, and download the resulting zip(s) into the "
+        "current working directory before the session closes",
     )
