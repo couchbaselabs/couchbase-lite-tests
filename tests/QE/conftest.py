@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,10 @@ import pytest_asyncio
 from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.utils import verify_lfs_checkout
+
+# Markers identifying SGW-focused tests; a session that ran none of these
+# (e.g. a CBL-focused platform run) skips SGW log collection (for now).
+SGW_LOG_MARKERS = ("sgw", "upg_sgw")
 
 
 # This is used to inject the full path to the dataset folder
@@ -16,6 +21,42 @@ def dataset_path() -> Path:
     verify_lfs_checkout()
     script_path = os.path.abspath(os.path.dirname(__file__))
     return Path(script_path, "..", "..", "dataset", "sg")
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def collect_sgw_logs(cblpytest, request):
+    """
+    After the last test of the session, run sgcollect_info on every SGW node
+    (in parallel) and download the zips next to this file, where the pipeline
+    teardown's move_artifacts places them in the Jenkins artifacts directory.
+
+    Runs while the environment is still up (pytest exits before teardown.sh),
+    and only when the session executed at least one SGW-focused test (for now),
+    so CBL-focused runs are unaffected. Never fails the session.
+    """
+    yield
+
+    if not any(
+        item.get_closest_marker(marker)
+        for item in request.session.items
+        for marker in SGW_LOG_MARKERS
+    ):
+        print("🧾 SGW log collection skipped: no SGW-marked tests in this session")
+        return
+
+    sys.path.append(str(Path(__file__).parents[2]))
+    from environment.aws.sg_collect import main as sg_collect_main
+
+    try:
+        hostnames = [sg.hostname for sg in cblpytest.sync_gateways]
+        sg_collect_main(
+            None,
+            output_dir=os.path.dirname(os.path.abspath(__file__)),
+            timeout=1800,
+            sgw_hosts=hostnames,
+        )
+    except Exception as e:
+        print(f"🧾 SGW log collection failed (non-fatal): {e}")
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)

@@ -31,7 +31,6 @@ if __name__ == "__main__":
     configure_terminal_encoding()
 
 from environment.aws.common.output import header
-from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SGW_ADMIN_PORT = 4985
 SGW_ADMIN_AUTH = ("admin", "password")
@@ -279,6 +278,11 @@ def resolve_sgw_hostnames(topology_file: str | None) -> list[str] | None:
     Returns:
         list[str] | None: The hostnames, or None if the state could not be read.
     """
+    # Imported lazily: this drags in the whole topology/test-server machinery,
+    # which callers that pass explicit hostnames (the QE conftest fixture)
+    # never need.
+    from environment.aws.topology_setup.setup_topology import TopologyConfig
+
     topology = TopologyConfig(topology_file) if topology_file else TopologyConfig()
     try:
         topology.read_from_terraform(str(SCRIPT_DIR))
