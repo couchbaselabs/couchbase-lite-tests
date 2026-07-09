@@ -44,17 +44,24 @@ async def collect_sgw_logs(cblpytest, request):
         print("🧾 SGW log collection skipped: no SGW-marked tests in this session")
         return
 
-    sys.path.append(str(Path(__file__).parents[2]))
-    from environment.aws.sg_collect import main as sg_collect_main
-
     try:
+        repo_root = str(Path(__file__).resolve().parents[2])
+        if repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
+        from environment.aws.sg_collect import main as sg_collect_main
+
         hostnames = [sg.hostname for sg in cblpytest.sync_gateways]
-        sg_collect_main(
+        ok = await asyncio.to_thread(
+            sg_collect_main,
             None,
             output_dir=os.path.dirname(os.path.abspath(__file__)),
             timeout=1800,
             sgw_hosts=hostnames,
         )
+        if not ok:
+            print(
+                "🧾 SGW log collection finished with failures (non-fatal); see logs above."
+            )
     except Exception as e:
         print(f"🧾 SGW log collection failed (non-fatal): {e}")
 
