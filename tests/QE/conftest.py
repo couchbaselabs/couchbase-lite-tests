@@ -52,7 +52,9 @@ async def collect_sgw_logs(cblpytest, request):
 
         hostnames = [sg.hostname for sg in cblpytest.sync_gateways]
         if not hostnames:
-            print("🧾 SGW log collection skipped: no Sync Gateways available in this session")
+            print(
+                "🧾 SGW log collection skipped: no Sync Gateways available in this session"
+            )
             return
         ok = await asyncio.to_thread(
             sg_collect_main,
