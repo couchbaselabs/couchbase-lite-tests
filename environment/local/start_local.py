@@ -29,7 +29,6 @@ SCRIPT_DIR = pathlib.Path(__file__).parent
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parent.parent))
 
-from environment.aws import download_tool
 from environment.aws.topology_setup import setup_topology
 
 TOPOLOGY_CONFIG = SCRIPT_DIR / "topology.json"
@@ -61,9 +60,6 @@ def main(build_testserver: str | None):
     topology_config = setup_topology.TopologyConfig(config_input=config)
 
     setup_topology.main(topology_config)
-
-    # hard code cbbackupmgr 8.0.0 for ease of use
-    download_tool.download_tool(download_tool.ToolName.BackupManager, version="8.0.0")
 
 
 def get_cbl_platform() -> str:
