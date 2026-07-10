@@ -31,4 +31,4 @@ This test creates 4 databases with unique buckets, deletes 2 buckets, and verifi
 3. Verify all databases are online
 4. Delete buckets for db1 and db3 and wait for those databases to be gone
 5. Verify db2 and db4 remain available
-6. Verify db1 and db3 are gone (return 403)
+6. Verify db1 and db3 are gone (return 403/503)
