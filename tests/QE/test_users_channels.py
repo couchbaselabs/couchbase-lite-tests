@@ -40,8 +40,7 @@ class TestUsersChannels(CBLTestClass):
         }
         db_payload = PutDatabasePayload(db_config)
         await sgs[0].put_database(sg_db, db_payload)
-        for sg in sgs[1:]:
-            await sg.wait_for_db_up(sg_db)
+        await cblpytest.sync_gateway_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step(
             f"Create user '{username}' with access to {channels} (stored in shared bucket)"

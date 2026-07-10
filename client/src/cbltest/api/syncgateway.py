@@ -2,6 +2,7 @@ import asyncio
 import re
 import ssl
 from abc import ABC, abstractmethod
+from enum import Enum
 from json import dumps, loads
 from pathlib import Path
 from typing import Any, cast
@@ -13,7 +14,7 @@ import tenacity
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
@@ -21,7 +22,7 @@ from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
-from cbltest.utils import assert_not_null
+from cbltest.utils import assert_not_null, retry_assert
 from cbltest.version import VERSION
 
 # This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
@@ -550,30 +551,53 @@ class SyncGatewayStatusResponse(BaseModel):
     vendor: SyncGatewayStatusVendor
 
 
-class DatabaseStatusResponse:
+class DatabaseState(str, Enum):
     """
-    A class representing a database status response from Sync Gateway
+    The state of a Sync Gateway database.
     """
 
-    @property
-    def db_name(self) -> str:
-        """Gets the database name"""
-        return self.__db_name
+    ONLINE = "Online"
+    OFFLINE = "Offline"
+    STARTING = "Starting"
+    STOPPING = "Stopping"
+    RESYNCING = "Resyncing"
 
-    @property
-    def state(self) -> str:
-        """Gets the database state ('Online', 'Offline', etc.)"""
-        return self.__state
 
-    @property
-    def update_seq(self) -> int:
-        """Gets the update sequence number"""
-        return self.__update_seq
+class DatabaseStatusResponse(BaseModel):
+    """
+    Output of GET /{db}/ endpoint of Sync Gateway
+    """
 
-    def __init__(self, response: dict):
-        self.__db_name = response.get("db_name", "")
-        self.__state = response.get("state", "Unknown")
-        self.__update_seq = response.get("update_seq", 0)
+    compact_running: bool = False
+    db_name: str
+    init_in_progress: bool = False
+    instance_start_time: int = 0
+    require_resync: bool = False
+    server_uuid: str = ""
+    state: DatabaseState
+    update_seq: int = 0
+
+
+class AllDatabasesVerboseEntry(BaseModel):
+    """
+    A single database entry from the GET /_all_dbs?verbose=true response
+    """
+
+    class DatabaseError(BaseModel):
+        """An error that occurred during database startup"""
+
+        error_code: int
+        error_message: str
+
+    bucket: str
+    database_error: DatabaseError | None = None
+    db_name: str
+    init_in_progress: bool | None = None
+    require_resync: bool | None = None
+    state: DatabaseState
+
+
+_all_databases_verbose_adapter = TypeAdapter(list[AllDatabasesVerboseEntry])
 
 
 class _SyncGatewayBase:
@@ -679,7 +703,7 @@ class _SyncGatewayBase:
             )
             if not resp.ok:
                 raise CblSyncGatewayBadResponseError(
-                    resp.status, f"{method} {path} returned {resp.status}"
+                    resp.status, f"{method} {path} returned {resp.status}: {data}"
                 )
 
             return ret_val
@@ -822,7 +846,7 @@ class _SyncGatewayBase:
             try:
                 resp = await self._send_request("get", f"/{db_name}/")
                 assert isinstance(resp, dict)
-                return DatabaseStatusResponse(cast(dict, resp))
+                return DatabaseStatusResponse.model_validate(resp)
             except CblSyncGatewayBadResponseError as e:
                 if e.code in [403, 404]:  # Database doesn't exist
                     return None
@@ -869,6 +893,19 @@ class _SyncGatewayBase:
             resp = await self._send_request("get", "/_all_dbs")
             assert isinstance(resp, list)
             return cast(list[str], resp)
+
+    async def get_all_databases_verbose(self) -> dict[str, AllDatabasesVerboseEntry]:
+        """
+        Gets the bucket and state information for all databases configured on this
+        Sync Gateway instance.
+
+        :return: A dict of AllDatabasesVerboseEntry keyed by db_name
+        """
+        with self._tracer.start_as_current_span("get_all_databases_verbose"):
+            resp = await self._send_request("get", "/_all_dbs?verbose=true")
+            assert isinstance(resp, list)
+            entries = _all_databases_verbose_adapter.validate_python(resp)
+            return {entry.db_name: entry for entry in entries}
 
     def _analyze_dataset_response(self, response: list) -> None:
         assert isinstance(response, list), "Invalid bulk docs response (not a list)"
@@ -2014,70 +2051,66 @@ class SyncGateway(_SyncGatewayBase):
         retry=tenacity.retry_if_exception_type(AssertionError),
     )
     async def wait_for_no_databases(self, bucket_name: str):
-        with self._tracer.start_as_current_span("get_all_dbs"):
-            resp = await self._send_request("get", "/_all_dbs?verbose=true")
-            assert isinstance(resp, list), resp
-            for db in resp:
-                assert db["bucket"] != bucket_name, (
-                    f"Database {db=} is still backed by bucket {bucket_name}"
-                )
+        dbs = await self.get_all_databases_verbose()
+        for db in dbs.values():
+            assert db.bucket != bucket_name, (
+                f"Database {db=} is still backed by bucket {bucket_name}"
+            )
 
-    async def wait_for_db_gone_clusterwide(
+    async def wait_for_db_online(
         self,
-        sync_gateways: list["SyncGateway"],
+        db_name: str,
+        max_retries: int = 70,
+        retry_delay: int = 1,
+    ) -> None:
+        """
+        Wait until the SGW node reports the database as Online.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+
+        async def _wait_for_db_online_poll() -> None:
+            dbs = await self.get_all_databases_verbose()
+            assert db_name in dbs, (
+                f"Node {db_name} is not online "
+                "(database not present in /_all_dbs?verbose=true)"
+            )
+            entry = dbs[db_name]
+            assert entry.state == DatabaseState.ONLINE, (
+                f"Node {db_name} is not online: {entry}"
+            )
+
+        await retry_assert(
+            _wait_for_db_online_poll,
+            tenacity.wait_fixed(retry_delay),
+            tenacity.stop_after_attempt(max_retries),
+        )
+
+    async def wait_for_db_gone(
+        self,
         db_name: str,
         max_retries: int = 30,
         retry_delay: int = 2,
     ) -> None:
         """
-        Wait until the SGW database is gone from the cluster.
-
-        :param db_name: Database name to poll.
-        :param max_retries: Maximum number of retries.
-        :param retry_delay: Seconds between retries.
-        """
-        for _ in range(max_retries):
-            gone_everywhere = True
-            for sg in sync_gateways:
-                dbs = await sg.get_all_database_names()
-                if db_name in dbs:
-                    gone_everywhere = False
-                    break
-            if gone_everywhere:
-                return
-            await asyncio.sleep(retry_delay)
-        raise TimeoutError(f"Database {db_name} still exists on some SG nodes")
-
-    async def wait_for_db_up(
-        self,
-        db_name: str,
-        max_retries: int = 20,
-        retry_delay: int = 3,
-        settle_online: int = 10,
-    ) -> None:
-        """
-        Wait until the SGW node is online.
+        Wait until the SGW node no longer lists the database.
 
         :param db_name: Database name to poll.
         :param max_retries: Number of polls before timing out.
         :param retry_delay: Seconds between polls.
-        :param settle_online: Extra seconds to wait after seeing Online.
         """
-        for _ in range(max_retries):
-            try:
-                sg_status = await self.get_database_status(db_name)
-            except ClientConnectorError:
-                sg_status = None
-            if sg_status is not None:
-                break
-            await asyncio.sleep(retry_delay)
-        else:
-            raise TimeoutError(
-                f"Node {db_name} is not online within {max_retries * retry_delay} seconds"
-            )
 
-        # Wait for the node to settle down after coming online
-        await asyncio.sleep(settle_online)
+        async def _wait_for_db_gone_poll() -> None:
+            dbs = await self.get_all_database_names()
+            assert db_name not in dbs
+
+        await retry_assert(
+            _wait_for_db_gone_poll,
+            tenacity.wait_fixed(retry_delay),
+            tenacity.stop_after_attempt(max_retries),
+        )
 
     @tenacity.retry(
         # Import count flips on SGW's polling cadence, not sub-second, so poll at

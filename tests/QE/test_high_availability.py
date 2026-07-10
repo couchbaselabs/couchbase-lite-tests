@@ -42,8 +42,7 @@ class TestHighAvailability(CBLTestClass):
         }
         db_payload = PutDatabasePayload(db_config)
         await sg1.put_database(sg_db, db_payload)
-        for sg in sgs[1:]:
-            await sg.wait_for_db_up(sg_db)
+        await cblpytest.sync_gateway_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step(
             f"Create user '{username}' with access to channels {channels}"
@@ -115,7 +114,7 @@ class TestHighAvailability(CBLTestClass):
 
         self.mark_test_step("Bring SG2 back online")
         await sg2.start(config_name="bootstrap")
-        await sg2.wait_for_db_up(sg_db)
+        await cblpytest.sync_gateway_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step("Verify load balancer now routes to all 3 nodes")
         # Create some final test docs through LB to verify all nodes are working

@@ -6,6 +6,7 @@ from .api.cloud import CouchbaseCloud
 from .api.couchbaseserver import CouchbaseServer
 from .api.edgeserver import EdgeServer
 from .api.syncgateway import SyncGateway
+from .api.syncgatewaycluster import SyncGatewayCluster
 from .api.testserver import TestServer
 from .configparser import (
     CouchbaseServerInfo,
@@ -56,6 +57,11 @@ class CBLPyTest:
     def sync_gateways(self) -> list[SyncGateway]:
         """Gets the list of Sync Gateways available"""
         return self.__sync_gateways
+
+    @property
+    def sync_gateway_cluster(self) -> SyncGatewayCluster:
+        """Gets the Sync Gateway cluster helper for operations that coordinate across all Sync Gateways"""
+        return self.__sync_gateway_cluster
 
     @property
     def couchbase_servers(self) -> list[CouchbaseServer]:
@@ -142,6 +148,8 @@ class CBLPyTest:
                     )
                 )
                 index += 1
+
+        self.__sync_gateway_cluster = SyncGatewayCluster(self.__sync_gateways)
 
         self.__couchbase_servers: list[CouchbaseServer] = []
         if not test_server_only:

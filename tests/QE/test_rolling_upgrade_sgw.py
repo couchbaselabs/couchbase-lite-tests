@@ -87,8 +87,6 @@ class TestSgwRollingUpgrade(CBLTestClass):
             except CblSyncGatewayBadResponseError as e:
                 if e.code != 412:
                     raise e
-        for sg in sg_nodes:
-            await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step("Ensure user exists on all SGW nodes")
         for sg in sg_nodes:

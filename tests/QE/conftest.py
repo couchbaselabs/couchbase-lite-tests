@@ -6,6 +6,7 @@ import pytest
 import pytest_asyncio
 from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.syncgateway import SyncGateway
+from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.utils import verify_lfs_checkout
 
 
@@ -34,7 +35,9 @@ async def cleanup_after_test(cblpytest, request):
                     "\n================== 🧹 CLEANUP FIXTURE STARTED =================="
                 )
                 await cleanup_all_test_resources(
-                    cblpytest.sync_gateways, cblpytest.couchbase_servers
+                    cblpytest.sync_gateways,
+                    cblpytest.couchbase_servers,
+                    cblpytest.sync_gateway_cluster,
                 )
                 print(
                     f"🧹 CLEANUP FIXTURE: Cleanup completed successfully for {test_name}"
@@ -49,6 +52,7 @@ async def cleanup_after_test(cblpytest, request):
 async def cleanup_all_test_resources(
     sync_gateways: list[SyncGateway] | SyncGateway,
     couchbase_servers: list[CouchbaseServer] | CouchbaseServer,
+    sync_gateway_cluster: SyncGatewayCluster,
 ) -> None:
     """
     Clean up ALL databases from ALL SGW instances and test buckets from ALL CBS instances.
@@ -81,7 +85,7 @@ async def cleanup_all_test_resources(
             # Wait for all databases to be deleted
             for db_name in db_names:
                 try:
-                    await sg.wait_for_db_gone_clusterwide(sg_list, db_name)
+                    await sync_gateway_cluster.wait_for_db_gone(db_name)
                 except Exception as e:
                     print(f"🧹 Failed to wait for database {db_name}: {e}")
         except Exception as e:

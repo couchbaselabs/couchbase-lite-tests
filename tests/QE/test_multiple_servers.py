@@ -75,7 +75,6 @@ async def _setup_database_and_user(
         "scopes": {"_default": {"collections": {"_default": {}}}},
     }
     await sg.put_database(sg_db, PutDatabasePayload(db_config))
-    await sg.wait_for_db_up(sg_db)
 
     await sg.delete_user(sg_db, user_name)
     await sg.add_user(
@@ -365,7 +364,7 @@ class TestISGRCollectionMapping(CBLTestClass):
                 "unsupported": {"sgr_tls_skip_verify": True},
             }
             await sg.put_database(sg_db, PutDatabasePayload(config))
-            await sg.wait_for_db_up(sg_db)
+            await sg.wait_for_db_online(sg_db)
 
         self.mark_test_step(f"Upload {num_docs} docs to each collection in SG1")
         for collection in b1_collections:
