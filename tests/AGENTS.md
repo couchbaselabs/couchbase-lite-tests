@@ -5,8 +5,8 @@ The two Python test suites that exercise Couchbase Lite via the `cbltest` framew
 ## Scope
 
 You own everything under `tests/`:
-- `tests/dev_e2e/` — Developer E2E (12 test modules + `test_replication_filter_data.py` data helper)
-- `tests/QE/` — QA suite (21 test files + 12 edge-server tests)
+- `tests/dev_e2e/` — Developer E2E tests (plus a `test_replication_filter_data.py` data helper)
+- `tests/QE/` — QA suite, including an edge-server sub-suite
 - `tests/.tools/` — binary tools used during tests (e.g. `cbbackupmgr`)
 
 You do **not** own `client/`, `servers/`, `environment/`, or `jenkins/`, but you understand how they wire into your tests.
@@ -57,7 +57,7 @@ tests/
 │   ├── test_upg_sgw.py
 │   ├── test_users_channels.py
 │   ├── test_xattrs.py
-│   └── edge_server/                    # Edge Server sub-suite (12 tests)
+│   └── edge_server/                    # Edge Server sub-suite
 │       ├── test_authentication.py
 │       ├── test_blobs.py
 │       ├── test_changes_feed.py

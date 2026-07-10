@@ -68,13 +68,13 @@ The next step is to download CBL library.
 #### macOS, iOS, Android, Linux
 
 ```
-./scripts/download_cbl.sh macos enterprise 4.0.0
+./scripts/download_cbl.sh macos enterprise 4.0.0 43
 ```
 
 #### Windows
 
 ```
-.\scripts\download_cbl.ps1 enterprise 4.0.0
+.\scripts\download_cbl.ps1 enterprise 4.0.0 43
 ```
 
 ### Development Projects

@@ -22,7 +22,7 @@ System-level test harness for Couchbase Lite releases across all supported platf
 | Path             | Contents                                                                                  | Sub-doc                                     |
 |------------------|-------------------------------------------------------------------------------------------|---------------------------------------------|
 | `client/`        | `cbltest` Python framework, pytest plugins, request/response API                          | [client/AGENTS.md](client/AGENTS.md)        |
-| `tests/`         | `dev_e2e/` (12 test modules + 1 data helper) and `QE/` (20 tests + 12 edge-server tests)  | [tests/AGENTS.md](tests/AGENTS.md)          |
+| `tests/`         | `dev_e2e/` (developer E2E tests) and `QE/` (QA suite + an edge-server sub-suite)          | [tests/AGENTS.md](tests/AGENTS.md)          |
 | `servers/`       | Per-platform test servers: `c/`, `dotnet/`, `ios/`, `jak/`, `javascript/`                 | [servers/AGENTS.md](servers/AGENTS.md)      |
 | `environment/`   | `aws/` (Terraform + orchestrator), `docker/`, `LogSlurp/`, `otel-collector/`              | [environment/AGENTS.md](environment/AGENTS.md) |
 | `jenkins/`       | CI/CD pipelines under `pipelines/{dev_e2e,QE}/{platform}/`                                | [jenkins/AGENTS.md](jenkins/AGENTS.md)      |

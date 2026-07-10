@@ -134,39 +134,31 @@ These scripts are designed to be run either via `uv run`, or imported and called
 ### Starting
 
 ```
-usage: start_backend.py [-h] [--cbs-version CBS_VERSION] [--tdk-config-out TDK_CONFIG_OUT]
-                        [--topology TOPOLOGY] [--no-terraform-apply] [--no-cbs-provision] [--no-sgw-provision]
-                        [--no-ls-provision] [--no-ts-run] [--sgw-url SGW_URL]
-                        --tdk-config-in TDK_CONFIG_IN
+Usage: start_backend.py [OPTIONS]
 
-Prepare an AWS EC2 environment for running E2E tests
+  Prepare an AWS EC2 environment for running E2E tests.
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --cbs-version CBS_VERSION
-                        The version of Couchbase Server to install.
-  --tdk-config-out TDK_CONFIG_OUT
-                        The path to the write the resulting TDK configuration file (stdout if empty)
-  --topology TOPOLOGY   The path to the topology configuration file
-  --no-terraform-apply  Skip terraform apply step
-  --no-cbs-provision    Skip Couchbase Server provisioning step
-  --no-sgw-provision    Skip Sync Gateway provisioning step
-  --no-ls-provision     Skip Logslurp provisioning step
-  --no-ts-run           Skip test server install and run step
-
-conditionally required arguments:
-  --sgw-url SGW_URL     The URL of Sync Gateway to install (required if using SGW)
-
-required arguments:
-  --tdk-config-in TDK_CONFIG_IN
-                        The path to the input TDK configuration file
+Options:
+  --topology TOPOLOGY    The path to the topology configuration file
+  --tdk-config-in PATH   The path to the input (template) TDK configuration file  [required]
+  --tdk-config-out PATH  The path to write the resulting TDK configuration file (stdout if empty)
+  --no-terraform-apply   Skip terraform apply step
+  --no-cbs-provision     Skip Couchbase Server provisioning step
+  --no-sgw-provision     Skip Sync Gateway provisioning step
+  --no-es-provision      Skip Edge Server provisioning step
+  --no-lb-provision      Skip load balancer provisioning step
+  --no-ls-provision      Skip LogSlurp provisioning step
+  --no-ts-run            Skip test server install and run step
+  --help                 Show this message and exit
 ```
 
-The Sync Gateway URL and Couchbase Server version properties should be self explanatory but the others are as follows:
+The main arguments are:
 
-- TDK config in: A template TDK compatible config file.
-- TDK config out: An optional file to write the resulting TDK config file to (otherwise it will go to stdout)
-- Topology is the toplogy JSON file that will describe how to set up AWS instances (see the [topology README](./topology_setup/README.md) for more information.)
+- TDK config in: A template TDK-compatible config file (required).
+- TDK config out: An optional file to write the resulting TDK config to (otherwise it goes to stdout).
+- Topology: The topology JSON file describing how to set up the AWS instances (see the [topology README](./topology_setup/README.md) for more information).
+
+> **Note:** Couchbase Server and Sync Gateway versions are no longer set on the command line. They now come from the topology file — `defaults.cbs.version` / `defaults.sgw.version`, or the per-cluster / per-gateway `version` fields. The `--no-*-provision` flags let you stand up only a subset of the environment.
 
 
 ### Stopping

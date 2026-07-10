@@ -42,6 +42,13 @@ To start the local test server (CBL-C):
 uv run environment/local/start_local.py
 ```
 
+By default this downloads a prebuilt test server. To build it from source
+instead, pass `--build-testserver` with a version string:
+
+```bash
+uv run environment/local/start_local.py --build-testserver 4.0.3
+```
+
 ## Running Tests
 
 After starting the environment, you can run tests against it:

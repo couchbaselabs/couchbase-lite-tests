@@ -87,10 +87,10 @@ dotnet/
 │   ├── Services/
 │   ├── Router.cs
 │   └── TestServer.cs
-└── scripts/                    # build_cli.sh, run_cli.sh, …
+└── scripts/                    # legacy helper scripts (not the build path)
 ```
 
-Build (CLI): `./scripts/build_cli.sh` → `dotnet publish`
+Build: via the orchestrator — `dotnet_register.py::build()` runs `dotnet publish` (after pinning the `Couchbase.Lite.Enterprise` package version). There is no standalone build script.
 
 ### iOS (`ios/`)
 
@@ -195,13 +195,12 @@ Each platform is registered for AWS deployment in [environment/aws/topology_setu
 ```bash
 # C
 cd servers/c && ./scripts/build_macos.sh 4.0.0 43 && cd build/out/bin && ./testserver
-cd servers/c && ./scripts/build_linux.sh   enterprise 4.0.0 43
-cd servers/c && ./scripts/build_ios.sh     enterprise 4.0.0 43
-cd servers/c && ./scripts/build_android.sh enterprise 4.0.0 43
-cd servers/c && .\scripts\build_wins.ps1 -Version 4.0.0 -BuildNum 43   # PowerShell
+cd servers/c && ./scripts/build_linux.sh   4.0.0 43
+cd servers/c && ./scripts/build_ios.sh     all 4.0.0 43
+cd servers/c && ./scripts/build_android.sh all enterprise 4.0.0 43
+cd servers/c && .\scripts\build_wins.ps1 -Edition enterprise -Version 4.0.0 -Build 43   # PowerShell
 
-# .NET
-cd servers/dotnet && ./scripts/build_cli.sh && ./scripts/run_cli.sh
+# .NET — built via the orchestrator (dotnet_register.py runs `dotnet publish`), no standalone build script
 
 # iOS
 cd servers/ios && ./Scripts/build.sh all enterprise 4.0.0 43
