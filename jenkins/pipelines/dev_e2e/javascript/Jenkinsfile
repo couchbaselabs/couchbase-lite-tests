@@ -33,9 +33,9 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'mob-e2e-mac-01' }
+            agent { label 'e2e&&macos-host' }
             options {
-                lock("mob-e2e-mac-01")
+                lock("${env.NODE_NAME}")
             }
             steps {
                 // Unlock keychain:

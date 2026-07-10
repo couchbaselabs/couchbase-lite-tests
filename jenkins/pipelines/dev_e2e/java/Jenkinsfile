@@ -54,9 +54,9 @@ pipeline {
         stage('Tests') {
             parallel {
                 stage('OSX Desktop Test') {
-                    agent { label 'mob-e2e-mac-01' }
+                    agent { label 'e2e&&macos-host' }
                     options {
-                        lock("mob-e2e-mac-01")
+                        lock("${env.NODE_NAME}")
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'macos_desktop'
@@ -85,9 +85,9 @@ pipeline {
                 }
 
                 stage('Windows Desktop Test') {
-                    agent { label 'mob-e2e-win-01' }
+                    agent { label 'e2e&&windows-host' }
                     options {
-                        lock("mob-e2e-win-01")
+                        lock("${env.NODE_NAME}")
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'windows_desktop'
@@ -114,9 +114,9 @@ pipeline {
                 }
 
                 stage('Linux Desktop Test') {
-                    agent { label 'mob-e2e-deb-02' }
+                    agent { label 'e2e&&linux-host' }
                     options {
-                        lock("mob-e2e-deb-02")
+                        lock("${env.NODE_NAME}")
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'linux_desktop'
@@ -145,9 +145,9 @@ pipeline {
                 }
 
                 stage('OSX Web Service Test') {
-                    agent { label 'mob-e2e-mac-01' }
+                    agent { label 'e2e&&macos-host' }
                     options {
-                        lock("mob-e2e-mac-01")
+                        lock("${env.NODE_NAME}")
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'macos_webservice'
@@ -176,9 +176,9 @@ pipeline {
                 }
 
                 stage('Windows Web Service Test') {
-                    agent { label 'mob-e2e-win-01' }
+                    agent { label 'e2e&&windows-host' }
                     options {
-                        lock("mob-e2e-win-01")
+                        lock("${env.NODE_NAME}")
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'windows_webservice'
@@ -207,9 +207,9 @@ pipeline {
                 }
 
                 stage('Linux Web Service Test') {
-                    agent { label 'mob-e2e-deb-02' }
+                    agent { label 'e2e&&linux-host' }
                     options {
-                        lock("mob-e2e-deb-02")
+                        lock("${env.NODE_NAME}")
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'linux_webservice'

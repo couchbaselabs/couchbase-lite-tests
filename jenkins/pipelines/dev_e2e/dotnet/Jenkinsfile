@@ -52,9 +52,9 @@ pipeline {
         stage('Run Tests') {
             parallel {
                 stage("Windows") {
-                    agent { label 'mob-e2e-win-01' }
+                    agent { label 'e2e&&windows-host' }
                     options {
-                        lock("mob-e2e-win-01")
+                        lock("${env.NODE_NAME}")
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'windows'
@@ -74,12 +74,12 @@ pipeline {
                     }
                 }
                 stage("Mac Catalyst") {
-                    agent { label 'mob-e2e-mac-01' }
+                    agent { label 'e2e&&macos-host' }
                     options {
-                        lock("mob-e2e-mac-01")
+                        lock("${env.NODE_NAME}")
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
+                        KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
                         TS_ARTIFACTS_DIR = 'macos'
                     }
                     steps {
@@ -99,13 +99,13 @@ pipeline {
                 }
                 stage('iOS') {
                     options {
-                        lock("mob-e2e-iphone-01")
+                        lock("mob-e2e-iphone-02")
                     }
                     environment { 
-                        KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
+                        KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
                         TS_ARTIFACTS_DIR = 'ios'
                     }
-                    agent { label 'mob-e2e-mac-01' }
+                    agent { label 'mob-e2e-iphone-02' }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         timeout(time: 60, unit: 'MINUTES') {
@@ -123,9 +123,9 @@ pipeline {
                 }
                 stage('Android') {
                     options {
-                        lock("mob-e2e-android-01") 
+                        lock("mob-e2e-android-02") 
                     }
-                    agent { label 'mob-e2e-mac-01' }
+                    agent { label 'mob-e2e-android-02' }
                     environment {
                         TS_ARTIFACTS_DIR = 'android'
                     }

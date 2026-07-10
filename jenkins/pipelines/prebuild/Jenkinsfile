@@ -118,10 +118,10 @@ pipeline {
 
 def getNodeForPlatform(platform) {
     if (platform.contains("windows")) {
-        return 'mob-e2e-win-01'
+        return 'e2e&&windows-host'
     } else if (platform.contains("linux")) {
-        return 'mob-e2e-deb-02'
+        return 'e2e&&linux-host'
     } else {
-        return 'mob-e2e-mac-01'
+        return 'e2e&&macos-host'
     }
 }
