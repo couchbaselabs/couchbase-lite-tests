@@ -321,8 +321,9 @@ class TestReplicationFunctional(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
+    @pytest.mark.parametrize("channel", ["*", "A"])
     async def test_CBL_SG_replication_with_rev_messages(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cblpytest: CBLPyTest, dataset_path: Path, channel: str
     ):
         self.mark_test_step("Reset SG and load `short_expiry` dataset.")
         cloud = cblpytest.simple_cloud()
@@ -340,7 +341,7 @@ class TestReplicationFunctional(CBLTestClass):
                     {
                         "type": "test_doc",
                         "content": "This is the first document that will be purged",
-                        "channels": ["*"],
+                        "channels": [channel],
                         "created_in": "CBL",
                     }
                 ],
@@ -402,7 +403,7 @@ class TestReplicationFunctional(CBLTestClass):
                     {
                         "type": "flush_doc",
                         "content": "This document will help flush doc_1 from rev cache",
-                        "channels": ["*"],
+                        "channels": [channel],
                         "created_in": "CBL",
                     }
                 ],
@@ -414,7 +415,7 @@ class TestReplicationFunctional(CBLTestClass):
                     {
                         "type": "flush_doc",
                         "content": "This document will also help flush doc_1 from rev cache",
-                        "channels": ["*"],
+                        "channels": [channel],
                         "created_in": "CBL",
                     }
                 ],
@@ -477,9 +478,15 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Verify replication completed successfully")
-        assert status.progress.completed is True, (
-            f"Replication status should be `completed`, but got ={status.progress.completed}"
-        )
+        if channel == "*" and await cloud.sync_gateway.is_using_views("short_expiry"):
+            # Checking the progress on documents explicitly assigned * channel will
+            # show completed: false instead of true when running with views. There
+            # are no other non progress side effects. See CBG-5573 and CBL-8624.
+            pass
+        else:
+            assert status.progress.completed is True, (
+                f"Replication status should be `completed`, but got ={status.progress.completed}"
+            )
 
         self.mark_test_step("""
             Verify all docs from SGW replicated successfully:
