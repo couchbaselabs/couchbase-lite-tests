@@ -36,7 +36,7 @@ tests/
 ├── QE/                                 # QA — broader coverage + edge cases
 │   ├── conftest.py                     # dataset_path + cleanup_after_test (autouse)
 │   ├── config.json                     # Generated — DO NOT hand-edit
-│   ├── test_db_online_offline.py
+│   ├── test_db_gone.py
 │   ├── test_delta_sync.py
 │   ├── test_high_availability.py
 │   ├── test_large_doc_workloads.py

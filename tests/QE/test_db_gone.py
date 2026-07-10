@@ -13,16 +13,17 @@ from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, Syn
 @pytest.mark.sgw
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
-class TestDbOnlineOffline(CBLTestClass):
+class TestDbGone(CBLTestClass):
     async def scan_rest_endpoints(
         self,
         sg: SyncGateway,
         db_name: str,
-        expected_online: bool,
+        expected_available: bool,
         num_docs: int = 10,
     ) -> tuple[int, int]:
         """
-        Scans multiple REST endpoints to verify database online/offline state.
+        Scans multiple REST endpoints to verify whether the database is still
+        available or gone (its backing bucket deleted out from under it).
         """
         endpoints_tested = 0
         errors_403 = 0
@@ -68,7 +69,7 @@ class TestDbOnlineOffline(CBLTestClass):
         return (endpoints_tested, errors_403)
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_db_offline_on_bucket_deletion(
+    async def test_db_gone_on_bucket_deletion(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         sg = cblpytest.sync_gateways[0]
@@ -103,12 +104,12 @@ class TestDbOnlineOffline(CBLTestClass):
             )
         await sg.update_documents(sg_db, sg_docs)
 
-        self.mark_test_step("Verify database is online - REST endpoints work")
+        self.mark_test_step("Verify database is available - REST endpoints work")
         endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-            sg, sg_db, expected_online=True
+            sg, sg_db, expected_available=True
         )
         assert errors_403 == 0, (
-            f"DB is online but {errors_403}/{endpoints_tested} endpoints returned 403"
+            f"DB is available but {errors_403}/{endpoints_tested} endpoints returned 403"
         )
 
         self.mark_test_step("Delete bucket to sever connection")
@@ -118,13 +119,13 @@ class TestDbOnlineOffline(CBLTestClass):
             db_status = await sg.get_database_status(sg_db)
             await asyncio.sleep(10)
 
-        self.mark_test_step("Verify database is offline - REST endpoints return 403")
+        self.mark_test_step("Verify database is gone - REST endpoints return 403")
         endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-            sg, sg_db, expected_online=False
+            sg, sg_db, expected_available=False
         )
         assert endpoints_tested > 0, "No endpoints were tested"
         assert errors_403 == endpoints_tested, (
-            f"DB is offline but only {errors_403}/{endpoints_tested} endpoints returned 403"
+            f"DB is gone but only {errors_403}/{endpoints_tested} endpoints returned 403"
         )
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -179,7 +180,7 @@ class TestDbOnlineOffline(CBLTestClass):
             )
 
         self.mark_test_step(
-            "Delete buckets for db1 and db3 and wait for databases to go offline"
+            "Delete buckets for db1 and db3 and wait for those databases to be gone"
         )
         cbs.drop_bucket("data-bucket-1")
         cbs.drop_bucket("data-bucket-3")
@@ -191,19 +192,19 @@ class TestDbOnlineOffline(CBLTestClass):
                 db_status = await sg.get_database_status(db_name)
                 await asyncio.sleep(10)
 
-        self.mark_test_step("Verify db2 and db4 remain online")
+        self.mark_test_step("Verify db2 and db4 remain available")
         for db_name in ["db2", "db4"]:
             endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-                sg, db_name, expected_online=True
+                sg, db_name, expected_available=True
             )
             assert errors_403 == 0, (
-                f"{db_name} should be online but got {errors_403} 403 errors"
+                f"{db_name} should be available but got {errors_403} 403 errors"
             )
 
-        self.mark_test_step("Verify db1 and db3 are offline (return 403)")
+        self.mark_test_step("Verify db1 and db3 are gone (return 403)")
         for db_name in ["db1", "db3"]:
             endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-                sg, db_name, expected_online=False
+                sg, db_name, expected_available=False
             )
             assert errors_403 == endpoints_tested, (
                 f"{db_name}: Expected all {endpoints_tested} endpoints to return 403, got {errors_403}"

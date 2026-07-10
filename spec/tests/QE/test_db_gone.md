@@ -1,0 +1,34 @@
+# Database Gone Tests
+
+Note: "offline" has a specific meaning in Sync Gateway (a database administratively
+taken offline via the admin API — see the Sync Gateway "Take Databases Offline"
+docs). These tests cover a different situation: the Couchbase Server bucket backing
+a database is deleted, so the database is *gone* — it no longer exists and all REST
+API endpoints reject requests.
+
+## test_db_gone_on_bucket_deletion
+
+Test that a database is gone when its bucket is deleted.
+
+This test verifies that when the Couchbase Server bucket backing a Sync Gateway database is deleted, the database no longer exists and all REST API endpoints return 403.
+
+1. Create bucket and default collection
+2. Configure Sync Gateway database endpoint
+3. Create user 'vipul' with access to ['ABC']
+4. Create 10 docs via Sync Gateway
+5. Verify database is available - REST endpoints work
+6. Delete bucket to sever connection
+7. Verify database is gone - REST endpoints return 403
+
+## test_multiple_dbs_bucket_deletion
+
+Test that deleting specific buckets makes only those databases go away.
+
+This test creates 4 databases with unique buckets, deletes 2 buckets, and verifies that only those 2 databases are gone while the other 2 remain available.
+
+1. Create buckets and configure databases
+2. Create 10 docs via Sync Gateway
+3. Verify all databases are online
+4. Delete buckets for db1 and db3 and wait for those databases to be gone
+5. Verify db2 and db4 remain available
+6. Verify db1 and db3 are gone (return 403)
