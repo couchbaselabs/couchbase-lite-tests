@@ -2074,12 +2074,12 @@ class SyncGateway(_SyncGatewayBase):
         async def _wait_for_db_online_poll() -> None:
             dbs = await self.get_all_databases_verbose()
             assert db_name in dbs, (
-                f"Node {db_name} is not online "
-                "(database not present in /_all_dbs?verbose=true)"
+                f"Database {db_name} is not online "
+                "(not present in /_all_dbs?verbose=true)"
             )
             entry = dbs[db_name]
             assert entry.state == DatabaseState.ONLINE, (
-                f"Node {db_name} is not online: {entry}"
+                f"Database {db_name} is not online: {entry}"
             )
 
         await retry_assert(
