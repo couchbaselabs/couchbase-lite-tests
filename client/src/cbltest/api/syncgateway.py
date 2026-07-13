@@ -2076,7 +2076,7 @@ class SyncGateway(_SyncGatewayBase):
             dbs = await self.get_all_databases_verbose()
             assert db_name in dbs, (
                 f"Database {db_name} is not online "
-                "(not present in /_all_dbs?verbose=true)"
+                "(database not present in /_all_dbs?verbose=true)"
             )
             entry = dbs[db_name]
             assert entry.state == DatabaseState.ONLINE, (
