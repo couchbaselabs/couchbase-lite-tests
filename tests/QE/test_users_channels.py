@@ -4,7 +4,11 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from cbltest.api.syncgateway import (
+    DocumentUpdateEntry,
+    PutDatabasePayload,
+    wait_for_db_online,
+)
 
 
 @pytest.mark.sgw
@@ -40,7 +44,7 @@ class TestUsersChannels(CBLTestClass):
         }
         db_payload = PutDatabasePayload(db_config)
         await sgs[0].put_database(sg_db, db_payload)
-        await cblpytest.sync_gateway_cluster.wait_for_db_online(sg_db)
+        await wait_for_db_online(sgs, sg_db)
 
         self.mark_test_step(
             f"Create user '{username}' with access to {channels} (stored in shared bucket)"

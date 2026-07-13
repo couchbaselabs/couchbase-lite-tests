@@ -5,7 +5,12 @@ import pytest
 import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import DocumentUpdateEntry, ISGRPayload, PutDatabasePayload
+from cbltest.api.syncgateway import (
+    DocumentUpdateEntry,
+    ISGRPayload,
+    PutDatabasePayload,
+    wait_for_db_online,
+)
 
 
 def _check_node_in_cluster(cbs_hostname: str, cluster_nodes: list) -> tuple[bool, bool]:
@@ -364,7 +369,7 @@ class TestISGRCollectionMapping(CBLTestClass):
                 "unsupported": {"sgr_tls_skip_verify": True},
             }
             await sg.put_database(sg_db, PutDatabasePayload(config))
-            await sg.wait_for_db_online(sg_db)
+            await wait_for_db_online(sgs, sg_db)
 
         self.mark_test_step(f"Upload {num_docs} docs to each collection in SG1")
         for collection in b1_collections:

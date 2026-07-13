@@ -15,7 +15,7 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
     WaitForDocumentEventEntry,
 )
-from cbltest.api.syncgateway import RemoteDocument
+from cbltest.api.syncgateway import RemoteDocument, wait_for_db_online
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.logging import cbl_info
 
@@ -73,9 +73,7 @@ async def setup_upgrade_env(
     # A good practice when taking new snapshots is to remove _sync:* docs before running a cbbackup.
     # cbbackupmgr restore --filter-keys cannot do a negative regex to filter out the dbconfig, checkpoints, etc.
     #
-    await cblpytest.sync_gateway_cluster.wait_for_db_online(
-        "upgrade", max_retries=120, retry_delay=1
-    )
+    await wait_for_db_online(cblpytest.sync_gateways, "upgrade")
 
     test_case.mark_test_step("Reset local database, and load `upgrade` dataset.")
     dbs = await cblpytest.test_servers[0].create_and_reset_db(

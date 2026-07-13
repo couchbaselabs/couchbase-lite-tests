@@ -1,5 +1,5 @@
 """Unit tests for SyncGateway helper plumbing: _send_request's error reporting,
-get_all_databases_verbose's one-pass list validation, and wait_for_db_online's
+get_all_databases_verbose's one-pass list validation, and _wait_for_db_online's
 timeout diagnostics.
 
 These exercise the real aiohttp ClientSession/ClientResponse machinery against
@@ -37,11 +37,11 @@ async def sync_gateway(
     monkeypatch, tmp_path
 ) -> AsyncIterator[tuple[SyncGateway, list[dict]]]:
     """A SyncGateway backed by a real aiohttp test server, so _send_request and
-    everything built on it (get_all_databases_verbose, wait_for_db_online, ...) runs
+    everything built on it (get_all_databases_verbose, _wait_for_db_online, ...) runs
     against real ClientSession/ClientResponse objects. `specs` controls what the
     server responds with: while it holds more than one entry, each request pops
     the next one; with exactly one entry left, that response repeats (useful for
-    polling loops like wait_for_db_online)."""
+    polling loops like _wait_for_db_online)."""
     monkeypatch.setattr(
         _HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log"
     )
@@ -180,7 +180,7 @@ class TestWaitForDbUp:
             }
         ]
 
-        await sg.wait_for_db_online("db1", max_retries=1, retry_delay=0)
+        await sg._wait_for_db_online("db1", max_retries=1, retry_delay=0)
 
     @pytest.mark.asyncio
     async def test_timeout_reports_last_seen_state(self, sync_gateway):
@@ -193,7 +193,7 @@ class TestWaitForDbUp:
         ]
 
         with pytest.raises(TimeoutError) as exc_info:
-            await sg.wait_for_db_online("db1", max_retries=2, retry_delay=0)
+            await sg._wait_for_db_online("db1", max_retries=2, retry_delay=0)
 
         assert "state=<DatabaseState.STARTING" in str(exc_info.value)
 
@@ -218,7 +218,7 @@ class TestWaitForDbUp:
         ]
 
         with pytest.raises(TimeoutError) as exc_info:
-            await sg.wait_for_db_online("db1", max_retries=2, retry_delay=0)
+            await sg._wait_for_db_online("db1", max_retries=2, retry_delay=0)
 
         message = str(exc_info.value)
         assert "error_code=500" in message
@@ -230,6 +230,6 @@ class TestWaitForDbUp:
         specs[:] = [{"status": 200, "json": []}]
 
         with pytest.raises(TimeoutError) as exc_info:
-            await sg.wait_for_db_online("db1", max_retries=2, retry_delay=0)
+            await sg._wait_for_db_online("db1", max_retries=2, retry_delay=0)
 
         assert "database not present in /_all_dbs?verbose=true" in str(exc_info.value)

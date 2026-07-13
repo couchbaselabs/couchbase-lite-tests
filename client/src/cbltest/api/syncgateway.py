@@ -2057,11 +2057,12 @@ class SyncGateway(_SyncGatewayBase):
                 f"Database {db=} is still backed by bucket {bucket_name}"
             )
 
-    async def wait_for_db_online(
+    async def _wait_for_db_online(
         self,
         db_name: str,
-        max_retries: int = 70,
-        retry_delay: int = 1,
+        *,
+        max_retries: int,
+        retry_delay: int,
     ) -> None:
         """
         Wait until the SGW node reports the database as Online.
@@ -2088,11 +2089,12 @@ class SyncGateway(_SyncGatewayBase):
             tenacity.stop_after_attempt(max_retries),
         )
 
-    async def wait_for_db_gone(
+    async def _wait_for_db_gone(
         self,
         db_name: str,
-        max_retries: int = 30,
-        retry_delay: int = 2,
+        *,
+        max_retries: int,
+        retry_delay: int,
     ) -> None:
         """
         Wait until the SGW node no longer lists the database.
@@ -2314,3 +2316,49 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         :param secure: Whether to use TLS/HTTPS
         """
         super().__init__(url, username, password, port, secure)
+
+
+async def wait_for_db_online(
+    sync_gateways: list[SyncGateway],
+    db_name: str,
+    max_retries: int = 70,
+    retry_delay: int = 1,
+) -> None:
+    """
+    Wait until every node in the given list reports the database as Online, polling
+    all nodes concurrently.
+
+    :param sync_gateways: Sync Gateway nodes to poll.
+    :param db_name: Database name to poll.
+    :param max_retries: Number of polls before timing out.
+    :param retry_delay: Seconds between polls.
+    """
+    await asyncio.gather(
+        *(
+            sg._wait_for_db_online(db_name, max_retries=max_retries, retry_delay=retry_delay)
+            for sg in sync_gateways
+        )
+    )
+
+
+async def wait_for_db_gone(
+    sync_gateways: list[SyncGateway],
+    db_name: str,
+    max_retries: int = 30,
+    retry_delay: int = 2,
+) -> None:
+    """
+    Wait until every node in the given list no longer lists the database, polling
+    all nodes concurrently.
+
+    :param sync_gateways: Sync Gateway nodes to poll.
+    :param db_name: Database name to poll.
+    :param max_retries: Number of polls before timing out.
+    :param retry_delay: Seconds between polls.
+    """
+    await asyncio.gather(
+        *(
+            sg._wait_for_db_gone(db_name, max_retries=max_retries, retry_delay=retry_delay)
+            for sg in sync_gateways
+        )
+    )
