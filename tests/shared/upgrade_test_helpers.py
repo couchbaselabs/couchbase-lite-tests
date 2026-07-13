@@ -68,10 +68,10 @@ async def setup_upgrade_env(
 
     test_case.mark_test_step("Wait for SG to bring the restored database online.")
 
-    # As of Sync Gateway 4.1.0, this takes a long time to come online (20s+) due this rollback of import feeds due to mismatched vBucket UUIDs.
+    # As of Sync Gateway 4.1.0, this can take a long time to come online (20s+) due to import-feed rollbacks caused by mismatched vBucket UUIDs.
     #
-    # A good practice if new snapshots are taken is to remove _sync:* docs before taking a cbbackup.
-    # cbbackupmgr restore --filter-keys can not do a negative regex to filter out the dbconfig, checkpoints, etc.
+    # A good practice when taking new snapshots is to remove _sync:* docs before running a cbbackup.
+    # cbbackupmgr restore --filter-keys cannot do a negative regex to filter out the dbconfig, checkpoints, etc.
     #
     await cblpytest.sync_gateway_cluster.wait_for_db_online(
         "upgrade", max_retries=120, retry_delay=1
