@@ -33,14 +33,12 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'mob-e2e-mac-01' }
-            options {
-                lock("mob-e2e-mac-01")
-            }
+            agent { label 'e2e&&macos-host' }
             steps {
-                // Unlock keychain:
-                timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/dev_e2e/javascript/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                lock("${env.NODE_NAME}") {
+                    timeout(time: 60, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/dev_e2e/javascript/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_VERSION}' ~/.ssh/jborden.pem"
+                    }
                 }
             }
             post { 

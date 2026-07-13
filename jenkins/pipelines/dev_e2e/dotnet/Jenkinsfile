@@ -52,16 +52,15 @@ pipeline {
         stage('Run Tests') {
             parallel {
                 stage("Windows") {
-                    agent { label 'mob-e2e-win-01' }
-                    options {
-                        lock("mob-e2e-win-01")
-                    }
+                    agent { label 'e2e&&windows-host' }
                     environment {
                         TS_ARTIFACTS_DIR = 'windows'
                     }
                     steps {
-                        timeout(time: 60, unit: 'MINUTES') {
-                            pwsh "jenkins\\pipelines\\dev_e2e\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION}"
+                        lock("${env.NODE_NAME}") {
+                            timeout(time: 60, unit: 'MINUTES') {
+                                pwsh "jenkins\\pipelines\\dev_e2e\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION}"
+                            }
                         }
                     }
                     post { 
@@ -74,18 +73,17 @@ pipeline {
                     }
                 }
                 stage("Mac Catalyst") {
-                    agent { label 'mob-e2e-mac-01' }
-                    options {
-                        lock("mob-e2e-mac-01")
-                    }
+                    agent { label 'e2e&&macos-host' }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
+                        KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
                         TS_ARTIFACTS_DIR = 'macos'
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} macos '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
+                        lock("${env.NODE_NAME}") {
+                            timeout(time: 60, unit: 'MINUTES') {
+                                sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} macos '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
+                            }
                         }
                     }
                     post { 
@@ -98,18 +96,17 @@ pipeline {
                     }
                 }
                 stage('iOS') {
-                    options {
-                        lock("mob-e2e-iphone-01")
-                    }
-                    environment { 
-                        KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password') 
+                    agent { label 'mob-e2e-iphone-02' }
+                    environment {
+                        KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
                         TS_ARTIFACTS_DIR = 'ios'
                     }
-                    agent { label 'mob-e2e-mac-01' }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ios '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
+                        lock("mob-e2e-iphone-02") {
+                            timeout(time: 60, unit: 'MINUTES') {
+                                sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ios '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
+                            }
                         }
                     }
                     post {
@@ -122,16 +119,15 @@ pipeline {
                     }
                 }
                 stage('Android') {
-                    options {
-                        lock("mob-e2e-android-01") 
-                    }
-                    agent { label 'mob-e2e-mac-01' }
+                    agent { label 'mob-e2e-android-02' }
                     environment {
                         TS_ARTIFACTS_DIR = 'android'
                     }
                     steps {
-                        timeout(time: 60, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} android '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
+                        lock("mob-e2e-android-02") {
+                            timeout(time: 60, unit: 'MINUTES') {
+                                sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} android '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
+                            }
                         }
                     }
                     post {

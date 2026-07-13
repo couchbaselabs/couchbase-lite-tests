@@ -33,16 +33,15 @@ pipeline {
             }
         }
         stage('Android') {
-            agent { label 'mob-e2e-mac-01' }
-            options {
-                lock("mob-e2e-android-01")
-            }
+            agent { label 'mob-e2e-android-01' }
             steps {
                 echo "Run Android Tests"
-                timeout(time: 60, unit: 'MINUTES') {
-                    sh """
-                        jenkins/pipelines/dev_e2e/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.SGW_VERSION}" ${params.TS_DATASET_VERSION}
-                    """
+                lock("mob-e2e-android-01") {
+                    timeout(time: 60, unit: 'MINUTES') {
+                        sh """
+                            jenkins/pipelines/dev_e2e/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.SGW_VERSION}" ${params.TS_DATASET_VERSION}
+                        """
+                    }
                 }
             }
             post {
