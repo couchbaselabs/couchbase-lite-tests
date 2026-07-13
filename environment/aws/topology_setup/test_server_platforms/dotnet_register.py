@@ -428,6 +428,7 @@ class DotnetTestServer_Android(DotnetTestServer):
         return AndroidBridge(
             str(path),
             "com.couchbase.dotnet.testserver",
+            needs_permissions=False,
         )
 
     def compress_package(self) -> str:

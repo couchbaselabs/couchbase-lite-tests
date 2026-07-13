@@ -51,16 +51,28 @@ class AndroidBridge(PlatformBridge):
 
     # Dangerous (runtime) permissions the MultipeerReplicator may need. These are
     # granted right after install so the test server doesn't need to block waiting
-    # for a system permission dialog during a test run.
-    __runtime_permissions: list[str] = [
-        "android.permission.ACCESS_FINE_LOCATION",  # BLE scanning on API <= 30
-        "android.permission.BLUETOOTH_SCAN",  # API 31+
-        "android.permission.BLUETOOTH_CONNECT",  # API 31+
-        "android.permission.BLUETOOTH_ADVERTISE",  # API 31+
-        "android.permission.NEARBY_WIFI_DEVICES",  # API 31+
+    # for a system permission dialog during a test run. Each entry is
+    # (permission, min_api, max_api); None means unbounded on that side.
+    __runtime_permissions: list[tuple[str, int | None, int | None]] = [
+        (
+            "android.permission.ACCESS_FINE_LOCATION",
+            None,
+            30,
+        ),  # BLE scanning on API <= 30
+        ("android.permission.BLUETOOTH_SCAN", 31, None),  # API 31+
+        ("android.permission.BLUETOOTH_CONNECT", 31, None),  # API 31+
+        ("android.permission.BLUETOOTH_ADVERTISE", 31, None),  # API 31+
+        ("android.permission.NEARBY_WIFI_DEVICES", 31, None),  # API 31+
     ]
 
-    def __init__(self, app_path: str, app_id: str, activity: str = "MainActivity"):
+    def __init__(
+        self,
+        app_path: str,
+        app_id: str,
+        activity: str = "MainActivity",
+        *,
+        needs_permissions: bool = True,
+    ) -> None:
         """
         Initialize the AndroidBridge with the application path, application ID, and activity name.
 
@@ -76,6 +88,7 @@ class AndroidBridge(PlatformBridge):
         self.__app_id = app_id
         self.__activity = activity
         self.__adb_location = None
+        self.__needs_permissions = needs_permissions
 
         find_command = "where" if platform.system() == "Windows" else "which"
         find_adb_result = subprocess.run(
@@ -128,7 +141,30 @@ class AndroidBridge(PlatformBridge):
             check=True,
             capture_output=False,
         )
-        self.__grant_runtime_permissions(location)
+        if self.__needs_permissions:
+            self.__grant_runtime_permissions(location)
+
+    def __get_api_level(self, location: str) -> int:
+        """
+        Retrieve the Android API level of the specified device.
+
+        Args:
+            location (str): The device location (e.g., device serial number).
+        """
+        result = subprocess.run(
+            [
+                str(self.__adb_location),
+                "-s",
+                location,
+                "shell",
+                "getprop",
+                "ro.build.version.sdk",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return int(result.stdout.strip())
 
     def __grant_runtime_permissions(self, location: str) -> None:
         """
@@ -140,7 +176,14 @@ class AndroidBridge(PlatformBridge):
             location (str): The device location (e.g., device serial number).
         """
         header(f"Granting runtime permissions to {self.__app_id} on {location}")
-        for permission in self.__runtime_permissions:
+        api_level = self.__get_api_level(location)
+        permissions = [
+            permission
+            for permission, min_api, max_api in self.__runtime_permissions
+            if (min_api is None or api_level >= min_api)
+            and (max_api is None or api_level <= max_api)
+        ]
+        for permission in permissions:
             result = subprocess.run(
                 [
                     str(self.__adb_location),
