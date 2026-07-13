@@ -1,14 +1,42 @@
 #!/usr/bin/env python3
+import json
 import pathlib
 import sys
 
 import click
+import requests
+from cbltest.configparser import CouchbaseServerInfo
 
 SCRIPT_DIR = pathlib.Path(__file__).parent.resolve()
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parent.parent))
 
+from environment.aws import download_tool
 from environment.aws.topology_setup.test_server_platforms.exe_bridge import ExeBridge
+
+SYNC_GATEWAY_CONFIG_DIR = SCRIPT_DIR / "sync_gateway_config"
+SYNC_GATEWAY_CONFIG = {
+    "rosmar": SYNC_GATEWAY_CONFIG_DIR / "basic_sync_gateway_rosmar.json",
+    "cbs": SYNC_GATEWAY_CONFIG_DIR / "basic_sync_gateway_cbs.json",
+}
+TEST_CONFIG = {
+    "rosmar": SCRIPT_DIR / "rosmar_config.json",
+    "cbs": SCRIPT_DIR / "cbs_config.json",
+}
+
+
+def get_cbs_version() -> str:
+    """Query the Couchbase Server instance in cbs_config.json for its release version."""
+    config = json.loads(TEST_CONFIG["cbs"].read_text())
+    cbs_info = CouchbaseServerInfo(config["couchbase-servers"][0])
+
+    r = requests.get(
+        f"http://{cbs_info.hostname}:8091/pools",
+        auth=(cbs_info.admin_user, cbs_info.admin_password),
+        timeout=10,
+    )
+    r.raise_for_status()
+    return r.json()["implementationVersion"].split("-")[0]
 
 
 @click.command()
@@ -32,13 +60,12 @@ def main(start, stop, server):
     # We only need config if starting
     config_path = None
     if start:
-        config_dir = SCRIPT_DIR / "sync_gateway_config"
-        config_file = (
-            "basic_sync_gateway_rosmar.json"
-            if server == "rosmar"
-            else "basic_sync_gateway_cbs.json"
-        )
-        config_path = str(config_dir / config_file)
+        config_path = str(SYNC_GATEWAY_CONFIG[server])
+        if server == "cbs":
+            cbs_version = get_cbs_version()
+            download_tool.download_tool(
+                download_tool.ToolName.BackupManager, cbs_version
+            )
 
     bridge = ExeBridge(
         exe_path=exe_path,
