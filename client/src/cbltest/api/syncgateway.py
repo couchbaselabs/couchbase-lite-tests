@@ -618,6 +618,131 @@ class SGCollectOptions(BaseModel):
     output_dir: str | None = None
 
 
+class ResyncAction(str, Enum):
+    """The action to perform via POST /{db}/_resync"""
+
+    START = "start"
+    STOP = "stop"
+
+
+class ResyncState(str, Enum):
+    """The state of a database resync operation."""
+
+    RUNNING = "running"
+    STOPPING = "stopping"
+    STOPPED = "stopped"
+    COMPLETED = "completed"
+    ERROR = "error"
+
+
+class PostResyncBody(BaseModel):
+    """Payload for POST /{db}/_resync."""
+
+    scopes: dict[str, list[str]] | None = None
+    regenerate_sequences: bool = False
+
+
+class CollectionConfig(BaseModel):
+    """Sync Gateway collection configuration."""
+
+    sync: str | None = None
+    import_filter: str | None = None
+
+
+class ScopeConfig(BaseModel):
+    """Sync Gateway scope configuration."""
+
+    collections: dict[str, CollectionConfig] | None = None
+
+
+class DatabaseConfig(BaseModel):
+    """Database configuration properties."""
+
+    allow_empty_password: bool | None = None
+    bucket: str | None = None
+    bucket_op_timeout_ms: float | None = None
+    cacertpath: str | None = None
+    cache: dict[str, Any] | None = None
+    certpath: str | None = None
+    changes_request_plus: bool | None = None
+    client_partition_window_secs: int | None = None
+    compact_interval_days: float | None = None
+    cors: dict[str, Any] | None = None
+    delta_sync: dict[str, Any] | None = None
+    disable_password_auth: bool | None = None
+    disable_public_all_docs: bool | None = None
+    event_handlers: dict[str, Any] | None = None
+    guest: dict[str, Any] | None = None
+    import_backup_old_rev: bool | None = None
+    import_docs: bool | None = None
+    import_filter: str | None = None
+    import_partitions: float | None = None
+    index: dict[str, Any] | None = None
+    javascript_timeout_secs: float | None = None
+    keypath: str | None = None
+    local_doc_expiry_secs: int | None = None
+    local_jwt: dict[str, Any] | None = None
+    logging: dict[str, Any] | None = None
+    max_concurrent_query_ops: int | None = None
+    name: str | None = None
+    offline: bool | None = None
+    oidc: dict[str, Any] | None = None
+    old_rev_expiry_seconds: float | None = None
+    password: str | None = None
+    query_pagination_limit: int | None = None
+    replications: dict[str, Any] | None = None
+    revs_limit: float | None = None
+    roles: dict[str, Any] | None = None
+    scopes: dict[str, ScopeConfig] | None = None
+    send_www_authenticate_header: bool | None = None
+    serve_insecure_attachment_types: bool | None = None
+    server: str | None = None
+    session_cookie_http_only: bool | None = None
+    session_cookie_name: str | None = None
+    session_cookie_secure: bool | None = None
+    sgreplicate_enabled: bool | None = None
+    sgreplicate_websocket_heartbeat_secs: int | None = None
+    slow_query_warning_threshold: float | None = None
+    store_legacy_revtree_data: bool | None = None
+    sync: str | None = None
+    unsupported: dict[str, Any] | None = None
+    use_views: bool | None = None
+    user_xattr_key: str | None = None
+    username: str | None = None
+    users: dict[str, Any] | None = None
+    view_query_timeout_secs: int | None = None
+    allow_conflicts: bool | None = None
+    enable_shared_bucket_access: bool | None = None
+    feed_type: str | None = None
+    kv_tls_port: int | None = None
+    num_index_replicas: float | None = None
+    pool: str | None = None
+    rev_cache_size: float | None = None
+    suspendable: bool | None = None
+
+
+class ResyncStatusResponse(BaseModel):
+    """Resync operation status payload."""
+
+    status: ResyncState
+    """Current resync state."""
+
+    resync_id: str | None = None
+    """Resync run ID."""
+
+    last_error: str = ""
+    """Last error message, if any."""
+
+    docs_changed: int = 0
+    """Number of changed documents."""
+
+    docs_processed: int = 0
+    """Number of processed documents."""
+
+    docs_errored: int = 0
+    """Number of errored documents."""
+
+
 class _SyncGatewayBase:
     """
     Base class for Sync Gateway clients containing common document and database operations.
@@ -828,7 +953,7 @@ class _SyncGatewayBase:
         self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0
     ) -> None:
         with self._tracer.start_as_current_span(
-            "put_database", attributes={"cbl.database.name": db_name}
+            "put_database", attributes={"sg.database.name": db_name}
         ) as current_span:
             try:
                 await self._send_request("put", f"/{db_name}/", payload)
@@ -859,7 +984,7 @@ class _SyncGatewayBase:
         :return: DatabaseStatusResponse with state, sequences, etc. Returns None if database doesn't exist (404/403)
         """
         with self._tracer.start_as_current_span(
-            "get_database_status", attributes={"cbl.database.name": db_name}
+            "get_database_status", attributes={"sg.database.name": db_name}
         ):
             try:
                 resp = await self._send_request("get", f"/{db_name}/")
@@ -1977,6 +2102,200 @@ class SyncGateway(_SyncGatewayBase):
             await self._send_request(
                 "put", f"/{db_name}/_role/{role}", JSONDictionary(body)
             )
+
+    async def _post_db_config(self, db_name: str, config: DatabaseConfig) -> None:
+        with self._tracer.start_as_current_span(
+            "post_db_config",
+            attributes={"sg.database.name": db_name},
+        ):
+            body = config.model_dump(exclude_none=True)
+            await self._send_request(
+                "post", f"/{db_name}/_config", JSONDictionary(body)
+            )
+
+    async def update_sync_function(
+        self,
+        db_name: str,
+        sync_function: str,
+        *,
+        scope: str,
+        collection: str,
+    ) -> None:
+        """
+        Updates a collection's sync function (POST /{db}/_config).
+
+        Args:
+            db_name: Database name.
+            sync_function: Sync function source code.
+            scope: Target scope.
+            collection: Target collection.
+        """
+        config = DatabaseConfig(
+            scopes={
+                scope: ScopeConfig(
+                    collections={collection: CollectionConfig(sync=sync_function)}
+                )
+            }
+        )
+        await self._post_db_config(db_name, config)
+
+    async def _wait_for_database_state(self, db_name: str, expected_state: str) -> None:
+        async def _poll() -> None:
+            status = await self.get_database_status(db_name)
+            actual_state = status.state if status else None
+            assert actual_state == expected_state, (
+                f"Database {db_name} expected to be {expected_state}, but is {actual_state}"
+            )
+
+        # Database online/offline changes run asynchronously on Sync Gateway; poll until convergence (timeout after 30s).
+        await retry_assert(_poll, tenacity.wait_fixed(2), tenacity.stop_after_delay(30))
+
+    async def _set_database_offline_state(self, db_name: str, offline: bool) -> None:
+        with self._tracer.start_as_current_span(
+            "set_database_offline_state",
+            attributes={"sg.database.name": db_name, "sg.database.offline": offline},
+        ):
+            config = DatabaseConfig(offline=offline)
+            await self._post_db_config(db_name, config)
+
+        await self._wait_for_database_state(db_name, "Offline" if offline else "Online")
+
+    async def take_database_offline(self, db_name: str) -> None:
+        """
+        Takes a database offline (POST /{db}/_config) and waits for completion.
+
+        Args:
+            db_name: Database name.
+        """
+        await self._set_database_offline_state(db_name, True)
+
+    async def bring_database_online(self, db_name: str) -> None:
+        """
+        Brings a database online (POST /{db}/_config) and waits for completion.
+
+        Args:
+            db_name: Database name.
+        """
+        await self._set_database_offline_state(db_name, False)
+
+    async def put_resync(
+        self,
+        db_name: str,
+        *,
+        action: ResyncAction = ResyncAction.START,
+        scopes: dict[str, list[str]] | None = None,
+        regenerate_sequences: bool = False,
+        reset: bool = False,
+    ) -> ResyncStatusResponse:
+        """
+        Starts or stops a resync operation (POST /{db}/_resync).
+
+        Args:
+            db_name: Database name.
+            action: ResyncAction.START or STOP.
+            scopes: Optional scope-to-collections mapping to limit resync scope.
+            regenerate_sequences: Regenerate sequence numbers for resynced documents.
+            reset: Reset resync progress and start over (only with action START).
+
+        Returns:
+            ResyncStatusResponse payload.
+        """
+        with self._tracer.start_as_current_span(
+            "put_resync",
+            attributes={"sg.database.name": db_name, "resync.action": str(action)},
+        ):
+            body = PostResyncBody(
+                scopes=scopes, regenerate_sequences=regenerate_sequences
+            )
+
+            params = {"action": str(action)}
+            if reset:
+                params["reset"] = "true"
+
+            resp = await self._send_request(
+                "post",
+                f"/{db_name}/_resync",
+                JSONDictionary(body.model_dump(exclude_none=True)),
+                params=params,
+            )
+            assert isinstance(resp, dict)
+            return ResyncStatusResponse.model_validate(resp)
+
+    async def get_resync_status(self, db_name: str) -> ResyncStatusResponse:
+        """
+        Gets the status of the most recent resync operation (GET /{db}/_resync).
+
+        Args:
+            db_name: Database name.
+
+        Returns:
+            ResyncStatusResponse payload.
+        """
+        with self._tracer.start_as_current_span(
+            "get_resync_status", attributes={"cbl.database.name": db_name}
+        ):
+            resp = await self._send_request("get", f"/{db_name}/_resync")
+            assert isinstance(resp, dict)
+            return ResyncStatusResponse.model_validate(resp)
+
+    async def _wait_for_resync_state(
+        self, db_name: str, expected_state: ResyncState
+    ) -> ResyncStatusResponse:
+        async def _poll() -> ResyncStatusResponse:
+            status = await self.get_resync_status(db_name)
+            assert status.status == expected_state, (
+                f"Resync status for {db_name} is {status.status}, expected {expected_state}"
+            )
+            return status
+
+        return await retry_assert(
+            _poll, tenacity.wait_fixed(2), tenacity.stop_after_delay(60)
+        )
+
+    async def wait_for_resync_running(self, db_name: str) -> ResyncStatusResponse:
+        """
+        Polls GET /{db}/_resync until resync status is 'running'.
+
+        Args:
+            db_name: Database name.
+
+        Returns:
+            ResyncStatusResponse payload.
+
+        Raises:
+            AssertionError: On timeout.
+        """
+        return await self._wait_for_resync_state(db_name, ResyncState.RUNNING)
+
+    async def wait_for_resync_completed(self, db_name: str) -> ResyncStatusResponse:
+        """
+        Polls GET /{db}/_resync until resync status is 'completed'.
+
+        Args:
+            db_name: Database name.
+
+        Returns:
+            ResyncStatusResponse payload.
+
+        Raises:
+            AssertionError: On timeout.
+        """
+        return await self._wait_for_resync_state(db_name, ResyncState.COMPLETED)
+
+    async def wait_for_resync_stopped(self, db_name: str) -> ResyncStatusResponse:
+        """
+        Polls GET /{db}/_resync until resync status is 'stopped'.
+
+        Args:
+            db_name: Database name.
+
+        Returns:
+            ResyncStatusResponse payload.
+
+        Raises:
+            AssertionError: On timeout.
+        """
+        return await self._wait_for_resync_state(db_name, ResyncState.STOPPED)
 
     async def upload_certificate(self, cert_content: bytes, cert_name: str) -> str:
         """
