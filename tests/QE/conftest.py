@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 from cbltest.api.couchbaseserver import CouchbaseServer
-from cbltest.api.syncgateway import SyncGateway, wait_for_db_gone
+from cbltest.api.syncgateway import SyncGateway
+from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.utils import verify_lfs_checkout
 
 
@@ -57,6 +58,8 @@ async def cleanup_all_test_resources(
     This automatic cleanup runs after each SGW test to prevent resource accumulation.
     Includes robust error handling to avoid interfering with test execution.
     """
+    sync_gateway_cluster = SyncGatewayCluster(sync_gateways)
+
     # Clean up Sync Gateway databases
     for i, sg in enumerate(sync_gateways):
         print(f"\t🧹 Processing SGW {i + 1}/{len(sync_gateways)}")
@@ -74,7 +77,7 @@ async def cleanup_all_test_resources(
             # Wait for all databases to be deleted
             for db_name in db_names:
                 try:
-                    await wait_for_db_gone(sync_gateways, db_name)
+                    await sync_gateway_cluster.wait_for_db_gone(db_name)
                 except Exception as e:
                     print(f"🧹 Failed to wait for database {db_name}: {e}")
         except Exception as e:

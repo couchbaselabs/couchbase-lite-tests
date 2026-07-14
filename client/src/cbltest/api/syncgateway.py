@@ -1951,6 +1951,25 @@ class SyncGateway(_SyncGatewayBase):
                     )
                     return cert_path
 
+    async def _wait_for_rest_api(self) -> None:
+        """
+        Wait until the SGW node's REST API is responding, polling /_ping until it
+        returns 200. /_ping endpoint is not responsive on startup until the all
+        databases are loaded and active.
+        """
+
+        async def _wait_for_rest_api_poll() -> None:
+            try:
+                await self._send_request("get", "/_ping")
+            except (CblSyncGatewayBadResponseError, ClientConnectorError) as exc:
+                raise AssertionError(f"SGW REST API is not ready: {exc}") from exc
+
+        await retry_assert(
+            _wait_for_rest_api_poll,
+            tenacity.wait_fixed(0.1),
+            tenacity.stop_after_delay(70),
+        )
+
     async def restart_with_config(self, config_name: str = "bootstrap") -> None:
         """
         Restart Sync Gateway with a specific bootstrap configuration.
@@ -1982,8 +2001,7 @@ class SyncGateway(_SyncGatewayBase):
                         raise Exception(
                             f"Failed to restart SGW: {resp.status} - {body}"
                         )
-                    # Wait a bit for SGW to fully initialize
-                    await asyncio.sleep(5)
+        await self._wait_for_rest_api()
 
     async def stop(self) -> None:
         """
@@ -2039,8 +2057,7 @@ class SyncGateway(_SyncGatewayBase):
                     if resp.status != 200:
                         body = await resp.text()
                         raise Exception(f"Failed to start SGW: {resp.status} - {body}")
-                    # Wait a bit for SGW to fully initialize
-                    await asyncio.sleep(5)
+        await self._wait_for_rest_api()
 
     @tenacity.retry(
         wait=tenacity.wait_random_exponential(multiplier=1, max=10),
@@ -2061,8 +2078,8 @@ class SyncGateway(_SyncGatewayBase):
         self,
         db_name: str,
         *,
-        max_retries: int,
-        retry_delay: int,
+        max_retries: int = 70,
+        retry_delay: int = 1,
     ) -> None:
         """
         Wait until the SGW node reports the database as Online.
@@ -2093,8 +2110,8 @@ class SyncGateway(_SyncGatewayBase):
         self,
         db_name: str,
         *,
-        max_retries: int,
-        retry_delay: int,
+        max_retries: int = 30,
+        retry_delay: int = 2,
     ) -> None:
         """
         Wait until the SGW node no longer lists the database.
@@ -2316,53 +2333,3 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         :param secure: Whether to use TLS/HTTPS
         """
         super().__init__(url, username, password, port, secure)
-
-
-async def wait_for_db_online(
-    sync_gateways: list[SyncGateway],
-    db_name: str,
-    max_retries: int = 70,
-    retry_delay: int = 1,
-) -> None:
-    """
-    Wait until every node in the given list reports the database as Online, polling
-    all nodes concurrently.
-
-    :param sync_gateways: Sync Gateway nodes to poll.
-    :param db_name: Database name to poll.
-    :param max_retries: Number of polls before timing out.
-    :param retry_delay: Seconds between polls.
-    """
-    await asyncio.gather(
-        *(
-            sg._wait_for_db_online(
-                db_name, max_retries=max_retries, retry_delay=retry_delay
-            )
-            for sg in sync_gateways
-        )
-    )
-
-
-async def wait_for_db_gone(
-    sync_gateways: list[SyncGateway],
-    db_name: str,
-    max_retries: int = 30,
-    retry_delay: int = 2,
-) -> None:
-    """
-    Wait until every node in the given list no longer lists the database, polling
-    all nodes concurrently.
-
-    :param sync_gateways: Sync Gateway nodes to poll.
-    :param db_name: Database name to poll.
-    :param max_retries: Number of polls before timing out.
-    :param retry_delay: Seconds between polls.
-    """
-    await asyncio.gather(
-        *(
-            sg._wait_for_db_gone(
-                db_name, max_retries=max_retries, retry_delay=retry_delay
-            )
-            for sg in sync_gateways
-        )
-    )

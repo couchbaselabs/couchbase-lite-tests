@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import PutDatabasePayload, wait_for_db_online
+from cbltest.api.syncgateway import PutDatabasePayload
 
 
 @pytest.mark.sgw
@@ -33,7 +33,6 @@ class TestServerSetup(CBLTestClass):
 
         self.mark_test_step("Restart SGW with alternate address config (explicit port)")
         await sg.restart_with_config("bootstrap-alternate")
-        await wait_for_db_online(cblpytest.sync_gateways, sg_db)
 
         self.mark_test_step(f"Create {num_docs} documents via SDK")
         for i in range(num_docs):
@@ -56,7 +55,6 @@ class TestServerSetup(CBLTestClass):
         import_count = await sg.wait_for_import_count(sg_db, 1)
         assert import_count != 0, f"Expected import_count > 0, got {import_count}"
         await sg.restart_with_config("bootstrap")
-        await wait_for_db_online(cblpytest.sync_gateways, sg_db)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_remove_dcp_cacert_handling(self, cblpytest: CBLPyTest) -> None:

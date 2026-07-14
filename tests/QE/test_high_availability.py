@@ -7,8 +7,8 @@ from cbltest.api.syncgateway import (
     DocumentUpdateEntry,
     PutDatabasePayload,
     SyncGatewayUserClient,
-    wait_for_db_online,
 )
+from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 
 
 @pytest.mark.sgw
@@ -21,6 +21,7 @@ class TestHighAvailability(CBLTestClass):
         self, cblpytest: CBLPyTest, cleanup_after_test
     ) -> None:
         sgs = cblpytest.sync_gateways
+        sg_cluster = SyncGatewayCluster(sgs)
         cbs = cblpytest.couchbase_servers[0]
         lb_url = cblpytest.load_balancers[0]
         sg_db = "db_ha"
@@ -43,7 +44,7 @@ class TestHighAvailability(CBLTestClass):
         }
         db_payload = PutDatabasePayload(db_config)
         await sg1.put_database(sg_db, db_payload)
-        await wait_for_db_online(sgs, sg_db)
+        await sg_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step(
             f"Create user '{username}' with access to channels {channels}"
@@ -115,7 +116,7 @@ class TestHighAvailability(CBLTestClass):
 
         self.mark_test_step("Bring SG2 back online")
         await sg2.start(config_name="bootstrap")
-        await wait_for_db_online(sgs, sg_db)
+        await sg_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step("Verify load balancer now routes to all 3 nodes")
         # Create some final test docs through LB to verify all nodes are working

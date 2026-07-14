@@ -5,12 +5,8 @@ import pytest
 import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import (
-    DocumentUpdateEntry,
-    ISGRPayload,
-    PutDatabasePayload,
-    wait_for_db_online,
-)
+from cbltest.api.syncgateway import DocumentUpdateEntry, ISGRPayload, PutDatabasePayload
+from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 
 
 def _check_node_in_cluster(cbs_hostname: str, cluster_nodes: list) -> tuple[bool, bool]:
@@ -328,9 +324,9 @@ class TestISGRCollectionMapping(CBLTestClass):
     async def test_isgr_explicit_collection_mapping(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
-        sgs = cblpytest.sync_gateways
+        sg_cluster = SyncGatewayCluster(cblpytest.sync_gateways)
         cbs = cblpytest.couchbase_servers[0]
-        sg1, sg2, sg3 = sgs[0], sgs[1], sgs[2]
+        sg1, sg2, sg3 = sg_cluster.sync_gateways[:2]
         bucket1, bucket2, bucket3 = "isgr-bucket1", "isgr-bucket2", "isgr-bucket3"
         sg_db1, sg_db2, sg_db3 = "db1", "db2", "db3"
         b1_collections = ["collection1", "collection2", "collection3"]
@@ -369,7 +365,7 @@ class TestISGRCollectionMapping(CBLTestClass):
                 "unsupported": {"sgr_tls_skip_verify": True},
             }
             await sg.put_database(sg_db, PutDatabasePayload(config))
-            await wait_for_db_online(sgs, sg_db)
+            await sg_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step(f"Upload {num_docs} docs to each collection in SG1")
         for collection in b1_collections:
