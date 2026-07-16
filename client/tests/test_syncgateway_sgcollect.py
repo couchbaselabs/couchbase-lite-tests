@@ -10,7 +10,8 @@ import pytest
 from aiohttp import ClientSession
 from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
-from cbltest.api.syncgateway import SGCollectRedactLevel, SyncGateway, run_sgcollects
+from cbltest.api.syncgateway import SGCollectRedactLevel, SyncGateway
+from cbltest.plugins.sgcollect_fixture import run_sgcollects
 
 
 class FakeSyncGateway(SyncGateway):
