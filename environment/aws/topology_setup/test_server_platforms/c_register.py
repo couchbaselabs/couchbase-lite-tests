@@ -438,6 +438,7 @@ class CTestServer_Android(CTestServer):
         return AndroidBridge(
             str(path),
             app_id,
+            needs_permissions=False,
         )
 
     def compress_package(self) -> str:
