@@ -5,6 +5,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 
 
 @pytest.mark.sgw
@@ -16,6 +17,7 @@ class TestUsersChannels(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         sgs = cblpytest.sync_gateways
+        sg_cluster = SyncGatewayCluster(sgs)
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         bucket_name = "data-bucket"
@@ -40,8 +42,7 @@ class TestUsersChannels(CBLTestClass):
         }
         db_payload = PutDatabasePayload(db_config)
         await sgs[0].put_database(sg_db, db_payload)
-        for sg in sgs[1:]:
-            await sg.wait_for_db_up(sg_db)
+        await sg_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step(
             f"Create user '{username}' with access to {channels} (stored in shared bucket)"

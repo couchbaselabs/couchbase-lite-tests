@@ -90,7 +90,6 @@ class TestDbGone(CBLTestClass):
         }
         db_payload = PutDatabasePayload(db_config)
         await sg.put_database(sg_db, db_payload)
-        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
         sg_docs: list[DocumentUpdateEntry] = []
@@ -154,7 +153,6 @@ class TestDbGone(CBLTestClass):
             }
             db_payload = PutDatabasePayload(db_config)
             await sg.put_database(db_name, db_payload)
-            await sg.wait_for_db_up(db_name)
             db_configs[i][4] = await sg.create_user_client(
                 db_name, username, "pass", [channel]
             )

@@ -56,7 +56,7 @@ class TestSgwUpgrade(CBLTestClass):
         self.db = (await cblpytest.test_servers[0].create_and_reset_db([cbl_db]))[0]
         db = self.db
 
-        self.mark_test_step("Configure Sync Gateway database and wait for it to be up")
+        self.mark_test_step("Configure Sync Gateway database")
         stable_upgrade_config = {
             "bucket": bucket,
             "num_index_replicas": 0,
@@ -84,7 +84,6 @@ class TestSgwUpgrade(CBLTestClass):
         except CblSyncGatewayBadResponseError as e:
             if e.code != 412:
                 raise e
-        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step("Create user1 for replication")
         collection_access = sg.create_collection_access_dict(

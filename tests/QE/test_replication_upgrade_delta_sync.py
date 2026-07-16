@@ -89,7 +89,6 @@ class TestUpgradeDeltaSync(CBLTestClass):
             except CblSyncGatewayBadResponseError as e2:
                 if e2.code != 412:
                     raise
-        await sg.wait_for_db_up("upgrade")
 
         self.mark_test_step(
             "Verify delta_sync is actually enabled on SGW 'upgrade' database"

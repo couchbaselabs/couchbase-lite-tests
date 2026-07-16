@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Callable
 from pathlib import Path
 from typing import TypeAlias
@@ -17,6 +16,7 @@ from cbltest.api.replicator_types import (
     WaitForDocumentEventEntry,
 )
 from cbltest.api.syncgateway import RemoteDocument
+from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.logging import cbl_info
 
@@ -67,8 +67,16 @@ async def setup_upgrade_env(
         reset_expired_ttl=reset_expired_ttl,
     )
 
-    test_case.mark_test_step("Wait 2s to ensure SG picks up the restored database.")
-    await asyncio.sleep(2)
+    test_case.mark_test_step("Wait for SG to bring the restored database online.")
+
+    # As of Sync Gateway 4.1.0, this can take a long time to come online (20s+) due to import-feed rollbacks caused by mismatched vBucket UUIDs.
+    #
+    # A good practice when taking new snapshots is to remove _sync:* docs before running a cbbackup.
+    # cbbackupmgr restore --filter-keys cannot do a negative regex to filter out the dbconfig, checkpoints, etc.
+    #
+    await SyncGatewayCluster(cblpytest.sync_gateways[:1]).wait_for_db_online(
+        "upgrade", max_retries=120, retry_delay=1
+    )
 
     test_case.mark_test_step("Reset local database, and load `upgrade` dataset.")
     dbs = await cblpytest.test_servers[0].create_and_reset_db(

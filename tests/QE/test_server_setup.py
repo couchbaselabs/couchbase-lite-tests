@@ -26,7 +26,6 @@ class TestServerSetup(CBLTestClass):
             "import_docs": True,
         }
         await sg.put_database(sg_db, PutDatabasePayload(db_config))
-        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step("Verify SGW is working with default config")
         sg_version = await sg.get_version()
@@ -34,7 +33,6 @@ class TestServerSetup(CBLTestClass):
 
         self.mark_test_step("Restart SGW with alternate address config (explicit port)")
         await sg.restart_with_config("bootstrap-alternate")
-        await sg.wait_for_db_up(sg_db)
 
         self.mark_test_step(f"Create {num_docs} documents via SDK")
         for i in range(num_docs):
@@ -57,7 +55,6 @@ class TestServerSetup(CBLTestClass):
         import_count = await sg.wait_for_import_count(sg_db, 1)
         assert import_count != 0, f"Expected import_count > 0, got {import_count}"
         await sg.restart_with_config("bootstrap")
-        await sg.wait_for_db_up(sg_db)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_remove_dcp_cacert_handling(self, cblpytest: CBLPyTest) -> None:
@@ -93,7 +90,6 @@ class TestServerSetup(CBLTestClass):
                 }
             ),
         )
-        await sg.wait_for_db_up(sg_db)
 
         doc_id = "test_cacert_auth"
         doc_body = {"type": "test", "message": "x509 ca_cert_path auth works"}
