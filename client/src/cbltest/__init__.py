@@ -215,8 +215,8 @@ class CBLPyTest:
 
         if len(self.couchbase_servers) == 0:
             if self.sync_gateways[0].using_rosmar:
-                return CouchbaseCloud(self.sync_gateways[0], None)
+                return CouchbaseCloud([self.sync_gateways[0]], None)
 
             raise CblTestError("No Couchbase Servers available in config")
 
-        return CouchbaseCloud(self.sync_gateways[0], self.couchbase_servers[0])
+        return CouchbaseCloud([self.sync_gateways[0]], self.couchbase_servers[0])

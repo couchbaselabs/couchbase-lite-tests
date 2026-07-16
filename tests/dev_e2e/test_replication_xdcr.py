@@ -46,11 +46,11 @@ class TestReplicationXdcr(CBLTestClass):
 
         self.mark_test_step("Reset SGs in cluster 1 and 2, and load dataset.")
         cloud1 = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
+            [cblpytest.sync_gateways[0]], cblpytest.couchbase_servers[0]
         )
         await cloud1.configure_dataset(dataset_path, dataset_name)
         cloud2 = CouchbaseCloud(
-            cblpytest.sync_gateways[1], cblpytest.couchbase_servers[1]
+            [cblpytest.sync_gateways[1]], cblpytest.couchbase_servers[1]
         )
         await cloud2.configure_dataset(dataset_path, dataset_name)
 

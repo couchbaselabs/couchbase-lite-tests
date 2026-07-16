@@ -18,7 +18,7 @@ class TestEdgeServerChaos(CBLTestClass):
         self.mark_test_step("test_edge_to_sgw_replication")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "travel")
-        sgw = cloud.sync_gateway
+        sgw = cloud.sync_gateways[0]
         source_db = sgw.replication_url("travel")
 
         self.mark_test_step("Configure Edge Server with travel dataset")

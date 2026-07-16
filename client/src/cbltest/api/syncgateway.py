@@ -2067,7 +2067,7 @@ class SyncGateway(_SyncGatewayBase):
         reraise=True,
         retry=tenacity.retry_if_exception_type(AssertionError),
     )
-    async def wait_for_no_databases(self, bucket_name: str):
+    async def _wait_for_no_databases(self, bucket_name: str):
         dbs = await self.get_all_databases_verbose()
         for db in dbs.values():
             assert db.bucket != bucket_name, (

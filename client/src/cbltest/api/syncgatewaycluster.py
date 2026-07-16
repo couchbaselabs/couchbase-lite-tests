@@ -1,4 +1,5 @@
 import asyncio
+import random
 
 from cbltest.api.syncgateway import SyncGateway
 
@@ -16,6 +17,24 @@ class SyncGatewayCluster:
 
     def __init__(self, sync_gateways: list[SyncGateway]):
         self.__sync_gateways = sync_gateways
+        self.__round_robin_index = 0
+
+    @property
+    def round_robin_node(self) -> SyncGateway:
+        """
+        Gets the next Sync Gateway node in the cluster, cycling through all nodes in
+        order across successive accesses.
+        """
+        node = self.__sync_gateways[self.__round_robin_index]
+        self.__round_robin_index = (self.__round_robin_index + 1) % len(
+            self.__sync_gateways
+        )
+        return node
+
+    @property
+    def random_node(self) -> SyncGateway:
+        """Gets a uniformly random Sync Gateway node from the cluster."""
+        return random.choice(self.__sync_gateways)
 
     async def wait_for_db_online(
         self,
@@ -61,4 +80,15 @@ class SyncGatewayCluster:
                 )
                 for sg in self.__sync_gateways
             )
+        )
+
+    async def wait_for_no_databases(self, bucket_name: str) -> None:
+        """
+        Wait until every node in the cluster no longer backs any database with the
+        given bucket, polling all nodes concurrently.
+
+        :param bucket_name: Bucket name to check for.
+        """
+        await asyncio.gather(
+            *(sg._wait_for_no_databases(bucket_name) for sg in self.__sync_gateways)
         )

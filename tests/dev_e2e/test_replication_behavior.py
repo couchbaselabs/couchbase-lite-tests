@@ -22,15 +22,16 @@ class TestReplicationBehavior(CBLTestClass):
     ):
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Delete name_101 through name_150 on sync gateway")
-        all_docs = await cloud.sync_gateway.get_all_documents("names")
+        all_docs = await sync_gateway.get_all_documents("names")
         for row in all_docs.rows:
             name_number = int(row.id[-3:])
             if name_number <= 150:
                 revid = assert_not_null(row.revid, f"Missing revid on {row.id}")
-                await cloud.sync_gateway.delete_document(row.id, revid, "names")
+                await sync_gateway.delete_document(row.id, revid, "names")
 
         self.mark_test_step("Reset local database, and load `empty` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
@@ -47,12 +48,12 @@ class TestReplicationBehavior(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("names"),
+            sync_gateway.replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 

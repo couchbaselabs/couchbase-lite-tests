@@ -27,6 +27,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
@@ -47,13 +48,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -97,11 +98,11 @@ class TestReplicationAutoPurge(CBLTestClass):
                     DocumentUpdateEntry(doc.id, doc.rev, {"channels": ["group2"]})
                 )
             elif doc.id == "post_4":
-                await cloud.sync_gateway.delete_document(
+                await sync_gateway.delete_document(
                     "post_4", doc.rev, "posts", collection="posts"
                 )
 
-        await cloud.sync_gateway.update_documents("posts", updates, collection="posts")
+        await sync_gateway.update_documents("posts", updates, collection="posts")
 
         self.mark_test_step("Start another replicator with the same config as above")
         replicator.enable_document_listener = True
@@ -161,6 +162,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
@@ -181,13 +183,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -217,9 +219,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         collection_access_dict = cblpytest.sync_gateways[
             0
         ].create_collection_access_dict({"_default.posts": ["group1"]})
-        await cloud.sync_gateway.add_user(
-            "posts", "user1", "pass", collection_access_dict
-        )
+        await sync_gateway.add_user("posts", "user1", "pass", collection_access_dict)
 
         self.mark_test_step("Start another replicator with the same config as above")
         replicator.enable_document_listener = True
@@ -267,9 +267,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         collection_access_dict = cblpytest.sync_gateways[
             0
         ].create_collection_access_dict({"_default.posts": ["group1", "group2"]})
-        await cloud.sync_gateway.add_user(
-            "posts", "user1", "pass", collection_access_dict
-        )
+        await sync_gateway.add_user("posts", "user1", "pass", collection_access_dict)
 
         self.mark_test_step("Start another replicator with the same config as above")
         replicator.clear_document_updates()
@@ -318,6 +316,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
@@ -338,13 +337,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         repl1 = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=False,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl1.start()
 
@@ -397,21 +396,21 @@ class TestReplicationAutoPurge(CBLTestClass):
                 updates.append(
                     DocumentUpdateEntry(doc.id, doc.rev, {"channels": ["group2"]})
                 )
-        await cloud.sync_gateway.update_documents("posts", updates, collection="posts")
+        await sync_gateway.update_documents("posts", updates, collection="posts")
 
         self.mark_test_step(
             "Start a continuous replicator with a config similar to the one above"
         )
         repl2 = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=True,
             enable_auto_purge=False,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl2.start()
 
@@ -481,6 +480,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
@@ -501,13 +501,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         repl1 = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=False,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl1.start()
 
@@ -537,9 +537,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         collection_access_dict = cblpytest.sync_gateways[
             0
         ].create_collection_access_dict({"_default.posts": ["group1"]})
-        await cloud.sync_gateway.add_user(
-            "posts", "user1", "pass", collection_access_dict
-        )
+        await sync_gateway.add_user("posts", "user1", "pass", collection_access_dict)
 
         self.mark_test_step("""
              Start another replicator:
@@ -553,14 +551,14 @@ class TestReplicationAutoPurge(CBLTestClass):
          """)
         repl2 = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=True,
             enable_auto_purge=False,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl2.start()
 
@@ -606,6 +604,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
@@ -626,13 +625,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         repl1 = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl1.start()
 
@@ -678,7 +677,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             DocumentUpdateEntry("post_1", rev_ids["post_1"], body={"channels": []}),
             DocumentUpdateEntry("post_2", rev_ids["post_2"], body={"channels": []}),
         ]
-        await cloud.sync_gateway.update_documents(
+        await sync_gateway.update_documents(
             "posts", channel_access_dict, "_default", "posts"
         )
 
@@ -695,7 +694,7 @@ class TestReplicationAutoPurge(CBLTestClass):
          """)
         repl2 = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[
                 ReplicatorCollectionEntry(
                     ["_default.posts"],
@@ -709,7 +708,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             enable_auto_purge=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl2.start()
 
@@ -760,6 +759,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
@@ -780,13 +780,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=auto_purge_enabled,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -813,7 +813,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         self.mark_test_step(
             "Update user by removing `group2` from the `admin_channels` property."
         )
-        await cloud.sync_gateway.add_user(
+        await sync_gateway.add_user(
             "posts",
             "user1",
             "pass",
@@ -877,6 +877,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     ):
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
@@ -888,12 +889,12 @@ class TestReplicationAutoPurge(CBLTestClass):
         self.mark_test_step(
             "Add a role on Sync Gateway `role1` with access to channel `group3` in `_default.posts`"
         )
-        await cloud.sync_gateway.add_role(
+        await sync_gateway.add_role(
             "posts", "role1", {"_default": {"posts": {"admin_channels": ["group3"]}}}
         )
 
         self.mark_test_step("Update `user1` to be in `role1`")
-        await cloud.sync_gateway.add_user(
+        await sync_gateway.add_user(
             "posts",
             "user1",
             "pass",
@@ -908,7 +909,7 @@ class TestReplicationAutoPurge(CBLTestClass):
                 * channels: ["group3"]
                 * owner: user2
         """)
-        await cloud.sync_gateway.update_documents(
+        await sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -937,13 +938,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=auto_purge_enabled,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -970,7 +971,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         self.mark_test_step(
             "Update `role1` by removing `group3` from the `admin_channels` property."
         )
-        await cloud.sync_gateway.add_role(
+        await sync_gateway.add_role(
             "posts", "role1", {"_default": {"posts": {"collection_access": {}}}}
         )
 
@@ -1029,6 +1030,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     ):
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
@@ -1049,13 +1051,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         repl = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl.start()
 
@@ -1093,13 +1095,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         repl = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=True,
             enable_document_listener=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl.start()
 
@@ -1110,7 +1112,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             Update doc in SGW:
                 * Update `post_1` with channels = [] (ACCESS-REMOVED)
         """)
-        await cloud.sync_gateway.update_documents(
+        await sync_gateway.update_documents(
             "posts",
             [DocumentUpdateEntry("post_1", rev_ids["post_1"], {"channels": []})],
             collection="posts",
@@ -1140,11 +1142,11 @@ class TestReplicationAutoPurge(CBLTestClass):
             Update doc in SGW:
                 * Update `post_1` with channels = ["group1"]
         """)
-        remote_doc = await cloud.sync_gateway.get_document(
+        remote_doc = await sync_gateway.get_document(
             "posts", "post_1", collection="posts"
         )
         assert remote_doc is not None, "post_1 vanished from SGW"
-        await cloud.sync_gateway.update_documents(
+        await sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -1178,6 +1180,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     ):
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
@@ -1198,13 +1201,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         repl = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl.start()
 
@@ -1242,13 +1245,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         repl = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PUSH,
             continuous=True,
             enable_document_listener=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl.start()
 
@@ -1300,7 +1303,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         self.mark_test_step(
             "Check that `post_1` on Sync Gateway has channels = ['fake']"
         )
-        remote_doc = await cloud.sync_gateway.get_document(
+        remote_doc = await sync_gateway.get_document(
             "posts", "post_1", collection="posts"
         )
 
@@ -1316,6 +1319,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     ):
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
@@ -1336,13 +1340,13 @@ class TestReplicationAutoPurge(CBLTestClass):
         """)
         repl = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl.start()
 
@@ -1372,16 +1376,14 @@ class TestReplicationAutoPurge(CBLTestClass):
             f"Perform a {remove_type} operation to remove post_1 on SGW"
         )
         if remove_type == "delete":
-            await cloud.sync_gateway.delete_document(
+            await sync_gateway.delete_document(
                 "post_1", rev_ids["post_1"], "posts", collection="posts"
             )
         else:
-            await cloud.sync_gateway.purge_document(
-                "post_1", "posts", collection="posts"
-            )
+            await sync_gateway.purge_document("post_1", "posts", collection="posts")
 
         self.mark_test_step("Recreate post_1 on SGW with channels [group1]")
-        await cloud.sync_gateway.update_documents(
+        await sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -1394,7 +1396,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         )
 
         self.mark_test_step("Remove user1 from group1")
-        await cloud.sync_gateway.add_user(
+        await sync_gateway.add_user(
             "posts",
             "user1",
             "pass",

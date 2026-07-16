@@ -29,6 +29,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
 
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database, and load `posts` dataset.")
@@ -47,10 +48,10 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -68,7 +69,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         )
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PUSH_AND_PULL,
             "posts",
             ["_default.posts"],
@@ -154,9 +155,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
                 * Verify the innermost field is properly encrypted.
                 * Validate nested structure is preserved.
         """)
-        doc = await cloud.sync_gateway.get_document(
-            "posts", "post_1000", collection="posts"
-        )
+        doc = await sync_gateway.get_document("posts", "post_1000", collection="posts")
         assert doc is not None, "Document should exist in SGW"
         nest1 = doc.body.get("nest_1")
         assert nest1 is not None, "Parent field should be present"
@@ -208,6 +207,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
@@ -226,11 +226,11 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("travel"),
+            sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -248,23 +248,23 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         )
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PULL,
             "travel",
             ["travel.hotels"],
         )
 
         self.mark_test_step("Record baseline bytes before update")
-        _, bytes_written_before = await cloud.sync_gateway.bytes_transferred("travel")
+        _, bytes_written_before = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Get existing document for encryption test")
-        original_doc = await cloud.sync_gateway.get_document(
+        original_doc = await sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document hotel_400 should exist"
 
         self.mark_test_step("Update existing document in SGW with encryption")
-        await cloud.sync_gateway.upsert_documents(
+        await sync_gateway.upsert_documents(
             "travel",
             [
                 DocumentUpdateEntry(
@@ -288,10 +288,10 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred after delta sync.")
-        _, bytes_written_after = await cloud.sync_gateway.bytes_transferred("travel")
+        _, bytes_written_after = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Verify delta sync worked with encryption.")
-        sgw_doc = await cloud.sync_gateway.get_document(
+        sgw_doc = await sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert sgw_doc is not None, "Document should exist in SGW"

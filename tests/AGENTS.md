@@ -94,7 +94,7 @@ class TestFeatureName(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_something(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
+        cloud = CouchbaseCloud([cblpytest.sync_gateways[0]], cblpytest.couchbase_servers[0])
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset")
