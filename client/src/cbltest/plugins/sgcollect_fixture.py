@@ -21,7 +21,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--sgcollect-on-test-failure",
         action="store_true",
         default=False,
-        help="If set, run sgcollect_info on every Sync Gateway node when at least one "
+        help="Run sgcollect_info on every Sync Gateway node when at least one "
         "test in the session fails, and download the resulting zip(s) into the "
-        "current working directory before the session closes",
+        "current working directory at the end of the tests",
     )
