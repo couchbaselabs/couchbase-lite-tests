@@ -79,14 +79,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="The default dataset version to use for test servers",
         default="4.0",
     )
-    group.addoption(
-        "--sgcollect-on-test-failure",
-        action="store_true",
-        default=False,
-        help="If set, run sgcollect_info on every Sync Gateway node when at least one "
-        "test in the session fails, and download the resulting zip(s) into the "
-        "current working directory before the session closes",
-    )
 
 
 # Parse the TDK config file once up front and stash it on the pytest Config, so that other plugins (and pytest_runtest_setup hooks) can use this.
