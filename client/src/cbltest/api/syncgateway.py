@@ -1672,13 +1672,14 @@ class _SyncGatewayBase:
             redact_salt=redact_salt,
             output_dir=output_dir,
         )
+        options_json = options.model_dump(mode="json", exclude_none=True)
         with self._tracer.start_as_current_span(
-            "start_sgcollect", attributes=options.model_dump(exclude_none=True)
+            "start_sgcollect", attributes=options_json
         ):
             resp = await self._send_request(
                 "post",
                 "/_sgcollect_info",
-                JSONDictionary(options.model_dump(exclude_none=True)),
+                JSONDictionary(options_json),
             )
             assert isinstance(resp, dict)
             return cast(dict, resp)
