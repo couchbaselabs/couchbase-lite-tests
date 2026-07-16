@@ -40,7 +40,7 @@ cd build/out/bin
 ### linux
 
 ```
-./scripts/build_linux.sh 4.0.0 43
+./scripts/build_linux.sh enterprise 4.0.0 43
 cd build/out/bin
 ./testserver
 ```

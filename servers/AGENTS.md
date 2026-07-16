@@ -121,7 +121,7 @@ jak/
 └── webservice/                 # Web service variant
 ```
 
-Build: `cd <variant> && ./gradlew build`
+Build: `cd <variant> && ./gradlew jar -PcblVersion=<version>-<build> -PdatasetVersion=<ver>` (`assembleRelease` for `android`) — `-PcblVersion` is required, Gradle fails at configure time without it.
 
 ### JavaScript (`javascript/`)
 
@@ -169,7 +169,7 @@ When adding a new endpoint, **every** platform must be updated. Examples:
 
 ## Deployment Registration
 
-Each platform is registered for AWS deployment in [environment/aws/topology_setup/test_server_platforms/](../environment/aws/topology_setup/test_server_platforms/). All registered classes extend `TestServer` and implement `PlatformBridge` (`validate`, `install`, `run`, `stop`, `uninstall`, `get_ip`).
+Each platform is registered for AWS deployment in [environment/aws/topology_setup/test_server_platforms/](../environment/aws/topology_setup/test_server_platforms/). All registered classes extend `TestServer`, whose `create_bridge()` returns a `PlatformBridge` implementation (`validate`, `install`, `run`, `stop`, `uninstall`, `get_ip`).
 
 | File | Registered Platform Keys |
 |---|---|
@@ -195,7 +195,7 @@ Each platform is registered for AWS deployment in [environment/aws/topology_setu
 ```bash
 # C
 cd servers/c && ./scripts/build_macos.sh 4.0.0 43 && cd build/out/bin && ./testserver
-cd servers/c && ./scripts/build_linux.sh   4.0.0 43
+cd servers/c && ./scripts/build_linux.sh   enterprise 4.0.0 43
 cd servers/c && ./scripts/build_ios.sh     all 4.0.0 43
 cd servers/c && ./scripts/build_android.sh all enterprise 4.0.0 43
 cd servers/c && .\scripts\build_wins.ps1 -Edition enterprise -Version 4.0.0 -Build 43   # PowerShell
@@ -205,10 +205,10 @@ cd servers/c && .\scripts\build_wins.ps1 -Edition enterprise -Version 4.0.0 -Bui
 # iOS
 cd servers/ios && ./Scripts/build.sh all enterprise 4.0.0 43
 
-# JVM
-cd servers/jak/desktop    && ./gradlew build
-cd servers/jak/android    && ./gradlew build
-cd servers/jak/webservice && ./gradlew build
+# JVM (CBL version required via -PcblVersion, or Gradle fails at configure time)
+cd servers/jak/desktop    && ./gradlew jar            -PcblVersion=4.0.0-43 -PdatasetVersion=3.2
+cd servers/jak/android    && ./gradlew assembleRelease -PcblVersion=4.0.0-43 -PdatasetVersion=3.2
+cd servers/jak/webservice && ./gradlew jar            -PcblVersion=4.0.0-43 -PdatasetVersion=3.2
 
 # JavaScript
 cd servers/javascript && npm install && npm run dev

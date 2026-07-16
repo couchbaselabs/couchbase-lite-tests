@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 
 """
-This module builds and optionally uploads Couchbase Lite test servers to the latestbuilds server.
-It includes functions for checking if an upload already exists, compressing the server package, and uploading the package via SFTP.
+CLI entry point that downloads a prebuilt Couchbase Lite test server package
+for a given platform and version.
 
 Functions:
-    upload_exists(server: TestServer) -> bool:
-        Check if the server package already exists on the latestbuilds server.
-
     main() -> None:
-        Main function to build and optionally upload the Couchbase Lite test server.
+        Parses platform/version from argv and downloads the matching test
+        server package via TestServer.download().
 """
 
 import sys
@@ -28,13 +26,8 @@ from environment.aws.topology_setup.test_server import TestServer
 
 def main() -> None:
     """
-    Main function to build and optionally upload the Couchbase Lite test server.
-
-    Parses command-line arguments to determine the platform, version, and whether to upload the built server.
-    Builds the test server and uploads it to the latestbuilds server if requested.
-
-    Raises:
-        SystemExit: If the LATESTBUILDS_PASSWORD environment variable is not set or if the upload is not requested.
+    Parses `platform` and `version` from argv, then downloads the matching
+    prebuilt test server package via TestServer.download().
     """
     parser = ArgumentParser("Downloads a given test server")
     parser.add_argument("platform", type=str, help="The platform to build")

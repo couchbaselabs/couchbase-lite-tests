@@ -1,6 +1,6 @@
 # AWS Scripted Backend
 
-**TL;DR This is mostly supplemental information.  If you are looking for what you need to understand to use this system, skip to [Prerequisites](#step-0-prerequisites) and [Putting it all together](#putting-it-all-together)**
+**TL;DR This is mostly supplemental information.  If you are looking for what you need to understand to use this system, skip to [Prerequisites](#prerequisites) and [Putting it all together](#putting-it-all-together)**
 
 The way it works from a high level is as follows.  The starting point is an environment set up as in the following:
 
@@ -89,7 +89,7 @@ It's not enough to simply spin up virtual machines.  The creator (i.e. the perso
 
 "read" here means that there is a permanent resource created in the AWS account already.  "created" means that resources must be provisioned for a particular session.
 
-Creating and destroying these resources is as simple as running `terraform apply` and `terraform destroy` respectively.  You can add the following to avoid the console prompting you:  `-var=keyname=<keyname-from-step-0> -auto-approve`.  Other useful variables are `logslurp`, which is a bool indicating whether or not logslurp is needed, `sgw_count` which is the number of EC2 instances to create for SGW, and `server_count` which is the number of EC2 instances to create for Couchbase Server.  These default to `true`, `1`, and `1`.
+Creating and destroying these resources is as simple as running `terraform apply` and `terraform destroy` respectively.  You can add `-auto-approve` to avoid the console prompting you.  The SSH key pair is generated automatically by Terraform (`aws_key_pair.ec2`) — there is no `keyname` variable to set.  Other useful variables are `logslurp`, which is a bool indicating whether or not logslurp is needed, `sgw_count` which is the number of EC2 instances to create for SGW, and `server_count` which is the number of EC2 instances to create for Couchbase Server.  These default to `true`, `1`, and `1`.
 
 ## Deployment
 
@@ -101,8 +101,8 @@ Once the resources are in place, they need to have the appropriate software inst
 
 The rough set of steps for Couchbase Server is as follows:
 
-- Configure system (disable transparent huge pages and turn down swappiness as described in Couchbase docs)
-- Download and install Couchbase Server RPM
+- Configure system (install Docker, sudoers rules for the `couchbase-server` service, Caddy/shell2http)
+- Run Couchbase Server as a Docker container (`couchbase/server:enterprise-<version>`)
 - Configure node for use (init cluster, setup auth and users, etc)
 
 For Sync Gateway:
@@ -129,7 +129,7 @@ This scripted backend also builds / downloads test servers for deployment to var
 
 Starting and stopping the system has dedicated python scripts.
 
-These scripts are designed to be run either via `uv run`, or imported and called from another python script if desired.  If you skipped here from the beginning, be sure to review the [Prerequisites](#step-0-prerequisites).
+These scripts are designed to be run either via `uv run`, or imported and called from another python script if desired.  If you skipped here from the beginning, be sure to review the [Prerequisites](#prerequisites).
 
 ### Starting
 
@@ -164,13 +164,22 @@ The main arguments are:
 ### Stopping
 
 ```
-usage: stop_backend.py [-h] [--topology TOPOLOGY]
+Usage: stop_backend.py [OPTIONS]
 
-Tear down a previously created E2E AWS EC2 testing backend
-
-optional arguments:
-  -h, --help           show this help message and exit
-  --topology TOPOLOGY  The topology file that was used to start the environment
+Options:
+  --topology PATH      The topology file that was used to start the
+                       environment
+  --destroy-sgw        Destroy only Sync Gateway instances
+  --sgw-index INTEGER  Specific SGW instance index to destroy (0-based, only
+                       with --destroy-sgw)
+  --destroy-cbs        Destroy only Couchbase Server instances
+  --destroy-es         Destroy only Edge Server instances
+  --destroy-lb         Destroy only Load Balancer instances
+  --destroy-ls         Destroy only Logslurp instances
+  --no-ts-stop         Do not stop test servers
+  --no-full-destroy    Do not destroy all terraform managed resources if no
+                       specific component is selected
+  --help               Show this message and exit.
 ```
 
-The stop script only has one argument which is the topology file that was used to run start_backend above.  If no file was provided to start_backend, it means the default was used and you should also give no argument to stop_backend so that it also uses the default.
+`--topology` should point at the same topology file used to run `start_backend.py` above (default if none was given).  Without any `--destroy-*` flag, `stop_backend.py` runs a full `terraform destroy`; the `--destroy-*` flags target individual components instead, and `--no-ts-stop`/`--no-full-destroy` narrow the teardown further.

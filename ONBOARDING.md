@@ -11,17 +11,17 @@ in doubt about a word, that glossary is the source of truth.
 
 Three roles, and the thing that ties them together:
 
-```
-   ┌────────────────────┐        instructs        ┌──────────────────────────┐
-   │   Client (TDK)      │ ──────────────────────▶ │      Test Servers        │
-   │  Python `cbltest`   │                         │  C │ .NET │ iOS │ JVM │ JS │
-   │  runs the Tests     │                         │ (one per CBL platform)   │
-   └─────────┬───────────┘                         └────────────┬─────────────┘
-             │ configures                                        │ replicates against
-             ▼                                                   ▼
-        ┌──────────────────────────── Backend ────────────────────────────┐
-        │   Sync Gateway (SGW)   ◀────────────▶   Couchbase Server (CBS)   │
-        └──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Client["Client (TDK) Python 'cbltest' runs the Tests"] ==>|instructs| Platforms["Test Servers (one per CBL platform)  |  C  |  .NET  |  iOS  |  JVM  |  JS"]
+
+    subgraph Backend ["Backend"]
+        direction LR
+        SGW["Sync Gateway (SGW)"] <==> CBS["Couchbase Server (CBS)"]
+    end
+
+    Client ==>|configures| SGW
+    Platforms ==>|replicates against| CBS
 ```
 
 - The **Client** (the Python `cbltest` framework) is the brain. It runs the
@@ -72,9 +72,16 @@ first. Full prerequisites and details live in
 2. **Provision the Backend + Test Servers** from a Topology:
    ```bash
    cd environment/aws
-   uv run python start_backend.py --topology topology_setup/topology.json
+   uv run python start_backend.py \
+     --topology topology_setup/topology.json \
+     --tdk-config-in <template.json> \
+     --tdk-config-out config.json
    ```
-   This emits a `config.json` into the test suite directory.
+   `--tdk-config-in` is a required template (schema + `api-version`; see
+   `client/smoke_tests/config_in.json`) that gets the real hostnames the
+   Orchestrator provisioned merged into it. `--tdk-config-out` is optional —
+   without it the resulting `config.json` is written to stdout instead of a
+   file.
 3. **Run the Tests** against that config:
    ```bash
    cd tests/dev_e2e
@@ -121,7 +128,7 @@ Run a single Test against an existing `config.json`:
 
 ```bash
 cd tests/dev_e2e
-uv run pytest -x -v --config config.json test_basic_replication.py::TestBasicReplication::test_push_pull
+uv run pytest -x -v --config config.json test_basic_replication.py::TestBasicReplication::test_push_and_pull
 ```
 
 Start here:

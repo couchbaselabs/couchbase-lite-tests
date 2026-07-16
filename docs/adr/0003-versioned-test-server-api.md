@@ -3,8 +3,9 @@
 The Client drives Test Servers written in five languages, and a single Client
 must work against multiple Couchbase Lite releases at once (the matrix spans
 older and newer CBL builds). To keep these decoupled, the Client↔Test Server
-protocol is explicitly versioned: every request carries a `CBLTest-API-Version`
-header, and the Client implements each version side-by-side under
+protocol is explicitly versioned: every versioned request carries a
+`CBLTest-API-Version` header (the initial unversioned `GET /` handshake is the
+one exception), and the Client implements each version side-by-side under
 `client/src/cbltest/v1/` and `v2/`, registered via `@register_request` /
 `@register_body`. `version.py::available_api_version()` is the source of truth.
 
