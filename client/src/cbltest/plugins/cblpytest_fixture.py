@@ -1,10 +1,8 @@
-from pathlib import Path
 from typing import Final, cast
 
 import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
-from cbltest.api.syncgateway import run_sgcollects
 from cbltest.configparser import ParsedConfig, _parse_config
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -27,7 +25,6 @@ async def cblpytest(request: pytest.FixtureRequest):
     test_props = request.config.getoption("--test-props")
     otel_endpoint = request.config.getoption("--otel-endpoint")
     dataset_version = request.config.getoption("--dataset-version", "4.0")
-    sgcollect_on_test_failure = request.config.getoption("--sgcollect-on-test-failure")
     if otel_endpoint is not None:
         # This section is all about setting up the OpenTelemetry report
         # and can be ignored if not using OpenTelemetry.
@@ -44,12 +41,7 @@ async def cblpytest(request: pytest.FixtureRequest):
         config, log_level, test_props, dataset_version=dataset_version
     )
     yield cblpytest
-
-    try:
-        if sgcollect_on_test_failure and request.session.testsfailed:
-            await run_sgcollects(cblpytest.sync_gateways, Path.cwd())
-    finally:
-        await cblpytest.close()
+    await cblpytest.close()
 
 
 # Some command line options are added as part of this plugin,
