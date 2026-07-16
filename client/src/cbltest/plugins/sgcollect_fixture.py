@@ -5,7 +5,7 @@ import pytest_asyncio
 from cbltest.api.syncgateway import run_sgcollects
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", autouse=True)
 async def sgcollect_session(cblpytest, request: pytest.FixtureRequest):
     yield
     if (
